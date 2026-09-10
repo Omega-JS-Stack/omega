@@ -15,6 +15,14 @@ const { test } = require('node:test');
 const { translateSite } = require('../src/translate/index.js');
 const { hashKey, CONTROL } = require('@omega.js/devkit/translate');
 
+// This file is about the PROVIDER pass. The framework's own default pages ride
+// a second, PACKAGED cache (#621) that would otherwise put copies under
+// /es/signin here — every run below points at a packaged root that does not
+// exist, so what these tests assert stays theirs alone.
+// translate-packaged-defaults.test.js owns that lane.
+const NO_PACKAGED = path.join(os.tmpdir(), 'omega-packaged-defaults-absent');
+const translate = (options) => translateSite({ packagedRoot: NO_PACKAGED, ...options });
+
 const PAGE = (title, body, prefix = '') => `<!doctype html><html lang="en" dir="ltr"${prefix ? ` data-omega-path-prefix="${prefix}"` : ''}><head>
 <title>${title}</title>
 <meta name="description" content="A fine page"/>
@@ -106,7 +114,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   const { root, dist } = stage();
   const calls = [];
 
-  const stats = await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend(calls) });
+  const stats = await translate({ root, outDir: dist, config: CONFIG, send: fakeSend(calls) });
 
   // Copies exist for translatable pages only. The language HOME lands as
   // <lang>.html (a FILE, matching the extensionless canonical /es) — an
@@ -116,7 +124,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'language home is a file, not a directory index');
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
   assert.ok(fs.existsSync(path.join(dist, 'ar.html')));
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'signin')), 'framework default page excluded');
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'signin')), 'framework default page excluded from the provider pass');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'admin')), 'system folder excluded');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'skipme')), 'config exclude honored');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'twitter.html')), 'socials redirect excluded');
@@ -166,7 +174,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.strictEqual(cache[hashKey('Welcome home')], 'Welcome home·es');
 
   // Second run: fully cached — the provider must never be called
-  const rerun = await translateSite({
+  const rerun = await translate({
     root, outDir: dist, config: CONFIG,
     send: async () => { throw new Error('provider must not be called on a warm cache'); },
   });
@@ -177,14 +185,14 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   // Human override: hand-edit a cached value → it wins on rebuild
   cache[hashKey('Welcome home')] = 'Bienvenido a casa';
   fs.writeFileSync(cacheFile, JSON.stringify(cache));
-  await translateSite({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('no calls'); } });
+  await translate({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('no calls'); } });
   const esAgain = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(esAgain.includes('Bienvenido a casa'), 'hand-edited cache value sticks');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('#605: the framework skips its own default pages with no config exclude at all', async () => {
+test('#605: the framework keeps its own default pages off the provider with no config exclude at all', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-wtr-'));
   const dist = path.join(root, 'dist');
   const write = (rel, html) => {
@@ -199,7 +207,7 @@ test('#605: the framework skips its own default pages with no config exclude at 
   // …and a page the BRAND wrote.
   write('guides/getting-started/index.html', PAGE('Getting started', '<p>Brand-authored guide</p>'));
 
-  const stats = await translateSite({
+  const stats = await translate({
     root,
     outDir: dist,
     // No `exclude` key whatsoever — a brand should not have to name any of this
@@ -207,8 +215,11 @@ test('#605: the framework skips its own default pages with no config exclude at 
     send: fakeSend([]),
   });
 
+  // Never a provider call, and (this run points at no packaged cache) never a
+  // copy either — the ONE thing #605 owns. What a packaged cache does for these
+  // routes is translate-packaged-defaults.test.js's story (#621).
   for (const route of ['signin', 'app', 'account', 'dashboard/account', 'payment/checkout', 'portal/email-preferences']) {
-    assert.ok(!fs.existsSync(path.join(dist, 'es', route)), `/${route} is a framework default page, never translated`);
+    assert.ok(!fs.existsSync(path.join(dist, 'es', route)), `/${route} is a framework default page — never sent to the provider`);
   }
   assert.ok(fs.existsSync(path.join(dist, 'es', 'guides', 'getting-started', 'index.html')), 'the brand page still translates');
   assert.strictEqual(stats.pages, 1, 'exactly one page was translatable');
@@ -220,7 +231,7 @@ test('translateSite: only-filter limits the run to one page', async () => {
   const { root, dist } = stage();
   const calls = [];
 
-  const stats = await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
+  const stats = await translate({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
 
   assert.strictEqual(stats.pages, 1);
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
@@ -233,7 +244,7 @@ test('translateSite: provider failure skips the page-language pair whole and war
   const { root, dist } = stage();
   const warnings = [];
 
-  const stats = await translateSite({
+  const stats = await translate({
     root, outDir: dist, config: CONFIG,
     logger: { log: () => {}, warn: (m) => warnings.push(m), error: () => {} },
     send: async ({ user }) => {
@@ -275,8 +286,8 @@ test('translateSite: a copy advertises only the languages actually produced', as
   const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
 
   // Warm es for /about only, then run cachedOnly with ar configured but cold
-  await translateSite({ root, outDir: dist, config: { ...CONFIG, translation: { languages: ['es'] } }, send: fakeSend([]), only: 'about' });
-  const stats = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+  await translate({ root, outDir: dist, config: { ...CONFIG, translation: { languages: ['es'] } }, send: fakeSend([]), only: 'about' });
+  const stats = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
 
   assert.strictEqual(stats.pages, 1);
   assert.ok(stats.skippedCold.includes('ar /about'), 'ar is cold for about');
@@ -292,7 +303,7 @@ test('translateSite: a copy advertises only the languages actually produced', as
 test('translateSite: disabled config skips cleanly', async () => {
   const { root, dist } = stage();
 
-  const stats = await translateSite({ root, outDir: dist, config: { brand: { name: 'X' } }, send: async () => {} });
+  const stats = await translate({ root, outDir: dist, config: { brand: { name: 'X' } }, send: async () => {} });
   assert.strictEqual(stats.skipped, true);
 
   fs.rmSync(root, { recursive: true, force: true });
@@ -303,7 +314,7 @@ test('translateSite: cachedOnly never calls the provider and skips cold pages wh
   const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
 
   // Everything cold → everything skipped, zero copies, zero provider calls
-  const cold = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+  const cold = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
   assert.strictEqual(cold.pages, 0);
   assert.strictEqual(cold.newStrings, 0);
   assert.ok(cold.skippedCold.includes('es /about'), 'about is reported cold for es');
@@ -312,13 +323,13 @@ test('translateSite: cachedOnly never calls the provider and skips cold pages wh
 
   // Warm ONE page (the explicit `omega translate` path), wipe its copies…
   const calls = [];
-  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
+  await translate({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
   assert.ok(calls.length > 0);
   fs.rmSync(path.join(dist, 'es'), { recursive: true, force: true });
   fs.rmSync(path.join(dist, 'ar'), { recursive: true, force: true });
 
   // …then cachedOnly produces the warm page and still skips the cold one
-  const warm = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+  const warm = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
   assert.strictEqual(warm.pages, 1, 'only the warmed page ships');
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'cold home has no copy');
@@ -331,7 +342,7 @@ test('translateSite: the sitemap gains every produced language URL with xhtml:li
   const { root, dist } = stage();
   const sitemapFile = path.join(dist, 'sitemap.xml');
 
-  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+  await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
 
   const xml = fs.readFileSync(sitemapFile, 'utf8');
   const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
@@ -363,7 +374,7 @@ test('translateSite: the sitemap gains every produced language URL with xhtml:li
   assert.match(entry('https://mini.co/es'), /<priority>1\.0<\/priority>/, 'language home inherits the home priority');
 
   // Idempotent: a second pass neither duplicates entries nor alternates
-  await translateSite({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('warm cache'); } });
+  await translate({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('warm cache'); } });
   const second = fs.readFileSync(sitemapFile, 'utf8');
   assert.strictEqual([...second.matchAll(/<loc>https:\/\/mini\.co\/es<\/loc>/g)].length, 1, 'no duplicate copy entry');
   assert.strictEqual([...second.matchAll(/hreflang="es" href="https:\/\/mini\.co\/es"/g)].length, 3, 'no duplicate alternates');
@@ -376,7 +387,7 @@ test('translateSite: an unproduced language appears nowhere in the sitemap', asy
   const sitemapFile = path.join(dist, 'sitemap.xml');
 
   // ar fails at the provider; es ships
-  await translateSite({
+  await translate({
     root, outDir: dist, config: CONFIG,
     send: async ({ user }) => {
       const lang = user.match(/^Target language: (\S+)/)[1];
@@ -395,7 +406,7 @@ test('translateSite: an unproduced language appears nowhere in the sitemap', asy
 
   // A stale copy entry from an earlier run is dropped when the language stops
   // being produced (the sitemap owns no lie either)
-  await translateSite({
+  await translate({
     root, outDir: dist, config: { ...CONFIG, translation: { languages: ['ar'] } },
     cachedOnly: true, send: async () => { throw new Error('no calls'); },
   });
@@ -408,7 +419,7 @@ test('translateSite: an unproduced language appears nowhere in the sitemap', asy
 test('translateSite: a MOUNTED site composes prefix-then-lang in hrefs, alternates and the sitemap (#359)', async () => {
   const { root, dist } = stage('/workkit');
 
-  await translateSite({ root, outDir: dist, config: MOUNTED_CONFIG, send: fakeSend([]) });
+  await translate({ root, outDir: dist, config: MOUNTED_CONFIG, send: fakeSend([]) });
 
   // 1. Page hrefs: the lang segment goes AFTER the base path, and an excluded
   //    route is still recognized through the prefix
@@ -440,7 +451,7 @@ test('translateSite: a MOUNTED site composes prefix-then-lang in hrefs, alternat
   assert.match(xml, /hreflang="es" href="https:\/\/mini\.co\/workkit\/es"\/>/, 'sitemap alternates mounted');
   assert.ok(!xml.includes('workkit/workkit'), 'sitemap URLs are never prefixed twice either');
 
-  await translateSite({ root, outDir: dist, config: MOUNTED_CONFIG, send: async () => { throw new Error('warm cache'); } });
+  await translate({ root, outDir: dist, config: MOUNTED_CONFIG, send: async () => { throw new Error('warm cache'); } });
   const second = fs.readFileSync(sitemapFile, 'utf8');
   assert.strictEqual([...second.matchAll(/<loc>https:\/\/mini\.co\/workkit\/es<\/loc>/g)].length, 1, 'no duplicate copy entry on a second pass');
 
@@ -450,7 +461,7 @@ test('translateSite: a MOUNTED site composes prefix-then-lang in hrefs, alternat
 test('translateSite: an UNMOUNTED site composes exactly as it always has (#359 regression pin)', async () => {
   const { root, dist } = stage();
 
-  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+  await translate({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
 
   const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(es.includes('href="/es/about"'), 'href: the lang segment sits at the site root');

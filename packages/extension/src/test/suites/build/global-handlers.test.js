@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'background.js'), 'utf8');
 
@@ -30,7 +31,7 @@ function globalHandlersBody() {
   return null;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'background.js setupGlobalHandlers — no `this` in a bare-called function (#90)',
@@ -66,4 +67,4 @@ module.exports = {
       },
     },
   ],
-};
+});

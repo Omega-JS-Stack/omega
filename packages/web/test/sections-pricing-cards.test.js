@@ -25,6 +25,13 @@ const SITE = { site: { brand: { name: 'ACME' } } };
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
+// The top-level `features` catalog (#647): each feature defined ONCE; the
+// products below name only their value.
+const FEATURES = {
+  requests: { name: 'Requests', icon: 'sparkles', definition: 'API requests per month.', usage: {} },
+  support: { name: 'Priority support', icon: 'headset' },
+};
+
 const CATALOG = {
   products: [
     {
@@ -32,8 +39,7 @@ const CATALOG = {
       name: 'Basic',
       type: 'subscription',
       tagline: 'best for getting started',
-      limits: { requests: 100 },
-      features: [{ id: 'requests', name: 'Requests', icon: 'sparkles', definition: 'API requests per month.' }],
+      features: { requests: 100 },
     },
     {
       id: 'premium',
@@ -41,13 +47,9 @@ const CATALOG = {
       type: 'subscription',
       tagline: 'best for teams',
       popular: true,
-      limits: { requests: -1 },
       trial: { days: 14 },
       prices: { monthly: 9.99, annually: 99.99 },
-      features: [
-        { id: 'requests', name: 'Requests', icon: 'sparkles' },
-        { id: 'support', name: 'Priority support', icon: 'headset', value: true },
-      ],
+      features: { requests: -1, support: true },
     },
   ],
 };
@@ -77,7 +79,7 @@ function makeEngine() {
  * @returns {Promise<string>} rendered html
  */
 function renderBand(engine, args = {}) {
-  const pricing = composePricing(CATALOG);
+  const pricing = composePricing(CATALOG, FEATURES);
   return engine.parseAndRender(
     '{% section "marketing/pricing-cards", plans: bridge.plans, annual: bridge.annual, data: bridge.data %}',
     { ...SITE, bridge: { plans: pricing.plans, annual: false, data: {}, ...args } },
@@ -179,7 +181,7 @@ test('#539: /pricing\'s overflow line reads "and:" too — one wording, both sur
   fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
 
   try {
-    const pages = await buildSite(consumerDir, { ...bareData, ...miniData, payment: CATALOG }, {}, 'pricing-cards-parity');
+    const pages = await buildSite(consumerDir, { ...bareData, ...miniData, features: FEATURES, payment: CATALOG }, {}, 'pricing-cards-parity');
     const html = pages.get('/pricing');
 
     assert.ok(html, 'the packaged /pricing default built');
@@ -202,7 +204,7 @@ test('#493: the base index layout composes the band under the WHY band', async (
   );
 
   try {
-    const pages = await buildSite(consumerDir, { ...bareData, ...miniData, payment: CATALOG }, {}, 'pricing-cards-index');
+    const pages = await buildSite(consumerDir, { ...bareData, ...miniData, features: FEATURES, payment: CATALOG }, {}, 'pricing-cards-index');
     const html = pages.get('/');
 
     assert.ok(html.includes('omega-price-card'), 'the homepage carries the plan band');

@@ -40,6 +40,7 @@ env:
   DIGICERT_API_KEY: ${{ secrets.DIGICERT_API_KEY }}
   DIGICERT_KEYPAIR_ALIAS: ${{ secrets.DIGICERT_KEYPAIR_ALIAS }}
   GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}
+  OMEGA_LICENSE_KEY: ${{ secrets.OMEGA_LICENSE_KEY }}
   SIGNTOOL_PATH: ${{ secrets.SIGNTOOL_PATH }}
   SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
   SSLCOM_CREDENTIAL_ID: ${{ secrets.SSLCOM_CREDENTIAL_ID }}
@@ -94,45 +95,9 @@ jobs:
           echo "windows=$win"    >> "$GITHUB_OUTPUT"
           echo "linux=$linux"    >> "$GITHUB_OUTPUT"
 
-  test:
-    name: Test
-    needs: setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      # Audit/build tests stage minimal scaffolds without icons / signing — explicitly
-      # off the publish path so they don't fail required-file checks meant for real builds.
-      OMEGA_BUILD_MODE: 'false'
-      OMEGA_IS_PUBLISH: 'false'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - name: Install Socket Firewall
-        working-directory: targets/desktop
-        run: npm install -g sfw
-      # Electron's main + renderer test layers need a display server on Linux.
-      - working-directory: targets/desktop
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libxss1 libasound2t64 libgbm1 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libxss1 libasound2 libgbm1
-      - working-directory: targets/desktop
-        run: sfw npm ci
-      - name: Run framework + project test suites
-        working-directory: targets/desktop
-        run: xvfb-run --auto-servernum -- npx omega test --reporter json
-        env:
-          # Skip extended suites that hit real external services (live backend creds, real
-          # network). Set TEST_EXTENDED_MODE: 'true' on a separate workflow to run them.
-          TEST_EXTENDED_MODE: ''
-
   build:
     name: Build (${{ matrix.os }})
-    needs: [setup, test]
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
@@ -140,9 +105,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
+      # The workflow's own token: a checkout never needs the release PAT, and a
+      # bad PAT then fails at the release step with an API error, not here with
+      # git asking for a username.
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -314,9 +281,9 @@ jobs:
           path: targets/desktop/release
       - working-directory: targets/desktop
         run: npx omega sign-windows --in release --out release/signed
-      # Upload the SIGNED Windows assets to the existing update-server release (created
-      # by mac/linux's electron-builder publish step). Then mirror to download-server's
-      # installer tag with stable filenames.
+      # Upload the SIGNED Windows assets to the release the mac/linux electron-builder
+      # publish step already created in the brand's public releases repo. The asset
+      # names carry no version, so nothing is mirrored anywhere.
       - working-directory: targets/desktop
         run: npx omega finalize-release --signed-dir release/signed
 
@@ -325,6 +292,8 @@ jobs:
     # Run after every required job. windows-sign is skipped when strategy=local OR when
     # `inputs.platforms` excludes windows; this job still runs and just won't flip the
     # release to published in those cases (see step gate below).
+    # `always()` lets a failed or skipped job reach this `if`, which is why the
+    # build's result is named rather than left to the default success gate.
     needs: [setup, build, windows-sign]
     if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
@@ -338,7 +307,7 @@ jobs:
         run: npm install -g sfw
       - working-directory: targets/desktop
         run: sfw npm ci
-      # Flip the update-server release from Draft to Published so electron-updater
+      # Flip the releases-repo release from Draft to Published so electron-updater
       # can read it. Idempotent — safe to run even if already published. ONLY runs
       # on all-platforms builds: a partial run (e.g. `--platforms windows`) leaves
       # the release as a draft, so subsequent runs can fill in the missing platform

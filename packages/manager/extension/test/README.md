@@ -17,15 +17,18 @@ Match the framework's four layers — Browser Extension Manager's test runner di
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('@omega.js/extension/test/assert');
+const Manager = require('@omega.js/extension/build');
 
 module.exports = {
-  'my feature does the thing': async () => {
-    const result = await doTheThing();
-    assert.equal(result, 'expected');
+  layer: 'build',
+  description: 'the project config carries a brand id',
+  run: (ctx) => {
+    ctx.expect(Manager.getConfig().brand.id).toBeTruthy();
   },
 };
 ```
+
+That is the standalone form: one test per file. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library (there is nothing to require). The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
 
 ## See also
 

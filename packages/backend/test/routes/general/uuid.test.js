@@ -2,7 +2,9 @@
  * Test: UUID Route
  * Tests the new RESTful UUID endpoint using proper HTTP verbs
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'UUID route',
   type: 'group',
   tests: [
@@ -128,4 +130,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -2,7 +2,7 @@
 // (freshness sweep, manage cycle, then the target legs). The spawn plumbing is composition of
 // tested pieces (discoverTargets, resolveTargetNode, watch-all's forwarding
 // pattern); the SELECTION is the behavior with rules worth pinning: default
-// set, --only/--except/--all, unknowns, missing targets, backend-first ordering.
+// set, --target=/--all, unknowns, missing targets, backend-first ordering.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -31,6 +31,10 @@ const forceColorAt = [];
 // signals the group, so a same-group leg would leak its grandchild.
 const spawnDetached = [];
 
+// The env every leg was spawned with, whole — the certificate trust (#795)
+// asks whether a KEY is there at all, not only what it holds.
+const legEnvs = [];
+
 // What each boot cycle asks runManage for — the lane lives here (#228)
 const manageOptions = [];
 
@@ -46,6 +50,7 @@ childProcess.spawn = (command, args, options) => {
     nonInteractiveAt.spawnEnv.push(options.env.OMEGA_NON_INTERACTIVE);
     forceColorAt.push(options.env.FORCE_COLOR);
     spawnDetached.push(options.detached);
+    legEnvs.push(options.env);
   }
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
@@ -88,6 +93,26 @@ require.cache[localPath] = {
   },
 };
 
+// The local certificate's root (#795): the helper is stubbed at its module
+// boundary so a leg's trust is observable on a host with no mkcert, and so the
+// "resolved ONCE per boot" rule is countable.
+let caRootPem = null;
+let caRootPemCalls = 0;
+const httpsPath = require.resolve('@omega.js/devkit/local-https');
+require.cache[httpsPath] = {
+  id: httpsPath,
+  filename: httpsPath,
+  path: path.dirname(httpsPath),
+  loaded: true,
+  exports: {
+    ...require('@omega.js/devkit/local-https'),
+    mkcertCaRootPem: () => {
+      caRootPemCalls += 1;
+      return caRootPem;
+    },
+  },
+};
+
 const managePath = require.resolve('../src/manage.js');
 require.cache[managePath] = {
   id: managePath,
@@ -105,6 +130,7 @@ require.cache[managePath] = {
 };
 
 const devCommand = require('../src/commands/dev.js');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
 const ALL_TARGETS = ['web', 'backend', 'desktop', 'extension'];
@@ -150,27 +176,22 @@ async function bootDev(cwd, options = {}) {
 }
 
 test('default set is the local web loop — web + backend, GUI targets stay down', () => {
-  const { selected, unknown, missing } = selectDevTargets({ available: ALL_TARGETS });
+  const { selected, missing } = selectDevTargets({ available: ALL_TARGETS });
 
   assert.deepStrictEqual(selected, ['backend', 'web'], 'backend boots first (publishes the port map)');
   assert.deepStrictEqual(DEFAULT_TARGETS, ['web', 'backend']);
-  assert.deepStrictEqual(unknown, []);
   assert.deepStrictEqual(missing, []);
 });
 
-test('--only is the exact set; --except subtracts; --all boots every leg', () => {
+test('--target= is the exact set; --all boots every leg', () => {
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_TARGETS, only: 'web' }).selected,
+    selectDevTargets({ available: ALL_TARGETS, target: 'web' }).selected,
     ['web'],
   );
   assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_TARGETS, only: 'desktop,web' }).selected,
+    selectDevTargets({ available: ALL_TARGETS, target: 'desktop,web' }).selected,
     ['desktop', 'web'],
-    '--only can opt GUI targets in',
-  );
-  assert.deepStrictEqual(
-    selectDevTargets({ available: ALL_TARGETS, except: 'backend' }).selected,
-    ['web'],
+    '--target= can opt GUI targets in — a GUI leg still needs naming',
   );
   assert.deepStrictEqual(
     selectDevTargets({ available: ALL_TARGETS, all: true }).selected,
@@ -179,11 +200,22 @@ test('--only is the exact set; --except subtracts; --all boots every leg', () =>
   );
 });
 
-test('unknown targets are reported, not booted; targets without dirs go to missing', () => {
-  const result = selectDevTargets({ available: ['web'], only: 'web,backend,mobile' });
+test('a token naming no dev leg STOPS the boot — never a matched subset', () => {
+  assert.throws(
+    () => selectDevTargets({ available: ['web'], target: 'web,mobile' }),
+    (error) => {
+      assert.strictEqual(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "mobile"/, 'no mobile dev leg exists (MAM parked)');
+      assert.match(error.message, /web, backend, desktop, extension/, 'the error names the legs that DO exist');
+      return true;
+    },
+  );
+});
+
+test('a named target with no dir in this brand goes to missing, and the rest still boot', () => {
+  const result = selectDevTargets({ available: ['web'], target: 'web,backend' });
 
   assert.deepStrictEqual(result.selected, ['web']);
-  assert.deepStrictEqual(result.unknown, ['mobile'], 'no mobile dev leg exists (MAM parked)');
   assert.deepStrictEqual(result.missing, ['backend'], 'requested but no dir in this brand');
 });
 
@@ -194,6 +226,23 @@ test('a web-only brand defaults to just web — no phantom backend leg', () => {
   assert.deepStrictEqual(missing, [], 'the default set adapts to the brand instead of warning');
 });
 
+// The retired pickers (#780) — refused before anything boots, never ignored
+// and never aliased onto --target=
+test('--only and --except are REFUSED, naming --target=', async () => {
+  const root = stageBrand();
+
+  await assert.rejects(
+    () => bootDev(root, { only: 'web' }),
+    (error) => {
+      assert.strictEqual(error.refusal, true, 'a refusal prints its message alone (no stack)');
+      assert.match(error.message, /--only is retired: pick targets with --target=/);
+      return true;
+    },
+  );
+  await assert.rejects(() => bootDev(root, { except: 'backend' }), /--except is retired/);
+  await assert.rejects(() => bootDev(root, { target: 'mobile' }), /Unknown --target token "mobile"/);
+});
+
 // ─── Boot sequence ───────────────────────────────────────────────────────────
 
 test('boot opens with the manage cycle, THEN spawns the target legs — brand asset edits land on restart', async () => {
@@ -201,7 +250,7 @@ test('boot opens with the manage cycle, THEN spawns the target legs — brand as
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  const outcome = await bootDev(root, { only: 'web' });
+  const outcome = await bootDev(root, { target: 'web' });
 
   assert.strictEqual(outcome, 'running', 'the orchestrator stays alive after booting');
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
@@ -213,7 +262,7 @@ test('a manage cycle with errors stops dev boot loudly — no target leg spawns'
   manageReport = { hasErrors: true, results: {}, brand: {} };
   const root = stageBrand();
 
-  await assert.rejects(() => bootDev(root, { only: 'web' }), /manage/i);
+  await assert.rejects(() => bootDev(root, { target: 'web' }), /manage/i);
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`], 'nothing booted on top of a broken brand');
 });
 
@@ -224,6 +273,8 @@ function resetRecorders() {
   boot.length = 0;
   manageOptions.length = 0;
   forceColorAt.length = 0;
+  legEnvs.length = 0;
+  caRootPemCalls = 0;
   Object.values(nonInteractiveAt).forEach((seen) => { seen.length = 0; });
 }
 
@@ -245,7 +296,7 @@ test('the boot manage cycle runs non-interactive — human gates skip instead of
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  await bootDev(root, { only: 'web' });
+  await bootDev(root, { target: 'web' });
 
   assert.deepStrictEqual(nonInteractiveAt.manage, ['1'],
     'the boot walk runs under OMEGA_NON_INTERACTIVE — no console confirm, consent flow, or secret paste can stall it');
@@ -256,7 +307,7 @@ test('the non-interactive switch is restored before any leg spawns — the dev s
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  await bootDev(root, { only: 'web' });
+  await bootDev(root, { target: 'web' });
 
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'], 'the boot still runs manage, then the leg');
   assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
@@ -278,11 +329,23 @@ test('a clean report with pending human gates still boots the legs — pending i
   };
   const root = stageBrand();
 
-  const outcome = await bootDev(root, { only: 'web' });
+  const outcome = await bootDev(root, { target: 'web' });
 
   assert.strictEqual(outcome, 'running');
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
     "the summary's ⚑ pending list is the report — the stack boots regardless");
+});
+
+test('--target= takes a target DIR name too, exactly like every other verb (#780)', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  const outcome = await bootDev(root, { target: 'website' });
+
+  assert.strictEqual(outcome, 'running');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
+    "the dir name picks the same leg its key does — one token vocabulary on every brand-root verb");
 });
 
 test('a pre-existing OMEGA_NON_INTERACTIVE survives the boot — the restore is not a blind delete', async () => {
@@ -292,7 +355,7 @@ test('a pre-existing OMEGA_NON_INTERACTIVE survives the boot — the restore is 
   process.env.OMEGA_NON_INTERACTIVE = '1';
 
   try {
-    await bootDev(root, { only: 'web' });
+    await bootDev(root, { target: 'web' });
 
     assert.deepStrictEqual(nonInteractiveAt.manage, ['1']);
     assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, '1', "the caller's own switch is put back, not dropped");
@@ -309,7 +372,7 @@ test('the boot walks the LOCAL lane only, and says where the full setup lives', 
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
+  const log = await captureLogAsync(() => bootDev(root, { target: 'web' }));
 
   assert.deepStrictEqual(manageOptions, [{ lane: 'boot' }],
     'the dev legs consume the local slice — the slow services must not hold the boot');
@@ -322,7 +385,7 @@ test('omega dev --full boots on the whole manage walk instead of the lane', asyn
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  const log = await captureLogAsync(() => bootDev(root, { only: 'web', full: true }));
+  const log = await captureLogAsync(() => bootDev(root, { target: 'web', full: true }));
 
   assert.deepStrictEqual(manageOptions, [{}], 'no lane — the full walk');
   assert.deepStrictEqual(nonInteractiveAt.manage, ['1'], 'and it is still quiet');
@@ -402,13 +465,13 @@ test('the sweep is handed each selected lane\'s framework host, resolved from it
   ], 'each host resolves from the target that declares it — the same chain the lane itself would walk');
 });
 
-test('a lane whose framework is unfiltered out is not swept — --only narrows the pass too (#340)', async () => {
+test('a lane whose framework is unpicked is not swept — --target= narrows the pass too (#340)', async () => {
   resetRecorders();
   resetSweep();
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageFanOutBrand();
 
-  await bootDev(root, { only: 'web' });
+  await bootDev(root, { target: 'web' });
 
   assert.deepStrictEqual(sweepHosts[0].map((host) => host.packageName), ['@omega.js/web']);
 });
@@ -426,7 +489,7 @@ test('a stale monorepo-linked dist stops the boot before the manage cycle — no
   };
   const root = stageFanOutBrand();
 
-  await assert.rejects(() => bootDev(root, { only: 'web' }), /@omega\.js\/web/);
+  await assert.rejects(() => bootDev(root, { target: 'web' }), /@omega\.js\/web/);
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web'],
     'the watch owns that dist — half-booting the stack on it is what the loud stop prevents');
 });
@@ -444,7 +507,7 @@ test('a monorepo-linked dist whose sweep heal FAILED stops the boot too (#398)',
   };
   const root = stageFanOutBrand();
 
-  await assert.rejects(() => bootDev(root, { only: 'web' }), /@omega\.js\/web/);
+  await assert.rejects(() => bootDev(root, { target: 'web' }), /@omega\.js\/web/);
   assert.deepStrictEqual(boot, ['sweep:@omega.js/web'],
     'with the watch down and the rebuild broken, no leg boots on that dist');
 });
@@ -456,7 +519,7 @@ test('a heal before the fan-out is announced, so the boot pause has a reason (#3
   sweepResult = { checked: [], healed: ['@omega.js/web'], staleLinked: [], healFailed: [], failed: [] };
   const root = stageFanOutBrand();
 
-  const log = await captureLogAsync(() => bootDev(root, { only: 'web' }));
+  const log = await captureLogAsync(() => bootDev(root, { target: 'web' }));
 
   assert.match(log, /@omega\.js\/web/);
 });
@@ -594,6 +657,87 @@ test('#587: a watch already running is reused, never doubled', async () => {
   }
 });
 
+/**
+ * Give the staged monorepo the log a running watch tees (#197): the header
+ * naming the pid that owns it, the roster the count comes from, then a ready
+ * line for every package whose initial prepare has landed.
+ */
+function stageWatchLog(monorepo, { pid, packages, reported }) {
+  const logPath = path.join(monorepo, '.temp', 'logs', 'watch-all.log');
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.writeFileSync(logPath, `${[
+    `# omega log — ${new Date().toISOString()} — pid=${pid}`,
+    `Watching ${packages.length} packages (src→dist): ${packages.join(', ')}`,
+    ...reported.map((name) => `[${name}] [02:00:00] 'prepare-package': Ready for changes!`),
+  ].join('\n')}\n`);
+  return logPath;
+}
+
+test('#622: an already-running watch mid-prepare still holds the legs — the boot reads its log', async () => {
+  resetRecorders();
+  resetSweep();
+  spawned.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+  const monorepo = stageMonorepo();
+  linkedMonorepo = monorepo;
+  realLocal.acquireWatchLock(monorepo); // held by a live process — this one
+  const logPath = stageWatchLog(monorepo, { pid: process.pid, packages: ['backend', 'web'], reported: ['backend'] });
+
+  try {
+    await bootDev(root);
+
+    // The playground's normal branch: Ian keeps the root watch up, so the boot
+    // never spawns one — and skipping the wait let a leg require a dist the
+    // watch was mid-purge on.
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+    ], 'web has not reported — no leg boots on a dist the running watch is still writing');
+
+    fs.appendFileSync(logPath, `[web] [02:00:01] 'prepare-package': Ready for changes!\n`);
+    await waitForSpawn(2);
+
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+      'spawn:backend',
+      'spawn:website',
+    ], 'the pass landed in the log — the legs boot, and nothing extra spawned');
+  } finally {
+    realLocal.releaseWatchLock(monorepo);
+    linkedMonorepo = null;
+    fs.rmSync(monorepo, { recursive: true, force: true });
+  }
+});
+
+test('#622: a long-idle watch costs the boot nothing — its log says every package reported', async () => {
+  resetRecorders();
+  resetSweep();
+  spawned.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand();
+  const monorepo = stageMonorepo();
+  linkedMonorepo = monorepo;
+  realLocal.acquireWatchLock(monorepo); // held by a live process — this one
+  stageWatchLog(monorepo, { pid: process.pid, packages: ['backend', 'web'], reported: ['backend', 'web'] });
+
+  try {
+    await bootDev(root);
+
+    assert.deepStrictEqual(boot, [
+      'sweep:@omega.js/backend,@omega.js/web',
+      `manage:${root}`,
+      'spawn:backend',
+      'spawn:website',
+    ], 'nothing is in flight — the gate reads the log and lets the boot straight through');
+  } finally {
+    realLocal.releaseWatchLock(monorepo);
+    linkedMonorepo = null;
+    fs.rmSync(monorepo, { recursive: true, force: true });
+  }
+});
+
 test('#587: a registry-installed brand spawns no watch, and says so once', async () => {
   resetRecorders();
   resetSweep();
@@ -664,7 +808,7 @@ test('the booted leg prints the collapsed stream — the chatter lands once, the
   const root = stageBrand();
 
   const log = await captureLogAsync(async () => {
-    await bootDev(root, { only: 'web' });
+    await bootDev(root, { target: 'web' });
     spawned[0].stdout.emit('data', Buffer.from(`${LOADED}\n${LOADED}\n${LOADED}\n✔  ready\n`));
   });
 
@@ -688,7 +832,7 @@ async function forceColorForLeg({ isTTY, inherited }) {
   if (inherited === undefined) { delete process.env.FORCE_COLOR; } else { process.env.FORCE_COLOR = inherited; }
 
   try {
-    await bootDev(root, { only: 'web' });
+    await bootDev(root, { target: 'web' });
   } finally {
     process.stdout.isTTY = priorTTY;
     if (priorForceColor === undefined) { delete process.env.FORCE_COLOR; } else { process.env.FORCE_COLOR = priorForceColor; }
@@ -707,6 +851,50 @@ test('no terminal, no forced color — and a caller that asked for it still wins
   assert.deepStrictEqual(await forceColorForLeg({ isTTY: false, inherited: '1' }), ['1'], "the caller's own switch passes straight through");
 });
 
+// ─── The local certificate's trust (#795) ────────────────────────────────────
+
+/**
+ * Boot with the mkcert helper's answer and the shell's own variable staged;
+ * reports the env each leg was spawned with.
+ */
+async function bootWithCaPem({ pem, inherited, brandRoot }) {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+
+  const prior = process.env.NODE_EXTRA_CA_CERTS;
+  caRootPem = pem;
+  if (inherited === undefined) { delete process.env.NODE_EXTRA_CA_CERTS; } else { process.env.NODE_EXTRA_CA_CERTS = inherited; }
+
+  try {
+    await bootDev(brandRoot);
+  } finally {
+    caRootPem = null;
+    if (prior === undefined) { delete process.env.NODE_EXTRA_CA_CERTS; } else { process.env.NODE_EXTRA_CA_CERTS = prior; }
+  }
+
+  return legEnvs;
+}
+
+test('every leg trusts the local certificate — one CAROOT lookup, handed to all of them (#795)', async () => {
+  const envs = await bootWithCaPem({ pem: '/fixture/mkcert/rootCA.pem', brandRoot: stageFanOutBrand() });
+
+  assert.deepStrictEqual(envs.map((env) => env.NODE_EXTRA_CA_CERTS), ['/fixture/mkcert/rootCA.pem', '/fixture/mkcert/rootCA.pem'],
+    "a brand's own leg calling the public https port VERIFIES the mkcert certificate instead of reaching for the proxy's internal port");
+  assert.strictEqual(caRootPemCalls, 1, 'resolved once before the leg loop, not per leg');
+});
+
+test('a shell-set NODE_EXTRA_CA_CERTS wins verbatim — the boot never overwrites a trust the caller chose', async () => {
+  const envs = await bootWithCaPem({ pem: '/fixture/mkcert/rootCA.pem', inherited: '/corp/bundle.pem', brandRoot: stageBrand() });
+
+  assert.deepStrictEqual(envs.map((env) => env.NODE_EXTRA_CA_CERTS), ['/corp/bundle.pem']);
+});
+
+test('no mkcert on the host → the key is ABSENT, never an empty path Node would fail to read', async () => {
+  const envs = await bootWithCaPem({ pem: null, brandRoot: stageBrand() });
+
+  assert.strictEqual('NODE_EXTRA_CA_CERTS' in envs[0], false);
+});
+
 // ─── Verb log (#197, #231) ───────────────────────────────────────────────────
 
 test('boot tees the brand-level fan-out to <brandRoot>/logs/dev.log, ANSI stripped', async () => {
@@ -721,7 +909,7 @@ test('boot tees the brand-level fan-out to <brandRoot>/logs/dev.log, ANSI stripp
   delete process.env.GITHUB_ACTIONS;
 
   try {
-    await bootDev(root, { only: 'web' });
+    await bootDev(root, { target: 'web' });
   } finally {
     // dev() never returns, so nothing else would restore the writers.
     require('@omega.js/devkit/attach-log-file').detach();
@@ -745,7 +933,7 @@ test('legs spawn detached — each leg owns its process group, so shutdown can r
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  await bootDev(root, { only: 'web' });
+  await bootDev(root, { target: 'web' });
 
   assert.deepStrictEqual(spawnDetached, [true],
     'a leg is a chain (npm → the real server); a same-group leg leaks the grandchild on a programmatic stop');
@@ -761,4 +949,59 @@ test('stopChild signals the process GROUP, and falls back to the direct child wh
   calls.length = 0;
   devCommand.stopChild(child, () => { throw new Error('ESRCH'); });
   assert.deepStrictEqual(calls, ['direct:SIGTERM'], 'a dead group still gets the direct kill');
+});
+
+test('#629: the boot registers the ONE stop-signal list — a closed terminal (SIGHUP) unwinds the legs too', async () => {
+  boot.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  // A signal with no listener is not a shutdown: node kills the orchestrator
+  // outright, and the legs (detached, so its group signal never reaches them)
+  // orphan with the emulator tree behind them. So the diff is per signal, and
+  // the list is the devkit one every supervisor registers, never a subset
+  // typed here.
+  const before = Object.fromEntries(STOP_SIGNALS.map((signal) => [signal, process.listeners(signal)]));
+  const added = {};
+
+  await bootDev(root, { target: 'web' });
+
+  try {
+    STOP_SIGNALS.forEach((signal) => {
+      added[signal] = process.listeners(signal).filter((fn) => !before[signal].includes(fn));
+
+      assert.strictEqual(added[signal].length, 1,
+        `${signal} must reach the orchestrator's shutdown, or the run dies with its legs still up`);
+    });
+  } finally {
+    // This process outlives the case; a handler left behind would answer for
+    // every case after it.
+    STOP_SIGNALS.forEach((signal) => (added[signal] || []).forEach((fn) => process.removeListener(signal, fn)));
+  }
+});
+
+// ─── The lockstep gate (#794) ────────────────────────────────────────────────
+
+test('a drifted @omega.js version REFUSES the boot before anything runs — no sweep, no manage, no leg', async () => {
+  boot.length = 0;
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  // The target's installed framework is a release behind the manager: what
+  // `omega update --apply` exists to fix, and what nothing downstream can see
+  const installed = path.join(root, 'targets', 'website', 'node_modules', '@omega.js', 'web');
+  fs.mkdirSync(installed, { recursive: true });
+  fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.1' }));
+
+  await assert.rejects(
+    () => bootDev(root, { target: 'web' }),
+    (error) => {
+      assert.strictEqual(error.refusal, true, 'a refusal prints its message alone');
+      assert.match(error.message, /@omega\.js\/web 0\.0\.1/);
+      assert.match(error.message, /omega update --apply/);
+      return true;
+    },
+  );
+
+  assert.deepStrictEqual(boot, [], 'the gate is the FIRST thing the boot does — the sweep never even ran');
 });

@@ -20,7 +20,6 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const { buildSite, BARE, PKG } = require('./lib/build.js');
-const { PAGE_BARE_SECTIONS } = require('../src/config-sections.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 const EXAMPLE = path.join(PKG, 'scaffold', 'src', 'pages', 'example.md.txt');
@@ -62,11 +61,6 @@ test('the documented frontmatter allow-list IS the engine\'s allow-list', () => 
   // the plumbing keys the guard never inspects (they're filtered upstream by
   // readOwnFrontmatter's RESOLVED_OMIT pass, so they're legal on any page).
   const allowed = new Set(setMembers(engine, 'PAGE_FRONTMATTER_ALLOW'));
-  // The one spread in that literal: the schema's page-bare sections (#607) —
-  // `meta` today. The schema is their SSOT, so the set names them by spread
-  // and the doc test resolves the same list.
-  assert.ok(/\.\.\.PAGE_BARE_SECTIONS/.test(engine), 'the allow set still spreads the schema\'s page-bare sections');
-  for (const section of PAGE_BARE_SECTIONS) allowed.add(section);
   for (const plumbing of ['layout', 'permalink']) {
     assert.ok(setMembers(engine, 'RESOLVED_OMIT').includes(plumbing), `${plumbing} is still engine plumbing`);
     allowed.add(plumbing);

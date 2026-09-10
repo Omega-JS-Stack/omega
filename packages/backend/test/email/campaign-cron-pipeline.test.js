@@ -28,11 +28,12 @@
 const {
   getNextOccurrence,
   getNextFutureOccurrence,
-} = require('../../src/manager/libraries/email/constants.js');
+} = require('../../dist/manager/libraries/email/constants.js');
 const {
   PROCESSING_LEASE_SECONDS,
   GENERATOR_MAX_ATTEMPTS,
-} = require('../../src/manager/events/cron/frequent/marketing-campaigns.js');
+} = require('../../dist/manager/events/cron/frequent/marketing-campaigns.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const WEEK = 7 * 86400;
 
@@ -57,7 +58,7 @@ function emailSettings(name) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Campaign cron pipeline (frequent cron processes all campaign types)',
   type: 'suite',
   timeout: 60000,
@@ -532,4 +533,4 @@ module.exports = {
       },
     },
   ],
-};
+});

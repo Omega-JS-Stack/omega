@@ -2,7 +2,9 @@
  * Test: test/authenticate
  * Tests different authentication methods using new RESTful API
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Authentication methods (RESTful)',
   type: 'group',
   tests: [
@@ -74,4 +76,4 @@ module.exports = {
       },
     },
   ],
-};
+});

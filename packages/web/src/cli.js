@@ -32,8 +32,16 @@ const ALIASES = {
   version: ['-v', '--version'],
 };
 
-module.exports = createCliRouter({
+const Main = createCliRouter({
   commandsDir: path.join(__dirname, 'commands'),
   aliases: ALIASES,
   defaultCommand: 'help',
 });
+
+// The environment surface (#717) — web's Manager equivalent is this CLI class,
+// the object every bin instantiates, so `Main.getEnvironment()` /
+// `isDevelopment()` / `isProduction()` / `isTesting()` are reachable the same
+// way @omega.js/desktop's and @omega.js/extension's Managers reach theirs.
+require('./mode-helpers.js').attachTo(Main);
+
+module.exports = Main;

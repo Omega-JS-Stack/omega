@@ -29,9 +29,10 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../src/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-linkage-uid';
 const ORDER_ID = '5320-5320-5320';
@@ -261,7 +262,7 @@ function chargebeeCreditNote(subscriptionId) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A refund record that belongs to another order is refused, never written onto this one',
   type: 'group',
   timeout: 30000,
@@ -400,4 +401,4 @@ module.exports = {
       },
     },
   ],
-};
+});

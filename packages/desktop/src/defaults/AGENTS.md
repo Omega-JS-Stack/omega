@@ -1,7 +1,9 @@
 # ========== Default Values ==========
 # OMEGA Desktop (@omega.js/desktop) consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md) with the same sections in the same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md).
+  Same sections in the same order: framework-specific extras may be inserted; canonical sections are never reordered/renamed. Edit every framework consumer template together.
+  The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
 
 ## Framework
 
@@ -17,7 +19,9 @@ This project consumes **OMEGA Desktop** (@omega.js/desktop), a comprehensive fra
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process.** It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
+**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process.**
+- It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
+- Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
 - **`node_modules/@omega.js/AGENTS.md`** → `docs/client/index.md`, the @omega.js/client guide: identity, module list, conventions
@@ -26,7 +30,7 @@ This project consumes **OMEGA Desktop** (@omega.js/desktop), a comprehensive fra
 ## Quick start
 
 ```bash
-npm start           # dev with auto-reload (gulp → webpack → electron .)
+npm start           # dev with auto-reload (gulp → esbuild → electron .)
 npm run build       # local production build (compiles bundles only, no installer)
 npm run package     # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
 npm run package:quick   # fast packaged build for the host platform/arch only (~20-30s)
@@ -47,7 +51,7 @@ npx omega install live # restore the published @omega.js/desktop from npm
 
 ## Where things live
 
-- `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, analytics, payment, cloud, monitoring, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, downloads, remoteConfig, restartManager) under `targets.desktop`.
+- `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, analytics, payment, cloud, monitoring, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, remoteConfig, restartManager) under `targets.desktop`.
 - Packaging config: fully generated. @omega.js/desktop produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + @omega.js/desktop's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
 - `hooks/notarize/post.js`: optional post-notarize extension hook (@omega.js/desktop owns the actual `afterSign` notarize step).
 - `src/main.js`: main-process entry. One-line bootstrap of `@omega.js/desktop/main`.
@@ -58,7 +62,10 @@ npx omega install live # restore the published @omega.js/desktop from npm
 - `src/views/<window>/index.html`: per-window HTML.
 - `src/assets/js/components/<window>/index.js`: renderer entry per window.
 - `src/assets/scss/main.scss`: shared SCSS.
-- `config/icons/<platform>/<slot>.png`: optional icon overrides (`macos/icon.png`, `macos/tray.png`, `macos/dmg.png`, `windows/icon.png`, etc.). Ship ONE file per slot at the native (retina) size; @omega.js/desktop auto-downscales @1x variants. macOS tray must be 32×32 (@omega.js/desktop renames to `trayTemplate.png` in dist for the OS dark-mode magic). Missing slots fall back to @omega.js/desktop bundled defaults; Linux falls back to Windows resolution.
+- `config/icons/<platform>/<slot>.png`: optional icon overrides (`macos/icon.png`, `macos/tray.png`, `macos/dmg.png`, `windows/icon.png`, etc.).
+  - Ship ONE file per slot at the native (retina) size; @omega.js/desktop auto-downscales @1x variants.
+  - macOS tray must be 32×32 (@omega.js/desktop renames to `trayTemplate.png` in dist for the OS dark-mode magic).
+  - Missing slots fall back to @omega.js/desktop bundled defaults; Linux falls back to Windows resolution.
 - `test/**/*.js`: your project test suites (framework auto-runs them alongside its own).
 
 ## Per-context imports
@@ -82,13 +89,16 @@ In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.log
 
 ## Dependency resolution
 
-- **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `@omega.js/client`, etc.). @omega.js/desktop's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omega.js/desktop's webpack config, not your `package.json`.
+- **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `@omega.js/client`, etc.). @omega.js/desktop's bundler resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omega.js/desktop's bundle task, not your `package.json`.
 - **@omega.js/client owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge).
 - **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime for unbundled code (gulp tasks, test fixtures).
 
 ## Testing
 
-Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/`: real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test. Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live). See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
+Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/`: real events on the real DOM), and **end-to-end** (`test/boot/`).
+- Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
+- Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live).
+- See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
 

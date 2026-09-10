@@ -20,7 +20,8 @@
  *
  * Run: npx omega test framework:events/notification-conversion
  */
-const onWrite = require('../../src/manager/events/firestore/notifications/on-write.js');
+const onWrite = require('../../dist/manager/events/firestore/notifications/on-write.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const TOKEN = '_test-notification-conversion-token';
 
@@ -89,7 +90,7 @@ async function runHandler({ Manager, before, after }) {
   return { calls: calls, delivery: delivery };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'notifications:on-write fires canonical notification conversions',
   type: 'group',
   timeout: 30000,
@@ -178,4 +179,4 @@ module.exports = {
       },
     },
   ],
-};
+});

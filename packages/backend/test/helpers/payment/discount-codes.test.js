@@ -22,7 +22,8 @@
  * is not the subject) and its rejection is swallowed.
  */
 const admin = require('firebase-admin');
-const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
+const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { DISCOUNT_CODES, validate } = discountCodes;
 
@@ -58,7 +59,7 @@ function refusedBy(discount) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Discount codes: the validate() contract',
   type: 'group',
   timeout: 15000,
@@ -137,4 +138,4 @@ module.exports = {
       },
     },
   ],
-};
+});

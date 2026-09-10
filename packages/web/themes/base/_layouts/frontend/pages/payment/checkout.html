@@ -57,7 +57,7 @@ config:
           data-action="pay-card"
           data-omega-bind="@show checkout.paymentMethods.card"
           hidden>
-    {% omega_icon "credit-card", "me-2 fa-lg" %}
+    <i class="fa-solid fa-credit-card me-2 fa-lg"></i>
     <span class="fw-semibold">Credit/Debit</span>
   </button>
 
@@ -79,7 +79,7 @@ config:
           data-action="pay-apple-pay"
           data-omega-bind="@show checkout.paymentMethods.applePay"
           hidden>
-    {% omega_icon "apple", "me-2 fa-lg" %}
+    <i class="fa-brands fa-apple me-2 fa-lg"></i>
     <span class="fw-semibold">Apple Pay</span>
   </button>
 
@@ -96,6 +96,17 @@ config:
     <span class="fw-semibold">Google Pay</span>
   </button>
 
+  <!-- Crypto Button — Coinbase Commerce (#642). One-time purchases only, so it
+       shows on the crypto provider's own switch and never on a subscription. -->
+  <button type="submit" class="btn btn-outline-adaptive payment-button d-flex align-items-center justify-content-center"
+          data-payment-method="crypto"
+          data-action="pay-crypto"
+          data-omega-bind="@show checkout.paymentMethods.crypto"
+          hidden>
+    <i class="fa-brands fa-bitcoin me-2 fa-lg"></i>
+    <span class="fw-semibold">Crypto</span>
+  </button>
+
   <p class="omega-checkout__terms small mb-0">
     By purchasing, you agree to our <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.
   </p>
@@ -108,11 +119,11 @@ config:
        encrypted" already says it, with the same lock. The gap above is the
        sheet's, not a utility: one home for the pay stack's rhythm. -->
   <div class="omega-checkout__trust">
-    <span>{% omega_icon "lock", "fa-xs" %} SSL encrypted</span>
+    <span><i class="fa-solid fa-lock fa-xs"></i> SSL encrypted</span>
     {% iftruthy resolved.pricing.guarantee %}
-      <span>{% omega_icon "shield-halved", "fa-xs" %} Money-back guarantee</span>
+      <span><i class="fa-solid fa-shield-halved fa-xs"></i> Money-back guarantee</span>
     {% endiftruthy %}
-    <span>{% omega_icon "handshake", "fa-xs" %} Secure payments</span>
+    <span><i class="fa-solid fa-handshake fa-xs"></i> Secure payments</span>
   </div>
 
   <!-- Help — the stack's last line, in the stack (Ian 2026-08-19, #374): the
@@ -121,7 +132,7 @@ config:
        capture carries no utility margins to drift between viewports. -->
   <div class="omega-checkout__help">
     <a href="javascript:;" class="omega-checkout__quiet-link small" id="checkout-help-button">
-      {% omega_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
+      <i class="fa-solid fa-circle-question fa-sm me-1"></i> Need help? Chat with us.
     </a>
   </div>
 {% endcapture %}
@@ -132,12 +143,12 @@ config:
     <div class="col-12 col-md-8 col-lg-6 col-xl-5">
       <div class="omega-form-panel text-center" role="alert">
         <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg omega-checkout__error-glyph mb-3">
-          {% omega_icon "triangle-exclamation", "fa-md" %}
+          <i class="fa-solid fa-triangle-exclamation fa-md"></i>
         </span>
         <h1 class="omega-display omega-display--section mb-2">Something went <em>wrong</em></h1>
         <p class="omega-quiet mb-4" data-omega-bind="@text checkout.error.message"></p>
         <button class="btn btn-adaptive omega-hover-nudge" onclick="window.location.reload()">
-          {% omega_icon "rotate-right", "fa-sm me-2" %}
+          <i class="fa-solid fa-rotate-right fa-sm me-2"></i>
           Try again
         </button>
       </div>
@@ -154,7 +165,8 @@ config:
   <header class="omega-checkout__head" data-omega-reveal="fade">
     <h1 class="omega-checkout__head-mark mb-0">
       <a href="/" class="omega-checkout__brand">
-        <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} logo" width="24" height="24">
+        {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+        <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} logo" width="24" height="24">
         <span class="fw-semibold">{{ resolved.config.brand.name }}</span>
       </a>
     </h1>
@@ -177,17 +189,17 @@ config:
             <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@show checkout">
               <span data-omega-bind="@text checkout.product.name">--</span> &middot; <span data-omega-bind="@text checkout.pricing.frequencyPaymentText">$--</span>
             </span>
-            {% omega_icon "chevron-down", "fa-xs omega-checkout__rowtoggle-chev" %}
+            <i class="fa-solid fa-chevron-down fa-xs omega-checkout__rowtoggle-chev"></i>
           </button>
 
           <div id="collapse-billing" class="collapse d-lg-block">
             <div class="omega-panel-head omega-checkout__panel-head">
               <h2 class="omega-checkout__panel-title d-none d-lg-flex mb-0">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "calendar-days", "fa-sm" %}</span>
+                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-calendar-days fa-sm"></i></span>
                 Billing cycle
               </h2>
               <a href="/pricing" class="omega-checkout__quiet-link small ms-auto">
-                {% omega_icon "arrow-left", "fa-xs me-1" %}Change plan
+                <i class="fa-solid fa-arrow-left fa-xs me-1"></i>Change plan
               </a>
             </div>
 
@@ -268,7 +280,7 @@ config:
                    landing is what takes it away. -->
               <div class="omega-checkout__note mt-3 omega-binding-skeleton"
                    data-omega-bind="@hide order">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "gift", "fa-sm" %}</span>
+                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-gift fa-sm"></i></span>
                 <span>Checking your plan</span>
               </div>
 
@@ -279,7 +291,7 @@ config:
                 <div class="omega-checkout__note mt-3"
                      data-omega-bind="@show !order.trial.show"
                      hidden>
-                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "shield-halved", "fa-sm" %}</span>
+                  <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-shield-halved fa-sm"></i></span>
                   <span>{{ resolved.pricing.guarantee }}</span>
                 </div>
               {% endiftruthy %}
@@ -288,7 +300,7 @@ config:
               <div class="omega-checkout__note omega-checkout__note--ok mt-3"
                    data-omega-bind="@show order.trial.show"
                    hidden>
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "gift", "fa-sm" %}</span>
+                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-gift fa-sm"></i></span>
                 <span data-omega-bind="@text order.trial.message"></span>
               </div>
             </div>
@@ -302,7 +314,7 @@ config:
                   data-bs-toggle="collapse" data-bs-target="#collapse-account" aria-expanded="false">
             <span class="omega-micro">Account</span>
             <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text auth.user.email">&nbsp;</span>
-            {% omega_icon "chevron-down", "fa-xs omega-checkout__rowtoggle-chev" %}
+            <i class="fa-solid fa-chevron-down fa-xs omega-checkout__rowtoggle-chev"></i>
           </button>
 
           <div id="collapse-account" class="collapse d-lg-block">
@@ -313,7 +325,7 @@ config:
             <div class="omega-checkout__account-block">
               <div class="omega-panel-head omega-checkout__panel-head">
                 <h2 class="omega-checkout__panel-title d-none d-lg-flex mb-0">
-                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "user", "fa-sm" %}</span>
+                  <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-user fa-sm"></i></span>
                   Account
                 </h2>
                 <a href="#" id="switch-account" class="omega-checkout__quiet-link small">Switch account</a>
@@ -349,13 +361,13 @@ config:
                     data-bs-toggle="collapse" data-bs-target="#collapse-summary" aria-expanded="true">
               <span class="omega-micro">Order summary</span>
               <span class="omega-checkout__rowtoggle-value omega-binding-skeleton" data-omega-bind="@text order.total">$--</span>
-              {% omega_icon "chevron-down", "fa-xs omega-checkout__rowtoggle-chev" %}
+              <i class="fa-solid fa-chevron-down fa-xs omega-checkout__rowtoggle-chev"></i>
             </button>
 
             <div id="collapse-summary" class="collapse show d-lg-block">
               <div class="omega-panel-head omega-checkout__panel-head d-none d-lg-flex">
                 <h2 class="omega-checkout__panel-title mb-0">
-                  <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "receipt", "fa-sm" %}</span>
+                  <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-receipt fa-sm"></i></span>
                   Order summary
                 </h2>
               </div>
@@ -381,13 +393,13 @@ config:
 
                 <!-- Discount Messages -->
                 <div class="mt-2 omega-quiet small" data-omega-bind="@show checkout.discount.loading" hidden>
-                  {% omega_icon "clock", "me-1" %} Checking code...
+                  <i class="fa-solid fa-clock me-1"></i> Checking code...
                 </div>
                 <div class="mt-2 omega-checkout__row-ok small" data-omega-bind="@show checkout.discount.success" hidden>
-                  {% omega_icon "check-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
+                  <i class="fa-solid fa-check-circle me-1"></i> <span data-omega-bind="@text checkout.discount.successMessage">Discount applied</span>
                 </div>
                 <div class="mt-2 omega-checkout__row-bad small" data-omega-bind="@show checkout.discount.error" hidden>
-                  {% omega_icon "times-circle", "me-1" %} <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
+                  <i class="fa-solid fa-times-circle me-1"></i> <span data-omega-bind="@text checkout.discount.errorMessage">Invalid discount code</span>
                 </div>
               </div>
 

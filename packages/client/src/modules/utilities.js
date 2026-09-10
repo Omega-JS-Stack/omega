@@ -51,20 +51,29 @@ class Utilities {
   }
 
   // Copy text to clipboard
-  clipboardCopy = (input) => {
+  //
+  // Always a promise, and a REFUSED copy REJECTS
+  // ([#726](https://github.com/Omega-JS-Stack/omega/issues/726)). Every caller
+  // draws its confirmation off this promise, so a failure that resolves tells
+  // the visitor their credential is in the buffer when it is not.
+  clipboardCopy = async (input) => {
     // Get the text from the input
     const text = input && input.nodeType
       ? input.value || input.innerText || input.innerHTML
       : input;
 
-    // Try to use the modern clipboard API
+    // Try to use the modern clipboard API — a refusal (no permission, an
+    // insecure context, a blurred document) is not a failure until the legacy
+    // lane has had its turn too.
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).catch(() => {
-        fallbackCopy(text);
-      });
-    } else {
-      fallbackCopy(text);
+      try {
+        return await navigator.clipboard.writeText(text);
+      } catch (e) {
+        return fallbackCopy(text);
+      }
     }
+
+    return fallbackCopy(text);
 
     function fallbackCopy(text) {
       const el = document.createElement('textarea');
@@ -73,13 +82,19 @@ class Utilities {
       document.body.appendChild(el);
       el.select();
 
+      // `execCommand` reports a refusal with a FALSE RETURN rather than a
+      // throw — reading the return is the only way this lane can fail.
+      let copied = false;
+
       try {
-        document.execCommand('copy');
-      } catch (e) {
-        console.error('Failed to copy to clipboard');
+        copied = document.execCommand('copy');
+      } finally {
+        document.body.removeChild(el);
       }
 
-      document.body.removeChild(el);
+      if (!copied) {
+        throw new Error('Failed to copy to clipboard');
+      }
     }
   }
 

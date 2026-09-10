@@ -5,6 +5,7 @@
 // a real in-memory strategy either way.
 
 const authPersistence = require('../../../lib/auth-persistence.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function fakeStrategy() {
   const store = new Map();
@@ -18,7 +19,7 @@ function fakeStrategy() {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'auth-persistence (main)',
@@ -163,4 +164,4 @@ module.exports = {
       },
     },
   ],
-};
+});

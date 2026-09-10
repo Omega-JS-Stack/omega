@@ -17,7 +17,7 @@ const {
   loadConfig, composeTargetConfig, validateConfig,
   normalizeTargetInstances, instanceIdFromDirName, instanceTargetDir, targetInstance,
   resolveInstanceEntry, instancePortOffset, resolveInstanceUrl,
-  DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE,
+  DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE, toSiteGlobal,
 } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
@@ -219,6 +219,83 @@ test('loadConfig: the instance entry is the target layer — scoped to ITS targe
   }
 });
 
+test('loadConfig: a bare instance entry resolves its derived url onto the config (#588)', (t) => {
+  const root = makeFixture('inst-derived-url', {
+    'config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+      targets: { web: [{ id: 'main' }, { id: 'admin' }, { id: 'store', url: 'https://shop.acme.com' }] },
+    }`,
+    'targets/website/package.json': '{}',
+    'targets/website-admin/package.json': '{}',
+    'targets/website-store/package.json': '{}',
+  });
+  cleanup(t, root);
+
+  // The derived url lands where an explicit instance url already merges to,
+  // the top level, so every reader of the resolved config (site-global's
+  // site.url, the authDomain host check) sees the instance's OWN url
+  const admin = loadConfig(path.join(root, 'targets', 'website-admin'), 'web');
+  assert.strictEqual(admin.config.url, 'https://admin.acme.test');
+  assert.strictEqual(toSiteGlobal(admin.config).url, 'https://admin.acme.test');
+
+  // An explicit url is untouched, and main keeps the brand url alone
+  const store = loadConfig(path.join(root, 'targets', 'website-store'), 'web');
+  assert.strictEqual(store.config.url, 'https://shop.acme.com');
+
+  const main = loadConfig(path.join(root, 'targets', 'website'), 'web');
+  assert.strictEqual(main.config.url, undefined, 'main derives nothing: brand.url is already its url');
+  assert.strictEqual(toSiteGlobal(main.config).url, 'https://acme.test');
+});
+
+test('loadConfig: the derived url is the instance url, never the brand-level facts (#588)', (t) => {
+  const root = makeFixture('inst-derived-brand-level', {
+    'config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+      cloud: { provider: 'firebase', config: { projectId: 'acme-prod', authDomain: 'acme.test' } },
+      targets: { web: [{ id: 'main' }, { id: 'admin' }] },
+    }`,
+    'targets/website/package.json': '{}',
+    'targets/website-admin/package.json': '{}',
+  });
+  cleanup(t, root);
+
+  const admin = loadConfig(path.join(root, 'targets', 'website-admin'), 'web');
+  assert.strictEqual(admin.config.url, 'https://admin.acme.test');
+
+  // authDomain is a BRAND fact (Ian 2026-09-01): one Firebase project, one
+  // backend, shared by every instance. The instance url must not turn the
+  // brand's own authDomain into a fatal host mismatch.
+  assert.deepStrictEqual(admin.errors, []);
+
+  // ... and the derived key is DECLARED, so it raises no undeclared-key
+  // warning of its own (#636)
+  assert.deepStrictEqual(admin.warnings, []);
+});
+
+test('loadConfig: a brand.url override AT the instance IS the instance url, never a base to stack on (#588)', (t) => {
+  const root = makeFixture('inst-derived-override', {
+    'config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+      targets: { web: [{ id: 'main' }, { id: 'shop' }, { id: 'admin' }] },
+    }`,
+    'targets/website/package.json': '{}',
+    // A local layer naming this instance's own host, never shop.shop.acme.test
+    'targets/website-shop/package.json': '{}',
+    'targets/website-shop/config/omega.json5': `{
+      brand: { url: 'https://shop.acme.test' },
+    }`,
+    // The dev shape of the same thing, never https://admin.localhost:4000
+    'targets/website-admin/package.json': '{}',
+    'targets/website-admin/config/omega.json5': `{
+      brand: { url: 'http://localhost:4000' },
+    }`,
+  });
+  cleanup(t, root);
+
+  assert.strictEqual(loadConfig(path.join(root, 'targets', 'website-shop'), 'web').config.url, 'https://shop.acme.test');
+  assert.strictEqual(loadConfig(path.join(root, 'targets', 'website-admin'), 'web').config.url, 'http://localhost:4000');
+});
+
 test('loadConfig: local shared/target layers still merge ABOVE the instance entry', (t) => {
   const root = makeFixture('inst-local-layer', {
     ...TWO_INSTANCE_BRAND,
@@ -304,4 +381,52 @@ test('resolveInstanceUrl: instance url → instance brand.url → brand shared u
   assert.strictEqual(resolveInstanceUrl(entry, 'main', config), 'https://acme.test');
   assert.strictEqual(resolveInstanceUrl({}, 'main', config), 'https://acme.test', 'object form falls to brand.url');
   assert.strictEqual(resolveInstanceUrl(entry, 'main', {}), null);
+});
+
+test('resolveInstanceUrl: the instance id IS the subdomain when the entry declares no url (#588)', () => {
+  const config = { brand: { url: 'https://acme.test' } };
+  const entry = [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }];
+
+  // A bare id derives its own subdomain, so `web: [{ id: 'main' }, { id: 'admin' }]`
+  // is a complete declaration
+  assert.strictEqual(resolveInstanceUrl(entry, 'admin', config), 'https://admin.acme.test');
+  assert.strictEqual(resolveInstanceUrl(entry, 'cdn', config), 'https://cdn.acme.test');
+  // main is the brand itself, never main.acme.test
+  assert.strictEqual(resolveInstanceUrl(entry, 'main', config), 'https://acme.test');
+  // An id with no entry at all still derives, since the id is the whole input
+  assert.strictEqual(resolveInstanceUrl(entry, 'docs', config), 'https://docs.acme.test');
+});
+
+test('resolveInstanceUrl: an explicit url beats the derivation, an instance brand.url beats it too', () => {
+  const config = { brand: { url: 'https://acme.test' } };
+  const entry = [
+    { id: 'main' },
+    { id: 'store', url: 'https://shop.acme.com' },       // a custom host, not store.acme.test
+    { id: 'help', brand: { url: 'https://help.zendesk.com' } },
+  ];
+
+  assert.strictEqual(resolveInstanceUrl(entry, 'store', config), 'https://shop.acme.com');
+  assert.strictEqual(resolveInstanceUrl(entry, 'help', config), 'https://help.zendesk.com');
+});
+
+test('resolveInstanceUrl: the host is taken exactly as brand.url states it (www kept, path dropped, port kept)', () => {
+  assert.strictEqual(
+    resolveInstanceUrl([{ id: 'admin' }], 'admin', { brand: { url: 'https://www.acme.test' } }),
+    'https://admin.www.acme.test',
+  );
+  assert.strictEqual(
+    resolveInstanceUrl([{ id: 'admin' }], 'admin', { brand: { url: 'https://acme.test/base/' } }),
+    'https://admin.acme.test',
+  );
+  assert.strictEqual(
+    resolveInstanceUrl([{ id: 'admin' }], 'admin', { brand: { url: 'acme.test:8080' } }),
+    'https://admin.acme.test:8080',
+  );
+});
+
+test('resolveInstanceUrl: no brand url at all → null for a non-main instance too (never half-derived)', () => {
+  assert.strictEqual(resolveInstanceUrl([{ id: 'admin' }], 'admin', {}), null);
+  assert.strictEqual(resolveInstanceUrl([{ id: 'admin' }], 'admin', undefined), null);
+  // An unparseable brand.url derives nothing rather than guessing a host
+  assert.strictEqual(resolveInstanceUrl([{ id: 'admin' }], 'admin', { brand: { url: 'https://' } }), null);
 });

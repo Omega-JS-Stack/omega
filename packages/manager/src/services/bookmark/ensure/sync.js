@@ -14,6 +14,7 @@
 const { execFileSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const { WebSocketServer } = require('ws');
+const { brandRepo } = require('@omega.js/config');
 const { isInteractive } = require('@omega.js/devkit/prompt');
 const { resolveExtensionPort } = require('../../../lib/automation-client.js');
 
@@ -128,10 +129,12 @@ function generateLinks(brandConfig, targets = [], extras = {}) {
 
   // GitHub — one brand monorepo
   if (github.org) {
-    const repoName = github.repo || brandConfig.brand?.id;
+    // BOTH halves from the one derivation: an `owner/name` slug houses the repo
+    // under its own owner, which `repo.providers.github.org` does not name.
+    const { repo } = brandRepo(brandConfig);
     links.GitHub = [
-      { title: 'Repository', url: `https://github.com/${github.org}/${repoName}` },
-      { title: 'Actions', url: `https://github.com/${github.org}/${repoName}/actions` },
+      { title: 'Repository', url: `https://github.com/${repo}` },
+      { title: 'Actions', url: `https://github.com/${repo}/actions` },
     ];
   }
 

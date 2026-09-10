@@ -132,11 +132,13 @@ const remoteScripts = {
 
   async _execute(code) {
     const manager = remoteScripts._manager;
-    const realRequire = (typeof __non_webpack_require__ !== 'undefined') ? __non_webpack_require__ : require;
 
+    // The real `require`, handed to the script: it is compiled by
+    // `new AsyncFunction`, so it has no module scope of its own and no bundler
+    // ever sees its body.
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const fn = new AsyncFunction('manager', 'require', code);
-    await fn(manager, realRequire);
+    await fn(manager, require);
   },
 
   _hash(str) {

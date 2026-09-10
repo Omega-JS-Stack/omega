@@ -236,7 +236,7 @@ test('§7 inherit: contradictions and malformed declarations throw; unfulfilled 
 
 test('data bridge: a showcase frame keeps the variant\'s own keys AND the section defaults (deep merge end-to-end)', async () => {
   const pages = await buildWith(miniData);
-  const demo = pages.get('/test/sections/section/marketing/hero/frames/input-capture');
+  const demo = pages.get('/test/sections/marketing/hero/frames/input-capture');
   assert.ok(demo, 'the Input capture variant frame built');
   assert.ok(demo.includes('Create your logo in'), 'the variant\'s headline survived the bridge');
   assert.ok(demo.includes('Introducing MiniCo'), 'unset badge fell through to the json5 default, brand-liquified');
@@ -344,13 +344,20 @@ test('wave 7: heading/section-head — nested composition (sections call it) + l
   assert.ok(post.includes('Related <em>posts</em>'), 'related-posts head: em-in-string headline through the guarded h2');
   // The pricing one-time/comparison bands are catalog-gated and the mini
   // corpus has no payment config — build once WITH a catalog so the inline
-  // | default: filter-arg call lines actually render.
+  // | default: filter-arg call lines actually render. The comparison band
+  // also needs rows, so the products name VALUES against a top-level
+  // `features` catalog (#647): no catalog, no matrix, no head.
   const paid = await buildWith({
     ...miniData,
+    features: {
+      alpha: { name: 'Alpha', usage: {} },
+      beta: { name: 'Beta' },
+      gamma: { name: 'Gamma' },
+    },
     payment: { products: [
-      { id: 'starter', name: 'Starter', prices: { monthly: 9, annually: 90 }, features: ['Alpha', 'Beta'] },
-      { id: 'growth', name: 'Growth', prices: { monthly: 29, annually: 290 }, features: ['Alpha', 'Beta', 'Gamma'] },
-      { id: 'kit', name: 'Launch Kit', type: 'one-time', prices: { once: 49 }, features: ['Alpha'] },
+      { id: 'starter', name: 'Starter', prices: { monthly: 9, annually: 90 }, features: { alpha: 100, beta: true } },
+      { id: 'growth', name: 'Growth', prices: { monthly: 29, annually: 290 }, features: { alpha: -1, beta: true, gamma: true } },
+      { id: 'kit', name: 'Launch Kit', type: 'one-time', prices: { once: 49 }, features: { alpha: 100 } },
     ] },
   });
   const pricing = paid.get('/pricing');

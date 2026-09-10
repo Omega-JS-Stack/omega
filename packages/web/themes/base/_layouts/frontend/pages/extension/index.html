@@ -72,8 +72,9 @@ setup:
       description: "Your account carries over. Everything you have here is in the popup."
       icon: "user-check"
 
-# Features Section
-features:
+# Highlights Section — named `highlights`, not `features`: `features` is a
+# CONFIG section now (the feature catalog, #647) and a page key may not shadow one
+highlights:
   superheadline:
     text: "Included"
   headline: "Small icon, whole"
@@ -129,11 +130,15 @@ cta:
 ---
 
 <!-- ═══ Hero: the page already picked your browser ═══ -->
-<section class="omega-dotgrid pb-0" data-omega-dotfield>
-  <div class="container text-center" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: "Extension", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, sub_class: "omega-hero__sub mx-auto" %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-0" data-omega-first-paint data-omega-dotfield>
+  <div class="container text-center">
+    {% component "heading/masthead", eyebrow: "Extension", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, sub_class: "omega-hero__sub mx-auto", first_paint: true %}
 
-    <div class="omega-dl-hero" data-omega-reveal>
+    <div class="omega-dl-hero">
       <!-- Filled by the detection JS: your browser's store button -->
       <a id="extension-hero" class="btn btn-adaptive btn-lg omega-dl-hero__btn" href="#browsers" hidden>
         <span class="omega-dl-hero__icon" data-hero-icon></span>
@@ -141,16 +146,16 @@ cta:
       </a>
       <!-- Shown until detection resolves (and forever without JS / no listing) -->
       <a id="extension-hero-fallback" class="btn btn-adaptive btn-lg omega-dl-hero__btn" href="#browsers">
-        {% omega_icon "puzzle-piece", "fa-sm me-2" %}
+        <i class="fa-solid fa-puzzle-piece fa-sm me-2"></i>
         See supported browsers
       </a>
       <a class="btn btn-outline-adaptive btn-lg omega-hover-nudge" href="#browsers">
         All browsers
-        <span class="omega-nudge ms-2">{% omega_icon "arrow-down", "fa-sm" %}</span>
+        <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-down fa-sm"></i></span>
       </a>
     </div>
 
-    <p class="omega-dl-hero__platforms omega-quiet small" data-omega-reveal>
+    <p class="omega-dl-hero__platforms omega-quiet small">
       {% for browser in resolved.downloads.browsers %}{{ browser.name }}{% unless forloop.last %} · {% endunless %}{% endfor %}
     </p>
   </div>
@@ -175,7 +180,7 @@ cta:
             <div class="omega-dl-card__actions">
               {% iftruthy config_url %}
                 <a href="{{ config_url }}" class="btn btn-adaptive w-100" data-install="true" target="_blank" rel="noopener">
-                  {% omega_icon "puzzle-piece", "fa-sm me-2" %}
+                  <i class="fa-solid fa-puzzle-piece fa-sm me-2"></i>
                   {{ browser.action | default: "Install" }}
                 </a>
               {% endiftruthy %}
@@ -205,7 +210,7 @@ cta:
         {% for step in resolved.setup.steps %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon step.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ step.icon }} fa-sm"></i></span>
               <strong>{{ forloop.index }}. {{ step.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ step.description }}</span>
@@ -221,14 +226,14 @@ cta:
   <div class="container">
     <div class="omega-duo">
       <div class="omega-duo__aside omega-section-head" data-omega-reveal>
-        {% component "heading/section-head", superheadline: resolved.features.superheadline.text, headline: resolved.features.headline, headline_accent: resolved.features.headline_accent %}
+        {% component "heading/section-head", superheadline: resolved.highlights.superheadline.text, headline: resolved.highlights.headline, headline_accent: resolved.highlights.headline_accent %}
       </div>
 
       <div class="omega-rowlist" data-omega-reveal-stagger="60">
-        {% for feature in resolved.features.items %}
+        {% for feature in resolved.highlights.items %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon feature.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ feature.icon }} fa-sm"></i></span>
               <strong>{{ feature.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ feature.description }}</span>

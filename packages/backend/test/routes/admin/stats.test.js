@@ -3,7 +3,9 @@
  * Tests the admin get stats endpoint
  * Requires admin authentication
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Admin get stats operation',
   type: 'group',
   tests: [
@@ -109,4 +111,4 @@ module.exports = {
       },
     },
   ],
-};
+});

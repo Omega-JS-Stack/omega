@@ -13,9 +13,10 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const fetch = require('wonderful-fetch');
-const resolverPath = path.resolve(__dirname, '../../../src/manager/libraries/content/source-resolver.js');
-const { parseFeed, extractArticleContent } = require('../../../src/manager/libraries/content/feed-parser.js');
+const resolverPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/source-resolver.js');
+const { parseFeed, extractArticleContent } = require('../../../dist/manager/libraries/content/feed-parser.js');
 const { contentSourceHash, getProcessedItemIds, trackContentSource } = require(resolverPath);
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const EXTENDED = !!process.env.TEST_EXTENDED_MODE;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
@@ -49,7 +50,7 @@ function saveArtifact(filename, data) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'content/ghostii-feed-integration',
   type: 'suite',
   timeout: 120000,
@@ -401,4 +402,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -58,30 +58,95 @@ function healPackageScripts(pkg) {
   return { scripts, changes };
 }
 
+// The command #675 retired. Every pre-#675 framework `projectScripts` chained
+// it — as the head (`npx omega setup && npx omega emulator`), mid-chain
+// (`npx omega clean && npx omega setup && npm run gulp --`), or alone
+// (`setup: 'npx omega setup'`). The command is gone, so any script still
+// naming it dies at `Unknown command "setup"` (#707): the segment is
+// framework-authored residue, never consumer intent.
+const RETIRED_SETUP_COMMAND = 'npx omega setup';
+
 /**
- * Fill a TARGET manifest's missing scripts from its framework's own
- * `projectScripts` declaration. Fill-missing ONLY — a consumer's customized
- * value is never overwritten. This is the onboard→dev cycle break (#675): the
- * framework's ensureTarget writes these on the first verb run, but the dev
- * fan-out reaches that verb THROUGH these scripts, so a freshly scaffolded
- * target needs them before any verb has ever run.
+ * The pre-#675 residue check: does this script value still run the retired
+ * command as one leg of its `&&` chain?
+ */
+function hasRetiredSetup(value) {
+  return value.split('&&').some((segment) => segment.trim() === RETIRED_SETUP_COMMAND);
+}
+
+/**
+ * The value with the retired leg dropped — `''` when the whole script WAS the
+ * retired command and nothing else is left to run.
+ */
+function withoutRetiredSetup(value) {
+  return value
+    .split('&&')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== RETIRED_SETUP_COMMAND)
+    .join(' && ');
+}
+
+/**
+ * Sync a TARGET manifest's scripts to its framework's own `projectScripts`
+ * declaration. ONE ownership policy (#689): a key the framework declares is
+ * FRAMEWORK-owned and takes the default value on every run — the walk and the
+ * framework's own ensureTarget agree, so a hand-edited standard script is
+ * rewritten either way and hook points are the customization seam. A key the
+ * framework never declares is the consumer's own and is never touched.
+ *
+ * Two rules, in order:
+ *
+ * 1. One-time migration (#707): a value still naming the retired
+ *    `npx omega setup` (#675) is framework-authored residue — it takes the
+ *    manifest's current value, or, for a key the manifest no longer declares,
+ *    just loses that leg (and the key goes when nothing is left to run). Once
+ *    rewritten nothing matches again, so no standing machinery accrues.
+ * 2. Overwrite-to-default for every declared key. This also covers the
+ *    onboard→dev cycle break (#675): the framework's ensureTarget writes these
+ *    on the first verb run, but the dev fan-out reaches that verb THROUGH
+ *    these scripts, so a freshly scaffolded target needs them before any verb
+ *    has ever run.
+ *
+ * `brandOwnedKeys` carves the exception out per key, never per target: a
+ * custom-server backend (#584) names its own `start`/`deploy` because those
+ * verbs refuse in that mode, so those keys are skipped by BOTH rules — never
+ * written, never scaffolded, not even a placeholder to delete.
  *
  * @param {Object} pkg - parsed target package.json
  * @param {Object} projectScripts - the framework package's projectScripts map
- * @returns {{ scripts: Object, changes: string[] }}
+ * @param {string[]} [brandOwnedKeys] - declared keys this target owns instead
+ * @returns {{ scripts: Object, changes: string[], skipped: string[] }}
+ *   skipped = the brand-owned keys the framework declares, for the report
  */
-function healTargetScripts(pkg, projectScripts) {
+function syncTargetScripts(pkg, projectScripts, brandOwnedKeys = []) {
   const scripts = { ...((pkg || {}).scripts || {}) };
+  const manifest = projectScripts || {};
+  const brandOwned = new Set(brandOwnedKeys);
   const changes = [];
 
-  for (const [key, value] of Object.entries(projectScripts || {})) {
-    if (!scripts[key]) {
-      scripts[key] = value;
-      changes.push(`${key}: '${value}'`);
+  for (const [key, value] of Object.entries(scripts)) {
+    if (brandOwned.has(key) || !hasRetiredSetup(value)) continue;
+
+    const healed = manifest[key] === undefined ? withoutRetiredSetup(value) : manifest[key];
+    if (healed) {
+      scripts[key] = healed;
+      changes.push(`${key}: '${healed}' (was '${RETIRED_SETUP_COMMAND}')`);
+    } else {
+      delete scripts[key];
+      changes.push(`${key}: removed (was '${RETIRED_SETUP_COMMAND}')`);
     }
   }
 
-  return { scripts, changes };
+  for (const [key, value] of Object.entries(manifest)) {
+    if (brandOwned.has(key) || scripts[key] === value) continue;
+
+    scripts[key] = value;
+    changes.push(`${key}: '${value}'`);
+  }
+
+  const skipped = Object.keys(manifest).filter((key) => brandOwned.has(key));
+
+  return { scripts, changes, skipped };
 }
 
-module.exports = { healPackageScripts, healTargetScripts, DEPLOY_SCRIPT, START_SCRIPT, MANAGE_SCRIPT };
+module.exports = { healPackageScripts, syncTargetScripts, DEPLOY_SCRIPT, START_SCRIPT, MANAGE_SCRIPT };

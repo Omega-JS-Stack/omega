@@ -7,8 +7,9 @@
  */
 
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Emulator ready deadline — env-tunable, junk fails loudly (#332)',
   type: 'group',
 
@@ -42,4 +43,4 @@ module.exports = {
       },
     },
   ],
-};
+});

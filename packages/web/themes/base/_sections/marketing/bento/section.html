@@ -27,7 +27,7 @@
                 <span class="omega-tile__ordinal">{{ forloop.index }}</span>
               {% endiftruthy %}
               {% iftruthy item.icon %}
-                <span class="omega-icon-chip">{% omega_icon item.icon, "fa-sm" %}</span>
+                <span class="omega-icon-chip"><i class="fa-solid fa-{{ item.icon }} fa-sm"></i></span>
               {% endiftruthy %}
               <span class="omega-tile__title">{{ item.title }}</span>
             </div>
@@ -82,7 +82,7 @@
       <div class="text-center mt-5" data-omega-reveal>
         <a href="{{ args.cta_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ args.cta_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       </div>
       {%- endif %}

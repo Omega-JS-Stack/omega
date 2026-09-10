@@ -1,4 +1,5 @@
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+module.exports = defineCases({
   layer: 'main',
   description: 'runtime.log truncates on boot',
   run: (ctx) => {
@@ -18,4 +19,4 @@ module.exports = {
 
     ctx.expect(fs.readFileSync(logPath, 'utf8')).toBe('');
   },
-};
+});

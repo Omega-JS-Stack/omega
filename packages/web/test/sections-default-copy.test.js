@@ -43,13 +43,13 @@ const SWEPT = [
     id: 'about/timeline',
     body: 'items:\n  - year: "2024"\n    title: "Founded"\n    description: "Two people, one room."\n',
     leaked: 'The moments that shaped how we work.',
-    frame: '/test/sections/section/about/timeline/frames/default-journey',
+    frame: '/test/sections/about/timeline/frames/default-journey',
   },
   {
     id: 'about/principles',
     body: 'items:\n  - title: "Ship it simple"\n    description: "The smallest thing that solves it wins."\n',
     leaked: 'Our working principles, in order.',
-    frame: '/test/sections/section/about/principles/frames/default-principles',
+    frame: '/test/sections/about/principles/frames/default-principles',
   },
 ];
 
@@ -97,13 +97,13 @@ const SWEPT_530 = [
     // before its head exists at all.
     body: 'enabled: true\n',
     leaked: 'Powerful features designed to accelerate your success',
-    frame: '/test/sections/section/marketing/showcase/frames/alternating-rows',
+    frame: '/test/sections/marketing/showcase/frames/alternating-rows',
   },
   {
     id: 'marketing/product-demo',
     body: 'enabled: true\n',
     leaked: 'Explore powerful features that help you succeed',
-    frame: '/test/sections/section/marketing/product-demo/frames/two-tabs',
+    frame: '/test/sections/marketing/product-demo/frames/two-tabs',
   },
   {
     id: 'marketing/pricing-cards',
@@ -111,7 +111,7 @@ const SWEPT_530 = [
     // a plan the way the layout bridges one in.
     body: 'plans:\n  - id: "starter"\n    name: "Starter"\n    free: true\n',
     leaked: 'Start free, upgrade when it pays for itself.',
-    frame: '/test/sections/section/marketing/pricing-cards/frames/two-plans',
+    frame: '/test/sections/marketing/pricing-cards/frames/two-plans',
   },
 ];
 

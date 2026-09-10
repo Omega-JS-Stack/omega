@@ -21,6 +21,7 @@
  */
 const { assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
 const { compiledWith, environment } = require('./_environment.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = 'brand-merge-user';
 
@@ -42,7 +43,7 @@ async function seedUser(env) {
   return env.authenticatedContext(UID, { email: `${UID}@test.com` }).firestore();
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Firestore rules: a brand match block merges into the framework block it names',
   type: 'group',
   timeout: 30000,
@@ -191,4 +192,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -9,7 +9,9 @@
 // The last test restores 'system' + clears the persisted override so the
 // harness leaves no theme residue for later suites.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'theme surface + matchMedia propagation',
@@ -113,4 +115,4 @@ module.exports = {
       },
     },
   ],
-};
+});

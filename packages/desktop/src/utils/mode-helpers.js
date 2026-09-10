@@ -100,7 +100,7 @@ function isTesting() {
 // Renderer caveat: same as isDevelopment — `electron.app` isn't available in renderer,
 // so the fallback to `process.cwd()/package.json` won't find anything useful in a
 // packaged app. Renderers that need the version should ask main via IPC, or read
-// `OMEGA_BUILD_JSON.package.version` (injected by webpack DefinePlugin).
+// `OMEGA_BUILD_JSON.package.version` (baked in by the bundle task's `define`).
 function getVersion() {
   if (typeof require !== 'undefined') {
     try {

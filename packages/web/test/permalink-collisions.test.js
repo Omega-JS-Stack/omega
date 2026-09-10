@@ -139,7 +139,7 @@ const configure = (fixture, environment) => configureOmega(stubConfig(), {
   coreDir: fixture.coreDir,
   defaultsDir: fixture.defaultsDir,
   environment,
-  assetManifest: { js: { pages: {} }, css: { pages: {}, themePages: {} } },
+  assetManifest: { js: { pages: {} }, css: { pages: {}, layouts: {} } },
 });
 
 test('a production build dies on a collision the config scan found', (t) => {

@@ -39,10 +39,10 @@ const MOUNT_SELECTOR = '[data-omega-language-switcher]';
 const LIST_SELECTOR = '[data-omega-language-list]';
 const ALTERNATE_SELECTOR = 'link[rel="alternate"][hreflang]';
 
-// The emitted icon set (emitIcons ships core/icons/* to assets/fa/*), served
+// The emitted icon set (emitIcons ships core/icons/* to assets/icons/*), served
 // from the site's own origin exactly like the runtime Font Awesome transport
 const FLAG_SELECTOR = 'img[data-omega-language-flag]';
-const FLAG_BASE = '/assets/fa/flags/lang/';
+const FLAG_BASE = '/assets/icons/flags/lang/';
 
 /**
  * Name one language in its own tongue.

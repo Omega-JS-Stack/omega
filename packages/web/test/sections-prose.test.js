@@ -95,15 +95,15 @@ test('#515: neutral defaults — an unauthored call puts no words on the page', 
 test('#515: the gallery ships the entry and its variants', async () => {
   const pages = await buildWith(miniData);
 
-  const entry = pages.get('/test/sections/section/marketing/prose');
+  const entry = pages.get('/test/sections/marketing/prose');
   assert.ok(entry, 'the entry page built');
   assert.ok(entry.includes('body'), 'the args table documents the body arg');
 
-  const full = pages.get('/test/sections/section/marketing/prose/frames/head-and-lede');
+  const full = pages.get('/test/sections/marketing/prose/frames/head-and-lede');
   assert.ok(full, 'the Head and lede variant frame built');
   assert.ok(full.includes('omega-prose'), 'with its paragraphs');
 
-  const headOnly = pages.get('/test/sections/section/marketing/prose/frames/head-only');
+  const headOnly = pages.get('/test/sections/marketing/prose/frames/head-only');
   assert.ok(headOnly, 'the Head only variant frame built');
   assert.ok(!headOnly.includes('omega-prose'), 'and renders exactly that');
 });

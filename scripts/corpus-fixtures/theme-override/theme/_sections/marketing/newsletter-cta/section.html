@@ -1,0 +1,14 @@
+{%- comment -%}
+  Corpus tier-2 override markup. Deliberately minimal, but it KEEPS the DOM
+  contract the inherited base section.js queries (form.newsletter-form,
+  .button-text) — that contract is what `inherit: ['js']` buys into.
+{%- endcomment -%}
+<section data-corpus-override="section-html-inherit">
+  <div class="container">
+    <h2>{{ args.headline }}</h2>
+    <form class="newsletter-form">
+      <input type="email" name="email" aria-label="Email address">
+      <button type="submit"><span class="button-text">{{ args.button.text }}</span></button>
+    </form>
+  </div>
+</section>

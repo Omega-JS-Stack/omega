@@ -19,9 +19,13 @@ updates:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: "Changelog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    {% component "heading/masthead", eyebrow: "Changelog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, first_paint: true %}
   </div>
 </section>
 
@@ -78,7 +82,7 @@ updates:
 
                   <span class="omega-timeline__more small">
                     {{ resolved.updates.view_details }}
-                    {% omega_icon "arrow-right", "fa-xs ms-1" %}
+                    <i class="fa-solid fa-arrow-right fa-xs ms-1"></i>
                   </span>
                 </div>
               </article>
@@ -100,12 +104,12 @@ updates:
   <div class="container">
     <div class="d-flex justify-content-center align-items-center gap-3 omega-quiet small flex-wrap" data-omega-reveal>
       <a href="/status" class="text-decoration-none">
-        {% omega_icon "signal", "fa-xs me-1" %}
+        <i class="fa-solid fa-signal fa-xs me-1"></i>
         System status
       </a>
       <span>•</span>
       <a href="/blog" class="text-decoration-none">
-        {% omega_icon "newspaper", "fa-xs me-1" %}
+        <i class="fa-solid fa-newspaper fa-xs me-1"></i>
         The blog
       </a>
     </div>

@@ -108,6 +108,15 @@ function createAdapter({ provider, consentCategory, attach }) {
       descriptor.method = mapping.method;
     }
 
+    // The other optional mapping key a TRANSPORT reads rather than a platform's
+    // payload: Meta's `action_source`, the required server-event field naming
+    // WHERE a conversion happened. Carried the same way `method` is, only when
+    // the catalog overrides the default the sender supplies
+    // ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
+    if (mapping.actionSource) {
+      descriptor.actionSource = mapping.actionSource;
+    }
+
     if (attach) {
       attach(descriptor, context.attribution);
     }

@@ -29,7 +29,7 @@
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret
   // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (.env — matches @omega.js/backend/EM convention)
-  // and is baked into the build snapshot (build.json / OMEGA_BUILD_JSON) at build time.
+  // and is baked into the build snapshot (OMEGA_BUILD_JSON, in every bundle) at build time.
   analytics: {
     providers: {
       google: {

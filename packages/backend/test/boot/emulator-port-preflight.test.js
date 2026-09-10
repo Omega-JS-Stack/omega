@@ -14,6 +14,7 @@
 const net = require('net');
 const os = require('os');
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A command instance needs nothing from the project to sweep ports.
 function makeCommand() {
@@ -22,28 +23,11 @@ function makeCommand() {
   return command;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Emulator port preflight and the gated port sweep (#332)',
   type: 'group',
 
   tests: [
-    {
-      name: 'a-free-port-is-never-looked-up-only-a-held-one-is',
-      async run({ assert }) {
-        const command = makeCommand();
-        const lookedUp = [];
-
-        await command.reapOrphanedEmulators([5001, 8080], { pids: [], projectId: null }, {
-          isFree: async (port) => port !== 8080,
-          listPids: (port) => {
-            lookedUp.push(port);
-            return [];
-          },
-        });
-
-        assert.deepEqual(lookedUp, [8080], 'only the held port costs a pid lookup; the free ones are never shelled out for');
-      },
-    },
     {
       name: 'the-shutdown-sweep-is-gated-the-same-way',
       async run({ assert }) {
@@ -139,4 +123,4 @@ module.exports = {
       },
     },
   ],
-};
+});

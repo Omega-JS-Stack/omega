@@ -152,7 +152,7 @@ test('the real bundler splits mermaid into its own chunk — the page entry stay
   // Mermaid's own words — present in the library, nowhere else.
   const MARKER = 'Syntax error in text';
   const files = fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks')).map((name) => path.join(outDir, 'assets', 'js', 'chunks', name));
-  const entry = path.join(outDir, manifest.js.pages.index.slice(1));
+  const entry = path.join(outDir, manifest.js.pages.index[0].slice(1));
   const carriers = [...files, entry].filter((file) => fs.readFileSync(file, 'utf8').includes(MARKER));
 
   assert.equal(carriers.length, 1, `mermaid lands in exactly one file (found ${carriers.length})`);

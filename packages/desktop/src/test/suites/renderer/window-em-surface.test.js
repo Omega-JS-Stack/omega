@@ -5,7 +5,9 @@
 // reconstructs each `run` function via `new Function('ctx', body)` so the function bodies
 // here can only reference `ctx` and `window` — no closures over module scope.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'window.desktop surface + storage proxy roundtrip',
@@ -102,4 +104,4 @@ module.exports = {
       },
     },
   ],
-};
+});

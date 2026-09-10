@@ -13,7 +13,8 @@
  */
 const assert = require('node:assert');
 
-const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
+const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The leak fixture: a user document shaped the way a sender hands it to Email.send().
 const LEAKED_KEY = 'sk_test_fake_leak';
@@ -51,7 +52,7 @@ async function captureSend(to) {
 let userDocSend;
 const sendWithUserDoc = () => (userDocSend = userDocSend || captureSend(USER_DOC));
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email.send() log privacy (recipient named by address/uid, never serialized)',
   type: 'group',
   tests: [
@@ -103,4 +104,4 @@ module.exports = {
       },
     },
   ],
-};
+});

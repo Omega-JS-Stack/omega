@@ -10,7 +10,9 @@
  * This is @omega.js/backend's equivalent of BXM's `boot/extension-loads` and UJM's site-boot
  * smoke. It is EXCLUDED from real-consumer runs (see runner.js discoverTests).
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Boot smoke — fixture emulator + omega_api reachable',
   type: 'group',
   timeout: 30000,
@@ -34,4 +36,4 @@ module.exports = {
       },
     },
   ],
-};
+});

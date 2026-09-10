@@ -9,6 +9,7 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES, getAvailableFrequencies } from '../../../payment/checkout/modules/state.js';
+import { resolveFeatures } from '@omega.js/client/modules/features.js';
 
 const logger = createLogger('account:billing');
 
@@ -819,26 +820,32 @@ function isCurrentPlan(productId, frequency, currentProductId, currentFrequency)
   return !currentFrequency || frequency === currentFrequency;
 }
 
-// A plan's headline features, straight off the SAME `payment.products` catalog
-// the pricing page composes its cards from — the config is the only home of this
-// copy — and presented the way the pricing card presents them: a green check,
-// the resolved value, and the feature's definition on hover behind the same
-// dotted underline. A feature's value falls back to the product's matching
-// limit, and -1 is the catalog's "unlimited" sentinel.
+// A plan's headline features, from the SAME two halves the pricing page composes
+// its cards from — the FEATURES CATALOG (name, icon, definition, row order) and
+// the product's own values map — and presented the way the pricing card presents
+// them: a green check, the value, and the feature's definition on hover behind
+// the same dotted underline. -1 is the catalog's "unlimited" sentinel, and a
+// value of `false` (or absent) means the tier does not include the feature at
+// all ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
 //
 // The definition is ALSO spelled out for assistive tech: a tooltip is
 // hover/focus text on an element that is neither, and these bullets are a
 // radio's description rather than a stop of their own.
 function renderPlanFeatures(product, id) {
-  const features = (product.features || []).slice(0, HEADLINE_FEATURE_LIMIT);
+  const catalog = featureCatalog();
+  const values = product.features || {};
+  const features = Object.keys(catalog)
+    .filter((featureId) => values[featureId] !== undefined && values[featureId] !== false)
+    .slice(0, HEADLINE_FEATURE_LIMIT)
+    .map((featureId) => ({ id: featureId, ...catalog[featureId] }));
 
   if (features.length === 0) {
     return '';
   }
 
   const items = features.map((feature) => {
-    const value = feature.value === undefined ? product.limits?.[feature.id] : feature.value;
-    const definition = resolveFeatureDefinition(feature);
+    const value = values[feature.id];
+    const definition = feature.definition || null;
     let prefix = '';
 
     // A value only prints when it SAYS something. `true` means "included" —
@@ -865,22 +872,12 @@ function renderPlanFeatures(product, id) {
   return `<ul class="omega-plan-card__features list-unstyled mb-0" id="${id}">${items.join('')}</ul>`;
 }
 
-// A feature's explanation, authored ONCE in the catalog: a definition on any
-// product's copy of a feature explains every other copy, exactly as the pricing
-// page's composer backfills them (`packages/web/src/pricing.js`).
-function resolveFeatureDefinition(feature) {
-  if (feature.definition) {
-    return feature.definition;
-  }
-
-  for (const product of paymentConfig?.products || []) {
-    const match = (product.features || []).find(other => other.id === feature.id && other.definition);
-    if (match) {
-      return match.definition;
-    }
-  }
-
-  return null;
+// The FEATURES CATALOG — the ONE home of what a feature is called, what icon it
+// wears and what its definition says. A product names only its value, so no copy
+// here can disagree with the pricing page's
+// ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+function featureCatalog() {
+  return omega.config?.features || {};
 }
 
 function getSelectedPlan() {
@@ -1464,72 +1461,116 @@ function populateCancelReasons() {
 
 // ─── Usage Metrics ───────────────────────────────────────────
 
+// A bar per COUNTED feature the catalog defines: what is left today, what is
+// left this month, and the override credits included in the month's number when
+// an admin granted any ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+//
+// Both numbers are shown because either one can be the thing standing in the
+// user's way: a paced feature refuses on the day's share long before the month
+// runs out, and a bar that only drew the month would leave "why did that fail?"
+// unanswered. The arithmetic is @omega.js/account's, the same module the
+// backend's gate reads, so a bar can never draw a limit the gate would not
+// enforce. Names, icons and definitions come from the catalog.
 function updateUsageInfo(account) {
-  const subscription = account.subscription || {};
   const $container = document.getElementById('usage-metrics-container');
 
   if (!$container) {
     return;
   }
 
-  // Use the effective plan for usage limits (basic if cancelled/suspended)
+  // The EFFECTIVE plan (basic if cancelled/suspended) is the one whose numbers apply
   const resolved = omega.auth().resolveSubscription(account);
   const product = paymentConfig?.products?.find(p => p.id === resolved.plan);
-  const limits = product?.limits || {};
+  const catalog = featureCatalog();
+
+  const features = resolveFeatures({ catalog, product: product || {}, account })
+    .filter((feature) => feature.counted && feature.limit !== 0);
 
   // Clear container
   $container.innerHTML = '';
 
-  // Get product limits from app data
-  if (!product || !limits || Object.keys(limits).length === 0) {
+  if (features.length === 0) {
     $container.innerHTML = '<div class="text-muted">Usage tracking not available for this plan.</div>';
     return;
   }
 
-  // Get actual usage from account
-  const usage = account.usage || {};
+  $container.innerHTML = features.map(renderUsageFeature).join('');
 
-  // Create a usage bar for each metric in limits
-  Object.entries(limits).forEach(([metricId, limit]) => {
-    const metricUsage = usage[metricId] || {};
-    const used = metricUsage.period || 0;
+  initializeTooltips($container);
+}
 
-    const isUnlimited = limit === -1;
-    const usagePercent = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+// One feature's block: its name (with the catalog's definition on hover), the
+// day bar when the feature is paced, and the month bar always.
+function renderUsageFeature(feature) {
+  const escape = omega.utilities().escapeHTML;
+  const icon = feature.icon
+    ? `<i class="fa-solid fa-${escape(feature.icon)} fa-sm me-1 text-muted"></i>`
+    : '';
+  const name = feature.definition
+    ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${escape(feature.definition)}">${escape(feature.name)}</span>`
+      + `<span class="visually-hidden"> &mdash; ${escape(feature.definition)}</span>`
+    : escape(feature.name);
 
-    let progressClass = 'bg-success';
-    if (!isUnlimited && usagePercent >= 80) {
-      progressClass = 'bg-danger';
-    } else if (!isUnlimited && usagePercent >= 50) {
-      progressClass = 'bg-warning';
-    }
+  // The override is EXTRA credits an admin granted ON TOP of the plan — say so,
+  // because the number beside it is not the number the pricing page quotes.
+  // Only when it is genuinely extra: an override can also dial a plan DOWN for
+  // one account, and subtracting unconditionally announced that as "+-50
+  // granted". A lower override is still the limit the bar draws; it just has no
+  // gift to claim.
+  const extra = feature.override !== null ? feature.override - feature.planLimit : 0;
+  const granted = extra > 0
+    ? `<span class="badge text-bg-success-subtle ms-2">+${escape(formatMetricValue(feature.id, extra))} granted</span>`
+    : '';
 
-    const metricName = formatMetricName(metricId);
-    const formattedUsed = formatMetricValue(metricId, used);
-    const formattedLimit = isUnlimited ? '∞' : formatMetricValue(metricId, limit);
+  const bars = [
+    feature.day.limit >= 0 ? renderUsageBar(feature, feature.day.limit, feature.day.used, feature.day.left, 'today') : '',
+    renderUsageBar(feature, feature.limit, feature.used, feature.left, 'this month'),
+  ].join('');
 
-    $container.innerHTML += `
+  return `
       <div class="mb-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <small class="text-muted fw-semibold">${omega.utilities().escapeHTML(metricName)}</small>
-          <small class="text-muted">${omega.utilities().escapeHTML(formattedUsed)} / ${omega.utilities().escapeHTML(formattedLimit)}</small>
+          <small class="text-muted fw-semibold">${icon}${name}${granted}</small>
         </div>
-        <div class="progress" style="height: 20px;">
+        ${bars}
+      </div>
+    `;
+}
+
+// One bar. `limit` of -1 is unlimited: no percentage can be honest about a
+// number with no ceiling, so the bar stays empty and the label says so.
+function renderUsageBar(feature, limit, used, left, period) {
+  const escape = omega.utilities().escapeHTML;
+  const isUnlimited = limit < 0;
+  const usagePercent = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+
+  let progressClass = 'bg-success';
+  if (!isUnlimited && usagePercent >= 80) {
+    progressClass = 'bg-danger';
+  } else if (!isUnlimited && usagePercent >= 50) {
+    progressClass = 'bg-warning';
+  }
+
+  const label = isUnlimited
+    ? `Unlimited ${period}`
+    : `${formatMetricValue(feature.id, left)} of ${formatMetricValue(feature.id, limit)} left ${period}`;
+
+  return `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <small class="text-muted">${escape(period)}</small>
+          <small class="text-muted">${escape(label)}</small>
+        </div>
+        <div class="progress mb-2" style="height: 20px;">
           <div class="progress-bar ${progressClass}" role="progressbar"
                style="width: ${usagePercent}%"
                aria-valuenow="${usagePercent}"
                aria-valuemin="0"
-               aria-valuemax="100">
+               aria-valuemax="100"
+               aria-label="${escape(`${feature.name} used ${period}`)}">
             ${usagePercent}%
           </div>
         </div>
-      </div>
-    `;
-  });
-
-  if ($container.innerHTML === '') {
-    $container.innerHTML = '<div class="text-muted">No usage data available.</div>';
-  }
+      `;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -1578,18 +1619,9 @@ function formatCurrency(amount, currency) {
   }).format(amount); // amount is already in display dollars
 }
 
-function formatMetricName(metricId) {
-  const names = {
-    requests: 'API Requests',
-    tokens: 'Tokens',
-    storage: 'Storage',
-    bandwidth: 'Bandwidth',
-    users: 'Users',
-    projects: 'Projects',
-  };
-  return names[metricId] || metricId.charAt(0).toUpperCase() + metricId.slice(1);
-}
-
+// A feature's value in the units it is counted in. The NAME is never derived
+// here any more — the catalog holds it (#647), so a brand that renames a
+// feature renames it in one place.
 function formatMetricValue(metricId, value) {
   if (metricId === 'storage' || metricId === 'bandwidth') {
     return formatBytes(value);

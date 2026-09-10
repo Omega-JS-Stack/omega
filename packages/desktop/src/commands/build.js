@@ -4,7 +4,7 @@ const logger = Manager.logger('build');
 const { runPipeline } = require('../utils/build-pipeline.js');
 const { ensureTarget } = require('./lib/ensure-target.js');
 
-// The consumer's `build` script is `npx omega build` — this verb owns the
+// The consumer's `build` script is `omega build` — this verb owns the
 // pipeline and the build-mode flag; it must never shell back to that script.
 // `certs` delivers the Apple artifacts first (#678).
 function plan() {

@@ -28,6 +28,7 @@
  * the generated pages carry, plus their own meta.
  */
 const { BUILT_IN_COLLECTIONS } = require('./collections.js');
+const { CONFIG_SECTIONS, SITE_FACT_KEYS } = require('./config-sections.js');
 
 // The listing's default page size — the blog's `per_page` (defaults/pages/blog.md).
 const DEFAULT_SIZE = 6;
@@ -51,7 +52,7 @@ const escapeYaml = (value) => yaml(value).slice(1, -1);
  * an empty section of a site reads exactly like an unwritten one.
  * @param {object} [config] - the raw targets.web.collections value
  * @returns {Array<object>} one entry per collection (empty when unset)
- * @throws {Error} on a bad shape, a built-in name, or a missing/invalid field
+ * @throws {Error} on a bad shape, a reserved name, or a missing/invalid field
  */
 function readCollections(config) {
   if (config === undefined || config === null) return [];
@@ -86,6 +87,28 @@ function readCollection(name, value) {
     throw new Error(
       `${at} is already an OMEGA collection — the built-in collections are `
       + `${BUILT_IN_COLLECTIONS.map((collection) => collection.name).join(', ')}, and they bring their own pages. `
+      + `Name your collection something else.`,
+    );
+  }
+
+  // The other two rosters the name would collide with (#593). A declared
+  // collection publishes as `site.<name>`, so a build fact's name is silently
+  // OVERWRITTEN (site.pricing becomes []; site.time is not even an array, so
+  // the sync throws "push is not a function" mid-build), and a config
+  // section's name makes the collection's own `site.<name>` read fail the
+  // dead-read guard with advice that cannot fix it (#611).
+  if (SITE_FACT_KEYS.includes(name)) {
+    throw new Error(
+      `${at} is already a site build fact — the build composes `
+      + `${SITE_FACT_KEYS.join(', ')} onto the \`site\` global, and a collection named ${name} overwrites site.${name}. `
+      + `Name your collection something else.`,
+    );
+  }
+
+  if (CONFIG_SECTIONS.has(name)) {
+    throw new Error(
+      `${at} is already a config section — omega.json5's ${name} block is what templates read as `
+      + `resolved.config.${name}, so this collection's own \`site.${name}\` reads would fail the build instead. `
       + `Name your collection something else.`,
     );
   }
@@ -220,8 +243,11 @@ function applyDocumentData(collection, data, brandName) {
   // category field (doc.category → doc.title); a bare `title` is the flat
   // spelling, and a title-cased slug is the last resort — a page with no name
   // still must not answer to the site's.
+  // `name` is the other spelling a real corpus uses for the same thing (#596,
+  // soundgrail's `product.name`), and `title` outranks it when a document
+  // carries both.
   const entry = (collection.namespace && data[collection.namespace]) || {};
-  const title = entry.title || data.title || titleCase(String(data.page.fileSlug || ''));
+  const title = entry.title || entry.name || data.title || titleCase(String(data.page.fileSlug || ''));
   const meta = data.meta || {};
 
   // The layout's h1 falls back through `resolved.title`; fill it so an
@@ -273,9 +299,11 @@ function collectionPages(collection) {
         // The listing survives an empty collection — a brand that declared it
         // before writing anything still gets the page (and its empty state).
         '  generatePageOnEmptyData: true',
-        // Eleventy reads this off RAW frontmatter when it expands pagination,
-        // before any computed data exists (test/collections-gate.test.js).
-        'eleventyExcludeFromCollections: true',
+        // NO eleventyExcludeFromCollections, the blog listing's own exemption
+        // (#564, defaults/pages/blog.md): page 1 IS the collection's canonical
+        // page and belongs in sitemap.xml, and Eleventy adds only page 0 of a
+        // paginated template to collections, so pages 2..N stay out of the
+        // walk exactly as the index flag says they should.
         '---',
         '',
       ].join('\n'),
@@ -303,6 +331,10 @@ function collectionPages(collection) {
         `  title: "{{ resolved.category.name | omega_title_case }} - ${escapeYaml(collection.title)} - {{ resolved.config.brand.name }}"`,
         `  description: "Browse all ${escapeYaml(collection.title)} in the {{ resolved.category.name | omega_title_case }} category."`,
         '  breadcrumb: "{{ resolved.category.name | omega_title_case }}"',
+        // The index posture (#564): a category page is a list of links to
+        // pages that are themselves indexed, so it is noindex AND out of
+        // sitemap.xml — one flag, both signals. Same as the blog taxonomy.
+        '  index: false',
         '',
         'pagination:',
         `  data: collections.${collection.taxonomy}`,

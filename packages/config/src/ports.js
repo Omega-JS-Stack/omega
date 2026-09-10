@@ -20,6 +20,11 @@
  * beside the map in the same file, and `readSiblingOrigin` reads it back
  * ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)).
  *
+ * Under local HTTPS the map carries two hosting entries: `https` is the
+ * public origin (the mkcert proxy) and `hosting` is the proxy's INTERNAL
+ * plain-http port. A consumer process targets `https`, never `hosting`
+ * ([#795](https://github.com/Omega-JS-Stack/omega/issues/795)).
+ *
  * Explicit pins (config `ports` section) never bump: a pinned port that is
  * busy is a hard error naming the pin, because the user asked for exactly
  * that port.

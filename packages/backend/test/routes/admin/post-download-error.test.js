@@ -13,13 +13,14 @@
  *     image broke.
  *   - Long reasons are truncated; empty reasons fall back to "unknown error".
  */
-const post = require('../../../src/manager/routes/admin/post/post');
+const post = require('../../../dist/manager/routes/admin/post/post');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { formatImageDownloadError } = post;
 
 const SRC = 'https://images.unsplash.com/photos/ux-prism-qv5lQ4DwOS8';
 
-module.exports = {
+module.exports = defineCases({
   description: 'routes/admin/post/post.formatImageDownloadError',
   type: 'group',
 
@@ -86,4 +87,4 @@ module.exports = {
       },
     },
   ],
-};
+});

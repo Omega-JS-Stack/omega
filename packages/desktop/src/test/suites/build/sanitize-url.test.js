@@ -1,8 +1,9 @@
 // sanitize-url tests — zero-trust URL gate for shell.openExternal and friends.
 
 const sanitizeURL = require('../../../utils/sanitize-url.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'sanitize-url',
@@ -74,4 +75,4 @@ module.exports = {
       },
     },
   ],
-};
+});

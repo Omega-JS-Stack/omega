@@ -44,7 +44,7 @@ test('brand.url set → the domain root: a CNAME cannot carry a path', () => {
 test('brand.url unset → the Pages project address /<name>/, from the slug the deploy plan resolves', () => {
   assert.equal(deployPathPrefix({ repo: { providers: { github: { org: 'Org', repo: 'site' } } }, brand: { id: 'b' } }, {}), '/site/');
   assert.equal(deployPathPrefix({ repo: { providers: { github: { repo: 'itw-creative-works/omega-brand' } } } }, {}), '/omega-brand/', 'the owner/name slug names the repo, not the owner');
-  assert.equal(deployPathPrefix({ brand: { id: 'my-brand' } }, {}), '/my-brand/', 'brand.id is the slug fallback (same chain as the direct plan)');
+  assert.equal(deployPathPrefix({ brand: { id: 'my-brand' } }, {}), '/my-brand-omega/', 'the derived `<brand.id>-omega` repo is the slug fallback (same chain as the direct plan)');
 });
 
 // #366 — a *.github.io brand.url is the PROJECT ADDRESS, not a custom domain:
@@ -74,7 +74,7 @@ test('an explicitly exported OMEGA_PATH_PREFIX wins the autofill; a blank one is
 
 test('the value normalizes through resolvePathPrefix — ONE normalizer (#355 owns it)', () => {
   assert.equal(deployPathPrefix({ repo: { providers: { github: { repo: 'Org//My-Site//' } } } }, {}), '/My-Site/');
-  assert.equal(deployPathPrefix({ brand: { id: '  spaced  ' } }, {}), '/spaced/');
+  assert.equal(deployPathPrefix({ brand: { id: '  spaced  ' } }, {}), '/spaced-omega/');
 
   // What the build receives is what #355 normalizes: the two agree exactly.
   const derived = deployPathPrefix({ repo: { providers: { github: { repo: 'Org/site' } } } }, {});
@@ -84,7 +84,7 @@ test('the value normalizes through resolvePathPrefix — ONE normalizer (#355 ow
 
 test('targetPathPrefix: the target-dir entry point loads the composed config (the CI lane calls this)', () => {
   const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, targets: { web: {} } }\n");
-  assert.equal(targetPathPrefix(project, {}), '/acme/', 'no brand.url → the project address');
+  assert.equal(targetPathPrefix(project, {}), '/acme-omega/', 'no brand.url → the project address');
   fs.rmSync(project, { recursive: true, force: true });
 
   const domain = tmpTarget("{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");

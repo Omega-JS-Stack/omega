@@ -2,8 +2,9 @@
 // from @omega.js/desktop defaults + consumer config + override merging.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'build-config — generate electron-builder.yml from omega.json5',
@@ -67,6 +68,102 @@ module.exports = {
         for (const t of out.linux.target) {
           ctx.expect(t.arch).toEqual(['x64']);
         }
+      },
+    },
+    {
+      name: 'baseConfig: artifact names carry NO version, from @omega.js/config\'s ONE rule (#620)',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const { desktopArtifactNames } = require('@omega.js/config');
+        const out = baseConfig({ app: { productName: 'Deployment Playground' } });
+        const names = desktopArtifactNames('Deployment Playground');
+
+        // Versionless names are what makes
+        // github.com/<org>/<repo>/releases/latest/download/<asset> a stable
+        // direct-download URL — the site derives its buttons from THESE names,
+        // so a second spelling here is a dead download button.
+        ctx.expect(out.mac.artifactName).toBe('Deployment-Playground-mac-universal.${ext}');
+        ctx.expect(out.nsis.artifactName).toBe('Deployment-Playground-windows-universal.${ext}');
+        ctx.expect(out.deb.artifactName).toBe(names.linux.debian);
+        ctx.expect(out.appImage.artifactName).toBe(names.linux.appimage);
+
+        // The mac fallback covers the dmg AND the auto-update zip, so the dmg
+        // needs no override of its own.
+        ctx.expect(out.mac.artifactName.replace('${ext}', 'dmg')).toBe(names.mac.universal);
+        ctx.expect(out.nsis.artifactName.replace('${ext}', 'exe')).toBe(names.windows.universal);
+        ctx.expect(out.dmg.artifactName).toBe(undefined);
+
+        // Nothing keeps a ${version} token — every name is stable across releases.
+        for (const template of [out.mac.artifactName, out.nsis.artifactName, out.deb.artifactName, out.appImage.artifactName, out.linux.artifactName]) {
+          ctx.expect(template.includes('${version}')).toBe(false);
+        }
+      },
+    },
+    {
+      name: 'baseConfig: an arch the versionless names cannot spell REFUSES the build (#620)',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const quiet = { log() {}, warn() {}, error() {} };
+        const build = { mode: { build: true }, logger: quiet };
+
+        // Two linux archs share ONE deb name and ONE AppImage name — the
+        // second arch's artifact overwrites the first's.
+        let onLinux = null;
+        try {
+          baseConfig({ platforms: { linux: { arch: ['x64', 'arm64'] } } }, build);
+        } catch (e) {
+          onLinux = e;
+        }
+        ctx.expect(onLinux === null).toBe(false);
+        ctx.expect(onLinux.message).toContain('platforms.linux.arch');
+
+        // A non-universal mac build would ship under the name `-mac-universal`.
+        let onMac = null;
+        try {
+          baseConfig({ platforms: { mac: { arch: ['arm64'] } } }, build);
+        } catch (e) {
+          onMac = e;
+        }
+        ctx.expect(onMac === null).toBe(false);
+        ctx.expect(onMac.message).toContain('platforms.mac.arch');
+
+        // A publish run is a build for this purpose.
+        let onPublish = null;
+        try {
+          baseConfig({ platforms: { mac: { arch: ['arm64'] } } }, { mode: { publish: true }, logger: quiet });
+        } catch (e) {
+          onPublish = e;
+        }
+        ctx.expect(onPublish === null).toBe(false);
+
+        // Development warns and keeps going — the collision only lands when a
+        // build actually publishes those files.
+        const said = [];
+        const loud = { log() {}, warn: (m) => said.push(m), error() {} };
+        const out = baseConfig({ platforms: { mac: { arch: ['arm64'] } } }, { mode: { build: false, publish: false }, logger: loud });
+        ctx.expect(out.mac.target[0].arch).toEqual(['arm64']);
+        ctx.expect(said.join('\n')).toContain('platforms.mac.arch');
+      },
+    },
+    {
+      name: 'baseConfig: the shippable arch sets pass — universal mac, single-arch linux, multi-arch windows',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const quiet = { log() {}, warn() {}, error() {} };
+        const build = { mode: { build: true }, logger: quiet };
+
+        // The defaults are what every brand ships: nothing to refuse.
+        const defaults = baseConfig({}, build);
+        ctx.expect(defaults.mac.target[0].arch).toEqual(['universal']);
+        ctx.expect(defaults.linux.target[0].arch).toEqual(['x64']);
+
+        // NSIS merges every arch into ONE installer, so windows is genuinely
+        // safe — its multi-arch default is never refused.
+        ctx.expect(baseConfig({ platforms: { win: { arch: ['x64', 'ia32', 'arm64'] } } }, build).win.target[0].arch)
+          .toEqual(['x64', 'ia32', 'arm64']);
+
+        // One linux arch names one deb: an arm64-only brand ships fine.
+        ctx.expect(baseConfig({ platforms: { linux: { arch: ['arm64'] } } }, build).linux.target[0].arch).toEqual(['arm64']);
       },
     },
     {
@@ -306,6 +403,48 @@ module.exports = {
       },
     },
     {
+      name: 'publishConfig: the auto-update feed is the config\'s releases repo, never the git remote (#799)',
+      run: (ctx) => {
+        const { publishConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+
+        // A brand nested in another repo (the playground inside this monorepo)
+        // resolves to its OWN releases repo: the git remote here is the
+        // framework monorepo, and a feed baked from it would 404 forever.
+        ctx.expect(publishConfig({
+          brand: { id: 'omega-playground' },
+          repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
+          releases: {},
+        })).toEqual({
+          provider:    'github',
+          owner:       'Omega-JS-Stack',
+          repo:        'omega-playground-releases',
+          releaseType: 'release',
+        });
+
+        // An explicit block still names its own repo.
+        ctx.expect(publishConfig({
+          brand: { id: 'acme' },
+          repo: { providers: { github: { org: 'Acme-Org' } } },
+          releases: { owner: 'Acme-Binaries', repo: 'acme-bins' },
+        }).repo).toBe('acme-bins');
+      },
+    },
+    {
+      name: 'publishConfig: releases.enabled false publishes nowhere, and an unaddressable repo emits no block',
+      run: (ctx) => {
+        const { publishConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+
+        ctx.expect(publishConfig({
+          brand: { id: 'acme' },
+          repo: { providers: { github: { org: 'Acme-Org' } } },
+          releases: { enabled: false },
+        })).toBe(null);
+
+        // No owner anywhere: half an address addresses nothing.
+        ctx.expect(publishConfig({ brand: { id: 'acme' }, releases: {} })).toBe(null);
+      },
+    },
+    {
       name: 'baseConfig: empty fileAssociations + protocols arrays NOT emitted',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
@@ -315,4 +454,4 @@ module.exports = {
       },
     },
   ],
-};
+});

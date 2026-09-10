@@ -6,11 +6,12 @@
  * DNS negative tests require TEST_EXTENDED_MODE (live DNS resolution).
  * Mailbox verification tests require TEST_EXTENDED_MODE + NEVERBOUNCE_API_KEY or ZEROBOUNCE_API_KEY.
  */
-const { validate, isDisposable, isCorporate, DEFAULT_CHECKS, ALL_CHECKS } = require('../../src/manager/libraries/email/validation.js');
+const { validate, isDisposable, isCorporate, DEFAULT_CHECKS, ALL_CHECKS } = require('../../dist/manager/libraries/email/validation.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const HAS_MAILBOX_API_KEY = !!(process.env.NEVERBOUNCE_API_KEY || process.env.ZEROBOUNCE_API_KEY);
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email validation',
   type: 'group',
   tests: [
@@ -742,4 +743,4 @@ module.exports = {
       },
     },
   ],
-};
+});

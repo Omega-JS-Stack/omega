@@ -1,38 +1,53 @@
 /**
- * Generalized brand e2e harness — boots the real stack (emulator + website),
- * provides step/teardown primitives, and lets each brand author its own
- * browser-driven test steps. Puppeteer stays in the brand's devDeps.
+ * The brand e2e harness — a brand's own browser lane, standing on its REAL
+ * local stack ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)).
+ *
+ * It boots what a developer boots: the backend emulator (persona seeding
+ * included) and the website's real `omega dev`. Nothing static, nothing built.
+ * That is the whole point of the rewrite: `omega build` is always a PRODUCTION
+ * build, so a served build never connects to the emulator, and a lane driving
+ * it proves a page nobody will ever load. Dev mode connects to the emulators
+ * with zero flags, which is exactly the stack a brand's pages are written for.
+ *
+ * It owns its stack and never disturbs a live one: every CLASSIC port is HELD
+ * for the run, so the N7 allocator in both children bumps past them onto fresh
+ * ones. A classic port somebody else already holds is left alone, and the
+ * allocator bumps around it just the same.
  *
  * Usage:
  *   const { E2eHarness } = require('@omega.js/devkit/test/e2e-harness');
- *   const harness = new E2eHarness(brandRoot, { sitePort: 4600 });
+ *   const harness = new E2eHarness(brandRoot);
  *   await harness.boot();
- *   // ... brand-specific puppeteer steps via harness.step() ...
+ *   const browser = await harness.launchBrowser();
+ *   const page = await browser.newPage();
+ *   await harness.preparePage(page);
+ *   // ... brand-specific steps via harness.step() ...
  *   await harness.teardown();
  *   harness.exit();
  */
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
-const { spawn } = require('child_process');
-const { resolvePorts, readPortsFile } = require('@omega.js/config');
+const { readPortsFile, resolvePorts, CLASSIC_PORTS } = require('@omega.js/config');
+const { findTarget } = require('../omega-bin.js');
+const { startChild, stopChild } = require('./boot-child.js');
+const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('./port-hold.js');
+const { launchBrowser } = require('./browser.js');
 const { createStepsLog } = require('./steps-log.js');
 
-const CONTENT_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json',
-  '.map': 'application/json',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-};
-
 // Covers emulator boot AND persona seeding (~55 accounts) — the ready marker
-// fires after both (see _startEmulator's watch comment).
-const EMULATOR_READY_TIMEOUT = 240000;
+// fires after both.
+const EMULATOR_READY_TIMEOUT = 300000;
+const DEV_READY_TIMEOUT = 300000;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// The emulator marker is the CLI's post-seed line, NOT firebase-tools' "All
+// emulators ready": persona seeding runs BETWEEN the two and STARTS with a
+// full Firestore wipe + auth bulk-clear, so proceeding on the firebase line
+// races the first browser step into that wipe window. The text lives in
+// @omega.js/backend's emulator command (cli/commands/emulator.js) — change in
+// lockstep. The dev marker carries the ORIGIN as its capture group, protocol
+// included, because `omega dev` serves mkcert HTTPS by default.
+const EMULATOR_READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
+const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
 
 /**
  * Discover the brand's targets by directory naming convention.
@@ -55,80 +70,161 @@ function discoverTargets(brandRoot) {
   return targets;
 }
 
+/**
+ * The local `node_modules/.bin/<name>`, by directory climb from `fromDir`.
+ *
+ * Spawned DIRECTLY rather than through npx: outside an npm-script PATH the npx
+ * shim routes through the Socket Firewall proxy, whose proxy env breaks
+ * firebase-tools' internal emulator REST calls.
+ *
+ * @param {string} name - Bin name ('mgr', 'omega')
+ * @param {string} fromDir - Directory to climb from
+ * @returns {string} The absolute bin path
+ * @throws {Error} When no install above fromDir carries it
+ */
+function resolveLocalBin(name, fromDir) {
+  let dir = path.resolve(fromDir);
+
+  while (true) {
+    const candidate = path.join(dir, 'node_modules', '.bin', name);
+    if (fs.existsSync(candidate)) return candidate;
+
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      throw new Error(`no node_modules/.bin/${name} above ${fromDir} — run npm install in the brand`);
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * The website target's own framework, or a loud refusal.
+ *
+ * A dev server is the FRAMEWORK's, so the target must declare one. A target
+ * that declares none has nothing to boot, and saying so by name beats
+ * dispatching `dev` to whatever CLI the node_modules climb happens to find
+ * (a brand root's manager, which would boot this whole stack a second time).
+ *
+ * @param {string} websiteDir - The website target directory
+ * @param {string} [brandRoot] - Root the target is reported relative to
+ * @returns {object} The findTarget result (kind: 'framework')
+ * @throws {Error} When the target declares no web framework
+ */
+function resolveDevTarget(websiteDir, brandRoot) {
+  const target = findTarget(websiteDir);
+  if (!target || target.kind !== 'framework') {
+    const shown = brandRoot ? path.relative(brandRoot, websiteDir) : websiteDir;
+    throw new Error(
+      `${shown} declares no web framework dependency, so there is no \`omega dev\` to boot `
+      + '(its package.json must depend on @omega.js/web).',
+    );
+  }
+  return target;
+}
+
 class E2eHarness {
   constructor(brandRoot, options) {
     options = options || {};
     this.brandRoot = brandRoot;
-    this.sitePort = options.sitePort || 4600;
     this.targets = discoverTargets(brandRoot);
-    this.logDir = options.logDir || path.join(brandRoot, 'e2e', '.logs');
+    this.logDir = options.logDir || path.join(brandRoot, 'test', 'e2e', '.logs');
 
     // Per-step verdicts on disk beside the environment logs (#197), same format
-    // the journey harness and the root e2e runners write: the emulator/page logs
+    // the journey harness and the root e2e runners write: the emulator/dev logs
     // say what the stack printed, this says which step broke. `grep '^FAIL'` it
     // after a run that died, or one read back hours later.
     this.stepsLog = createStepsLog(this.logDir);
 
+    this.hold = null;
     this.emulator = null;
     this.emulatorPorts = {};
-    this.siteServer = null;
+    this.dev = null;
+    this.browser = null;
+    this.sitePort = null;
+    this._siteUrl = null;
     this.failures = [];
     this.pageConsole = [];
   }
 
   /**
-   * Boot the full stack: build website, start emulator (with persona
-   * seeding), serve the built site. Ports self-allocate (N7): the emulator
-   * CLI bumps taken ports and publishes its resolved map via the ports file;
-   * the site port bumps here. No pre-flight free-check needed.
+   * Boot the full stack: hold the classic ports, start the emulator (with
+   * persona seeding), then the website's real dev server. Ports self-allocate
+   * (N7) past the held classics, and the emulator CLI publishes its resolved
+   * map through the ports file.
    */
   async boot() {
-    // Build website
-    if (this.targets.website) {
-      await this.step('website builds', async () => {
-        const buildPath = path.join(this.targets.website, 'build.js');
-        if (!fs.existsSync(buildPath)) {
-          throw new Error(`No build.js found at ${buildPath}`);
-        }
-        await require(buildPath)();
-      });
-    }
+    await this.step('the classic ports are held so the stack boots beside a live dev', async () => {
+      this.hold = await holdClassicPorts();
+      // The website port is allocated HERE because the emulator needs it at
+      // BOOT time: the backend builds its checkout confirmation URLs from
+      // OMEGA_WEBSITE_PORT, and it starts first.
+      const { ports } = await resolvePorts({ wanted: { website: CLASSIC_PORTS.website } });
+      this.sitePort = ports.website;
+      const busy = this.hold.busy.length ? ` (busy, left alone: ${this.hold.busy.join(', ')})` : '';
+      return `held ${this.hold.held.length}/${CLASSIC_HOLD_PORTS.length}${busy}; website :${this.sitePort}`;
+    });
 
-    // Boot emulator (persona seeding happens inside `npx mgr emulator` by
+    // Boot the emulator (persona seeding happens inside `mgr emulator` by
     // default; the ready marker fires AFTER it, so steps never race the wipe)
     if (this.targets.backend) {
       await this.step('emulator boots + personas seed (functions, firestore, auth, database, hosting, pubsub)', async () => {
-        this.emulator = this._startEmulator();
+        this.emulator = startChild({
+          bin: resolveLocalBin('mgr', this.targets.backend),
+          args: ['emulator'],
+          cwd: this.targets.backend,
+          env: this.childEnv,
+          logFile: path.join(this.logDir, 'emulator.log'),
+          marker: EMULATOR_READY_MARKER,
+          timeout: EMULATOR_READY_TIMEOUT,
+          relativeTo: this.brandRoot,
+        });
         await this.emulator.ready;
-        // The CLI published where the emulators ACTUALLY landed (classic
-        // defaults or bumped) — preparePage() forwards this map to the
-        // browser so pages connect to THIS stack, never a neighbor's.
+        // The CLI published where the emulators ACTUALLY landed — preparePage()
+        // forwards this map to the browser so pages connect to THIS stack.
         this.emulatorPorts = readPortsFile(this.targets.backend) || {};
         const hosting = this.emulatorPorts.hosting ? `, hosting :${this.emulatorPorts.hosting}` : '';
-        return `log: ${path.relative(this.brandRoot, path.join(this.logDir, 'emulator.log'))}${hosting}`;
+        return `auth :${this.emulatorPorts.auth}${hosting}`;
       });
     }
 
-    // Serve website
     if (this.targets.website) {
-      await this.step('website serves', async () => {
-        const { ports } = await resolvePorts({ wanted: { website: this.sitePort } });
-        this.sitePort = ports.website;
-        const distDir = path.join(this.targets.website, 'dist');
-        this.siteServer = await this._startSiteServer(distDir);
-        const body = await new Promise((resolve, reject) => {
-          http.get(`http://localhost:${this.sitePort}/`, (response) => {
-            let data = '';
-            response.on('data', (chunk) => { data += chunk; });
-            response.on('end', () => resolve(data));
-          }).on('error', reject);
+      await this.step('the website serves through the REAL `omega dev`', async () => {
+        resolveDevTarget(this.targets.website, this.brandRoot);
+
+        this.dev = startChild({
+          bin: resolveLocalBin('omega', this.targets.website),
+          args: ['dev', `--port=${this.sitePort}`],
+          cwd: this.targets.website,
+          env: this.childEnv,
+          logFile: path.join(this.logDir, 'dev.log'),
+          marker: DEV_READY_MARKER,
+          timeout: DEV_READY_TIMEOUT,
+          relativeTo: this.brandRoot,
         });
-        if (!body || body.length < 50) {
-          throw new Error('served page is empty or suspiciously short');
-        }
-        return this.siteUrl;
+        this._siteUrl = await this.dev.ready;
+        return this._siteUrl;
       });
     }
+  }
+
+  /**
+   * The environment both children inherit. The website port is resolved before
+   * either boots, because the backend builds URLs from it and starts first.
+   */
+  get childEnv() {
+    return { ...process.env, ...(this.sitePort ? { OMEGA_WEBSITE_PORT: String(this.sitePort) } : {}) };
+  }
+
+  /**
+   * The lane's browser, resolved from the brand root (`@omega.js/manager`
+   * carries puppeteer, so a brand installs nothing). Closed by teardown().
+   *
+   * @param {object} [options] - Forwarded to devkit's launcher
+   * @returns {Promise<object>} The puppeteer browser
+   */
+  async launchBrowser(options) {
+    this.browser = await launchBrowser({ from: this.brandRoot, ...(options || {}) });
+    return this.browser;
   }
 
   /**
@@ -162,13 +258,12 @@ class E2eHarness {
    * Wire a puppeteer page into the harness: console capture + the resolved
    * emulator port map as `window.__OMEGA_DEV_PORTS__`.
    *
-   * That global is a FALLBACK, not an override (#300). This harness serves a
-   * STATIC build made before the emulator booted, so its pages carry no
-   * `dev.ports` chrome at all and the injection is the only map they can get.
-   * A page served by a real dev server carries the live map itself, and
+   * That global is a FALLBACK, never an override (#300). A page served by a
+   * real dev server carries the live map in its own chrome, and
    * @omega.js/client lets that baked chrome win — otherwise this side channel
    * (which no real browser has) would hide a broken real one, which is exactly
-   * how bumped-port breakage stayed green through every e2e run.
+   * how bumped-port breakage stayed green through every e2e run. It stays
+   * wired for the pages that carry no chrome of their own.
    * Call after boot() and before the first page.goto().
    */
   async preparePage(page) {
@@ -177,7 +272,8 @@ class E2eHarness {
   }
 
   /**
-   * Tear down all infrastructure started by boot().
+   * Tear down everything boot() started, newest first: the browser, the dev
+   * server, the emulator, then the held ports.
    */
   async teardown() {
     // Write page console log unconditionally — an EMPTY page.log is itself
@@ -185,14 +281,24 @@ class E2eHarness {
     fs.mkdirSync(this.logDir, { recursive: true });
     fs.writeFileSync(path.join(this.logDir, 'page.log'), `${this.pageConsole.join('\n')}\n`);
 
-    if (this.siteServer) {
-      this.siteServer.close();
-      this.siteServer = null;
+    if (this.browser) {
+      await this.browser.close().catch(() => {});
+      this.browser = null;
+    }
+
+    if (this.dev) {
+      await stopChild(this.dev.child);
+      this.dev = null;
     }
 
     if (this.emulator) {
-      await this._stopEmulator(this.emulator.child);
+      await stopChild(this.emulator.child);
       this.emulator = null;
+    }
+
+    if (this.hold) {
+      releasePorts(this.hold.servers);
+      this.hold = null;
     }
   }
 
@@ -201,9 +307,9 @@ class E2eHarness {
    */
   exit() {
     if (this.failures.length) {
-      // A failure a runner pushed itself (puppeteer.launch, preparePage — the
-      // deaths OUTSIDE step()) has no verdict yet; abort() records it as
-      // `preflight` and no-ops when a step already failed.
+      // A failure a runner pushed itself (the deaths OUTSIDE step()) has no
+      // verdict yet; abort() records it as `preflight` and no-ops when a step
+      // already failed.
       this.stepsLog.abort(this.failures[this.failures.length - 1].error);
       console.log(`\n  ${this.failures.length} step(s) failed — logs: ${path.relative(this.brandRoot, this.logDir)}/\n`);
       process.exit(1);
@@ -212,87 +318,8 @@ class E2eHarness {
   }
 
   get siteUrl() {
-    return `http://localhost:${this.sitePort}`;
-  }
-
-  // -- Internal helpers -------------------------------------------------------
-
-  _startEmulator() {
-    fs.mkdirSync(this.logDir, { recursive: true });
-    const emulatorLog = path.join(this.logDir, 'emulator.log');
-    const logStream = fs.createWriteStream(emulatorLog);
-
-    // Backend commands run from the TARGET ROOT (src/dist pillar) — the CLI
-    // stages dist/ itself before booting the emulator.
-    const child = spawn('npx', ['mgr', 'emulator'], {
-      cwd: this.targets.backend,
-      env: { ...process.env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-    });
-
-    const ready = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`emulator not ready after ${EMULATOR_READY_TIMEOUT / 1000}s (log: ${emulatorLog})`));
-      }, EMULATOR_READY_TIMEOUT);
-
-      const watch = (chunk) => {
-        const text = chunk.toString();
-        logStream.write(text);
-        // Wait for the CLI's post-seed marker, NOT firebase-tools' "All
-        // emulators ready" — persona seeding runs BETWEEN the two and STARTS
-        // with a full Firestore wipe + auth bulk-clear. Proceeding on the
-        // firebase line races browser steps (e.g. signup) into that wipe
-        // window. The marker text lives in @omega.js/backend's emulator
-        // command (cli/commands/emulator.js) — change in lockstep.
-        if (/Emulator ready\. Press Ctrl\+C/i.test(text)) {
-          clearTimeout(timer);
-          resolve();
-        }
-      };
-
-      child.stdout.on('data', watch);
-      child.stderr.on('data', watch);
-      child.on('exit', (code) => {
-        clearTimeout(timer);
-        reject(new Error(`emulator exited early (code ${code}, log: ${emulatorLog})`));
-      });
-    });
-
-    return { child, ready };
-  }
-
-  async _stopEmulator(child) {
-    if (!child || child.exitCode !== null) return;
-    const exited = new Promise((resolve) => child.once('exit', resolve));
-    try { process.kill(-child.pid, 'SIGINT'); } catch (e) { return; }
-    const result = await Promise.race([exited.then(() => 'clean'), sleep(20000)]);
-    if (result !== 'clean') {
-      try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { /* already gone */ }
-    }
-  }
-
-  _startSiteServer(distDir) {
-    const server = http.createServer((request, response) => {
-      const urlPath = new URL(request.url, `http://localhost:${this.sitePort}`).pathname;
-      const relative = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
-      const filePath = path.normalize(path.join(distDir, relative));
-
-      if (!filePath.startsWith(distDir) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-        response.writeHead(404);
-        response.end('Not found');
-        return;
-      }
-
-      response.writeHead(200, { 'Content-Type': CONTENT_TYPES[path.extname(filePath)] || 'application/octet-stream' });
-      fs.createReadStream(filePath).pipe(response);
-    });
-
-    return new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(this.sitePort, () => resolve(server));
-    });
+    return this._siteUrl;
   }
 }
 
-module.exports = { E2eHarness, discoverTargets };
+module.exports = { E2eHarness, discoverTargets, resolveLocalBin, resolveDevTarget, EMULATOR_READY_MARKER, DEV_READY_MARKER };

@@ -6,6 +6,7 @@
 // OMEGA_TEST_SHOW) is exercised directly with save/restore around each case.
 
 const isTestStealth = require('../../../utils/test-stealth.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Run fn with OMEGA_TEST_MODE / OMEGA_TEST_SHOW set to the given values (undefined = unset),
 // restoring the real environment afterwards so other build suites are unaffected.
@@ -32,7 +33,7 @@ function withEnv(vars, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'test-stealth predicate',
@@ -79,4 +80,4 @@ module.exports = {
       },
     },
   ],
-};
+});

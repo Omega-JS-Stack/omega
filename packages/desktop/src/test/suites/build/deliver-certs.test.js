@@ -12,6 +12,7 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 
 const { deliverTargetCerts, resolveSourceRoot } = require('../../../utils/deliver-certs.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const P12 = path.join('.omega', 'certificates', 'apple', 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12');
 const quiet = { log() {}, warn() {}, error() {} };
@@ -36,7 +37,7 @@ function stageBrand({ tree = true, companyTree = false } = {}) {
   return { root, brandRoot, targetDir };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'deliver-certs — signing artifacts on every verb (#678)',
@@ -91,4 +92,4 @@ module.exports = {
       },
     },
   ],
-};
+});

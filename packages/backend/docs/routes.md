@@ -20,10 +20,8 @@ module.exports = async ({ Manager, ctx, analytics, usage, user, settings, librar
   const { admin } = libraries;
   const firestore = admin.firestore();
 
-  // Track usage
-  await usage.validate('requests');
-  usage.increment('requests');
-  await usage.update();
+  // Count a use of a metered feature — check, count and write in ONE call
+  await usage.consume('requests');
 
   // settings strings are whitespace-trimmed by middleware; HTML is preserved.
   // Call utilities.sanitize() at the HTML-insertion site, or opt the whole

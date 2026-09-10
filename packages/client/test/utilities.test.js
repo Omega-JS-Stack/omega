@@ -1,4 +1,4 @@
-const { describe, it, before } = require('node:test');
+const { describe, it, before, afterEach } = require('node:test');
 const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Utilities Module', () => {
@@ -225,6 +225,76 @@ describe('Utilities Module', () => {
 
   it('should have clipboardCopy method', () => {
     assert(typeof getManager().utilities().clipboardCopy === 'function');
+  });
+
+  describe('clipboardCopy', () => {
+    // The whole contract is FAILURE ([#726](https://github.com/Omega-JS-Stack/omega/issues/726)):
+    // every caller shows a confirmation off this promise, so a refused clipboard
+    // that resolves tells the visitor their key is in the buffer when it is not.
+    // The two browser seams are swapped per test and put back.
+    const realClipboard = navigator.clipboard;
+    const realExecCommand = document.execCommand;
+    const realCreateElement = document.createElement;
+
+    afterEach(() => {
+      navigator.clipboard = realClipboard;
+      document.execCommand = realExecCommand;
+      document.createElement = realCreateElement;
+    });
+
+    // The textareas the fallback lane mints, in order.
+    function captureElements() {
+      const created = [];
+
+      document.createElement = (tag) => {
+        const element = realCreateElement(tag);
+        created.push(element);
+        return element;
+      };
+
+      return created;
+    }
+
+    it('should resolve when the modern clipboard API takes the text', async () => {
+      const written = [];
+      navigator.clipboard = { writeText: async (text) => { written.push(text); } };
+
+      await getManager().utilities().clipboardCopy('modern lane');
+
+      assert.deepStrictEqual(written, ['modern lane']);
+    });
+
+    it('should fall back to execCommand when writeText rejects', async () => {
+      // A denied permission or a blurred document — not a failure yet.
+      navigator.clipboard = { writeText: async () => { throw new Error('denied'); } };
+      document.execCommand = () => true;
+
+      const created = captureElements();
+
+      await getManager().utilities().clipboardCopy('fallback lane');
+
+      assert.strictEqual(created.length, 1, 'the fallback minted its textarea');
+      assert.strictEqual(created[0].value, 'fallback lane', 'the text reached the fallback');
+    });
+
+    it('should reject when execCommand reports failure', async () => {
+      // `execCommand` says no with a FALSE RETURN, never a throw — the unchecked
+      // return is what made every refusal look like a success.
+      navigator.clipboard = undefined;
+      document.execCommand = () => false;
+
+      await assert.rejects(
+        () => getManager().utilities().clipboardCopy('refused'),
+        /Failed to copy to clipboard/,
+      );
+    });
+
+    it('should reject when both lanes fail', async () => {
+      navigator.clipboard = { writeText: async () => { throw new Error('denied'); } };
+      document.execCommand = () => { throw new Error('not allowed'); };
+
+      await assert.rejects(() => getManager().utilities().clipboardCopy('refused'));
+    });
   });
 
   it('should have showNotification method', () => {

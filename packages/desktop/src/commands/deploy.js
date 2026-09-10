@@ -18,8 +18,7 @@ const { deployViaDispatch, findLocalSpecs } = require('@omega.js/devkit/deploy')
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { deployPrecheck } = require('./lib/deploy-precheck.js');
 const { deliverTargetCerts } = require('../utils/deliver-certs.js');
-
-const WORKFLOW = 'build.yml';
+const { dispatchTarget } = require('./release.js');
 
 module.exports = async function (options) {
   options = options || {};
@@ -55,8 +54,13 @@ module.exports = async function (options) {
 
   if (dryRun) {
     const platforms = options.platforms || options.platform || 'all';
+    // The SAME address `omega release` dispatches on (config, and the composed
+    // workflow name inside a brand), so the printed plan is the real one.
+    const target = dispatchTarget({ projectRoot: projectDir, config: Manager.getConfig() });
     const { plan } = await deployViaDispatch({
-      workflow: WORKFLOW,
+      workflow: target.workflow,
+      owner: target.owner,
+      repo: target.repo,
       inputs: { platforms: String(platforms) },
       dryRun: true,
     });

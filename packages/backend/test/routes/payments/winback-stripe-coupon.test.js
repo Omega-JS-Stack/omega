@@ -17,9 +17,10 @@
  *
  * Run: npx omega test framework:routes/payments/winback-stripe-coupon
  */
-const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const stripeWinback = require('../../../src/manager/routes/payments/winback/providers/stripe.js');
-const winback = require('../../../src/manager/libraries/payment/winback.js');
+const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const stripeWinback = require('../../../dist/manager/routes/payments/winback/providers/stripe.js');
+const winback = require('../../../dist/manager/libraries/payment/winback.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-winback-coupon-uid';
 const RESOURCE_ID = 'sub_test_winback_coupon';
@@ -92,7 +93,7 @@ async function applyOffer(Manager, discount) {
   return captured;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment winback: what Stripe is asked to do with the save offer',
   type: 'group',
   timeout: 15000,
@@ -122,4 +123,4 @@ module.exports = {
       },
     },
   ],
-};
+});

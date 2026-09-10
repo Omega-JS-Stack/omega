@@ -1,7 +1,9 @@
 # ========== Default Values ==========
 # @omega.js/web consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md) with the same sections in the same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md).
+  Same sections in the same order: framework-specific extras may be inserted; canonical sections are never reordered/renamed. Edit every framework consumer template together.
+  The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
 
 ## Framework
 
@@ -17,7 +19,9 @@ This project consumes **@omega.js/web**, the OMEGA web framework (Eleventy 3 + L
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/web boots `@omega.js/client` as a runtime singleton on every page.** It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/web.
+**@omega.js/web boots `@omega.js/client` as a runtime singleton on every page.**
+- It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
+- Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/web.
 
 **Required reading:**
 - **`node_modules/@omega.js/AGENTS.md`** → `docs/client/index.md`, the @omega.js/client guide: identity, module list, conventions

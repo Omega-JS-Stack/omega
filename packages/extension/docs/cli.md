@@ -6,6 +6,7 @@
 
 | Command | Aliases | Purpose |
 |---|---|---|
+| `build` | `-b`, `--build` | Production build: clean, then the gulp `build` task with `OMEGA_BUILD_MODE=true` set in-process. The verb OWNS the pipeline — the synced `build` project script is the thin `omega build` alias, so the verb never shells back to it ([#81](https://github.com/Omega-JS-Stack/omega/issues/81)) |
 | `clean` | `-c`, `--clean` | Remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `deploy` | `-d`, `--deploy` | Dispatch the extension's CI publish workflow — `publish.yml` standalone, the composed `<target>-publish.yml` inside a brand monorepo ([defaults.md](defaults.md#brand-monorepos); see docs/shared/deploys.md in the Omega repo) |

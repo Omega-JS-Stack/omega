@@ -8,7 +8,6 @@ import omega from '@omega.js/client';
 
 // Initialize section
 export function init() {
-  setupButtons();
   setupResetApiKeyForm();
   setupMcp();
 }
@@ -29,38 +28,6 @@ function updateApiKey(apiKey) {
   if ($apiKeyInput) {
     $apiKeyInput.value = apiKey || 'No API key generated';
   }
-}
-
-// Setup button handlers
-function setupButtons() {
-  const $copyBtn = document.getElementById('copy-api-key-btn');
-  if ($copyBtn) {
-    $copyBtn.addEventListener('click', handleCopyApiKey);
-  }
-
-  const $copyMcpBtn = document.getElementById('copy-mcp-url-btn');
-  if ($copyMcpBtn) {
-    $copyMcpBtn.addEventListener('click', () => handleCopyInput('mcp-url-input', $copyMcpBtn));
-  }
-
-  document.querySelectorAll('[data-copy-target]').forEach(($btn) => {
-    $btn.addEventListener('click', () => {
-      const targetId = $btn.getAttribute('data-copy-target');
-      const $target = document.getElementById(targetId);
-
-      if (!$target) {
-        return;
-      }
-
-      const text = $target.tagName === 'PRE' ? $target.textContent : $target.value;
-
-      navigator.clipboard.writeText(text).then(() => {
-        omega.utilities().showNotification('Copied!', 'success');
-      }).catch(() => {
-        omega.utilities().showNotification('Failed to copy', 'danger');
-      });
-    });
-  });
 }
 
 // Setup MCP integration URLs
@@ -179,45 +146,4 @@ function setupResetApiKeyForm() {
     updateApiKey(response.privateKey);
     formManager.showSuccess('API key has been reset successfully!');
   });
-}
-
-// Handle copy API key
-async function handleCopyApiKey() {
-  const $apiKeyInput = document.getElementById('api-key-input');
-  const $copyBtn = document.getElementById('copy-api-key-btn');
-
-  handleCopyInput('api-key-input', $copyBtn);
-}
-
-// Generic copy handler for input elements
-async function handleCopyInput(inputId, $btn) {
-  const $input = document.getElementById(inputId);
-
-  if (!$input || !$input.value || $input.value === 'Loading...') {
-    omega.utilities().showNotification('Nothing to copy', 'warning');
-    return;
-  }
-
-  try {
-    await omega.utilities().clipboardCopy($input);
-
-    const $text = $btn.querySelector('.button-text');
-    if ($text) {
-      const originalText = $text.textContent;
-      $text.textContent = 'Copied!';
-      $btn.classList.remove('btn-outline-adaptive');
-      $btn.classList.add('btn-success');
-
-      setTimeout(() => {
-        $text.textContent = originalText;
-        $btn.classList.remove('btn-success');
-        $btn.classList.add('btn-outline-adaptive');
-      }, 2000);
-    } else {
-      omega.utilities().showNotification('Copied!', 'success');
-    }
-  } catch (err) {
-    console.error('Failed to copy:', err);
-    omega.utilities().showNotification('Failed to copy', 'danger');
-  }
 }

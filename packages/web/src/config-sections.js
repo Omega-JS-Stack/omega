@@ -9,30 +9,54 @@
  *
  *   resolved.config.*  — the brand config with this page's `config:` merged on
  *                        top. Every config key a template reads lives here.
- *   resolved.meta.*    — the meta walk (page `meta:` → layout defaults → the
- *                        config `meta` section). `meta` is the ONE section the
- *                        schema marks `pageBare`, so it keeps its bare
- *                        frontmatter spelling as well as its `config.meta` home.
+ *   resolved.meta.*    — the meta walk (page `meta:` → layout defaults →
+ *                        brand.name/brand.description, head.html's fallback).
+ *                        PAGE machinery: omega.json5 carries no meta section
+ *                        at all, so meta never exists in two places (Ian
+ *                        2026-08-26).
  *   site.*             — BUILD FACTS only: the collections the build indexed,
  *                        the build stamp, the curated targets view. Never config.
  *
  * CONFIG_SECTIONS is the schema's own list (`configSections('web')`) plus the
  * web presentation sections that ride `targets.web` without a schema rule yet
- * — the keys docs/shared/config.md's UJM mapping table sends there.
+ * — the keys docs/shared/config.md's UJM mapping table sends there. It answers
+ * the `config:` namespace question in BOTH directions: a section restated bare
+ * is a build error, and a key under `config:` that is not a section is one too.
  */
-const { configSections, PAGE_BARE_SECTIONS } = require('@omega.js/config/schema');
+const { configSections } = require('@omega.js/config/schema');
 
 // Config sections @omega.js/web owns that carry no schema rule yet: the legacy
 // UJM presentation blocks the config converter still writes under
 // `targets.web` (docs/shared/config.md's mapping table).
 const WEB_ONLY_SECTIONS = ['favicon', 'manifest', 'icons', 'currency'];
 
-// Every top-level key a web build's resolved config can hold.
-const CONFIG_SECTIONS = new Set([...configSections('web'), ...WEB_ONLY_SECTIONS]);
+// `meta` is the ONE schema section that is not a `config:` section on a page.
+// `targets.web.meta.index` is the SITE-WIDE DEFAULT of a page-machinery key
+// (#564, Ian's same-name ruling 2026-09-09): the page spells it `meta.index`
+// bare, exactly as the site spells it one level up, so a second spelling under
+// `config:` would be the very drift the ruling forbids. It is page machinery
+// everywhere a page is concerned: bare on the page, never movable by
+// `omega migrate`, and refused under `config:`.
+const PAGE_MACHINERY_SECTIONS = ['meta'];
 
-// The BUILD FACTS the `site` global carries — the engine composes exactly
-// these, and the guard lane fails any other `site.<key>` read in a template.
-// Each one is something the BUILD knows and the config cannot say.
+// Every top-level key a web build's resolved config can hold, MINUS the page
+// machinery above.
+const CONFIG_SECTIONS = new Set(
+  [...configSections('web'), ...WEB_ONLY_SECTIONS].filter((key) => !PAGE_MACHINERY_SECTIONS.includes(key)),
+);
+
+// The sections a `site.<key>` read is DEAD on: the config ones, plus `meta`.
+// `meta` is not config any more (#607, Ian 2026-08-26) — it is the page's own
+// walk, living at `resolved.meta` — but `site.meta` is exactly as dead as
+// `site.brand` was, renders the same empty string, and `omega migrate`'s
+// config-reads rule rewrites it, so the read census owns it either way.
+const DEAD_SITE_SECTIONS = new Set([...CONFIG_SECTIONS, 'meta']);
+
+// The BUILD FACTS the `site` global carries — these, plus one array per
+// collection the brand declares in `targets.web.collections` (#593), which
+// dynamic-pages' readCollection guard keeps disjoint from this list. Each one
+// is something the BUILD knows and the config cannot say, and the guard lane
+// fails any other `site.<key>` read in the framework's own templates.
 const SITE_FACT_KEYS = [
   'targets',      // the curated per-target display view (#85)
   'posts',        // the indexed collections, Jekyll doc shape
@@ -45,7 +69,7 @@ const SITE_FACT_KEYS = [
   'characters',   // the literal-character set templates interpolate
   'pricing',      // the payment view-model composePricing built
   'brandTokens',  // the --omega-accent-* ramp composeBrandTokens built
-  'fontPreloads', // the active theme's first-paint faces, read off disk
+  'license',      // the deploy-time license stamp (#320) — gates the attribution
 ];
 
 // ---------------------------------------------------------------------------
@@ -160,13 +184,62 @@ function templateReads(source) {
   return found;
 }
 
+// ---------------------------------------------------------------------------
+// The other dead read the census owns: `random_id`
+// ([#595](https://github.com/Omega-JS-Stack/omega/issues/595))
+//
+// UJM injected a fresh `random_id` into every render, and consumer includes
+// used it to scope repeated markup (Bootstrap accordion ids). OMEGA has no such
+// global: the read renders EMPTY, which is the #611 failure mode exactly — no
+// error, and every accordion on the page collapses into one container. The
+// replacement is an explicit assign of the `omega_random` filter, so what
+// counts as a leftover read is "reads it, never assigns it", and it answers to
+// the same Liquid-context/display-region rules every other read does.
+// ---------------------------------------------------------------------------
+const RANDOM_ID = /(?<![.\w])random_id\b/g;
+const RANDOM_ID_ASSIGN = /\{%-?\s*assign\s+random_id\s*=/;
+
+/**
+ * Every BARE `random_id` read in a template's source, in source order.
+ * A dotted `block.random_id` is somebody else's property, and the file's own
+ * `{% assign random_id = … %}` is the fix, not a read.
+ * @param {string} source
+ * @returns {Array<{ expression: string, index: number, line: number }>}
+ */
+function randomIdReads(source) {
+  const regions = liquidRegions(source);
+  if (!regions.length) return [];
+
+  const found = [];
+  RANDOM_ID.lastIndex = 0;
+  let match;
+  while ((match = RANDOM_ID.exec(source)) !== null) {
+    if (!regions.some(([start, end]) => match.index >= start && match.index < end)) continue;
+    if (/\bassign\s+$/.test(source.slice(Math.max(0, match.index - 32), match.index))) continue;
+    found.push({
+      expression: match[0],
+      index: match.index,
+      line: source.slice(0, match.index).split('\n').length,
+    });
+  }
+  return found;
+}
+
+/** Does this source define `random_id` itself? */
+function assignsRandomId(source) {
+  return RANDOM_ID_ASSIGN.test(source);
+}
+
 module.exports = {
   CONFIG_SECTIONS,
-  PAGE_BARE_SECTIONS,
+  DEAD_SITE_SECTIONS,
   SITE_FACT_KEYS,
   WEB_ONLY_SECTIONS,
   NOT_A_READ,
+  RANDOM_ID_ASSIGN_IDIOM: '{% assign random_id = 100 | omega_random %}',
   displayRegions,
   liquidRegions,
   templateReads,
+  randomIdReads,
+  assignsRandomId,
 };

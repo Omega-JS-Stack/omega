@@ -47,7 +47,7 @@ async function buildConsumer(consumerDir, name, siteData = miniData) {
         farmDir: path.join(PKG, '.omega', `${name}-farm`),
         assetManifest: {
           js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
         },
       });
     },
@@ -182,7 +182,7 @@ test('#458: a PAGINATING default page materializes — addressed by its logical 
   );
 });
 
-test('cp220: the {% composition %} guard — append without the flag (legacy), replace with composition: true', async () => {
+test('cp220: the {% composition %} guard — a body REPLACES the composition, and `append` is gone (#607)', async () => {
   const consumer = path.join(PKG, '.omega', 'customize-replace');
   fs.rmSync(consumer, { recursive: true, force: true });
   fs.mkdirSync(path.join(consumer, 'pages'), { recursive: true });
@@ -197,15 +197,17 @@ test('cp220: the {% composition %} guard — append without the flag (legacy), r
   assert.ok(replaced.includes('<h2'), 'markdown content formats (parity branch)');
   assert.ok(!replaced.includes('omega-hero'), 'the default composition is REPLACED by default');
 
-  // append: true — the legacy escape hatch: body renders BELOW the composition
+  // The legacy UJM add-below flag is DELETED (#607, Ian 2026-08-26): it is an
+  // unknown frontmatter key now, stripped with the content-key warning, and
+  // the body replaces the composition like any other body. A page that wants
+  // the default bands writes them — `omega customize <url>` materializes them.
   fs.writeFileSync(
     path.join(consumer, 'pages', 'index.md'),
     '---\nlayout: blueprint/index\npermalink: /\nappend: true\n---\n\n## My appended prose\n',
   );
   const appended = (await buildConsumer(consumer, 'customize-append')).get('/');
-  assert.ok(appended.includes('omega-hero'), 'the default composition still renders');
-  assert.ok(appended.includes('My appended prose'), 'body content appends below it');
-  assert.ok(appended.indexOf('omega-hero') < appended.indexOf('My appended prose'), 'composition first, content after');
+  assert.ok(!appended.includes('omega-hero'), '`append: true` no longer keeps the default composition');
+  assert.ok(appended.includes('My appended prose'), 'the body still renders — it replaced the composition');
 });
 
 test('cp220: materialize-then-build identity, then divergence — args land, bands drop, words keep flowing', async () => {

@@ -4,9 +4,10 @@ const path = require('path');
 const fs = require('fs');
 
 const Manager = require('../../../build.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const root = Manager.getRootPath('main');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'CLI',
@@ -50,11 +51,19 @@ module.exports = {
       },
     },
     {
-      name: 'bin/omega-desktop exists and is executable',
+      name: 'bin/omega-desktop exists',
       run: (ctx) => {
         const binFile = path.join(root, 'bin', 'omega-desktop');
         ctx.expect(fs.existsSync(binFile)).toBeTruthy();
-        const stat = fs.statSync(binFile);
+      },
+    },
+    {
+      name: 'bin/omega-desktop is executable',
+      run: (ctx) => {
+        // NTFS has no execute bit, so the mode carries nothing to assert on a
+        // Windows checkout — the existence case above still runs everywhere.
+        if (process.platform === 'win32') ctx.skip('NTFS has no execute bit — `stat.mode & 0o100` is meaningless on Windows');
+        const stat = fs.statSync(path.join(root, 'bin', 'omega-desktop'));
         ctx.expect((stat.mode & 0o100) !== 0).toBeTruthy();
       },
     },
@@ -69,6 +78,52 @@ module.exports = {
       },
     },
     {
+      name: 'the box verbs never read the project .env cascade (#337)',
+      run: (ctx) => {
+        // A signing box is a MACHINE: `runner` and `sign-windows` read the shell
+        // and <runner home>\.env, nothing else. Run from a brand folder, the
+        // project's GH_TOKEN would otherwise register the box's runners against
+        // that token's orgs. Every other verb keeps the cascade.
+        const os = require('os');
+        const { spawnSync } = require('child_process');
+
+        const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cli-env-'));
+        try {
+          fs.writeFileSync(path.join(projectDir, '.env'), 'GH_TOKEN="ghp_from_the_project"\n');
+          const script = path.join(projectDir, 'boot.js');
+          fs.writeFileSync(script, [
+            `require(${JSON.stringify(path.join(root, 'dist', 'cli.js'))});`,
+            'process.stdout.write(String(process.env.GH_TOKEN || \'(unset)\'));',
+          ].join('\n'));
+
+          // The child gets no token to find, and no real box home to read one
+          // from: `runner`/`sign-windows` read `<runner home>/.env` at require
+          // time, and this case must never touch the signing box's own file.
+          const env = { ...process.env, OMEGA_RUNNER_HOME: path.join(projectDir, '.runner-home') };
+          delete env.GH_TOKEN;
+          const boot = (...argv) => spawnSync(process.execPath, [script, ...argv], { cwd: projectDir, env, encoding: 'utf8' });
+
+          const built = boot('build');
+          ctx.expect(built.status).toBe(0);
+          ctx.expect(built.stdout).toBe('ghp_from_the_project');
+
+          // Both spellings the alias table takes: the bare verb and its `--` flag.
+          for (const argv of [
+            ['runner', 'status'], ['sign-windows', '--smoke'],
+            ['--runner'], ['--runner', 'status'], ['--sign-windows', '--smoke'],
+          ]) {
+            const boxed = boot(...argv);
+            ctx.expect(boxed.status).toBe(0);
+            if (boxed.stdout !== '(unset)') {
+              throw new Error(`\`omega ${argv.join(' ')}\` applied the project .env (GH_TOKEN=${boxed.stdout}) — the box reads only the shell and its own file.`);
+            }
+          }
+        } finally {
+          fs.rmSync(projectDir, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'mirrored aliases: -t routes to test, -d routes to deploy (wave-6 D6)',
       run: (ctx) => {
         const { aliases } = require(path.join(root, 'dist', 'cli.js')).config;
@@ -77,4 +132,4 @@ module.exports = {
       },
     },
   ],
-};
+});

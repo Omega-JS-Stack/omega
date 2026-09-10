@@ -3,7 +3,7 @@
  *
  * `theme.id` is a SHARED omega.json5 key, but each framework owns its own theme
  * set: a brand whose WEBSITE theme is `studymonkey` hands the extension build an
- * id it ships no stylesheet for. The sass loadPath and the webpack `__theme__`
+ * id it ships no stylesheet for. The sass loadPath and the bundler's `__theme__`
  * alias both pointed straight at `dist/assets/themes/<id>`, so the build died on
  * a raw sass `Can't find stylesheet to import` naming neither the config key nor
  * the extension's valid themes.
@@ -19,7 +19,7 @@ const jetpack = require('fs-jetpack');
 // theme.id builds with.
 const DEFAULT_THEME_ID = 'classy';
 
-// One warning per unknown id, not per resolve site: sass and webpack both
+// One warning per unknown id, not per resolve site: sass and the bundler both
 // resolve the same id in a build, and the consumer has ONE thing to fix.
 const warnedIds = new Set();
 

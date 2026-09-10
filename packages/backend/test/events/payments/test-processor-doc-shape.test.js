@@ -26,10 +26,11 @@
 const assert = require('node:assert');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 
-const cancelProcessor = require('../../../src/manager/routes/payments/cancel/providers/test.js');
-const refundProcessor = require('../../../src/manager/routes/payments/refund/providers/test.js');
-const planProcessor = require('../../../src/manager/routes/payments/plan/providers/test.js');
-const uncancelProcessor = require('../../../src/manager/routes/payments/uncancel/providers/test.js');
+const cancelProcessor = require('../../../dist/manager/routes/payments/cancel/providers/test.js');
+const refundProcessor = require('../../../dist/manager/routes/payments/refund/providers/test.js');
+const planProcessor = require('../../../dist/manager/routes/payments/plan/providers/test.js');
+const uncancelProcessor = require('../../../dist/manager/routes/payments/uncancel/providers/test.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-doc-shape-uid';
 const RESOURCE_ID = '_test-doc-shape-sub';
@@ -107,7 +108,7 @@ const PROCESSORS = [
   ['refund (one-time)', (ctx) => refundProcessor.processOneTimeRefund({ resourceId: RESOURCE_ID, uid: UID, order: { ...order(), type: 'one-time' }, ctx })],
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'Test processors write the same pipeline-doc shape the webhook route does',
   type: 'group',
   timeout: 30000,
@@ -158,4 +159,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -19,9 +19,10 @@
  * Run: npx omega test framework:helpers/user-doc-heal
  */
 
-const onCreate = require('../../src/manager/events/auth/on-create.js');
-const beforeSignIn = require('../../src/manager/events/auth/before-signin.js');
-const { buildUserDoc, healUserDoc, HEAL_TAG } = require('../../src/manager/libraries/user-doc.js');
+const onCreate = require('../../dist/manager/events/auth/on-create.js');
+const beforeSignIn = require('../../dist/manager/events/auth/before-signin.js');
+const { buildUserDoc, healUserDoc, HEAL_TAG } = require('../../dist/manager/libraries/user-doc.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The 1st-gen EventContext shape for a user creation — what the trigger hands the
 // handler, forwarded straight to its debug line and the consumer hook.
@@ -160,7 +161,7 @@ async function cleanup(Manager, uid) {
   await admin.firestore().doc(`users/${uid}`).delete().catch(() => {});
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'a missing user doc heals at sign-in (idempotent, order-proof)',
   type: 'group',
   timeout: 60000,
@@ -536,4 +537,4 @@ module.exports = {
       },
     },
   ],
-};
+});

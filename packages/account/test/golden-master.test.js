@@ -140,7 +140,7 @@ const FIXTURES = {
       requests: { monthly: '5', daily: 2, total: null, last: { id: 'req-9' } },
       customFeature: { monthly: 1 },
     },
-    oauth2: { google: { token: 'tok', nested: { deep: true } } },
+    connections: { google: { token: 'tok', nested: { deep: true } } },
     attribution: {
       utm: { tags: { source: 'newsletter', campaign: 'summer' }, url: 'https://x.example' },
     },

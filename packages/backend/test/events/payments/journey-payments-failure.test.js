@@ -8,7 +8,9 @@
  *
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: paid → invoice.payment_failed → suspended',
   type: 'suite',
   timeout: 30000,
@@ -143,4 +145,4 @@ module.exports = {
       },
     },
   ],
-};
+});

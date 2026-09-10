@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -127,7 +126,7 @@ function showReviewModal(reviewURL, data) {
   // Extract site name for display
   try {
     const siteName = new URL(fullURL).hostname.replace('www.', '');
-    $link.innerHTML = `${getPrerenderedIcon('arrow-up-right-from-square', 'me-2')} Post your review on ${omega.utilities().escapeHTML(siteName)}`;
+    $link.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square me-2"></i> Post your review on ${omega.utilities().escapeHTML(siteName)}`;
   } catch (e) {
     // Use default text
   }
@@ -143,11 +142,16 @@ function showReviewModal(reviewURL, data) {
   const $copyBtn = document.getElementById('review-modal-copy');
   if ($copyBtn && $feedbackTextarea) {
     $copyBtn.addEventListener('click', () => {
-      omega.utilities().clipboardCopy($feedbackTextarea.value);
-      $copyBtn.innerHTML = `${getPrerenderedIcon('check', 'me-1')} Copied!`;
-      setTimeout(() => {
-        $copyBtn.innerHTML = `${getPrerenderedIcon('copy', 'me-1')} Copy`;
-      }, 2000);
+      // The clipboard rejects on a real refusal since #726: confirm only what
+      // was copied, and never leave the rejection unhandled.
+      omega.utilities().clipboardCopy($feedbackTextarea.value)
+        .then(() => {
+          $copyBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i> Copied!`;
+          setTimeout(() => {
+            $copyBtn.innerHTML = `<i class="fa-solid fa-copy me-1"></i> Copy`;
+          }, 2000);
+        })
+        .catch((error) => console.error('Failed to copy the feedback text:', error));
     }, { once: false });
   }
 

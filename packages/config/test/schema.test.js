@@ -10,7 +10,7 @@ const { SHARED_SECTIONS, BACKEND_PROJECT_TYPES, backendProjectType } = require('
 test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   assert.deepStrictEqual(
     SHARED_SECTIONS,
-    ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'],
+    ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'features', 'payment', 'monitoring', 'connections', 'theme', 'translation'],
   );
 });
 
@@ -78,6 +78,38 @@ test('advertising: adsense is pure client-presence — no second switch (#527)',
   );
 });
 
+// #642 — the crypto provider is back as a real one, so its config switch owes
+// the schema a rule like every other. Coinbase Commerce's ONLY credential is a
+// secret (COINBASE_COMMERCE_API_KEY), and a secret can never live in config, so
+// there is no case-1 datum to gate on: the switch is an explicit `enabled`,
+// default OFF. Default OFF because an accidental ON puts a Crypto button on the
+// checkout that no key can complete.
+test('payment: coinbase is an explicit enabled switch, default OFF (#642)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'payment.providers.coinbase.enabled');
+
+  assert.ok(rule, 'missing payment.providers.coinbase.enabled');
+  assert.equal(rule.type, 'boolean');
+  assert.equal(rule.required, false);
+  assert.equal(rule.default, false, 'the polarity is stated by the default');
+
+  // The sibling providers keep their own (case-1) data switches
+  const paths = SHARED_SCHEMA.map((entry) => entry.path);
+  for (const path of ['payment.providers.stripe.publishableKey', 'payment.providers.paypal.clientId', 'payment.providers.chargebee.site']) {
+    assert.ok(paths.includes(path), `missing ${path}`);
+  }
+
+  // A brand carrying the block validates clean — it stopped doing so when #636
+  // deleted the stub out from under every config that had one
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepEqual(
+    validateConfig({ ...base, payment: { providers: { coinbase: { enabled: true } } } }).errors, [],
+    'an enabled crypto provider is expressible',
+  );
+});
+
 test('monitoring declares every knob the monitoring package resolves (#380)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const paths = SHARED_SCHEMA.map((entry) => entry.path);
@@ -122,25 +154,51 @@ test('the de-branded role sections are declared (#23)', () => {
   assert.ok(!paths.some((path) => path.includes('-')), 'no hyphenated config key survives');
 });
 
-test('targets.web.redirects is declared — the path-redirect map (#442)', () => {
-  const { TARGET_SCHEMAS } = require('../src/schema.js');
+// #466 — the web target owns no redirect map any more: a templated redirect is
+// a Cloudflare redirect RULE the edge service reconciles, and an enumerable one
+// is a redirect PAGE. The rules block is where the retired key now points, so
+// it owes the schema a rule of its own.
+test('edge.providers.cloudflare.rules.redirect is declared — the templated-redirect home (#466)', () => {
+  const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
   const { validateConfig } = require('../src/validate.js');
-  const rule = TARGET_SCHEMAS.web.find((entry) => entry.path === 'redirects');
 
-  assert.ok(rule, 'missing redirects');
+  assert.ok(
+    !TARGET_SCHEMAS.web.some((entry) => entry.path === 'redirects'),
+    'targets.web.redirects is gone — the web build answers no redirect config',
+  );
+
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'edge.providers.cloudflare.rules.redirect');
+  assert.ok(rule, 'missing edge.providers.cloudflare.rules.redirect');
   assert.equal(rule.type, 'array');
-  assert.match(rule.description, /:id|captured/, 'the description names the one captured segment');
+  assert.match(rule.description, /targetUrl/, 'the description names the destination key');
 
-  // The target chain overlays targets.web at the top level, which is the shape
-  // the walker validates against.
   const base = { brand: { id: 'mini', name: 'MiniCo' } };
   assert.deepEqual(
-    validateConfig({ ...base, redirects: [{ from: '/c/:id', to: '/code?id=:id', type: 301 }] }, { target: 'web' }).errors, [],
-    'the entry shape passes',
+    validateConfig({
+      ...base,
+      edge: {
+        providers: {
+          cloudflare: {
+            rules: {
+              redirect: [{
+                name: 'Redirect: QR short code',
+                expression: '(starts_with(http.request.uri.path, "/c/"))',
+                statusCode: 301,
+                preserveQueryString: false,
+                targetUrl: { expression: 'concat("https://", http.host, "/code?id=", substring(http.request.uri.path, 3))' },
+                enabled: true,
+              }],
+            },
+          },
+        },
+      },
+    }).errors,
+    [],
+    'the DashQR pattern passes as a rules entry',
   );
   assert.equal(
-    validateConfig({ ...base, redirects: { '/c/:id': '/code?id=:id' } }, { target: 'web' }).errors.length, 1,
-    'a map is not a redirects list — entries are ORDERED, first match wins',
+    validateConfig({ ...base, edge: { providers: { cloudflare: { rules: { redirect: { '/c/:id': '/code' } } } } } }).errors.length, 1,
+    'a map is not a rules list — Cloudflare evaluates them in order',
   );
 });
 
@@ -379,6 +437,52 @@ test('the SendGrid unsubscribe group ids are declared, one row per group (#649)'
     validateConfig({ ...base, marketing: { campaigns: { providers: { sendgrid: { groups: { ...groups, orders: '16223' } } } } } }).errors
       .some((e) => e.includes('config.marketing.campaigns.providers.sendgrid.groups.orders has wrong type')),
     'a stringified id is caught — SendGrid answers ids as numbers',
+  );
+});
+
+// #650 — three @omega.js/client keys that WORK (they reach the client payload
+// and change behaviour: no auth policy, no exit popup, no service worker) and
+// the schema never declared, so every validate run told a brand that turned
+// one off it might be a typo. The client blob stays un-enumerated by design;
+// these three are declared because a brand AUTHORS them.
+test('the client keys a brand authors are declared (#650)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+
+  for (const path of ['client.auth.config.policy', 'client.exitPopup.enabled', 'client.serviceWorker.enabled']) {
+    assert.ok(rules.has(path), `missing ${path}`);
+    assert.equal(rules.get(path).required, false, `${path} is the brand's own answer, never demanded`);
+    assert.ok(rules.get(path).description, `${path} documents what it drives`);
+  }
+
+  // The two switches carry @omega.js/client's own polarity (both default ON),
+  // so the answer is materialized into the brand file like consent's.
+  const defaults = schemaDefaults('web');
+  assert.equal(defaults.client.exitPopup.enabled, true);
+  assert.equal(defaults.client.serviceWorker.enabled, true);
+  // The policy is a PAGE decision (the auth layouts set it in frontmatter) and
+  // its framework answer is "none" — nothing to write into a brand's config.
+  assert.ok(!('default' in rules.get('client.auth.config.policy')), 'the policy must not materialize a default');
+
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  const { errors, warnings } = validateConfig({
+    ...base,
+    client: {
+      auth: { config: { policy: 'disabled' } },
+      exitPopup: { enabled: false },
+      serviceWorker: { enabled: false },
+    },
+  });
+
+  assert.deepEqual(errors, [], 'the OFF state each of them honors is expressible');
+  assert.deepEqual(warnings, [], 'and a brand that turns them off is not told it may have a typo');
+
+  assert.ok(
+    validateConfig({ ...base, client: { auth: { config: { policy: 'authed' } } } }).errors
+      .some((e) => e.includes('config.client.auth.config.policy "authed" is not allowed')),
+    'a near-miss policy is loud instead of silently no-policy',
   );
 });
 

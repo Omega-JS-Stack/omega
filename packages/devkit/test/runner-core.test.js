@@ -186,6 +186,89 @@ test('middle layers dispatch with byLayer/wants; boot aggregates flat test list'
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('bootBound moves a file to the boot lane and hands it to boot.run whole', async () => {
+  const root = makeTree('runner-bootbound', {
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+    'consumer/test/bound.js': `module.exports = { type: 'group', layer: 'page', view: 'main', description: 'view suite', tests: [
+      { name: 'v1', run: () => {} },
+      { name: 'v2', run: () => {} },
+    ]};`,
+    'consumer/test/plain.js': `module.exports = { layer: 'page', description: 'page suite', tests: [ { name: 'p1', run: () => {} } ] };`,
+  });
+
+  const seen = { middle: null, boot: null };
+  const runner = createRunner(makeConfig(root, {
+    bootBound: (mod) => mod.layer === 'page' && typeof mod.view === 'string',
+    middleLayers: [{
+      layers: ['page'],
+      run: async ({ byLayer }) => { seen.middle = byLayer.page.map((file) => path.basename(file)); },
+    }],
+    boot: {
+      run: async ({ tests, suites }) => {
+        seen.boot = {
+          tests:  tests.map((t) => t.description),
+          suites: suites.map(({ file, mod }) => ({
+            file:  path.basename(file),
+            view:  mod.view,
+            names: mod.tests.map((t) => t.name),
+          })),
+        };
+      },
+    },
+  }));
+
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run()));
+
+  // The bound file left the middle layer entirely...
+  assert.deepEqual(seen.middle, ['plain.js']);
+  // ...and reached boot.run WHOLE, never flattened into the inspect list.
+  assert.deepEqual(seen.boot, {
+    tests:  [],
+    suites: [{ file: 'bound.js', view: 'main', names: ['v1', 'v2'] }],
+  });
+
+  // --layer=page must not reach it (the suite needs the boot lane's built app);
+  // --layer=boot must.
+  seen.middle = null; seen.boot = null;
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ layer: 'page' })));
+  assert.deepEqual(seen.middle, ['plain.js']);
+  assert.equal(seen.boot, null);
+
+  seen.middle = null; seen.boot = null;
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ layer: 'boot' })));
+  assert.equal(seen.middle, null);
+  assert.deepEqual(seen.boot.suites, [{ file: 'bound.js', view: 'main', names: ['v1', 'v2'] }]);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('the filter narrows a boot-bound suite by test name, and drops it when nothing survives', async () => {
+  const root = makeTree('runner-bootbound-filter', {
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+    'consumer/test/bound.js': `module.exports = { type: 'group', layer: 'page', view: 'main', description: 'view suite', tests: [
+      { name: 'renders the heading', run: () => {} },
+      { name: 'wires the button',    run: () => {} },
+    ]};`,
+  });
+
+  let boot = null;
+  const runner = createRunner(makeConfig(root, {
+    bootBound: (mod) => mod.layer === 'page' && typeof mod.view === 'string',
+    boot: { run: async ({ suites }) => { boot = suites.map(({ mod }) => mod.tests.map((t) => t.name)); } },
+  }));
+
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ filter: 'heading' })));
+  assert.deepEqual(boot, [['renders the heading']]);
+
+  // Nothing matches: the suite is dropped, and with no inspect tests either
+  // boot.run is never called (no build, no Electron boot for an empty run).
+  boot = null;
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ filter: 'nothing-matches-this' })));
+  assert.equal(boot, null);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('C5 scoping: bare = project only; framework:/alias:/full: select sources', async () => {
   const root = makeTree('runner-target', {
     'framework/suites/fw.js': `module.exports = { description: 'framework test', run: () => {} };`,
@@ -253,9 +336,130 @@ test('framework boot/ suites are excluded for consumers but run in self-test mod
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+// Every tree in this monorepo whose files a case runner discovers, with that
+// runner's own discovery rule. `_`-prefixed files and directories are helpers
+// and fixtures, never cases (DISCOVERY_IGNORE).
+const CASE_ROOTS = [
+  { label: 'backend',   dir: 'packages/backend/test',                extension: '.test.js' },
+  { label: 'desktop',   dir: 'packages/desktop/src/test/suites',     extension: '.js' },
+  { label: 'extension', dir: 'packages/extension/src/test/suites',   extension: '.js' },
+];
+
+function collectCaseFiles(dir, extension, found = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('_')) continue;
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) collectCaseFiles(abs, extension, found);
+    else if (entry.name.endsWith(extension)) found.push(abs);
+  }
+  return found;
+}
+
+test('every case file in the monorepo exports through defineCases (#630)', () => {
+  const monorepoRoot = path.join(__dirname, '..', '..', '..');
+  const unwrapped = [];
+  let checked = 0;
+
+  for (const root of CASE_ROOTS) {
+    const dir = path.join(monorepoRoot, root.dir);
+    if (!fs.existsSync(dir)) continue;   // vendored/partial checkout — nothing to guard
+    for (const file of collectCaseFiles(dir, root.extension)) {
+      checked += 1;
+      const source = fs.readFileSync(file, 'utf8');
+      if (!/module\.exports\s*=\s*defineCases\(/.test(source)) {
+        unwrapped.push(path.relative(monorepoRoot, file));
+      }
+    }
+  }
+
+  assert.ok(checked > 0, 'the guard must actually walk case files');
+  assert.deepEqual(
+    unwrapped,
+    [],
+    `case files that would report a hollow pass under \`node --test\` — wrap them:\n  module.exports = defineCases({ ... });\n${unwrapped.join('\n')}`,
+  );
+});
+
 test('exports SkipError, DISCOVERY_IGNORE, and the shared expect', () => {
   assert.equal(typeof SkipError, 'function');
   assert.ok(Array.isArray(DISCOVERY_IGNORE));
   assert.equal(typeof expect, 'function');
   assert.equal(expect, require('../src/test/assert.js'));
+});
+
+test('a scoped target matches nested suites in slash form on every platform (#337)', async () => {
+  // path.relative answers with the OS separator, so on Windows a framework
+  // suite at build\runner.test.js never matched `desktop:build/runner` and
+  // the run reported "No test files found". The grammar is slash-spelled
+  // everywhere; a backslash-spelled target from a Windows shell matches too.
+  const root = makeTree('runner-scoped-sep', {
+    'framework/suites/build/runner.test.js': `module.exports = { description: 'fw runner', run: () => {} };`,
+    'framework/suites/build/other.test.js':  `module.exports = { description: 'fw other', run: () => {} };`,
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+  });
+  const runner = createRunner(makeConfig(root));
+
+  for (const target of ['fix:build/runner', 'fix:build\\runner', 'fix:build/runner.test.js']) {
+    const scoped = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target })));
+    assert.equal(scoped.result.passed, 1, target);
+    assert.ok(!scoped.lines.some((line) => line.includes('No test files found')), target);
+  }
+
+  const dir = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target: 'fix:build/' })));
+  assert.equal(dir.result.passed, 2);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a named target that matches no file is a no-match run, not a green zero (#814)', async () => {
+  // `omega test renderer/typo` used to print "No test files found.", "0 passing"
+  // and exit 0 — a typo'd path, or a renamed suite, ran silently green.
+  const root = makeTree('runner-no-match', {
+    'framework/suites/build/fw.js': `module.exports = { description: 'framework test', run: () => {} };`,
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+    'consumer/test/build/proj.js': `module.exports = { description: 'project test', run: () => {} };`,
+  });
+  const runner = createRunner(makeConfig(root));
+  const at = (options) => quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run(options)));
+
+  // Every spelling of a path target: bare, project-scoped, framework-scoped, both.
+  for (const target of ['build/typo', 'project:build/typo', 'fix:build/typo', 'full:build/typo']) {
+    const { result, lines } = await at({ target });
+    assert.equal(result.noMatch, target, target);
+    assert.equal(result.passed, 0, target);
+    assert.ok(!lines.some((line) => line.includes('No test files found')), target);
+  }
+
+  // A target that selects a file is untouched...
+  const hit = await at({ target: 'build/proj' });
+  assert.equal(hit.result.noMatch, null);
+  assert.equal(hit.result.passed, 1);
+
+  // ...and so is a partial hit: `full:` reaching ONE source is a real selection.
+  const partial = await at({ target: 'full:build/proj' });
+  assert.equal(partial.result.noMatch, null);
+  assert.equal(partial.result.passed, 1);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a run that named no file stays green with nothing to run (#814)', async () => {
+  // The other half of the rule: nothing was asked for BY NAME, so an empty
+  // project (or a bare source prefix) is still an exit-0 run.
+  const root = makeTree('runner-no-tests', {
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+  });
+  const runner = createRunner(makeConfig(root));
+  const at = (options) => quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run(options)));
+
+  const bare = await at({});
+  assert.equal(bare.result.noMatch, null);
+  assert.equal(bare.result.passed + bare.result.failed, 0);
+  assert.ok(bare.lines.some((line) => line.includes('No test files found')));
+
+  for (const target of ['project:', 'fix:', 'full:']) {
+    const prefix = await at({ target });
+    assert.equal(prefix.result.noMatch, null, target);
+  }
+
+  fs.rmSync(root, { recursive: true, force: true });
 });

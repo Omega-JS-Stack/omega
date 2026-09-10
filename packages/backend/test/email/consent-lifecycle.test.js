@@ -19,8 +19,9 @@
  * and BEEHIIV_API_KEY in env. Total runtime is ~60-90s — most of it spent waiting
  * for SendGrid's async upsert/delete background jobs to surface.
  */
-const sendgridProvider = require('../../src/manager/libraries/email/providers/sendgrid.js');
-const beehiivProvider = require('../../src/manager/libraries/email/providers/beehiiv.js');
+const sendgridProvider = require('../../dist/manager/libraries/email/providers/sendgrid.js');
+const beehiivProvider = require('../../dist/manager/libraries/email/providers/beehiiv.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const SETTLE_MS = 5000; // Beehiiv settles in 1-2s; SendGrid's background-job upsert can take 10-20s+
 const POLL_INTERVAL_MS = 2000;
@@ -54,7 +55,7 @@ async function pollProvider(fetchFn, expectPresent) {
   return lastValue;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing provider lifecycle (live SendGrid + Beehiiv round-trip)',
   type: 'group',
   skip: !process.env.TEST_EXTENDED_MODE
@@ -254,4 +255,4 @@ module.exports = {
       },
     },
   ],
-};
+});

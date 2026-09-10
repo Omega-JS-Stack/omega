@@ -1,462 +1,531 @@
 /**
- * Usage
- * Meant to check and update usage for a user
- * Reads product limits from Manager.config.payment.products
- * Stores usage in the user's firestore document OR in local/temp storage if no user
+ * Usage — the counted-feature gate
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+ *
+ * ONE call does the whole job:
+ *
+ *   const left = await ctx.usage.consume('saves');   // throws a 429 over limit
+ *
+ * `consume` checks both counters, refuses with a 429 that names WHICH one hit,
+ * else counts, writes, and returns what is left. There is no separate
+ * "validate then increment then update" dance for a caller to get half right —
+ * every hand-rolled gate in the framework's own routes existed because there
+ * was one.
+ *
+ * What a feature IS lives in config, once: the top-level `features` catalog
+ * defines it (name, icon, definition, and the `usage` block that meters it)
+ * and each product names only its VALUE. @omega.js/account's features module
+ * owns every derivation from those two halves plus the user's counters — the
+ * effective limit (a per-user override wins over the plan's number), the day
+ * share, what is left — so this gate and the browser's account page can never
+ * speak different numbers.
+ *
+ * Two counters per counted feature per user, month and day. The day's share is
+ * the month limit spread over the days of this month, so a quota cannot be
+ * burned on day one; `usage: { pace: false }` on the catalog entry opts out.
+ * Either counter full refuses, and the month cap always holds.
+ *
+ * Init is LAZY: the middleware `attach`es a counter that resolves the account
+ * on the first consume/read, so a route that never counts pays nothing.
+ *
+ * Anonymous counting is EXPLICIT: `ctx.usage.forKey(ip)` returns a separate
+ * keyed counter. Passing a key can never silently move a signed-in user's
+ * counters into the anonymous store, which is what the old `options.key` did.
+ *
+ * Mirrors are declared in the CATALOG (`usage: { mirror: ['teams'] }`), never
+ * at the call site: `consume` writes the touched feature's counters — that
+ * feature's, not the whole usage object — to the user doc and to every doc the
+ * account owns of each named kind (`owns.teams`), in one parallel write.
  */
 
-const moment = require('moment');
-const _ = require('lodash');
-const hcaptcha = require('hcaptcha');
 const User = require('./user.js');
 const env = require('../libraries/env.js');
+
+// @omega.js/account is a private workspace package: in the monorepo the bare
+// specifier resolves via the workspace link (and the prepare-package vendor
+// hook rewrites it in dist/), but src/ ships in the tarball UNREWRITTEN — so
+// fall back to the copy vendored into dist/, which sits at the same depth from
+// both trees. The same two-step user.js makes.
+let features;
+try {
+  features = require('@omega.js/account/features');
+} catch (e) {
+  features = require('../../../dist/vendor/account/features.js');
+}
+
+// Where an anonymous key's counters live when the brand stores them in
+// Firestore (the default) — one document per key, wiped daily by the cron.
+const ANONYMOUS_COLLECTION = 'usage';
 
 function Usage(m) {
   const self = this;
 
   self.Manager = m;
 
-  self.user = null;
-  self.options = null;
   self.ctx = null;
+  self.options = null;
+
+  // The anonymous key this counter counts against, or null for the signed-in
+  // user. Set ONLY by forKey() — never inferred from a request.
+  self.key = null;
+
+  // The account (or the keyed counter document) the counters live on, resolved
+  // on first use.
+  self.user = null;
+  self.resolved = false;
+
   self.storage = null;
-
-  self.paths = {
-    user: '',
-  }
-
-  self._mirrors = [];
-
-  self.initialized = false;
 }
 
-Usage.prototype.init = function (ctx, options) {
+/**
+ * Attach a counter to a request. Synchronous and I/O-free: nothing is read
+ * until the first consume/read, so a route that never counts pays nothing.
+ *
+ * @param {object} ctx - The RouteContext
+ * @param {object} [options] - Counter options
+ * @param {string} [options.unauthenticatedMode] - 'firestore' (default) or 'local', for keyed counters
+ * @param {string[]} [options.whitelistKeys] - API keys that never get refused
+ * @param {Date} [options.today] - The day being counted (tests)
+ * @param {boolean} [options.log] - Log the counter lines (defaults to dev)
+ * @returns {Usage} this
+ */
+Usage.prototype.attach = function (ctx, options) {
   const self = this;
 
-  return new Promise(async function(resolve, reject) {
-    const Manager = self.Manager;
-
-    // Set options
-    options = options || {};
-    options.clear = typeof options.clear === 'undefined' ? false : options.clear;
-    options.today = typeof options.today === 'undefined' ? undefined : options.today;
-    options.key = typeof options.key === 'undefined' ? undefined : options.key;
-    options.unauthenticatedMode = typeof options.unauthenticatedMode === 'undefined' ? 'firestore' : options.unauthenticatedMode;
-    options.whitelistKeys = options.whitelistKeys || [];
-    options.log = typeof options.log === 'undefined' ? ctx.isDevelopment() : options.log;
-
-    // Check for required options
-    if (!ctx) {
-      return reject(new Error('Missing required {ctx} parameter'));
-    }
-
-    // Add @omega.js/backend to whitelist keys
-    options.whitelistKeys.push(env.get('OMEGA_ADMIN_KEY'));
-
-    // Set options
-    self.options = options;
-
-    // Set ctx
-    self.ctx = ctx;
-
-    // Setup storage (used for unauthenticated local-mode usage tracking)
-    self.storage = Manager.storage({name: 'usage', temporary: true, clear: options.clear, log: options.log});
-
-    // Set local key
-    self.key = (options.key || self.ctx.request.geolocation.ip || 'unknown')
-      // .replace(/[\.:]/g, '_');
-
-    // Set paths
-    self.paths.user = `users.${self.key}`;
-
-    // Authenticate user (user will be resolved as well)
-    self.user = await ctx.authenticate();
-
-    self.useUnauthenticatedStorage = !self.user.auth.uid || self.options.key;
-
-    // Load usage with temporary if unauthenticated
-    if (self.useUnauthenticatedStorage) {
-      let foundUsage;
-
-      if (options.unauthenticatedMode === 'firestore') {
-        // TODO: Make it request using .where() query so it doesnt use a read if it doesnt have to
-        foundUsage = await Manager.libraries.admin.firestore().doc(`usage/${self.key}`)
-          .get()
-          .then((r) => r.data())
-          .catch((e) => {
-            ctx.report(`Usage.init(): Error fetching usage data: ${e}`, {code: 500});
-          });
-      } else {
-        foundUsage = self.storage.get(`${self.paths.user}.usage`, {}).value();
-      }
-
-      self.user.usage = foundUsage ? foundUsage : self.user.usage;
-    }
-
-    // Log — the counters this user arrived with, never the document holding them:
-    // it carries api.privateKey, consent and attribution, and a backend line lands
-    // in Cloud Logging for the whole retention window
-    // ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
-    self.log(`Usage.init(): Got user ${self.user?.auth?.uid || 'unauthenticated'}`, self.user?.usage);
-
-    // Set initialized to true
-    self.initialized = true;
-
-    // Resolve
-    return resolve(self);
-  });
-};
-
-Usage.prototype.setUser = async function (uid) {
-  const self = this;
-  const admin = self.Manager.libraries.admin;
-
-  const doc = await admin.firestore().doc(`users/${uid}`).get().catch(() => null);
-  const data = (doc && doc.exists) ? doc.data() : {};
-
-  self.user = {
-    ...data,
-    auth: { uid: uid, ...(data.auth || {}) },
-    usage: data.usage || {},
-    subscription: data.subscription || {},
-  };
-
-  self.useUnauthenticatedStorage = false;
-
-  self.log(`Usage.setUser(): Switched to user ${uid}`);
-
-  return self;
-};
-
-Usage.prototype.setMirrors = function (paths) {
-  const self = this;
-  self._mirrors = Array.isArray(paths) ? paths : [];
-  return self;
-};
-
-Usage.prototype.addMirror = function (path) {
-  const self = this;
-  self._mirrors.push(path);
-  return self;
-};
-
-Usage.prototype.validate = function (name, options) {
-  const self = this;
-
-  return new Promise(async function(resolve, reject) {
-    const Manager = self.Manager;
-    const ctx = self.ctx;
-
-    // Set options
-    options = options || {};
-    options.useCaptchaResponse = typeof options.useCaptchaResponse === 'undefined' ? true : options.useCaptchaResponse;
-    options.log = typeof options.log === 'undefined' ? true : options.log;
-    options._forceReject = typeof options._forceReject === 'undefined' ? false : options._forceReject;
-
-    // Check for required options
-    const monthly = self.getUsage(name);
-    const allowed = self.getLimit(name);
-
-    // Log (independent of options.log because this is important)
-    if (options.log) {
-      ctx.log(`Usage.validate(): Checking ${monthly}/${allowed} for ${name} (${self.key})...`);
-    }
-
-    // Reject function
-    function _reject() {
-      reject(
-        ctx.report(`You have exceeded your ${name} usage limit of ${monthly}/${allowed}.`, {code: 429})
-      );
-    }
-
-    // Force reject (for testing/debugging)
-    if (options._forceReject) {
-      return _reject();
-    }
-
-    // Negative limits are unlimited (product config convention: -1)
-    if (allowed < 0) {
-      self.log(`Usage.validate(): Unlimited limit (${allowed}) for ${name}`);
-
-      return resolve(true);
-    }
-
-    // Check if they have a white list key
-    const hasWhitelistKey = self.options.whitelistKeys.some((key) => key && key === self?.user?.api?.privateKey);
-    if (hasWhitelistKey) {
-      self.log(`Usage.validate(): Whitelist key found for ${name}`);
-
-      return resolve(true);
-    }
-
-    // Check daily caps (for products with rateLimit: 'daily', which is the default)
-    const dailyAllowance = self.getDailyAllowance(name);
-    if (dailyAllowance !== null) {
-      // Flat daily cap: ceil(monthlyLimit / daysInMonth)
-      const now = new Date();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      const flatDailyCap = Math.ceil(allowed / daysInMonth);
-
-      // Get today's usage from the daily counter
-      const daily = _.get(self.user, `usage.${name}.daily`, 0);
-
-      if (options.log) {
-        ctx.log(`Usage.validate(): Daily cap check: ${daily}/${flatDailyCap} today, ${monthly}/${dailyAllowance} proportional (monthly: ${allowed}) for ${name} (${self.key})`);
-      }
-
-      // Check flat daily cap (can't exceed ceil(limit/daysInMonth) in a single day)
-      if (daily >= flatDailyCap) {
-        return reject(
-          ctx.report(`You have reached your daily usage limit for ${name} (${daily}/${flatDailyCap}). Your monthly limit is ${allowed}.`, {code: 429})
-        );
-      }
-
-      // Check proportional monthly cap (can't accumulate too fast)
-      if (monthly >= dailyAllowance) {
-        return reject(
-          ctx.report(`You have reached your usage limit for ${name} (${monthly}/${dailyAllowance}). Your monthly limit is ${allowed}.`, {code: 429})
-        );
-      }
-    }
-
-    // If they are under the monthly limit, resolve
-    if (monthly < allowed) {
-      self.log(`Usage.validate(): Valid for ${name}`);
-
-      return resolve(true);
-    }
-
-    // If they are using captcha, attempt to resolve
-    const captchaResponse = ctx.request.data['h-captcha-response'];
-    if (captchaResponse && options.useCaptchaResponse) {
-      self.log(`Usage.validate(): Checking captcha response`, captchaResponse);
-
-      const captchaResult = await hcaptcha.verify(env.get('HCAPTCHA_SECRET'), captchaResponse)
-        .then((data) => data)
-        .catch((e) => e);
-
-      // If the captcha is valid, resolve
-      if (!captchaResult || captchaResult instanceof Error || !captchaResult.success) {
-        return reject(
-          ctx.report(`Captcha verification failed.`, {code: 400})
-        );
-      }
-    }
-
-    // Otherwise, they are over the limit, reject
-    return _reject();
-  });
-};
-
-Usage.prototype.increment = function (name, value, options) {
-  const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
-
-  // Set name
-  name = name || 'requests';
-
-  // Set value
-  value = typeof value === 'undefined' ? 1 : value;
+  if (!ctx) {
+    throw new Error('Usage.attach(): Missing required {ctx} parameter');
+  }
 
   // Set options
   options = options || {};
-  options.id = options.id || null;
+  options.unauthenticatedMode = typeof options.unauthenticatedMode === 'undefined' ? 'firestore' : options.unauthenticatedMode;
+  options.whitelistKeys = options.whitelistKeys || [];
+  options.today = typeof options.today === 'undefined' ? undefined : options.today;
+  options.log = typeof options.log === 'undefined' ? ctx.isDevelopment() : options.log;
 
-  // Update total, monthly, daily, and last
-  ['total', 'monthly', 'daily', 'last'].forEach((key) => {
-    const resolved = `usage.${name}.${key}`;
-    const existing = _.get(self.user, resolved, 0);
+  // The framework's own admin key always bypasses
+  options.whitelistKeys = options.whitelistKeys.concat([env.get('OMEGA_ADMIN_KEY')]);
 
-    if (key === 'last') {
-      const now = moment(
-        typeof self.options.today === 'undefined' ? new Date() : self.options.today
-      );
-
-      _.set(self.user, resolved, {
-        id: options.id,
-        timestamp: now.toISOString(),
-        timestampUNIX: now.unix(),
-      });
-    } else {
-      _.set(self.user, resolved, existing + value);
-    }
-  });
-
-  // Log the counter this moved — not the whole user document (#632)
-  self.log(`Usage.init(): Incremented ${name} for ${self.user?.auth?.uid || 'unauthenticated'}`, _.get(self.user, `usage.${name}`));
+  self.ctx = ctx;
+  self.options = options;
 
   return self;
 };
 
-Usage.prototype.set = function (name, value) {
+/**
+ * A counter for an anonymous key (an IP, an installation id) — a SEPARATE
+ * counter, so a signed-in user's own counters are never moved into the
+ * anonymous store by a caller that only meant to rate-limit by address.
+ *
+ * Keyed counters are day-only in practice: the reset cron wipes the whole
+ * anonymous store every day (docs/usage-rate-limiting.md).
+ *
+ * @param {string} key - The key to count against
+ * @returns {Usage} A new counter bound to that key
+ */
+Usage.prototype.forKey = function (key) {
   const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
 
-  // Set name
-  name = name || 'requests';
+  const keyed = new Usage(self.Manager);
 
-  // Set value
-  value = typeof value === 'undefined' ? 0 : value;
+  keyed.attach(self.ctx, { ...self.options });
+  keyed.key = `${key || 'unknown'}`;
 
-  // Update monthly
-  const resolved = `usage.${name}.monthly`;
-
-  // Set the value
-  _.set(self.user, resolved, value);
-
-  // Log the counter this set — not the whole user document (#632)
-  self.log(`Usage.init(): Set ${name} for ${self.user?.auth?.uid || 'unauthenticated'}`, _.get(self.user, `usage.${name}`));
-
-  return self;
+  return keyed;
 };
 
-Usage.prototype.getUsage = function (name) {
+/**
+ * The brand's feature catalog.
+ * @returns {object} config.features, keyed by feature id
+ */
+Usage.prototype.catalog = function () {
   const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
 
-  // Get usage
-  if (name) {
-    return _.get(self.user, `usage.${name}.monthly`, 0);
-  } else {
-    return self.user.usage;
-  }
+  return self.Manager.config.features || {};
 };
 
+/**
+ * The product whose numbers apply: the account's RESOLVED plan (a cancelled or
+ * suspended subscription resolves to the free tier), else `basic`.
+ * @param {string} [id] - Force a specific product id
+ * @returns {object} The catalog entry, or {}
+ */
 Usage.prototype.getProduct = function (id) {
   const self = this;
-  const Manager = self.Manager;
 
-  const products = Manager.config.payment?.products || [];
+  const products = self.Manager.config.payment?.products || [];
 
-  // Look up by provided ID, or fall back to user's resolved plan
   id = id || User.resolveSubscription(self.user).plan;
 
-  return products.find(p => p.id === id)
-    || products.find(p => p.id === 'basic')
+  return products.find((product) => product.id === id)
+    || products.find((product) => product.id === 'basic')
     || {};
 };
 
-Usage.prototype.getLimit = function (name) {
+/**
+ * Resolve the account (or the keyed counter document) this counter counts on.
+ * Runs at most once — every consume/read awaits it first.
+ * @returns {Promise<Usage>} this
+ */
+Usage.prototype.resolve = async function () {
   const self = this;
 
-  const limits = self.getProduct().limits || {};
-
-  // Return specific limit or all limits
-  if (name) {
-    return limits[name] || 0;
+  if (self.resolved) {
+    return self;
   }
+
+  if (self.key) {
+    self.user = { usage: await self.loadKeyed() };
+  } else if (self.ctx.resolvedUser) {
+    // The middleware already authenticated this request — re-authenticating
+    // would verify the token and re-read the user doc a second time
+    self.user = self.ctx.request.user;
+  } else {
+    self.user = await self.ctx.authenticate();
+  }
+
+  // A signed-OUT caller has no document to count on. `authenticate()` resolves
+  // a full account SHAPE for one (uid null) and marks the request resolved all
+  // the same, so without this the write below would land on `users/null` — one
+  // document every anonymous caller on earth would share, and a limit none of
+  // them could ever exceed. Silently routing to the anonymous store instead
+  // would be the OTHER old bug: a key that switches storage behind the caller's
+  // back. Anonymous counting is explicit, so this says so.
+  if (!self.key && !self.user?.auth?.uid) {
+    throw new Error('usage: no signed-in account to count against; use usage.forKey(<key>) for anonymous callers');
+  }
+
+  self.resolved = true;
+
+  // Log — the counters this counter arrived with, never the document holding
+  // them: it carries api.privateKey, consent and attribution, and a backend
+  // line lands in Cloud Logging for the whole retention window
+  // ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+  self.log(`Usage.resolve(): Resolved ${self.key || self.user?.auth?.uid || 'unauthenticated'}`, self.user?.usage);
+
+  return self;
+};
+
+/**
+ * The stored counters for this counter's anonymous key.
+ * @returns {Promise<object>} feature id → counters
+ */
+Usage.prototype.loadKeyed = async function () {
+  const self = this;
+
+  if (self.options.unauthenticatedMode !== 'firestore') {
+    self.storage = self.storage || self.Manager.storage({ name: ANONYMOUS_COLLECTION, temporary: true, clear: false, log: false });
+
+    return self.storage.get(`users.${self.key}.usage`, {}).value() || {};
+  }
+
+  const found = await self.Manager.libraries.admin.firestore().doc(`${ANONYMOUS_COLLECTION}/${self.key}`)
+    .get()
+    .then((r) => r.data())
+    .catch((e) => {
+      self.ctx.report(`Usage.loadKeyed(): Error fetching usage data: ${e}`, { code: 500 });
+    });
+
+  return found || {};
+};
+
+/**
+ * What this account's state is for a feature, WITHOUT counting: the effective
+ * limit (overrides applied), both counters, and what is left of each.
+ * @param {string} feature - Feature id from the catalog
+ * @returns {Promise<object>} { id, name, limit, used, left, day: { limit, used, left }, ... }
+ */
+Usage.prototype.read = async function (feature) {
+  const self = this;
+
+  await self.resolve();
+
+  return self.state(feature);
+};
+
+/**
+ * The resolved feature state, from what is already loaded (no I/O).
+ * @param {string} feature - Feature id from the catalog
+ * @returns {object} @omega.js/account's resolveFeature shape
+ */
+Usage.prototype.state = function (feature) {
+  const self = this;
+
+  return features.resolveFeature(feature, {
+    catalog: self.catalog(),
+    product: self.getProduct(),
+    account: self.user,
+    now: self.options.today,
+  });
+};
+
+/**
+ * The state of a counter running against an EXPLICIT limit rather than the
+ * plan's — same shape as state(), with no day share (see consume's options).
+ * @param {string} feature - Counter id
+ * @param {number} limit - The limit that applies
+ * @returns {object} The resolveFeature shape
+ */
+Usage.prototype.explicitState = function (feature, limit) {
+  const self = this;
+
+  return features.resolveFeature(feature, {
+    catalog: { [feature]: { name: feature, usage: { pace: false } } },
+    product: { features: { [feature]: limit } },
+    account: self.user,
+    now: self.options.today,
+  });
+};
+
+/**
+ * Count one use of a feature — the ONE call a route makes.
+ *
+ * Refuses with a 429 naming which counter hit: the MONTH is checked first (a
+ * spent month is not "try again tomorrow"), then the day's share.
+ *
+ * `options.limit` is for the counters that are NOT plan features — a per-IP
+ * signup gate is a security control with its own declared config key
+ * (`targets.backend.auth.signup.maxPerIpPerDay`), not a tier anybody buys. An
+ * explicit limit supplies the definition the catalog would have, so the
+ * catalog lookup and the product read are skipped, and the counter is a plain
+ * period counter with no day share (an anonymous key's store is wiped daily,
+ * so its period IS the day).
+ *
+ * @param {string} feature - Feature id from the catalog
+ * @param {number} [amount] - How much to count (default 1)
+ * @param {object} [options] - Consume options
+ * @param {number} [options.limit] - An explicit limit for a non-plan counter
+ * @returns {Promise<object>} { used, left, day: { used, left } } after counting
+ */
+Usage.prototype.consume = async function (feature, amount, options) {
+  const self = this;
+  const ctx = self.ctx;
+
+  // Set amount
+  amount = typeof amount === 'undefined' ? 1 : amount;
+
+  // Set options
+  options = options || {};
+
+  const explicit = typeof options.limit === 'number';
+  const entry = self.catalog()[feature];
+
+  // A feature no catalog defines, or a perk, is a PROGRAMMER error: the route
+  // asked to meter something the config never made countable, and counting it
+  // anyway would build a limit nothing enforces.
+  if (!explicit && !entry) {
+    throw ctx.report(`Usage.consume(): "${feature}" is not defined in the features catalog (config.features)`, { code: 500 });
+  }
+
+  if (!explicit && !features.isCountedFeature(entry)) {
+    throw ctx.report(`Usage.consume(): "${feature}" is a perk, not a counted feature — give features.${feature} a \`usage\` block to meter it`, { code: 500 });
+  }
+
+  await self.resolve();
+
+  const state = explicit ? self.explicitState(feature, options.limit) : self.state(feature);
+  const name = (entry && entry.name) || feature;
+
+  // A whitelisted API key still COUNTS (the record stays honest) — it only
+  // never gets refused.
+  const whitelisted = self.options.whitelistKeys.some((key) => key && key === self.user?.api?.privateKey);
+
+  if (!whitelisted) {
+    if (state.limit >= 0 && state.used + amount > state.limit) {
+      throw ctx.report(
+        `You have used all ${state.limit} of your ${name} this month (${state.used}/${state.limit}). Upgrade your plan for more.`,
+        { code: 429 },
+      );
+    }
+
+    if (state.day.limit >= 0 && state.day.used + amount > state.day.limit) {
+      throw ctx.report(
+        `You have used today's ${name} (${state.day.used}/${state.day.limit} of the ${state.limit} on your plan this month). Try again tomorrow.`,
+        { code: 429 },
+      );
+    }
+  }
+
+  self.count(feature, amount);
+
+  await self.write(feature);
+
+  const counted = explicit ? self.explicitState(feature, options.limit) : self.state(feature);
+
+  return {
+    used: counted.used,
+    left: counted.left,
+    day: { used: counted.day.used, left: counted.day.left },
+  };
+};
+
+/**
+ * Move the counters in memory. `total` never resets; `last` records when the
+ * feature moved.
+ * @param {string} feature - Feature id
+ * @param {number} amount - How much to count
+ * @returns {Usage} this
+ */
+Usage.prototype.count = function (feature, amount) {
+  const self = this;
+
+  const now = self.options.today ? new Date(self.options.today) : new Date();
+
+  self.user.usage = self.user.usage || {};
+
+  const counters = self.user.usage[feature] || {};
+
+  self.user.usage[feature] = {
+    ...counters,
+    monthly: (counters.monthly || 0) + amount,
+    daily: (counters.daily || 0) + amount,
+    total: (counters.total || 0) + amount,
+    last: {
+      timestamp: now.toISOString(),
+      timestampUNIX: Math.floor(now.getTime() / 1000),
+    },
+  };
+
+  // Log the counter this moved — not the whole user document (#632)
+  self.log(`Usage.count(): Counted ${amount} ${feature} for ${self.key || self.user?.auth?.uid || 'unauthenticated'}`, self.user.usage[feature]);
+
+  return self;
+};
+
+/**
+ * The write payload for ONE feature: that feature's counters and nothing else,
+ * so two features counted in the same second cannot overwrite each other.
+ * @param {string} feature - Feature id
+ * @returns {object} { usage: { <feature>: counters } }
+ */
+Usage.prototype.countersPatch = function (feature) {
+  const self = this;
+
+  return { usage: { [feature]: (self.user.usage || {})[feature] } };
+};
+
+/**
+ * The mirror documents this feature's counters also land on: every doc the
+ * account owns of each kind the CATALOG names. Declared in config, never at
+ * the call site.
+ * @param {string} feature - Feature id
+ * @returns {string[]} Firestore document paths
+ */
+Usage.prototype.mirrorPaths = function (feature) {
+  const self = this;
+
+  // An anonymous key owns nothing
+  if (self.key) {
+    return [];
+  }
+
+  const owns = self.user?.owns || {};
+  const paths = [];
+
+  features.featureMirrors(self.catalog()[feature]).forEach((kind) => {
+    const owned = owns[kind];
+    const ids = Array.isArray(owned) ? owned : (owned ? [owned] : []);
+
+    ids.forEach((id) => paths.push(`${kind}/${id}`));
+  });
+
+  return paths;
+};
+
+/**
+ * Persist one feature's counters: the user document and every mirror, in ONE
+ * parallel write.
+ * @param {string} feature - Feature id
+ * @returns {Promise<void>}
+ */
+Usage.prototype.write = async function (feature) {
+  const self = this;
+
+  const { admin } = self.Manager.libraries;
+  const counters = (self.user.usage || {})[feature];
+
+  if (self.key) {
+    if (self.options.unauthenticatedMode !== 'firestore') {
+      self.storage = self.storage || self.Manager.storage({ name: ANONYMOUS_COLLECTION, temporary: true, clear: false, log: false });
+      self.storage.set(`users.${self.key}.usage.${feature}`, counters).write();
+
+      self.log(`Usage.write(): Wrote ${feature} to local storage`, counters);
+
+      return;
+    }
+
+    await admin.firestore().doc(`${ANONYMOUS_COLLECTION}/${self.key}`)
+      .set({ [feature]: counters }, { merge: true })
+      .catch((e) => {
+        throw self.ctx.report(e, { code: 500 });
+      });
+
+    return;
+  }
+
+  const patch = self.countersPatch(feature);
+  const paths = [`users/${self.user.auth.uid}`, ...self.mirrorPaths(feature)];
+
+  await Promise.all(paths.map((path) => admin.firestore().doc(path).set(patch, { merge: true })))
+    .then(() => {
+      self.log(`Usage.write(): Wrote ${feature} to ${paths.length} document(s)`, counters);
+    })
+    .catch((e) => {
+      throw self.ctx.report(e, { code: 500 });
+    });
+};
+
+/**
+ * The counters this account arrived with — the `omega-properties` header's
+ * `usage.current`. Empty until the counter has RESOLVED: a route that never
+ * counted read nothing, and the header must not force a read to report one.
+ * @returns {object} feature id → counters
+ */
+Usage.prototype.counters = function () {
+  const self = this;
+
+  return self.resolved ? (self.user?.usage || {}) : {};
+};
+
+/**
+ * Every counted feature's EFFECTIVE limit for this account (overrides applied)
+ * — the `omega-properties` header's `usage.limits`, which the client merges
+ * into its `usage` bindings. Empty until the counter has resolved.
+ * @returns {object} feature id → limit (-1 unlimited)
+ */
+Usage.prototype.limits = function () {
+  const self = this;
+
+  if (!self.resolved) {
+    return {};
+  }
+
+  const catalog = self.catalog();
+  const limits = {};
+
+  Object.keys(catalog).forEach((id) => {
+    if (features.isCountedFeature(catalog[id])) {
+      limits[id] = self.state(id).limit;
+    }
+  });
 
   return limits;
 };
 
 /**
- * Get the daily allowance cap for a metric
- * Prevents users from burning their entire monthly quota in a single day
- *
- * Uses two checks:
- * 1. Flat daily cap: ceil(monthlyLimit / daysInMonth) — max uses per day
- *    e.g. 100/month in March (31 days) = ceil(100/31) = 4/day
- *    e.g. 10/month in March (31 days) = ceil(10/31) = 1/day
- * 2. Proportional monthly cap: ceil(monthlyLimit * dayOfMonth / daysInMonth) — running total
- *    Ensures users can't accumulate too much too fast even within daily limits
- *
- * Returns null if the product opts out with rateLimit: 'monthly'
- * Products can set rateLimit: 'daily' (default) | 'monthly'
+ * Add API keys that never get refused (they still count).
+ * @param {string|string[]} keys - Key(s) to whitelist
+ * @returns {Usage} this
  */
-Usage.prototype.getDailyAllowance = function (name) {
-  const self = this;
-
-  // Get the product config
-  const product = self.getProduct();
-  const rateLimit = product.rateLimit || 'daily';
-
-  // If explicitly set to monthly, no daily cap
-  if (rateLimit !== 'daily') {
-    return null;
-  }
-
-  // Get the monthly limit (negative limits are unlimited — no daily cap)
-  const monthlyLimit = self.getLimit(name);
-  if (!monthlyLimit || monthlyLimit < 0) {
-    return null;
-  }
-
-  // Calculate caps
-  const now = new Date();
-  const dayOfMonth = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-
-  // Proportional monthly cap — how much should be used by this day at most
-  // ceil ensures at least 1 usage per day even with very low limits
-  return Math.ceil(monthlyLimit * (dayOfMonth / daysInMonth));
-};
-
-Usage.prototype.update = function () {
-  const self = this;
-
-  // Shortcuts
-  const Manager = self.Manager;
-  const ctx = self.ctx;
-
-  return new Promise(async function(resolve, reject) {
-    const { admin } = Manager.libraries;
-
-    // Build the primary write promise
-    let mainWrite;
-
-    // Write self.user to firestore or local if no user or if key is set
-    if (self.useUnauthenticatedStorage) {
-      if (self.options.unauthenticatedMode === 'firestore') {
-        mainWrite = admin.firestore().doc(`usage/${self.key}`)
-          .set(self.user.usage, { merge: true });
-      } else {
-        self.storage.set(`${self.paths.user}.usage`, self.user.usage).write();
-
-        self.log(`Usage.update(): Updated user.usage in local storage`, self.user.usage);
-
-        mainWrite = Promise.resolve();
-      }
-    } else {
-      mainWrite = admin.firestore().doc(`users/${self.user.auth.uid}`)
-        .set({
-          usage: self.user.usage,
-        }, { merge: true });
-    }
-
-    // Build mirror write promises
-    const mirrorWrites = (self._mirrors || []).map((path) => {
-      return admin.firestore().doc(path)
-        .set({ usage: self.user.usage }, { merge: true });
-    });
-
-    // Execute all writes in parallel
-    Promise.all([mainWrite, ...mirrorWrites])
-      .then(() => {
-        self.log(`Usage.update(): Updated user.usage in firestore (+ ${mirrorWrites.length} mirrors)`, self.user.usage);
-
-        return resolve(self.user.usage);
-      })
-      .catch(e => {
-        return reject(ctx.report(e, {code: 500}));
-      });
-  });
-};
-
 Usage.prototype.addWhitelistKeys = function (keys) {
   const self = this;
 
-  const options = self.options;
-
-  // Make keys and array if not already
+  // Make keys an array if not already
   keys = Array.isArray(keys) ? keys : [keys];
 
   // Add keys to whitelist
-  options.whitelistKeys = options.whitelistKeys.concat(keys);
+  self.options.whitelistKeys = self.options.whitelistKeys.concat(keys);
 
-  // Log
   return self;
 };
 

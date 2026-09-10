@@ -33,8 +33,9 @@
  * Run: npx omega test framework:analytics/match-normalization
  */
 const crypto = require('crypto');
-const matchData = require('../../src/manager/libraries/analytics/match-data.js');
-const conversions = require('../../src/manager/libraries/analytics/conversions.js');
+const matchData = require('../../dist/manager/libraries/analytics/match-data.js');
+const conversions = require('../../dist/manager/libraries/analytics/conversions.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -50,13 +51,13 @@ function fullUserDoc() {
       name: { first: "  Ada-Marie ", last: "O'Byrne " },
       birthday: { timestamp: '1985-02-16T00:00:00.000Z', timestampUNIX: 477273600 },
       gender: 'female',
-      location: { country: 'US', region: 'California', city: 'San Diego', zip: '94035-1234' },
+      location: { country: 'US', region: 'California', city: 'San Diego', postalCode: '94035-1234' },
       telephone: { countryCode: 1, national: 5550102030 },
     },
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Match parameters: one normalization table per provider',
   type: 'group',
 
@@ -149,6 +150,40 @@ module.exports = {
     },
 
     {
+      // The account schema HOLDS an address now — `personal.location.postalCode`
+      // and `.street` ([#663](https://github.com/Omega-JS-Stack/omega/issues/663))
+      // — so the reader's `zip` key finally finds a value on a real doc. The bag
+      // key stays `zip` because that is the parameter name Meta's own table
+      // normalizes; the schema's name is the international one.
+      name: 'the-postal-code-and-street-come-off-the-account-schema',
+      auth: 'none',
+
+      async run({ assert, Manager }) {
+        const user = Manager.User({
+          auth: { uid: '_test-match-uid', email: 'buyer@example.com' },
+          personal: { location: { postalCode: '90210', street: '123 Main Street' } },
+        }).properties;
+
+        assert.equal(user.personal.location.postalCode, '90210', 'precondition: the resolver keeps the schema field');
+
+        const fields = matchData.readUserMatchFields(user);
+
+        assert.equal(fields.zip, '90210', 'postalCode rides the platform\'s own zip key');
+        assert.equal(fields.street, '123 Main Street', 'street reads as it always did');
+
+        const identity = matchData.buildIdentity({ uid: '_test-match-uid', user: user });
+
+        assert.equal(identity.meta.zp, sha256('90210'), 'and reaches Meta\'s zp, normalized by Meta\'s rule');
+
+        // `personal.location.zip` was never a schema field — a doc carrying one
+        // is read as the nothing it is, rather than as a second home for the value.
+        const legacy = matchData.readUserMatchFields({ personal: { location: { zip: '90210' } } });
+
+        assert.equal(legacy.zip, undefined, 'personal.location.zip is not read any more');
+      },
+    },
+
+    {
       name: 'ga4-normalizes-its-address-block-per-its-own-spec',
       auth: 'none',
 
@@ -200,4 +235,4 @@ module.exports = {
       },
     },
   ],
-};
+});

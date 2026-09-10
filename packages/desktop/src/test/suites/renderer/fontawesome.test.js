@@ -6,7 +6,9 @@
 // `new Function('ctx', body)` — no closures over module scope, so each test
 // inlines its own poll helper.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'fontawesome bridge + auto-render',
@@ -185,4 +187,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -16,10 +16,11 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const NO_CI = { env: {} };
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'attach-log-file — tee stdout/stderr to a file',
@@ -95,4 +96,4 @@ module.exports = {
       },
     },
   ],
-};
+});

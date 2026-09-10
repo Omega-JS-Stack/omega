@@ -126,32 +126,36 @@ alternative:
     <div class="text-center mt-5" data-omega-reveal>
       <a href="{{ alt.section_cta.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
         {{ alt.section_cta.text }}
-        <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+        <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
       </a>
     </div>
   {% endiftruthy %}
 {% endcapture %}
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield data-competitor-name="{{ alt.competitor.name }}">
-  <div class="container" data-omega-reveal-stagger="90">
-    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield data-competitor-name="{{ alt.competitor.name }}">
+  <div class="container">
+    <div class="omega-post-card__eyebrow mb-4">
       <a href="/alternatives">Alternatives</a>
       <span>/</span>
       <span>{{ alt.competitor.name }}</span>
     </div>
-    {% component "heading/masthead", headline: alt.hero.headline, headline_accent: alt.hero.headline_accent, sub: alt.hero.description %}
-    <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
+    {% component "heading/masthead", headline: alt.hero.headline, headline_accent: alt.hero.headline_accent, sub: alt.hero.description, first_paint: true %}
+    <div class="d-flex flex-wrap gap-3 mt-4">
       {% iftruthy alt.hero.primary_button.text %}
         <a href="{{ alt.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ alt.hero.primary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       {% endiftruthy %}
       {% iftruthy alt.hero.secondary_button.text %}
         <a href="{{ alt.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ alt.hero.secondary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       {% endiftruthy %}
     </div>
@@ -187,18 +191,18 @@ alternative:
                     </th>
                     <td class="text-center">
                       {% if feature.ours.value == true %}
-                        {% omega_icon "circle-check", "text-success" %}
+                        <i class="fa-solid fa-circle-check text-success"></i>
                       {% elsif feature.ours.value == false %}
-                        {% omega_icon "circle-xmark", "text-muted opacity-25" %}
+                        <i class="fa-solid fa-circle-xmark text-muted opacity-25"></i>
                       {% else %}
                         <span class="fw-semibold text-adaptive">{{ feature.ours.value }}</span>
                       {% endif %}
                     </td>
                     <td class="text-center">
                       {% if feature.theirs.value == true %}
-                        {% omega_icon "circle-check", "text-success" %}
+                        <i class="fa-solid fa-circle-check text-success"></i>
                       {% elsif feature.theirs.value == false %}
-                        {% omega_icon "circle-xmark", "text-muted opacity-25" %}
+                        <i class="fa-solid fa-circle-xmark text-muted opacity-25"></i>
                       {% else %}
                         <span class="text-muted">{{ feature.theirs.value }}</span>
                       {% endif %}

@@ -78,7 +78,7 @@ test('#472: an authored facts_head renders the band head above the rail', async 
   // The superheadline is TEXT, always (Ian's 2026-08-22 ruling): an authored
   // icon is ignored on the way in, never an error.
   assert.ok(html.includes('<span class="omega-micro">By the numbers</span>'), 'the label alone, icon key or not');
-  assert.ok(!html.includes('data-icon='), 'no omega_icon output in the band head');
+  assert.ok(!/<i class="fa-/.test(html), 'no icon markup in the band head');
   assert.ok(html.includes('The metrics that <em>matter</em>'), 'the headline renders, markup and all');
   assert.ok(html.includes('What the work adds up to.'), 'and the sub line');
   assert.ok(html.includes('omega-section-head'), 'through the shared section-head cluster');
@@ -94,8 +94,11 @@ test('#472: no facts_head — the bare rail, exactly as before', async () => {
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(`{% section "about/hero" %}\n${FACTS}{% endsection %}`, SITE);
 
-  assert.ok(html.includes('<div class="omega-facts" style="--omega-facts-cols: 2;" data-omega-reveal="left">'),
-    'the rail is the untouched two-column grid, revealing itself');
+  // The rail lost its reveal attribute in #467: about/hero is the about page's
+  // first viewport, so the whole band paints with the document
+  // (test/first-paint-bands.test.js owns that promise).
+  assert.ok(html.includes('<div class="omega-facts" style="--omega-facts-cols: 2;">'),
+    'the rail is the untouched two-column grid');
   assert.ok(!html.includes('omega-section-head'), 'no head cluster, empty or otherwise');
   assert.ok(!/<h2/.test(html), 'and no stray heading in the band');
   assert.ok(html.includes('Founded'), 'the facts render as they always did');

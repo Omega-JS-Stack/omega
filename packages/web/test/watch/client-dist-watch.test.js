@@ -43,6 +43,8 @@ const clientEntry = (marker) => [
 
 // The one client subpath the boot runtime imports (runtime/boot.js).
 const CLIENT_ICON_RENDERER = 'export function createIconRenderer() { return { start: () => {} }; }';
+// The runtime's second client import (#619): the icon set's dir and its candidate walk.
+const CLIENT_ICON_CORE = "export const ICONS_DIR = 'icons'; export function candidateRelPaths() { return []; }";
 
 /**
  * A minimal site whose ONLY interesting input is the client: one asset layer
@@ -75,6 +77,7 @@ function app(t) {
 
   writeClient('index.js', clientEntry('CLIENT-BEFORE'));
   writeClient('modules/icon-renderer.js', CLIENT_ICON_RENDERER);
+  writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
 
   t.after(() => {
     fs.rmSync(root, { recursive: true, force: true });
@@ -171,6 +174,7 @@ test('a client dist DELETED and rewritten whole rebuilds the site bundle', async
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-PREPARE'));
   fixture.writeClient('modules/icon-renderer.js', CLIENT_ICON_RENDERER);
+  fixture.writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
 
   await site.bundleBecomes(/CLIENT-AFTER-PREPARE/, 'a replaced dist rebuilds the site — the watch re-arms onto the new directory');
 

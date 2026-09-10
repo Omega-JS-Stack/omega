@@ -1,0 +1,49 @@
+{% comment %}
+  One connection card on the account page — the row the connections section's
+  JS drives (`connection-<id>` is the element it looks for, and its absence is
+  what makes a configured provider render the unsupported warning instead).
+  Params: id, name, logo, first (the top card wears no hairline).
+
+  `logo` takes one of two shapes ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)):
+  the NAME of a mark this package ships (`core/logos/brandmarks/original/<name>.svg`),
+  drawn inline by omega_logo — what the packaged defaults use — or a full URL,
+  drawn as an img. A value carrying a `/` or a `:` is a URL; anything else is a
+  mark name.
+{% endcomment %}
+<div id="connection-{{ include.id }}" class="{% unless include.first %}border-top{% endunless %} px-0 py-3 d-none">
+  <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
+    <div class="d-flex align-items-center">
+      <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 fa fa-3xl">
+        {% assign logoIsUrl = false %}
+        {% if include.logo contains '/' or include.logo contains ':' %}{% assign logoIsUrl = true %}{% endif %}
+        {% if logoIsUrl %}
+          <img src="{{ include.logo | omega_cachebreak }}" class="object-fit-contain" alt="{{ include.name }} Logo"/>
+        {% else %}
+          {% omega_logo include.logo %}
+        {% endif %}
+      </div>
+      <div>
+        <h6 class="mb-0">{{ include.name }}</h6>
+        <small class="text-muted d-block" id="{{ include.id }}-connection-description"></small>
+      </div>
+    </div>
+    <div class="text-start text-sm-end flex-shrink-0">
+      <div>
+        <form id="connection-form-{{ include.id }}" class="d-grid d-sm-inline-block" novalidate data-form-state="initializing" onsubmit="return false">
+          <input type="hidden" name="provider" value="{{ include.id }}">
+          <!-- Connect button -->
+          <button type="submit" class="btn btn-sm btn-adaptive" data-action="connect">
+            <i class="fa-solid fa-link fa-sm"></i>
+            <span class="button-text">Connect</span>
+          </button>
+          <!-- Disconnect button (hidden by default) -->
+          <button type="submit" class="btn btn-sm btn-outline-danger d-none" data-action="disconnect">
+            <i class="fa-solid fa-unlink fa-sm"></i>
+            <span class="button-text">Disconnect</span>
+          </button>
+        </form>
+        <small class="text-muted d-block mt-1" id="{{ include.id }}-connection-status"></small>
+      </div>
+    </div>
+  </div>
+</div>

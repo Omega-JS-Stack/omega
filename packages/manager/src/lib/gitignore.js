@@ -1,10 +1,11 @@
 /**
- * Shared gitignore ensure — the secrets store, run output, and the run logs
- * never get committed. Used by the workspace service (brand roots) and runCompany
- * (the company root, which no service pass touches).
+ * Shared gitignore ensure — the secrets store, the environment env files, run
+ * output, and the run logs never get committed. Used by the workspace service
+ * (brand roots) and runCompany (the company root, which no service pass touches).
  *
- * The scaffold writes both entries into a NEW brand's .gitignore; this heals
- * every root that predates an entry, on its next manage run (#197: `logs/`).
+ * The scaffold writes every entry into a NEW brand's .gitignore; this heals
+ * every root that predates an entry, on its next manage run (#197: `logs/`;
+ * [#586](https://github.com/Omega-JS-Stack/omega/issues/586): `.env.*`).
  */
 
 const { join } = require('node:path');
@@ -25,11 +26,18 @@ const ENTRIES = [
     aliases: ['logs', 'logs/'],
     comment: '# Run logs (truncated on every launch — never committed)',
   },
+  {
+    // `.env` itself is the scaffold's, and every brand already carries it; this
+    // is the environment OVERLAY half (#586), which is just as much a secret
+    entry: '.env.*',
+    aliases: ['.env.*', '.env*'],
+    comment: '# Secrets — the environment overlays beside .env',
+  },
 ];
 
 /**
- * Ensure `.omega/` and `logs/` are listed in {rootDir}/.gitignore. Idempotent —
- * only the missing entries get appended, each under its own comment.
+ * Ensure `.omega/`, `logs/` and `.env.*` are listed in {rootDir}/.gitignore.
+ * Idempotent — only the missing entries get appended, each under its own comment.
  *
  * @param {string} rootDir - Directory whose .gitignore gets the entries
  * @returns {'present'|'added'}

@@ -1,0 +1,49 @@
+// Classy never RAISES on hover (Ian 2026-08-29, #686). Nothing travels upward
+// under the pointer — the highlight, the ring, the shadow and the press all
+// stay, and so does the hero's tilt; only the lift goes.
+//
+// Every rule below is shared css another theme still lifts with, which is why
+// classy opts OUT here instead of the rule losing its raise at the source:
+// core's motion library serves every skin, and newsflash/neobrutalism import
+// classy's floor partials wholesale. Raises classy owns alone are gone from
+// their own files.
+//
+// _theme.scss loads this LAST, so equal specificity is enough for everything
+// the theme emits above it.
+
+// The core hover idiom (core/css/motion/_index.scss), which main.scss lands
+// ahead of every theme.
+.omega-hover-lift,
+.omega-hover-raise,
+.omega-interactive--lift {
+  &:hover,
+  &:focus-visible {
+    transform: none;
+  }
+}
+
+// The floor partials (css/marketing/_content.scss, css/marketing/_hero.scss).
+.omega-person:hover {
+  transform: none;
+}
+
+// The frame still tips toward the pointer — the tilt mirrors _hero.scss, only
+// its 3px of travel is dropped. A media query adds no specificity, so the
+// re-declaration carries _hero.scss's park with it or the frame would tip
+// under reduced motion.
+.omega-hero__frame:hover .omega-hero__frame-inner {
+  transform: rotateX(1.1deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omega-hero__frame:hover .omega-hero__frame-inner {
+    transform: none;
+  }
+}
+
+// core/css/core/_animations.scss lands AFTER the theme (main.scss loads core's
+// utilities last), so the legacy raise utility cannot be cancelled at equal
+// specificity: the `html` prefix is one step stronger wherever it lands.
+html .hover-up:hover {
+  transform: none;
+}

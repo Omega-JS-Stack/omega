@@ -1,11 +1,12 @@
 /**
  * `omega-manager onboard [id]` — create (or converge) a brand monorepo.
  *
- * Flags: --id/--name/--url/--description/--tagline/--targets=web,backend
- * pre-answer the wizard (prompts only fill the gaps in a TTY; non-interactive
- * runs derive the rest from the id). --dry-run prints the file plan without
- * writing or prompting; --manage/--no-manage forces the manage handoff
- * instead of asking.
+ * Flags: --id/--name/--url/--description/--tagline/--contactName (plus the
+ * optional --contactImage/--contactUrl)/--targets=web,backend pre-answer the
+ * wizard (prompts only fill the gaps in a TTY; non-interactive runs derive
+ * the rest from the id — the contact person is never derived). --dry-run
+ * prints the file plan without writing or prompting; --manage/--no-manage
+ * forces the manage handoff instead of asking.
  */
 const { runOnboard } = require('../onboard.js');
 
@@ -16,6 +17,9 @@ module.exports = async (options) => {
     url: options.url,
     description: options.description,
     tagline: options.tagline,
+    contactName: options.contactName,
+    contactImage: options.contactImage,
+    contactUrl: options.contactUrl,
     targets: options.targets,
     dryRun: options.dryRun,
     manage: options.manage,

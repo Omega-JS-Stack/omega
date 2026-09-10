@@ -14,6 +14,7 @@ process.env.OMEGA_TEST_RUNNER = '1';
 
 const path = require('path');
 const TestRunner = require('./runner.js');
+const { noMatchExitCode } = require('@omega.js/devkit/test/scope');
 
 async function main() {
   // Parse config from base64-encoded env var
@@ -73,7 +74,13 @@ async function main() {
 
   const results = await runner.run();
 
-  // Exit with appropriate code (a pre-flight abort ran zero tests — that is a failure)
+  // Exit with appropriate code (a pre-flight abort ran zero tests: that is a
+  // failure, and so is a target that named files and matched none, #814 — the
+  // no-match answers with its own code, which is 1 standalone and distinct
+  // inside a brand-root fan-out, so the manager can count it as a miss)
+  if (results.noMatch) {
+    process.exit(noMatchExitCode());
+  }
   process.exit(results.failed > 0 || results.aborted ? 1 : 0);
 }
 

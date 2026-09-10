@@ -74,6 +74,29 @@ function deriveEmail(url) {
 }
 
 /**
+ * The brand.contact.person block from the wizard's answers (#770): the NAME
+ * is the whole block's condition — a headshot or a link with nobody to sign
+ * is not a person, and no name at all writes nothing at all, because a human
+ * fact can never be derived (the manage walk's own gate is what catches the
+ * gap later, rather than a framework identity signing the brand's email).
+ *
+ * @returns {Object|null} - { name, image?, url? }, or null when unanswered
+ */
+function buildPerson({ name, image, url }) {
+  const clean = (value) => (typeof value === 'string' ? value.trim() : '');
+
+  if (!clean(name)) {
+    return null;
+  }
+
+  return {
+    name: clean(name),
+    ...(clean(image) ? { image: clean(image) } : {}),
+    ...(clean(url) ? { url: clean(url) } : {}),
+  };
+}
+
+/**
  * Normalize a --targets flag value ('web,backend' or array) and validate
  * every entry against the canonical target list.
  */
@@ -211,6 +234,35 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
     tagline = (await input({ message: 'Brand tagline (optional, ~3 words):' })).trim();
   }
 
+  // contact person — the human who signs the personal sends. The support
+  // email derives from the url; a NAME cannot, so the wizard asks for it and
+  // requires an answer, while a non-interactive run without --contactName
+  // writes no person at all rather than inventing one (#770). The headshot
+  // and the link are optional garnish on the same signoff.
+  let contactName = options.contactName ?? null;
+  if (contactName != null && (typeof contactName !== 'string' || !contactName.trim())) {
+    throw new Error('Invalid --contactName — pass the person\'s name (--contactName="Jane Doe")');
+  }
+  if (contactName == null && !interactive && (options.contactImage != null || options.contactUrl != null)) {
+    throw new Error('--contactImage/--contactUrl need a --contactName to belong to — nothing would be written');
+  }
+  if (contactName == null && interactive) {
+    contactName = await input({
+      message: 'Contact person (signs the personal emails: welcome, nudges, checkups):',
+      validate: (value) => (value.trim().length > 0 ? true : 'Required'),
+    });
+  }
+
+  let contactImage = options.contactImage ?? null;
+  if (contactImage == null && interactive && contactName) {
+    contactImage = await input({ message: 'Contact person headshot URL (optional):' });
+  }
+
+  let contactUrl = options.contactUrl ?? null;
+  if (contactUrl == null && interactive && contactName) {
+    contactUrl = await input({ message: 'Contact person link URL (optional):' });
+  }
+
   // targets — checkbox in a TTY, web+backend otherwise
   let targets = options.targets != null ? parseTargetsFlag(options.targets) : null;
   if (!targets) {
@@ -243,6 +295,7 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
     description: description || null,
     tagline: tagline || null,
     email: deriveEmail(url),
+    person: buildPerson({ name: contactName, image: contactImage, url: contactUrl }),
     targets,
     accountAdmins,
     bundleIdPrefix: deriveBundleIdPrefix(companyUrl || url),
@@ -292,6 +345,9 @@ function answersFromBrand(brandRoot) {
     description: brand.config.brand?.description || null,
     tagline: brand.config.brand?.tagline || null,
     email: brand.config.brand?.contact?.email || deriveEmail(url),
+    // The brand's own answer, kept as it stands — the scaffold never rewrites
+    // an existing config, so a rerun leaves the person byte-identical (#770)
+    person: brand.config.brand?.contact?.person || null,
     targets: brand.enabledTargets.length > 0 ? brand.enabledTargets : DEFAULT_TARGETS,
     bundleIdPrefix: brand.config.certificates?.providers?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
   };
@@ -362,7 +418,7 @@ function printNextSteps(answers) {
  * Main onboard runner.
  *
  * @param {string} cwd - Where the command ran
- * @param {Object} options - { id, name, url, description, tagline, targets, dryRun, manage }
+ * @param {Object} options - { id, name, url, description, tagline, contactName, contactImage, contactUrl, targets, dryRun, manage }
  * @returns {Object} - { brandRoot, mode, created, kept, planned, valid, manageExitCode }
  */
 async function runOnboard(cwd, options = {}) {

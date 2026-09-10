@@ -96,7 +96,7 @@ exports['hook:build:post']  = makeHookTask('build/post');
 exports['hook:release:pre'] = makeHookTask('release/pre');
 exports['hook:release:post'] = makeHookTask('release/post');
 
-// Build pipeline: hook:build:pre → defaults → distribute → (sass | webpack | html in parallel)
+// Build pipeline: hook:build:pre → defaults → distribute → (sass | bundle | html in parallel)
 // → audit → build-config → hook:build:post.
 // build-config generates dist/electron-builder.yml entirely from @omega.js/desktop defaults +
 // config/omega.json5 (no consumer-shipped electron-builder.yml). Mode-dependent
@@ -105,7 +105,7 @@ exports.build = series(
   exports['hook:build:pre'],
   exports.defaults,
   exports.distribute,
-  parallel(exports.sass, exports.webpack, exports.html),
+  parallel(exports.sass, exports.bundle, exports.html),
   exports.audit,
   exports['build-config'],
   exports['hook:build:post'],
@@ -126,13 +126,14 @@ exports.packageQuick = series(
   exports['package-quick'],
 );
 
-// Publish: build + hook:release:pre + electron-builder release + mirror + hook:release:post.
-// Single sign+notarize pass; mirror is post-publish (re-uploads artifacts under stable names).
+// Publish: build + hook:release:pre + electron-builder release + hook:release:post.
+// Single sign+notarize pass. The artifacts land in the brand's ONE public releases
+// repo under versionless names (#620/#799), which is what the site links: there is
+// no mirror step any more.
 exports.publish = series(
   exports.build,
   exports['hook:release:pre'],
   exports.release,
-  exports['mirror-downloads'],
   exports['hook:release:post'],
 );
 

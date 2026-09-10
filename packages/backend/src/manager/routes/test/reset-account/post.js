@@ -1,3 +1,4 @@
+const { resolvedBrandHost } = require('@omega.js/config');
 const { getAccountDefinitions, createAccount, seedOrderFixture, seedSessionFixture } = require('../../../../test/test-accounts.js');
 
 /**
@@ -30,9 +31,10 @@ module.exports = async ({ ctx, user }) => {
   // only ever acts on the account it is called AS.
   const uid = user.auth?.uid;
 
-  // The seeder resolves persona emails against the brand's contact domain —
-  // the same derivation `omega emulator` seeds with.
-  const domain = (config.brand?.contact?.email || '').split('@')[1] || '';
+  // The seeder resolves persona emails against the brand's HOST — the same
+  // derivation `omega emulator` seeds with, and the one the dev palette signs
+  // in on ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)).
+  const domain = resolvedBrandHost(config);
   const definitions = getAccountDefinitions(domain, config);
   const entry = Object.entries(definitions).find(([, definition]) => definition.uid === uid);
 

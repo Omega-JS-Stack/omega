@@ -1,0 +1,13 @@
+// The corpus tier-2 override's theme entry (cell `shape-theme-override`).
+// It shadows the PACKAGED classy `_theme.scss` for the same theme id, and
+// takes the documented inheritance hatch (docs/shared/theming.md, the
+// partial/consumer theme lane): the forward self-skips this file, lands on
+// base's `_theme.scss`, and emits the whole packaged classy chain — so a
+// consumer theme this small still renders a complete site.
+@forward 'omega:theme';
+
+// The css marker the cell greps out of the compiled stylesheet. A custom
+// property on :root is invisible to a reader and paints nothing.
+:root {
+  --corpus-override: css;
+}

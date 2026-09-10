@@ -1,12 +1,14 @@
 // Boot-layer test for lib/restart-manager — proves the split lib dir (index/
-// protocol/install) survives webpack bundling into a real consumer bundle
+// protocol/install) survives esbuild bundling into a real consumer bundle
 // (js-yaml + the directory require are the packaging risks) and bails cleanly
 // as 'testing' in the consumer's real boot path.
 //
 // NOTE: inspect bodies are serialized to the spawned Electron process — no
 // closures over module scope.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'restart-manager — bundled lib boots and bails cleanly',
@@ -33,4 +35,4 @@ module.exports = {
       },
     },
   ],
-};
+});

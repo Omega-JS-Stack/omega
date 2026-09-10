@@ -12,7 +12,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { after, test } = require('node:test');
 
-const { buildDirectPlan, pagesHost } = require('../src/commands/deploy.js');
+const { buildDirectPlan, pagesHost, dispatchAddress } = require('../src/commands/deploy.js');
 
 // Every plan here resolves from the CONFIG it is handed: an empty env and a
 // working tree with no git remote keep the machine this runs on out of it.
@@ -66,9 +66,9 @@ test('direct plan: owner/name slug carries both (ITW-housed brand repo, org stil
   assert.equal(plan.repo, 'itw-creative-works/omega-brand');
 });
 
-test('direct plan: repo defaults to brand.id when no slug is set', () => {
+test('direct plan: repo defaults to `<brand.id>-omega` when no slug is set', () => {
   const plan = buildDirectPlan({ repo: { providers: { github: { org: 'Org' } } }, brand: { id: 'my-brand', url: 'https://my.brand' } });
-  assert.equal(plan.repo, 'Org/my-brand');
+  assert.equal(plan.repo, 'Org/my-brand-omega');
 });
 
 test('direct plan: a custom-domain plan carries the domain root prefix and its CNAME, unchanged', () => {
@@ -227,6 +227,50 @@ test('direct plan: a repo that names itself NOWHERE refuses, naming every way ou
 // A fatal finding is a refusal, not a plan: it stops the lane before the build,
 // the CNAME write and the push, and it stops a DRY RUN too — a plan printed
 // from a config nothing will read is a lie about what would happen.
+test('dispatch address: the CI dispatch names the CONFIG\'s repo, never the enclosing checkout (#799)', (t) => {
+  // A brand nested inside ANOTHER git repo, which is the shape that broke: the
+  // working tree's own remote is somebody else's repo, so only the config can
+  // say where this site's workflow lives.
+  const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dispatch-'));
+  const targetDir = path.join(brandRoot, 'targets', 'website');
+  const previous = process.cwd();
+  t.after(() => {
+    process.chdir(previous);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  });
+
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), `{
+  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+  repo: { providers: { github: { org: 'Acme-Org' } } },
+  targets: { web: {} },
+}`);
+
+  process.chdir(targetDir);
+  assert.deepStrictEqual(dispatchAddress(), { owner: 'Acme-Org', repo: 'acme-omega' });
+});
+
+test('dispatch address: a config that names no repo REFUSES instead of dispatching somewhere (#799)', (t) => {
+  const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-dispatch-none-'));
+  const targetDir = path.join(brandRoot, 'targets', 'website');
+  const previous = process.cwd();
+  t.after(() => {
+    process.chdir(previous);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  });
+
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), `{
+  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+  targets: { web: {} },
+}`);
+
+  process.chdir(targetDir);
+  assert.throws(() => dispatchAddress(), /brand repo to dispatch on/);
+});
+
 test('deploy --direct: a fatal config finding stops the lane before any deploy work (#426)', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-invalid-'));
   const previous = process.cwd();
@@ -252,4 +296,45 @@ test('deploy --direct: a fatal config finding stops the lane before any deploy w
     /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
     'the findings surface as a thrown fatal, not a silently-ignored array',
   );
+});
+
+// #588: a multi-instance brand deploys each instance to its OWN host. The
+// instance id IS the subdomain, so a bare `{ id: 'admin' }` publishes to
+// admin.acme.test: the CNAME the gh-pages push writes, the plan URL, and the
+// path prefix the build mounts under all have to name that host, not the main
+// site's. They read the resolved config's top-level `url` (the instance's own
+// public url), falling back to brand.url for the single-instance world.
+test('direct plan: a web instance deploys to ITS derived host, main untouched (#588)', (t) => {
+  const { loadConfig } = require('@omega.js/config');
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-instances-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },
+  repo: { providers: { github: { org: 'Org', repo: 'site' } } },
+  targets: { web: [{ id: 'main' }, { id: 'admin' }] },
+}`);
+  for (const dir of ['website', 'website-admin']) {
+    fs.mkdirSync(path.join(root, 'targets', dir), { recursive: true });
+    fs.writeFileSync(path.join(root, 'targets', dir, 'package.json'), '{}');
+  }
+
+  const planFor = (dir) => {
+    const { config, errors } = loadConfig(path.join(root, 'targets', dir), 'web');
+    assert.deepEqual(errors, [], `${dir} config is valid`);
+    return { plan: buildDirectPlan(config, ISOLATED), config };
+  };
+
+  const admin = planFor('website-admin');
+  assert.equal(admin.plan.cname, 'admin.acme.test', 'the gh-pages CNAME names the instance host');
+  assert.equal(admin.plan.url, 'https://admin.acme.test', 'the plan publishes to the instance host');
+  assert.equal(admin.plan.pathPrefix, '/', 'a custom domain mounts at the root');
+  assert.equal(pagesHost(admin.config), 'admin.acme.test', "so does `omega build`'s dist/CNAME");
+
+  const main = planFor('website');
+  assert.equal(main.plan.cname, 'acme.test', 'main is the brand host, unchanged');
+  assert.equal(main.plan.url, 'https://acme.test');
+  assert.equal(main.plan.pathPrefix, '/');
 });

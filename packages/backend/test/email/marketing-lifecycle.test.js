@@ -5,7 +5,9 @@
  * Requires TEST_EXTENDED_MODE=true and SENDGRID_API_KEY / BEEHIIV_API_KEY env vars.
  * These tests hit real external APIs.
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Marketing lifecycle (add → sync → remove)',
   type: 'suite',
   timeout: 60000,
@@ -134,4 +136,4 @@ module.exports = {
       },
     },
   ],
-};
+});

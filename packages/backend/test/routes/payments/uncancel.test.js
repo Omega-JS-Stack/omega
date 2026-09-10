@@ -21,12 +21,13 @@
  */
 const { buildUser, callHandler, recordingResponse, withEnvironment } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/uncancel/post.js');
+const handler = require('../../../dist/manager/routes/payments/uncancel/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDERS = ['stripe', 'chargebee', 'paypal', 'test'];
 
 function providerModule(name) {
-  return require(`../../../src/manager/routes/payments/uncancel/providers/${name}.js`);
+  return require(`../../../dist/manager/routes/payments/uncancel/providers/${name}.js`);
 }
 
 // A subscriber whose cancellation is scheduled — the one state uncancel accepts.
@@ -91,7 +92,7 @@ async function uncancelReadingProperties(Manager, user) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment uncancel endpoint: guards + provider capability gate',
   type: 'group',
   timeout: 15000,
@@ -266,4 +267,4 @@ module.exports = {
       },
     },
   ],
-};
+});

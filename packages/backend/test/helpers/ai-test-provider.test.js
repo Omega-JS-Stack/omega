@@ -6,7 +6,8 @@
  * user message. These tests exercise the full request() surface directly —
  * no network involved by design.
  */
-const TestProvider = require('../../src/manager/libraries/ai/providers/test.js');
+const TestProvider = require('../../dist/manager/libraries/ai/providers/test.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { parseScript } = TestProvider._internals;
 
 function makeProvider() {
@@ -15,7 +16,7 @@ function makeProvider() {
   return new TestProvider({});
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'AI test provider (scripted sequences)',
   type: 'group',
   tests: [
@@ -223,4 +224,4 @@ module.exports = {
       },
     },
   ],
-};
+});

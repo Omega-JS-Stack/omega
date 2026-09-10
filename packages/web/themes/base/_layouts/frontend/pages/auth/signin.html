@@ -12,7 +12,8 @@ social_signin:
     <div class="omega-auth__card">
       <!-- Logo -->
       <div class="omega-auth__brand">
-        <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
+        {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+        <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
@@ -40,7 +41,7 @@ social_signin:
                   <span class="d-inline-flex me-2" aria-hidden="true">{% omega_logo provider.logo, "brandmarks" %}</span>
                 {% endiftruthy %}
                 {% iffalsy provider.logo %}
-                  {% omega_icon provider.icon, "me-2" %}
+                  <i class="fa-solid fa-{{ provider.icon }} me-2"></i>
                 {% endiffalsy %}
                 <span class="button-text">Continue with {{ provider.name }}</span>
               </button>
@@ -64,8 +65,8 @@ social_signin:
           <div class="input-group">
             <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" autocomplete="current-password">
             <button class="btn omega-password-toggle px-3" type="button" aria-label="Toggle password visibility">
-              <span class="omega-password-show">{% omega_icon "eye", "fa-fw" %}</span>
-              <span class="omega-password-hide d-none">{% omega_icon "eye-slash", "fa-fw" %}</span>
+              <span class="omega-password-show"><i class="fa-solid fa-eye fa-fw"></i></span>
+              <span class="omega-password-hide d-none"><i class="fa-solid fa-eye-slash fa-fw"></i></span>
             </button>
           </div>
         </div>
@@ -73,7 +74,7 @@ social_signin:
         <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
           {{ initializing_spinner }}
           <span class="button-text">Sign in</span>
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right-to-bracket", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right-to-bracket fa-sm"></i></span>
         </button>
       </form>
 

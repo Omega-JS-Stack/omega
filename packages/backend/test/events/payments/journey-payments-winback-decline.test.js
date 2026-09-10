@@ -23,7 +23,8 @@
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
 // exclusive to this suite and declared in the seed roster, so the account it
@@ -31,7 +32,7 @@ const handler = require('../../../src/manager/routes/payments/intent/post.js');
 const PERSONA = 'journey-payments-winback-decline';
 const RESOURCE_ID = 'sub_test_journey_winback_decline_cancelled';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: cancelled subscriber resubscribes and is declined → checkout-declined',
   type: 'suite',
   timeout: 60000,
@@ -167,4 +168,4 @@ module.exports = {
       },
     },
   ],
-};
+});

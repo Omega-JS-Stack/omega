@@ -11,7 +11,6 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
@@ -234,7 +233,7 @@ function renderRow(row) {
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('user', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-user fa-sm"></i></span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 220px;">${escape(email)}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(uid)}</div>
@@ -251,37 +250,37 @@ function renderRow(row) {
     <td>
       <div class="dropdown">
         <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="User actions">
-          ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
+          <i class="fa-solid fa-ellipsis-vertical fa-sm"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><a class="dropdown-item small btn-view-user" href="#">
-            ${getPrerenderedIcon('eye', 'fa-sm me-2')}
+            <i class="fa-solid fa-eye fa-sm me-2"></i>
             View details
           </a></li>
           <li><a class="dropdown-item small btn-edit-user" href="#">
-            ${getPrerenderedIcon('pen', 'fa-sm me-2')}
+            <i class="fa-solid fa-pen fa-sm me-2"></i>
             Edit user
           </a></li>
           <li><a class="dropdown-item small btn-copy-uid" href="#">
-            ${getPrerenderedIcon('copy', 'fa-sm me-2')}
+            <i class="fa-solid fa-copy fa-sm me-2"></i>
             Copy UID
           </a></li>
           <li><a class="dropdown-item small btn-view-firebase" href="#">
-            ${getPrerenderedIcon('fire', 'fa-sm me-2')}
+            <i class="fa-solid fa-fire fa-sm me-2"></i>
             View in Explorer
           </a></li>
           <li><a class="dropdown-item small btn-signin-as" href="#">
-            ${getPrerenderedIcon('right-to-bracket', 'fa-sm me-2')}
+            <i class="fa-solid fa-right-to-bracket fa-sm me-2"></i>
             Sign in as user
           </a></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item small btn-toggle-disabled" href="#">
             ${auth?.disabled
-              ? `${getPrerenderedIcon('unlock', 'fa-sm me-2')} Enable user`
-              : `${getPrerenderedIcon('ban', 'fa-sm me-2')} Disable user`}
+              ? `<i class="fa-solid fa-unlock fa-sm me-2"></i> Enable user`
+              : `<i class="fa-solid fa-ban fa-sm me-2"></i> Disable user`}
           </a></li>
           <li><a class="dropdown-item small text-danger btn-delete-user" href="#">
-            ${getPrerenderedIcon('trash', 'fa-sm me-2')}
+            <i class="fa-solid fa-trash fa-sm me-2"></i>
             Delete user
           </a></li>
         </ul>
@@ -474,7 +473,7 @@ function showSignInAsModalReady(email, urlString) {
     $copyBtn.onclick = async () => {
       await navigator.clipboard.writeText(urlString).catch(() => {});
       const originalHTML = $copyBtn.innerHTML;
-      $copyBtn.innerHTML = `${getPrerenderedIcon('circle-check', 'fa-sm')}`;
+      $copyBtn.innerHTML = `<i class="fa-solid fa-circle-check fa-sm"></i>`;
       $copyBtn.classList.add('btn-success');
       $copyBtn.classList.remove('btn-outline-adaptive');
       setTimeout(() => {

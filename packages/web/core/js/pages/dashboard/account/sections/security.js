@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -410,7 +409,6 @@ function initializeSigninLinkGenerator() {
   const $warningView = document.getElementById('generate-signin-link-warning');
   const $resultView = document.getElementById('generate-signin-link-result');
   const $output = document.getElementById('signin-link-output');
-  const $copyBtn = document.getElementById('signin-link-copy-btn');
 
   const expectedPhrase = $phrase.textContent.trim();
 
@@ -468,17 +466,6 @@ function initializeSigninLinkGenerator() {
       $generateBtn.disabled = false;
     } finally {
       $generateBtn.querySelector('.button-text').textContent = originalText;
-    }
-  });
-
-  $copyBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText($output.value);
-      omega.utilities().showNotification('Signin link copied to clipboard', 'success');
-    } catch (error) {
-      $output.select();
-      document.execCommand('copy');
-      omega.utilities().showNotification('Signin link copied to clipboard', 'success');
     }
   });
 }
@@ -674,7 +661,7 @@ function getDeviceIcon(device) {
     iconName = 'chrome';
   }
 
-  return getPrerenderedIcon(iconName, 'fa-xl');
+  return `<i class="fa-solid fa-${iconName} fa-xl"></i>`;
 }
 
 // Format location from session data

@@ -404,7 +404,6 @@ function adjustNavbarOffset() {
   const $promoBanner = document.getElementById('pricing-promo-banner');
   // The fixed nav the banner pushes down (classy v2's .omega-nav; .navbar-wrapper for legacy themes)
   const $nav = document.querySelector('.omega-nav, .navbar-wrapper');
-  const $firstSection = document.querySelector('main > section:first-of-type');
 
   if (!$promoBanner || !$nav) {
     return;
@@ -414,15 +413,13 @@ function adjustNavbarOffset() {
   $promoBanner.removeAttribute('hidden');
 
   // Full banner height — the banner sits entirely ABOVE the nav, never
-  // bleeding into it (the nav/section transitions make the push-down glide)
+  // bleeding into it (the nav's margin transition makes the push-down glide)
   const bannerOffset = $promoBanner.offsetHeight;
 
-  // Push navbar down to make room for banner
+  // Push navbar down to make room for banner. The NAV is the only thing that
+  // moves: the banner is nav chrome, and adding its height to the opening
+  // section's padding too dropped the whole page a second into the visit
+  // ([#764](https://github.com/Omega-JS-Stack/omega/issues/764)). The page's
+  // own CSS holds whatever room the banner needs.
   $nav.style.marginTop = `${bannerOffset}px`;
-
-  // Also increase first section padding to account for banner
-  if ($firstSection) {
-    const currentPadding = parseFloat(getComputedStyle($firstSection).paddingTop);
-    $firstSection.style.paddingTop = `${currentPadding + bannerOffset}px`;
-  }
 }

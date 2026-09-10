@@ -54,6 +54,14 @@ const methods = {
       if (options.resolve) {
         self.request.user = self.Manager.User(user).properties;
         self.request.user.authenticated = user.authenticated || false;
+
+        // This request's caller is RESOLVED. The usage counter is lazy now
+        // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)) and
+        // resolves on its first consume(), which is after the middleware
+        // already ran this — without the marker it would verify the token and
+        // re-read the user doc a SECOND time on every counting route.
+        self.resolvedUser = true;
+
         return self.request.user;
       } else {
         return user;

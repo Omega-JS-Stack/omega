@@ -1,0 +1,42 @@
+{% comment %}
+  The account page's connection cards, from ONE source: the brand's `connections`
+  config ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)).
+
+  Every entry carrying a `name` and a `logo` draws a card. The framework's config
+  DEFAULTS carry both (plus a description) for the five providers @omega.js/backend
+  ships a module for, so a brand that writes `google: { enabled: true }` gets a
+  drawn card and can still overwrite any field. The layout's old `connections:`
+  frontmatter rows are gone: they shadowed the config, and their CDN logos 404.
+
+  A configured provider with no name+logo gets the connections section's
+  "unsupported connection" card at runtime, which says what is missing.
+  Visibility is the JS's alone: every card renders hidden and the section shows
+  the enabled ones.
+{% endcomment %}
+<div id="connections-list">
+  <!-- Loading state -->
+  <div id="connections-loading" class="text-center py-3">
+    <div class="spinner-border spinner-border-sm text-primary" role="status">
+      <span class="visually-hidden">Loading connections...</span>
+    </div>
+  </div>
+
+  <!-- No connections message (hidden by default) -->
+  <div id="connections-empty" class="text-center py-4 text-muted d-none">
+    <p>No connections are available right now.</p>
+  </div>
+
+  {% assign connectionCardDrawn = false %}
+  {% for entry in resolved.config.connections %}
+    {% assign providerId = entry[0] %}
+    {% assign provider = entry[1] %}
+    {% if provider.name and provider.logo %}
+      {% assign isFirstCard = false %}
+      {% unless connectionCardDrawn %}
+        {% assign isFirstCard = true %}
+        {% assign connectionCardDrawn = true %}
+      {% endunless %}
+      {% include frontend/components/connection-card.html id=providerId name=provider.name logo=provider.logo first=isFirstCard %}
+    {% endif %}
+  {% endfor %}
+</div>

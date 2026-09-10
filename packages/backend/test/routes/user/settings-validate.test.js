@@ -5,7 +5,9 @@
  *
  * SKIPPED: Requires project-specific defaults.js file which @omega.js/backend test environment doesn't have
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User validate settings',
   skip: 'Requires project-specific defaults.js file',
   type: 'group',
@@ -79,4 +81,4 @@ module.exports = {
       },
     },
   ],
-};
+});

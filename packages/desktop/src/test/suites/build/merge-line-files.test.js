@@ -4,8 +4,9 @@
 const path = require('path');
 const { mergeLineBasedFiles, normalizeEnvLine, DEFAULT_MARKER, CUSTOM_MARKER } =
   require(path.join(__dirname, '..', '..', '..', 'utils', 'merge-line-files.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'merge-line-files — env + gitignore merge',
@@ -226,4 +227,4 @@ ${CUSTOM_MARKER}
       },
     },
   ],
-};
+});

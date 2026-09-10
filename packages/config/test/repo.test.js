@@ -1,7 +1,8 @@
 /**
  * brandRepoName/brandRepoOwner — the shared brand-repo derivation from the
- * optional `repo.providers.github.repo` slug ("owner/name" or bare name; name → brand.id,
- * owner → repo.providers.github.org). Born from the 2026-07-18 launch-night collision
+ * optional `repo.providers.github.repo` slug ("owner/name" or bare name; name → `<brand.id>-omega`,
+ * the `<brand.id>-<role>` rule of #809; owner → repo.providers.github.org).
+ * Born from the 2026-07-18 launch-night collision
  * (brand "omega" resolved to the framework MONOREPO); the `repoWebsite` URL
  * key is retired (2026-07-19).
  */
@@ -10,7 +11,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, loadConfig } = require('../src/index.js');
+const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, releasesRepo, loadConfig } = require('../src/index.js');
 
 test('brandRepoName: explicit owner/name slug names the repo', () => {
   assert.equal(
@@ -23,10 +24,16 @@ test('brandRepoName: bare-name slug wins over brand.id', () => {
   assert.equal(brandRepoName({ repo: { providers: { github: { repo: 'site' } } }, brand: { id: 'b' } }), 'site');
 });
 
-test('brandRepoName: brand.id fallback; empty when nothing resolves (the collision case needs the slug)', () => {
-  assert.equal(brandRepoName({ repo: { providers: { github: {} } }, brand: { id: 'my-brand' } }), 'my-brand');
-  assert.equal(brandRepoName({ brand: { id: 'my-brand' } }), 'my-brand');
+test('brandRepoName: the `<brand.id>-omega` default; empty when nothing resolves (the collision case needs the slug)', () => {
+  assert.equal(brandRepoName({ repo: { providers: { github: {} } }, brand: { id: 'my-brand' } }), 'my-brand-omega');
+  assert.equal(brandRepoName({ brand: { id: 'my-brand' } }), 'my-brand-omega');
+  assert.equal(brandRepoName({ brand: { id: '  spaced  ' } }), 'spaced-omega', 'the id is trimmed before the role joins it');
   assert.equal(brandRepoName({}), '');
+});
+
+test('brandRepoName: the derived default is the brand id plus its role, never the bare id (#809)', () => {
+  // Hard-coded on purpose: the rule is a NAME, not a recipe to recompute here.
+  assert.equal(brandRepoName({ brand: { id: 'omega-playground' } }), 'omega-playground-omega');
 });
 
 test('brandRepoOwner: slug owner wins (legacy orgWebsite — brand repo under the paid company org)', () => {
@@ -64,7 +71,7 @@ test('backend load: the target-overlaid github.repo drives the derivation (CMS c
 test('brandRepo: the finished value frameworks hand to consumer code (#290)', () => {
   assert.deepEqual(
     brandRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } }),
-    { owner: 'Acme-Org', name: 'acme', repo: 'Acme-Org/acme' },
+    { owner: 'Acme-Org', name: 'acme-omega', repo: 'Acme-Org/acme-omega' },
   );
 
   // The target overlay wins, exactly as the two halves resolve it.
@@ -75,9 +82,54 @@ test('brandRepo: the finished value frameworks hand to consumer code (#290)', ()
 });
 
 test('brandRepo: half an address addresses nothing — the slug stays empty', () => {
-  assert.deepEqual(brandRepo({ brand: { id: 'acme' } }), { owner: '', name: 'acme', repo: '' });
+  assert.deepEqual(brandRepo({ brand: { id: 'acme' } }), { owner: '', name: 'acme-omega', repo: '' });
   assert.deepEqual(brandRepo({ repo: { providers: { github: { org: 'Acme-Org' } } } }), { owner: 'Acme-Org', name: '', repo: '' });
   assert.deepEqual(brandRepo({}), { owner: '', name: '', repo: '' });
+});
+
+test('releasesRepo: the default is `<brand.id>-releases` under the brand repo owner (#799)', () => {
+  assert.deepEqual(
+    releasesRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } }),
+    { owner: 'Acme-Org', name: 'acme-releases', repo: 'Acme-Org/acme-releases' },
+  );
+
+  // The brand repo's own owner, slug form included (the app repo may sit under
+  // the paid company org while repo.providers.github.org names the brand's).
+  assert.equal(
+    releasesRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-brand' } } } }).owner,
+    'itw-creative-works',
+  );
+});
+
+test('releasesRepo: an explicit owner + repo names the repo outright', () => {
+  assert.deepEqual(
+    releasesRepo({
+      brand: { id: 'acme' },
+      repo: { providers: { github: { org: 'Acme-Org' } } },
+      targets: { desktop: { releases: { owner: 'Acme-Binaries', repo: 'acme-bins' } } },
+    }),
+    { owner: 'Acme-Binaries', name: 'acme-bins', repo: 'Acme-Binaries/acme-bins' },
+  );
+});
+
+test('releasesRepo: reads the raw shape (targets.desktop.releases) and the desktop-resolved overlay alike', () => {
+  const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } };
+
+  // Raw config, the shape the site global reads.
+  assert.equal(releasesRepo({ ...base, targets: { desktop: { releases: { repo: 'bins' } } } }).repo, 'Acme-Org/bins');
+  // Desktop-resolved config, where the merge chain overlaid the block on top.
+  assert.equal(releasesRepo({ ...base, releases: { repo: 'bins' } }).repo, 'Acme-Org/bins');
+  // Both present: the overlay is the resolved value and wins.
+  assert.equal(
+    releasesRepo({ ...base, releases: { repo: 'overlay' }, targets: { desktop: { releases: { repo: 'raw' } } } }).repo,
+    'Acme-Org/overlay',
+  );
+});
+
+test('releasesRepo: half an address addresses nothing', () => {
+  assert.deepEqual(releasesRepo({ brand: { id: 'acme' } }), { owner: '', name: 'acme-releases', repo: '' });
+  assert.deepEqual(releasesRepo({ repo: { providers: { github: { org: 'Acme-Org' } } } }), { owner: 'Acme-Org', name: '', repo: '' });
+  assert.deepEqual(releasesRepo({}), { owner: '', name: '', repo: '' });
 });
 
 test('parseRepoSlug: shapes', () => {

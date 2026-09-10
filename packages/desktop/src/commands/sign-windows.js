@@ -23,12 +23,32 @@ const { execute } = require('node-powertools');
 
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('sign-windows');
+
+// The box's own signing configuration (`<runner home>\.env`: the cert, the PIN,
+// signtool) is read before anything below looks at process.env, so a manual
+// sign, `--smoke` and the e2e suite work from any directory. A CI-delivered
+// value wins over the file (utils/runner-env.js).
+const runnerEnv = require('../utils/runner-env.js');
+runnerEnv.loadRunnerEnv();
+const attachLogFile = require('../utils/attach-log-file.js');
+
 const { startAutoUnlock } = require('../lib/sign-helpers/auto-unlock.js');
 const { writeUpdateInfo } = require('../lib/sign-helpers/update-info.js');
 const signEvents = require('../lib/sign-helpers/sign-events.js');
 
 module.exports = async function (options) {
   options = options || {};
+
+  // The box's own record of what it signed, beside the install — the same file
+  // `omega runner` writes, since a sign is one of the things the box did. Its
+  // OWN tee, so an outer verb's log file survives this one's detach.
+  //
+  // `attachInCI` because this file is the BOX's, not the workspace's: the
+  // `windows-sign` job IS the run whose trail the box needs to keep. `append`
+  // because the `runner start` listener that spawned this holds the same file.
+  const logTarget = boxLogTarget();
+  const tee = attachLogFile.createTee();
+  if (logTarget) tee.attach(logTarget, { attachInCI: true, append: true });
 
   const jobStart = Date.now();
   // GITHUB_REPOSITORY is "<owner>/<repo>" inside a GH Actions runner — split for the
@@ -54,6 +74,8 @@ module.exports = async function (options) {
   } catch (e) {
     signEvents.emit('job-end', { ok: false, duration_ms: Date.now() - jobStart, error: e?.message || String(e) });
     throw e;
+  } finally {
+    tee.detach();
   }
 };
 
@@ -62,10 +84,12 @@ async function runSignCommand(options) {
   // This is the fastest possible end-to-end check that the EV token, drivers, signtool,
   // and password cache are all working — no @omega.js/desktop build required.
   if (options.smoke) {
+    await runnerEnv.ensureRunnerConfig({ logger, scopes: ['signing'] });
     return smokeTest();
   }
 
   const strategy = Manager.getWindowsSignStrategy();
+
   const config   = Manager.getConfig();
   const projectRoot = process.cwd();
 
@@ -88,6 +112,14 @@ async function runSignCommand(options) {
       logger.warn(`No .exe / .msi files found under ${inDir} — nothing to sign.`);
       return;
     }
+  }
+
+  // Signing HERE needs the box's cert, PIN and signtool: ask for what is missing
+  // in a terminal, refuse without one. The cloud strategy has no such needs.
+  // After the input checks on purpose: a mistyped --target fails before anyone
+  // is asked for a PIN.
+  if (strategy === 'self-hosted' || strategy === 'local') {
+    await runnerEnv.ensureRunnerConfig({ logger, scopes: ['signing'] });
   }
 
   // Verify-only mode: don't sign anything, just run signtool verify against each.
@@ -119,9 +151,36 @@ async function runSignCommand(options) {
   throw new Error(`Unknown Windows signing strategy: ${strategy}`);
 }
 
+// The runner log this run may tee to, or null.
+//
+// Off Windows there is no box home at all, so a manual mac/linux sign drops no
+// `.gh-runners/` into the cwd. And from a TEST run the box's own record is off
+// limits unless the home is a scratch one — a suite pointed at a real home
+// writes nothing rather than overwriting what the box did
+// ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)).
+//
+// `env` and `platform` resolve the HOME (the test seam); whether this is a test
+// run is read from process.env by isTestRun, always — never from an argument.
+//
+// @param {object} [env] - Environment the home is resolved from.
+// @param {string} [platform] - Platform the default home is resolved for.
+// @returns {string|null}
+function boxLogTarget(env, platform) {
+  env = env || process.env;
+  platform = platform || process.platform;
+
+  const home = env.OMEGA_RUNNER_HOME
+    || (platform === 'win32' ? runnerEnv.defaultRunnerHome(platform, env) : null);
+  if (!home) return null;
+  if (runnerEnv.isTestRun() && !runnerEnv.isScratchRunnerHome(home)) return null;
+
+  return runnerEnv.runnerLogFile(home);
+}
+
 // signtool path (Windows SDK). Falls back to plain `signtool` on PATH.
-function getSigntoolPath() {
-  if (process.env.SIGNTOOL_PATH) return process.env.SIGNTOOL_PATH;
+function getSigntoolPath(env) {
+  env = env || process.env;
+  if (env.SIGNTOOL_PATH) return env.SIGNTOOL_PATH;
   return 'signtool'; // assume on PATH; SDK installers add it
 }
 
@@ -134,15 +193,22 @@ function isThumbprint(value) {
   return /^[0-9a-fA-F]{40}$/.test(stripped);
 }
 
-async function signWithSigntool(targets, inDir, outDir) {
-  const projectRoot = process.cwd();
-  const tokenRef   = process.env.WIN_EV_TOKEN_PATH || process.env.WIN_CSC_LINK;
-  const password   = process.env.WIN_CSC_KEY_PASSWORD;
+// Every signtool input, resolved from the environment in one place, with the
+// loud named error when a required one is missing.
+//
+// WIN_EV_TOKEN_PATH is the ONE name for the certificate reference — the schema
+// name ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)). The old
+// WIN_CSC_LINK alias is gone: two names for one key means two things to keep
+// straight on a box nobody logs into.
+function resolveSigntoolEnv(env) {
+  env = env || process.env;
 
+  const tokenRef = env.WIN_EV_TOKEN_PATH;
   if (!tokenRef) {
-    throw new Error('WIN_EV_TOKEN_PATH (or WIN_CSC_LINK) not set — cannot sign.');
+    throw new Error('WIN_EV_TOKEN_PATH not set — cannot sign. Set it to the EV cert SHA1 thumbprint (SafeNet/eToken) or a .pfx path.');
   }
 
+  const password      = env.WIN_CSC_KEY_PASSWORD;
   const useThumbprint = isThumbprint(tokenRef);
 
   // Thumbprint mode (SafeNet/eToken): signtool finds cert in user store, SafeNet handles auth.
@@ -151,8 +217,126 @@ async function signWithSigntool(targets, inDir, outDir) {
     throw new Error('WIN_CSC_KEY_PASSWORD not set — required when WIN_EV_TOKEN_PATH is a .pfx path.');
   }
 
-  const signtool = getSigntoolPath();
-  const timestampUrl = process.env.WIN_TIMESTAMP_URL || 'http://timestamp.sectigo.com';
+  return {
+    tokenRef,
+    password,
+    useThumbprint,
+    signtool:     getSigntoolPath(env),
+    timestampUrl: env.WIN_TIMESTAMP_URL || 'http://timestamp.sectigo.com',
+  };
+}
+
+// The `signtool sign` command line, as one string. Pure, so the exact argument
+// order for both cert modes is provable without a Windows box.
+//
+// It ends in `2>&1` because signtool writes its diagnosis to stderr and the
+// retry classifier below reads `e.message` — without the redirect a wrong PIN
+// can arrive as a bare exit code and get retried three times.
+function buildSignCommand({ signtool, tokenRef, password, timestampUrl, outPath }) {
+  const certArgs = isThumbprint(tokenRef)
+    ? [`/sha1 ${tokenRef.replace(/\s+/g, '')}`]
+    : [`/f "${tokenRef}"`, `/p "${password}"`];
+
+  return [
+    `"${signtool}"`,
+    'sign',
+    ...certArgs,
+    `/tr "${timestampUrl}"`,
+    '/td sha256',
+    '/fd sha256',
+    `"${outPath}"`,
+    '2>&1',
+  ].join(' ');
+}
+
+// The `signtool verify` command line. Local-only, so it stays single-shot.
+function buildVerifyCommand({ signtool, outPath }) {
+  return `"${signtool}" verify /pa "${outPath}"`;
+}
+
+// The sign call reaches a THIRD PARTY — the timestamp server — and that is the
+// one part of signing that fails and then works seconds later (rate limit, 502,
+// a dropped connection mid-handshake). So the sign call gets three attempts with
+// a short backoff; verify is local and never retries.
+const SIGN_ATTEMPTS       = 3;
+const SIGN_RETRY_DELAY_MS = 5000;
+
+// node-powertools' `execute` with `log: false` — what this file passes — rejects
+// with `new Error(stderr || 'Command failed with exit code N')`, and the sign
+// command ends in `2>&1` (it runs through a shell), so BOTH of signtool's
+// streams reach `e.message` and this is classifying on signtool's own words.
+//
+// Failures signtool NAMES as permanent. Retrying a wrong PIN walks the EV token
+// toward a lockout, and no amount of waiting conjures a certificate that isn't
+// in the store — so these stop on the first attempt. Anything else (including a
+// bare exit code, where signtool told us nothing) is treated as transient and
+// retried, because a lost timestamp round-trip looks exactly like that.
+const NON_TRANSIENT_SIGN_FAILURES = [
+  /No certificates were found/i,
+  /password is not correct/i,
+  /token .{0,20}locked/i,
+  /hash on the file is malformed/i,
+];
+
+function isTransientSignFailure(error) {
+  const message = String(error?.message || error || '');
+  return !NON_TRANSIENT_SIGN_FAILURES.some((re) => re.test(message));
+}
+
+// Run `cmd` with the retry policy above. Every attempt lands in the signing
+// event log, so `runner monitor` shows the retries as they happen. Throws the
+// last error when it gives up.
+//
+// `startUnlock` is called PER ATTEMPT and stopped the moment that attempt ends.
+// SafeNet raises its "Token Logon" dialog on every signtool call, and the
+// watcher returns as soon as it has typed once — so a single watcher wrapped
+// around the whole loop leaves attempts 2 and 3 facing the dialog unattended,
+// which is exactly the retry that was supposed to save the job.
+async function signWithRetry(cmd, options) {
+  options = options || {};
+  const {
+    file,
+    attempts    = SIGN_ATTEMPTS,
+    delayMs     = SIGN_RETRY_DELAY_MS,
+    exec        = (c) => execute(c, { log: false }),
+    sleep       = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    emit        = signEvents.emit,
+    startUnlock = () => ({ stop: () => {} }),
+  } = options;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    emit('sign-attempt', { file, attempt, of: attempts });
+
+    const unlock = startUnlock();
+    let failure;
+    try {
+      return await exec(cmd);
+    } catch (e) {
+      failure = e;
+    } finally {
+      // Stopped before the verdict and the backoff — nothing polls the desktop
+      // while we are only waiting.
+      unlock.stop();
+    }
+
+    if (attempt === attempts || !isTransientSignFailure(failure)) throw failure;
+    emit('sign-retry', {
+      file,
+      attempt,
+      of:          attempts,
+      retry_in_ms: delayMs,
+      error:       failure?.message || String(failure),
+    });
+    await sleep(delayMs);
+  }
+
+  // Unreachable: the loop returns on success and throws on the last attempt.
+  throw new Error(`signWithRetry exhausted ${attempts} attempts without a verdict`);
+}
+
+async function signWithSigntool(targets, inDir, outDir) {
+  const projectRoot = process.cwd();
+  const { tokenRef, password, useThumbprint, signtool, timestampUrl } = resolveSigntoolEnv();
 
   // Track which signed installers are NSIS-style .exe so we can write latest.yml
   // for them after the signing loop. .msi targets use Windows Installer's own
@@ -167,19 +351,7 @@ async function signWithSigntool(targets, inDir, outDir) {
     // Copy first, sign in place at the output location (signtool modifies in-place).
     jetpack.copy(target, outPath, { overwrite: true });
 
-    const certArgs = useThumbprint
-      ? [`/sha1 ${tokenRef.replace(/\s+/g, '')}`]
-      : [`/f "${tokenRef}"`, `/p "${password}"`];
-
-    const cmd = [
-      `"${signtool}"`,
-      'sign',
-      ...certArgs,
-      `/tr "${timestampUrl}"`,
-      '/td sha256',
-      '/fd sha256',
-      `"${outPath}"`,
-    ].join(' ');
+    const cmd = buildSignCommand({ signtool, tokenRef, password, timestampUrl, outPath });
 
     logger.log(`Signing ${path.relative(projectRoot, outPath)}${useThumbprint ? ' (thumbprint mode)' : ''}...`);
 
@@ -192,11 +364,14 @@ async function signWithSigntool(targets, inDir, outDir) {
     });
 
     // In thumbprint mode against a SafeNet/eToken cert, signtool triggers a
-    // "Token Logon" dialog. Start a watcher that types the password into it.
-    const unlock = useThumbprint ? startAutoUnlock({ password, logger }) : { stop: () => {} };
+    // "Token Logon" dialog. signWithRetry starts one watcher per attempt to type
+    // the password into it, and stops each when that attempt ends.
     const fileStart = Date.now();
     try {
-      await execute(cmd, { log: false });
+      await signWithRetry(cmd, {
+        file: path.basename(outPath),
+        startUnlock: () => (useThumbprint ? startAutoUnlock({ password, logger }) : { stop: () => {} }),
+      });
     } catch (e) {
       signEvents.emit('sign-fail', {
         file: path.basename(outPath),
@@ -205,11 +380,10 @@ async function signWithSigntool(targets, inDir, outDir) {
         error: e?.message || String(e),
       });
       throw e;
-    } finally {
-      unlock.stop();
     }
 
-    const verifyCmd = `"${signtool}" verify /pa "${outPath}"`;
+    // Verify is a local check with no third party in it — one shot.
+    const verifyCmd = buildVerifyCommand({ signtool, outPath });
     try {
       await execute(verifyCmd, { log: false });
     } catch (e) {
@@ -298,6 +472,21 @@ async function verifyOnly(targets) {
   return { signed, unsigned, errored, total: targets.length };
 }
 
+// A real PE/COFF .exe to sign when there is no build to sign: %WINDIR%\System32\where.exe
+// (small, always present, and copying it is fine). One home for that choice, so the smoke
+// test and the Windows-gated end-to-end suite sign the same thing.
+function copySampleExe(destPath, env) {
+  env = env || process.env;
+
+  const sourceExe = path.join(env.WINDIR || 'C:\\Windows', 'System32', 'where.exe');
+  if (!jetpack.exists(sourceExe)) {
+    throw new Error(`Could not find a sample .exe to sign at ${sourceExe}. Pass --target <path> instead.`);
+  }
+  jetpack.copy(sourceExe, destPath, { overwrite: true });
+
+  return destPath;
+}
+
 // Smoke test: write a 1-byte .exe to %TEMP%, run the full self-hosted signing flow against it.
 // Validates that EV token, SafeNet drivers, signtool, and the password cache are all functional
 // without needing an actual @omega.js/desktop build. Cleans up after itself.
@@ -306,25 +495,10 @@ async function smokeTest() {
     throw new Error('--smoke is Windows-only (signtool is required).');
   }
 
-  const tokenRef = process.env.WIN_EV_TOKEN_PATH || process.env.WIN_CSC_LINK;
-  const password = process.env.WIN_CSC_KEY_PASSWORD;
-  if (!tokenRef) {
-    throw new Error('WIN_EV_TOKEN_PATH (or WIN_CSC_LINK) not set — set a SHA1 thumbprint (SafeNet/eToken) or a .pfx path in your .env before running --smoke.');
-  }
-  const useThumbprint = isThumbprint(tokenRef);
-  if (!useThumbprint && !password) {
-    throw new Error('WIN_CSC_KEY_PASSWORD not set — required when WIN_EV_TOKEN_PATH is a .pfx path.');
-  }
+  const { tokenRef, useThumbprint } = resolveSigntoolEnv();
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-smoke-'));
-  // Build a minimal valid PE/COFF .exe: copy whichever tiny system .exe is around.
-  // Easiest source: %WINDIR%\System32\where.exe (small, always present, copy is OK).
-  const sourceExe = path.join(process.env.WINDIR || 'C:\\Windows', 'System32', 'where.exe');
-  const target    = path.join(tmp, 'desktop-smoke-test.exe');
-  if (!jetpack.exists(sourceExe)) {
-    throw new Error(`Could not find a sample .exe to sign at ${sourceExe}. Pass --target <path> instead.`);
-  }
-  jetpack.copy(sourceExe, target, { overwrite: true });
+  const tmp    = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-smoke-'));
+  const target = copySampleExe(path.join(tmp, 'desktop-smoke-test.exe'));
 
   logger.log(`Smoke test: signing a temp copy of where.exe at ${target}`);
   logger.log(`Cert ref: ${tokenRef}${useThumbprint ? ' (thumbprint mode — SafeNet handles auth)' : ' (file mode)'}`);
@@ -368,3 +542,22 @@ async function signWithCloudProvider(provider, targets, inDir, outDir) {
     logger,
   });
 }
+
+// Exports for testing — the pure halves of the signer: what the command line
+// looks like, which env keys feed it, and when a failure is worth retrying.
+module.exports.isThumbprint           = isThumbprint;
+module.exports.boxLogTarget           = boxLogTarget;
+module.exports.resolveSigntoolEnv     = resolveSigntoolEnv;
+module.exports.buildSignCommand       = buildSignCommand;
+module.exports.buildVerifyCommand     = buildVerifyCommand;
+module.exports.signWithRetry          = signWithRetry;
+module.exports.isTransientSignFailure = isTransientSignFailure;
+module.exports.SIGN_ATTEMPTS          = SIGN_ATTEMPTS;
+module.exports.SIGN_RETRY_DELAY_MS    = SIGN_RETRY_DELAY_MS;
+
+// Exports for the Windows-gated end-to-end suite — the halves that shell out to
+// signtool for real. They only run where signtool and the EV token are
+// (suites/build/sign-windows-e2e.test.js gates on exactly that).
+module.exports.signWithSigntool       = signWithSigntool;
+module.exports.verifyOnly             = verifyOnly;
+module.exports.copySampleExe          = copySampleExe;

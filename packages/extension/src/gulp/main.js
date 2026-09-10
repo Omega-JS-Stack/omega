@@ -17,7 +17,7 @@ const projectRoot = Manager.getRootPath('project');
 require('@omega.js/config').loadEnv(projectRoot, { target: 'extension' });
 
 // Tee all stdout/stderr to <projectRoot>/logs/<dev|build>.log for easy `tail -f` / grep / Claude
-// inspection — captures gulp task output, webpack/serve output, console.log calls, the works.
+// inspection — captures gulp task output, bundle/serve output, console.log calls, the works.
 // build.log for production builds (OMEGA_BUILD_MODE=true), dev.log for `npm start`.
 // Disable via OMEGA_LOG_FILE=false. Override path via OMEGA_LOG_FILE=<path>.
 const attachLogFile = require('../utils/attach-log-file.js');
@@ -61,7 +61,7 @@ exports.build = series(
   exports.defaults,
   exports.distribute,
   exports.translate,
-  parallel(exports.sass, exports.webpack, exports.icons, exports.fontawesome, exports.html),
+  parallel(exports.sass, exports.bundle, exports.icons, exports.fontawesome, exports.html),
   exports.package,
   exports.audit,
   exports.publish,

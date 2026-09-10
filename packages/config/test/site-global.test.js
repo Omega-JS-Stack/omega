@@ -66,31 +66,50 @@ test('exposes curated site.targets: presence + enabled, machinery absent', () =>
   assert.strictEqual(site.targets.desktop.app, undefined);
 });
 
-test('derives the desktop releases URL: playground parity (org + brand.id)', () => {
+test('derives the desktop releases URL: the brand\'s ONE releases repo (#799)', () => {
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
     repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
     targets: { desktop: { releases: {} } },
   });
 
-  // The literal value the playground used to hand-write.
+  // `<brand.id>-releases`, the default @omega.js/config's releasesRepo owns: the
+  // same address the desktop build bakes into app-update.yml.
   assert.strictEqual(
     site.targets.desktop.releasesUrl,
-    'https://github.com/Omega-JS-Stack/omega-playground/releases/latest',
+    'https://github.com/Omega-JS-Stack/omega-playground-releases/releases/latest',
   );
 });
 
-test('desktop releases URL: releases.repo wins over repo.providers.github.repo wins over brand.id', () => {
+test('desktop releases URL: releases.repo wins over the `<brand.id>-releases` default; the APP repo never does', () => {
   const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } } };
 
   assert.strictEqual(
-    toSiteGlobal({ ...base, targets: { desktop: { releases: { repo: 'update-server' } } } })
+    toSiteGlobal({ ...base, targets: { desktop: { releases: { repo: 'acme-bins' } } } })
       .targets.desktop.releasesUrl,
-    'https://github.com/Acme-Org/update-server/releases/latest',
+    'https://github.com/Acme-Org/acme-bins/releases/latest',
   );
+  // The app repo (acme-site) is private in the #620 layout, so it can never be
+  // the fallback: an undeclared releases repo is `<brand.id>-releases`.
   assert.strictEqual(
     toSiteGlobal({ ...base, targets: { desktop: { releases: {} } } }).targets.desktop.releasesUrl,
-    'https://github.com/Acme-Org/acme-site/releases/latest',
+    'https://github.com/Acme-Org/acme-releases/releases/latest',
+  );
+});
+
+test('desktop releases URL: releases.owner moves the whole download surface (one derivation, #799)', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme', name: 'Acme App' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    targets: { desktop: { releases: { owner: 'Acme-Binaries' } } },
+  });
+
+  // The hub and every direct-download URL come from the same releasesRepo call
+  // @omega.js/desktop bakes into the publish block, so they cannot disagree.
+  assert.strictEqual(site.targets.desktop.releasesUrl, 'https://github.com/Acme-Binaries/acme-releases/releases/latest');
+  assert.strictEqual(
+    site.targets.desktop.downloads.mac.universal,
+    'https://github.com/Acme-Binaries/acme-releases/releases/latest/download/Acme-App-mac-universal.dmg',
   );
 });
 
@@ -98,6 +117,68 @@ test('desktop releases URL omitted without a github org', () => {
   const site = toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { releases: {} } } });
   assert.strictEqual(site.targets.desktop.enabled, true);
   assert.strictEqual(site.targets.desktop.releasesUrl, undefined);
+});
+
+// ── per-artifact direct downloads (#620) ─────────────────────────────────
+
+test('derives a direct-download URL per artifact, beside the releases hub', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme', name: 'Acme App' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    targets: { desktop: { releases: { repo: 'releases' } } },
+  });
+
+  // /releases/latest/download/<asset> resolves only because the asset name
+  // carries no version — the whole point of #620.
+  assert.deepStrictEqual(site.targets.desktop.downloads, {
+    mac: { universal: 'https://github.com/Acme-Org/releases/releases/latest/download/Acme-App-mac-universal.dmg' },
+    windows: { universal: 'https://github.com/Acme-Org/releases/releases/latest/download/Acme-App-windows-universal.exe' },
+    linux: {
+      debian: 'https://github.com/Acme-Org/releases/releases/latest/download/Acme-App-linux-debian.deb',
+      appimage: 'https://github.com/Acme-Org/releases/releases/latest/download/Acme-App-linux-appimage.AppImage',
+    },
+  });
+  assert.strictEqual(site.targets.desktop.releasesUrl, 'https://github.com/Acme-Org/releases/releases/latest',
+    'the hub stays — the direct URLs sit BESIDE it');
+});
+
+test('the artifact names are the packager\'s own — app.productName wins over brand.name', () => {
+  const { desktopArtifactNames } = require('../src/desktop-artifacts.js');
+  const site = toSiteGlobal({
+    brand: { id: 'acme', name: 'Acme App' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    targets: { desktop: { app: { productName: 'Acme Studio' }, releases: {} } },
+  });
+
+  // One rule, two readers: @omega.js/desktop's build-config writes THESE names
+  // into electron-builder.yml.
+  const names = desktopArtifactNames('Acme Studio');
+  assert.ok(site.targets.desktop.downloads.mac.universal.endsWith(`/${names.mac.universal}`));
+  assert.strictEqual(names.mac.universal, 'Acme-Studio-mac-universal.dmg');
+});
+
+test('no product name, no direct URLs — a guessed filename is a dead button', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    targets: { desktop: { releases: {} } },
+  });
+
+  assert.strictEqual(site.targets.desktop.downloads, undefined);
+  assert.ok(site.targets.desktop.releasesUrl, 'the hub still answers');
+});
+
+test('the direct URLs survive the second toSiteGlobal pass', () => {
+  const once = toSiteGlobal({
+    brand: { id: 'acme', name: 'Acme App' },
+    repo: { providers: { github: { org: 'Acme-Org' } } },
+    targets: { desktop: { releases: { repo: 'releases' } } },
+  });
+  const twice = toSiteGlobal(once);
+
+  // Pass two sees the curated view: no app block, no brand-derived product
+  // name to re-derive from. The curated URLs are the authority.
+  assert.deepStrictEqual(twice, once);
 });
 
 // ── the releases opt-in gate (#124) ───────────────────────────────────────
@@ -114,10 +195,10 @@ test('a bare desktop target derives nothing — no releases config, no links', (
 });
 
 test('a present releases block opts in (enabled defaults true)', () => {
-  const url = 'https://github.com/Acme-Org/acme-site/releases/latest';
+  const url = 'https://github.com/Acme-Org/acme-releases/releases/latest';
   const base = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'acme-site' } } } };
 
-  for (const releases of [{}, { enabled: true }, { repo: 'acme-site' }]) {
+  for (const releases of [{}, { enabled: true }, { repo: 'acme-releases' }]) {
     const site = toSiteGlobal({ ...base, targets: { desktop: { releases } } });
     assert.strictEqual(site.targets.desktop.releasesUrl, url);
   }
@@ -183,7 +264,7 @@ test('#610: the site data carries NO download or extension page map — site.tar
   assert.strictEqual(site.extension, undefined, 'no derived extension map');
   assert.strictEqual(
     site.targets.desktop.releasesUrl,
-    'https://github.com/Omega-JS-Stack/omega-playground/releases/latest',
+    'https://github.com/Omega-JS-Stack/omega-playground-releases/releases/latest',
     'the desktop releases URL is the ONE download fact',
   );
   assert.deepStrictEqual(

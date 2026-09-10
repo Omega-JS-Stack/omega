@@ -13,9 +13,10 @@
  *
  * Product-agnostic: resolves the first paid subscription product from config.
  */
-const User = require('../../../src/manager/helpers/user.js');
+const User = require('../../../dist/manager/helpers/user.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: declined checkout → suspended (no access) → recovered',
   type: 'suite',
   timeout: 60000,
@@ -221,4 +222,4 @@ module.exports = {
       },
     },
   ],
-};
+});

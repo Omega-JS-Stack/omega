@@ -1,8 +1,10 @@
 // Dev icon audit (development only; main.js only imports this chunk when
-// omega.isDevelopment()). The build-time icon loader stamps every fallback
-// triangle with data-omega-icon-missing="<slug>" (template-kit media.js) —
-// this scan turns those silent triangles into console errors you can't
-// miss, and re-checks once after load for late-rendered markup.
+// omega.isDevelopment()). The build's inlining pass marks every icon the set
+// had no file for with data-omega-icon-missing="<style>/<name>" (#619, web
+// src/inline-icons.js) and leaves it EMPTY — this scan turns those silent
+// gaps into console errors you can't miss, and re-checks once after load for
+// late-rendered markup. Its runtime twin is the transport's own dev error
+// (runtime/icons.js), which covers icons JS created after the build.
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 /* @dev-only:start */
@@ -28,7 +30,7 @@ export default function devIconAudit() {
       const key = `${slug}`;
       if (reported.has(key)) return;
       reported.add(key);
-      logger.error(`Missing icon "${slug}" — rendered the fallback triangle`, el);
+      logger.error(`Missing icon "${slug}" — the icon set has no file for it`, el);
     });
   };
 

@@ -8,11 +8,12 @@
  *
  * Run: npx omega test backend:routes/verts/cache
  */
-const { getInventory, resetInventoryCache } = require('../../../src/manager/routes/verts/utils.js');
+const { getInventory, resetInventoryCache } = require('../../../dist/manager/routes/verts/utils.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const TTL = 10 * 60 * 1000; // long enough to never expire mid-suite
 
-module.exports = {
+module.exports = defineCases({
   description: 'Verts inventory cache',
   type: 'suite',
   tests: [
@@ -74,4 +75,4 @@ module.exports = {
       },
     },
   ],
-};
+});

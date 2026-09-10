@@ -4,10 +4,13 @@ const chalk = require('chalk').default;
 const {
   BRAND_RULES_FILE,
   COMPILED_RULES_FILE,
+  MARKER_MIGRATION_COMMAND,
   RULES_MIGRATION_COMMAND,
   compileFirestoreRules,
   deferredRulesTarget,
   ensureBrandRulesSource,
+  isPreFamilyMarkerFile,
+  markerMigrationDeferralNotice,
   needsRulesMigration,
 } = require('../../utils/compile-rules');
 
@@ -29,7 +32,14 @@ class FirestoreRulesFileTest extends BaseTest {
     return 'compile firestore rules';
   }
 
+  // Which deferral run() hit, so the reported lines match the reason. Two
+  // deferrals share this check: the compiled-rules one (#522) and the
+  // pre-family marker one (#40).
   getWarning() {
+    if (this.deferral === 'pre-family') {
+      return markerMigrationDeferralNotice(BRAND_RULES_FILE);
+    }
+
     return [
       `${BRAND_RULES_FILE} was left untouched — the compiled-rules migration is deferred while firebase.json points at it.`,
       `Run it deliberately, on its own: ${RULES_MIGRATION_COMMAND}`,
@@ -46,6 +56,15 @@ class FirestoreRulesFileTest extends BaseTest {
     }
 
     const contents = jetpack.read(`${self.firebaseProjectPath}/${BRAND_RULES_FILE}`) || '';
+
+    // A pre-family source DEFERS, before the migration question below: nothing
+    // in this check speaks those markers, and a plain `false` would send the
+    // driver into fix() — which refuses, and scores as a healed check
+    // ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+    if (isPreFamilyMarkerFile(contents)) {
+      this.deferral = 'pre-family';
+      return 'warn';
+    }
 
     // An unparseable file fails the check and lets fix() throw with the
     // compiler's precise message — setup must never quietly rewrite rules it
@@ -68,6 +87,13 @@ class FirestoreRulesFileTest extends BaseTest {
   async fix() {
     const self = this.self;
     const result = ensureBrandRulesSource({ projectDir: self.firebaseProjectPath });
+
+    // Refused, not fixed: the source is pre-family and was left untouched, so
+    // there is nothing to compile from it either ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+    if (result.refused) {
+      console.log(chalk.red(`${BRAND_RULES_FILE} still carries a pre-family marker ('{{ backend-manager }}' or a '///---...---///' block), which this check does not speak — it was left untouched. Run \`${MARKER_MIGRATION_COMMAND}\` to convert it, then run this again.`));
+      return;
+    }
 
     if (result.created) {
       console.log(chalk.yellow(`Seeded ${BRAND_RULES_FILE} — your rules, compiled with the framework half. It is yours to edit.`));

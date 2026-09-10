@@ -180,9 +180,9 @@ function checkWindows(issues, strategy, config) {
   logger.log(`Checking Windows signing prerequisites (strategy: ${strategy})...`);
 
   if (strategy === 'self-hosted' || strategy === 'local') {
-    const tokenPath = process.env.WIN_EV_TOKEN_PATH || process.env.WIN_CSC_LINK;
+    const tokenPath = process.env.WIN_EV_TOKEN_PATH;
     if (!tokenPath) {
-      issues.push({ severity: 'error', message: 'Set WIN_EV_TOKEN_PATH (or WIN_CSC_LINK) to the EV token / certificate path.' });
+      issues.push({ severity: 'error', message: 'Set WIN_EV_TOKEN_PATH to the EV token / certificate path.' });
       return;
     }
     if (!process.env.WIN_CSC_KEY_PASSWORD) {

@@ -206,8 +206,15 @@ function paypalConverged() {
       image_url: BRANDMARK,
       home_url: BRAND_URL,
     }),
+    // Plus configures trial days, so each interval carries TWIN plans: the
+    // trial twin and the skip-trial twin (#761)
     listPlansForProduct: (id) => (id === 'PROD-PLUS'
-      ? [paypalPlan('P-M', 'MONTH', '10.00', 14), paypalPlan('P-Y', 'YEAR', '100.00', 14)]
+      ? [
+        paypalPlan('P-M', 'MONTH', '10.00', 14),
+        paypalPlan('P-M-NT', 'MONTH', '10.00', 0),
+        paypalPlan('P-Y', 'YEAR', '100.00', 14),
+        paypalPlan('P-Y-NT', 'YEAR', '100.00', 0),
+      ]
       : []),
     listWebhooks: { webhooks: [{ id: 'WH-1', url: PAYPAL_WEBHOOK_URL, event_types: PAYPAL_EVENTS.map((name) => ({ name })) }] },
   };
@@ -303,9 +310,11 @@ test('payment: manager defaults — enabled, null public keys, radar rules, NO c
   assert.equal(DEFAULTS.payment.providers.stripe.radar.length, 9);
   assert.equal(DEFAULTS.payment.providers.paypal.clientId, null);
   assert.equal(DEFAULTS.payment.providers.chargebee.site, null);
-  // #636: the coinbase stub is gone — there is no coinbase provider in the
-  // backend's payment lane, so the default only advertised one that isn't
-  assert.ok(!('coinbase' in DEFAULTS.payment.providers));
+  // #642: the coinbase provider is real again (Coinbase Commerce, crypto,
+  // one-time purchases), so the default advertises one that exists — and it is
+  // OFF, because its whole credential is a secret the manager cannot detect.
+  // #636 deleted the stub for the opposite reason: back then nothing read it.
+  assert.equal(DEFAULTS.payment.providers.coinbase.enabled, false);
   assert.deepEqual(DEFAULTS.payment.products, []);
   // De-ITW pins: no company Stripe org ID; product images come from
   // brand.images.brandmark, not a hardcoded company CDN
@@ -360,6 +369,18 @@ test('payment: unknown --provider skips with guidance', async () => {
   const result = await runService(brandConfig(), { stripe: fakeStripe(), options: { provider: 'venmo' } });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /unknown --provider "venmo"/);
+});
+
+test('payment: --provider=coinbase asks for the key and then says it reconciles nothing (#642)', async () => {
+  // Coinbase Commerce is a real provider with ZERO operations: no catalog, no
+  // webhook API. Narrowing a run to it must not answer the sibling sentence
+  // ("not configured"), which would read as a setup failure on a brand that is
+  // configured perfectly well. Non-interactive here, so no gate opens.
+  const result = await runService(brandConfig(), { stripe: fakeStripe(), options: { provider: 'coinbase' } });
+
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /coinbase has nothing to reconcile/);
+  assert.doesNotMatch(result.reason, /not configured/, 'a configured brand is never told it is unconfigured');
 });
 
 test('payment: providers.stripe = false disables Stripe even with credentials present', async () => {
@@ -804,7 +825,9 @@ test('paypal-products: missing everywhere → exact product + plan create payloa
   }]]);
   assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
     [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Monthly)`, interval: 'monthly', amount: 10, trialDays: 14 }],
+    [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Monthly, no trial)`, interval: 'monthly', amount: 10, trialDays: 0 }],
     [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Annually)`, interval: 'annually', amount: 100, trialDays: 14 }],
+    [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Annually, no trial)`, interval: 'annually', amount: 100, trialDays: 0 }],
   ]);
   assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', paypal: { productId: "PROD-NEW" } }, // Plus`));
 });
@@ -831,8 +854,10 @@ test('paypal-products: plan drift → stale + duplicate deactivated, correct pla
   responses.listPlansForProduct = (id) => (id === 'PROD-PLUS'
     ? [
       paypalPlan('P-M-STALE', 'MONTH', '9.00', 14),   // wrong amount → deactivate + recreate
-      paypalPlan('P-Y', 'YEAR', '100.00', 14),        // converged
+      paypalPlan('P-M-NT', 'MONTH', '10.00', 0),      // converged skip-trial twin
+      paypalPlan('P-Y', 'YEAR', '100.00', 14),        // converged trial twin
       paypalPlan('P-Y-DUP', 'YEAR', '100.00', 14),    // duplicate match → deactivate
+      paypalPlan('P-Y-NT', 'YEAR', '100.00', 0),      // converged skip-trial twin
     ]
     : []);
   responses.deactivatePlan = null;
@@ -845,6 +870,66 @@ test('paypal-products: plan drift → stale + duplicate deactivated, correct pla
   assert.deepEqual(paypal.callsTo('deactivatePlan').map((c) => c.args).sort(), [['P-M-STALE'], ['P-Y-DUP']]);
   assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
     [{ productId: 'PROD-PLUS', name: `${BRAND_NAME} - Plus (Monthly)`, interval: 'monthly', amount: 10, trialDays: 14 }],
+  ]);
+});
+
+test('paypal-products: a trial product mints BOTH twins per interval — trial and skip-trial (#761)', async () => {
+  // A buyer who is not owed a trial has to land on a plan with no TRIAL cycle
+  // to skip, so a trial product carries two active plans per paid interval
+  const products = [
+    { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10 } },
+  ];
+  const responses = paypalConverged();
+  responses.listProducts = [];
+  responses.createProduct = { id: 'PROD-NEW' };
+  responses.listPlansForProduct = [];
+  responses.createPlan = ({ trialDays }) => ({ id: trialDays > 0 ? 'P-NEW-TRIAL' : 'P-NEW-NT' });
+  const paypal = fakePaypal(responses);
+
+  const config = brandConfig({ products });
+  await runService(config, { paypal, options: { provider: 'paypal' }, brandRoot: makeBrandRoot(writebackSource(config)) });
+
+  assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
+    [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Monthly)`, interval: 'monthly', amount: 10, trialDays: 14 }],
+    [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Monthly, no trial)`, interval: 'monthly', amount: 10, trialDays: 0 }],
+  ]);
+  assert.deepEqual(paypal.callsTo('deactivatePlan'), []);
+});
+
+test('paypal-products: converged twins rerun — nothing created, nothing deactivated (#761)', async () => {
+  // Neither twin is a duplicate or a stale copy of the other, so a second walk
+  // over an already-twinned product is read-only
+  const products = [
+    { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 }, paypal: { productId: 'PROD-PLUS' } },
+  ];
+  const paypal = fakePaypal(paypalConverged());
+  const config = brandConfig({ products });
+
+  const result = await runService(config, { paypal, options: { provider: 'paypal' } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(paypal.mutations(), []);
+});
+
+test('paypal-products: a stale plan on a trial product is deactivated and BOTH twins created (#761)', async () => {
+  // The pre-twin world's single plan, at a price config has since moved off:
+  // it matches neither twin, so it goes and the pair is minted
+  const products = [
+    { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10 }, paypal: { productId: 'PROD-PLUS' } },
+  ];
+  const responses = paypalConverged();
+  responses.listPlansForProduct = (id) => (id === 'PROD-PLUS' ? [paypalPlan('P-M-OLD', 'MONTH', '9.00', 14)] : []);
+  responses.deactivatePlan = null;
+  responses.createPlan = ({ trialDays }) => ({ id: trialDays > 0 ? 'P-NEW-TRIAL' : 'P-NEW-NT' });
+  const paypal = fakePaypal(responses);
+  const config = brandConfig({ products });
+
+  await runService(config, { paypal, options: { provider: 'paypal' } });
+
+  assert.deepEqual(paypal.callsTo('deactivatePlan').map((c) => c.args), [['P-M-OLD']]);
+  assert.deepEqual(paypal.callsTo('createPlan').map((c) => c.args), [
+    [{ productId: 'PROD-PLUS', name: `${BRAND_NAME} - Plus (Monthly)`, interval: 'monthly', amount: 10, trialDays: 14 }],
+    [{ productId: 'PROD-PLUS', name: `${BRAND_NAME} - Plus (Monthly, no trial)`, interval: 'monthly', amount: 10, trialDays: 0 }],
   ]);
 });
 
@@ -1212,7 +1297,7 @@ test('payment: dry-run on a fully drifted account — zero mutations on all thre
 // ─── Interactive provider credential entry (config-landing flow) ────────────
 
 const { providerSetupFlow } = require('../src/services/payment/lib/provider-setup.js');
-const { readFileSync } = require('node:fs');
+const { readFileSync, existsSync } = require('node:fs');
 const { join: joinPath } = require('node:path');
 
 const PROVIDER_FLOW_CONFIG = `{
@@ -1298,6 +1383,122 @@ test('provider-setup: Disable writes payment.providers.stripe: false and lands n
   } finally {
     tty.close();
   }
+});
+
+// ─── Coinbase Commerce: the ask with no public half (#642) ──────────────────
+
+const COINBASE_FLOW_CONFIG = `{
+  // Fixture Brand — provider writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  payment: {
+    providers: {
+      coinbase: { enabled: true }, // the whole switch
+    },
+  },
+}
+`;
+
+function coinbaseFlowContext(brandRoot) {
+  return {
+    brandId: 'fixture-brand',
+    brandRoot,
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+      payment: { providers: { coinbase: { enabled: true } } },
+    },
+  };
+}
+
+test('provider-setup: the coinbase flow asks for the API key ALONE — there is no public half', async () => {
+  // Every sibling lands a public value in omega.json5 beside its secret
+  // (publishableKey, clientId, site). Coinbase Commerce has none: the API key is
+  // the entire credential, which is exactly why its config switch is `enabled`.
+  const saved = process.env.COINBASE_COMMERCE_API_KEY;
+  delete process.env.COINBASE_COMMERCE_API_KEY;
+  const promptModule = require('@omega.js/devkit/prompt');
+  const realOpen = promptModule.openInBrowser;
+  const opened = [];
+  promptModule.openInBrowser = (url) => { opened.push(url); return true; };
+  const brandRoot = makeBrandRoot(COINBASE_FLOW_CONFIG);
+  const context = coinbaseFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = providerSetupFlow(context, 'coinbase');
+    await tty.answer('Set up now?', '\r'); // Yes
+    // No public-field prompt at all — straight to the shared secret ask (#608)
+    await tty.answer('Press Enter to open the Coinbase Commerce', '\r');
+    await tty.answer('Paste COINBASE_COMMERCE_API_KEY:', 'cb_fixture_key_789\r');
+    const landed = await run;
+
+    assert.equal(landed, true);
+    assert.equal(opened.length, 1, 'ONE Enter-gated open, the page that mints the key');
+    assert.match(opened[0], /commerce\.coinbase\.com/);
+    // The secret lands in the brand .env and this run's process
+    assert.ok(readFileSync(joinPath(brandRoot, '.env'), 'utf8').includes('COINBASE_COMMERCE_API_KEY="cb_fixture_key_789"'));
+    assert.equal(process.env.COINBASE_COMMERCE_API_KEY, 'cb_fixture_key_789');
+    // And NOTHING was written to omega.json5 — there is no public half to land
+    assert.equal(readConfigSource(brandRoot), COINBASE_FLOW_CONFIG);
+  } finally {
+    tty.close();
+    promptModule.openInBrowser = realOpen;
+    if (saved === undefined) {
+      delete process.env.COINBASE_COMMERCE_API_KEY;
+    } else {
+      process.env.COINBASE_COMMERCE_API_KEY = saved;
+    }
+  }
+});
+
+test('provider-setup: coinbase Disable writes payment.providers.coinbase.enabled: false', async () => {
+  // The sibling providers disable at `payment.providers.<name>` because their
+  // switch IS the block. Coinbase's switch is `enabled`, so Disable has to land
+  // THERE — the one shape the schema declares and the checkout reads (#642).
+  const saved = process.env.COINBASE_COMMERCE_API_KEY;
+  delete process.env.COINBASE_COMMERCE_API_KEY;
+  const brandRoot = makeBrandRoot(COINBASE_FLOW_CONFIG);
+  const context = coinbaseFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = providerSetupFlow(context, 'coinbase');
+    await tty.answer('Set up now?', '\x1B[B\x1B[B\r'); // Disable (stop prompting)
+    const landed = await run;
+
+    assert.equal(landed, false);
+    assert.equal(context.brandConfig.payment.providers.coinbase.enabled, false);
+    assert.ok(readConfigSource(brandRoot).includes('enabled: false'), 'the switch is off in omega.json5');
+    // Disable steps aside BEFORE the secret ask, so no brand .env is even created
+    assert.equal(existsSync(joinPath(brandRoot, '.env')), false, 'and no key was asked for');
+  } finally {
+    tty.close();
+    if (saved === undefined) {
+      delete process.env.COINBASE_COMMERCE_API_KEY;
+    } else {
+      process.env.COINBASE_COMMERCE_API_KEY = saved;
+    }
+  }
+});
+
+test('payment: a brand with crypto OFF is never asked for a Coinbase key', async () => {
+  // `enabled` is the whole switch, so an absent or false one means the brand has
+  // no use for the key — asking would be a prompt for a credential nothing reads.
+  const { REQUIRES } = require('../src/config.js');
+  const input = REQUIRES.payment.env.find((entry) => entry.name === 'COINBASE_COMMERCE_API_KEY');
+
+  assert.ok(input, 'the key is declared in the REQUIRES registry, or the setup contract cannot ask for it');
+  assert.equal(input.gates, false, 'an optional input: a missing crypto key never gates the payment service');
+  assert.equal(input.disablePath, 'payment.providers.coinbase.enabled', 'Disable lands on the switch the schema declares');
+
+  for (const providers of [{}, { coinbase: {} }, { coinbase: { enabled: false } }, { coinbase: false }]) {
+    assert.equal(
+      input.when({ payment: { providers } }), false,
+      `not asked when crypto is off: ${JSON.stringify(providers)}`,
+    );
+  }
+
+  assert.equal(input.when({ payment: { providers: { coinbase: { enabled: true } } } }), true, 'asked when it is on');
 });
 
 test('provider-setup: non-interactive returns false without touching anything', async () => {

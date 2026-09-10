@@ -8,10 +8,11 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'logger-lite.js');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'logger-lite — runtime logger module shape + serialization',
@@ -144,4 +145,4 @@ module.exports = {
       },
     },
   ],
-};
+});

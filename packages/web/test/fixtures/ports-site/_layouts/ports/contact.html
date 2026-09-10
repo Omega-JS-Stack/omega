@@ -138,7 +138,7 @@ faqs:
           <div class="card h-100 border-0 shadow-sm text-center" data-lazy="@class animation-slide-up">
             <div class="card-body p-4">
               <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
-                {% omega_icon method.icon, "text-light fs-2" %}
+                <i class="fa-solid fa-{{ method.icon }} text-light fs-2"></i>
               </div>
               <h4 class="mb-1">{{ method.title }}</h4>
               <p class="text-muted mb-3">{{ method.description }}</p>
@@ -162,7 +162,7 @@ faqs:
               {% iftruthy resolved.contact_form.superheadline.text %}
                 <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
                   {% iftruthy resolved.contact_form.superheadline.icon %}
-                    {% omega_icon resolved.contact_form.superheadline.icon, "me-1" %}
+                    <i class="fa-solid fa-{{ resolved.contact_form.superheadline.icon }} me-1"></i>
                   {% endiftruthy %}
                   {{ resolved.contact_form.superheadline.text }}
                 </span>
@@ -253,11 +253,11 @@ faqs:
 
               <div class="d-grid gap-2 d-md-flex justify-content-md-between align-items-center">
                 <button type="submit" class="btn btn-primary btn-lg px-5">
-                  {% omega_icon "paper-plane", "me-2" %}
+                  <i class="fa-solid fa-paper-plane me-2"></i>
                   Send message
                 </button>
                 <a href="{{ resolved.config.url }}" class="btn btn-link">
-                  {% omega_icon "arrow-left", "me-1" %}
+                  <i class="fa-solid fa-arrow-left me-1"></i>
                   Back to home
                 </a>
               </div>
@@ -279,7 +279,7 @@ faqs:
             {% comment %}Fix-forward: {{ }} inside quoted tag args is a silent
             no-op upstream (live somiibo emits class="fa text- display-4"){% endcomment %}
             {% capture stat_icon_classes %}text-{{ stat.color }} display-4{% endcapture %}
-            {% omega_icon stat.icon, stat_icon_classes %}
+            <i class="fa-solid fa-{{ stat.icon }} {{ stat_icon_classes }}"></i>
           </div>
           <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
           <p class="text-muted mb-0">{{ stat.label }}</p>
@@ -298,7 +298,7 @@ faqs:
           {% iftruthy resolved.faqs.superheadline.text %}
             <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
               {% iftruthy resolved.faqs.superheadline.icon %}
-                {% omega_icon resolved.faqs.superheadline.icon, "me-1" %}
+                <i class="fa-solid fa-{{ resolved.faqs.superheadline.icon }} me-1"></i>
               {% endiftruthy %}
               {{ resolved.faqs.superheadline.text }}
             </span>

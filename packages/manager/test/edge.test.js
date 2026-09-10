@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const { OPERATIONS, DEFAULTS, templateObject } = require('../src/config.js');
 const service = require('../src/services/edge/index.js');
 const { buildRequiredRecords } = require('../src/services/edge/lib/dns-records-helpers.js');
+const { loadBrand } = require('../src/lib/brand.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 
 // Tests must never see a real token from the shell environment
@@ -145,7 +146,7 @@ function handlerContext(config, api, extra = {}) {
 
 /** Every read a fully-converged default-config zone answers. */
 function convergedResponses(config) {
-  const cache = config.edge.providers.cloudflare.cacheRules[0];
+  const cacheRules = config.edge.providers.cloudflare.cacheRules;
   const redirect = config.edge.providers.cloudflare.rules.redirect[0];
   const sec = config.edge.providers.cloudflare.rules.security[0];
   const csp = config.edge.providers.cloudflare.rules.responseHeaders[0].headers['Content-Security-Policy'];
@@ -163,15 +164,15 @@ function convergedResponses(config) {
       .map(([id, value]) => ({ id, value: structuredClone(value), editable: true })),
     'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': {
       id: 'rs-cache', kind: 'zone', phase: 'http_request_cache_settings', name: 'Cache Rules', description: 'managed',
-      rules: [{
-        id: 'cr1', description: cache.name, expression: cache.expression, enabled: cache.enabled,
+      rules: cacheRules.map((rule, i) => ({
+        id: `cr${i + 1}`, description: rule.name, expression: rule.expression, enabled: rule.enabled,
         action: 'set_cache_settings',
         action_parameters: {
           cache: true,
-          edge_ttl: { mode: 'override_origin', default: cache.edgeTtl },
-          browser_ttl: { mode: 'override_origin', default: cache.browserTtl },
+          edge_ttl: { mode: 'override_origin', default: rule.edgeTtl },
+          browser_ttl: { mode: 'override_origin', default: rule.browserTtl },
         },
-      }],
+      })),
     },
     'GET /zones/zone-1/managed_headers': {
       managed_request_headers: [
@@ -773,8 +774,9 @@ test('cache-rules: updates stale TTLs and removes unconfigured rules in one PUT'
 
   assert.equal(result.output.cacheRules.updated, true);
   const put = api.call('PUT', '/zones/zone-1/rulesets/rs-cache');
-  assert.equal(put.body.rules.length, 1);
+  assert.equal(put.body.rules.length, config.edge.providers.cloudflare.cacheRules.length);
   assert.equal(put.body.rules[0].action_parameters.edge_ttl.default, cache.edgeTtl);
+  assert.ok(!put.body.rules.some((rule) => rule.description === 'Old Rule Nobody Configured'));
 });
 
 test('cache-rules: missing entrypoint ruleset is created via POST', async () => {
@@ -793,7 +795,244 @@ test('cache-rules: missing entrypoint ruleset is created via POST', async () => 
   assert.equal(result.output.cacheRules.updated, true);
   const post = api.call('POST', '/zones/zone-1/rulesets');
   assert.equal(post.body.phase, 'http_request_cache_settings');
-  assert.equal(post.body.rules.length, 1);
+  assert.equal(post.body.rules.length, DEFAULTS.edge.providers.cloudflare.cacheRules.length);
+});
+
+// #751: the built site's every asset is content-hashed under /assets, so it is
+// cacheable forever — HTML is the one thing that must not be, or a deploy stays
+// invisible to a returning visitor for as long as the browser holds it.
+test('cache-rules: the framework defaults cache built assets for a year and keep HTML short (#751)', () => {
+  const rules = DEFAULTS.edge.providers.cloudflare.cacheRules;
+  const assets = rules.find((rule) => rule.name === 'Assets: Cache for 1 Year');
+  const html = rules.find((rule) => rule.name === 'HTML: Short Browser Cache');
+
+  assert.equal(assets.edgeTtl, 31536000);
+  assert.equal(assets.browserTtl, 31536000);
+  assert.ok(assets.expression.includes('wildcard r"/assets/*"'));
+
+  assert.ok(html, 'the defaults carry an HTML rule');
+  assert.equal(html.browserTtl, 60);
+  assert.equal(html.edgeTtl, 7200);
+  // Never the asset rule's paths — one path, one cache lifetime
+  assert.ok(html.expression.includes('not starts_with(http.request.uri.path, "/assets/")'));
+});
+
+test('cache-rules: a brand declaring no rules still reconciles the framework defaults (#751)', async () => {
+  const ensureCacheRules = require('../src/services/edge/ensure/cache-rules.js');
+  const { config } = loadBrand(makeBrandRoot(`{
+  brand: { id: 'fixture-brand', url: 'https://${DOMAIN}' },
+}
+`));
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': () => {
+        throw new Error('Cloudflare API Error: could not find entrypoint ruleset (10003)');
+      },
+      'POST /zones/zone-1/rulesets': {},
+    },
+  });
+
+  await ensureCacheRules(handlerContext(config, api));
+
+  const post = api.call('POST', '/zones/zone-1/rulesets');
+  assert.deepEqual(
+    post.body.rules.map((rule) => rule.description),
+    ['Assets: Cache for 1 Year', 'HTML: Short Browser Cache'],
+  );
+  assert.equal(post.body.rules[0].action_parameters.browser_ttl.default, 31536000);
+  assert.equal(post.body.rules[1].action_parameters.browser_ttl.default, 60);
+});
+
+// Cache rules are ZONE-scoped, and the zone serves the api host too
+// (api.<domain>, whose Firebase rewrites answer extensionless user-scoped GETs
+// like /authorize and /omega/user/connections). An unguarded HTML rule would make
+// those edge-cacheable, so the rule names the hosts it is FOR.
+test('cache-rules: the HTML rule never matches the api or emailurl hosts (#751)', () => {
+  const rules = DEFAULTS.edge.providers.cloudflare.cacheRules;
+  const html = rules.find((rule) => rule.name === 'HTML: Short Browser Cache');
+  const assets = rules.find((rule) => rule.name === 'Assets: Cache for 1 Year');
+
+  assert.ok(html.expression.includes('not starts_with(http.host, "api.")'));
+  // The other proxied non-site host: the SendGrid link-tracking CNAME, whose
+  // extensionless click/open URLs must reach SendGrid every time.
+  assert.ok(html.expression.includes('not starts_with(http.host, "emailurl.")'));
+  // Every site host on the zone still matches: apex, www, and a subdomain
+  // project served under the parent zone — so the guard is the api PREFIX,
+  // never an equality on one host.
+  assert.ok(!html.expression.includes('http.host eq'));
+  // The assets rule stays host-agnostic: both its paths are static files
+  assert.ok(!assets.expression.includes('http.host'));
+});
+
+test("cache-rules: a brand's own cacheRules replace the defaults entirely (#751)", () => {
+  const { config } = loadBrand(makeBrandRoot(`{
+  brand: { id: 'fixture-brand', url: 'https://${DOMAIN}' },
+  edge: { providers: { cloudflare: { cacheRules: [{ name: 'Only Mine', expression: 'true', edgeTtl: 60, browserTtl: 60 }] } } },
+}
+`));
+
+  assert.deepEqual(config.edge.providers.cloudflare.cacheRules.map((rule) => rule.name), ['Only Mine']);
+});
+
+// #754: 0 is a real TTL, not "unset". `browserTtl: 0` is a brand saying "hold
+// nothing in the browser" (Cloudflare writes `max-age=0`), and a `||` default
+// silently turned that into 14400. The manager sends the TTLs the brand
+// declared and lets Cloudflare judge them — an edge bypass is its own MODE in
+// Cloudflare's grammar, never a value this module substitutes.
+test('cache-rules: a declared TTL of 0 is honored, never replaced by the default (#754)', async () => {
+  const ensureCacheRules = require('../src/services/edge/ensure/cache-rules.js');
+  const { config } = loadBrand(makeBrandRoot(`{
+  brand: { id: 'fixture-brand', url: 'https://${DOMAIN}' },
+  edge: { providers: { cloudflare: { cacheRules: [
+    { name: 'HTML: No Browser Cache', expression: 'true', edgeTtl: 7200, browserTtl: 0 },
+    { name: 'API: No Cache At All', expression: 'starts_with(http.host, "api.")', edgeTtl: 0, browserTtl: 0 },
+  ] } } },
+}
+`));
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': () => {
+        throw new Error('Cloudflare API Error: could not find entrypoint ruleset (10003)');
+      },
+      'POST /zones/zone-1/rulesets': {},
+    },
+  });
+
+  await ensureCacheRules(handlerContext(config, api));
+
+  const post = api.call('POST', '/zones/zone-1/rulesets');
+  assert.equal(post.body.rules[0].action_parameters.browser_ttl.default, 0);
+  assert.equal(post.body.rules[0].action_parameters.edge_ttl.default, 7200);
+  assert.equal(post.body.rules[1].action_parameters.browser_ttl.default, 0);
+  assert.equal(post.body.rules[1].action_parameters.edge_ttl.default, 0);
+});
+
+// A rule already at 0 on the zone is converged: the diff must not see a
+// difference the `||` default invented and PUT a needless update every run.
+test('cache-rules: a zone already at a 0 TTL needs no update (#754)', async () => {
+  const ensureCacheRules = require('../src/services/edge/ensure/cache-rules.js');
+  const { config } = loadBrand(makeBrandRoot(`{
+  brand: { id: 'fixture-brand', url: 'https://${DOMAIN}' },
+  edge: { providers: { cloudflare: { cacheRules: [
+    { name: 'HTML: No Browser Cache', expression: 'true', edgeTtl: 7200, browserTtl: 0 },
+  ] } } },
+}
+`));
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint': {
+        id: 'rs-cache', kind: 'zone', phase: 'http_request_cache_settings', name: 'Cache Rules', description: 'managed',
+        rules: [{
+          id: 'cr1', description: 'HTML: No Browser Cache', expression: 'true', enabled: true,
+          action: 'set_cache_settings',
+          action_parameters: {
+            cache: true,
+            edge_ttl: { mode: 'override_origin', default: 7200 },
+            browser_ttl: { mode: 'override_origin', default: 0 },
+          },
+        }],
+      },
+    },
+  });
+
+  const result = await ensureCacheRules(handlerContext(config, api));
+
+  assert.equal(result, undefined);
+  assert.deepEqual(api.mutations(), []);
+});
+
+// The DashQR case (#466): printed QR codes point at /c/<id> forever, so the
+// destination is COMPUTED from the request path. That is the whole reason
+// templated redirects live at the edge rather than in web config — a static
+// host has nothing that can answer a path it never built.
+const QR_RULE = {
+  name: 'Redirect: QR short code',
+  expression: '(starts_with(http.request.uri.path, "/c/"))',
+  statusCode: 301,
+  preserveQueryString: false,
+  targetUrl: { expression: 'concat("https://", http.host, "/code?id=", substring(http.request.uri.path, 3))' },
+  enabled: true,
+};
+
+test('rules-redirect: a templated redirect is created with its computed target intact (#466)', async () => {
+  const ensureRedirect = require('../src/services/edge/ensure/rules-redirect.js');
+  const config = brandConfig();
+  const trailing = config.edge.providers.cloudflare.rules.redirect[0];
+  config.edge.providers.cloudflare.rules.redirect.push(QR_RULE);
+
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/rulesets/phases/http_request_dynamic_redirect/entrypoint': {
+        id: 'rs-redirect', kind: 'zone', phase: 'http_request_dynamic_redirect', name: 'Redirect Rules',
+        rules: [{
+          id: 'rr1', description: trailing.name, expression: trailing.expression, enabled: trailing.enabled,
+          action: 'redirect',
+          action_parameters: {
+            from_value: {
+              status_code: trailing.statusCode,
+              preserve_query_string: trailing.preserveQueryString,
+              target_url: trailing.targetUrl,
+            },
+          },
+        }],
+      },
+      'PUT /zones/zone-1/rulesets/rs-redirect': {},
+    },
+  });
+
+  const result = await ensureRedirect(handlerContext(config, api));
+
+  assert.equal(result.output.redirect.updated, true);
+  const put = api.call('PUT', '/zones/zone-1/rulesets/rs-redirect');
+  assert.equal(put.body.rules.length, 2, 'the converged rule survives beside the new one');
+
+  const qr = put.body.rules.find((rule) => rule.description === QR_RULE.name);
+  assert.equal(qr.action, 'redirect');
+  assert.equal(qr.expression, QR_RULE.expression, 'the match is the edge filter expression, verbatim');
+  assert.deepEqual(qr.action_parameters.from_value, {
+    status_code: 301,
+    // The target carries its own `?id=`, so an inbound querystring must NOT be
+    // appended — that is what the key is for.
+    preserve_query_string: false,
+    target_url: QR_RULE.targetUrl,
+  });
+});
+
+test('rules-redirect: a converged templated rule mutates nothing, and a dry run plans instead of writing', async () => {
+  const ensureRedirect = require('../src/services/edge/ensure/rules-redirect.js');
+  const config = brandConfig();
+  config.edge.providers.cloudflare.rules.redirect.push(QR_RULE);
+
+  const responses = {
+    'GET /zones/zone-1/rulesets/phases/http_request_dynamic_redirect/entrypoint': {
+      id: 'rs-redirect', kind: 'zone', phase: 'http_request_dynamic_redirect', name: 'Redirect Rules',
+      rules: config.edge.providers.cloudflare.rules.redirect.map((rule, index) => ({
+        id: `rr${index + 1}`, description: rule.name, expression: rule.expression, enabled: rule.enabled,
+        action: 'redirect',
+        action_parameters: {
+          from_value: {
+            status_code: rule.statusCode,
+            preserve_query_string: rule.preserveQueryString,
+            target_url: rule.targetUrl,
+          },
+        },
+      })),
+    },
+  };
+
+  const converged = fakeApi({ responses });
+  await ensureRedirect(handlerContext(config, converged));
+  assert.deepEqual(converged.mutations(), [], 'a converged ruleset is a zero-mutation read');
+
+  // Drift the live status code so the dry run has something to plan.
+  const drifted = fakeApi({ responses: structuredClone(responses) });
+  drifted.responses['GET /zones/zone-1/rulesets/phases/http_request_dynamic_redirect/entrypoint']
+    .rules[1].action_parameters.from_value.status_code = 302;
+
+  const result = await ensureRedirect(handlerContext(config, drifted, { options: { dryRun: true } }));
+
+  assert.equal(result.output.redirect.planned, 'update');
+  assert.deepEqual(drifted.mutations(), [], 'a dry run writes nothing');
 });
 
 test('managed-transforms: enables only the drifted transform', async () => {

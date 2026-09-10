@@ -1,34 +1,28 @@
 /**
- * media.js — the media omega_ tags (icon, logo, image, video).
+ * media.js — the media omega_ tags (logo, image, video).
  *
- * Ported from jekyll-uj-powertools lib/tags/{icon,logo,image,video}.rb.
- * Icon/logo SVG loading is directory-injectable via the adapter options
- * (`options.icons.fontAwesomeDirs` — an ordered chain of icon roots, each
- * holding `{solid,regular,brands}/` subdirs, earlier dirs win;
- * `options.icons.aliasFile` — fontawesome-free's icon-families.json for
- * alias resolution; `options.icons.flagsDir` / `options.logos.dir`) — no
- * hardcoded node_modules path like the Ruby had. Icon semantics (candidate
- * order, root attributes, aliases) live in @omega.js/client's icon-core
- * (C4 cp108), shared with desktop's runtime icon server. Missing icons
- * fall back to the same default warning-triangle SVG with a warn-once.
+ * Ported from jekyll-uj-powertools lib/tags/{logo,image,video}.rb. Logo SVG
+ * loading is directory-injectable via the adapter options (`options.logos.dir`)
+ * — no hardcoded node_modules path like the Ruby had.
+ *
+ * ICONS are not a tag ([#619](https://github.com/Omega-JS-Stack/omega/issues/619)):
+ * authoring is native Font Awesome markup (`<i class="fa-solid fa-rocket">`),
+ * which @omega.js/web inlines at build and upgrades at runtime — one system,
+ * nothing to learn, and it works for markup JS creates.
  */
 
 // Libraries
 const fs = require('fs');
 const path = require('path');
-const { injectSvgAttributes, candidateRelPaths, buildAliasMap } = require('@omega.js/client/modules/icon-core.js');
 const { resolveInput, parseArguments, parseOptions, stripQuotes } = require('../variable-resolver.js');
-const { LANGUAGE_TO_COUNTRY } = require('../data/language-flags.js');
 
 // Constants (verbatim from the Ruby port)
 const DEFAULT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M320 64C334.7 64 348.2 72.1 355.2 85L571.2 485C577.9 497.4 577.6 512.4 570.4 524.5C563.2 536.6 550.1 544 536 544L104 544C89.9 544 76.9 536.6 69.6 524.5C62.3 512.4 62.1 497.4 68.8 485L284.8 85C291.8 72.1 305.3 64 320 64zM320 232C306.7 232 296 242.7 296 256L296 368C296 381.3 306.7 392 320 392C333.3 392 344 381.3 344 368L344 256C344 242.7 333.3 232 320 232zM346.7 448C347.3 438.1 342.4 428.7 333.9 423.5C325.4 418.4 314.7 418.4 306.2 423.5C297.7 428.7 292.8 438.1 293.4 448C292.8 457.9 297.7 467.3 306.2 472.5C314.7 477.6 325.4 477.6 333.9 472.5C342.4 467.3 347.3 457.9 346.7 448z"/></svg>';
 const IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
 // Caches (module-level like the Ruby class variables)
-const iconCache = new Map();
 const logoCache = new Map();
-const aliasMaps = new Map(); // aliasFile path → Map(alias → canonical)
-const warnedIcons = new Set(); // names already warned about (warn-once)
+const warnedLogos = new Set(); // names already warned about (warn-once)
 let logoInstanceCounter = 0;
 
 /**
@@ -61,137 +55,6 @@ function readFileIfExists(filePath) {
   }
 }
 
-// {% omega_icon name %} / {% omega_icon name, "css classes" %}
-//                       / {% omega_icon name, "css classes", label="Meaning" %}
-//
-// The WRAPPER carries the accessibility answer (#538). Icons are decorative
-// almost everywhere they appear — beside visible text in buttons, tiles and
-// facts — so the default emit is `aria-hidden="true"`: hidden from the a11y
-// tree by declaration instead of by the convention that screen readers skip
-// text-free SVGs. The rare icon that CARRIES meaning says so with `label=`,
-// and gets `role="img"` + `aria-label` instead of the hidden stamp.
-const omegaIcon = {
-  block: false,
-  render(ctx, markup) {
-    const parts = parseArguments(markup);
-    const iconName = resolveNameArg(ctx, parts[0]) || '';
-    // The css classes stay POSITIONAL; anything key=value is an option, so
-    // `{% omega_icon "star", label="Featured" %}` never reads as a class list.
-    const classArg = parts[1] && !parts[1].includes('=') ? parts[1] : null;
-    const cssClasses = classArg ? resolveInput(ctx.lookup, classArg, true) : null;
-    const label = parseOptions(parts.slice(1), ctx.lookup).label;
-
-    const iconSvg = loadIcon(ctx, iconName);
-    if (!iconSvg) return '';
-
-    const processed = injectSvgAttributes(iconSvg);
-    const dataAttr = iconName ? ` data-icon="${escapeAttr(iconName)}"` : '';
-    const a11yAttrs = label
-      ? ` role="img" aria-label="${escapeAttr(label)}"`
-      : ' aria-hidden="true"';
-
-    if (cssClasses) {
-      return `<i class="fa ${escapeAttr(cssClasses)}"${dataAttr}${a11yAttrs}>${processed}</i>`;
-    }
-    return `<i class="fa"${dataAttr}${a11yAttrs}>${processed}</i>`;
-  },
-};
-
-function loadIcon(ctx, iconName) {
-  const icons = (ctx.options && ctx.options.icons) || {};
-  const dirs = icons.fontAwesomeDirs || [];
-  const style = (ctx.site.config.icons && ctx.site.config.icons.style) || icons.style || 'solid';
-  const cacheKey = `${dirs.join('|')}|${style}/${iconName}`;
-
-  if (iconCache.has(cacheKey)) return iconCache.get(cacheKey);
-
-  const svg = tryLoadFontAwesome(icons, iconName, style)
-    || tryLoadFlag(icons, iconName)
-    || defaultIconWithWarning(iconName, dirs);
-
-  iconCache.set(cacheKey, svg);
-  return svg;
-}
-
-function tryLoadFontAwesome(icons, iconName, style) {
-  const dirs = icons.fontAwesomeDirs || [];
-  if (!dirs.length || !iconName) return null;
-
-  const alias = aliasFor(icons.aliasFile, iconName);
-  const names = alias ? [iconName, alias] : [iconName];
-
-  for (const dir of dirs) {
-    for (const name of names) {
-      for (const rel of candidateRelPaths(name, style)) {
-        const svg = readFileIfExists(path.join(dir, rel));
-        if (svg) return svg;
-      }
-    }
-  }
-  return null;
-}
-
-/** Alias slug → canonical slug from the configured metadata file (cached). */
-function aliasFor(aliasFile, iconName) {
-  if (!aliasFile) return null;
-
-  if (!aliasMaps.has(aliasFile)) {
-    let map = new Map();
-    const raw = readFileIfExists(aliasFile);
-    if (raw) {
-      try {
-        map = buildAliasMap(JSON.parse(raw));
-      } catch {
-        // Unparseable metadata — resolve without aliases.
-      }
-    }
-    aliasMaps.set(aliasFile, map);
-  }
-  return aliasMaps.get(aliasFile).get(iconName) || null;
-}
-
-/** The default warning-triangle, with a once-per-name build warning. */
-function defaultIconWithWarning(iconName, dirs) {
-  if (iconName && dirs.length && !warnedIcons.has(iconName)) {
-    warnedIcons.add(iconName);
-    console.warn(`[@omega.js/template-kit:media] omega_icon: no SVG found for "${iconName}" — rendering the default icon`);
-  }
-  return tagMissing(DEFAULT_ICON, iconName);
-}
-
-/**
- * Stamp the failed slug onto the fallback SVG so the browser can see it:
- * the dev-only icon audit (web core/js/core/dev-icon-audit.js) scans
- * [data-omega-icon-missing] and console.errors every miss.
- */
-function tagMissing(svg, name) {
-  const safe = String(name || 'unknown').replace(/["<>&]/g, '');
-  return svg.replace('<svg ', `<svg data-omega-icon-missing="${safe}" `);
-}
-
-function tryLoadFlag(icons, iconName) {
-  if (!icons.flagsDir || !iconName) return null;
-
-  const direct = readFileIfExists(path.join(icons.flagsDir, `${iconName}.svg`));
-  if (direct) return normalizeFlagSvg(direct);
-
-  const countryCode = LANGUAGE_TO_COUNTRY[iconName.toLowerCase()];
-  if (!countryCode) return null;
-  const mapped = readFileIfExists(path.join(icons.flagsDir, `${countryCode}.svg`));
-  return mapped ? normalizeFlagSvg(mapped) : null;
-}
-
-/**
- * The flag set carries hardcoded width/height="512" on the root — strip
- * them so injectSvgAttributes' standard 1em inline-icon sizing applies
- * (FA sources never carry dimensions; flags are the exception).
- * @param {string} svg
- * @returns {string}
- */
-function normalizeFlagSvg(svg) {
-  return svg.replace(/<svg([^>]*)>/, (match, attrs) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, '')}>`);
-}
-
 // {% omega_logo name %} / {% omega_logo name, type, color %} — inline SVG with
 // instance-unique ID prefixing so repeated logos don't collide
 const omegaLogo = {
@@ -220,8 +83,8 @@ function loadLogo(ctx, logoName, type, color) {
 
   let svg = logos.dir && readFileIfExists(path.join(logos.dir, type, color, `${logoName}.svg`));
   if (!svg) {
-    if (!warnedIcons.has(`logo:${logoName}`)) {
-      warnedIcons.add(`logo:${logoName}`);
+    if (!warnedLogos.has(logoName)) {
+      warnedLogos.add(logoName);
       console.warn(`[@omega.js/template-kit:media] omega_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
     }
     svg = tagMissing(DEFAULT_ICON, `logo:${logoName}`);
@@ -229,6 +92,19 @@ function loadLogo(ctx, logoName, type, color) {
 
   logoCache.set(cacheKey, svg);
   return svg;
+}
+
+/**
+ * Stamp the failed slug onto the fallback SVG so the browser can see it: the
+ * dev-only icon audit (web core/js/core/dev-icon-audit.js) scans
+ * [data-omega-icon-missing] and console.errors every miss.
+ * @param {string} svg
+ * @param {string} name
+ * @returns {string}
+ */
+function tagMissing(svg, name) {
+  const safe = String(name || 'unknown').replace(/["<>&]/g, '');
+  return svg.replace('<svg ', `<svg data-omega-icon-missing="${safe}" `);
 }
 
 /**
@@ -490,7 +366,6 @@ function getVideoMimeType(extension) {
 }
 
 module.exports = {
-  omegaIcon,
   omegaLogo,
   omegaImage,
   omegaVideo,

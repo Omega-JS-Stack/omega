@@ -83,8 +83,7 @@ test('#250 wiring: a brand omega.json5 safelist survives the resolved-config pat
   const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-purge-config-'));
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), JSON.stringify({
-    brand: { id: 'purgeco', name: 'PurgeCo', url: 'https://purge.example.com' },
-    meta: { title: 'PurgeCo', description: 'Config-path purge fixture' },
+    brand: { id: 'purgeco', name: 'PurgeCo', url: 'https://purge.example.com', description: 'Config-path purge fixture' },
     theme: { id: 'classy' },
     // .carousel-inner is genuinely unused by the bare fixture — it purges
     // without this section, so its survival can ONLY come from the config.

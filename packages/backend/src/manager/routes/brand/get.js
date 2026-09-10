@@ -16,7 +16,7 @@ function buildPublicConfig(config) {
   return {
     brand: config.brand || {},
     repo: config.repo || {},
-    oauth2: config.oauth2 || {},
+    connections: config.connections || {},
     payment: config.payment || {},
     cloud: config.cloud || {},
     reviews: config.reviews || {},

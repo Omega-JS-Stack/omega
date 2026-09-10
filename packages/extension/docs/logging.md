@@ -16,7 +16,7 @@ All in `<projectRoot>/logs/`:
 
 ## What gets captured
 
-Everything that flows through stdout/stderr: `Manager.logger(...)` output, raw `console.log` calls, gulp task names, webpack/sass output, the works. ANSI color codes are stripped from the file (grep-friendly); the terminal continues to receive colored output unchanged.
+Everything that flows through stdout/stderr: `Manager.logger(...)` output, raw `console.log` calls, gulp task names, bundle/sass output, the works. ANSI color codes are stripped from the file (grep-friendly); the terminal continues to receive colored output unchanged.
 
 ## Controls
 

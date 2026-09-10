@@ -292,11 +292,11 @@
             // demo's href= as a link the page emits (#521).
             content: '<div class="row g-3 text-start">\
               <div class="col-12">\
-                <label for="demo-brand-color" class="form-label fw-bold">{% omega_icon "palette", "me-1" %}Choose your brand color:</label>\
+                <label for="demo-brand-color" class="form-label fw-bold"><i class="fa-solid fa-palette me-1"></i>Choose your brand color:</label>\
                 <input type="color" class="form-control form-control-color form-control-lg border-0 w-100" id="demo-brand-color" value="#6366f1" aria-label="Choose your brand color">\
               </div>\
               <div class="col-12">\
-                <a href="/signup" class="btn btn-adaptive-inverse btn-lg px-4 w-100">{% omega_icon "palette", "me-2" %}Apply theme</a>\
+                <a href="/signup" class="btn btn-adaptive-inverse btn-lg px-4 w-100"><i class="fa-solid fa-palette me-2"></i>Apply theme</a>\
               </div>\
             </div>',
           },

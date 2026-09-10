@@ -4,7 +4,6 @@
  * for the campaign editor modal.
  */
 
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 
 // Lazy-loaded markdown-it instance
@@ -42,7 +41,7 @@ async function renderEmailPreview(formData) {
       </div>
       <div class="email-preview-body">${renderedContent}</div>
       <div class="email-preview-disclaimer text-muted small mt-3">
-        ${getPrerenderedIcon('triangle-exclamation', 'fa-xs me-1')}
+        <i class="fa-solid fa-triangle-exclamation fa-xs me-1"></i>
         Preview shows formatted content. Final email may vary by template.
       </div>
     </div>
@@ -70,8 +69,8 @@ function renderPushPreview(formData) {
         <div class="push-preview-status-bar">
           <span>9:41 AM</span>
           <span>
-            ${getPrerenderedIcon('wifi', 'fa-sm me-1')}
-            ${getPrerenderedIcon('battery-full', 'fa-sm')}
+            <i class="fa-solid fa-wifi fa-sm me-1"></i>
+            <i class="fa-solid fa-battery-full fa-sm"></i>
           </span>
         </div>
         <div class="push-preview-notification"
@@ -87,7 +86,7 @@ function renderPushPreview(formData) {
               <div class="fw-semibold small">${omega.utilities().escapeHTML(name)}</div>
               <div class="small text-muted mt-1">${omega.utilities().escapeHTML(subject)}</div>
               <div class="small text-muted mt-1">
-                ${getPrerenderedIcon('clock', 'fa-xs me-1')}
+                <i class="fa-solid fa-clock fa-xs me-1"></i>
                 Now
               </div>
             </div>

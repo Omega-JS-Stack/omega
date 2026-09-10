@@ -12,6 +12,7 @@
  * are skipped but user-doc mutations still happen.
  */
 const crypto = require('crypto');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const TEST_EMAIL = 'rachel.greene+backend-unsub@gmail.com';
 const TEST_ASM_ID = '24077';
@@ -20,7 +21,7 @@ function generateSig(email) {
   return crypto.createHmac('sha256', process.env.UNSUBSCRIBE_HMAC_KEY).update(email.toLowerCase()).digest('hex');
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing email-preferences (anonymous HMAC + authenticated)',
   type: 'group',
   tests: [
@@ -289,4 +290,4 @@ module.exports = {
       },
     },
   ],
-};
+});

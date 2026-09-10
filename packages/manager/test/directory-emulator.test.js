@@ -147,7 +147,7 @@ test('directory: a config price change lands in the parent doc; an unchanged con
   let doc = await db.getDoc(DOC_PATH);
   assert.equal(doc.sponsorships.prices['guest-post'], 70);
   assert.deepEqual(doc.brand, { id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' });
-  assert.deepEqual(doc.github, { owner: 'emulator-org', name: BRAND_ID, repo: `emulator-org/${BRAND_ID}` });
+  assert.deepEqual(doc.github, { owner: 'emulator-org', name: `${BRAND_ID}-omega`, repo: `emulator-org/${BRAND_ID}-omega` });
   assert.equal(doc.orderCount, 7, 'the hub-owned field survived the push');
 
   // ── Second walk, unchanged config: zero writes, untouched document ────────

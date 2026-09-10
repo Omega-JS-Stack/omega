@@ -6,7 +6,7 @@
 
 - **One log file**, `runtime.log`, populated by all three Electron processes (main / preload / renderer)
 - **Live console output** during development (DevTools console for renderer, terminal stdout for main)
-- **Fresh each boot** — truncated on every `Manager.initialize()`, just like `dev.log`/`build.log`/`test.log`
+- **Kept across boots** — never truncated; it rotates by size instead (see the lifetime table below), unlike `dev.log`/`build.log`/`test.log`
 - **Cross-process timestamps** so log lines from main + preload + renderer interleave in arrival order
 
 ## Where the file lives
@@ -77,7 +77,19 @@ For dev-loop convenience. From the consumer project root:
 | `npx omega logs --open` | Open the log file in OS default editor |
 | `npx omega logs --lines=100` | Default mode with custom tail length |
 
-`mgr logs` only resolves the dev path (`<cwd>/logs/runtime.log`). To find the production log on a user's machine, use the table above or call `getLogFilePath()` from app code.
+### The surface argument
+
+An optional positional names which of the project's logs to read — `npx omega logs [runtime|dev|build|test]`, resolving `<cwd>/logs/<surface>.log`. It defaults to `runtime`, and every flag above works the same on whichever surface was named:
+
+```bash
+npx omega logs dev --tail       # follow the gulp pipeline live
+npx omega logs test --lines=100 # last 100 lines of the previous test run
+npx omega logs build --path     # just the path, for piping
+```
+
+Anything else fails naming the four surfaces. (The four files themselves are described in the lifetime table below; `ci.log` and `signing.log` are not tail targets.)
+
+`mgr logs` only resolves the dev path (`<cwd>/logs/<surface>.log`). To find the production runtime log on a user's machine, use the table above or call `getLogFilePath()` from app code.
 
 ## How to find the file path from app code
 
@@ -203,7 +215,7 @@ Five separate logs in `<projectRoot>/logs/`:
 
 | File | Source | Lifetime |
 |---|---|---|
-| `runtime.log` | Packaged-app runtime in dev mode | Truncated each boot |
+| `runtime.log` | Packaged-app runtime in dev mode | Persistent, rotates at 10 MB to `runtime.old.log` (one archive generation) |
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
@@ -212,6 +224,6 @@ Five separate logs in `<projectRoot>/logs/`:
 
 `dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `OMEGA_LOG_FILE=false`; override its path with `OMEGA_LOG_FILE=<path>`.)
 
-They serve different purposes and don't overlap — `dev.log`/`build.log` show you "is webpack still bundling?", `test.log` shows you "which test failed on the last run?", `ci.log` shows you "did the release workflow pass?", `runtime.log` shows you "is my app's auto-updater finding the right release feed?". All useful.
+They serve different purposes and don't overlap — `dev.log`/`build.log` show you "is the build still running?", `test.log` shows you "which test failed on the last run?", `ci.log` shows you "did the release workflow pass?", `runtime.log` shows you "is my app's auto-updater finding the right release feed?". All useful.
 
 In production: only `runtime.log` exists (no project, no gulp, no GH Actions stream).

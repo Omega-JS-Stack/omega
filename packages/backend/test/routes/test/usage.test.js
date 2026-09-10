@@ -1,9 +1,14 @@
 /**
  * Test: POST /test/usage
- * Tests the usage tracking API
- * This is a suite because we need to track state and verify increments
+ * Tests the usage tracking API through `consume`
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)) — one call
+ * checks, counts and writes, and the response reports what is LEFT of both
+ * counters rather than the raw fields.
+ * This is a suite because we need to track state and verify the counting
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Usage tracking API',
   type: 'suite',
   timeout: 30000,
@@ -18,54 +23,46 @@ module.exports = {
 
         state.initialUsage = userDoc?.usage || {};
 
-        // Store initial values for requests metric (may not exist yet)
+        // Store initial values for the requests feature (may not exist yet)
         state.initialMonthly = state.initialUsage?.requests?.monthly || 0;
         state.initialDaily = state.initialUsage?.requests?.daily || 0;
-        state.initialTotal = state.initialUsage?.requests?.total || 0;
 
         assert.ok(true, 'Initial usage state captured');
       },
     },
 
-    // Test 2: Increment usage with default values
+    // Test 2: Consume usage with default values
     {
-      name: 'increment-default',
+      name: 'consume-default',
       async run({ http, assert, state }) {
         const response = await http.as('basic').post('backend-manager/test/usage', {});
 
-        assert.isSuccess(response, 'Usage increment should succeed');
-        assert.hasProperty(response, 'data.metric', 'Response should contain metric name');
+        assert.isSuccess(response, 'Usage consume should succeed');
+        assert.hasProperty(response, 'data.feature', 'Response should contain the feature name');
         assert.hasProperty(response, 'data.amount', 'Response should contain amount');
         assert.hasProperty(response, 'data.before', 'Response should contain before values');
         assert.hasProperty(response, 'data.after', 'Response should contain after values');
 
         // Verify defaults
-        assert.equal(response.data.metric, 'requests', 'Metric should be requests');
+        assert.equal(response.data.feature, 'requests', 'Feature should be requests');
         assert.equal(response.data.amount, 1, 'Default amount should be 1');
 
-        // Verify monthly incremented
+        // Verify the month counter moved
         assert.equal(
-          response.data.after.monthly,
-          response.data.before.monthly + 1,
-          'Monthly should be incremented by 1'
+          response.data.after.used,
+          response.data.before.used + 1,
+          'The month counter should move by 1'
         );
 
-        // Verify daily incremented
+        // Verify the day counter moved
         assert.equal(
-          response.data.after.daily,
-          response.data.before.daily + 1,
-          'Daily should be incremented by 1'
-        );
-
-        // Verify total incremented
-        assert.equal(
-          response.data.after.total,
-          response.data.before.total + 1,
-          'Total should be incremented by 1'
+          response.data.after.day.used,
+          response.data.before.day.used + 1,
+          'The day counter should move by 1'
         );
 
         // Store for next test
-        state.afterFirstIncrement = response.data.after;
+        state.afterFirstConsume = response.data.after;
       },
     },
 
@@ -80,19 +77,15 @@ module.exports = {
 
         assert.equal(
           userDoc.usage.requests.monthly,
-          state.afterFirstIncrement.monthly,
+          state.afterFirstConsume.used,
           'Persisted monthly should match API response'
         );
         assert.equal(
           userDoc.usage.requests.daily,
-          state.afterFirstIncrement.daily,
+          state.afterFirstConsume.day.used,
           'Persisted daily should match API response'
         );
-        assert.equal(
-          userDoc.usage.requests.total,
-          state.afterFirstIncrement.total,
-          'Persisted total should match API response'
-        );
+        assert.ok(userDoc.usage.requests.total > 0, 'Total should be counted too');
 
         // Verify last timestamp exists
         assert.ok(userDoc.usage.requests.last, 'Should have last object');
@@ -101,32 +94,27 @@ module.exports = {
       },
     },
 
-    // Test 4: Increment with custom amount
+    // Test 4: Consume a custom amount
     {
-      name: 'increment-custom-amount',
+      name: 'consume-custom-amount',
       async run({ http, assert, state }) {
         const response = await http.as('basic').post('backend-manager/test/usage', {
           amount: 5,
         });
 
-        assert.isSuccess(response, 'Custom amount increment should succeed');
+        assert.isSuccess(response, 'Custom amount consume should succeed');
         assert.equal(response.data.amount, 5, 'Amount should be 5');
 
-        // Verify all counters incremented by 5
+        // Verify both counters moved by 5
         assert.equal(
-          response.data.after.monthly,
-          response.data.before.monthly + 5,
-          'Monthly should be incremented by 5'
+          response.data.after.used,
+          response.data.before.used + 5,
+          'The month counter should move by 5'
         );
         assert.equal(
-          response.data.after.daily,
-          response.data.before.daily + 5,
-          'Daily should be incremented by 5'
-        );
-        assert.equal(
-          response.data.after.total,
-          response.data.before.total + 5,
-          'Total should be incremented by 5'
+          response.data.after.day.used,
+          response.data.before.day.used + 5,
+          'The day counter should move by 5'
         );
 
         state.afterCustomAmount = response.data.after;
@@ -143,62 +131,51 @@ module.exports = {
 
         assert.equal(
           userDoc.usage.requests.monthly,
-          state.afterCustomAmount.monthly,
+          state.afterCustomAmount.used,
           'Requests monthly should be persisted'
         );
         assert.equal(
           userDoc.usage.requests.daily,
-          state.afterCustomAmount.daily,
+          state.afterCustomAmount.day.used,
           'Requests daily should be persisted'
-        );
-        assert.equal(
-          userDoc.usage.requests.total,
-          state.afterCustomAmount.total,
-          'Requests total should be persisted'
         );
       },
     },
 
-    // Test 6: Multiple increments accumulate
+    // Test 6: Multiple consumes accumulate
     {
-      name: 'multiple-increments-accumulate',
+      name: 'multiple-consumes-accumulate',
       async run({ http, assert, state }) {
-        // First increment
+        // First consume
         const response1 = await http.as('basic').post('backend-manager/test/usage', {});
 
-        assert.isSuccess(response1, 'First increment should succeed');
+        assert.isSuccess(response1, 'First consume should succeed');
 
-        // Second increment
+        // Second consume
         const response2 = await http.as('basic').post('backend-manager/test/usage', {});
 
-        assert.isSuccess(response2, 'Second increment should succeed');
+        assert.isSuccess(response2, 'Second consume should succeed');
 
-        // Third increment with custom amount
+        // Third consume with a custom amount
         const response3 = await http.as('basic').post('backend-manager/test/usage', {
           amount: 3,
         });
 
-        assert.isSuccess(response3, 'Third increment should succeed');
+        assert.isSuccess(response3, 'Third consume should succeed');
 
         // Verify accumulation: should be initial + 1 (test 2) + 5 (test 4) + 1 + 1 + 3 = initial + 11
         const expectedMonthly = state.initialMonthly + 11;
         const expectedDaily = state.initialDaily + 11;
-        const expectedTotal = state.initialTotal + 11;
 
         assert.equal(
-          response3.data.after.monthly,
+          response3.data.after.used,
           expectedMonthly,
-          `Monthly should accumulate to ${expectedMonthly}`
+          `The month counter should accumulate to ${expectedMonthly}`
         );
         assert.equal(
-          response3.data.after.daily,
+          response3.data.after.day.used,
           expectedDaily,
-          `Daily should accumulate to ${expectedDaily}`
-        );
-        assert.equal(
-          response3.data.after.total,
-          expectedTotal,
-          `Total should accumulate to ${expectedTotal}`
+          `The day counter should accumulate to ${expectedDaily}`
         );
       },
     },
@@ -212,15 +189,15 @@ module.exports = {
 
         const response = await http.as('none').post('backend-manager/test/usage', {});
 
-        assert.isSuccess(response, 'Unauthenticated usage increment should succeed');
+        assert.isSuccess(response, 'Unauthenticated usage consume should succeed');
         assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
         assert.equal(response.data.key, state.unauthKey, 'Key should be unknown');
 
-        // Verify all counters incremented
-        assert.equal(response.data.after.monthly, response.data.before.monthly + 1, 'Monthly should increment by 1');
-        assert.equal(response.data.after.daily, response.data.before.daily + 1, 'Daily should increment by 1');
+        // Verify both counters moved
+        assert.equal(response.data.after.used, response.data.before.used + 1, 'The month counter should move by 1');
+        assert.equal(response.data.after.day.used, response.data.before.day.used + 1, 'The day counter should move by 1');
 
-        state.unauthMonthly = response.data.after.monthly;
+        state.unauthMonthly = response.data.after.used;
       },
     },
 
@@ -231,7 +208,7 @@ module.exports = {
         const usageDoc = await firestore.get(`usage/${state.unauthKey}`);
 
         assert.ok(usageDoc, 'Usage doc should exist in usage collection');
-        assert.ok(usageDoc?.requests, 'Usage doc should have the requests metric');
+        assert.ok(usageDoc?.requests, 'Usage doc should have the requests feature');
         assert.equal(usageDoc.requests.monthly, state.unauthMonthly, 'Persisted monthly should match');
       },
     },
@@ -328,20 +305,20 @@ module.exports = {
     {
       name: 'daily-counter-accumulates-after-reset',
       async run({ http, assert }) {
-        // After cron reset daily to 0, new increments should start from 0
+        // After cron reset the day counter to 0, new consumes start from 0
         const response = await http.as('basic').post('backend-manager/test/usage', {
           amount: 3,
         });
 
-        assert.isSuccess(response, 'Increment after cron reset should succeed');
-        assert.equal(response.data.before.daily, 0, 'Daily should be 0 after cron reset');
-        assert.equal(response.data.after.daily, 3, 'Daily should be 3 after increment');
+        assert.isSuccess(response, 'Consume after cron reset should succeed');
+        assert.equal(response.data.before.day.used, 0, 'The day counter should be 0 after cron reset');
+        assert.equal(response.data.after.day.used, 3, 'The day counter should be 3 after consuming');
 
         // Monthly should have continued accumulating (not reset)
         assert.equal(
-          response.data.after.monthly,
-          response.data.before.monthly + 3,
-          'Monthly should continue accumulating'
+          response.data.after.used,
+          response.data.before.used + 3,
+          'The month counter should continue accumulating'
         );
       },
     },
@@ -362,19 +339,14 @@ module.exports = {
         assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
 
         assert.equal(
-          response.data.after.monthly,
-          response.data.before.monthly,
-          'Monthly must not go down'
+          response.data.after.used,
+          response.data.before.used,
+          'The month counter must not go down'
         );
         assert.equal(
-          response.data.after.daily,
-          response.data.before.daily,
-          'Daily must not go down'
-        );
-        assert.equal(
-          response.data.after.total,
-          response.data.before.total,
-          'Total must not go down'
+          response.data.after.day.used,
+          response.data.before.day.used,
+          'The day counter must not go down'
         );
       },
     },
@@ -388,15 +360,15 @@ module.exports = {
           amount: -5,
         });
 
-        assert.isSuccess(response, 'Unauthenticated increment should succeed');
+        assert.isSuccess(response, 'Unauthenticated consume should succeed');
         assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
         assert.equal(response.data.amount, 0, 'Amount should clamp to 0');
         assert.equal(
-          response.data.after.monthly,
-          response.data.before.monthly,
-          'Monthly must not go down'
+          response.data.after.used,
+          response.data.before.used,
+          'The month counter must not go down'
         );
       },
     },
   ],
-};
+});

@@ -2,7 +2,9 @@
 // inside a real MV3 service worker context with `chrome` + `self` globals
 // wired up. If this fails, no other background-layer test can be trusted.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'background',
   description: 'background SW — context smoke',
@@ -44,4 +46,4 @@ module.exports = {
       },
     },
   ],
-};
+});

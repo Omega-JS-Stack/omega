@@ -13,8 +13,9 @@
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
 const powertools = require('node-powertools');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: paid → refund webhook → payment-refunded transition',
   type: 'suite',
   timeout: 30000,
@@ -221,4 +222,4 @@ module.exports = {
       },
     },
   ],
-};
+});

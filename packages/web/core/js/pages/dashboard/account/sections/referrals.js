@@ -1,11 +1,6 @@
 // Referrals section module
 import omega from '@omega.js/client';
 
-// Initialize referrals section
-export function init() {
-  setupButtons();
-}
-
 // Load referrals data
 export function loadData(account) {
   if (!account) return;
@@ -21,16 +16,26 @@ export function loadData(account) {
 }
 
 // Update referral code display
+//
+// The button rides `data-omega-copy`
+// ([#727](https://github.com/Omega-JS-Stack/omega/issues/727)), and the value
+// it copies is set HERE rather than read off the field: the placeholder the
+// field shows when the account has no code is a sentence, not a link, and an
+// empty explicit value is what makes the mechanism say "Nothing to copy".
 function updateReferralCode(code) {
   const $codeInput = document.getElementById('referral-code-input');
+  const $copyBtn = document.getElementById('copy-referral-code-btn');
 
-  if ($codeInput) {
-    if (code) {
-      const baseUrl = window.location.origin;
-      $codeInput.value = `${baseUrl}?ref=${code}`;
-    } else {
-      $codeInput.value = 'No referral link available';
-    }
+  if (!$codeInput) {
+    return;
+  }
+
+  const link = code ? `${window.location.origin}?ref=${code}` : '';
+
+  $codeInput.value = link || 'No referral link available';
+
+  if ($copyBtn) {
+    $copyBtn.omegaCopyValue = link;
   }
 }
 
@@ -209,48 +214,4 @@ function getTimeSince(timestamp) {
 
   const years = Math.floor(months / 12);
   return `${years} year${years > 1 ? 's' : ''} ago`;
-}
-
-// Setup button handlers
-function setupButtons() {
-  // Copy referral code button
-  const $copyBtn = document.getElementById('copy-referral-code-btn');
-  if ($copyBtn) {
-    $copyBtn.addEventListener('click', handleCopyReferralCode);
-  }
-}
-
-// Handle copy referral code
-async function handleCopyReferralCode() {
-  const $codeInput = document.getElementById('referral-code-input');
-  const $copyBtn = document.getElementById('copy-referral-code-btn');
-
-  if (!$codeInput || !$codeInput.value || $codeInput.value === 'No referral link available') {
-    omega.utilities().showNotification('No referral link to copy', 'warning');
-    return;
-  }
-
-  try {
-    // Copy the full URL directly from the input (it now contains the full URL)
-    await omega.utilities().clipboardCopy($codeInput);
-
-    // Update button text temporarily
-    const $text = $copyBtn.querySelector('.button-text');
-    const originalText = $text.textContent;
-
-    $text.textContent = 'Copied!';
-    $copyBtn.classList.remove('btn-primary');
-    $copyBtn.classList.add('btn-success');
-
-    // Reset after 2 seconds
-    setTimeout(() => {
-      $text.textContent = originalText;
-      $copyBtn.classList.remove('btn-success');
-      $copyBtn.classList.add('btn-primary');
-    }, 2000);
-
-  } catch (err) {
-    console.error('Failed to copy referral link:', err);
-    omega.utilities().showNotification('Failed to copy referral link', 'danger');
-  }
 }

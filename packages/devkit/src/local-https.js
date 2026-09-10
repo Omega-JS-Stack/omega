@@ -19,6 +19,11 @@
  *   http gets a 307 redirect to https on the same host — anyone typing
  *   http://localhost:<port> lands in the right place instead of a browser
  *   connection error.
+ *
+ * - mkcertCaRootPem() → '<mkcert -CAROOT>/rootCA.pem' | null
+ *   The root certificate a spawned Node process TRUSTS through
+ *   NODE_EXTRA_CA_CERTS, so a child calling the public https port verifies it
+ *   instead of bypassing verification (#795). Memoised per process.
  */
 const fs = require('fs');
 const path = require('path');
@@ -28,8 +33,79 @@ const http = require('http');
 const https = require('https');
 const { execSync } = require('child_process');
 const jetpack = require('fs-jetpack');
+const { commandOnPath } = require('./command-path.js');
 
 const NOOP = () => {};
+
+/**
+ * The install line to print when mkcert is absent, for THIS host.
+ *
+ * mkcert ships through a different manager on every platform — its README
+ * (https://github.com/FiloSottile/mkcert#installation) names Homebrew on
+ * macOS, Chocolatey or Scoop on Windows, and on Linux certutil from apt plus
+ * mkcert itself from the release binary or Linuxbrew. One home for the string,
+ * since `omega serve`, `omega emulator`, web's `omega dev` and the generator
+ * below all print it.
+ *
+ * Every line OPENS with something pasteable — an alternative belongs in a
+ * sentence after it, never spliced into the command a reader will copy.
+ *
+ * @param {string} [platform] - Host platform (test seam)
+ * @returns {string} The command to run, then any alternative
+ */
+function mkcertInstallHint(platform = process.platform) {
+  if (platform === 'darwin') {
+    return 'brew install mkcert && mkcert -install';
+  }
+
+  if (platform === 'win32') {
+    return 'choco install mkcert && mkcert -install. Scoop works too: scoop bucket add extras, then scoop install mkcert.';
+  }
+
+  return 'sudo apt install libnss3-tools, then install mkcert itself from https://github.com/FiloSottile/mkcert/releases (or Linuxbrew) and run mkcert -install.';
+}
+
+// One CAROOT lookup per process — mkcert's root does not move under a running
+// stack, and three call sites ask for it. Keyed by the exec that answered, so a
+// test seam never inherits (or poisons) the real host's answer.
+const caRootPemCache = new Map();
+
+/**
+ * The absolute path to THIS machine's mkcert root CA certificate.
+ *
+ * A Node child reads no system trust store, so a process calling the public
+ * https port (the proxy above) fails the certificate. Handing it this path as
+ * NODE_EXTRA_CA_CERTS makes it VERIFY the local certificate — the reason it is
+ * not NODE_TLS_REJECT_UNAUTHORIZED=0, which disables verification wholesale and
+ * makes Node print a warning (#795).
+ *
+ * The `mkcert -CAROOT` call IS the on-PATH probe: mkcert missing means the
+ * shell exits nonzero, which is the null answer.
+ *
+ * @param {object} [options]
+ * @param {function} [options.exec] - execSync (test seam)
+ * @returns {string|null} The rootCA.pem path, or null when mkcert or its root is absent
+ */
+function mkcertCaRootPem({ exec = execSync } = {}) {
+  if (caRootPemCache.has(exec)) {
+    return caRootPemCache.get(exec);
+  }
+
+  let pem = null;
+  try {
+    // A host without mkcert answers with a nonzero exit, the expected null, so
+    // the child's stderr stays quiet (no "command not found" in the dev banner).
+    const caRoot = String(exec('mkcert -CAROOT', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).trim();
+    const candidate = caRoot ? path.join(caRoot, 'rootCA.pem') : null;
+    pem = candidate && fs.existsSync(candidate) ? candidate : null;
+  } catch (e) {
+    // No mkcert on this host — callers fall back (plain http, or no trust var).
+    pem = null;
+  }
+
+  caRootPemCache.set(exec, pem);
+  return pem;
+}
 
 /**
  * Find-or-generate mkcert certificates in certsDir.
@@ -98,9 +174,13 @@ function checkCertProblem(certFile) {
   // Verify the signature chains to the CURRENT mkcert root CA. If mkcert (or
   // its root) isn't available we can't verify — keep the existing certs rather
   // than breaking the no-mkcert fallback path.
+  const caPem = mkcertCaRootPem();
+  if (!caPem) {
+    return null;
+  }
+
   try {
-    const caRoot = execSync('mkcert -CAROOT', { encoding: 'utf8' }).trim();
-    const ca = new X509Certificate(fs.readFileSync(path.join(caRoot, 'rootCA.pem')));
+    const ca = new X509Certificate(fs.readFileSync(caPem));
 
     if (!cert.verify(ca.publicKey)) {
       const issuerCN = cert.issuer.split('\n').find((line) => line.startsWith('CN=')) || cert.issuer;
@@ -121,10 +201,8 @@ function checkCertProblem(certFile) {
  * @returns {{ key: string, cert: string } | null}
  */
 function generateMkcertCerts(certsDir, log = NOOP) {
-  try {
-    execSync('which mkcert', { stdio: 'pipe' });
-  } catch (e) {
-    log('mkcert not found. Install with: brew install mkcert && mkcert -install');
+  if (!commandOnPath('mkcert')) {
+    log(`mkcert not found. Install with: ${mkcertInstallHint()}`);
     return null;
   }
 
@@ -216,7 +294,7 @@ function startLocalHttpsProxy({ port, targetPort, certs, log = NOOP }) {
       for (let i = 0; i < req.rawHeaders.length; i += 2) {
         lines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
       }
-      upstream.write(lines.join('\r\n') + '\r\n\r\n');
+      upstream.write(`${lines.join('\r\n')}\r\n\r\n`);
 
       if (head && head.length) {
         upstream.write(head);
@@ -277,4 +355,6 @@ module.exports = {
   checkCertProblem,
   findCertPair,
   generateMkcertCerts,
+  mkcertInstallHint,
+  mkcertCaRootPem,
 };

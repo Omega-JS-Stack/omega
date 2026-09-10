@@ -1,0 +1,9 @@
+/*
+ * SITE-layer LAYOUT sheet (#624): `css/layouts/<layout>.scss` is keyed by the
+ * layout name exactly as a page sheet is keyed by the URL, and layers the same
+ * way — this one decorates whatever the framework layers ship for the redirect
+ * layout.
+ */
+.consumer-redirect-probe {
+  color: rebeccapurple;
+}

@@ -16,6 +16,7 @@ const jetpack = require('fs-jetpack');
 
 const { scaffoldDefaults } = require('../../dist/utils/scaffold-defaults.js');
 const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../../dist/utils/merge-line-files.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The engine logs per-file by default; tests only want failures surfaced.
 const quiet = { log() {}, warn: console.warn, error: console.error };
@@ -24,7 +25,7 @@ function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-defaults-'));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Defaults scaffold — devkit engine + real @omega.js/backend file map',
   type: 'group',
   timeout: 30000,
@@ -244,4 +245,4 @@ module.exports = {
       },
     },
   ],
-};
+});

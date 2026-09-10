@@ -10,12 +10,13 @@ const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { resolvePathPrefix } = require('./path-prefix.js');
 const { buildServiceWorker, writeBuildMeta } = require('./service-worker.js');
-const { copyStaticAssets, hasFaviconSet } = require('./static-assets.js');
+const { copyStaticAssets, hasFaviconSet, brandmarkSvgUrl } = require('./static-assets.js');
 const { processImages } = require('./imagemin.js');
 const { configureOmega } = require('./engine.js');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { emitLanguageFlags } = require('./language-flags.js');
 const { resolveThemeLayers } = require('./layers.js');
+const { getEnvironment } = require('./mode-helpers.js');
 const { PATHS } = require('./paths.js');
 
 /**
@@ -38,10 +39,15 @@ const { PATHS } = require('./paths.js');
  * @param {boolean} [options.skipPurge] - skip the PurgeCSS pass
  * @param {string} [options.manifestPath] - also write the asset manifest here (the dev config reads it)
  * @param {string} [options.pathPrefix] - the base path the site is served under (#355) — default `process.env.OMEGA_PATH_PREFIX`, then the domain root
+ * @param {object} [options.license] - the deploy-time license stamp (#320) the verb resolved → site.license (default: keyless)
  * @param {function} [options.onPhase] - (name, seconds) callback after each phase
  * @returns {Promise<{ timings: object, htmlCount: number, manifest: object, pathPrefix: string }>}
  */
 async function buildSite(options) {
+  // The environment (#717): resolved ONCE here, from the one surface, and
+  // handed to both emit lanes below — the build meta and the engine read the
+  // same answer instead of each re-testing a loose `options.environment`.
+  const environment = getEnvironment.call(options);
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
@@ -85,6 +91,7 @@ async function buildSite(options) {
     })
   );
   manifest.favicons = hasFaviconSet(options.staticDirs);
+  manifest.brandmarkSvg = brandmarkSvgUrl(options.staticDirs);
   if (options.manifestPath) {
     fs.mkdirSync(path.dirname(options.manifestPath), { recursive: true });
     fs.writeFileSync(options.manifestPath, JSON.stringify(manifest, null, 2));
@@ -95,7 +102,7 @@ async function buildSite(options) {
     writeBuildMeta({
       siteData: options.siteData,
       outDir: options.outDir,
-      environment: options.environment,
+      environment,
       version: options.version,
       consumerDir: options.consumerDir,
       clientEntry: options.clientEntry,
@@ -108,7 +115,7 @@ async function buildSite(options) {
     });
   });
 
-  // ---- runtime icon set (assets/fa/) — feeds the browser-side auto-render,
+  // ---- runtime icon set (assets/icons/) — feeds the browser-side auto-render,
   //      plus the language-named flag aliases the client switcher fetches
   await phase('icons', () => {
     const icons = emitIcons({
@@ -151,9 +158,10 @@ async function buildSite(options) {
           layoutMode: options.layoutMode,
           farmDir: options.farmDir,
           assetManifest: manifest,
-          environment: options.environment,
+          environment,
           version: options.version,
           pathPrefix,
+          license: options.license,
         }),
     });
     await elev.write();

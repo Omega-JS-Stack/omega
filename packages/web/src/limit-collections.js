@@ -16,6 +16,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const Logger = require('@omega.js/devkit/logger');
+const { isProduction } = require('./mode-helpers.js');
 
 const logger = new Logger('limit-collections');
 
@@ -154,12 +155,12 @@ function collectionDocuments(consumerDir, name, collections) {
  * @param {string} options.consumerDir - the consumer site (Eleventy input dir)
  * @param {object} [options.limits] - the raw dev.limitCollections config
  * @param {Array<object>} [options.collections] - the brand's own collections (readCollections' output)
- * @param {string} [options.environment] - 'production' never samples
+ * @param {string} [options.environment] - the build's environment (#717, read through the one surface) — production never samples
  * @returns {{ dropped: Set<string>, limited: Array<{ name: string, kept: number, total: number }> }|null} null when nothing is limited
  */
 function applyCollectionLimits(eleventyConfig, options) {
   const config = readLimits(options.limits, options.collections);
-  if (!config || !config.entries.length || options.environment === 'production') return null;
+  if (!config || !config.entries.length || isProduction.call(options)) return null;
 
   const dropped = new Set();
   const limited = [];

@@ -16,9 +16,11 @@ const {
   resolveSchema,
   resolveFieldValue,
   enforceEnums,
-} = require('../../src/manager/helpers/schema-engine.js');
+  enforceMins,
+} = require('../../dist/manager/helpers/schema-engine.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// The one ctx surface enforceEnums touches.
+// The one ctx surface enforceEnums/enforceMins touch.
 const ctx = { report: (message, options) => Object.assign(new Error(message), options) };
 
 // Collect the (path, node) pairs the walk visits, in order.
@@ -28,7 +30,7 @@ function walk(schema) {
   return seen;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'schema-engine leaf detection, walk, field pipeline, enums',
   type: 'group',
 
@@ -258,7 +260,7 @@ module.exports = {
       async run({ assert }) {
         // NaN and ±Infinity are `number` to typeof, so the type check accepted
         // them and every bound comparison against NaN is false — the clamp
-        // never fired and a NaN reached sinks like usage.increment(), where it
+        // never fired and a NaN reached sinks like usage.consume(), where it
         // poisons every later comparison
         // ([#244](https://github.com/Omega-JS-Stack/omega/issues/244)).
         const node = { types: ['number'], min: 0, default: 7 };
@@ -297,9 +299,12 @@ module.exports = {
     },
 
     {
-      name: 'strings-and-arrays-truncate-to-max-and-ignore-min',
+      name: 'strings-and-arrays-truncate-to-max-and-min-never-pads',
       async run({ assert }) {
         assert.equal(resolveFieldValue('abcdefgh', { types: ['string'], max: 3 }), 'abc');
+        // A short string is never padded here — the refusal is the boundary's
+        // job (enforceMins), so resolution stays a pure defaults/coercion pass
+        // ([#789](https://github.com/Omega-JS-Stack/omega/issues/789)).
         assert.equal(resolveFieldValue('ab', { types: ['string'], min: 5 }), 'ab', 'min never pads');
         assert.deepEqual(resolveFieldValue([1, 2, 3, 4], { types: ['array'], max: 2 }), [1, 2]);
       },
@@ -443,5 +448,90 @@ module.exports = {
         assert.equal(thrown.message.includes('{options.mode}'), true);
       },
     },
+
+    // ─── enforceMins ───
+
+    {
+      name: 'a-string-shorter-than-min-rejects-with-400',
+      async run({ assert }) {
+        // The documented path-id idiom (`default:` path segment + `min: 1`, NOT
+        // `required`) used to guard nothing: min bounded numbers only, so an
+        // empty id reached the route
+        // ([#789](https://github.com/Omega-JS-Stack/omega/issues/789)).
+        let thrown;
+        try {
+          enforceMins(ctx, { id: '' }, [{ path: 'id', min: 1 }]);
+        } catch (e) {
+          thrown = e;
+        }
+
+        assert.equal(thrown instanceof Error, true);
+        assert.equal(thrown.code, 400);
+        assert.equal(thrown.message, 'Invalid settings {id}: must be at least 1 character');
+
+        // Never padded to length — refused.
+        let short;
+        try {
+          enforceMins(ctx, { code: 'ab' }, [{ path: 'code', min: 5 }]);
+        } catch (e) {
+          short = e;
+        }
+        assert.equal(short.message, 'Invalid settings {code}: must be at least 5 characters');
+      },
+    },
+
+    {
+      name: 'a-string-at-or-above-min-passes',
+      async run({ assert }) {
+        enforceMins(ctx, { id: 'a' }, [{ path: 'id', min: 1 }]);
+        enforceMins(ctx, { id: 'abcdef' }, [{ path: 'id', min: 1 }]);
+        // Nested paths are read by dot-path, like the enum door.
+        enforceMins(ctx, { options: { mode: 'ab' } }, [{ path: 'options.mode', min: 2 }]);
+      },
+    },
+
+    {
+      name: 'an-array-shorter-than-min-rejects-with-400',
+      async run({ assert }) {
+        let thrown;
+        try {
+          enforceMins(ctx, { tags: ['solo'] }, [{ path: 'tags', min: 2 }]);
+        } catch (e) {
+          thrown = e;
+        }
+
+        assert.equal(thrown.code, 400);
+        assert.equal(thrown.message, 'Invalid settings {tags}: must have at least 2 items');
+
+        // At the bound it passes.
+        enforceMins(ctx, { tags: ['a', 'b'] }, [{ path: 'tags', min: 2 }]);
+      },
+    },
+
+    {
+      name: 'a-number-below-min-still-clamps-and-is-never-refused',
+      async run({ assert }) {
+        const value = resolveFieldValue(5, { types: ['number'], min: 10 });
+
+        assert.equal(value, 10, 'numbers keep clamping to min');
+        enforceMins(ctx, { limit: value }, [{ path: 'limit', min: 10 }]);
+
+        // Non-length types are ignored outright.
+        enforceMins(ctx, { flag: false, blob: {}, nothing: null }, [
+          { path: 'flag', min: 1 },
+          { path: 'blob', min: 1 },
+          { path: 'nothing', min: 1 },
+        ]);
+      },
+    },
+
+    {
+      name: 'an-undeclared-min-never-refuses',
+      async run({ assert }) {
+        // No min declared → no floor: the empty string resolves and passes.
+        assert.equal(resolveFieldValue('', { types: ['string'] }), '');
+        enforceMins(ctx, { id: '' }, []);
+      },
+    },
   ],
-};
+});

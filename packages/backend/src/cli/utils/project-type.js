@@ -11,7 +11,10 @@
  * of that list: the Functions deploy, the local emulator, and the emulator test
  * run. It also takes away the Firebase-only ARTIFACTS those verbs read —
  * FIREBASE_ONLY_SCAFFOLD and FIREBASE_ONLY_SETUP_CHECKS are the one home of
- * that list ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)).
+ * that list ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)) — and
+ * the package SCRIPTS that run them, which the framework manifest's
+ * `projectScriptsCustomOwned` names
+ * ([#689](https://github.com/Omega-JS-Stack/omega/issues/689)).
  * Everything else — the routes, the schemas, the auth middleware, every
  * helper, and the rest of setup — is identical in both modes, which is the
  * whole point of the mode.
@@ -19,6 +22,12 @@
 const chalk = require('chalk').default;
 
 const { hasOmegaConfig, loadConfig, backendProjectType } = require('@omega.js/config');
+
+// The framework's own manifest: `projectScripts` (every standard target script)
+// and `projectScriptsCustomOwned` (the ones a custom-server backend owns
+// instead). Declared THERE, not here, because the manager walk reads the same
+// pair off the installed package without loading any backend code (#689).
+const frameworkPackage = require('../../../package.json');
 
 // verb → what replaces it in custom mode. A refusal that doesn't name the
 // lane is just a wall.
@@ -87,6 +96,27 @@ function isCustomProject(targetRoot) {
 }
 
 /**
+ * The package scripts THIS framework owns for the target at `targetRoot` — the
+ * ONE home of the ownership semantics, read by both writers: the scaffold every
+ * verb runs (ensure-target.js) and the setup check that holds a target to them
+ * (setup-tests/npm-project-scripts.js).
+ *
+ * Every `projectScripts` key in firebase mode. In custom mode, all but the keys
+ * whose verbs that mode refuses — those are the BRAND's (its own server command,
+ * its own host deploy), so they are never written and never scaffolded.
+ *
+ * @param {string} targetRoot - The backend target root.
+ * @returns {Object} Script key → the command this framework owns it as.
+ */
+function frameworkOwnedScripts(targetRoot) {
+  const declared = frameworkPackage.projectScripts || {};
+  if (!isCustomProject(targetRoot)) return { ...declared };
+
+  const brandOwned = frameworkPackage.projectScriptsCustomOwned || [];
+  return Object.fromEntries(Object.entries(declared).filter(([key]) => !brandOwned.includes(key)));
+}
+
+/**
  * The gate every Firebase-only verb opens with. When this target runs in
  * custom mode it prints the refusal — the mode, and the lane that replaces
  * this verb — fails the process, and returns true; the caller returns at once.
@@ -107,4 +137,4 @@ function refuseWhenCustom(targetRoot, verb) {
   return true;
 }
 
-module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS };
+module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, frameworkOwnedScripts, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS };

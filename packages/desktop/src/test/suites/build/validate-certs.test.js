@@ -6,6 +6,7 @@ const fs   = require('fs');
 const os   = require('os');
 
 const validateCerts = require(path.join(__dirname, '..', '..', '..', 'commands', 'validate-certs.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // A minimal mock provisioning profile (CMS-wrapped XML plist payload).
 function makeMockProvision({ appId, expirationDate }) {
@@ -28,7 +29,7 @@ function makeMockProvision({ appId, expirationDate }) {
   return `XX-CMS-WRAPPER-XX${inner}YY-CMS-WRAPPER-YY`;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'validate-certs — provisioning profile parsing',
@@ -99,4 +100,4 @@ module.exports = {
       },
     },
   ],
-};
+});

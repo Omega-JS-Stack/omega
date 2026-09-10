@@ -14,9 +14,14 @@
 //   2. Copies ONLY the referenced modules (plus their transitive relative
 //      requires/imports) into <dist>/vendor/<package>/ — selective, so a host
 //      that uses just safe-install doesn't ship the test runner or inherit its
-//      dependency requirements
+//      dependency requirements. The closure covers the vendored modules' OWN
+//      cross-package requires too (#739): devkit's license.js requires
+//      @omega.js/config and @omega.js/account, so both land beside it even
+//      when the host references neither
 //   3. Rewrites every @omega.js specifier under dist/ to a relative path into
-//      the matching vendor dir
+//      the matching vendor dir — host files and the vendored trees alike, so a
+//      vendored module reaches its siblings by path (../config/index.js) and a
+//      published tarball needs none of the private packages present
 //   4. Fails if the host doesn't declare a runtime dependency the vendored modules
 //      require — vendored code resolves e.g. chalk from the HOST's node_modules
 //
@@ -243,25 +248,24 @@ function resolvePackageRoot(name, cwd) {
 }
 
 // Locate a package's ROOT directory (where its package.json lives) for asset
-// vendoring — entry-relative walk-up, since exports maps rarely expose
-// './package.json' to require.resolve.
+// vendoring. A plain node_modules walk-up from the host, never require.resolve:
+// that resolves the package's `main`, which for a dist-building package is a
+// file its own prepare has not written yet on a fresh tree (a CI checkout
+// preparing desktop before web), and assets live in the package's SOURCES.
 function resolveAssetPackageRoot(name, cwd) {
-  let entry;
-  try {
-    entry = require.resolve(name, { paths: [cwd, __dirname] });
-  } catch (error) {
-    throw new Error(`[devkit vendor] Cannot resolve '${name}' from ${cwd} — is it a devDependency of the host?`);
-  }
-
-  let dir = path.dirname(entry);
-  while (dir !== path.dirname(dir)) {
-    const manifest = path.join(dir, 'package.json');
-    if (jetpack.exists(manifest) && (jetpack.read(manifest, 'json') || {}).name === name) {
-      return dir;
+  for (const base of [cwd, __dirname]) {
+    let dir = path.resolve(base);
+    while (true) {
+      const candidate = path.join(dir, 'node_modules', name);
+      if ((jetpack.read(path.join(candidate, 'package.json'), 'json') || {}).name === name) {
+        return candidate;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
     }
-    dir = path.dirname(dir);
   }
-  throw new Error(`[devkit vendor] Cannot locate the package root of '${name}' from its entry ${entry}`);
+  throw new Error(`[devkit vendor] Cannot resolve '${name}' from ${cwd} — is it a devDependency of the host?`);
 }
 
 // Copy the host's declared cross-package assets (package.json `omega.vendorAssets`)
@@ -461,16 +465,53 @@ function vendorPackages(options) {
   };
 
   // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
+  // The seed set GROWS as the modules being vendored are themselves read (#739):
+  // devkit's license.js requires '@omega.js/config' and '@omega.js/account', so
+  // both ship beside it even when the host names neither — the same closure rule
+  // the host scan applies, run to a fixed point. Seeds come from the STRIPPED
+  // source, a commented-out require being no dependency (#354); step 4's rewrite
+  // still reads raw text, so a specifier inside a comment is rewritten rather
+  // than shipped raw past CI's self-containment grep.
   // A failure here (e.g. a require of a module that doesn't exist) rolls back.
   const vendored = {};
   try {
-    for (const [name, seeds] of seedsByPackage) {
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const [name, seeds] of [...seedsByPackage]) {
+        const packageRoot = rootFor(name);
+        const needed = resolveNeededFiles(name, packageRoot, seeds);
+        vendored[name] = [...needed].sort();
+
+        for (const relative of needed) {
+          const contents = stripComments(jetpack.read(path.join(packageRoot, relative)) || '');
+          if (!contents.includes('@omega.js/')) continue;
+          for (const pattern of REFERENCE_PATTERNS) {
+            for (const match of contents.matchAll(pattern)) {
+              const dependency = match[3];
+              // A published runtime dep (@omega.js/client) resolves from the
+              // host's node_modules at consumer runtime — same rule as host code.
+              if (neverVendor(dependency)) continue;
+              if (!VENDORABLE_PACKAGES.includes(dependency)) {
+                throw new Error(`[devkit vendor] vendored '@omega.js/${name}/${relative}' references '@omega.js/${dependency}', which is not a vendorable private utility (${VENDORABLE_PACKAGES.join(', ')}) — declare it as a runtime dependency of ${hostPackage.name} instead, or drop the reference`);
+              }
+              const file = subpathToFile(match[4], rootFor(dependency));
+              if (!seedsByPackage.has(dependency)) seedsByPackage.set(dependency, new Set());
+              if (!seedsByPackage.get(dependency).has(file)) {
+                seedsByPackage.get(dependency).add(file);
+                grew = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const [name, files] of Object.entries(vendored)) {
       const packageRoot = rootFor(name);
-      const needed = resolveNeededFiles(name, packageRoot, seeds);
-      for (const relative of needed) {
+      for (const relative of files) {
         jetpack.copy(path.join(packageRoot, relative), path.join(vendorRoot, name, relative), { overwrite: true });
       }
-      vendored[name] = [...needed].sort();
     }
   } catch (error) {
     rollbackVendor();
@@ -492,8 +533,9 @@ function vendorPackages(options) {
     for (const pattern of BARE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         const name = specifierToPackageName(match[2]);
-        // Cross-references between @omega.js packages are never host deps —
-        // leftovers in shipped dist are caught by CI's no-@omega.js-refs check.
+        // Cross-references between @omega.js packages are never host deps: the
+        // vendorable ones become sibling paths in step 4's rewrite, and a
+        // published runtime dep (client) resolves from the host's node_modules.
         if (name.startsWith('@omega.js/')) {
           continue;
         }
@@ -508,17 +550,27 @@ function vendorPackages(options) {
     throw new Error(`[devkit vendor] ${hostPackage.name} must declare runtime dependencies used by vendored modules: ${[...missing].join(', ')}`);
   }
 
-  // 4. Rewrite the @omega.js references to relative paths into the vendor dirs.
+  // 4. Rewrite the @omega.js references to relative paths into the vendor dirs —
+  // in the host's files AND inside the vendored trees themselves (#739), where a
+  // surviving cross-package specifier is MODULE_NOT_FOUND on a published install,
+  // the private packages never shipping. Same patterns, same target rule: the
+  // sibling vendored copy, reached relative to the file doing the requiring.
   // Two-phase so a failure can never leave dist part-rewritten: every updated
   // file is computed in memory first, then the batch writes — and a mid-batch
   // write failure restores the originals already written before rethrowing.
+  const vendoredFilesToRewrite = Object.entries(vendored)
+    .flatMap(([name, files]) => files.map((relative) => path.join(vendorRoot, name, relative)));
+
   const rewrites = [];
-  filesToRewrite.forEach((abs) => {
+  [...filesToRewrite, ...vendoredFilesToRewrite].forEach((abs) => {
     const contents = jetpack.read(abs);
     let updated = contents;
     for (const pattern of REFERENCE_PATTERNS) {
       updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
-        if (neverVendor(name)) return match;
+        // Host files can only carry vendorable names here (the scan threw
+        // otherwise); a vendored file can still carry a non-vendorable one
+        // inside a COMMENT, which the seed scan strips and never validated.
+        if (neverVendor(name) || !VENDORABLE_PACKAGES.includes(name)) return match;
         const target = path.join(vendorRoot, name, subpathToFile(subpath, rootFor(name)));
         let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
         if (!relative.startsWith('.')) {

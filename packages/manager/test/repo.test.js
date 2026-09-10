@@ -44,7 +44,7 @@ const ORG_OK = {
 const REPO_OK = {
   private: true,
   homepage: 'https://fixture-brand.test',
-  html_url: 'https://github.com/fixture-org/fixture-brand',
+  html_url: 'https://github.com/fixture-org/fixture-brand-omega',
 };
 
 // Pages fully configured
@@ -129,7 +129,7 @@ test('repo service: fully converged brand is a zero-mutation no-op with state in
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.mutations(), []);
-  assert.equal(result.state.repo.fullName, 'fixture-org/fixture-brand');
+  assert.equal(result.state.repo.fullName, 'fixture-org/fixture-brand-omega');
   assert.equal(result.state.pages.domain, 'fixture-brand.test');
 });
 
@@ -193,16 +193,16 @@ test('repo: missing repo is created with visibility/description/homepage and rec
 
   assert.equal(result.status, 'success');
   const created = api.call('createRepo');
-  assert.deepEqual(created.args, ['fixture-org', 'fixture-brand', {
+  assert.deepEqual(created.args, ['fixture-org', 'fixture-brand-omega', {
     isPrivate: true,
     description: 'A fixture brand',
     homepage: 'https://fixture-brand.test',
   }]);
-  assert.equal(result.state.repo.fullName, 'fixture-org/fixture-brand');
+  assert.equal(result.state.repo.fullName, 'fixture-org/fixture-brand-omega');
   assert.equal(result.output.repo.created, true);
 });
 
-test('repo: github.repo overrides the brand-id repo name', async () => {
+test('repo: github.repo overrides the derived `<brand.id>-omega` repo name', async () => {
   const api = fakeApi({ org: ORG_OK, repo: REPO_OK, branch: true, pages: PAGES_OK });
   await run(brandConfig({ repo: 'custom-repo' }), api);
 
@@ -218,7 +218,7 @@ test('repo: visibility/homepage drift patches only the drift', async () => {
   const result = await run(brandConfig(), api);
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(api.call('updateRepo').args, ['fixture-org', 'fixture-brand', {
+  assert.deepEqual(api.call('updateRepo').args, ['fixture-org', 'fixture-brand-omega', {
     private: true,
     homepage: 'https://fixture-brand.test',
   }]);
@@ -251,7 +251,7 @@ test('pages: enables + sets domain when unconfigured; fixes a drifted source bra
   const result = await run(brandConfig(), fresh);
   assert.equal(result.status, 'success');
   assert.ok(fresh.names().includes('enablePages'));
-  assert.deepEqual(fresh.call('setPagesDomain').args, ['fixture-org', 'fixture-brand', 'fixture-brand.test']);
+  assert.deepEqual(fresh.call('setPagesDomain').args, ['fixture-org', 'fixture-brand-omega', 'fixture-brand.test']);
 
   // Wrong source branch, correct cname: branch fixed, domain untouched
   const drifted = fakeApi({

@@ -6,14 +6,16 @@
  * What the contract promises, and what these tests hold it to:
  *   - config accepts the key (object and array/multi-instance form) only when
  *     it declares `type: 'custom'`; a stray unknown key is still an error;
- *   - the manager runs each verb through the target's script IN ORDER, and
- *     skips loudly when a script is absent;
+ *   - the manager runs a verb through the target's script and skips loudly when
+ *     the script is absent (the one lane, `resolveTargetRun`);
  *   - every framework service op skips custom targets — except the workspace
  *     service (which recognizes the dir instead of warning it unmapped);
  *   - brand-root `omega dev` boots the custom target's `start` in the same
  *     terminal fan-out.
  *
- * Nothing here spawns a real script: the verb runner takes its runner as a seam.
+ * The brand-root `omega build` / `omega clean` fan-outs — verb order over every
+ * target type, and the loud skip in a real run — are build-clean-command.test.js.
+ * Nothing here spawns a real script.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -23,14 +25,12 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { validateConfig } = require('@omega.js/config/validate');
-const {
-  CUSTOM_VERBS, customTargetNames, customTargetDirs, targetScripts, runCustomVerbs,
-} = require('../src/lib/custom-target.js');
+const { customTargetNames, customTargetDirs, targetScripts } = require('../src/lib/custom-target.js');
 const { discoverTargets } = require('../src/lib/brand.js');
 const { resolveTargetRun } = require('../src/lib/framework-bin.js');
 const ensureStructure = require('../src/services/workspace/ensure/structure.js');
 const { selectDevTargets } = require('../src/commands/dev.js');
-const { selectDeployTargets } = require('../src/commands/deploy.js');
+const { selectTargets } = require('../src/commands/deploy.js');
 
 const BASE = { brand: { id: 'b', name: 'B', url: 'https://b.test' } };
 
@@ -119,76 +119,6 @@ test('custom-target: discoverTargets marks the dir custom instead of leaving it 
 
 // ─── the verbs ───────────────────────────────────────────────────────────────
 
-test('custom-target: the five verbs are the contract, in order', () => {
-  assert.deepEqual(CUSTOM_VERBS, ['start', 'build', 'test', 'deploy', 'clean']);
-});
-
-test('custom-target: every declared verb runs through the target script, in verb order', async () => {
-  const root = makeBrand({ scripts: { start: 'node serve.js', build: 'tsc', test: 'node --test', deploy: 'render deploy', clean: 'rm -rf dist' } });
-  try {
-    const entry = discoverTargets(root).find((item) => item.name === 'api');
-    const ran = [];
-
-    const results = await runCustomVerbs(entry, CUSTOM_VERBS, {
-      run: async (command, args, cwd) => { ran.push({ command, args, cwd }); return { success: true }; },
-    });
-
-    assert.deepEqual(ran.map((call) => call.args.join(' ')), [
-      'run start', 'run build', 'run test', 'run deploy', 'run clean',
-    ]);
-    assert.deepEqual(ran.map((call) => call.command), Array(5).fill('npm'));
-    assert.deepEqual([...new Set(ran.map((call) => call.cwd))], [entry.path]);
-    assert.deepEqual(results.map((result) => result.ran), [true, true, true, true, true]);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('custom-target: an absent script is a LOUD skip, never a failure or a silent no-op', async () => {
-  const root = makeBrand({ scripts: { build: 'tsc' } });
-  const lines = [];
-  const original = console.log;
-  console.log = (...args) => lines.push(args.join(' '));
-
-  try {
-    const entry = discoverTargets(root).find((item) => item.name === 'api');
-    const ran = [];
-
-    const results = await runCustomVerbs(entry, CUSTOM_VERBS, {
-      run: async (command, args) => { ran.push(args.join(' ')); return { success: true }; },
-    });
-
-    assert.deepEqual(ran, ['run build']);
-    assert.deepEqual(results.filter((result) => result.skipped).map((result) => result.verb), ['start', 'test', 'deploy', 'clean']);
-    // Every skip NAMES itself and the target — a verb that quietly did nothing
-    // is indistinguishable from one that worked
-    for (const verb of ['start', 'test', 'deploy', 'clean']) {
-      assert.match(lines.join('\n'), new RegExp(`api.*${verb}`));
-    }
-    // Nothing failed: an absent script is not an error
-    assert.equal(results.some((result) => result.success === false), false);
-  } finally {
-    console.log = original;
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('custom-target: a failing script is reported as a failure, not swallowed', async () => {
-  const root = makeBrand({ scripts: { build: 'tsc' } });
-  try {
-    const entry = discoverTargets(root).find((item) => item.name === 'api');
-    const [result] = await runCustomVerbs(entry, ['build'], {
-      run: async () => ({ success: false, error: 'exit code 2' }),
-    });
-
-    assert.equal(result.ran, true);
-    assert.equal(result.success, false);
-    assert.equal(result.error, 'exit code 2');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
 test('custom-target: a target with no package.json scripts declares no verbs', () => {
   const root = makeBrand({ scripts: {} });
   try {
@@ -258,22 +188,27 @@ test('custom-target: omega dev boots the custom target beside the framework legs
   assert.deepEqual(selected.sort(), ['api', 'backend', 'web']);
 });
 
-test('custom-target: --only still narrows to one custom leg', () => {
-  const { selected, unknown } = selectDevTargets({ available: ['web', 'api'], custom: ['api'], only: 'api' });
+test('custom-target: --target= still narrows to one custom leg', () => {
+  const { selected, missing } = selectDevTargets({ available: ['web', 'api'], custom: ['api'], target: 'api' });
   assert.deepEqual(selected, ['api']);
-  assert.deepEqual(unknown, []);
+  assert.deepEqual(missing, []);
 });
 
-test('custom-target: a custom target with no start script is not a dev leg', () => {
-  const { selected, missing } = selectDevTargets({ available: ['web'], custom: [], only: 'api' });
-  assert.deepEqual(selected, []);
-  assert.deepEqual(missing, []);
+test('custom-target: a custom target with no start script is not a dev leg — naming it stops the boot', () => {
+  assert.throws(
+    () => selectDevTargets({ available: ['web'], custom: [], target: 'api' }),
+    (error) => {
+      assert.equal(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "api"/);
+      return true;
+    },
+  );
 });
 
 // ─── the deploy / test fan-outs ──────────────────────────────────────────────
 
 test('custom-target: the brand deploy fan-out includes custom targets, LAST', () => {
-  const { selected } = selectDeployTargets({
+  const { selected } = selectTargets({
     targets: [
       { name: 'api', target: null, custom: true },
       { name: 'website', target: 'web' },
@@ -313,12 +248,11 @@ test('custom-target: the fan-outs run a custom target\'s own script, never a fra
   }
 });
 
-test('custom-target: --only addresses a custom target by name', () => {
-  const { selected, unknown } = selectDeployTargets({
+test('custom-target: --target= addresses a custom target by name', () => {
+  const { selected } = selectTargets({
     targets: [{ name: 'api', target: null, custom: true }, { name: 'website', target: 'web' }],
-    only: 'api',
+    target: 'api',
   });
 
   assert.deepEqual(selected.map((entry) => entry.name), ['api']);
-  assert.deepEqual(unknown, []);
 });

@@ -6,7 +6,9 @@
  *
  * Run: npx omega test routes/admin/users-list
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'routes/admin/users/list',
   type: 'group',
 
@@ -66,4 +68,4 @@ module.exports = {
       },
     },
   ],
-};
+});

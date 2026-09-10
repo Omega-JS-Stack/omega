@@ -7,7 +7,9 @@
  * - Users can delete themselves after subscription is removed
  * - Admins can delete any user
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User deletion flow',
   type: 'suite',
 
@@ -133,4 +135,4 @@ module.exports = {
       },
     },
   ],
-};
+});

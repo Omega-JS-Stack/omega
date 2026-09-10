@@ -30,8 +30,10 @@ const JS_HOOKS = [
   'data-form-state="initializing"',
 ];
 
-// #636: there is no coinbase provider, so no crypto button either.
-const PAYMENT_METHODS = ['card', 'paypal', 'apple-pay', 'google-pay'];
+// #642: the crypto button is back, because the Coinbase Commerce provider it
+// starts an intent on now exists. It renders like every other method, and shows
+// only when payment.providers.coinbase.enabled says so.
+const PAYMENT_METHODS = ['card', 'paypal', 'apple-pay', 'google-pay', 'crypto'];
 const FREQUENCIES = ['annually', 'monthly', 'weekly', 'daily'];
 
 test('contract: every JS selector the checkout page binds survives the redesign', async () => {
@@ -455,7 +457,7 @@ test('#374: the trust chips AND the help line close the pay stack, centered, on 
     captured.indexOf('id="checkout-help-button"') > captured.indexOf('omega-checkout__trust'),
     'written after the trust block — the order the stack reads in',
   );
-  assert.match(captured, /\{% omega_icon "circle-question", "fa-sm me-1" %\}/, 'and it kept its glyph verbatim through the move');
+  assert.match(captured, /<i class="fa-solid fa-circle-question fa-sm me-1"><\/i>/, 'and it kept its glyph verbatim through the move');
   assert.ok(!/mt-3 mt-lg-4/.test(layout), 'the page-foot utility margins went with the foot');
 
   // The id renders twice now, so the page JS must bind EVERY copy — a
@@ -541,7 +543,7 @@ test('#326: the summary reads like every other card, and the recurring row is go
   // rule under it, where every other card leads with an icon chip and a title.
   const title = checkout.match(/<h2 class="omega-checkout__panel-title[^"]*"[^>]*>\s*<span class="omega-icon-chip omega-icon-chip--neutral">([^]*?)<\/span>\s*Order summary/);
   assert.ok(title, 'the Order summary title is built exactly like the other card titles: icon chip on the LEFT, then the words');
-  assert.match(title[1], /data-icon="receipt"/, 'and the glyph rides the one icon mechanism, inlined at build');
+  assert.match(title[1], /data-omega-fa="solid\/receipt"><svg/, 'and the glyph rides the one icon mechanism, inlined at build');
 
   const heads = checkout.match(/omega-panel-head omega-checkout__panel-head/g) || [];
   assert.equal(heads.length, 3, 'billing, account and order summary all wear the same head — the pay zones wear none (#374)');

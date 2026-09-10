@@ -5,6 +5,7 @@
  * Run: npx omega test backend:mcp/oauth
  */
 const fetch = require('wonderful-fetch');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 async function fetchJSON(url, options) {
   try {
@@ -27,7 +28,7 @@ async function fetchJSON(url, options) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'MCP OAuth authorize + token flow',
   type: 'group',
 
@@ -156,4 +157,4 @@ module.exports = {
       },
     },
   ],
-};
+});

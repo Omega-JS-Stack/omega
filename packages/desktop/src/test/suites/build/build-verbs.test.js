@@ -1,5 +1,5 @@
 // Build-layer tests for the canonical build verbs (build / package / publish).
-// The synced projectScripts are thin `npx omega <verb>` aliases, so each verb must
+// The synced projectScripts are thin `omega <verb>` aliases, so each verb must
 // run the pipeline ITSELF — clean, certs, gulp task — and never shell back to
 // `npm run build` / `npm run publish` (that would recurse forever).
 //
@@ -15,6 +15,7 @@ const pipeline    = require(path.join(__dirname, '..', '..', '..', 'utils', 'bui
 const build   = require(path.join(commandsDir, 'build.js'));
 const pkg     = require(path.join(commandsDir, 'package.js'));
 const publish = require(path.join(commandsDir, 'publish.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Record the steps a plan runs, in order, without executing anything real.
 // The step implementations (clean/setup/validate-certs/gulp) are the seam the
@@ -44,7 +45,7 @@ async function withEnv(run) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'build verbs — the CLI owns the pipeline and its env flags',
@@ -152,4 +153,4 @@ module.exports = {
       },
     },
   ],
-};
+});

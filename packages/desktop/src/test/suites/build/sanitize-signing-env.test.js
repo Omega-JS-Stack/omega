@@ -3,8 +3,9 @@
 // and fail with "<projectRoot> not a file").
 
 const sanitizeSigningEnv = require('../../../utils/sanitize-signing-env.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'sanitize-signing-env',
@@ -29,6 +30,33 @@ module.exports = {
 
         ctx.expect(removed.sort()).toEqual(['APPLE_API_KEY', 'WIN_CSC_LINK']);
         ctx.expect('WIN_CSC_LINK' in env).toBe(false);
+      },
+    },
+    {
+      name: 'the Windows signing keys are covered; the retired runner-logon keys are not',
+      run: (ctx) => {
+        // The self-hosted signer reads all of these; an empty placeholder on any
+        // of them used to survive into signtool's arguments as an empty string.
+        const env = {
+          WIN_EV_TOKEN_PATH:    '',
+          WIN_CSC_KEY_PASSWORD: '  ',
+          WIN_TIMESTAMP_URL:    '',
+          SIGNTOOL_PATH:        '',
+        };
+        const removed = sanitizeSigningEnv(env);
+
+        ctx.expect(removed.sort()).toEqual([
+          'SIGNTOOL_PATH',
+          'WIN_CSC_KEY_PASSWORD',
+          'WIN_EV_TOKEN_PATH',
+          'WIN_TIMESTAMP_URL',
+        ]);
+        ctx.expect(Object.keys(env).length).toBe(0);
+
+        // The runner logon keys are retired ([#337]) — the runner has no service
+        // and no task to hand an account to, so nothing reads them.
+        ctx.expect(sanitizeSigningEnv.SIGNING_ENV_KEYS).not.toContain('WIN_RUNNER_LOGON_ACCOUNT');
+        ctx.expect(sanitizeSigningEnv.SIGNING_ENV_KEYS).not.toContain('WIN_RUNNER_LOGON_PASSWORD');
       },
     },
     {
@@ -67,4 +95,4 @@ module.exports = {
       },
     },
   ],
-};
+});

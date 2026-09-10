@@ -379,11 +379,32 @@ above — and nothing else; the id of each lives in the brand's own config at
 
 ## Testing
 
+### The testing-mode capture (the SendGrid stand-in)
+
+Outside extended mode, `Transactional.send()` **records** the email instead of delivering it and returns `{ status: 'captured' }` ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). The seam sits past `build()` — after the brand, the recipients, the template data and the MJML render, before SendGrid is even required — so a broken template or an unconfigured signoff fails a test rather than reaching production, and the audit trail and the `admin/email` analytics event (both facts about a DELIVERY) are not written.
+
+**The gate is the mailer's, not the caller's.** `ctx.isTesting() && !TEST_EXTENDED_MODE` is asked in exactly one place (`isCapturing()`), the way the marketing library gates `add`/`sync`/`remove` at the SSOT level. Do not add an `isTesting()` check around a new `send()` call — the seam already covers it. What the seam does NOT cover: a send scheduled past `SEND_AT_LIMIT` is queued to `emails-queue` before the seam is reached (assert it there), and extended mode still sends real mail.
+
+**The store is a file:** `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `Manager.cwd`). A file rather than a `_test/emails` Firestore collection because a test drives the mailer from three places and only a file serves all three — the emulator's function worker (another process from the test runner, so an in-memory array is impossible), the test-runner process itself, and a plain-node case with no emulator and therefore no Firestore to read. It also needs no rules, no index and no cleanup lane, and `.temp/` is already gitignored. Cross-process appends stay atomic by keeping every record under `PIPE_BUF` (the summary absorbs the trim).
+
+**The helpers are test-only** (`src/test/utils/email-capture.js`, never a framework export, exactly like `test-mode-file.js`):
+
+```javascript
+const capture = require('../../dist/test/utils/email-capture.js');
+
+capture.clearCaptured(Manager);              // before the act
+await http.as('signup-emails').post('backend-manager/user/signup', {});
+capture.readCaptured(Manager);               // [{ to, template, subject, summary, sendAt }]
+```
+
+The record's `summary` is the rendered body reduced to visible text — where a test finds the product name a receipt exists to state. Field table and the fire-and-forget caveat: [test-framework.md](test-framework.md#testing-mode-email-capture--how-a-test-reads-what-was-sent).
+
 All email tests live under `test/email/`, mirroring the source at `src/manager/libraries/email/`:
 
 | Test file | What it tests | Extended? |
 |---|---|---|
 | `templates.js` | MJML rendering for all 4 email templates (11 tests) | No |
+| `testing-capture.js` | The [testing-mode capture](#the-testing-mode-capture-the-sendgrid-stand-in): the gate, the store, the summary, the mailer's seam (6 tests) | No |
 | `transactional.js` | Transactional email building (assertions on output shape) | No |
 | `validation.js` | Email format/disposable/corporate/local-part/typo/dns checks (52 tests) | No |
 | `transactional-send.js` | Single transactional email send via SendGrid | Yes |
@@ -429,6 +450,7 @@ All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_te
 | Custom disposable domains | `src/manager/libraries/email/data/custom-disposable-domains.json` |
 | Disposable-domain seed/cache contract | `src/manager/libraries/email/disposable-domains.js` |
 | NeverBounce provider | `src/manager/libraries/email/validation-provider-neverbounce.js` |
+| Testing-mode capture (the SendGrid stand-in) | `src/test/utils/email-capture.js` |
 | ZeroBounce provider | `src/manager/libraries/email/validation-provider-zerobounce.js` |
 | Validation tests | `test/email/validation.test.js`, `test/email/validation-cases.test.js` |
 | Content-trust test (render lanes + escaping) | `test/email/render-content.test.js` |

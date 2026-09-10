@@ -120,6 +120,33 @@ add_to_cart: {
   `ttq.page()` ([#409](https://github.com/Omega-JS-Stack/omega/issues/409)); it takes no name
   and no payload, the pixel reads the page, and `name`/`kind` stay declared for the catalog
   and the fire log.
+- **`actionSource`** — the fifth key, Meta only and SERVER only: the `action_source` this
+  event's conversion carries instead of the default `website`. Meta requires the field and
+  asks that it be accurate, and its enum names the case itself, `system_generated`, "for
+  example, a subscription renewal that's set to auto-pay each month". So
+  `subscription_renew`, `payment_recovered` and `trial_convert` declare it: a card was billed
+  with nobody on the site ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)). A
+  cancellation the subscriber clicked is a website conversion like any other and declares
+  nothing.
+
+**The two commerce dialects**, as the 2026-09-02 standards review against the live references
+left them ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)). The browser and the
+server halves send the SAME payload for one event, because that is what they deduplicate on:
+
+- **Meta** `custom_data` carries `content_ids` AND `contents` (`{ id, quantity, item_price }`,
+  Meta's own field names; its pixel reference asks for `contents` or `content_ids` on a catalog campaign),
+  `content_type: 'product'`, `currency`, `value`, `num_items` (the UNITS bought, summed over
+  the items, not the number of lines), `order_id` from the canonical `transaction_id`, and
+  `content_name` only on an event with exactly ONE product, since Meta documents it as the
+  singular name of the page/product.
+- **TikTok** `properties` carries `content_ids` AND `contents`
+  (`{ content_id, content_name, price, quantity }`), `content_type: 'product'` at the
+  PROPERTIES level where Events API 2.0 documents it (its `contents` object has no per-item
+  `content_type`; the older Pixel SDK model's does), `currency`, `value` (the order total,
+  where a `price` is one item's) and `order_id`.
+- A churn moment's exclusion signal keeps neither platform's priced fields: Meta's `contents`
+  comes off whole (its `item_price` IS the amount, and the object requires `id` + `quantity`),
+  TikTok's keeps the array minus `price`/`quantity`, and `content_ids` names the plan on both.
 
 **The three mapping kinds** — and the third one is an absence:
 
@@ -138,14 +165,16 @@ names their platform does not define, and those are `custom` here.
 written or changed** (Ian 2026-08-27,
 [#652](https://github.com/Omega-JS-Stack/omega/issues/652)) — never from memory, because a
 platform renames and retires events (TikTok retired `CompletePayment` for `Purchase`, and
-`ClickButton` was never on its standard list at all). The four pages sit in the catalog
+`ClickButton` was never on its standard list at all). The pages sit in the catalog
 header so no edit can miss them:
 
 | Spec | What it settles |
 |---|---|
 | [GA4 recommended events](https://support.google.com/analytics/answer/9267735) | Which canonical names are GA4 standards |
 | [Meta standard events](https://www.facebook.com/business/help/402791146561655) | The exact wire name, and what each event MEANS (Purchase requires `value` + `currency`) |
+| [Meta Pixel reference](https://developers.facebook.com/docs/meta-pixel/reference) | Which params each standard event takes, and which a catalog campaign needs (`contents` or `content_ids`) |
 | [TikTok standard events](https://ads.tiktok.com/help/article/standard-events-parameters) | The current standard roster and its recommended params |
+| [TikTok Events API 2.0](https://business-api.tiktok.com/portal/docs?id=1771100865818625) | The server half's envelope, `properties` and `contents` fields (the 2.0 shape, which is not the Pixel SDK's) |
 | [GA4 transaction_id dedupe](https://support.google.com/analytics/answer/12313109) | The one PARAM that binds: one id per charge |
 
 A `kind: 'standard'` may only ever claim a name the platform lists; anything else is
@@ -520,7 +549,7 @@ Every key below is hashing-required except the last four.
 | `fn` / `ln` | `personal.name.first` / `.last` | lowercase, no punctuation, SHA-256 |
 | `ct` | `personal.location.city` | lowercase, no punctuation and NO SPACES (`newyork`), SHA-256 |
 | `st` | `personal.location.region` | the 2-character ANSI code in lowercase (a US state NAME is looked up); other countries lowercase with no spaces, SHA-256 |
-| `zp` | `personal.location.zip` — no account source today; wired for the brand that adds one | lowercase, no spaces or dashes, first five digits of a US zip, SHA-256 |
+| `zp` | `personal.location.postalCode` — the account page's optional postal-code field ([#663](https://github.com/Omega-JS-Stack/omega/issues/663)); the bag key keeps Meta's own name | lowercase, no spaces or dashes, first five digits of a US zip, SHA-256 |
 | `country` | `personal.location.country` | ISO 3166-1 alpha-2, lowercase, SHA-256 — a country NAME sends nothing |
 | `db` | `personal.birthday` (the `$timestamp` pair) | `YYYYMMDD` in UTC, SHA-256 |
 | `ge` | `personal.gender` | the lowercase initial, and Meta accepts `f`/`m` alone — anything else sends nothing |
@@ -540,7 +569,9 @@ built by `helpers/analytics.js` from the authenticated request's own user. Its r
 Meta's: `sha256_email_address` and `sha256_phone_number` (E.164 WITH the `+`), and an
 `address` block whose `sha256_first_name` / `sha256_last_name` drop digits and symbols,
 `sha256_street` keeps its digits, while `city`, `region` (the region NAME, not a code) and
-`postal_code` ride in the CLEAR and `country` is UPPERCASE alpha-2. The account's own
+`postal_code` ride in the CLEAR and `country` is UPPERCASE alpha-2. The address comes off the
+account: `personal.location.street` and `personal.location.postalCode` are the account page's
+optional fields ([#663](https://github.com/Omega-JS-Stack/omega/issues/663)). The account's own
 `personal.location` wins over the request's geolocation, which stays the fallback.
 
 **Where the signup's match data comes from.** The server half of `sign_up` fires from the

@@ -9,8 +9,9 @@
  * Requires ANTHROPIC_API_KEY / OPENAI_API_KEY
  * in the runner environment.
  */
-const Anthropic = require('../../src/manager/libraries/ai/providers/anthropic.js');
-const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
+const Anthropic = require('../../dist/manager/libraries/ai/providers/anthropic.js');
+const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const WEATHER_TOOL = {
   name: 'get_weather',
@@ -52,7 +53,7 @@ function skipReason(keys) {
   return false;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Live AI tool loops (anthropic + openai)',
   type: 'group',
   tests: [
@@ -167,4 +168,4 @@ module.exports = {
       },
     },
   ],
-};
+});

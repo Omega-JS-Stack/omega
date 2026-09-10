@@ -179,7 +179,7 @@ test('a single include materializes at its shadow path, with a provenance header
   const source = fs.readFileSync(mapFor(root).find((entry) => entry.path === BASE_FOOTER).source, 'utf8');
 
   assert.match(output, /Materialized src\/_includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file/);
-  assert.match(written, /^\{% comment %\}\n {2}Materialized by `omega customize _includes\/frontend\/sections\/footer\.html` — a copy of the theme:base layer's file\./, 'the header names the source layer in Liquid comment form (never rendered)');
+  assert.match(written, /^\{% comment %\}\n {2}omega:consumer-override: materialized by omega customize _includes\/frontend\/sections\/footer\.html — a copy of the theme:base layer's file\./, 'the header names the source layer in Liquid comment form (never rendered)');
   assert.ok(written.endsWith(source), 'the file itself is a verbatim copy');
 });
 
@@ -190,8 +190,23 @@ test('a stylesheet materializes into the consumer asset layer with a scss commen
   await runIn(t, root, { _: ['customize', entry.path] });
   const written = fs.readFileSync(path.join(root, 'src', 'assets', 'css', 'main.scss'), 'utf8');
 
-  assert.match(written, /^\/\/ Materialized by `omega customize assets\/css\/main\.scss`/, 'scss carries // comments, not liquid');
+  assert.match(written, /^\/\/ omega:consumer-override: materialized by omega customize assets\/css\/main\.scss/, 'scss carries // comments, not liquid');
   assert.ok(written.endsWith(fs.readFileSync(entry.source, 'utf8')), 'verbatim below the header');
+});
+
+test('the provenance header carries the consumer-override marker in the first five lines', async (t) => {
+  const root = consumer(t);
+
+  // A materialize IS the deliberate consumer copy, so the file has to pass the
+  // omega:guard shadow check (#452) without anybody hand-editing a marker in.
+  // That hook reads the first FIVE lines only, in any comment syntax.
+  await runIn(t, root, { _: ['customize', BASE_FOOTER] });
+  await runIn(t, root, { _: ['customize', 'assets/css/main.scss'] });
+
+  for (const rel of [path.join('_includes', 'frontend', 'sections', 'footer.html'), path.join('assets', 'css', 'main.scss')]) {
+    const head = fs.readFileSync(path.join(root, 'src', rel), 'utf8').split('\n').slice(0, 5).join('\n');
+    assert.match(head, /omega:consumer-override: materialized by omega customize /, `${rel} lost the marker the guard hook reads`);
+  }
 });
 
 // ─── The css contract: a listed sheet is one the compile chain HONORS ────────
@@ -199,18 +214,16 @@ test('a stylesheet materializes into the consumer asset layer with a scss commen
 test('every css entry the map offers actually wins when materialized — proved by a real compile', async (t) => {
   const root = consumer(t);
   const entries = mapFor(root).filter((entry) => entry.kind === 'css');
-  const page = entries.find((entry) => entry.path.startsWith('assets/css/pages/'));
 
   assert.ok(entries.length, 'the lane is not empty');
-  assert.ok(page, 'page sheets are offered');
 
-  for (const entry of [entries.find((e) => e.path === 'assets/css/main.scss'), page]) {
+  for (const entry of entries) {
     await runIn(t, root, { _: ['customize', entry.path] });
     fs.appendFileSync(path.join(root, 'src', entry.path), `\n.shadow-proof-${entry.path.replace(/\W/g, '-')} { color: red; }\n`);
   }
 
   const css = await compileCss(t, root);
-  for (const entry of [entries.find((e) => e.path === 'assets/css/main.scss'), page]) {
+  for (const entry of entries) {
     assert.ok(css.includes(`.shadow-proof-${entry.path.replace(/\W/g, '-')}`), `${entry.path}: the consumer's copy reached the compiled output`);
   }
 });
@@ -223,7 +236,10 @@ test('unreachable partials are NOT listed — a consumer copy of one never loads
   // sheet resolves against the IMPORTING file before any loadPath, so a
   // consumer copy of a partial is dead weight. Offering it would be a lie.
   assert.ok(entries.every((entry) => !entry.path.split('/').some((segment) => segment.startsWith('_'))), 'no partials in the map');
-  assert.ok(entries.every((entry) => entry.path === 'assets/css/main.scss' || entry.path.startsWith('assets/css/pages/')), 'only the two lanes sass layers by');
+  // …and #624 narrows it to ONE: a page or layout sheet is never shadowed —
+  // every layer's loads — so materializing one would DUPLICATE its rules, not
+  // replace them. The map offers only what a consumer copy takes over.
+  assert.ok(entries.every((entry) => entry.path === 'assets/css/main.scss'), 'main.scss is the only sheet sass resolves by layer');
   assert.equal(materializeOverride({ path: 'assets/css/base/_utilities.scss', consumerDir: path.join(root, 'src') }).status, 'unknown', 'and the verb refuses to write one');
 
   const utilities = path.join(root, 'src', 'assets', 'css', 'base', '_utilities.scss');

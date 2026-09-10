@@ -1,0 +1,50 @@
+{
+  "attempt_number": 1,
+  "id": "_test-delivery-confirmed",
+  "scheduled_for": "2026-09-01T18:20:11Z",
+  "event": {
+    "api_version": "2018-03-22",
+    "created_at": "2026-09-01T18:20:10Z",
+    "id": "_test-evt-charge-confirmed",
+    "resource": "event",
+    "type": "charge:confirmed",
+    "data": {
+      "id": "8f783fa6-eaa3-4460-af64-cac26b183ed1",
+      "code": "FBHJR22R",
+      "resource": "charge",
+      "name": "Starter Library",
+      "description": "OMEGA Playground",
+      "hosted_url": "https://commerce.coinbase.com/charges/FBHJR22R",
+      "created_at": "2026-09-01T18:12:19Z",
+      "confirmed_at": "2026-09-01T18:20:10Z",
+      "expires_at": "2026-09-01T19:12:19Z",
+      "pricing_type": "fixed_price",
+      "pricing": {
+        "local": { "amount": "49.99", "currency": "USD" },
+        "bitcoin": { "amount": "0.00055395", "currency": "BTC" }
+      },
+      "metadata": {
+        "uid": "_test-coinbase-buyer",
+        "orderId": "_test-order-coinbase-1",
+        "productId": "launch-kit"
+      },
+      "payments": [
+        {
+          "payment_id": "23668f49-5b1f-43cc-8d43-0e0a4aa373ea",
+          "network": "bitcoin",
+          "status": "CONFIRMED",
+          "detected_at": "2026-09-01T18:19:55Z",
+          "value": {
+            "local": { "amount": "49.99", "currency": "USD" },
+            "crypto": { "amount": "0.00055395", "currency": "BTC" }
+          }
+        }
+      ],
+      "timeline": [
+        { "status": "NEW", "context": "OTHER", "time": "2026-09-01T18:12:19Z" },
+        { "status": "PENDING", "context": "OTHER", "time": "2026-09-01T18:19:55Z" },
+        { "status": "COMPLETED", "context": "OTHER", "time": "2026-09-01T18:20:10Z" }
+      ]
+    }
+  }
+}

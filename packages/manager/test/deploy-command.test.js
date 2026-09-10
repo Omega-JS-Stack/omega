@@ -35,7 +35,7 @@ require.cache[managePath] = {
 };
 
 const deployCommand = require('../src/commands/deploy.js');
-const { selectDeployTargets, buildForwardedFlags } = deployCommand;
+const { selectTargets, buildForwardedFlags } = deployCommand;
 const { BOOT_SERVICES } = require('../src/config.js');
 
 // ─── Fixture staging (test-command.test.js pattern) ──────────────────────────
@@ -123,6 +123,9 @@ async function runDeployCommand(cwd, options = {}) {
     await deployCommand({ _: ['deploy'], ...options });
     return process.exitCode;
   } finally {
+    // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers
+    // so the next case starts from an unpatched stdout.
+    require('@omega.js/devkit/attach-log-file').detach();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }
@@ -146,7 +149,7 @@ test('bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in
   assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
-test('flags forward verbatim to every target; --only/--except are consumed here', async () => {
+test('flags forward verbatim to every target; --target= is consumed here', async () => {
   const { brand } = stageBrand();
   // yargs shape: kebab original + camelCase twin (the twin must NOT forward twice)
   await runDeployCommand(brand, { 'dry-run': true, dryRun: true, direct: true });
@@ -158,33 +161,56 @@ test('flags forward verbatim to every target; --only/--except are consumed here'
   }
 });
 
-test('--only filters by target or target dir name; nothing else runs', async () => {
+test('--target= picks by target key or target dir name; nothing else runs', async () => {
   const { brand } = stageBrand();
-  await runDeployCommand(brand, { only: 'web' });
+  await runDeployCommand(brand, { target: 'web' });
 
   let calls = readCalls(brand);
   assert.deepEqual(calls.map((c) => c.name), ['web']);
-  assert.deepEqual(calls[0].argv, ['deploy'], '--only never forwards');
+  assert.deepEqual(calls[0].argv, ['deploy'], '--target= never forwards');
 
   fs.rmSync(path.join(brand, 'calls.log'));
-  await runDeployCommand(brand, { only: 'backend,website' }); // dir name matches too
+  await runDeployCommand(brand, { target: 'backend,website' }); // dir name matches too
   calls = readCalls(brand);
   assert.deepEqual(calls.map((c) => c.name), ['backend', 'web'], 'order stays backend-first regardless of the flag order');
 });
 
-test('--except subtracts from the set', async () => {
+// The retired pickers (#780) — `--only` is firebase's own flag on the backend
+// target, so accepting it at the brand root would mean two things at once
+test('--only and --except are REFUSED, not ignored and not aliased — zero spawns', async () => {
   const { brand } = stageBrand();
-  await runDeployCommand(brand, { except: 'backend' });
 
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
+  await assert.rejects(
+    () => runDeployCommand(brand, { only: 'web' }),
+    (error) => {
+      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
+      assert.match(error.message, /--only is retired: pick targets with --target=/);
+      assert.match(error.message, /firebase's own --only hosting runs from targets\/backend/, 'the sentence names where the firebase flag DOES belong');
+      return true;
+    },
+  );
+  await assert.rejects(() => runDeployCommand(brand, { except: 'backend' }), /--except is retired/);
+
+  assert.deepEqual(readCalls(brand, { all: true }), [], 'not even the delivery lane ran');
 });
 
-test('a filter matching nothing NEVER falls back to deploy-everything — error, zero spawns', async () => {
+test('a --target= token matching nothing STOPS the run — never a matched subset, never deploy-everything', async () => {
   const { brand } = stageBrand();
-  const code = await runDeployCommand(brand, { only: 'hosting' });
 
-  assert.deepEqual(readCalls(brand), []);
-  assert.equal(code, 1);
+  await assert.rejects(
+    () => runDeployCommand(brand, { target: 'hosting' }),
+    (error) => {
+      assert.equal(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "hosting"/);
+      assert.match(error.message, /this brand's targets are backend, web/, 'the error names what the brand actually has');
+      return true;
+    },
+  );
+
+  // A typo BESIDE a real target must not quietly deploy the matched half
+  await assert.rejects(() => runDeployCommand(brand, { target: 'web,hosting' }), /Unknown --target token "hosting"/);
+
+  assert.deepEqual(readCalls(brand, { all: true }), [], 'not even the delivery lane ran');
 });
 
 test('a failing backend STOPS the run before web (later targets depend on it) — exit 1', async () => {
@@ -267,31 +293,37 @@ test('a delivery lane with errors stops the deploy — nothing publishes on brok
 
 // ─── Units ───────────────────────────────────────────────────────────────────
 
-test('selectDeployTargets: full DEPLOY_ORDER — backend, web, then the rest', () => {
+test('selectTargets: full DEPLOY_ORDER — backend, web, then the rest', () => {
   const targets = [
     { name: 'desktop', target: 'desktop' },
     { name: 'website', target: 'web' },
     { name: 'extension', target: 'extension' },
     { name: 'backend', target: 'backend' },
   ];
-  const { selected, unknown } = selectDeployTargets({ targets });
+  const { selected } = selectTargets({ targets });
   assert.deepEqual(selected.map((entry) => entry.target), ['backend', 'web', 'extension', 'desktop']);
-  assert.deepEqual(unknown, []);
 });
 
-test('selectDeployTargets: unknown tokens are reported, matched ones still select', () => {
+test('selectTargets: an unknown token throws — a matched subset is never returned', () => {
   const targets = [{ name: 'website', target: 'web' }];
-  const { selected, unknown } = selectDeployTargets({ targets, only: 'web,hosting' });
-  assert.deepEqual(selected.map((entry) => entry.name), ['website']);
-  assert.deepEqual(unknown, ['hosting']);
+
+  assert.throws(
+    () => selectTargets({ targets, target: 'web,hosting' }),
+    (error) => {
+      assert.equal(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "hosting": this brand's targets are web\. Nothing ran\./);
+      return true;
+    },
+  );
+
+  assert.deepEqual(selectTargets({ targets, target: 'web' }).selected.map((entry) => entry.name), ['website']);
 });
 
 test('buildForwardedFlags: values, booleans, --no- forms; yargs bookkeeping consumed', () => {
   const flags = buildForwardedFlags({
     _: ['deploy'],
     $0: 'omega',
-    only: 'web',
-    except: 'backend',
+    target: 'web',
     'continue-on-error': true,
     continueOnError: true,
     'dry-run': true,

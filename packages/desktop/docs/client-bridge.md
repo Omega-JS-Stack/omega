@@ -165,11 +165,11 @@ If `cloud.config` is empty/missing, the bridge logs a warning and runs in no-op 
 
 ## Firebase (bundled)
 
-Firebase is **bundled by webpack from @omega.js/desktop's module context** (@omega.js/client owns it in @omega.js/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
+Firebase is **bundled from @omega.js/desktop's module context** (@omega.js/client owns it in @omega.js/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
 
 If you're building a no-auth Electron app, just leave `cloud.config` empty — the bridge is a clean no-op.
 
-In a TESTING run (`OMEGA_TEST_MODE=true`) the bridge connects its auth instance to the local auth emulator — `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, classic `9099` otherwise. Same move `getApiUrl()` makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
+In a TESTING run (`OMEGA_TEST_MODE=true`) the bridge connects its auth instance to the local auth emulator, on the port it reads in three steps: `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, then the `dev.ports.auth` value the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then the classic `9099`. Same chain `getApiUrl()` walks ([environment-detection.md](environment-detection.md)) and the same move it makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
 
 ## Common patterns
 

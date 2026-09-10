@@ -20,9 +20,11 @@
  *
  * Run: npx omega test backend:events/payments/journey-payments-abandoned
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const PERSONA = 'journey-payments-abandoned';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: an abandoned checkout leaves a pending intent and nothing else',
   type: 'suite',
   timeout: 30000,
@@ -121,4 +123,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,5 +1,5 @@
 node_modules/
-e2e/.logs/
+test/e2e/.logs/
 
 # Omega manager state (durable IDs + per-run output)
 .omega/

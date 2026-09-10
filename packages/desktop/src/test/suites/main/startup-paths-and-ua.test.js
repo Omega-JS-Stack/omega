@@ -6,7 +6,9 @@
 // These are observable side-effects of `manager.initialize()` so we just inspect
 // the live electron `app` after the harness boot.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'startup paths + global user agent',
@@ -94,4 +96,4 @@ module.exports = {
       },
     },
   ],
-};
+});

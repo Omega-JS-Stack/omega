@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import fetch from 'wonderful-fetch';
 import omega from '@omega.js/client';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
@@ -121,9 +120,9 @@ function setupForm() {
       // the action (the old danger/success repaint fought the theme)
       $submit.className = 'btn btn-adaptive w-100 mb-4';
       if (currentAction === 'unsubscribe') {
-        $submit.querySelector('.button-text').innerHTML = `${getPrerenderedIcon('bell-slash', 'me-2')}Unsubscribe`;
+        $submit.querySelector('.button-text').innerHTML = `<i class="fa-solid fa-bell-slash me-2"></i>Unsubscribe`;
       } else {
-        $submit.querySelector('.button-text').innerHTML = `${getPrerenderedIcon('bell', 'me-2')}Resubscribe`;
+        $submit.querySelector('.button-text').innerHTML = `<i class="fa-solid fa-bell me-2"></i>Resubscribe`;
       }
     });
   });

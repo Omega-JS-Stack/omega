@@ -14,10 +14,11 @@ const {
   mergeLineBasedFiles,
   DEFAULT_MARKER,
   CUSTOM_MARKER,
-} = require('../../src/utils/merge-line-files.js');
+} = require('../../dist/utils/merge-line-files.js');
 
 // Setup-test helper shim — must re-export the SAME canonical impl (SSOT).
-const helperShim = require('../../src/cli/commands/setup-tests/helpers/merge-line-files.js');
+const helperShim = require('../../dist/cli/commands/setup-tests/helpers/merge-line-files.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A representative framework .env template (keys grouped under headers).
 const TEMPLATE = [
@@ -71,7 +72,7 @@ function headerAboveKey(merged, key) {
   return null;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'mergeLineBasedFiles() line-based .env / .gitignore merge',
   type: 'group',
 
@@ -268,4 +269,4 @@ module.exports = {
       },
     },
   ],
-};
+});

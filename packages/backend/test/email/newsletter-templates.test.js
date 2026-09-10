@@ -13,8 +13,9 @@
  * fixture covers clean + editorial; the "field-report" fixture covers
  * field-report.
  */
-const { renderNewsletter } = require('../../src/manager/libraries/email/generators/lib/mjml-template.js');
-const { listNewsletterTemplates: listTemplates, resolveNewsletterTemplate: resolveTemplate } = require('../../src/manager/libraries/email/generators/lib/templates/index.js');
+const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
+const { listNewsletterTemplates: listTemplates, resolveNewsletterTemplate: resolveTemplate } = require('../../dist/manager/libraries/email/generators/lib/templates/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const TEST_BRAND = {
   id: 'testco',
@@ -157,7 +158,7 @@ async function render(templateName, structureOverrides = {}, overrides = {}) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Newsletter template fixture suite',
   type: 'suite',
   auth: 'none',
@@ -482,7 +483,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 
 // Exported for adhoc inspection (not used by the runner)
 module.exports.CLASSIC_STRUCTURE = CLASSIC_STRUCTURE;

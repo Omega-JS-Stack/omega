@@ -8,12 +8,16 @@
 // flush behind the transparent nav.
 
 // The opener's clearance: 4rem of fixed nav plus hero breathing room. One
-// home, because a blog post hands the same value to its masthead band below.
+// home, because a blog post hands the same value to its masthead band below
+// and /pricing adds the promo banner's headroom to it.
+$opener-clearance: 10rem;
+$opener-clearance-lg: 12rem;
+
 @mixin nav-clearance {
-  padding-top: 10rem;
+  padding-top: $opener-clearance;
 
   @media (min-width: 992px) {
-    padding-top: 12rem;
+    padding-top: $opener-clearance-lg;
   }
 }
 
@@ -32,11 +36,8 @@ main {
 
     // first-of-TYPE, not first-child: /pricing opens with the promo-banner
     // div and a post with the read-progress bar, and either would otherwise
-    // swallow the clearance the hero needs (the page JS names the same
-    // element when it pushes the banner down)
+    // swallow the clearance the hero needs
     &:first-of-type {
-      transition: padding-top var(--omega-speed-slow) var(--omega-ease); // promo-banner push-down glides
-
       @include nav-clearance;
     }
   }
@@ -52,6 +53,30 @@ main {
     > .omega-dotgrid:first-child {
       @include nav-clearance;
     }
+  }
+}
+
+// A page carrying the fixed promo banner (/pricing) holds the banner's own
+// room in its opener, from first paint. The banner is NAV chrome: showing it
+// pushes the nav down and moves NOTHING else (#764), so the room has to be
+// there before it arrives, or the masthead opens under the pushed nav. The
+// opener already clears the 4rem nav by 6rem, which swallows the one-row
+// banner every width from 992px up; a phone wraps it onto three rows
+// (~7.4rem), which overruns the clearance by ~1.5rem, and the token adds a
+// little air on top so the eyebrow never sits flush under the pushed nav.
+// Static on purpose: a closed banner keeps the room rather than moving the page.
+main:has(#pricing-promo-banner) > section:first-of-type {
+  --omega-promo-headroom: 3rem;
+
+  padding-top: calc(#{$opener-clearance} + var(--omega-promo-headroom));
+
+  // This rule outranks the mixin, so the desktop arm restates its value or
+  // the phone padding wins at every width; the zero token keeps the two
+  // arms one shape (the #44 pin counts the mixin's own literals).
+  @media (min-width: 992px) {
+    --omega-promo-headroom: 0rem;
+
+    padding-top: calc(#{$opener-clearance-lg} + var(--omega-promo-headroom));
   }
 }
 

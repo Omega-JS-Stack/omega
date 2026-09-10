@@ -10,6 +10,7 @@
  * This is a suite because we need to clean up created files and cancel workflows after tests.
  */
 const { Octokit } = require('@octokit/rest');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Test file paths that will be created and need cleanup
 const TEST_FILES = [
@@ -17,7 +18,7 @@ const TEST_FILES = [
   '_test/type-test.txt',
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin write content to GitHub repo',
   type: 'suite',
   timeout: 120000,
@@ -219,4 +220,4 @@ module.exports = {
       },
     },
   ],
-};
+});

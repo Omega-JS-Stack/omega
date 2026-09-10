@@ -13,6 +13,7 @@
 const path = require('path');
 
 const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const RENDERER_PATH = path.join(__dirname, '..', '..', '..', 'renderer.js');
 const CLIENT_BRIDGE_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'client-bridge.js');
@@ -58,7 +59,7 @@ function makeRenderer(auth, handle) {
   return { manager, invokes, requests, timeline };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'renderer auth bridge — sync-request context UID',
@@ -154,4 +155,4 @@ module.exports = {
       },
     },
   ],
-};
+});

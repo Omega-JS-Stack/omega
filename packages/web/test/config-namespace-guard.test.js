@@ -11,7 +11,8 @@
  * Two rules, one per direction:
  *   1. `site.<config section>` — config never rides the build-fact global.
  *   2. `resolved.<config section>` — the old FLAT path, before `config:`.
- *      `meta` is the schema's one pageBare section and keeps its flat spelling.
+ *      `resolved.meta` is not one: meta is PAGE machinery, never a config
+ *      section, so the walk keeps its flat spelling (#607, Ian 2026-08-26).
  *
  * The framework's own surfaces are all this static lane can see. A CONSUMER's
  * pages are guarded at BUILD time by the same census (#611) — the last test
@@ -24,7 +25,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { CONFIG_SECTIONS, PAGE_BARE_SECTIONS, SITE_FACT_KEYS, templateReads } = require('../src/config-sections.js');
+const {
+  CONFIG_SECTIONS, SITE_FACT_KEYS, RANDOM_ID_ASSIGN_IDIOM,
+  templateReads, randomIdReads, assignsRandomId,
+} = require('../src/config-sections.js');
 const { buildSite, BARE } = require('./lib/build.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -82,14 +86,60 @@ test('#607: no template reads a config section off the `site` global', () => {
 });
 
 test('#607: no template reads a config section off the old flat `resolved` path', () => {
-  const offenders = reads('resolved').filter((entry) => (
-    CONFIG_SECTIONS.has(entry.key) && !PAGE_BARE_SECTIONS.includes(entry.key)
-  ));
+  const offenders = reads('resolved').filter((entry) => CONFIG_SECTIONS.has(entry.key));
 
   assert.deepEqual(offenders, [], offenders.map((entry) => (
     `${entry.file}:${entry.line} reads resolved.${entry.key} — the flat config path is gone; `
     + `spell it resolved.config.${entry.key} (#607)`
   )).join('\n'));
+});
+
+test('#595: no shipped template reads the retired UJM `random_id` global', () => {
+  const offenders = [];
+  for (const surface of SURFACES) {
+    for (const file of walk(path.join(PKG, surface))) {
+      const source = fs.readFileSync(file, 'utf8');
+      if (assignsRandomId(source)) continue;
+      for (const read of randomIdReads(source)) offenders.push(`${path.relative(PKG, file)}:${read.line}`);
+    }
+  }
+
+  assert.deepEqual(offenders, [], offenders.map((where) => (
+    `${where} reads a bare \`random_id\` — UJM's per-render global is gone and the read renders EMPTY; `
+    + `assign it first (${RANDOM_ID_ASSIGN_IDIOM}) (#595)`
+  )).join('\n'));
+});
+
+test('#595: a CONSUMER page that reads `random_id` without assigning it is named at build, with the idiom', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-randomid-'));
+  const consumerDir = path.join(tmp, 'src');
+  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(consumerDir, 'pages', 'index.md'), [
+    '---', 'layout: blueprint/index', 'permalink: /', '---',
+    '<div class="accordion" id="faq-{{ random_id }}"></div>', '',
+  ].join('\n'));
+  fs.writeFileSync(path.join(consumerDir, 'pages', 'ok.md'), [
+    '---', 'layout: blueprint/index', 'permalink: /ok/', '---',
+    '{% assign random_id = 100 | omega_random %}',
+    '<div class="accordion" id="faq-{{ random_id }}"></div>', '',
+  ].join('\n'));
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...parts) => warnings.push(parts.join(' '));
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'random-id-census');
+    assert.ok(pages.get('/'), 'an empty id is not a build failure — a leftover is FLAGGED, never fatal (the assign may live in a layout)');
+
+    const warning = warnings.find((line) => line.includes('random_id'));
+    assert.ok(warning, `the leftover read is named: ${warnings.join(' | ')}`);
+    assert.match(warning, /index\.md/, 'the warning names the file');
+    assert.match(warning, /omega_random/, '…and the idiom that replaces the global');
+    assert.ok(!warnings.some((line) => line.includes('ok.md')), 'a page that assigns it first is not a leftover');
+  } finally {
+    console.warn = originalWarn;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('#611: a CONSUMER page reading a config section off `site` fails the build, naming the file and the expression', async () => {
@@ -125,6 +175,36 @@ test('#611: a CONSUMER page reading a config section off `site` fails the build,
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  }
+});
+
+test('#671: a CONFIG VALUE reading a config section off `site` fails the build, naming the config key', async () => {
+  // The per-template census never sees this one: `targets.web.meta.title:
+  // "Agency - {{ site.brand.name }}"` is a CONFIG value, and since #611 it
+  // renders the brand name empty in every page's <title> with no error.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-configvalue-'));
+  const consumerDir = path.join(tmp, 'src');
+  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(consumerDir, 'pages', 'index.md'), ['---', 'layout: blueprint/index', 'permalink: /', '---', 'Home', ''].join('\n'));
+
+  const dead = { ...bareData, meta: { ...(bareData.meta || {}), title: 'Creative agency - {{ site.brand.name }}' } };
+
+  try {
+    await assert.rejects(
+      () => buildSite(consumerDir, dead, { environment: 'development' }, 'config-value-guard'),
+      (error) => {
+        const parts = [];
+        for (let node = error; node; node = node.originalError || node.cause) parts.push(node.message);
+        const message = parts.join(' | ');
+        assert.match(message, /meta\.title/, 'the error names the config KEY, the only address a config value has');
+        assert.match(message, /site\.brand\.name/, '…and the expression it found');
+        assert.match(message, /resolved\.config\.brand\.name/, '…and the one that replaces it');
+        assert.match(message, /omega migrate/, '…and the verb that rewrites it');
+        return true;
+      },
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
@@ -211,10 +291,10 @@ test('#611: code DISPLAY and plain prose are not reads — a fence, a raw block,
   }
 });
 
-test('#607: `meta` keeps its flat spelling — it is the schema\'s one pageBare section', () => {
-  assert.deepEqual(PAGE_BARE_SECTIONS, ['meta'], 'the pageBare allow-list is meta alone');
+test('#607: `meta` keeps its flat spelling — it is PAGE machinery, never a config section', () => {
+  assert.ok(!CONFIG_SECTIONS.has('meta'), 'omega.json5 declares no meta section (Ian 2026-08-26)');
   assert.ok(
     reads('resolved').some((entry) => entry.key === 'meta'),
-    'the head include still reads resolved.meta — the merged page → layout → config walk',
+    'the head include still reads resolved.meta — the merged page → layout walk',
   );
 });

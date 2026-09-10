@@ -18,7 +18,8 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const Settings = require('../../src/manager/helpers/settings.js');
+const Settings = require('../../dist/manager/helpers/settings.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const Manager = { cwd: '/nonexistent-cwd' };
 
@@ -52,7 +53,7 @@ function schemaDir(files) {
 
 const NAME_SCHEMA = 'module.exports = () => ({ name: { types: [\'string\'], default: \'%LABEL%\' } });';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Settings schema file loading + constant()',
   type: 'group',
 
@@ -288,4 +289,4 @@ module.exports = {
       },
     },
   ],
-};
+});

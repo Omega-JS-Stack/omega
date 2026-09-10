@@ -1,6 +1,8 @@
 // Main-layer tests for lib/protocol.js — single-instance lock + custom URL scheme.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'protocol (main)',
@@ -72,4 +74,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -37,6 +37,27 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
     const reminderIndex = data.reminderIndex || 0;
 
     try {
+      // A cart with checkout activity inside its own reminder window is not
+      // abandoned — the shopper asked for a provider session and is working
+      // through the checkout right now. The sweep mailed one of them 2 minutes
+      // before the purchase went through: the clock was set ONCE, when the
+      // checkout page opened, and nothing ever moved it
+      // ([#655](https://github.com/Omega-JS-Stack/omega/issues/655)).
+      //
+      // The window is the CURRENT reminder's own delay, so activity restarts the
+      // same clock the reminder was already waiting on rather than adding a
+      // second rule beside it. A cart nobody ever took to a checkout carries no
+      // activity at all and reads exactly as it did.
+      const lastActivityAt = data.lastActivityAt || 0;
+      const dueAfterActivity = lastActivityAt + REMINDER_DELAYS[reminderIndex];
+
+      if (dueAfterActivity > nowUNIX) {
+        ctx.log(`Cart for uid=${uid} had checkout activity ${nowUNIX - lastActivityAt}s ago, deferring reminder #${reminderIndex + 1} to ${dueAfterActivity}`);
+        await deferTo(doc, dueAfterActivity, nowUNIX);
+        skipped++;
+        continue;
+      }
+
       // Fetch user doc for email sending
       const userSnap = await admin.firestore().doc(`users/${uid}`).get();
 
@@ -126,6 +147,30 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
 
   ctx.log(`Completed! (${sent} sent, ${completed} completed, ${skipped} skipped)`);
 };
+
+/**
+ * Push a cart's next reminder out, leaving everything else as it is
+ *
+ * The reminder is DEFERRED, never spent: the index does not advance, so the
+ * shopper still gets reminder #1 if this checkout goes nowhere.
+ *
+ * @param {object} doc - The cart's query snapshot
+ * @param {number} nextReminderAt - The second the reminder becomes due again
+ * @param {number} nowUNIX - The second this run took its snapshot
+ */
+async function deferTo(doc, nextReminderAt, nowUNIX) {
+  const now = powertools.timestamp(new Date(), { output: 'string' });
+
+  await doc.ref.set({
+    nextReminderAt: nextReminderAt,
+    metadata: {
+      updated: {
+        timestamp: now,
+        timestampUNIX: nowUNIX,
+      },
+    },
+  }, { merge: true });
+}
 
 /**
  * Mark a cart document as completed

@@ -20,6 +20,10 @@
  * output-only, and an API-made brand is born Internal). So an interactive
  * run STOPS on it — open the console page and poll until it flips — instead
  * of attempting a write that cannot exist.
+ *
+ * The screen's BRANDING page (logo, home/privacy/terms links, authorized
+ * domains) has no API either, and nothing here can reconcile it — so the run
+ * NAMES it as a manual step with the one line that matters (#696).
  */
 const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
@@ -40,6 +44,22 @@ const AUDIENCE_POLL_MS = 5000;
 /** The console page that owns the audience switch (the only path there is). */
 function audienceUrl(projectId) {
   return `https://console.cloud.google.com/auth/audience?project=${projectId}`;
+}
+
+/**
+ * Name the consent screen's BRANDING page as a manual step (#696).
+ *
+ * The logo, the home/privacy/terms links and the authorized domains have no
+ * API at all — so the walk cannot reconcile them, and by the automation ruling
+ * (#693) what cannot be automated gets NAMED instead of going unmentioned.
+ * The one-line checklist is the part that decides whether it is safe to touch
+ * the page mid-launch: a logo upload is the only entry that costs anything.
+ *
+ * @param {string} projectId - The GCP project the consent screen belongs to.
+ */
+function logBrandingManualStep(projectId) {
+  console.log(`      ${chalk.dim('→')} Branding is manual (no API): ${chalk.cyan(`https://console.cloud.google.com/auth/branding?project=${projectId}`)}`);
+  console.log(`      ${chalk.dim('→')} ${chalk.dim("Links + authorized domains are safe anytime; a LOGO upload starts Google's verification review for External apps")}`);
 }
 
 /**
@@ -129,6 +149,8 @@ async function ensureExternalAudience(context, brand) {
 async function reportExistingBrand(context, brand) {
   const audience = await ensureExternalAudience(context, brand);
 
+  logBrandingManualStep(context.projectId);
+
   return {
     ...(audience.status ? { status: audience.status, reason: audience.reason } : {}),
     state: {
@@ -181,6 +203,8 @@ module.exports = async function ensureOAuthConsent(context) {
     // audience is READ off the new brand and taken through the same stopper
     // as any other, never assumed
     const audience = await ensureExternalAudience(context, brand);
+
+    logBrandingManualStep(projectId);
 
     return {
       ...(audience.status ? { status: audience.status, reason: audience.reason } : {}),

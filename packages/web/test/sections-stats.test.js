@@ -49,7 +49,7 @@ test('#518: an item with icon and color renders the glyph and the token class', 
   );
 
   assert.ok(html.includes('<div class="omega-stat omega-tone-3" data-omega-reveal>'), 'the tone slot rides the stat, from the ONE palette');
-  assert.ok(/<span class="omega-icon-chip omega-stat__icon"><i class="fa fa-sm" data-icon="smile"/.test(html),
+  assert.ok(/<span class="omega-icon-chip omega-stat__icon"><i class="fa-solid fa-smile fa-sm"><\/i>/.test(html),
     'the glyph rides the one icon mechanism, in the shared chip idiom');
   assert.ok(html.includes('<div class="omega-stat__num" data-omega-countup>1M+</div>'), 'the number is untouched');
   assert.ok(html.includes('Happy customers'), 'and its label');
@@ -80,12 +80,12 @@ test('#518: a color that is not a palette name paints nothing — no hex ever re
 
   assert.ok(html.includes('<div class="omega-stat" data-omega-reveal>'), 'the stat falls back to the theme accent');
   assert.ok(!html.includes('#d6336c'), 'the raw hex never lands in a class, a style, or anywhere else');
-  assert.ok(html.includes('data-icon="bolt"'), 'while the icon still renders');
+  assert.ok(html.includes('fa-bolt'), 'while the icon still renders');
 });
 
 test('#518: the gallery variant shows the iconed, toned rail', async () => {
   const pages = await buildWith(miniData, {}, 'stats-args-test');
-  const frame = pages.get('/test/sections/section/marketing/stats/frames/icons-and-tones');
+  const frame = pages.get('/test/sections/marketing/stats/frames/icons-and-tones');
   assert.ok(frame, 'the icons-and-tones variant frame built');
 
   assert.equal((frame.match(/class="omega-icon-chip omega-stat__icon"/g) || []).length, 4, 'every demo stat carries its glyph');

@@ -5,6 +5,7 @@ const fs      = require('fs');
 const os      = require('os');
 const crypto  = require('crypto');
 const yaml    = require('js-yaml');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'update-info.js');
 
@@ -16,7 +17,7 @@ function writeBytes(filePath, bytes) {
   fs.writeFileSync(filePath, Buffer.from(bytes));
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'update-info — Windows auto-updater feed (latest.yml) generation',
@@ -220,4 +221,4 @@ module.exports = {
       },
     },
   ],
-};
+});

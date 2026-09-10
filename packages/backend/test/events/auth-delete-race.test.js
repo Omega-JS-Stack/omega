@@ -1,4 +1,5 @@
 const uuid = require('uuid');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /**
  * Test: auth:on-delete race condition
@@ -9,7 +10,7 @@ const uuid = require('uuid');
  * The production fix uses the emulator's bulk-clear REST API in deleteTestUsers()
  * to avoid triggering on-delete at all during test setup.
  */
-module.exports = {
+module.exports = defineCases({
   description: 'auth:on-delete race condition (create → delete → recreate)',
   type: 'group',
   timeout: 120000,
@@ -169,7 +170,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

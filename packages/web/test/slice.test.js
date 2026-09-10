@@ -36,8 +36,20 @@ async function buildMini(overrides = {}) {
         siteData,
         farmDir: path.join(PKG, '.omega', 'layout-farm'),
         assetManifest: {
-          js: { main: '/assets/js/main-TEST.js', pages: { 'signin/index': '/assets/js/pages/signin/index-TEST.js', 'blog/[slug]': '/assets/js/pages/blog/[slug]-TEST.js' } },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          js: {
+            main: '/assets/js/main-TEST.js',
+            // One key, every layer's bundle, in load order (#624)
+            pages: {
+              'signin/index': ['/assets/js/pages/signin/index-CORE.js', '/assets/js/pages/signin/index.classy-THEME.js', '/assets/js/pages/signin/index.site-TEST.js'],
+              'blog/[slug]': ['/assets/js/pages/blog/[slug]-TEST.js'],
+            },
+            layouts: {},
+          },
+          css: {
+            main: '/assets/css/main-TEST.css',
+            pages: { 'signin/index': [{ href: '/assets/css/pages/signin/index-CORE.css' }, { href: '/assets/css/pages/signin/index.classy-THEME.css' }] },
+            layouts: {},
+          },
           favicons: true,
         },
         ...overrides,
@@ -87,7 +99,7 @@ test('a bracket layout value no longer resolves — the build fails loudly (#148
           farmDir: path.join(PKG, '.omega', 'layout-farm'),
           assetManifest: {
             js: { main: '/assets/js/main-TEST.js', pages: {} },
-            css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+            css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
           },
         });
       },
@@ -99,16 +111,17 @@ test('a bracket layout value no longer resolves — the build fails loudly (#148
   }
 });
 
-test('meta-only page: layout voice renders, meta consumed, body appended (no content lane)', () => {
+test('meta-only page: layout voice renders, meta consumed (no content lane)', () => {
   const html = pages.get('/about');
   // The 2026-07-19 rule: page frontmatter carries NO content — the layout's
   // own composition voice renders (same hero as '/', which shares the
-  // blueprint), meta.title is the surviving frontmatter lane, and the body
-  // rides below via append: true (the guard test owns the rejection side).
+  // blueprint), and meta.title is the surviving frontmatter lane. The page
+  // writes no body, because a body REPLACES that composition and #607 deleted
+  // the `append:` flag that used to keep both (the guard test owns the
+  // rejection side; customize.test.js owns the replace lane).
   assert.ok(html.includes('The platform for'), 'section-default hero.headline renders — no consumer override lane');
   assert.ok(html.includes('Site-wide directory-data override'), 'directory data (the surviving site-wide lane) still feeds the band');
   assert.ok(html.includes('<title>About - MiniCo</title>'), 'frontmatter Liquid in meta.title (the sanctioned lane)');
-  assert.ok(html.includes('Consumer body content'), 'markdown body rendered below the composition');
 });
 
 test('site-wide defaults layer: root directory data beats layout frontmatter, loses to page frontmatter', () => {
@@ -136,9 +149,33 @@ test('consumer about.md SUPPRESSES the framework default about page', () => {
 test('default pages render when the consumer has no same-URL file', () => {
   const signin = pages.get('/signin');
   assert.ok(signin.includes('id="auth-form"'), 'real classy signin form present');
-  assert.ok(signin.includes('/assets/js/pages/signin/index-TEST.js'), 'pageAssets script from the manifest');
+  assert.ok(signin.includes('/assets/js/pages/signin/index.site-TEST.js'), 'pageAssets script from the manifest');
   assert.ok(pages.get('/signup').includes('id="auth-form"'), 'signup default');
   assert.ok(pages.get('/404').includes('id="page-url"'), '404 default (flat url, 404.html file)');
+});
+
+// #624 — the ONE rule reaches the markup: the page links every layer's asset
+// for its URL, in LOAD order, which for module scripts IS execution order and
+// for stylesheets IS the cascade.
+test('#624: every layer\'s page asset is emitted, in layer order', () => {
+  const signin = pages.get('/signin');
+
+  const at = (url) => {
+    const index = signin.indexOf(url);
+    assert.notStrictEqual(index, -1, `${url} is on the page`);
+    return index;
+  };
+
+  const main = at('/assets/js/main-TEST.js');
+  const core = at('/assets/js/pages/signin/index-CORE.js');
+  const theme = at('/assets/js/pages/signin/index.classy-THEME.js');
+  const consumer = at('/assets/js/pages/signin/index.site-TEST.js');
+  assert.ok(main < core && core < theme && theme < consumer, 'main, then core, then the theme, then the consumer');
+
+  const mainCss = at('/assets/css/main-TEST.css');
+  const coreCss = at('/assets/css/pages/signin/index-CORE.css');
+  const themeCss = at('/assets/css/pages/signin/index.classy-THEME.css');
+  assert.ok(mainCss < coreCss && coreCss < themeCss, 'the sheets follow the same order — the theme wins the cascade by loading last');
 });
 
 test('wildcard page modules emit for every URL in the family (spec §7, asset_path is dead)', () => {
@@ -173,7 +210,7 @@ test('zero-page consumer still gets a homepage at / (cp194 wizard-rehearsal catc
           farmDir: path.join(PKG, '.omega', 'layout-farm'),
           assetManifest: {
             js: { main: '/assets/js/main-TEST.js', pages: {} },
-            css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+            css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
           },
         });
       },
@@ -218,6 +255,23 @@ test('posts: Jekyll filename convention, readtime, taxonomy links', () => {
 test('blog index: paginator compat over Eleventy pagination', () => {
   const html = pages.get('/blog');
   assert.ok(html.includes('First post') && html.includes('Second post'), 'both posts listed via paginator.posts');
+});
+
+test('#598: the blog hub featured card reads the post\'s REAL read time', () => {
+  // The featured slot does not go through post-card.html, and the flattened
+  // Jekyll doc it renders from carried no `content` — so the hub printed
+  // "1 min read" for a long post while the post's own page printed the truth.
+  const hub = pages.get('/blog');
+  const start = hub.indexOf('<article class="omega-featured-post');
+  assert.ok(start > -1, 'page 1 leads with the featured card');
+  const card = hub.slice(start, hub.indexOf('</article>', start));
+
+  assert.ok(card.includes('Second post'), 'the newest post is the feature');
+  const onCard = (card.match(/(\d+) min read/) || [])[1];
+  const onPost = (pages.get('/blog/second-post').match(/(\d+) min read/) || [])[1];
+
+  assert.strictEqual(onPost, '4', 'the fixture post is a 1,012-word read');
+  assert.strictEqual(onCard, onPost, 'the hub card agrees with the post page');
 });
 
 test('taxonomy pages generated from post.categories / post.tags', () => {
@@ -315,8 +369,8 @@ test('admin verts card serves at /admin/verts (docs/web/ads-system.md phase 3)',
   assert.ok(/<input type="url"[^>]*name="vert\.image"/.test(verts), 'image is a URL field');
 });
 
-test('template-kit tags render inside Eleventy (omega_icon, urlmatches nav)', () => {
-  assert.ok(pages.get('/').includes('data-icon='), 'omega_icon SVGs render');
+test('icons inline and template-kit tags render inside Eleventy (urlmatches nav)', () => {
+  assert.ok(pages.get('/').includes('data-omega-fa='), 'native fa-* markup is inlined at build');
   assert.ok(pages.get('/').includes('navbar'), 'nav include renders from the packaged nav.json data');
 });
 

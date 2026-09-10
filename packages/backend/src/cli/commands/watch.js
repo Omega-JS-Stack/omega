@@ -2,7 +2,58 @@ const BaseCommand = require('./base-command');
 const path = require('path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { execSync, spawn } = require('child_process');
+const { commandOnPath } = require('@omega.js/devkit/command-path');
+const { spawnOnPath } = require('../utils/spawn-shell');
+
+/**
+ * A path as a JS string literal, safe inside the `node -e "…"` script below.
+ *
+ * `JSON.stringify` does the escaping — a Windows path is full of backslashes, and
+ * hand-written quotes turned `C:\\dist\\trigger.js` into `C:distrigger.js` the
+ * moment node parsed it. Its DOUBLE quotes then get swapped for single ones,
+ * because the literal lives inside the shell's own `"…"` wrapper and a double
+ * quote there would close the script early.
+ *
+ * @param {string} value - The path
+ * @returns {string} A single-quoted JS string literal
+ */
+function jsPath(value) {
+  return `'${JSON.stringify(value).slice(1, -1).replace(/'/g, "\\'")}'`;
+}
+
+/**
+ * The nodemon `--exec` line BOTH watch lanes run when a framework source file changes.
+ *
+ * Firebase only reloads on a CONTENT change — not a create, not a bare mtime bump —
+ * so the trigger file is REWRITTEN, never `touch`ed (which was the wrong semantics
+ * here as well as a Unix binary the host shell may not have). It is a `node -e`
+ * one-liner because nodemon hands the exec to whatever shell the host has, and node
+ * is the one interpreter every host running this is guaranteed to own.
+ *
+ * Three steps, in order: 1) ensure the file exists, 2) let the FS settle, 3) write new
+ * content. The settle wait is an in-process `Atomics.wait` — a `setTimeout` would not
+ * block the write that has to follow it, and `sleep` is a Unix binary.
+ *
+ * The <log>.reset sentinels ride along so a parent serve/emulator command rolls its log
+ * file cleanly on every hot reload (mirrors the emulator log-roll pattern the test
+ * runner uses). Best-effort: with no parent watching, the file is harmless and the next
+ * boot's stale-sentinel sweep clears it.
+ *
+ * @param {object} options
+ * @param {string} options.triggerFile - The file Firebase watches for content changes
+ * @param {string[]} options.resetPaths - <log>.reset sentinels to drop alongside it
+ * @param {string} options.message - What this lane prints once the trigger is written
+ * @returns {string} The shell line for nodemon's --exec
+ */
+function reloadTriggerExec({ triggerFile, resetPaths, message }) {
+  const sentinels = resetPaths.map((resetPath) => `try{fs.writeFileSync(${jsPath(resetPath)},'');}catch(e){}`).join('');
+  const script = `var f=${jsPath(triggerFile)},fs=require('fs');`
+    + `if(!fs.existsSync(f)){fs.writeFileSync(f,'// init');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);}`
+    + `fs.writeFileSync(f,'// '+Date.now());`
+    + sentinels;
+
+  return `node -e "${script}" && echo "${message}"`;
+}
 
 class WatchCommand extends BaseCommand {
   /**
@@ -19,14 +70,13 @@ class WatchCommand extends BaseCommand {
   }
 
   /**
-   * Check if nodemon is available
+   * Is nodemon installed? An EXISTENCE check only — what the probe resolved is
+   * never what gets spawned (see spawnOnPath).
+   *
+   * @returns {boolean}
    */
-  getNodemonPath() {
-    try {
-      return execSync('which nodemon', { encoding: 'utf8' }).trim();
-    } catch (error) {
-      return null;
-    }
+  hasNodemon() {
+    return !!commandOnPath('nodemon');
   }
 
   /**
@@ -34,9 +84,8 @@ class WatchCommand extends BaseCommand {
    */
   startBackground() {
     const config = this.getConfig();
-    const nodemonPath = this.getNodemonPath();
 
-    if (!nodemonPath) {
+    if (!this.hasNodemon()) {
       this.log(chalk.gray('  (@omega.js/backend watch disabled - install nodemon globally to enable)\n'));
       return null;
     }
@@ -55,26 +104,22 @@ class WatchCommand extends BaseCommand {
       jetpack.write(config.triggerFile, `// @omega.js/backend reload trigger\n`);
     }
 
-    // Use nodemon to watch the @omega.js/backend src directory and update trigger file on changes
-    // Note: Firebase only triggers on file content changes (not create/delete)
-    // So we must: 1) ensure file exists, 2) wait for FS to settle, 3) write new content
+    // Use nodemon to watch the @omega.js/backend src directory and rewrite the trigger
+    // file on changes (reloadTriggerExec owns what that line does and why).
     // --on-change-only: only run exec when files change, not on initial startup
     // --delay 1: debounce multiple rapid changes into one trigger
-    //
-    // The exec also drops <log>.reset sentinels so the parent serve/emulator command
-    // rolls its log file cleanly on every hot reload (mirrors the emulator log-roll
-    // pattern used by the test runner). Sentinels are best-effort — if a parent
-    // command isn't watching, the file is harmless and gets cleaned up by the next
-    // boot's stale-sentinel sweep.
-    const triggerFile = config.triggerFile;
     const devLogResetPath = this.getTempPath('dev.log.reset');
     const emulatorLogResetPath = this.getTempPath('emulator.log.reset');
-    const nodemon = spawn(nodemonPath, [
+    const nodemon = spawnOnPath('nodemon', [
       '--on-change-only',
       '--delay', '1',
       '--watch', config.bemSrcDir,
       '--ext', 'js,json',
-      '--exec', `node -e "var f='${triggerFile}',fs=require('fs');if(!fs.existsSync(f)){fs.writeFileSync(f,'// init');require('child_process').execSync('sleep 0.1');}fs.writeFileSync(f,'// '+Date.now());try{fs.writeFileSync('${devLogResetPath}','');}catch(e){}try{fs.writeFileSync('${emulatorLogResetPath}','');}catch(e){}" && echo "  [@omega.js/backend] Triggered hot reload"`,
+      '--exec', reloadTriggerExec({
+        triggerFile: config.triggerFile,
+        resetPaths: [devLogResetPath, emulatorLogResetPath],
+        message: '  [@omega.js/backend] Triggered hot reload',
+      }),
     ], {
       stdio: 'inherit',
       detached: false,
@@ -89,9 +134,8 @@ class WatchCommand extends BaseCommand {
    */
   async execute() {
     const config = this.getConfig();
-    const nodemonPath = this.getNodemonPath();
 
-    if (!nodemonPath) {
+    if (!this.hasNodemon()) {
       this.logWarning('\n  Warning: nodemon is not installed globally.');
       this.log(chalk.gray('  Install it with: npm install -g nodemon\n'));
       return;
@@ -114,15 +158,17 @@ class WatchCommand extends BaseCommand {
       jetpack.write(config.triggerFile, `// @omega.js/backend reload trigger\n`);
     }
 
-    // Use nodemon to watch the @omega.js/backend src directory and touch the trigger file on changes.
-    // Also drop <log>.reset sentinels so any sibling serve/emulator command rolls its
-    // log file on each reload (mirrors the test runner's log-roll pattern).
+    // The same trigger rewrite the background lane runs, with this lane's own line.
     const devLogResetPath = this.getTempPath('dev.log.reset');
     const emulatorLogResetPath = this.getTempPath('emulator.log.reset');
-    const nodemon = spawn(nodemonPath, [
+    const nodemon = spawnOnPath('nodemon', [
       '--watch', config.bemSrcDir,
       '--ext', 'js,json',
-      '--exec', `touch "${config.triggerFile}" "${devLogResetPath}" "${emulatorLogResetPath}" && echo "  → Triggered hot reload"`,
+      '--exec', reloadTriggerExec({
+        triggerFile: config.triggerFile,
+        resetPaths: [devLogResetPath, emulatorLogResetPath],
+        message: '  → Triggered hot reload',
+      }),
     ], {
       stdio: 'inherit',
       cwd: config.bemDir,
@@ -142,5 +188,9 @@ class WatchCommand extends BaseCommand {
     await new Promise(() => {});
   }
 }
+
+// Static, alongside EmulatorCommand's precedent — the exec line is pure, so a
+// test builds it for a Windows path without a watcher or a nodemon.
+WatchCommand.reloadTriggerExec = reloadTriggerExec;
 
 module.exports = WatchCommand;

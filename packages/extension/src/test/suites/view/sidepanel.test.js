@@ -2,7 +2,9 @@
 // chrome.sidePanel for the Chrome 114+ UI panel surface — verify that
 // the test harness can target it just like popup/options.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   layer: 'view',
   context: 'sidepanel',
   description: 'view/sidepanel — DOM + context attribute',
@@ -11,4 +13,4 @@ module.exports = {
     ctx.expect(document.title).toContain('Side Panel');
     ctx.expect(typeof chrome.runtime.id).toBe('string');
   },
-};
+});

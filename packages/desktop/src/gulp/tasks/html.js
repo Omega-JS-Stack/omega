@@ -12,7 +12,7 @@
 // The page name (passed to templating as page.name) is derived from the view's directory:
 //   src/views/main/index.html       -> page.name = 'main'
 //   src/views/settings/index.html   -> page.name = 'settings'
-// This lines up with the webpack entry naming so /assets/js/components/<page.name>.bundle.js
+// This lines up with the `bundle` task's entry naming so /assets/js/components/<page.name>.bundle.js
 // and /assets/css/components/<page.name>.bundle.css resolve correctly.
 
 const Manager = new (require('../../build.js'));

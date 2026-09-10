@@ -1,4 +1,4 @@
-// Boot-layer proof that electron-store ships INSIDE the webpack bundle.
+// Boot-layer proof that electron-store ships INSIDE the esbuild bundle.
 //
 // Why this suite exists: electron-store is ESM-only and used to be loaded via a
 // `webpackIgnore`'d dynamic import — a runtime resolution that accidentally worked
@@ -7,11 +7,13 @@
 // @omega.js/desktop is a devDependency that never ships in the asar. Storage silently became a
 // no-op. The functional round-trip below would therefore pass either way — the
 // regression assertion is the BUNDLE TEXT one: no live `import('electron-store')`
-// call may survive webpack (eager bundling compiles it to __webpack_require__).
+// call may survive the bundle (esbuild's eager bundling inlines the module).
 //
 // NOTE: inspect bodies are serialized to the spawned Electron process — no closures.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'storage — electron-store bundled into main.bundle.js (no runtime resolution)',
@@ -24,7 +26,7 @@ module.exports = {
         const path = require('path');
         const bundle = fs.readFileSync(path.join(appRoot, 'dist', 'main.bundle.js'), 'utf8');
 
-        // A surviving dynamic import (with or without magic comments) means webpack
+        // A surviving dynamic import (with or without magic comments) means the bundler
         // was told to ignore it → packaged consumers would hit the no-op fallback.
         const liveImport = /import\s*\(\s*(\/\*[\s\S]*?\*\/\s*)?['"]electron-store['"]/.test(bundle);
         expect(liveImport).toBe(false);
@@ -54,4 +56,4 @@ module.exports = {
       },
     },
   ],
-};
+});

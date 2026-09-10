@@ -4,10 +4,22 @@
 // $uuid/$randomId/$apiKey fields resolve to null (real values always come from
 // the backend-written doc).
 import { resolveAccount, resolveSubscription } from '@omega.js/account';
+import { resolveFeatures } from '@omega.js/account/features';
 import { registerTrigger } from './triggers.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('auth');
+
+// The auth codes the session probe refuses to read as a verdict on the session
+// ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): the connection,
+// a throttle, and the Auth server failing to answer at all. They all clear on
+// their own, and signing a user out over one loses a session that never died.
+// Every OTHER `auth/*` code is a definite verdict, so it signs out.
+const TRANSIENT_PROBE_CODES = new Set([
+  'auth/network-request-failed',
+  'auth/too-many-requests',
+  'auth/internal-error',
+]);
 
 class Auth {
   constructor(manager) {
@@ -20,6 +32,9 @@ class Auth {
     // instantly, so a slow fetch would otherwise deliver a STALE signed-in
     // state after a newer signed-out one (#196).
     this._stateGeneration = 0;
+
+    // The one probe in flight, or null (#798; see probeSession)
+    this._sessionProbe = null;
   }
 
   // Check if user is authenticated
@@ -223,27 +238,47 @@ class Auth {
     return resolveSubscription(account || this.manager.storage().get('auth', {})?.account);
   }
 
-  // Resolve usage bindings from account data + product limits from config.
-  // Returns: { credits: { monthly: 5, limit: 100 }, ... }
+  // Resolve usage bindings from account data + the EFFECTIVE limits of the
+  // resolved plan ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+  // Returns, per counted feature:
+  //   { monthly, daily, total, limit, left, day: { limit, used, left }, override }
   //
-  // The product catalog lives at `config.payment.products` (OMEGA canonical
-  // shape — matches @omega.js/backend, UJM, and @omega.js/desktop). Each product entry has `{ id, limits: {...} }`.
+  // Both halves are config: the FEATURES CATALOG (`config.features`) says what
+  // a feature is and whether it is counted, and the product's `features` map
+  // (`config.payment.products[].features`) says what this tier promises. The
+  // arithmetic — the per-user override winning over the plan's number, the day
+  // share of a month limit — is @omega.js/account's, the same module the
+  // backend's `consume` gate reads, so a bar can never draw a limit the gate
+  // would not enforce.
   _resolveUsage(state) {
     const accountUsage = state.account?.usage || {};
     const productId    = state.resolved?.plan || 'basic';
     const products     = this.manager.config.payment?.products || [];
     const product      = products.find(p => p.id === productId) || {};
-    const limits       = product.limits || {};
+    const catalog      = this.manager.config.features || {};
 
-    // Merge current usage with limits for each feature
     const usage = {};
-    const keys = new Set([...Object.keys(accountUsage), ...Object.keys(limits)]);
 
-    for (const key of keys) {
-      usage[key] = {
-        ...(accountUsage[key] || {}),
-        limit: limits[key] || 0,
+    for (const resolved of resolveFeatures({ catalog, product, account: state.account })) {
+      if (!resolved.counted) {
+        continue;
+      }
+
+      usage[resolved.id] = {
+        ...(accountUsage[resolved.id] || {}),
+        limit: resolved.limit,
+        left: resolved.left,
+        override: resolved.override,
+        day: resolved.day,
       };
+    }
+
+    // A counter the account carries that the catalog no longer defines still
+    // rides the bindings — a page that reads it must not blank out mid-release
+    for (const key of Object.keys(accountUsage)) {
+      if (key !== 'overrides' && !usage[key]) {
+        usage[key] = { ...accountUsage[key], limit: 0 };
+      }
     }
 
     return usage;
@@ -259,6 +294,59 @@ class Auth {
     } catch (error) {
       console.error('Get ID token error:', error);
       throw error;
+    }
+  }
+
+  // Ask the Auth SERVER whether this session is still good, at a moment of
+  // doubt ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)). Firebase
+  // itself only asks at page load and at the hourly refresh, so a revoked,
+  // disabled or deleted account keeps an open tab signed in until a reload,
+  // and a dev backend restart leaves the tab on a session the emulator no
+  // longer has. The probe is a FORCED token refresh, which exchanges the
+  // refresh token with the Auth server; it never asks our backend, so dev and
+  // production run the same code.
+  //
+  // Resolves 'signed-out' | 'alive' | 'gone' | 'unknown', and never rejects on
+  // the classification itself: callers fire it and move on.
+  probeSession() {
+    if (!this.isAuthenticated()) {
+      return Promise.resolve('signed-out');
+    }
+
+    // One probe in flight per instance: focus, online and a 401 arrive
+    // together all the time, and they are all asking the same question.
+    if (this._sessionProbe) {
+      return this._sessionProbe;
+    }
+
+    this._sessionProbe = this._runSessionProbe().finally(() => {
+      this._sessionProbe = null;
+    });
+
+    return this._sessionProbe;
+  }
+
+  async _runSessionProbe() {
+    try {
+      await this.getIdToken(true);
+      return 'alive';
+    } catch (error) {
+      const code = error.code || '';
+
+      // An auth error carrying a verdict means the session is gone: expired,
+      // revoked, disabled, deleted. Sign out: the onAuthStateChanged emission
+      // is what drives every surface's policy listener.
+      if (code.startsWith('auth/') && !TRANSIENT_PROBE_CODES.has(code)) {
+        logger.warn(`Session is gone (${code}); signing out`);
+        await this.signOut();
+        return 'gone';
+      }
+
+      // A bad connection, a throttle and a failing Auth server never sign
+      // anyone out, and neither does the "Backend starting" window: keep the
+      // user and say nothing louder.
+      logger.log(`Session probe inconclusive (${code || error.message}); keeping the user signed in`);
+      return 'unknown';
     }
   }
 

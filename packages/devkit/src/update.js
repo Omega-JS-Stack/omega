@@ -263,9 +263,15 @@ async function buildUpdateReport(options) {
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
+  // `only` narrows the manifest to a named set — the brand-root shell rides
+  // the fan-out for its @omega.js/manager pin alone (#794), and a brand's own
+  // root tooling is none of that leg's business.
+  const only = Array.isArray(options.only) ? new Set(options.only) : null;
+  const pick = (deps) => (only ? Object.fromEntries(Object.entries(deps).filter(([name]) => only.has(name))) : deps);
+
   const groups = [
-    ['prod', manifest.dependencies || {}],
-    ['dev', manifest.devDependencies || {}],
+    ['prod', pick(manifest.dependencies || {})],
+    ['dev', pick(manifest.devDependencies || {})],
   ];
 
   const locals = [];
@@ -396,6 +402,12 @@ function detectNpu(options = {}) {
  * (npm relocates a dev dep to dependencies without --save-dev). Installs run
  * through `npu install` when npu exists (Socket supply-chain firewall);
  * otherwise plain `npm install` (the caller warns loudly).
+ *
+ * The @omega.js family rides its own command per group, with `--save-exact`
+ * (#794): npm's default save-prefix writes `^<version>`, so the one verb that
+ * is ALLOWED to move a brand would have un-pinned the family it just moved.
+ * Everything else keeps npm's default prefix — the pin is the family's rule,
+ * not a rule for the whole dependency tree.
  * @param {object[]} updates - selectUpdates().updates
  * @param {object} options
  * @param {boolean} options.hasNpu
@@ -406,10 +418,15 @@ function buildInstallCommands(updates, options) {
   const commands = [];
 
   for (const [group, flag] of [['prod', ''], ['dev', ' --save-dev']]) {
-    const specs = updates.filter((update) => update.group === group)
-      .map((update) => `${update.name}@${update.to}`);
-    if (specs.length > 0) {
-      commands.push({ command: `${bin} ${specs.join(' ')}${flag}`, group });
+    const inGroup = updates.filter((update) => update.group === group);
+
+    for (const [family, extra] of [[false, ''], [true, ' --save-exact']]) {
+      const specs = inGroup
+        .filter((update) => update.name.startsWith('@omega.js/') === family)
+        .map((update) => `${update.name}@${update.to}`);
+      if (specs.length > 0) {
+        commands.push({ command: `${bin} ${specs.join(' ')}${flag}${extra}`, group });
+      }
     }
   }
 
@@ -472,6 +489,7 @@ function formatReport(report, options = {}) {
  * disables), --force-fresh (alias for --min-age 0).
  * @param {object} [options]
  * @param {string} [options.dir] - target directory (default cwd)
+ * @param {string[]} [options.only] - check just these package names (#794)
  * @param {boolean} [options.apply] - install the selected set
  * @param {boolean} [options.major] - allow breaking jumps (with --apply)
  * @param {number} [options.minAge] - quarantine threshold in days
@@ -490,7 +508,7 @@ async function runUpdate(options = {}) {
   const minAge = options.forceFresh ? 0 : Number(options.minAge ?? DEFAULT_MIN_AGE_DAYS);
   const lookup = options.lookup || ((name) => fetchPackument(name));
 
-  const report = await buildUpdateReport({ dir, lookup, now, minAge });
+  const report = await buildUpdateReport({ dir, lookup, now, minAge, only: options.only });
   logger.log(`Dependency report for ${report.project}:`);
   for (const line of formatReport(report, { minAge })) logger.log(line);
 

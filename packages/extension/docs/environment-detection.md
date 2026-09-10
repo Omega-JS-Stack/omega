@@ -47,7 +47,7 @@ if (isDevelopment() || isTesting()) { /* DevTools menu items, verbose logging */
 
 ## URL helpers
 
-@omega.js/extension does **not** own backend URL helpers (`getApiUrl` / `getFunctionsUrl` / `getWebsiteUrl`). Extension code that needs a backend URL reads it from the `@omega.js/client` runtime singleton in the runtime contexts (popup / options / sidepanel / background), which follows the same local-in-dev/testing, production-otherwise convention. The rule "call the getter, never hardcode" still applies; the implementation lives in `@omega.js/client`.
+@omega.js/extension owns ONE backend URL helper, `getApiUrl()` in [src/utils/url-helpers.js](../src/utils/url-helpers.js), mixed into every context Manager beside the mode helpers. It follows the same local-in-dev/testing, production-otherwise convention as @omega.js/client's `getApiUrl`. The local port comes from whichever channel the context has: the `OMEGA_HTTPS_PORT` / `OMEGA_HOSTING_PORT` env vars (build-time Node and the test harness), then the `dev.ports` map the build baked into `OMEGA_BUILD_JSON` (a browser context has no `process.env`, so a bumped emulator port reaches it this way, [#744](https://github.com/Omega-JS-Stack/omega/issues/744)), then the classic 5002. The rule "call the getter, never hardcode" applies everywhere; the runtime contexts' other backend URLs come from the `@omega.js/client` singleton.
 
 ## Where they live
 

@@ -11,9 +11,13 @@ hero:
    spelling ("Growth Hacks", #457); the tag cloud on /blog/tags title-cases the
    RAW spelling ("Growth-hacks") — a split legacy UJM shipped too (#294). {% endcomment %}
 {% assign tag_name = resolved.tag.name | omega_title_case %}
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    <div class="omega-post-card__eyebrow mb-4">
       <a href="/blog">Blog</a>
       <span>/</span>
       <a href="/blog/tags">Tags</a>
@@ -21,7 +25,7 @@ hero:
       <span>{{ tag_name }}</span>
     </div>
 
-    {% component "heading/masthead", headline: tag_name, sub: resolved.hero.subheadline %}
+    {% component "heading/masthead", headline: tag_name, sub: resolved.hero.subheadline, first_paint: true %}
   </div>
 </section>
 
@@ -73,7 +77,7 @@ hero:
     <div class="row justify-content-center">
       <div class="col-12 text-center">
         <a href="/blog/tags" class="btn btn-outline-adaptive">
-          {% omega_icon "arrow-left", "fa-sm me-2" %}
+          <i class="fa-solid fa-arrow-left fa-sm me-2"></i>
           All tags
         </a>
       </div>

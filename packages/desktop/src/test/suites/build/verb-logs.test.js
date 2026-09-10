@@ -9,8 +9,9 @@
 
 const path = require('path');
 const fs   = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'verb logs — the live run is teed to logs/test.log',
@@ -39,4 +40,4 @@ module.exports = {
       },
     },
   ],
-};
+});

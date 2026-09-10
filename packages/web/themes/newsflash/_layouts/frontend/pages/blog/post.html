@@ -150,7 +150,7 @@ config:
               {% endunless %}
             {% endfor %}
           {% for tag in tags %}
-            <a href="{{ resolved.config.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm">{% omega_icon "tag", "me-1" %}{{ tag }}</a>
+            <a href="{{ resolved.config.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark btn-sm"><i class="fa-solid fa-tag me-1"></i>{{ tag }}</a>
           {% endfor %}
         </div>
       </div>
@@ -181,7 +181,7 @@ config:
                   </div>
                 {% endiftruthy %}
                 <a href="{% omega_member resolved.post.author, "url" %}" class="small fw-bold text-decoration-none">
-                  More from this author {% omega_icon "arrow-right", "ms-1" %}
+                  More from this author <i class="fa-solid fa-arrow-right ms-1"></i>
                 </a>
               </div>
             </div>

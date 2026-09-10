@@ -26,8 +26,9 @@
  * Run: npx omega test backend:events/payments/trial-lapse-sweep-staleness
  */
 const assert = require('node:assert');
-const sweep = require('../../../src/manager/events/cron/daily/trial-lapse-sweep.js');
+const sweep = require('../../../dist/manager/events/cron/daily/trial-lapse-sweep.js');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const DAY = 24 * 60 * 60;
 
@@ -90,7 +91,7 @@ async function runSweep({ user, onRead = null } = {}) {
   return { store, logs };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Trial-lapse sweep: the staleness guard and its write are one transaction',
   type: 'group',
   timeout: 30000,
@@ -169,4 +170,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -8,6 +8,7 @@ const assert = require('node:assert');
 const { test } = require('node:test');
 const {
   parseRemoteUrl,
+  dispatchRepo,
   resolveRepo,
   resolveToken,
   buildDispatch,
@@ -40,6 +41,24 @@ test('resolveRepo: reads the origin remote via the injected exec', () => {
     () => resolveRepo({ execFn: () => 'https://example.com/not-github.git' }),
     /Cannot parse a GitHub repo/,
   );
+});
+
+test('dispatchRepo: the CONFIG names the repo a dispatch addresses, never a remote (#799)', () => {
+  assert.deepStrictEqual(
+    dispatchRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } }),
+    { owner: 'Acme-Org', repo: 'acme-omega' },
+  );
+
+  // The slug wins, exactly as brandRepo resolves it (the app repo may sit under
+  // the paid company org).
+  assert.deepStrictEqual(
+    dispatchRepo({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' } } } }),
+    { owner: 'itw-creative-works', repo: 'acme-app' },
+  );
+
+  // Half an address addresses nothing: throw instead of POSTing to `undefined/acme`.
+  assert.throws(() => dispatchRepo({ brand: { id: 'acme' } }), /brand repo to dispatch on/);
+  assert.throws(() => dispatchRepo({}), /brand repo to dispatch on/);
 });
 
 test('resolveToken: GH_TOKEN → GITHUB_TOKEN → gh auth token → null', () => {

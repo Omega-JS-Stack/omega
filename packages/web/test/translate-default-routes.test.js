@@ -12,7 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { defaultExcludedRoutes } = require('../src/translate/default-routes.js');
+const { defaultExcludedRoutes, legalRoutes } = require('../src/translate/default-routes.js');
 
 // The list every brand had to hand-write before the framework owned it — the
 // playground's `translation.exclude`, verbatim (#605 deletes it there).
@@ -36,7 +36,7 @@ test('#605: the derived list reaches the flows no hand-written list covered', ()
   // The payment + portal pages moved under folders after the legacy list was
   // written (/checkout became /payment/checkout), so every brand kept paying
   // to translate a card form. Derivation cannot miss them.
-  for (const route of ['payment/checkout', 'payment/confirmation', 'portal/email-preferences', 'dashboard/account', 'oauth2', '404']) {
+  for (const route of ['payment/checkout', 'payment/confirmation', 'portal/email-preferences', 'dashboard/account', 'connections/callback', '404']) {
     assert.ok(routes.has(route), `/${route} is framework plumbing`);
   }
 });
@@ -47,6 +47,26 @@ test('#605: the brand-facing default pages are still translated', () => {
   // Marketing surface — the whole point of translating a site.
   for (const route of ['', 'about', 'pricing', 'blog', 'contact', 'careers', 'download', 'alternatives', 'feedback', 'status', 'extension']) {
     assert.ok(!routes.has(route), `/${route} is marketing copy and must keep translating`);
+  }
+});
+
+test('#621: the legal routes are derived from the same scan, not typed out twice', () => {
+  // The generator harvests nothing for them — legally binding copy ships in ONE
+  // language (docs/shared/translation.md) — and it reads them from HERE.
+  assert.deepStrictEqual([...legalRoutes()].sort(), ['cookies', 'privacy', 'terms']);
+
+  // Derived, so a legal page that arrives is covered with no edit anywhere else
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-defaults-'));
+  const pages = path.join(tmp, 'pages', 'legal');
+  fs.mkdirSync(pages, { recursive: true });
+  fs.writeFileSync(path.join(pages, 'dpa.md'), '---\nlayout: blueprint/legal/dpa\npermalink: /dpa\n---\n');
+  fs.writeFileSync(path.join(pages, 'signin.md'), '---\nlayout: blueprint/auth/signin\npermalink: /signin\n---\n');
+
+  try {
+    assert.deepStrictEqual([...legalRoutes(tmp)], ['dpa'], 'the legal page only — an auth page is excluded, not legal');
+    assert.deepStrictEqual([...defaultExcludedRoutes(tmp)].sort(), ['dpa', 'signin'], 'both are still never translated');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 

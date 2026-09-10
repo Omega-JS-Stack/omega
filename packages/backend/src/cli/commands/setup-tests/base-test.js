@@ -18,6 +18,26 @@ class BaseTest {
   }
 
   /**
+   * `cloud.shared: true` — one Firebase project carrying every tenant brand's
+   * state. Checks that PULL live state down into this brand's repo gate on this
+   * for the same reason the demo one above exists: what is up there is not one
+   * brand's to track, and merging it in ships another tenant's definitions
+   * ([#716](https://github.com/Omega-JS-Stack/omega/issues/716)).
+   * @returns {boolean}
+   */
+  get isSharedProject() {
+    const { loadConfig } = require('@omega.js/config');
+
+    try {
+      return loadConfig(this.self.firebaseProjectPath, 'backend').config.cloud?.shared === true;
+    } catch (e) {
+      // No config, or an unloadable one — the omega-config check reports that.
+      // An unreadable config is not a shared project.
+      return false;
+    }
+  }
+
+  /**
    * `--offline` mode: the run may still READ live cloud state, but nothing may
    * MUTATE it. A check whose fix (or whose check itself) deploys/writes to the
    * brand's live project downgrades to a reported 'warn' instead of spawning
@@ -62,10 +82,17 @@ class BaseTest {
     return target;
   }
 
-  /** Persist the target manifest (call after readTargetManifest() + mutation). */
+  /**
+   * Persist the target manifest (call after readTargetManifest() + mutation).
+   * npm's own shape, trailing newline included — the SAME byte contract
+   * ensure-target's scaffoldPackageJson and the sibling writers keep
+   * ([#590](https://github.com/Omega-JS-Stack/omega/issues/590)). A fix that
+   * dropped it flipped the consumer's manifest between two byte shapes
+   * depending on which writer ran last (jetpack.write emits none).
+   */
   writeTargetManifest() {
     const jetpack = require('fs-jetpack');
-    jetpack.write(`${this.self.firebaseProjectPath}/package.json`, JSON.stringify(this.self.package, null, 2));
+    jetpack.write(`${this.self.firebaseProjectPath}/package.json`, `${JSON.stringify(this.self.package, null, 2)}\n`);
   }
 
   /**

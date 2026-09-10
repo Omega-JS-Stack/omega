@@ -67,7 +67,20 @@ test('the base row carries the framework powered-by line', async () => {
     line.includes('<a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a>'),
     `linked framework site: ${line}`,
   );
-  assert.ok(/data-icon="bolt"[^>]*><svg/.test(line), `bolt icon inlined: ${line}`);
+  assert.ok(/data-omega-fa="solid\/bolt"><svg/.test(line), `bolt icon inlined: ${line}`);
+});
+
+test('#320: a LICENSED build drops the attribution, and nothing else moves', async () => {
+  const pages = await buildWith(
+    miniData,
+    { license: { status: 'licensed', payments: 'live', attribution: 'removed' } },
+    'footer-powered-licensed',
+  );
+  const html = pages.get('/');
+
+  assert.ok(!/omega-footer__powered/.test(html), 'a licensed deploy ships no framework attribution');
+  assert.ok(!/omegajs\.dev/.test(html), 'no stray link either');
+  assert.ok(copyrightLine(html).includes('MiniCo. All rights reserved.'), "the brand's own copyright is untouched");
 });
 
 test('#379: the bolt and attribution links take the brand primary in both themes', () => {

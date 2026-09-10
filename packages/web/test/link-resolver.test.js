@@ -156,6 +156,44 @@ test('#521: an href DISPLAYED as escaped code is not a link the page emits', () 
   ]);
 });
 
+test('#601: an href inside a SINGLE-quoted attribute value is not a link the page emits', () => {
+  // studymonkey's shape: a brand hands structured content to client JS in a
+  // data attribute, `escape` writes the inner quotes as &quot;, and the
+  // minifier emits the attribute single-quoted with those quotes decoded back.
+  // The raw text then holds ` href=\"`, which a quote-blind scan read as a
+  // bare value of `\` — three dead links on 130+ pages that no page emits.
+  const { out } = tmpTarget({
+    ...CLEAN,
+    'facts.html': '<html><body>'
+      + '<form data-fun-facts=\'[\n  "Did you know we have a <a href=\\"/discord\\" target=\\"_blank\\">Discord</a>?"\n]\'></form>'
+      + '</body></html>',
+    // The same page's REAL links still resolve on their own merits.
+    'linked.html': page('/about', '/nowhere'),
+  });
+
+  assert.deepStrictEqual(checkDistLinks({ distDir: out }).offenders, [
+    '/nowhere (linked from linked.html)',
+  ]);
+});
+
+test('#601: a single-quoted attribute never hides the links around it', () => {
+  // The quote-aware parse skips the whole value, so an anchor AFTER a
+  // single-quoted attribute is read exactly as before.
+  const { out } = tmpTarget({
+    ...CLEAN,
+    'mixed.html': '<html><body>'
+      + '<form data-facts=\'["see <a href=\\"/discord\\">discord</a>"]\'></form>'
+      + '<a href=\'/single-quoted-gone\'>x</a>'
+      + '<a href="/double-quoted-gone">y</a>'
+      + '</body></html>',
+  });
+
+  assert.deepStrictEqual(checkDistLinks({ distDir: out }).offenders, [
+    '/double-quoted-gone (linked from mixed.html)',
+    '/single-quoted-gone (linked from mixed.html)',
+  ]);
+});
+
 test('#490: the exception list is json5 — the WHY lives beside the entry', () => {
   const { root } = tmpTarget(CLEAN);
 
@@ -205,4 +243,26 @@ test('#430: the check is unaffected by where the OS puts a temp dir', () => {
     ['/spotify (linked from deep/nested/page.html)'],
   );
   assert.ok(!out.startsWith(path.join(os.tmpdir(), 'dist')), 'the fixture really is a temp target root');
+});
+
+test('#755: a MOUNTED build resolves its own base path, not a site of dead links', () => {
+  // A project site (brand.url carrying a path) ships every root-relative URL
+  // under the mount point, while dist paths stay site-relative. Read raw, every
+  // internal link on every page resolves against the wrong file and reads dead.
+  const mount = (html) => html.replace('<html>', '<html data-omega-path-prefix="/repo">');
+  const { out } = tmpTarget({
+    'index.html': mount(page('/repo/', '/repo/about', '/repo/blog', 'https://example.com')),
+    'about.html': mount(`<html><head><link href="/repo/assets/css/site.css"></head><body>${page('/repo/')}</body></html>`),
+    'blog/index.html': mount(page('/repo/about/', './index')),
+    'assets/css/site.css': 'body{}',
+    // The mount changes nothing about a link that really is dead — and it is
+    // named by the SITE url, the one a brand's exception list is written in.
+    'gaps.html': mount(page('/repo/spotify')),
+  });
+
+  const result = checkDistLinks({ distDir: out });
+
+  assert.deepStrictEqual(result.offenders, ['/spotify (linked from gaps.html)']);
+  assert.deepStrictEqual(result.stale, []);
+  assert.strictEqual(result.pageCount, 4, 'every html page was read — an empty walk would pass vacuously');
 });

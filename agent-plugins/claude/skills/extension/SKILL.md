@@ -6,7 +6,7 @@ user-invocable: true
 
 # OMEGA Extension (@omega.js/extension)
 
-`@omega.js/extension` builds cross-browser MV3 extensions (Chrome, Firefox, Edge, Opera, Brave): a one-line-import bootstrap per extension context, a component-based architecture across background, popup, options, sidepanel, content, pages, and offscreen, cross-context auth synchronization with the background service worker as the source of truth, auto-translation across 16 languages, a gulp/webpack build into `packaged/<browser>/`, and a four-layer test framework. It is the BXM successor.
+`@omega.js/extension` builds cross-browser MV3 extensions (Chrome, Firefox, Edge, Opera, Brave): a one-line-import bootstrap per extension context, a component-based architecture across background, popup, options, sidepanel, content, pages, and offscreen, cross-context auth synchronization with the background service worker as the source of truth, auto-translation across 16 languages, a gulp/esbuild build into `packaged/<browser>/`, and a four-layer test framework. It is the BXM successor.
 
 ## Where the knowledge lives
 

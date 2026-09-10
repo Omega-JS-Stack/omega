@@ -10,7 +10,7 @@ const Logger = require('@omega.js/devkit/logger');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { purgeZoneCache } = require('../purge.js');
 
-const logger = new Logger('omega:purge');
+const logger = new Logger('purge');
 
 module.exports = async function (options) {
   options = options || {};

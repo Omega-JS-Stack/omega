@@ -6,7 +6,7 @@
 // runner job, EV USB token, signtool — see commands/sign-windows.js), so by the
 // time we have a signed binary, electron-builder is long gone. We have to write
 // `latest.yml` ourselves against the signed exe; otherwise its sha512 wouldn't
-// match the binary on update-server and electron-updater would reject the update.
+// match the binary in the releases repo and electron-updater would reject the update.
 //
 // `latest.yml` is the public client-side contract that electron-updater reads
 // from the GitHub release. Schema reference:

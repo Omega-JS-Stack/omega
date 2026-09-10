@@ -144,6 +144,11 @@ async function initializeCheckout() {
       state.providers?.stripe?.publishableKey
       || state.providers?.chargebee?.site
       || state.providers?.paypal?.clientId
+      // Crypto counts only where it can actually be paid: a subscription has no
+      // Coinbase Commerce flow at all (#642), so a crypto-only brand must still
+      // say "no payment methods" on a subscription rather than paint a checkout
+      // whose one button is hidden.
+      || (state.providers?.coinbase?.enabled === true && product.type !== 'subscription')
     );
 
     if (!hasPaymentMethods) {

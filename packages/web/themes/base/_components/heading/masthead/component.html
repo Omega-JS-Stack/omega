@@ -2,14 +2,21 @@
 omega-display--page h1 (+ optional em accent) + sub line. The calling layout
 owns the band shell (dotgrid section, container, duo/split wrappers, reveal
 stagger) — this is the repeated head only. Breadcrumb-eyebrow pages pass no
-eyebrow and keep their link row in the layout. {% endcomment %}
+eyebrow and keep their link row in the layout.
+
+#467: `first_paint` is the caller saying "this cluster IS the first viewport",
+and the reveal attributes come off — a band the visitor never scrolls to must
+not wait for the observer. The band itself declares data-omega-first-paint;
+this switch keeps the markup honest rather than shipping attributes the
+exemption has already neutralized. {% endcomment %}
+{% iffalsy args.first_paint %}{% assign masthead_reveal = " data-omega-reveal" %}{% endiffalsy %}
 {% iftruthy args.eyebrow %}
-  <span class="omega-micro d-block mb-3" data-omega-reveal>{{ args.eyebrow }}</span>
+  <span class="omega-micro d-block mb-3"{{ masthead_reveal }}>{{ args.eyebrow }}</span>
 {% endiftruthy %}
-<h1 class="omega-display omega-display--page{% if args.h1_class != blank %} {{ args.h1_class }}{% endif %}" data-omega-reveal>
+<h1 class="omega-display omega-display--page{% if args.h1_class != blank %} {{ args.h1_class }}{% endif %}"{{ masthead_reveal }}>
   {{ args.headline }}{% if args.headline_accent != blank %}
   <em>{{ args.headline_accent }}</em>{% endif %}
 </h1>
 {% iftruthy args.sub %}
-  <p class="{{ args.sub_class }}" data-omega-reveal>{{ args.sub }}</p>
+  <p class="{{ args.sub_class }}"{{ masthead_reveal }}>{{ args.sub }}</p>
 {% endiftruthy %}

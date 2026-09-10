@@ -18,6 +18,7 @@ module.exports = createCliRouter({
   commandsDir: path.join(__dirname, 'commands'),
   defaultCommand: 'help',
   aliases: {
+    build: ['-b', '--build'],
     clean: ['-c', '--clean'],
     deploy: ['-d', '--deploy'],
     install: ['-i', 'i', '--install'],

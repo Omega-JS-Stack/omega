@@ -56,7 +56,7 @@ test('#43: size: lg still renders btn-lg — and no longer collides with the btn
 test('#3: the stock app chrome resolves every icon — no fallback triangle, no missing tag', async () => {
   const app = await buildApp();
 
-  assert.ok(!app.includes('data-omega-icon-missing'), 'no icon fell through to the tagged fallback');
-  assert.ok(app.includes('data-icon="table-columns"'), 'the rail-collapse toggle wears a resolvable icon');
-  assert.ok(!app.includes('data-icon="sidebar"'), 'the unresolvable name is gone');
+  assert.ok(!app.includes('data-omega-icon-missing'), 'no icon fell through to the empty marker');
+  assert.ok(app.includes('data-omega-fa="solid/table-columns"'), 'the rail-collapse toggle wears a resolvable icon');
+  assert.ok(!app.includes('fa-sidebar'), 'the unresolvable name is gone');
 });

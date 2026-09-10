@@ -22,7 +22,7 @@
 - **Zero-bounce hidden-launch on macOS.** `startup.mode = 'hidden'` bakes `LSUIElement: true` into Info.plist at build time → app launches completely invisible (no dock icon, no Cmd+Tab, no taskbar). Tray + notifications + networking still work. When the user double-clicks the running app's icon, @omega.js/desktop's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler surfaces the `main` window and the dock icon appears alongside it. CleanMyMac-style "tray-only at login, full window when manually opened" is the default.
 - **Auto-update background install.** When a download finishes from a background poll (not user-initiated), @omega.js/desktop auto-relaunches into the new version after 5s — apps update overnight without bothering the user. User-initiated checks skip this so your UI can prompt instead.
 - **Vert (ad) units with zero JS.** Drop `<div data-omega-vert></div>` into any view — the renderer auto-binds it (live, MutationObserver) to the shared OMEGA verts module: house/company inventory only (no AdSense in desktop surfaces), lazy near-viewport loading, sandboxed iframe, no-fill collapse. See [verts](docs/verts.md).
-- **Webpack-bundled** main / preload / renderer for source protection.
+- **esbuild-bundled** main / preload / renderer for source protection.
 - **Built-in test framework** — Jest-like syntax, four layers: `build` (plain Node), `main` (spawned Electron), `renderer` (hidden BrowserWindow), and `boot` (spawns the consumer's actual built `dist/main.bundle.js` for end-to-end smoke tests against the live manager — no `npm start && sleep && kill` shell hacks). Boot layer always rebuilds the bundle first so tests never see stale code.
 - **Schema-validated config.** One `config/omega.json5` (the OMEGA-wide format: shared brand/analytics/payment/firebase sections + desktop settings under `targets.desktop`), validated against the canonical schema in the bundled `@omega.js/config`. Validation runs at app boot AND during `gulp audit` — a misconfigured app never reaches the "white window of confusion" stage; it tells you exactly which field is broken with a numbered list. Simple flag model — `required: true | false | (config) => bool` — and `match` / `enum` / `type` only fire on field presence so consumers never see a flood of redundant errors for the same field. Pure-JS validator, no Ajv/Joi/Zod dep. See [config-schema](docs/config-schema.md).
 - **Multi-platform build/release** via GitHub Actions — macOS sign + notarize, Linux (deb + AppImage + optional Snap), Windows EV-token signing (self-hosted runner now, cloud-signing pluggable). Sensible installer defaults out of the box: NSIS one-click install on Windows (desktop + start menu shortcut, launch on finish), universal mac binary (one .dmg for Intel + Apple Silicon), `app.category` automatically mapped to per-platform values, copyright `{YEAR}` token always current. Snap Store publishing is on by default in the scaffold and auto-skipped at build time when `SNAPCRAFT_STORE_CREDENTIALS` isn't set — drop the credential blob into `.env`, run `mgr push-secrets`, and the next release ships to the Snap Store. See [installer-options](docs/installer-options.md).
@@ -34,7 +34,7 @@
 ```bash
 npm install @omega.js/desktop --save-dev
 nvm use                  # switch to the Node version Electron uses (one-time per shell)
-npm start                # dev: gulp → webpack → electron .
+npm start                # dev: gulp → esbuild → electron .
 OMEGA_CDP_PORT=9222 npm start  # dev + expose Chrome DevTools Protocol for Claude/MCP debugging
 npx omega cdp status       # drive the running dev app over CDP: status|eval|shot|capture|theme|relaunch|quit (docs/cdp-debugging.md)
 npm run build            # local production build (bundles only, no installer)
@@ -79,7 +79,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 | File | What | Lifetime |
 |---|---|---|
 | `runtime.log` | Your packaged app's runtime — main + preload + renderer all converge here via electron-log | Persistent, rotates at 10 MB |
-| `dev.log` | Gulp pipeline output — sass, webpack, html, electron child stdout from `npm start` | Truncated each `npm start` |
+| `dev.log` | Gulp pipeline output — sass, bundle, html, electron child stdout from `npm start` | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail, harness boot lines) | Truncated each test run |
 | `ci.log` | `npm run release` — streamed GH Actions output during a CI release | Truncated each release |
@@ -87,7 +87,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 ```bash
 npx omega logs                  # tail last 50 of runtime.log
 npx omega logs --tail           # follow runtime.log live
-tail -f logs/dev.log          # gulp pipeline output
+npx omega logs dev --tail       # follow dev.log (runtime|dev|build|test)
 grep -i error logs/runtime.log
 ```
 
@@ -155,7 +155,7 @@ Each subsystem has its own API reference under [`docs/`](docs/):
 - [runner](docs/runner.md) — Windows EV-token signing runner — `npx omega runner install`, auto-onboards new GH orgs, `npx omega runner monitor` for a live signing event tail
 - [test-framework](docs/test-framework.md) — writing tests, running them, layers
 - [test-boot-layer](docs/test-boot-layer.md) — boot test layer (spawns the consumer's actual built bundle for end-to-end smoke tests)
-- [build-system](docs/build-system.md) — gulp, webpack, electron-builder pipeline
+- [build-system](docs/build-system.md) — gulp, esbuild, electron-builder pipeline
 
 ## Status
 

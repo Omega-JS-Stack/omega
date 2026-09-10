@@ -15,6 +15,8 @@ const VERBS = [
   ['omega onboard', 'create a NEW brand monorepo from scratch (the wizard)'],
   ['omega company', 'the company workspace: `init` scaffolds one, `adopt <brand>` stamps a brand into it'],
   ['omega test', "run every target's test suites"],
+  ['omega build', 'build every target, backend first'],
+  ['omega clean', "wipe every target's build output"],
   ['omega update', 'dependency-freshness fan-out over the targets'],
   ['omega migrate', 'delete retired keys from config/omega.json5 (comments preserved)'],
   ['omega pipeline', 'the live full-cycle test: manage → deploy → verify'],

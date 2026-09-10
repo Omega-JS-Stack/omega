@@ -17,7 +17,7 @@ const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { materialize, listCustomizable } = require('../customize.js');
 const { buildOverrideMap, materializeOverride } = require('../overrides.js');
 
-const logger = new Logger('omega:customize');
+const logger = new Logger('customize');
 
 // Section/include/css entries print grouped under these headings, in this order
 const KIND_HEADINGS = [

@@ -160,7 +160,7 @@ module.exports = [
 - Certificates are auto-generated via mkcert into `.temp/certs/`
 - `getApiUrl()` returns `https://localhost:5002` when the HTTPS proxy is active
 - Disable with `--no-https` to fall back to plain HTTP (the emulator an `omega test` run auto-starts is always plain — the harness talks http)
-- Install mkcert: `brew install mkcert && mkcert -install`
+- Install mkcert: `brew install mkcert && mkcert -install` on macOS — the CLI prints the line for the host it is running on (choco/scoop on Windows, apt on Linux)
 - The cert + proxy machinery is the shared `@omega.js/devkit/local-https` module (vendored at prepare time) — the same engine behind web's `omega dev` HTTPS
 
 ## Hosting Rewrites

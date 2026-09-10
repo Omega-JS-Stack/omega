@@ -83,9 +83,10 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
 
   ctx.log(`Account deleted: ${uid}${reason ? `, reason: ${reason}` : ''}`);
 
-  // Send confirmation email (fire-and-forget)
-  const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
-  if (email && shouldSend) {
+  // Send confirmation email (fire-and-forget). No testing-mode gate — the mailer's
+  // own seam captures a testing send instead of delivering it
+  // ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)).
+  if (email) {
     sendConfirmationEmail(ctx, email, uid, reason, userData?.personal?.name?.first);
   }
 

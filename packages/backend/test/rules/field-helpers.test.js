@@ -17,6 +17,7 @@
  */
 const { assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
 const { compiledWith, environment } = require('./_environment.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = 'field-helpers-user';
 const EMAIL = `${UID}@test.com`;
@@ -81,7 +82,7 @@ async function seed(env, documents) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Firestore rules: the framework field helpers on create and on update',
   type: 'group',
   timeout: 30000,
@@ -305,4 +306,4 @@ module.exports = {
       },
     },
   ],
-};
+});

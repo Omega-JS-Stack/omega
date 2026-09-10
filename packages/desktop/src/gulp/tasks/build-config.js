@@ -14,7 +14,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
-const { deepMerge } = require('@omega.js/config');
+const { deepMerge, desktopArtifactName, sanitizeProductName, releasesRepo } = require('@omega.js/config');
 const Manager = new (require('../../build.js'));
 
 const { writeMacEntitlements } = require('../../lib/sign-helpers/entitlements.js');
@@ -72,33 +72,14 @@ module.exports = function buildConfig(done) {
       logger.log(`${startupMode === 'hidden' ? 'startup.mode' : 'startup.openAtLogin.mode'}=hidden → injected mac.extendInfo.LSUIElement=true`);
     }
 
-    // Inject `publish` from `releases` config. Owner: explicit releases.owner
-    // → the brand's repo.providers.github.org (config-first — a brand-monorepo app has no
-    // git remote of its own, the cp142 rehearsal catch) → git discovery.
-    // Without a publish block electron-builder's update-info step crashes on
-    // a null publish config, so resolving from config isn't cosmetic.
-    if (config.releases?.enabled !== false) {
-      const releases = config.releases || {};
-      let releaseOwner = releases.owner || config.repo?.providers?.github?.org;
-      if (!releaseOwner) {
-        try {
-          const { discoverRepo } = require('../../utils/github.js');
-          const discovered = await discoverRepo(projectRoot);
-          releaseOwner = discovered.owner;
-        } catch (e) {
-          logger.warn(`Could not discover repo owner; leaving publish block off. (${e.message})`);
-        }
-      }
-      const releaseRepo = releases.repo || 'update-server';
-      if (releaseOwner) {
-        builderConfig.publish = {
-          provider:    'github',
-          owner:       releaseOwner,
-          repo:        releaseRepo,
-          releaseType: 'release',
-        };
-        logger.log(`releases → publish block: github ${releaseOwner}/${releaseRepo}`);
-      }
+    // Inject `publish` from config. This is the feed URL electron-updater bakes
+    // into the shipped app, so it comes from the config alone (#799).
+    const publish = publishConfig(config);
+    if (publish) {
+      builderConfig.publish = publish;
+      logger.log(`releases → publish block: github ${publish.owner}/${publish.repo}`);
+    } else if (config.releases?.enabled !== false) {
+      logger.warn('Could not address the releases repo (no github org and no releases.owner); leaving publish block off.');
     }
 
     // Inject afterSign → @omega.js/desktop's built-in notarize hook.
@@ -181,6 +162,10 @@ function baseConfig(config, extras = {}) {
   const winArch   = Array.isArray(winTargetCfg.arch)   && winTargetCfg.arch.length   ? winTargetCfg.arch   : ['x64', 'ia32'];
   const linuxArch = Array.isArray(linuxTargetCfg.arch) && linuxTargetCfg.arch.length ? linuxTargetCfg.arch : ['x64'];
 
+  // The arch sets the versionless names can spell (#620) — checked HERE, the
+  // last moment a colliding build is still fixable.
+  assertArchRules({ mac: macArch, linux: linuxArch }, extras);
+
   // NSIS installer UX. Defaults match Slack/Discord-style "no friction" install:
   // one-click (no wizard), shortcut everywhere, launch on finish, per-user.
   const nsisOneClick           = winTargetCfg.oneClick !== false;
@@ -216,12 +201,16 @@ function baseConfig(config, extras = {}) {
     return abs;
   };
 
-  // Sanitized productName for use in artifact filenames. electron-builder's default
-  // `${productName}` template variable preserves spaces, which then become dots in NSIS
-  // output ("Deployment.Playground.Setup.1.0.6.exe") and behave inconsistently across
-  // targets. Replacing spaces with hyphens up front gives consistent hyphenated names
-  // across mac/win/linux that match what mirror-downloads produces on download-server.
-  const safeProductName = String(productName).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  // Artifact filenames come from @omega.js/config's desktop-artifacts — the ONE
+  // naming rule (#620), shared with the website's direct-download URLs
+  // (`site.targets.desktop.downloads`). They carry no version, which is what
+  // makes `/releases/latest/download/<asset>` a link that never changes, and
+  // they sanitize the productName (electron-builder's `${productName}` keeps
+  // spaces, which become dots in NSIS output). Passing electron-builder's
+  // literal `${ext}` yields a TEMPLATE, for the platform fallbacks that serve
+  // more than one target (mac's dmg + auto-update zip).
+  const artifactTemplate = (platform, artifact) => desktopArtifactName(productName, platform, artifact, '${ext}');
+  const safeProductName = sanitizeProductName(productName);
 
   // Build linux target list — `deb` + `AppImage` always; `snap` if enabled.
   const linuxTargets = [
@@ -273,21 +262,17 @@ function baseConfig(config, extras = {}) {
       hardenedRuntime:    true,
       gatekeeperAssess:   false,
       notarize: false,   // notarization runs via afterSign hook
-      // mac.artifactName is the FALLBACK template for mac targets that don't have
-      // their own. The .dmg target overrides it (cleaner names without -mac suffix).
-      // The .zip target uses this — KEEP the `-mac` suffix on zip filenames because
-      // (a) it's electron-builder's convention, (b) mirror-downloads keys off `-mac`
-      // to recognize "this is the auto-updater zip" vs a generic archive on the same
-      // release. With arch=universal there's only ONE zip per version (no -arm64 split)
-      // so we drop ${arch} from the template — produces e.g. `Product-1.0.0-mac.zip`.
-      artifactName: `${safeProductName}-\${version}-mac.\${ext}`,
+      // mac.artifactName is the FALLBACK template for mac targets that don't
+      // have their own, and it serves BOTH mac targets: the .dmg the site links
+      // (`Product-mac-universal.dmg`) and the .zip electron-updater fetches
+      // from the feed (`Product-mac-universal.zip`). One template, so the dmg
+      // needs no override of its own. No ${arch}: with arch=universal there is
+      // one artifact per target — and a non-universal mac arch is refused
+      // outright (assertArchRules), because nothing appends the arch back.
+      artifactName: artifactTemplate('mac', 'universal'),
     },
 
-    dmg: {
-      // Plain `Product-version.dmg` — the user-facing installer name. Universal
-      // binary so no arch suffix. Stable URL on download-server is `Product.dmg`.
-      artifactName: `${safeProductName}-\${version}.\${ext}`,
-    },
+    dmg: {},
 
     win: {
       target: [
@@ -300,9 +285,9 @@ function baseConfig(config, extras = {}) {
     },
 
     nsis: {
-      // NSIS-Setup form. version baked in so update-server keeps unique per-release
-      // filenames. download-server mirror strips the version for stable URLs.
-      artifactName:            `${safeProductName}-Setup-\${version}.\${ext}`,
+      // ONE installer for every winArch (electron-builder merges them), so the
+      // name says `universal` like the site's `/download/windows/universal`.
+      artifactName:            artifactTemplate('windows', 'universal'),
       oneClick:                nsisOneClick,
       perMachine:              nsisPerMachine,
       // `createDesktopShortcut: 'always'` ensures the icon is created even when the
@@ -317,7 +302,21 @@ function baseConfig(config, extras = {}) {
     linux: {
       target:       linuxTargets,
       category:     category.linux,
-      artifactName: `${safeProductName}-\${version}-\${arch}.\${ext}`,
+      // The FALLBACK, which only the snap reaches — deb and AppImage are the
+      // two published artifacts and carry their own names below. The snap is
+      // never a release asset (the Snap Store publishes it), so it keeps ${arch}.
+      artifactName: `${safeProductName}-linux-\${arch}.\${ext}`,
+    },
+
+    // The two linux artifacts the site links, each its own name (they share
+    // linux.artifactName otherwise, and one template cannot say both). One
+    // target apiece, so these are the finished filenames, not templates.
+    deb: {
+      artifactName: desktopArtifactName(productName, 'linux', 'debian'),
+    },
+
+    appImage: {
+      artifactName: desktopArtifactName(productName, 'linux', 'appimage'),
     },
   };
 
@@ -359,6 +358,72 @@ function baseConfig(config, extras = {}) {
   return out;
 }
 
+/**
+ * The arch rules the versionless artifact names impose
+ * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)).
+ *
+ * A name with no `${arch}` token gets no arch back: electron-builder's
+ * macro expander only REPLACES the token where it appears, and the
+ * `getArchSuffix()` a suffix could come from is staging-dir and NSIS-internal.
+ * So two linux archs write over one deb name, and a non-universal mac build
+ * ships under a name that says `universal`. Windows is exempt — NSIS merges
+ * every arch into ONE installer, which is why its multi-arch default is safe.
+ *
+ * A build/publish run refuses; anything else warns and keeps going, because the
+ * collision only lands when a build actually publishes those files.
+ *
+ * @param {object} arch - The resolved per-platform arch lists (`{ mac, linux }`).
+ * @param {object} [options]
+ * @param {object} [options.mode] - The Manager's mode (`{ build, publish, … }`).
+ * @param {object} [options.logger] - Logger with `warn` (default: this task's).
+ * @throws {Error} in build/publish mode, naming the offending config key.
+ */
+function assertArchRules(arch, options) {
+  options = options || {};
+  const mode = options.mode || Manager.getMode();
+  const warn = (options.logger || logger).warn.bind(options.logger || logger);
+
+  const violations = [];
+  if (arch.mac.length !== 1 || arch.mac[0] !== 'universal') {
+    violations.push(`platforms.mac.arch (${arch.mac.join(', ')}) — the mac artifact is named \`-mac-universal\`, so a non-universal build ships mislabelled`);
+  }
+  if (arch.linux.length > 1) {
+    violations.push(`platforms.linux.arch (${arch.linux.join(', ')}) — the deb and the AppImage carry ONE name each, so the second arch overwrites the first`);
+  }
+  if (violations.length === 0) return;
+
+  const message = `The versionless artifact names (#620) cannot spell this build's arch set: ${violations.join('; ')}. `
+    + 'They support a universal mac and a single linux arch (windows is unaffected — NSIS merges every arch into one installer); '
+    + 'per-arch names are a future additive change.';
+
+  if (mode.build || mode.publish) {
+    throw new Error(message);
+  }
+
+  warn(message);
+}
+
+// The electron-builder `publish` block: the brand's ONE public releases repo,
+// resolved by @omega.js/config's releasesRepo (`<brand.id>-releases` under the
+// brand repo owner unless the config names another). Config-only on purpose:
+// this address is baked into app-update.yml and polled by every installed copy
+// forever, and a brand-monorepo app's git remote is the repo it is NESTED in
+// (the playground inside the framework monorepo), which would bake a feed that
+// 404s. `releases.enabled: false` publishes nowhere, and an unaddressable repo
+// emits no block at all rather than half an address.
+function publishConfig(config) {
+  if (config?.releases?.enabled === false) {
+    return null;
+  }
+
+  const { owner, name } = releasesRepo(config);
+  if (!owner || !name) {
+    return null;
+  }
+
+  return { provider: 'github', owner, repo: name, releaseType: 'release' };
+}
+
 // Whether the packaged app gets LSUIElement=true in Info.plist. True for
 // hidden-mode apps AND for normal-mode apps whose login launch is hidden —
 // the dock bounce is a native animation that starts before any JS runs, so
@@ -374,6 +439,7 @@ function shouldInjectLSUIElement(config) {
 module.exports.baseConfig    = baseConfig;
 module.exports.deepMerge     = deepMerge;
 module.exports.shouldInjectLSUIElement = shouldInjectLSUIElement;
+module.exports.publishConfig = publishConfig;
 module.exports.expandYear    = expandYear;
 module.exports.resolveCategory = resolveCategory;
 module.exports.CATEGORY_MAP  = CATEGORY_MAP;

@@ -24,11 +24,14 @@
 const { TAGS, filters: { FILTER_NAMES } } = require('@omega.js/template-kit');
 
 // The config namespace (#607): a page's frontmatter overrides omega.json5
-// under `config:`, and `meta` is the one section that keeps its bare spelling.
-const { CONFIG_SECTIONS, PAGE_BARE_SECTIONS, templateReads } = require('../config-sections.js');
+// under `config:`, and nothing that is not a config section may sit there.
+const {
+  CONFIG_SECTIONS, RANDOM_ID_ASSIGN_IDIOM,
+  templateReads, randomIdReads, assignsRandomId,
+} = require('../config-sections.js');
 
 /** Does this bare frontmatter key belong under `config:`? */
-const isMovableSection = (key) => CONFIG_SECTIONS.has(key) && !PAGE_BARE_SECTIONS.includes(key);
+const isMovableSection = (key) => CONFIG_SECTIONS.has(key);
 
 // Packaged theme ids whose hardcoded layout prefixes the engine aliases
 const PACKAGED_THEMES = ['classy', 'neobrutalism', 'newsflash', 'bootstrap'];
@@ -124,6 +127,79 @@ const legacyPrefix = {
     return { text: fromLines(out, trailingNewline), edits, findings: [] };
   },
 };
+
+// ---------------------------------------------------------------------------
+// Rule 27 — the icon TAG → native Font Awesome markup (#619)
+//
+// Icons are not a tag any more, on either side of the rename: authoring is
+// `<i class="fa-solid fa-rocket">`, which the build inlines and the runtime
+// watcher upgrades. So a legacy `{% uj_icon %}` (and an already-half-migrated
+// `{% omega_icon %}`) converts to markup, never to a tag that no longer
+// exists. Runs FIRST — before the uj_→omega_ rename and before the tag-arg
+// hoist, both of which would otherwise treat it as a live tag.
+//
+// The name arg becomes the `fa-<name>` class (a Liquid variable interpolates
+// into it), the positional class arg rides along verbatim, and the weight is
+// always `fa-solid`: the icon lookup falls back to `brands/` for any weight,
+// so a brand name resolves without the converter knowing the icon set.
+// ---------------------------------------------------------------------------
+const ICON_TAG_PATTERN = /\{%-?\s*(?:uj|omega)_icon\s*([^%]*?)-?%\}/g;
+
+const iconTagMarkup = {
+  id: 'icon-tag-markup',
+  title: '`uj_icon`/`omega_icon` tags → native Font Awesome markup',
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    const edits = [];
+    const out = lines.map((line, index) => {
+      const replaced = line.replace(ICON_TAG_PATTERN, (whole, markup) => {
+        const args = splitTagArgs(markup.trim());
+        if (!args.length) return whole;
+
+        const name = quotedValue(args[0]);
+        const nameClass = name === null ? `fa-{{ ${args[0]} }}` : `fa-${name}`;
+        // Only the POSITIONAL class arg carries over; a `label=` option has no
+        // native equivalent, so the icon converts and the option drops.
+        const extraArg = args[1] && !args[1].includes('=') ? args[1] : null;
+        const extraValue = extraArg === null ? '' : (quotedValue(extraArg) ?? `{{ ${extraArg} }}`);
+        const classes = extraValue ? `fa-solid ${nameClass} ${extraValue}` : `fa-solid ${nameClass}`;
+
+        return `<i class="${classes}"></i>`;
+      });
+      if (replaced !== line) edits.push({ rule: 'icon-tag-markup', line: index + 1, before: line.trim(), after: replaced.trim() });
+      return replaced;
+    });
+    return { text: fromLines(out, trailingNewline), edits, findings: [] };
+  },
+};
+
+/** Split a tag's markup on top-level commas, respecting quotes. */
+function splitTagArgs(markup) {
+  const args = [];
+  let current = '';
+  let quote = null;
+  for (const char of markup) {
+    if (quote) {
+      current += char;
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+    } else if (char === ',') {
+      args.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) args.push(current.trim());
+  return args;
+}
+
+/** The inside of a quoted arg, or null when the arg is an expression. */
+function quotedValue(arg) {
+  return /^(['"]).*\1$/.test(arg) ? arg.slice(1, -1).trim() : null;
+}
 
 // ---------------------------------------------------------------------------
 // Rule 1 — page.resolved.* → resolved.*
@@ -485,20 +561,11 @@ const analyticsShape = {
 // TWO dead spellings, because the port produces both: the `site.<section>` a
 // UJM page wrote by hand, and the flat `resolved.<section>` rule 1 manufactures
 // out of `page.resolved.<section>`. `site.meta` is the meta WALK rather than a
-// config section, so it lands on `resolved.meta` — the schema's one pageBare
-// section, which keeps its flat spelling.
+// config section, so it lands on `resolved.meta`, where the walk lives.
 //
 // Runs AFTER rule 9: `site.analytics.<provider>` is that rule's input, and
 // renaming the root first would strand the flat spelling it answers to.
 // ---------------------------------------------------------------------------
-
-// Longest first: a bare alternation would let `data` claim the front of
-// `dataRequest` and leave the rest of the path dangling.
-const READ_SECTIONS = [...CONFIG_SECTIONS]
-  .filter((key) => !PAGE_BARE_SECTIONS.includes(key))
-  .sort((a, b) => b.length - a.length);
-
-const READ_SECTION_SET = new Set(READ_SECTIONS);
 
 /**
  * What one read becomes, or null when it is not this rule's business.
@@ -506,16 +573,244 @@ const READ_SECTION_SET = new Set(READ_SECTIONS);
  * @returns {string|null} the replacement ROOT+KEY (the dotted tail rides along)
  */
 function movedRead(read) {
-  // `meta` is a config section AND the page-bare walk, and a template reads the
-  // walk — so `site.meta` lands on `resolved.meta`, never under `config`.
+  // `meta` is not config at all — it is the page's own walk — so `site.meta`
+  // lands on `resolved.meta`, never under `config`.
   if (read.key === 'meta') return read.root === 'site' ? 'resolved.meta' : null;
-  return READ_SECTION_SET.has(read.key) ? `resolved.config.${read.key}` : null;
+  return CONFIG_SECTIONS.has(read.key) ? `resolved.config.${read.key}` : null;
+}
+
+// ---------------------------------------------------------------------------
+// The SELF-REFERENCE (#671, part 2)
+//
+// A UJM page wrote `meta: { title: "{{ site.meta.title }}" }` to mean "use the
+// site default". Rewritten it becomes `{{ resolved.meta.title }}` — and THIS
+// block is what the meta walk resolves that from, so the page's <title> shipped
+// the literal string `{{ resolved.meta.title }}`. There is nothing to rewrite
+// it to: absence already falls through to the config default, so the read is
+// DROPPED, key and all, with a finding naming the file. Both spellings go —
+// a brand migrated before 0.46.0 is carrying the rewritten shape, and re-running
+// migrate has to repair it rather than call the page done.
+// ---------------------------------------------------------------------------
+
+/**
+ * Split a YAML flow mapping's body on its TOP-LEVEL commas (quotes and nested
+ * brackets hold their commas).
+ * @param {string} body - the text between `{` and `}`
+ * @returns {string[]}
+ */
+function splitFlowPairs(body) {
+  const pairs = [];
+  let depth = 0;
+  let quote = null;
+  let start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const char = body[i];
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'") quote = char;
+    else if (char === '{' || char === '[') depth += 1;
+    else if (char === '}' || char === ']') depth -= 1;
+    else if (char === ',' && depth === 0) {
+      pairs.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+  pairs.push(body.slice(start));
+  return pairs.filter((pair) => pair.trim() !== '');
+}
+
+/**
+ * The `}` closing the flow mapping opened on `lines[start]`, quote-aware — a
+ * brace inside a quoted scalar is text, not structure.
+ * @param {string[]} lines
+ * @param {number} start - index of the line carrying the opening brace
+ * @param {number} limit - one past the last line the mapping may reach
+ * @returns {{ line: number, column: number }|null} null when it never closes
+ */
+function flowMappingEnd(lines, start, limit) {
+  let depth = 0;
+  let quote = null;
+  for (let i = start; i < limit; i++) {
+    const line = lines[i];
+    for (let c = 0; c < line.length; c++) {
+      const char = line[c];
+      if (quote) {
+        if (char === quote) quote = null;
+        continue;
+      }
+      if (char === '"' || char === "'") quote = char;
+      else if (char === '{') depth += 1;
+      else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) return { line: i, column: c };
+      }
+    }
+    quote = null; // a quoted YAML scalar does not span lines
+  }
+  return null;
+}
+
+/**
+ * The lines nested under the key on `lines[opener]` — everything more indented,
+ * blanks skipped, up to the first line that dedents.
+ * @param {string[]} lines
+ * @param {number} opener
+ * @param {number} limit - one past the last line to consider (the fence)
+ * @returns {number[]} line indexes
+ */
+function nestedLines(lines, opener, limit) {
+  const indent = lines[opener].match(/^[ \t]*/)[0].length;
+  const children = [];
+  for (let i = opener + 1; i < limit; i++) {
+    if (lines[i].trim() === '') continue;
+    if (lines[i].match(/^[ \t]*/)[0].length <= indent) break;
+    children.push(i);
+  }
+  return children;
+}
+
+/**
+ * Drop the reads of the meta walk that sit inside the page's OWN `meta:` block.
+ * @param {string} text
+ * @returns {{ text: string, edits: object[], findings: object[] }}
+ */
+function dropSelfMetaReads(text) {
+  const { lines, trailingNewline } = toLines(text);
+  const sourceLines = [...lines];
+  const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+  if (fenceEnd < 0) return { text, edits: [], findings: [] };
+
+  const readLines = new Set(
+    templateReads(text).filter((read) => read.key === 'meta' && read.line <= fenceEnd).map((read) => read.line),
+  );
+  if (!readLines.size) return { text, edits: [], findings: [] };
+
+  const drop = new Set();
+  const rewritten = new Set();
+  const findings = [];
+  const say = (line, key, source) => findings.push({
+    check: 'config-reads', line, severity: 'warning',
+    message: `dropped \`${key}\` from this page's own \`meta:\` block (#671) — it read \`${source}\`, which IS the walk this block feeds, `
+      + 'so the page rendered the literal expression. Absence falls through to the config default',
+  });
+
+  let block = null; // the `meta:` block we are inside: { opener, indent, children }
+  const blocks = [];
+  for (let i = 1; i < fenceEnd; i++) {
+    const line = lines[i];
+    const blank = line.trim() === '';
+    const indent = blank ? Infinity : line.match(/^[ \t]*/)[0].length;
+    if (block && !blank && indent <= block.indent) block = null;
+
+    if (block) {
+      if (!blank) block.children.push(i);
+      continue;
+    }
+
+    const opener = line.match(/^([ \t]*)meta:\s*$/);
+    if (opener) {
+      block = { opener: i, indent: opener[1].length, children: [] };
+      blocks.push(block);
+      continue;
+    }
+
+    // The flow spelling, on ONE line (`meta: { title: "{{ site.meta.title }}" }`)
+    // or spread over several with the closing brace below — both are legal
+    // YAML, and a self-reference hides in either. Judged pair by pair, per
+    // line, exactly like the block form.
+    const flow = line.match(/^([ \t]*)meta:\s*\{/);
+    if (!flow) continue;
+    const close = flowMappingEnd(lines, i, fenceEnd);
+    if (!close) continue;
+
+    const open = line.indexOf('{', flow[1].length);
+    const segments = [];
+    for (let j = i; j <= close.line; j++) {
+      const body = lines[j].slice(j === i ? open + 1 : 0, j === close.line ? close.column : lines[j].length);
+      const pairs = splitFlowPairs(body);
+      segments.push({
+        index: j,
+        kept: !readLines.has(j + 1) ? pairs : pairs.filter((pair) => {
+          if (!/\{\{[^}]*\b(site|resolved)\.meta\b/.test(pair)) return true;
+          say(j + 1, (pair.match(/^\s*([\w-]+)\s*:/) || [null, 'meta'])[1], pair.trim());
+          return false;
+        }),
+      });
+    }
+
+    if (segments.every((segment) => segment.kept.length === 0)) {
+      for (let j = i; j <= close.line; j++) drop.add(j);
+    } else {
+      const last = segments.filter((segment) => segment.kept.length > 0).pop();
+      for (const segment of segments) {
+        const j = segment.index;
+        const head = j === i ? lines[j].slice(0, open + 1) : '';
+        const tail = j === close.line ? lines[j].slice(close.column) : '';
+        if (segment.kept.length === 0) {
+          // A line that carried nothing else goes; the opener and the closer
+          // stay to carry their braces.
+          if (!head && !tail) drop.add(j);
+          else lines[j] = `${head}${tail ? lines[j].match(/^[ \t]*/)[0] : ''}${tail}`;
+        } else {
+          const body = segment.kept.join(',') + (segment === last ? '' : ',');
+          lines[j] = `${head}${body}${tail}`;
+        }
+        if (lines[j] !== sourceLines[j] && !drop.has(j)) rewritten.add(j);
+      }
+      // The one-line form reads as one pair list — collapse the space the
+      // dropped pairs left before the closing brace.
+      if (i === close.line) lines[i] = lines[i].replace(/\s+\}(\s*)$/, ' }$1');
+    }
+    i = close.line;
+  }
+
+  for (const entry of blocks) {
+    for (const child of entry.children.filter((line) => readLines.has(line + 1))) {
+      drop.add(child);
+      say(child + 1, (lines[child].match(/^\s*([\w-]+)\s*:/) || [null, 'meta'])[1], lines[child].trim());
+    }
+  }
+
+  // An emptied key is a NULL key, not an absent one — and this engine's
+  // deepMerge lets a null REPLACE the config defaults it was supposed to fall
+  // through to. So every key the drop emptied goes with it, from the deepest
+  // nested one (an `og:` whose only child was a self-read) up to the `meta:`
+  // opener itself — a fixed point, because dropping one empties its parent.
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let i = 1; i < fenceEnd; i++) {
+      if (drop.has(i) || !/^[ \t]*[\w-]+:\s*$/.test(lines[i])) continue;
+      const children = nestedLines(lines, i, fenceEnd);
+      if (children.length === 0 || !children.every((child) => drop.has(child))) continue;
+      drop.add(i);
+      changed = true;
+    }
+  }
+
+  if (!drop.size && !rewritten.size) return { text, edits: [], findings: [] };
+
+  // One edit per changed line: a drop the report never counted was a repair
+  // the codemod never wrote (the write and the file listing both gate on edits).
+  const edits = [...new Set([...drop, ...rewritten])].sort((a, b) => a - b).map((index) => ({
+    rule: 'config-reads',
+    line: index + 1,
+    before: sourceLines[index].trim(),
+    after: drop.has(index) ? '(removed — a page may not read the walk its own `meta:` block feeds)' : lines[index].trim(),
+  }));
+
+  return { text: fromLines(lines.filter((line, index) => !drop.has(index)), trailingNewline), edits, findings };
 }
 
 const configReads = {
   id: 'config-reads',
   title: '`site.<section>` / `resolved.<section>` reads → `resolved.config.<section>`',
   apply(text) {
+    // A page's own `meta:` block first (#671): those reads are dropped, not
+    // moved, and dropping before the rewrite catches BOTH spellings on one path.
+    const self = dropSelfMetaReads(text);
+
     // The census is config-sections.js's, shared with the engine's build guard
     // (#611): only LIQUID context counts, and fenced code blocks and `{% raw %}`
     // bodies are display, not markup (#521). Without that this rule turned
@@ -524,31 +819,36 @@ const configReads = {
     // both found by the blind-verifier walk (2026-08-25).
     //
     // Splice from the END so every earlier offset stays valid.
-    const reads = templateReads(text).filter((read) => movedRead(read) !== null);
-    if (!reads.length) return { text, edits: [], findings: [] }; // already migrated — idempotent
+    const reads = templateReads(self.text).filter((read) => movedRead(read) !== null);
+    if (!reads.length) {
+      // Already migrated — idempotent (the self-reference drop may still have
+      // repaired a page rewritten by an older migrate, and THAT is an edit:
+      // the codemod writes and lists what the rules report as changed).
+      return { text: self.text, edits: self.edits, findings: self.findings };
+    }
 
-    let out = text;
+    let out = self.text;
     const lines = new Map(); // line → { before, after } — one edit per changed line
     for (const read of [...reads].reverse()) {
       const tail = read.expression.slice(`${read.root}.${read.key}`.length);
       out = out.slice(0, read.index) + movedRead(read) + tail + out.slice(read.index + read.expression.length);
     }
-    const beforeLines = toLines(text).lines;
+    const beforeLines = toLines(self.text).lines;
     const afterLines = toLines(out).lines;
     for (const read of reads) {
       if (lines.has(read.line)) continue;
       lines.set(read.line, { before: beforeLines[read.line - 1], after: afterLines[read.line - 1] });
     }
 
-    const edits = [...lines].map(([line, { before, after }]) => ({
+    const moved = [...lines].map(([line, { before, after }]) => ({
       rule: 'config-reads', line, before: before.trim(), after: after.trim(),
     }));
 
     return {
       text: out,
-      edits,
-      findings: [{
-        check: 'config-reads', line: edits[0].line, severity: 'warning',
+      edits: [...self.edits, ...moved],
+      findings: [...self.findings, {
+        check: 'config-reads', line: moved[0].line, severity: 'warning',
         message: 'rewrote config reads to `resolved.config.<section>` (#607) — the brand config left the `site` global, '
           + 'where they rendered an empty string with no error. Check the page still reads what it meant',
       }],
@@ -669,50 +969,272 @@ const clientImport = {
 // successor is the singleton's own `omega.request()`, so the import line goes
 // and the calls are renamed — but the OPTIONS are the client's, not
 // wonderful-fetch's, so every rewritten call is reported for review.
+//
+// The rename alone shipped two dead shapes with no error at all
+// ([#594](https://github.com/Omega-JS-Stack/omega/issues/594)), so the rewrite
+// carries them too:
+//   - `response: 'json'` — @omega.js/client parses by content type and RETURNS
+//     the body, so the option means nothing. Dropped from the rewritten call.
+//   - `err.status` — the HTTP status lives on `error.code`
+//     (packages/client/src/modules/request.js), so `if (err.status === 429)`
+//     compared `undefined` and the whole rate-limit branch went dark. Every
+//     `.status` read on a CAUGHT error in a rewritten file becomes `.code`.
+// What is not mechanically rewritable is named at its line instead: a
+// non-json `response`, options behind an identifier, a `.status` read on
+// something that is not a catch binding.
 // ---------------------------------------------------------------------------
 const FORM_MANAGER_SPECIFIER = /(["'])__main_assets__\/js\/libs\/form-manager\.js\1/g;
 const AUTHORIZED_FETCH_IMPORT = /^\s*import\s+[\w{},\s*]+\s+from\s+["']__main_assets__\/js\/libs\/authorized-fetch\.js["'];?\s*$/;
 const CLIENT_DEFAULT_IMPORT = /import\s+omega\s+from\s+["']@omega\.js\/client["']/;
+
+// `catch (err)`, `.catch((err) =>` and `.catch(err =>` — the three ways a
+// consumer binds the error whose `.status` the rewrite has to move. The arrow
+// with no parens is the commonest of them, and its terminator is the `=>`.
+const CATCH_PARAM = /\bcatch\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*(?:[),]|=>)/g;
+// One `response: <string>` option, with whichever comma separates it. The
+// replacer keeps ONE of the two commas so the neighbours stay separated.
+const RESPONSE_OPTION = /(,\s*)?\bresponse\s*:\s*(['"])([^'"]*)\2(\s*,)?/;
+const STATUS_READ = /\b([A-Za-z_$][\w$]*)\.status\b/g;
+
+// A `/` that opens a REGEX rather than dividing: what may precede one is an
+// operator, an opening bracket, or a keyword — never a value.
+const REGEX_PRECEDER = /(?:^|[(,=:[!&|?{};+\-*%~^<>]|\b(?:return|typeof|case|in|of|do|else|yield|await|new|delete|void))\s*$/;
+
+/**
+ * The end of the string/template/regex literal opening at `start`.
+ * @param {string} text
+ * @param {number} start - index of the opening delimiter
+ * @param {string} close - the delimiter that ends it
+ * @param {boolean} multiline - whether it may cross a newline
+ * @returns {number} index of the closing delimiter, -1 unterminated
+ */
+function literalEnd(text, start, close, multiline) {
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] === '\\') i += 1;
+    else if (text[i] === close) return i;
+    else if (!multiline && text[i] === '\n') return -1;
+  }
+  return -1;
+}
+
+/**
+ * Walk JS source from `start`, handing `visit(char, index)` every character
+ * that is real CODE — string, template, comment and regex bodies are SKIPPED.
+ * A paren inside a url (`'/search('`) is text, and counting it desynced every
+ * span this rule measures, which handed the option strip unrelated code.
+ * @param {string} text
+ * @param {number} start
+ * @param {function(string, number): (number|undefined)} visit - a returned index stops the walk
+ * @returns {number|null} what `visit` returned, or null when nothing stopped it
+ */
+function walkCode(text, start, visit) {
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '/' && next === '/') {
+      const line = text.indexOf('\n', i);
+      if (line < 0) return null;
+      i = line;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      const close = text.indexOf('*/', i + 2);
+      if (close < 0) return null;
+      i = close + 1;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      const close = literalEnd(text, i, char, char === '`');
+      if (close < 0) return null;
+      i = close;
+      continue;
+    }
+    if (char === '/' && REGEX_PRECEDER.test(text.slice(Math.max(0, i - 12), i))) {
+      const close = literalEnd(text, i, '/', false);
+      if (close < 0) return null;
+      i = close;
+      continue;
+    }
+
+    const stop = visit(char, i);
+    if (stop !== undefined) return stop;
+  }
+  return null;
+}
+
+/**
+ * The index of the character closing the group opened at `open`.
+ * @param {string} text
+ * @param {number} open - index of the `(` or `{`
+ * @returns {number|null} null when it never closes
+ */
+function groupEnd(text, open) {
+  const closer = text[open] === '(' ? ')' : '}';
+  let depth = 0;
+  return walkCode(text, open, (char, index) => {
+    if (char === text[open]) depth += 1;
+    else if (char === closer) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+    return undefined;
+  });
+}
+
+/**
+ * The end of the argument list opened at (entry, column) — parens balanced
+ * across lines, string and comment bodies skipped. A call's options object is
+ * the span this walk covers.
+ * @param {Array<{ text: string }>} entries - the file's surviving lines
+ * @param {number} start - index of the entry carrying the opening paren
+ * @param {number} column - offset of the opening paren in that entry
+ * @returns {number} index of the entry carrying the closing paren
+ */
+function argumentSpanEnd(entries, start, column) {
+  const text = entries.slice(start).map((entry) => entry.text).join('\n');
+  const close = groupEnd(text, column);
+  // Never balanced: the span is the call's own line and nothing is stripped
+  // below it. A run of the file's remaining lines is how a shape this walk
+  // cannot read turns into edits to code that has nothing to do with the call.
+  if (close === null) return start;
+  return start + (text.slice(0, close).match(/\n/g) || []).length;
+}
+
+/**
+ * Every catch binding in a file, with the LINE SPAN of the block it is bound
+ * over: a `{ … }` body, or an arrow's bare expression (which ends where the
+ * `.catch(` call does).
+ * @param {string} text - the whole source
+ * @returns {Array<{ name: string, start: number, end: number }>} 1-based lines
+ */
+function catchScopes(text) {
+  const lineAt = (index) => (text.slice(0, index).match(/\n/g) || []).length + 1;
+  const scopes = [];
+
+  CATCH_PARAM.lastIndex = 0;
+  let match;
+  while ((match = CATCH_PARAM.exec(text)) !== null) {
+    // Past whatever is left of the header (`) => `, a second parameter) to the
+    // first character of the body itself.
+    const body = walkCode(text, match.index + match[0].length, (char, index) => (/[\s),=>]/.test(char) ? undefined : index));
+    if (body === null) continue;
+    const end = text[body] === '{' ? groupEnd(text, body) : groupEnd(text, text.indexOf('(', match.index));
+    if (end === null) continue;
+    scopes.push({ name: match[1], start: lineAt(match.index), end: lineAt(end) });
+  }
+  return scopes;
+}
 
 const clientLibs = {
   id: 'client-libs',
   title: '`__main_assets__/js/libs/form-manager.js` → the client module; `authorizedFetch()` → `omega.request()`',
   apply(text) {
     const { lines, trailingNewline } = toLines(text);
-    const edits = [];
     const findings = [];
-    const out = [];
+    // Every surviving line with the ORIGINAL line number it reports as: the
+    // import line and an option-only line are removed, so the two numbering
+    // schemes part ways immediately and every finding owes the source's.
+    const entries = [];
+    const removed = new Map(); // original line → what the edit records as `after`
+    const callEntries = [];
     let rewroteCall = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
       if (AUTHORIZED_FETCH_IMPORT.test(line)) {
-        edits.push({ rule: 'client-libs', line: i + 1, before: line.trim(), after: '(removed — omega.request() replaces it)' });
+        removed.set(i + 1, '(removed — omega.request() replaces it)');
         continue;
       }
 
       const replaced = line
         .replace(FORM_MANAGER_SPECIFIER, '$1@omega.js/client/modules/form-manager.js$1')
         .replace(/\bauthorizedFetch\(/g, 'omega.request(');
-      if (replaced !== line) {
-        edits.push({ rule: 'client-libs', line: i + 1, before: line.trim(), after: replaced.trim() });
-        if (/\bauthorizedFetch\(/.test(line)) {
-          rewroteCall = true;
+      if (/\bauthorizedFetch\(/.test(line)) {
+        rewroteCall = true;
+        callEntries.push(entries.length);
+        findings.push({
+          check: 'client-libs', line: i + 1, severity: 'warning',
+          message: '`authorizedFetch(…)` → `omega.request(…)`: same (url, options) shape and the same Bearer attach, and the two dead shapes went with it '
+            + '(`response: \'json\'` dropped — the parsed body IS the return value; `err.status` → `err.code`, where @omega.js/client puts the HTTP status). '
+            + 'What is left is yours to verify: `output`, and the route segment (`/backend-manager/` is now `/omega/`)',
+        });
+      }
+      entries.push({ line: i + 1, text: replaced });
+    }
+
+    if (rewroteCall) {
+      // ---- the options of each rewritten call
+      for (const start of callEntries) {
+        const column = entries[start].text.indexOf('omega.request(') + 'omega.request'.length;
+        const end = argumentSpanEnd(entries, start, column);
+        let sawOptions = false;
+
+        for (let i = start; i <= end; i++) {
+          const match = entries[i].text.match(RESPONSE_OPTION);
+          if (!match) continue;
+          sawOptions = true;
+          if (match[3] !== 'json') {
+            findings.push({
+              check: 'client-libs', line: entries[i].line, severity: 'warning',
+              message: `\`response: '${match[3]}'\` has no @omega.js/client equivalent — \`omega.request\` parses by content type and returns the body. Port this call's output handling by hand`,
+            });
+            continue;
+          }
+          const stripped = entries[i].text
+            .replace(RESPONSE_OPTION, (whole, lead, quote, value, trail) => (lead && trail ? trail : ''))
+            .replace(/\{\s+\}/, '{}');
+          if (stripped.trim() === '') removed.set(entries[i].line, '(removed — omega.request returns the parsed body)');
+          else entries[i].text = stripped;
+        }
+
+        // Options behind an identifier (`omega.request(url, OPTIONS)`): a text
+        // codemod cannot see inside them, and they are exactly where the dead
+        // wonderful-fetch keys hide.
+        const spanText = entries.slice(start, end + 1).map((entry) => entry.text).join('\n');
+        if (!sawOptions && /,\s*[A-Za-z_$][\w$]*\s*\)/.test(spanText)) {
           findings.push({
-            check: 'client-libs', line: i + 1, severity: 'warning',
-            message: '`authorizedFetch(…)` → `omega.request(…)`: same (url, options) shape and the same Bearer attach, but the options are @omega.js/client\'s — verify `response`/`output` and the route segment (`/backend-manager/` is now `/omega/`)',
+            check: 'client-libs', line: entries[start].line, severity: 'warning',
+            message: 'the options come from a variable — check it by hand for the wonderful-fetch keys (`response`, `output`) @omega.js/client does not have',
           });
         }
       }
-      out.push(replaced);
+
+      // ---- the error shape: authorizedFetch WAS this file's fetch, so an
+      // error caught here is one of its errors — but only INSIDE the block that
+      // binds it. Rewriting every `<name>.status` in the file by name renamed a
+      // same-named parameter of an unrelated function.
+      const scopes = catchScopes(lines.join('\n'));
+
+      for (const entry of entries) {
+        entry.text = entry.text.replace(STATUS_READ, (read, identifier) => {
+          const bound = scopes.some((scope) => scope.name === identifier && entry.line >= scope.start && entry.line <= scope.end);
+          if (bound) return `${identifier}.code`;
+          findings.push({
+            check: 'client-libs', line: entry.line, severity: 'warning',
+            message: `left \`${read}\` alone — @omega.js/client puts the HTTP status on \`error.code\` (request.js), and only the author knows whose \`.status\` this is`,
+          });
+          return read;
+        });
+      }
     }
+
+    // The edits, in source order: a removed line, then any line whose text moved.
+    const edits = [];
+    for (const entry of entries) {
+      const before = lines[entry.line - 1];
+      if (removed.has(entry.line)) continue;
+      if (entry.text !== before) edits.push({ rule: 'client-libs', line: entry.line, before: before.trim(), after: entry.text.trim() });
+    }
+    for (const [line, after] of removed) edits.push({ rule: 'client-libs', line, before: lines[line - 1].trim(), after });
+    edits.sort((a, b) => a.line - b.line);
 
     // `omega.request()` needs the singleton in scope. Every real consumer that
     // called authorizedFetch also imported web-manager (rule 13 renames that
     // import ahead of this one), so a miss here is a genuinely odd file — say
     // so rather than emit a module that throws on first call.
-    const result = fromLines(out, trailingNewline);
+    const result = fromLines(entries.filter((entry) => !removed.has(entry.line)).map((entry) => entry.text), trailingNewline);
     if (rewroteCall && !CLIENT_DEFAULT_IMPORT.test(result)) {
       findings.push({
         check: 'client-libs', line: 1, severity: 'error',
@@ -1174,9 +1696,9 @@ const heroSecondaryButton = {
 // Rule 23 — bare config sections in frontmatter → under a `config:` parent
 // (#607). A UJM-era page restated omega.json5 keys bare (`theme:`, `client:`,
 // `inbound:`), which merged into the same flat tree the config seeded and let
-// the two namespaces drift. The page lane is `config:` now, `meta` is the one
-// section that keeps its bare spelling, and the build ERRORS on any other —
-// so this rule is what carries a legacy page across.
+// the two namespaces drift. The page lane is `config:` now and the build
+// ERRORS on a bare config section — so this rule is what carries a legacy page
+// across. Page machinery (`meta:`, `schema:`) is not config and stays put.
 //
 // Runs LAST with the other inserting rules: it re-indents whole blocks, so
 // every line-numbered finding above it reports the pre-rewrite line.
@@ -1249,13 +1771,102 @@ const configParent = {
       findings: [{
         check: 'config-parent', line: moved[0].line, severity: 'warning',
         message: `moved ${moved.map((block) => `\`${block.key}\``).join(', ')} under \`config:\` — a page overrides omega.json5 there now (#607), `
-          + `and \`${PAGE_BARE_SECTIONS.join('`, `')}\` is the only section that keeps its bare spelling. Check the merged result renders what the page meant`,
+          + 'and no config section keeps a bare spelling. Check the merged result renders what the page meant',
+      }],
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 26 — the retired `append:` frontmatter flag
+// ([#607](https://github.com/Omega-JS-Stack/omega/issues/607), Ian 2026-08-26)
+//
+// `append: true` was the legacy UJM add-below contract kept behind a flag: the
+// page body rendered BELOW the layout's default `{% composition %}` instead of
+// replacing it. The flag is deleted — a page that wants the default bands
+// writes them (`omega customize <url>` materializes exactly that) — so a page
+// still carrying it renders the same as one without, and the key survives only
+// as an unknown frontmatter key the build strips with a warning. Dropped here,
+// with the finding that says what changed.
+//
+// Frontmatter-scoped and TOP-LEVEL only: `append` is a `| append:` Liquid
+// filter everywhere else, and an indented `append:` belongs to some other
+// block's data.
+// ---------------------------------------------------------------------------
+const appendFlag = {
+  id: 'append-flag',
+  title: 'the retired `append:` frontmatter flag → dropped',
+  apply(text) {
+    const { lines, trailingNewline } = toLines(text);
+    const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+    if (fenceEnd < 0) return { text, edits: [], findings: [] };
+
+    const at = lines.findIndex((line, index) => index > 0 && index < fenceEnd && /^append:/.test(line));
+    if (at < 0) return { text, edits: [], findings: [] }; // already migrated — idempotent
+
+    const out = [...lines];
+    out.splice(at, 1);
+
+    return {
+      text: fromLines(out, trailingNewline),
+      edits: [{ rule: 'append-flag', line: at + 1, before: lines[at].trim(), after: '' }],
+      findings: [{
+        check: 'append-flag', line: at + 1, severity: 'warning',
+        message: '`append: true` is gone (#607) — a page body REPLACES the layout\'s default composition, and there is no '
+          + 'flag to keep both. Run `omega customize <url>` to materialize the default bands into this page, then edit them '
+          + 'with your own content below',
+      }],
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rule 25 — the UJM `random_id` global → an `omega_random` assign
+// ([#595](https://github.com/Omega-JS-Stack/omega/issues/595))
+//
+// UJM handed every render a fresh `random_id`, and consumer includes scoped
+// repeated markup with it (`id="tool-faq-{{ random_id }}"`). OMEGA has no such
+// global, so the read renders EMPTY and every accordion on the page shares one
+// container id — silently. `omega_random` is the successor, and the idiom is
+// one assign at the top of the file, which the reads then keep spelling
+// exactly as they did.
+//
+// Runs LAST: it inserts a line at the top, so every line-numbered edit and
+// finding above it reports the pre-insert line.
+// ---------------------------------------------------------------------------
+const randomIdGlobal = {
+  id: 'random-id',
+  title: '`{{ random_id }}` (the UJM per-render global) → `{% assign random_id = 100 | omega_random %}`',
+  apply(text) {
+    const reads = randomIdReads(text);
+    if (!reads.length || assignsRandomId(text)) return { text, edits: [], findings: [] }; // already migrated — idempotent
+
+    const { lines, trailingNewline } = toLines(text);
+    // Under the frontmatter fence if there is one: an assign inside it is YAML,
+    // not Liquid. A file with no fence (an include, the shape that carried this
+    // idiom) takes line 1.
+    const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+    const at = fenceEnd < 0 ? 0 : fenceEnd + 1;
+
+    const out = [...lines];
+    out.splice(at, 0, RANDOM_ID_ASSIGN_IDIOM);
+
+    return {
+      text: fromLines(out, trailingNewline),
+      edits: [{ rule: 'random-id', line: at + 1, before: '', after: RANDOM_ID_ASSIGN_IDIOM }],
+      findings: [{
+        check: 'random-id', line: reads[0].line, severity: 'warning',
+        message: `\`random_id\` was a UJM per-render GLOBAL and OMEGA has none — unported it renders empty and every id it scopes collides. `
+          + `Migrate wrote \`${RANDOM_ID_ASSIGN_IDIOM}\` at the top of the file; check the value's range suits the ids it builds`,
       }],
     };
   },
 };
 
 const RULES = [
+  iconTagMarkup,       // 27 — FIRST: the icon tag stops being a tag (#619), so
+                       //      neither the uj_→omega_ rename nor the tag-arg
+                       //      hoist may see one
   legacyPrefix,        // 0 — must precede every rule that matches tag names
   pageResolved,        // 1
   bracketLayout,       // 2
@@ -1277,9 +1888,14 @@ const RULES = [
                        //      rules 9 and 12 answer to (`site.analytics.…`,
                        //      `themes/[ site.theme.id ]/…`), so it goes after
                        //      every rule that reads one
+  appendFlag,          // 26 — before the re-indenting rules: it deletes a
+                       //      frontmatter line, so its own finding is the
+                       //      pre-move line like every rule above
   sectionArgs,         // 18 — the INSERTING rules go last, so every
   heroSecondaryButton, // 22   line-numbered finding above them reports the
   configParent,        // 23   pre-rewrite line
+  randomIdGlobal,      // 25 — LAST: it inserts at the TOP, which moves every
+                       //      other line in the file
 ];
 
 // The consumer-JS table (src/**/*.js — the tree the template walk skips).
@@ -1304,4 +1920,10 @@ const JSON_RULES = [
   configReads,         // 24 — a binding that emits config renders empty too (#611)
 ];
 
-module.exports = { RULES, JS_RULES, JSON_RULES, VALID_PAGE_PROPS, MANUAL_PAGE_PROPS, PACKAGED_THEMES };
+module.exports = {
+  RULES, JS_RULES, JSON_RULES,
+  // Rule 24 alone, for the ONE file that is not a template and still carries
+  // reads: the brand's own omega.json5 (#671, migrate/index.js step 2b).
+  configReads,
+  VALID_PAGE_PROPS, MANUAL_PAGE_PROPS, PACKAGED_THEMES,
+};

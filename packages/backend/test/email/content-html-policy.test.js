@@ -23,15 +23,16 @@
  * test/routes/marketing/campaign.test.js.
  */
 const assert = require('node:assert');
-const prepare = require('../../src/manager/libraries/email/prepare.js');
-const { buildCampaignDoc } = require('../../src/manager/routes/marketing/campaign/utils.js');
+const prepare = require('../../dist/manager/libraries/email/prepare.js');
+const { buildCampaignDoc } = require('../../dist/manager/routes/marketing/campaign/utils.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The internal lane's build runs for real so the passthrough is proven all the way to
 // the SendGrid payload, not just at renderContent().
 function transactionalBuild(settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
+  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
   const Manager = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
@@ -51,7 +52,7 @@ function transactionalBuild(settings) {
   }).then((email) => email.content[0].value);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email internal-only send fields (content.html, html, contentHtml, trustedContent)',
   type: 'group',
   tests: [
@@ -127,7 +128,7 @@ module.exports = {
         // The tool schema is what an admin-authenticated AI reads. #125 removed the
         // 'Raw HTML body (alternative to template)' parameter; if it ever comes back,
         // the lane is advertising the bypass again.
-        const sendEmail = require('../../src/mcp/tools.js').find((tool) => tool.name === 'send_email');
+        const sendEmail = require('../../dist/mcp/tools.js').find((tool) => tool.name === 'send_email');
 
         assert.ok(sendEmail, 'send_email tool not found — update this test');
         assert.equal(sendEmail.inputSchema.properties.html, undefined, 'send_email re-advertises the html parameter');
@@ -209,7 +210,7 @@ module.exports = {
         // internalOnlyFieldFault() in the handler is the BRACES — the moment either
         // field is declared on a schema (or a consumer route forwards raw settings),
         // the guard is what stops it. If this test ever fails, the guard is live.
-        const emailSchema = require('../../src/manager/schemas/admin/email/post.js')();
+        const emailSchema = require('../../dist/manager/schemas/admin/email/post.js')();
         const email = emailSchema.parse({
           to: 'a@b.co',
           subject: 's',
@@ -227,7 +228,7 @@ module.exports = {
         // the handler guard rather than a schema strip.
         assert.equal(email.data.content.html, '<img src=x onerror=alert(1)>', 'data.content.html no longer passes the schema — update this test');
 
-        const campaignSchema = require('../../src/manager/schemas/marketing/campaign/post.js')();
+        const campaignSchema = require('../../dist/manager/schemas/marketing/campaign/post.js')();
         const campaign = campaignSchema.parse({ name: 'n', subject: 's', contentHtml: '<img src=x>', trustedContent: true });
 
         assert.equal(campaign.contentHtml, undefined, 'campaign schema admitted contentHtml');
@@ -266,4 +267,4 @@ module.exports = {
       },
     },
   ],
-};
+});

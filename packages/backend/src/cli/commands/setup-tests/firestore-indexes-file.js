@@ -51,7 +51,12 @@ class FirestoreIndexesFileTest extends BaseTest {
       // indexes from (friction #8's second head: this fix used the same
       // shell-redirect that poisons the file with the 403 text). Seed the
       // template's empty shape; the emulator needs no composite indexes.
-      if (this.isDemoProject) {
+      // A shared project has a live set, but it is every tenant brand's, not
+      // this one's — pulling it writes another tenant's indexes into this
+      // brand's repo, and this ungated pull runs BEFORE the gated sync check
+      // ([#716](https://github.com/Omega-JS-Stack/omega/issues/716)). Seed the
+      // same template and let the brand author its own.
+      if (this.isDemoProject || this.isSharedProject) {
         jetpack.copy(path.resolve(__dirname, '../../../../templates', name), filePath);
         return;
       }

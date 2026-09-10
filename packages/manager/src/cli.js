@@ -15,6 +15,8 @@ const ALIASES = {
   onboard: ['-o', '--onboard', 'create', 'new'],
   dev: ['--dev', 'serve'], // brand-root local stack (web + backend by default)
   deploy: ['--deploy'], // brand-root deliberate publish fan-out (backend first)
+  build: ['--build'], // brand-root build fan-out, every target type (#603)
+  clean: ['--clean'], // brand-root clean fan-out, every target type (#603)
   update: ['--update', 'outdated', 'out'], // brand-root dependency-freshness fan-out (devkit update per target)
   test: ['--test'],
   version: ['-v', '--version'],

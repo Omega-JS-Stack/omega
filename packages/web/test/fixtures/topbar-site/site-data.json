@@ -1,6 +1,5 @@
 {
   "url": "https://topbar.example.com",
   "brand": { "id": "topbar", "name": "TopbarCo", "description": "Action-sizing test brand" },
-  "meta": { "title": "TopbarCo", "description": "Topbar meta description" },
   "theme": { "id": "classy" }
 }

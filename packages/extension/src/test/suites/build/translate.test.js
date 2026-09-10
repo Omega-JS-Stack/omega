@@ -11,6 +11,7 @@ const jetpack = require('fs-jetpack');
 
 const { composeMessages, readTranslatedDescription } = require('../../../gulp/tasks/translate.js');
 const { hashKey, saveCache } = require('@omega.js/devkit/translate');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const EN_MESSAGES = {
   appName: { message: 'OMEGA', description: 'The name of the extension.' },
@@ -18,7 +19,7 @@ const EN_MESSAGES = {
   btnTooltip: { message: 'Click to open', description: 'Tooltip for the button.' },
 };
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'translation glue (devkit engine consumers)',
@@ -81,4 +82,4 @@ module.exports = {
       },
     },
   ],
-};
+});

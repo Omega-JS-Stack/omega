@@ -18,7 +18,8 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
+const { envPort, CLASSIC_PORTS } = require('../../dist/vendor/config/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The REAL shipped ruleset, read straight from templates/ — the same file the
 // verbs' scaffold copies into a brand's target root as `database.rules.json`
@@ -67,7 +68,7 @@ async function environment() {
   return env;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Realtime Database security rules for sessions',
   type: 'group',
   timeout: 30000,
@@ -166,4 +167,4 @@ module.exports = {
       },
     },
   ],
-};
+});

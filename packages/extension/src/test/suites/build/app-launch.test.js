@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 
@@ -24,7 +25,7 @@ function contextSource(name) {
     .replace(/(^|[^:])\/\/.*$/gm, (match, before) => before + ' '.repeat(match.length - before.length));
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'app_launch — the contexts that count as a launch',
@@ -61,4 +62,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -57,6 +57,18 @@ Manager.getApiUrl()  // the app's API URL — the SSOT for calling the backend
 
 **Apps should launch the flow through `manager.openAuthFlow()` (main process), not by opening `getAuthUrl()` themselves**: production opens `getAuthUrl()` externally as-is (the OS routes the custom scheme back), while dev/test — where the scheme is NOT OS-registered (protocol.js registers only in production, and macOS can't runtime-register schemes missing from the bundle's Info.plist) — swap the final hop for a one-shot, nonce-checked loopback HTTP listener (RFC 8252 §7.3) that feeds the token into the SAME deep-link pipeline. Sign-in always happens in the user's REAL default browser (their existing session/SSO), never an embedded window. Requires @omega.js/client ≥ 4.3.4 on the website (`isValidRedirectUrl` accepts loopback hosts while the SITE runs in dev). See [src/lib/auth-flow.js](../src/lib/auth-flow.js).
 
+All three local helpers resolve from whichever channel the process has: the `OMEGA_*_PORT` env vars (the CLI that booted the stack publishes them), the `dev` map the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, so a bumped emulator port reaches it only this way, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), and the classic default. `getApiUrl()` and `getFunctionsUrl()` read them in exactly that order; `getWebsiteUrl()` takes its baked cell first, for the reason under the table:
+
+| Helper | Env channel | Baked channel | Classic |
+|---|---|---|---|
+| `getApiUrl()` | `OMEGA_HTTPS_PORT`, else `OMEGA_HOSTING_PORT` | `dev.ports.https`, else `dev.ports.hosting` | 5002 |
+| `getFunctionsUrl()` | `OMEGA_FUNCTIONS_PORT` | `dev.ports.functions` | 5001 |
+| `getWebsiteUrl()` | `OMEGA_WEBSITE_PORT`, composed as `https://localhost:<port>` | `dev.origin` (the whole origin) first, else `dev.ports.website` | `https://localhost:4000` |
+
+The first two rows are port chains: each cell names a port, and the helper builds the URL around it. The website row is an ORIGIN chain ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)): the baked `dev.origin` the live website published carries scheme, host AND port, so it is the complete fact and outranks both port cells; only when it is absent does a port compose an origin, over **https**, because `omega dev` fronts its public port with the mkcert proxy by default and a port number alone can never say the scheme. Whenever the website published an origin, that is the same answer `@omega.js/client`'s `getDevWebsiteOrigin()` gives every other surface ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)), and `getAuthUrl()` inherits it by construction.
+
+A resolved `OMEGA_HTTPS_PORT` (or a baked `dev.ports.https`) means `omega serve`'s mkcert proxy is up, so the api URL is https. That is the same three-step chain @omega.js/extension's `getApiUrl()` walks, and the same one client-bridge uses for the auth emulator port (`OMEGA_AUTH_PORT` → `dev.ports.auth` → 9099, [client-bridge.md](client-bridge.md)).
+
 Resolving local in test mode is required because tests hit the local emulator — without it, the app (and tests calling `getApiUrl()`) would leak to the live production server.
 
 > The URL helpers live in [src/utils/url-helpers.js](../src/utils/url-helpers.js) and depend on `this.getEnvironment()` (from mode-helpers.js) being mixed in — both `attachTo` calls run at the bottom of every Manager entry point.

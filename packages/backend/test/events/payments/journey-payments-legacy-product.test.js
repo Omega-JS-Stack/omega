@@ -14,7 +14,9 @@
  * This test is config-dependent — it requires at least one product with legacyProductIds.
  * If no such product exists, the test skips gracefully.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: webhook with legacy product ID → correct product resolution',
   type: 'suite',
   timeout: 30000,
@@ -146,4 +148,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -15,9 +15,10 @@
  * REAL, copied from `ps -A -o pid=,ppid=,command=` against a booted sandbox
  * emulator — the fixture is what the sweep actually reads, not an invention.
  */
-const EmulatorCommand = require('../../src/cli/commands/emulator.js');
+const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const { isOwnedEmulatorProcess, isReapableOrphan, ownershipFromRecord } = EmulatorCommand;
+const { isOwnedEmulatorProcess, ownershipFromRecord } = EmulatorCommand;
 
 const OURS = 'demo-sandbox-brand';
 
@@ -36,7 +37,7 @@ const FOREIGN_FIRESTORE_JAR = FIRESTORE_JAR.replace(OURS, 'demo-other-brand');
 // reparented to PID 1, so an orphan-shaped check matches it too.
 const RELOAD_WATCHER = 'node /Users/ian/.nvm/versions/node/v22.22.1/bin/nodemon --on-change-only --delay 1 --watch /Users/ian/Developer/Repositories/Omega/omega/packages/backend/src --ext js,json --exec node -e "fs.writeFileSync(\'/Users/ian/Developer/Repositories/Omega/omega/brands/sandbox-brand/targets/backend/.temp/emulator.log.reset\',\'\')"';
 
-module.exports = {
+module.exports = defineCases({
   description: 'emulator orphan sweep ownership matcher',
   type: 'group',
 
@@ -115,61 +116,14 @@ module.exports = {
       },
     },
 
-    // ─── the PRE-BOOT reaper ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)) ───
-
-    {
-      name: 'the-pre-boot-reaper-needs-the-same-ownership-proof',
-      async run({ assert }) {
-        // The shutdown sweep was hardened; the reaper that runs BEFORE boot
-        // was not. It killed any ppid-1 process on the wanted ports whose
-        // command line merely matched /emulator|firebase/i — a name is not
-        // ownership, and both of these rows match that pattern.
-        assert.equal(isReapableOrphan({ pid: 51001, ppid: 1, command: FOREIGN_FIRESTORE_JAR }, { pids: [], projectId: OURS }), false);
-        assert.equal(isReapableOrphan({ pid: 51002, ppid: 1, command: FOREIGN_EMULATOR_CLI }, { pids: [], projectId: OURS }), false);
-      },
-    },
-
-    {
-      name: 'the-reload-watcher-survives-the-pre-boot-reaper',
-      async run({ assert }) {
-        // The worst row for a name-only signature: it is reparented to PID 1
-        // by design and its command line names firebase paths, so the old
-        // reaper killed another session's watcher on every boot.
-        assert.equal(isReapableOrphan({ pid: 60001, ppid: 1, command: RELOAD_WATCHER }, { pids: [], projectId: OURS }), false);
-      },
-    },
-
-    {
-      name: 'our-own-crash-leftovers-are-still-reaped',
-      async run({ assert }) {
-        // What the reaper exists for: a previous run of THIS project died
-        // without teardown and its java emulators squat the classic ports
-        // forever. Both proofs work — the record it wrote while up, and a
-        // command line naming this project.
-        assert.equal(isReapableOrphan({ pid: 37360, ppid: 1, command: PUBSUB_JAR }, { pids: [37360], projectId: OURS }), true);
-        assert.equal(isReapableOrphan({ pid: 37088, ppid: 1, command: FIRESTORE_JAR }, { pids: [], projectId: OURS }), true);
-      },
-    },
-
-    {
-      name: 'a-process-with-a-living-parent-is-never-a-crash-leftover',
-      async run({ assert }) {
-        // The orphan half of the proof stands: something whose parent is alive
-        // belongs to a RUNNING stack — ours (a re-boot while up) or a
-        // sibling's. The allocator bumps around it exactly as before.
-        assert.equal(isReapableOrphan({ pid: 37088, ppid: 34965, command: FIRESTORE_JAR }, { pids: [37088], projectId: OURS }), false);
-        assert.equal(isReapableOrphan({ pid: 37088, command: FIRESTORE_JAR }, { pids: [37088], projectId: OURS }), false, 'an unreadable ppid is not an orphan');
-      },
-    },
-
     // ─── the pid record's shelf life ───
 
     {
       name: 'a-fresh-pid-record-is-evidence',
       async run({ assert }) {
-        const record = { pids: [37088, 37360], projectId: OURS, rootPid: 34965, startedAt: new Date().toISOString() };
+        const record = { pids: [37088, 37360], projectId: OURS, rootPid: 34965, ports: { firestore: 8080 }, startedAt: new Date().toISOString() };
 
-        assert.deepEqual(ownershipFromRecord(record), { pids: [37088, 37360], projectId: OURS, rootPid: 34965 });
+        assert.deepEqual(ownershipFromRecord(record), { pids: [37088, 37360], projectId: OURS, rootPid: 34965, ports: { firestore: 8080 } });
       },
     },
 
@@ -188,7 +142,7 @@ module.exports = {
           startedAt: new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
         };
 
-        assert.deepEqual(ownershipFromRecord(record), { pids: [], projectId: OURS, rootPid: 34965 });
+        assert.deepEqual(ownershipFromRecord(record), { pids: [], projectId: OURS, rootPid: 34965, ports: {} });
       },
     },
 
@@ -199,7 +153,7 @@ module.exports = {
         // unknown age is treated as expired, never as fresh.
         assert.deepEqual(ownershipFromRecord({ pids: [37088], projectId: OURS }).pids, []);
         assert.deepEqual(ownershipFromRecord({ pids: [37088], projectId: OURS, startedAt: 'whenever' }).pids, []);
-        assert.deepEqual(ownershipFromRecord(null), { pids: [], projectId: null, rootPid: null });
+        assert.deepEqual(ownershipFromRecord(null), { pids: [], projectId: null, rootPid: null, ports: {} });
         assert.deepEqual(ownershipFromRecord({ pids: 'nope', startedAt: new Date().toISOString() }).pids, []);
       },
     },
@@ -220,4 +174,4 @@ module.exports = {
       },
     },
   ],
-};
+});

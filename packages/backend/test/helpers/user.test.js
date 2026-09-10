@@ -4,7 +4,8 @@
  *
  * Tests the declarative schema resolver: defaults, passthrough, templates, type coercion
  */
-const User = require('../../src/manager/helpers/user.js');
+const User = require('../../dist/manager/helpers/user.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock Manager with minimal Utilities
 const Manager = {
@@ -17,7 +18,7 @@ function createUser(settings) {
   return new User(Manager, settings).properties;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'User() schema resolver',
   type: 'group',
 
@@ -71,16 +72,17 @@ module.exports = {
         assert.equal(typeof user.api.privateKey, 'string', 'api.privateKey should be string');
         assert.ok(user.api.privateKey.length > 0, 'api.privateKey should not be empty');
 
-        // Usage
-        assert.deepEqual(user.usage, {}, 'usage should be empty object by default');
+        // Usage — no counters until a feature is consumed, and the override
+        // map the schema always declares (#647)
+        assert.deepEqual(user.usage, { overrides: {} }, 'usage should hold only the empty override map by default');
 
         // Personal
         assert.equal(user.personal.name.first, null, 'personal.name.first should be null');
         assert.equal(user.personal.name.last, null, 'personal.name.last should be null');
         assert.equal(user.personal.telephone.countryCode, 0, 'telephone.countryCode should be 0');
 
-        // OAuth2
-        assert.deepEqual(user.oauth2, {}, 'oauth2 should be empty object');
+        // Connections
+        assert.deepEqual(user.connections, {}, 'connections should be empty object');
 
         // Attribution
         assert.equal(user.attribution.affiliate.code, null, 'attribution.affiliate.code should be null');
@@ -123,10 +125,10 @@ module.exports = {
       },
     },
 
-    // ─── $passthrough: oauth2 ───
+    // ─── $passthrough: connections ───
 
     {
-      name: 'oauth2-passthrough-preserves-provider-data',
+      name: 'connections-passthrough-preserves-provider-data',
       async run({ assert }) {
         const googleToken = {
           access_token: 'ya29.xxx',
@@ -139,7 +141,7 @@ module.exports = {
         };
 
         const user = createUser({
-          oauth2: {
+          connections: {
             google: {
               token: googleToken,
               identity: { email: 'g@gmail.com', name: 'Test' },
@@ -150,18 +152,18 @@ module.exports = {
           },
         });
 
-        assert.equal(user.oauth2.google.token.access_token, 'ya29.xxx', 'google access_token preserved');
-        assert.equal(user.oauth2.google.token.refresh_token, '1//xxx', 'google refresh_token preserved');
-        assert.equal(user.oauth2.google.identity.email, 'g@gmail.com', 'google identity preserved');
-        assert.equal(user.oauth2.microsoft.token.access_token, 'eyJ.xxx', 'microsoft token preserved');
+        assert.equal(user.connections.google.token.access_token, 'ya29.xxx', 'google access_token preserved');
+        assert.equal(user.connections.google.token.refresh_token, '1//xxx', 'google refresh_token preserved');
+        assert.equal(user.connections.google.identity.email, 'g@gmail.com', 'google identity preserved');
+        assert.equal(user.connections.microsoft.token.access_token, 'eyJ.xxx', 'microsoft token preserved');
       },
     },
 
     {
-      name: 'oauth2-empty-when-not-provided',
+      name: 'connections-empty-when-not-provided',
       async run({ assert }) {
         const user = createUser({});
-        assert.deepEqual(user.oauth2, {}, 'oauth2 should be empty object when not provided');
+        assert.deepEqual(user.connections, {}, 'connections should be empty object when not provided');
       },
     },
 
@@ -204,8 +206,8 @@ module.exports = {
       async run({ assert }) {
         const user = createUser({
           usage: {
-            requests: { monthly: 10, total: 100, last: { id: 'r1', timestamp: '2025-01-01T00:00:00.000Z', timestampUNIX: 1735689600 } },
-            emails: { monthly: 5, total: 50, last: { id: 'e1', timestamp: '2025-01-02T00:00:00.000Z', timestampUNIX: 1735776000 } },
+            requests: { monthly: 10, total: 100, last: { timestamp: '2025-01-01T00:00:00.000Z', timestampUNIX: 1735689600 } },
+            emails: { monthly: 5, total: 50, last: { timestamp: '2025-01-02T00:00:00.000Z', timestampUNIX: 1735776000 } },
             sends: { monthly: 3, total: 30 },
           },
         });
@@ -213,17 +215,16 @@ module.exports = {
         // Defined key (requests)
         assert.equal(user.usage.requests.monthly, 10, 'requests.monthly preserved');
         assert.equal(user.usage.requests.total, 100, 'requests.total preserved');
-        assert.equal(user.usage.requests.last.id, 'r1', 'requests.last.id preserved');
+        assert.equal(user.usage.requests.last.timestamp, '2025-01-01T00:00:00.000Z', 'requests.last.timestamp preserved');
 
         // Dynamic key (emails) — full data
         assert.equal(user.usage.emails.monthly, 5, 'emails.monthly preserved');
         assert.equal(user.usage.emails.total, 50, 'emails.total preserved');
-        assert.equal(user.usage.emails.last.id, 'e1', 'emails.last.id preserved');
+        assert.equal(user.usage.emails.last.timestamp, '2025-01-02T00:00:00.000Z', 'emails.last.timestamp preserved');
 
         // Dynamic key (sends) — partial data, template fills in missing
         assert.equal(user.usage.sends.monthly, 3, 'sends.monthly preserved');
         assert.equal(user.usage.sends.total, 30, 'sends.total preserved');
-        assert.equal(user.usage.sends.last.id, null, 'sends.last.id defaulted to null');
         assert.ok(user.usage.sends.last.timestamp, 'sends.last.timestamp defaulted');
         assert.equal(typeof user.usage.sends.last.timestampUNIX, 'number', 'sends.last.timestampUNIX defaulted to number');
       },
@@ -234,7 +235,7 @@ module.exports = {
       async run({ assert }) {
         const user = createUser({});
 
-        assert.deepEqual(user.usage, {}, 'usage should be empty object when no keys provided');
+        assert.deepEqual(user.usage, { overrides: {} }, 'usage should hold only the override map when no counters are provided');
       },
     },
 
@@ -421,7 +422,7 @@ module.exports = {
         const user = createUser({});
         const expectedKeys = [
           'auth', 'subscription', 'roles', 'flags', 'affiliate',
-          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent', 'metadata',
+          'activity', 'api', 'owns', 'usage', 'personal', 'connections', 'attribution', 'trackingConsent', 'consent', 'metadata',
         ];
 
         for (const key of expectedKeys) {
@@ -436,7 +437,7 @@ module.exports = {
         const user = createUser({});
         const expectedKeys = [
           'auth', 'subscription', 'roles', 'flags', 'affiliate',
-          'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent', 'metadata',
+          'activity', 'api', 'owns', 'usage', 'personal', 'connections', 'attribution', 'trackingConsent', 'consent', 'metadata',
         ];
 
         for (const key of Object.keys(user)) {
@@ -728,7 +729,7 @@ module.exports = {
           flags: { signupProcessed: true, onboarded: true },
           affiliate: { code: 'IAN7', referrals: ['ref1', 'ref2'] },
           api: { clientId: 'uuid-123', privateKey: 'key-456' },
-          oauth2: {
+          connections: {
             google: {
               token: { access_token: 'ya29.real', refresh_token: '1//real', expiry_date: 1700000000 },
               identity: { email: 'ian@gmail.com', name: 'Ian W', picture: 'https://photo.url' },
@@ -757,8 +758,8 @@ module.exports = {
         assert.equal(user.affiliate.code, 'IAN7', 'affiliate code preserved');
         assert.deepEqual(user.affiliate.referrals, ['ref1', 'ref2'], 'referrals preserved');
         assert.equal(user.api.clientId, 'uuid-123', 'api clientId preserved');
-        assert.equal(user.oauth2.google.token.access_token, 'ya29.real', 'oauth2 token preserved');
-        assert.equal(user.oauth2.google.identity.email, 'ian@gmail.com', 'oauth2 identity preserved');
+        assert.equal(user.connections.google.token.access_token, 'ya29.real', 'connections token preserved');
+        assert.equal(user.connections.google.identity.email, 'ian@gmail.com', 'connections identity preserved');
         assert.equal(user.usage.emails.monthly, 42, 'usage emails preserved');
         assert.equal(user.personal.name.first, 'Ian', 'name preserved');
         assert.equal(user.personal.company.name, 'ITW Creative Works', 'company preserved');
@@ -767,4 +768,4 @@ module.exports = {
       },
     },
   ],
-};
+});

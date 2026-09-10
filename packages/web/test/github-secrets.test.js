@@ -67,7 +67,7 @@ test('collect: the SCHEMA names the keys, the composed env supplies the values (
   // A key nobody declared for web is not a web secret, however it got into the
   // cascade — the published set is the schema's `delivery: { web: … }` list.
   const dir = tmpTarget('OPENAI_API_KEY=sk\nMY_CUSTOM_THING=custom\nlowercase=nope\nRECAPTCHA_SITE_KEY=\n');
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir }), { OPENAI_API_KEY: 'sk' });
+  assert.deepStrictEqual(collectEnvSecrets(dir), { OPENAI_API_KEY: 'sk' });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -76,7 +76,7 @@ test('collect: the composed env is FILES only — the shell is never a source (#
 
   process.env.OMEGA_TEST_USER_UID = 'shell-only';
   try {
-    assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), { GH_TOKEN: 'brand-token' });
+    assert.deepStrictEqual(collectEnvSecrets(target), { GH_TOKEN: 'brand-token' });
   } finally {
     delete process.env.OMEGA_TEST_USER_UID;
   }
@@ -88,7 +88,7 @@ test('collect: the brand-root .env alone supplies the target — no target .env 
   const { brand, target } = tmpBrand({ brandEnv: 'GH_TOKEN=brand-token\nOPENAI_API_KEY=brand-openai\n' });
 
   assert.ok(!fs.existsSync(path.join(target, '.env')), 'the target ships no .env of its own');
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+  assert.deepStrictEqual(collectEnvSecrets(target), {
     GH_TOKEN: 'brand-token',
     OPENAI_API_KEY: 'brand-openai',
   });
@@ -102,7 +102,7 @@ test('collect: a target .env overrides the brand root per key (#678)', () => {
     targetEnv: 'GH_TOKEN=target-token\nLOCAL_ONLY=local-value\n',
   });
 
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+  assert.deepStrictEqual(collectEnvSecrets(target), {
     GH_TOKEN: 'target-token',
     OPENAI_API_KEY: 'brand-openai',
   });
@@ -121,7 +121,7 @@ test('collect: the env schema decides what rides down — a backend key stays ho
     ].join('\n'),
   });
 
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {
+  assert.deepStrictEqual(collectEnvSecrets(target), {
     GOOGLE_ANALYTICS_SECRET: 'web-stream',
   });
 
@@ -135,11 +135,11 @@ test('#454: machine-local keys never publish, from any layer', () => {
   assert.ok(!WEB_KEYS.includes('OMEGA_FONTAWESOME_ROOT'), 'and it is not a web delivery');
 
   const dir = tmpTarget('OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\nOPENAI_API_KEY=sk\n');
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: dir }), { OPENAI_API_KEY: 'sk' });
+  assert.deepStrictEqual(collectEnvSecrets(dir), { OPENAI_API_KEY: 'sk' });
 
   // Nor from the brand root, where the cascade otherwise delivers it to web.
   const { brand, target } = tmpBrand({ brandEnv: 'OMEGA_FONTAWESOME_ROOT=/Users/ian/.omega/fontawesome\n' });
-  assert.deepStrictEqual(collectEnvSecrets({ targetDir: target }), {});
+  assert.deepStrictEqual(collectEnvSecrets(target), {});
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(brand, { recursive: true, force: true });
@@ -152,6 +152,35 @@ test('#454: a machine-local key never reaches the workflow env block either', ()
   const workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
 
   assert.ok(!workflow.includes('OMEGA_FONTAWESOME_ROOT'), 'the machine-local path is not injected into CI');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('#715: no scaffold workflow gates a step on the `secrets` context — GitHub refuses the whole file', () => {
+  // The `secrets` context is unavailable in EVERY `if` expression; one such
+  // line makes the server reject the workflow before it runs a job, so the
+  // consumer sees a zero-job "workflow file issue" run on every push.
+  const workflowDir = path.join(__dirname, '..', 'scaffold', '.github', 'workflows');
+
+  for (const name of fs.readdirSync(workflowDir)) {
+    const template = fs.readFileSync(path.join(workflowDir, name), 'utf8');
+    for (const line of template.split('\n')) {
+      if (!/^\s*if:/.test(line)) continue;
+      assert.ok(!line.includes('secrets.'), `${name} gates a step on the secrets context: ${line.trim()}`);
+    }
+  }
+
+  // A secret-conditional step reads the value through the workflow env block.
+  const dir = tmpTarget('GH_TOKEN=ghp\n');
+  scaffoldDefaults({ outputDir: dir, logger: quiet });
+  const workflow = fs.readFileSync(path.join(dir, '.github', 'workflows', 'build.yml'), 'utf8');
+
+  assert.ok(workflow.includes('\n  CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}'),
+    'the purge token is hoisted into the workflow env block');
+  assert.ok(workflow.includes("if: env.CLOUDFLARE_TOKEN != ''"), 'the purge step gates on env');
+  // …and the publish lane arms that gate: without the repo secret the
+  // expression is permanently false and the purge step can never fire (#728)
+  assert.ok(WEB_KEYS.includes('CLOUDFLARE_TOKEN'), 'the purge token publishes as a repo Actions secret');
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -193,7 +222,12 @@ test('workflow: the scaffolded block is the schema set — the same block for an
   const second = scaffoldDefaults({ outputDir: dir, logger: quiet });
   const reread = fs.readFileSync(workflowPath, 'utf8');
 
-  assert.ok(!reread.includes('\n  CLOUDFLARE_TOKEN:'), 'an undeclared key never enters the generated block');
+  assert.ok(!renderSecretsBlock('web').includes('CLOUDFLARE_TOKEN'), 'the template declares it itself — the generated block never restates it (#728)');
+  assert.strictEqual(
+    (reread.match(/^ {2}CLOUDFLARE_TOKEN:/gm) || []).length,
+    1,
+    "the only CLOUDFLARE_TOKEN env key is the template's own purge gate (#715)",
+  );
   assert.strictEqual(reread, workflow, 'the block is unchanged');
   assert.ok(!second.written.includes('.github/workflows/build.yml'), 'idempotent: identical block is not a write');
 
@@ -309,14 +343,14 @@ test('setup step: a remote that is not the brand\'s own repo skips loudly (never
     }),
     { skipped: 'repo-mismatch' },
   );
-  assert.match(messages.join('\n'), /remote here is Omega-JS-Stack\/omega, but this brand's repo is acme\/my-brand/);
+  assert.match(messages.join('\n'), /remote here is Omega-JS-Stack\/omega, but this brand's repo is acme\/my-brand-omega/);
 
   // Same brand, checked out as its own repo → publishes.
   const published = publishEnvSecrets({
     targetDir: dir,
     logger: quiet,
     env: {},
-    gitExecFn: () => 'git@github.com:acme/my-brand.git\n',
+    gitExecFn: () => 'git@github.com:acme/my-brand-omega.git\n',
     execFn: () => '',
   });
   assert.deepStrictEqual(published.published, ['GH_TOKEN']);

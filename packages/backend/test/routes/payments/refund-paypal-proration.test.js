@@ -16,7 +16,8 @@
  *
  * Run: npx omega test backend:routes/payments/refund-paypal-proration
  */
-const paypalRefund = require('../../../src/manager/routes/payments/refund/providers/paypal.js');
+const paypalRefund = require('../../../dist/manager/routes/payments/refund/providers/paypal.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A stand-in for the PayPal HTTP client — the external boundary. It answers plan
 // lookups from the fixture it was built with and records what was asked for.
@@ -66,7 +67,7 @@ async function rejects(assert, promise, pattern, message) {
   assert.ok(false, `${message} — it resolved instead of refusing`);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal refund proration: the billing period is derived or refused',
   type: 'group',
 
@@ -186,4 +187,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -205,10 +205,15 @@ RouteContext.prototype.isTesting = function () {
   return this.Manager.isTesting();
 };
 
+// The account this request is acting as. The usage counter used to be able to
+// answer a DIFFERENT one (the retired `setUser()` proxy-billing swap), which is
+// why this read used to prefer it; the counter now only ever holds the
+// authenticated account, so the request is the one home
+// ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
 RouteContext.prototype.getUser = function () {
   const self = this;
 
-  return self?.usage?.user || self.request.user;
+  return self.request.user;
 };
 
 // Mix in the concern modules

@@ -8,6 +8,7 @@
     sub: 'string',
     sub_class: 'string',
     h1_class: 'string',
+    first_paint: 'boolean', // #467: this cluster IS the first viewport — drop the reveal attributes, the band's data-omega-first-paint owns the paint
   },
 
   defaults: {

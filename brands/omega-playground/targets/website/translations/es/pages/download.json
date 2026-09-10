@@ -40,7 +40,6 @@
   "e21f935f11d7": "Copiar",
   "936df3873b17": "Instala el paquete",
   "550a6557610e": "Para Debian/Ubuntu:",
-  "4cd6d51d0f59": "Para Fedora/RHEL:",
   "b32384fa2855": "Abre la aplicación Play Store",
   "4a2ecbd7fcea": "Toca \"Instalar\"",
   "cb9dda76b532": "Toca \"Abrir\"",
@@ -92,7 +91,6 @@
   "dda50b864933": " Descargar para Windows ",
   "d7c9a01a949c": "Ubuntu 18.04+ y similares",
   "9ad58e5ba8c6": " Paquete Debian ",
-  "0299332d450c": " Paquete Snap ",
   "164229e9e890": "En movimiento",
   "25ce6dd72f64": "En tu ",
   "9488b1710a66": " también",
@@ -181,5 +179,6 @@
   "bad57ef7837c": "Instagram",
   "d41f5b4977ee": "Facebook",
   "8fa3899e9b32": "Linkedin",
-  "053bc65874ad": "Discord"
+  "053bc65874ad": "Discord",
+  "5abd720ef990": " AppImage "
 }

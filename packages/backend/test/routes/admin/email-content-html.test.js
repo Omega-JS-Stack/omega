@@ -11,7 +11,9 @@
  *
  * The policy itself is unit-tested in test/email/content-html-policy.test.js.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Admin send email — data.content.html boundary (route)',
   type: 'group',
   tests: [
@@ -53,4 +55,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -12,6 +12,15 @@ async function run() {
   try {
     await Main.process(process.argv);
   } catch (e) {
+    // A crafted refusal (devkit scaffold-guard.js) prints its message alone, the
+    // same way every other framework's CLI prints it — one presentation for a
+    // refused command, never a failure's ✗ on one surface and plain lines on the
+    // next (#706).
+    if (e && e.refusal) {
+      console.error(e.message);
+      process.exit(1);
+    }
+
     // Print a clean one-line error instead of Node's raw UnhandledPromiseRejection
     // dump. Commands that intend a hard stop should `process.exit(1)` themselves
     // (e.g. setup's haltSetup); this is the catch-all backstop.

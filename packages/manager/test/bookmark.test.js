@@ -68,10 +68,10 @@ test('bookmark: full config derives every group with new-world shapes', () => {
   // Stripe links carry NO account slug (per-brand keys)
   assert.ok(links.Stripe.every((l) => l.url.startsWith('https://dashboard.stripe.com/')));
 
-  // GitHub: the ONE brand monorepo (repo defaults to brand id)
+  // GitHub: the ONE brand monorepo (repo defaults to `<brand.id>-omega`)
   assert.deepEqual(links.GitHub.map((l) => l.url), [
-    'https://github.com/fixture-org/fixture',
-    'https://github.com/fixture-org/fixture/actions',
+    'https://github.com/fixture-org/fixture-omega',
+    'https://github.com/fixture-org/fixture-omega/actions',
   ]);
 
   // Live: website + API subdomain (backend target present)
@@ -82,7 +82,7 @@ test('bookmark: groups with unmet inputs are absent', () => {
   const links = generateLinks({ brand: { id: 'bare', name: 'Bare' } }, []);
   assert.deepEqual(links, {});
 
-  // github.repo overrides the brand-id repo name; no backend target → no API link
+  // github.repo overrides the derived repo name; no backend target → no API link
   const partial = generateLinks(
     { brand: { id: 'p', url: 'https://p.example' }, repo: { providers: { github: { org: 'o', repo: 'custom-repo' } } } },
     [{ name: 'web', target: 'web' }],
@@ -90,6 +90,21 @@ test('bookmark: groups with unmet inputs are absent', () => {
   assert.deepEqual(Object.keys(partial), ['Search', 'GitHub', 'Live']);
   assert.equal(partial.GitHub[0].url, 'https://github.com/o/custom-repo');
   assert.deepEqual(partial.Live.map((l) => l.title), ['Website']);
+});
+
+test('bookmark: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
+  // The real shape this protects: ../omega-brand declares org Omega-JS-Stack and
+  // repo "itw-creative-works/omega-brand", so an owner read off `org` links to a
+  // repo that does not exist.
+  const links = generateLinks(
+    { brand: { id: 'acme', url: 'https://acme.example' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' } } } },
+    [{ name: 'web', target: 'web' }],
+  );
+
+  assert.deepEqual(links.GitHub.map((l) => l.url), [
+    'https://github.com/itw-creative-works/acme-app',
+    'https://github.com/itw-creative-works/acme-app/actions',
+  ]);
 });
 
 // ─── registration ────────────────────────────────────────────────────────────

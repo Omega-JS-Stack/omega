@@ -13,11 +13,12 @@
 //   4. Sign-out: any renderer can request sign-out via desktop:auth:sign-out. Main signs out
 //      its own Firebase + broadcasts desktop:auth:sign-out to all renderers.
 //
-// Firebase is BUNDLED by webpack from @omega.js/desktop's module context (@omega.js/client owns it in @omega.js/desktop's
+// Firebase is BUNDLED by esbuild from @omega.js/desktop's module context (@omega.js/client owns it in @omega.js/desktop's
 // tree). If loading fails, the bridge stays in no-op mode and logs the reason.
 
 const LoggerLite = require('./logger-lite.js');
 const authPersistence = require('./auth-persistence.js');
+const { localPort } = require('../utils/url-helpers.js');
 
 const logger = new LoggerLite('client-bridge');
 
@@ -69,9 +70,9 @@ const bridge = {
     bridge._initialized = true;
   },
 
-  // Load firebase. Returns true on success. BUNDLED by webpack from @omega.js/desktop's module context
-  // (@omega.js/client owns firebase in @omega.js/desktop's tree) — same treatment as json5 in main.js. It was
-  // previously a webpackIgnore'd runtime import(), which resolves relative to the CONSUMER's
+  // Load firebase. Returns true on success. BUNDLED by esbuild from @omega.js/desktop's module context
+  // (@omega.js/client owns firebase in @omega.js/desktop's tree) — same treatment as json5 in main.js. In the
+  // webpack era it was a webpackIgnore'd runtime import(), which resolves relative to the CONSUMER's
   // main.bundle.js: that walk never reaches @omega.js/desktop's node_modules when @omega.js/desktop is symlinked
   // (`mgr install dev`) and depends on npm hoisting when installed — every dev app silently
   // ran the bridge in no-op mode. Interop guards handle both namespace shapes (json5 precedent).
@@ -117,16 +118,23 @@ const bridge = {
     // A TESTING run talks to the LOCAL stack, never real auth — the same move
     // getApiUrl() makes when it maps testing to localhost, and the same one
     // @omega.js/extension's background SW makes for its emulator runs. Only
-    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched. The
-    // port arrives on the resolved-port env channel (N7), classic 9099 when unset.
+    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
     if (bridge._manager.isTesting()) {
       const { connectAuthEmulator } = bridge._firebaseModule;
-      const port = process.env.OMEGA_AUTH_PORT || 9099;
+      const port = bridge._authEmulatorPort();
       logger.log(`testing run — connecting auth to the emulator on :${port}`);
       connectAuthEmulator(bridge._firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
     }
 
     return bridge._firebaseAuth;
+  },
+
+  // The auth emulator's port, on the same three-step chain getApiUrl() walks:
+  // the resolved-port env channel (N7), then the `dev.ports` map the bundle
+  // baked into OMEGA_BUILD_JSON, then the classic 9099
+  // ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)).
+  _authEmulatorPort() {
+    return localPort(bridge._manager, 'OMEGA_AUTH_PORT', 'auth') || 9099;
   },
 
   _registerIpc() {

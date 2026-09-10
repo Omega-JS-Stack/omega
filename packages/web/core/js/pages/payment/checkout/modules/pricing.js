@@ -1,10 +1,12 @@
 // Pure pricing calculation -- no side effects, no state mutation
 
-// Resolve price for a frequency (handles both `{ amount: N }` and plain `N` formats)
+// Resolve price for a frequency. A catalog price is a bare number and nothing
+// else — the config validator refuses `{ amount: N }` outright, because this
+// page unwrapped it and every backend reader did not: the same entry priced the
+// summary correctly and reached the confirmation URL as `[object Object]`
+// ([#674](https://github.com/Omega-JS-Stack/omega/issues/674)).
 function resolvePrice(prices, key) {
-  const entry = prices?.[key];
-  if (entry == null) return 0;
-  return typeof entry === 'object' ? (entry.amount || 0) : Number(entry) || 0;
+  return Number(prices?.[key]) || 0;
 }
 
 // A discount code comes in one of TWO shapes, and the server returns exactly

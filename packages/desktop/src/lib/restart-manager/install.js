@@ -93,7 +93,8 @@ function parseFeed(ymlText) {
 
 /**
  * Pick the install artifact for a platform from a parsed feed.
- *   darwin — zip, preferring `-<arch>-mac.zip` → `-universal-mac.zip` → `-mac.zip`
+ *   darwin — zip, preferring `-<arch>-mac.zip` → `-universal-mac.zip` →
+ *            `-mac-universal.zip` (the versionless form, #620) → `-mac.zip`
  *   win32  — the NSIS setup .exe (run silently with /S; NSIS is what lets RM
  *            self-update via electron-updater on Windows)
  *   linux  — the .AppImage entry
@@ -110,6 +111,9 @@ function pickArtifact(feed, platform, arch) {
   if (platform === 'darwin') {
     picked = names.find((n) => n.endsWith(`-${arch}-mac.zip`))
       || names.find((n) => n.endsWith('-universal-mac.zip'))
+      // The name @omega.js/desktop packages under since #620 — a feed published
+      // before it still answers on one of the forms above.
+      || names.find((n) => n.endsWith('-mac-universal.zip'))
       || names.find((n) => n.endsWith('-mac.zip'));
   } else if (platform === 'win32') {
     picked = names.find((n) => n.endsWith('.exe'));

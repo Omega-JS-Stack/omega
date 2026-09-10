@@ -5,6 +5,7 @@ meta:
   title: "Blog Categories - {{ resolved.config.brand.name }}"
   description: "Browse all blog categories on {{ resolved.config.brand.name }}."
   breadcrumb: "Categories"
+  index: false      # #564: noindex, and out of sitemap.xml with it
 ---
 
 {{ content | omega_content_format }}

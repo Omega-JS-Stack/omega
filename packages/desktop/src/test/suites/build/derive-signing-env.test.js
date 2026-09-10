@@ -8,6 +8,7 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 
 const deriveSigningEnv = require('../../../utils/derive-signing-env.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function stageTarget(files) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-derive-'));
@@ -17,7 +18,7 @@ function stageTarget(files) {
   return tmp;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'derive-signing-env',
@@ -118,4 +119,4 @@ module.exports = {
       },
     },
   ],
-};
+});

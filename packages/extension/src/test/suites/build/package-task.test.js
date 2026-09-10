@@ -1,8 +1,9 @@
-// Build-layer tests for gulp/tasks/package.js — the three things a consumer's
+// Build-layer tests for gulp/tasks/package.js — the things a consumer's
 // packaged output lives or dies by (#46):
 //
-//   1. build.json / build.js carry `cloud` from config/omega.json5 (without it
-//      the service worker's Firebase auth never initializes).
+//   1. The packaged artifact carries NO build.js / build.json. The snapshot is
+//      baked into every bundle since #743 (build-json-bake.test.js owns what it
+//      carries); a leftover file here would be a second, staler copy of it.
 //   2. A versionless app FAILS the build (Chrome refuses a manifest with no
 //      version — it used to package the raw JSON5 source manifest and finish green).
 //   3. The icon prune drops only icons the build never minted, in BOTH legal
@@ -25,8 +26,8 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const vm    = require('vm');
 const JSON5 = require('json5');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC       = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'package.js');
@@ -71,14 +72,6 @@ async function inProject(dir, fn) {
   }
 }
 
-// The JSONP build.js assigns the snapshot onto self/window/globalThis — run it
-// in a real VM context and read it back, rather than regexing the text.
-function evaluateBuildJs(file) {
-  const sandbox = { self: {}, window: {} };
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), sandbox);
-  return sandbox.self.OMEGA_BUILD_JSON;
-}
-
 const MANIFEST = (extra) => `{ manifest_version: 3, name: 'Staged', ${extra} }`;
 
 // Set env vars for one test, restoring exactly what was there (an empty string
@@ -113,116 +106,39 @@ module.exports = async (ctx) => {
 };
 `;
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'package task — build.json cloud, manifest version guard, icon prune',
+  description: 'package task — no build.js/build.json sidecar, manifest version guard, icon prune',
   tests: [
     {
-      name: 'build.json and build.js carry cloud from config/omega.json5',
+      name: 'the packaged artifact carries NO build.js and NO build.json (#743)',
       run: async (ctx) => {
+        // The snapshot rides in every bundle's own banner now. A JSONP file
+        // beside them would be a second copy of the same facts — regenerated on
+        // its own schedule, and the one the service worker used to trust.
         const tmp = stageProject({
-          config: `{
-            brand: { id: 'staged', name: 'Staged' },
-            cloud: { config: { apiKey: 'AIza-staged', projectId: 'demo-staged', appId: '1:2:web:3' } },
-            targets: { extension: {} },
-          }`,
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: {} } }`,
+          files: {
+            'dist/manifest.json': MANIFEST(`description: 'a packageable extension'`),
+            'dist/assets/js/components/popup.bundle.js': `globalThis.probe = 1;\n`,
+            'dist/_locales/en/messages.json': `{ "appName": { "message": "Staged" } }`,
+          },
         });
         try {
           await inProject(tmp, async (task) => {
-            const outputDir = path.join(tmp, 'packaged', 'chromium', 'raw');
-            await task.generateBuildJs(outputDir);
+            const failure = await new Promise((resolve) => task.packageFn(resolve));
+            ctx.expect(failure).toBe(undefined);
 
-            const json = JSON.parse(fs.readFileSync(path.join(outputDir, 'build.json'), 'utf8'));
-            ctx.expect(json.config.cloud.config.apiKey).toBe('AIza-staged');
-            ctx.expect(json.config.cloud.config.projectId).toBe('demo-staged');
-
-            // The JSONP the service worker importScripts() carries the same snapshot
-            const jsonp = evaluateBuildJs(path.join(outputDir, 'build.js'));
-            ctx.expect(jsonp.config.cloud.config.apiKey).toBe('AIza-staged');
-            ctx.expect(jsonp.config.firebase.app.enabled).toBe(true);
+            const raw = path.join(tmp, 'packaged', 'chromium', 'raw');
+            // The package lane ran for real: the compiled manifest is there…
+            ctx.expect(fs.existsSync(path.join(raw, 'manifest.json'))).toBe(true);
+            // …and neither JSONP sidecar is.
+            ctx.expect(fs.existsSync(path.join(raw, 'build.js'))).toBe(false);
+            ctx.expect(fs.existsSync(path.join(raw, 'build.json'))).toBe(false);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
-        }
-      },
-    },
-    {
-      name: 'cloud is an empty object when config/omega.json5 declares none',
-      run: async (ctx) => {
-        const tmp = stageProject({});
-        try {
-          await inProject(tmp, async (task) => {
-            const outputDir = path.join(tmp, 'packaged', 'chromium', 'raw');
-            await task.generateBuildJs(outputDir);
-            const json = JSON.parse(fs.readFileSync(path.join(outputDir, 'build.json'), 'utf8'));
-            ctx.expect(json.config.cloud).toEqual({});
-            ctx.expect(json.config.firebase.app.enabled).toBe(false);
-          });
-        } finally {
-          fs.rmSync(tmp, { recursive: true, force: true });
-        }
-      },
-    },
-    {
-      name: 'build.js bakes the sibling backend\'s resolved emulator ports, and never in production (#300)',
-      run: async (ctx) => {
-        // An extension context has no env and no filesystem — the bake is its
-        // ONLY channel to a bumped emulator. Stage the target inside a real brand
-        // with a live backend ports file beside it.
-        const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-ports-brand-'));
-        fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
-        fs.mkdirSync(path.join(brand, 'targets', 'backend', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'backend', '.temp', 'ports.json'), JSON.stringify({
-          ports: { auth: 9100, firestore: 8081, hosting: 5003 }, pid: process.pid, startedAt: 'x',
-        }));
-
-        // …and a live WEBSITE publishing its resolved origin beside its port —
-        // bumped AND https, the pair a port number alone can never express (#262)
-        fs.mkdirSync(path.join(brand, 'targets', 'website', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'website', '.temp', 'ports.json'), JSON.stringify({
-          ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
-        }));
-
-        const app = path.join(brand, 'targets', 'extension');
-        fs.mkdirSync(app, { recursive: true });
-        fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
-
-        // The runner itself exports OMEGA_TEST_MODE, and getEnvironment() reads
-        // it BEFORE OMEGA_BUILD_MODE — a "production" bake under omega test is
-        // otherwise a testing bake (the auth-emulator-gate bakeConfig idiom).
-        const ENV_KEYS = ['OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV'];
-        const bake = async (mode) => {
-          const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
-          ENV_KEYS.forEach((key) => delete process.env[key]);
-          if (mode === 'production') process.env.OMEGA_BUILD_MODE = 'true';
-          try {
-            return await inProject(app, async (task) => {
-              const outputDir = path.join(app, 'packaged', mode, 'raw');
-              await task.generateBuildJs(outputDir);
-              return JSON.parse(fs.readFileSync(path.join(outputDir, 'build.json'), 'utf8')).config;
-            });
-          } finally {
-            ENV_KEYS.forEach((key) => {
-              if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
-            });
-          }
-        };
-
-        try {
-          const dev = await bake('development');
-          ctx.expect(dev.dev.ports.auth).toBe(9100);
-          ctx.expect(dev.dev.ports.firestore).toBe(8081);
-          ctx.expect(dev.dev.ports.hosting).toBe(5003);
-          // The website's origin is a resolved fact in the same map (#262)
-          ctx.expect(dev.dev.origin).toBe('https://localhost:4001');
-
-          // A packaged build has no local stack to reach — no map ships
-          const production = await bake('production');
-          ctx.expect(production.dev).toBe(undefined);
-        } finally {
-          fs.rmSync(brand, { recursive: true, force: true });
         }
       },
     },
@@ -376,29 +292,20 @@ module.exports = {
       },
     },
     {
-      name: 'pipeline failures re-throw instead of finishing green (build.js write, malformed locale)',
+      name: 'pipeline failures re-throw instead of finishing green (malformed locale)',
       run: async (ctx) => {
-        // generateBuildJs: outputDir sits under a path that is a FILE, so the
-        // write throws — before #46 the catch logged and returned green.
-        const buildJsTmp = stageProject({ files: { 'blocker': 'a file, not a dir' } });
-        // compileLocales: a locale that is not JSON5 makes the parse throw.
+        // compileLocales: a locale that is not JSON5 makes the parse throw —
+        // before #46 the catch logged and returned green.
         const localeTmp = stageProject({
           files: { 'dist/_locales/en/messages.json': '{ not: valid json5 ][' },
         });
         try {
-          await inProject(buildJsTmp, async (task) => {
-            let thrown = null;
-            await task.generateBuildJs(path.join(buildJsTmp, 'blocker', 'raw')).catch((e) => { thrown = e; });
-            ctx.expect(thrown).toBeInstanceOf(Error);
-          });
-
           await inProject(localeTmp, async (task) => {
             let thrown = null;
             await task.compileLocales(path.join(localeTmp, 'out')).catch((e) => { thrown = e; });
             ctx.expect(thrown).toBeInstanceOf(Error);
           });
         } finally {
-          fs.rmSync(buildJsTmp, { recursive: true, force: true });
           fs.rmSync(localeTmp, { recursive: true, force: true });
         }
       },
@@ -921,4 +828,4 @@ module.exports = {
       },
     },
   ],
-};
+});

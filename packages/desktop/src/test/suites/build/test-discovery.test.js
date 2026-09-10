@@ -5,8 +5,9 @@
 // next to their suites.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'test discovery — underscore exclusion convention',
@@ -60,4 +61,4 @@ module.exports = {
       },
     },
   ],
-};
+});

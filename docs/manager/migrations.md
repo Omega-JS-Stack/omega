@@ -19,7 +19,7 @@ An unknown `--migration=<name>` lists the available ones and skips.
 |---|---|
 | `targets-rename` (local) | A pre-[#443](https://github.com/Omega-JS-Stack/omega/issues/443) brand's `apps/` folder → `targets/`, moving the folder and flipping the root `workspaces` glob together. |
 | `notifications` | Push-subscription docs to the canonical shape: `uid` → `owner`, flattened `owner.uid`, legacy timestamps → `metadata.*`, `url` → `context.client.url`, the legacy `attribution.utm` blob folded into `first`/`last`, string trimming — then schema validation. |
-| `users` | The canonical user schema: orphan docs deleted, `plan` → `subscription`, flat `subscription.id` → `subscription.product`, deprecated fields removed, timestamps reconciled against Firebase Auth's canonical creation time, auth/consent/attribution backfills, dynamic values generated, sentinels (`''`, `127.0.0.1`, `ZZ`, `Unknown`) normalized to null, `usage.*.period` → `usage.*.monthly`. |
+| `users` | The canonical user schema: orphan docs deleted, `plan` → `subscription`, flat `subscription.id` → `subscription.product`, `oauth2.<provider>` → `connections.<provider>` with a `type: 'oauth2'` stamp and the original deleted ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)), each moved record gaining the `identity.id` the connections route matches on — from Google's `sub` or Kick's `user_id`, as a string, deleting nothing ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)), deprecated fields removed, timestamps reconciled against Firebase Auth's canonical creation time, auth/consent/attribution backfills, dynamic values generated, sentinels (`''`, `127.0.0.1`, `ZZ`, `Unknown`) normalized to null, `usage.*.period` → `usage.*.monthly`. |
 | `orders` | `payments-orders`: the legacy `attribution.utm` blob → first/last touches. |
 | `payments-intents` | The same fold on `payments-intents`, the upstream copy of the same degradation. |
 | `payment-provider` | The [#428](https://github.com/Omega-JS-Stack/omega/issues/428) word rename's DATA half: the stored `processor` field → `provider`, across all five payment-touching collections (`users.subscription.payment.processor`, `payments-orders.processor`, `payments-intents.processor`, `payments-webhooks.processor`, `payments-disputes.alert.processor`). |
@@ -47,5 +47,10 @@ brand's own files.
 - **`payment-provider` is idempotent by construction**: no legacy key is a strict no-op, both
   keys present keeps `provider` (written by current code, so newer) and drops the leftover, and
   a `null` value still moves — `null` is what the schema stores for an account that never paid.
+- **The `users` connections move follows the same rule** ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)):
+  no `oauth2` is a strict no-op, both keys present keeps `connections` and deletes only the
+  leftover, and the original is deleted in the same write — the standing ruling on a migration
+  that MOVES a field. It runs ahead of the defaults backfill, or the backfill would write an
+  empty `connections` object the move then collides with.
 - **Legacy one-offs stay in omega-manager.** Its other 25 registered migrations repair one
   company's historical data, not the schema.

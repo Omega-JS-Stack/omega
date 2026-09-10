@@ -55,6 +55,13 @@ const COMPILED_RULES_FILE = 'dist/firestore.rules';
 // ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)).
 const RULES_MIGRATION_COMMAND = 'npx omega migrate:rules';
 
+// The one-time conversion of a PRE-FAMILY marker file onto the family grammar
+// ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)). Every evergreen
+// verb speaks ONLY the family, so a tree carried over from BEM converges at no
+// verb until this one has run — the verbs DETECT the old shapes and point here,
+// never convert.
+const MARKER_MIGRATION_COMMAND = 'npx omega migrate:markers';
+
 // The two halves that ship inside this package.
 const TEMPLATES_DIR = path.resolve(__dirname, '..', '..', '..', 'templates');
 const FRAMEWORK_RULES_TEMPLATE = path.join(TEMPLATES_DIR, 'firestore.framework.rules');
@@ -559,6 +566,10 @@ function compiledHeader() {
  * @returns {{ compiled: string, merged: string[], warnings: string[] }}
  */
 function compileRules(options) {
+  if (isPreFamilyMarkerFile(options.brandSource)) {
+    throw new Error(`${BRAND_RULES_FILE} still carries a pre-family marker ('{{ backend-manager }}' or a '///---...---///' block), which is not rules syntax — compiling it would splice that marker into the deployed ruleset as if it were one of your rules. Run \`${MARKER_MIGRATION_COMMAND}\` to convert it (your custom rules are kept).`);
+  }
+
   if (isLegacyMarkerFile(options.brandSource)) {
     throw new Error(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — compiling it would emit a duplicate-function ruleset that cannot load. Run \`npx omega migrate:rules\` to migrate it (your custom rules are kept).`);
   }
@@ -657,6 +668,12 @@ function compileFirestoreRules(options) {
   const deferred = deferredRulesTarget({ projectDir });
   const nextStep = deferred ? RULES_MIGRATION_COMMAND : 'npx omega test';
 
+  if (isPreFamilyMarkerFile(brandSource)) {
+    onWarn(`${BRAND_RULES_FILE} still carries a pre-family marker ('{{ backend-manager }}' or a '///---...---///' block), which is not rules syntax — refusing to write a ${COMPILED_RULES_FILE} that carries that marker as if it were one of your rules. Run \`${MARKER_MIGRATION_COMMAND}\` to convert it (your custom rules are kept).`);
+
+    return { compiledPath, merged: [], seededFallback, refused: true };
+  }
+
   if (isLegacyMarkerFile(brandSource)) {
     onWarn(`${BRAND_RULES_FILE} still carries the legacy OMEGA Rules marker block, which redefines the framework's own functions — refusing to write a duplicate-function ${COMPILED_RULES_FILE} that cannot load. Run \`${nextStep}\` to migrate it (your custom rules are kept).`);
 
@@ -691,19 +708,20 @@ function compileFirestoreRules(options) {
  * All of it idempotent, and all of it setup's (never the build's — the build
  * writes dist/ only):
  *   - no file          → write the seed
+ *   - pre-family       → REFUSED, untouched (only `omega migrate:markers` speaks it)
  *   - legacy markers   → extract the non-managed region into the new source ONCE
  *   - v2 hook era      → delete a hook still carrying its default body, KEEP a
  *                        customized one as an ordinary brand function, and
  *                        refresh a header that still documents the hook model
  * @param {object} options
  * @param {string} options.projectDir - The target root.
- * @returns {{ created: boolean, migrated: boolean, strippedHooks: string[], keptHooks: string[] }}
+ * @returns {{ created: boolean, migrated: boolean, refused: boolean, strippedHooks: string[], keptHooks: string[] }}
  */
 function ensureBrandRulesSource(options) {
   const projectDir = options.projectDir;
   const sourcePath = path.join(projectDir, BRAND_RULES_FILE);
   const seed = jetpack.read(BRAND_RULES_SEED);
-  const result = { created: false, migrated: false, strippedHooks: [], keptHooks: [] };
+  const result = { created: false, migrated: false, refused: false, strippedHooks: [], keptHooks: [] };
 
   let contents = jetpack.exists(sourcePath) ? jetpack.read(sourcePath) : '';
 
@@ -711,6 +729,16 @@ function ensureBrandRulesSource(options) {
     jetpack.write(sourcePath, seed);
 
     return { ...result, created: true };
+  }
+
+  // A PRE-FAMILY source is not a legacy-marker one and not a v2 one: nothing
+  // below speaks `///---backend-manager---///` or `{{ backend-manager }}`, so
+  // the hook-era pass would rename its helpers, report a MIGRATION, and leave
+  // every pre-family marker sitting in the file. Refuse instead — the same
+  // shape the build's refusal takes, and the caller names the run-alone verb
+  // that does speak it ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+  if (isPreFamilyMarkerFile(contents)) {
+    return { ...result, refused: true };
   }
 
   if (isLegacyMarkerFile(contents)) {
@@ -742,6 +770,38 @@ function ensureBrandRulesSource(options) {
 function isLegacyMarkerFile(contents) {
   // Fresh regex per call — the shared one is /g and carries lastIndex.
   return /\/\/ ========== OMEGA Rules \(v.*?\) ==========/.test(contents);
+}
+
+/**
+ * BEM's hand-written insertion placeholder, whitespace-tolerant exactly as BEM
+ * matched it. Fresh regex per call — these are /g for the replace paths.
+ * @returns {RegExp}
+ */
+function preFamilyPlaceholderRegex() {
+  return /{{\s*?backend-manager\s*?}}/g;
+}
+
+/**
+ * The pre-family managed BLOCK, open marker through end marker: BEM's own
+ * `///---backend-manager---///` and the cp72-74 `///---omega---///` interim
+ * flavor, which differ only in that word.
+ * @returns {RegExp}
+ */
+function preFamilyBlockRegex() {
+  return /\/\/\/---(?:backend-manager|omega)---\/\/\/[\s\S]*?\/\/\/---------end---------\/\/\//g;
+}
+
+/**
+ * A PRE-FAMILY marker file — one the family grammar cannot see at all, so no
+ * evergreen verb can converge it ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+ *
+ * Both rules files ask here: firestore.rules and database.rules.json carried the
+ * same two shapes (the placeholder, and the bracket block).
+ * @param {string} contents
+ * @returns {boolean}
+ */
+function isPreFamilyMarkerFile(contents) {
+  return preFamilyPlaceholderRegex().test(contents) || preFamilyBlockRegex().test(contents);
 }
 
 /**
@@ -778,7 +838,7 @@ function hasRetiredHookEra(contents) {
  * @returns {boolean}
  */
 function needsRulesMigration(contents) {
-  return !contents.trim() || isLegacyMarkerFile(contents) || hasRetiredHookEra(contents);
+  return !contents.trim() || isPreFamilyMarkerFile(contents) || isLegacyMarkerFile(contents) || hasRetiredHookEra(contents);
 }
 
 /**
@@ -789,8 +849,32 @@ function needsRulesMigration(contents) {
  * @returns {string} The new brand source.
  */
 function migrateLegacyMarkerFile(contents) {
+  return spliceIntoSeed(contents.replace(/\/\/ ========== OMEGA Rules \(v.*?\) ==========.*?\/\/ ========== End OMEGA Rules ==========/s, ''));
+}
+
+/**
+ * Convert a PRE-FAMILY firestore.rules — a `///---backend-manager---///` /
+ * `///---omega---///` managed block, or the bare `{{ backend-manager }}`
+ * placeholder — into the new source, the same three steps
+ * `migrateLegacyMarkerFile()` takes: only the markers stripped differ. Runs
+ * ONCE ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+ * @param {string} contents - The pre-family file.
+ * @returns {string} The new brand source.
+ */
+function migratePreFamilyMarkerFile(contents) {
+  return spliceIntoSeed(contents
+    .replace(preFamilyBlockRegex(), '')
+    .replace(preFamilyPlaceholderRegex(), ''));
+}
+
+/**
+ * The tail every rules-marker migration shares: take what the brand wrote out of
+ * a now-markerless file and land it in the seed's example-rules slot.
+ * @param {string} stripped - The file with its managed block/placeholder gone.
+ * @returns {string} The new brand source.
+ */
+function spliceIntoSeed(stripped) {
   const seed = jetpack.read(BRAND_RULES_SEED);
-  const stripped = contents.replace(/\/\/ ========== OMEGA Rules \(v.*?\) ==========.*?\/\/ ========== End OMEGA Rules ==========/s, '');
   const custom = trimBlankEdges(extractDocumentsBody(stripped, BRAND_RULES_FILE));
 
   if (!seed.includes(SEED_RULES_PLACEHOLDER)) {
@@ -799,7 +883,10 @@ function migrateLegacyMarkerFile(contents) {
     throw new Error(`templates/${BRAND_RULES_FILE}: the example-rules placeholder the migration replaces is gone`);
   }
 
-  return seed.replace(SEED_RULES_PLACEHOLDER, custom.trim() ? custom : SEED_RULES_PLACEHOLDER);
+  // Function replacement, never a replacement STRING: brand-authored rules are
+  // arbitrary text, and `$$` / `$&` / `` $` `` / `$'` in a replacement string
+  // are directives that would rewrite the brand's own bytes on the way in.
+  return seed.replace(SEED_RULES_PLACEHOLDER, () => (custom.trim() ? custom : SEED_RULES_PLACEHOLDER));
 }
 
 /**
@@ -1030,12 +1117,28 @@ function rulesMigrationDeferralNotice(target) {
   ];
 }
 
+/**
+ * The pre-family deferral, as setup reports it: what was NOT done, and the one
+ * verb that does it. The twin of `rulesMigrationDeferralNotice()` above, shared
+ * by both rules checks so they defer in identical words
+ * ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+ * @param {string} fileName - The file carrying the pre-family marker.
+ * @returns {string[]} Pre-formatted lines.
+ */
+function markerMigrationDeferralNotice(fileName) {
+  return [
+    `${fileName} still carries a pre-family marker ('{{ backend-manager }}' or a '///---...---///' block) — nothing here speaks it, so the file was left untouched.`,
+    `Convert it once, on its own, then run this again: ${MARKER_MIGRATION_COMMAND}`,
+  ];
+}
+
 module.exports = {
   RULES_VERSION,
   BRAND_RULES_FILE,
   BRAND_RULES_SEED,
   COMPILED_RULES_FILE,
   FRAMEWORK_RULES_TEMPLATE,
+  MARKER_MIGRATION_COMMAND,
   RETIRED_NAMES,
   RULES_MIGRATION_COMMAND,
   compileRules,
@@ -1043,6 +1146,10 @@ module.exports = {
   deferredRulesTarget,
   ensureBrandRulesSource,
   extractDocumentsBody,
+  isPreFamilyMarkerFile,
+  markerMigrationDeferralNotice,
+  migratePreFamilyMarkerFile,
+  preFamilyPlaceholderRegex,
   needsRulesMigration,
   rulesMigrationDeferralNotice,
 };

@@ -15,10 +15,7 @@
   <body>
     {{ content }}
 
-    <!-- Build -->
-    <script src="/build.js?cb={{ cacheBust }}"></script>
-
-    <!-- Main JS -->
+    <!-- Main JS (OMEGA_BUILD_JSON rides baked in the bundle's banner, #743) -->
     <script src="/assets/js/components/{{ page.name }}.bundle.js?cb={{ cacheBust }}"></script>
   </body>
 </html>

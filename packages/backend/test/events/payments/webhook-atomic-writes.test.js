@@ -16,6 +16,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-atomic-uid';
 const ORDER_ID = '4242-4242-4242';
@@ -33,7 +34,7 @@ function runEvent({ failPath } = {}) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Webhook pipeline writes are atomic (no split payment state)',
   type: 'group',
   timeout: 30000,
@@ -65,4 +66,4 @@ module.exports = {
       },
     },
   ],
-};
+});

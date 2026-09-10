@@ -58,6 +58,42 @@ test('minifyHtml: broken JSON-LD and unparseable inline scripts ship verbatim â€
   assert.ok(out.includes('const = broken('), 'unparseable script verbatim');
 });
 
+// #762: the inline-script regex matched the prose `<script src>` inside an
+// ordinary head comment and ran to the NEXT `</script>`, so the comment's own
+// `-->` landed inside the extracted span and the minifier ate everything up to
+// the following comment's close, placeholder included. Every tag between the
+// two comments (charset, the motion stamp, the preconnects) vanished silently.
+const COMMENTED_HEAD = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Analytics origins: these are plain <script src> fetches, so no
+         crossorigin on the preconnect. -->
+    <link rel="preconnect" href="https://connect.facebook.net"/>
+    <meta charset="utf-8"/>
+    <!-- Motion gate: inline and first so the stamp beats first paint. -->
+    <script>document.documentElement.setAttribute('data-omega-motion', 'true');</script>
+    <!-- The first-paint script, a deferred module. -->
+    <script type="module" src="/assets/js/first-paint.js"></script>
+    <script>
+      // a comment-looking string inside a script body is script text: <!-- keep -->
+      const marker = "<!-- not a comment -->";
+    </script>
+    <title>T</title>
+  </head>
+  <body><p>hi</p></body>
+</html>`;
+
+test('#762: a head comment that mentions <script keeps every tag that follows it', () => {
+  const out = minifyHtml(COMMENTED_HEAD);
+
+  assert.ok(out.includes('<meta charset=utf-8>'), 'the charset meta ships');
+  assert.ok(out.includes('rel=preconnect'), 'the preconnect ships');
+  assert.ok(out.includes('setAttribute("data-omega-motion","true")'), 'the motion stamp ships, minified');
+  assert.ok(out.includes('first-paint.js'), 'the module script ships');
+  assert.ok(out.includes('<!-- not a comment -->'), 'a comment-shaped string inside a script body is script text');
+  assert.ok(!out.includes('Analytics origins'), 'the ordinary comments are still eaten');
+});
+
 test('engine: production builds minify .html outputs; dev builds and meta-files stay readable', async () => {
   const prod = await buildWith(miniData, { environment: 'production' }, 'minify-prod');
   const dev = await buildWith(miniData, {}, 'minify-dev');

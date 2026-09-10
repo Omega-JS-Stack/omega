@@ -25,7 +25,7 @@ centred product frame never stacks under one either. {% endcomment %}
           {% assign demo_btn_class = demo.options.button.class | default: "btn-adaptive" %}
           <button type="submit" class="btn {{ demo_btn_class }} btn-lg text-nowrap flex-shrink-0">
             {% iftruthy demo.options.button.icon %}
-              {% omega_icon demo.options.button.icon, "me-2" %}
+              <i class="fa-solid fa-{{ demo.options.button.icon }} me-2"></i>
             {% endiftruthy %}
             {{ demo.options.button.text }}
           </button>
@@ -42,7 +42,7 @@ centred product frame never stacks under one either. {% endcomment %}
               <div class="col-12 {% if field_size == 'half' %}col-sm-6{% endif %}">
                 <label for="hero-demo-{{ field.name }}" class="form-label d-flex align-items-center mb-2">
                   {% iftruthy field.icon %}
-                    {% omega_icon field.icon, "me-2" %}
+                    <i class="fa-solid fa-{{ field.icon }} me-2"></i>
                   {% endiftruthy %}
                   {{ field.label | default: field.placeholder | default: field.name }}
                   {% iftruthy field.required %}<span class="text-danger ms-1" aria-hidden="true">*</span>{% endiftruthy %}
@@ -84,7 +84,7 @@ centred product frame never stacks under one either. {% endcomment %}
             <div class="col-12 {% unless demo.options.button.full_width %}col-sm-auto{% endunless %}">
               <button type="submit" class="btn {{ form_btn_class }} btn-lg w-100">
                 {% iftruthy demo.options.button.icon %}
-                  {% omega_icon demo.options.button.icon, "me-2" %}
+                  <i class="fa-solid fa-{{ demo.options.button.icon }} me-2"></i>
                 {% endiftruthy %}
                 {{ demo.options.button.text }}
               </button>
@@ -163,7 +163,7 @@ in place, unchanged. {% endcomment %}
         <a class="omega-hero__badge" href="{{ args.badge.href }}" data-omega-reveal>
           <span class="omega-dot"></span>
           {{ args.badge.text }}
-          {% omega_icon "arrow-right", "fa-xs" %}
+          <i class="fa-solid fa-arrow-right fa-xs"></i>
         </a>
       {% else %}
         <div data-omega-reveal>
@@ -208,9 +208,9 @@ in place, unchanged. {% endcomment %}
     <div class="omega-hero__ctas" data-omega-reveal>
       {% if args.primary_button.enabled != false and args.primary_button.text %}
         <a href="{{ args.primary_button.href }}" class="btn {{ primary_btn_class }} btn-lg{% iffalsy args.primary_button.icon %} omega-hover-nudge{% endiffalsy %}">
-          {% iftruthy args.primary_button.icon %}{% omega_icon args.primary_button.icon, "me-2" %}{% endiftruthy %}
+          {% iftruthy args.primary_button.icon %}<i class="fa-solid fa-{{ args.primary_button.icon }} me-2"></i>{% endiftruthy %}
           {{ args.primary_button.text }}
-          {% iffalsy args.primary_button.icon %}<span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>{% endiffalsy %}
+          {% iffalsy args.primary_button.icon %}<span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>{% endiffalsy %}
         </a>
       {% endif %}
       {% iftruthy args.command %}
@@ -220,9 +220,9 @@ in place, unchanged. {% endcomment %}
       {% endiftruthy %}
       {% if args.secondary_button.enabled != false and args.secondary_button.text %}
         <a href="{{ args.secondary_button.href }}" class="btn {{ secondary_btn_class }} btn-lg{% iffalsy args.secondary_button.icon %} omega-hover-nudge{% endiffalsy %}">
-          {% iftruthy args.secondary_button.icon %}{% omega_icon args.secondary_button.icon, "me-2" %}{% endiftruthy %}
+          {% iftruthy args.secondary_button.icon %}<i class="fa-solid fa-{{ args.secondary_button.icon }} me-2"></i>{% endiftruthy %}
           {{ args.secondary_button.text }}
-          {% iffalsy args.secondary_button.icon %}<span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>{% endiffalsy %}
+          {% iffalsy args.secondary_button.icon %}<span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>{% endiffalsy %}
         </a>
       {% endif %}
     </div>
@@ -230,7 +230,7 @@ in place, unchanged. {% endcomment %}
     {% if args.meta and args.meta.size > 0 %}
       <div class="omega-hero__meta" data-omega-reveal>
         {% for item in args.meta %}
-          <span>{% omega_icon "check", "text-success fa-xs me-1" %}{{ item }}</span>
+          <span><i class="fa-solid fa-check text-success fa-xs me-1"></i>{{ item }}</span>
         {% endfor %}
       </div>
     {% endif %}
@@ -239,9 +239,18 @@ in place, unchanged. {% endcomment %}
 {% comment %} ── The demo module — a slot's finished markup wins over the typed lanes {% endcomment %}
 {% capture hero_demo_module %}{% if args.demo_html != blank %}{{ args.demo_html }}{% else %}{{ hero_demo_content }}{% endif %}{% endcapture %}
 
+{% comment %} #763: the hero IS the first viewport, so data-omega-first-paint on
+the band starts its reveals AT PARSE TIME: the head's inline starter sees the
+band the moment the parser hands it over, waits one frame and stamps
+data-omega-inview itself, mirroring the stagger below. The copy therefore fades
+in on the design's own rhythm without waiting for first-paint.js to download and
+its observer to fire — that wait is what put ~2.0s on the playground homepage's
+2,588ms mobile LCP (#749, the element is p.omega-hero__sub). The attribute
+carries the same treatment to markup the template never sees, the demo slots a
+consumer authors. {% endcomment %}
 <!-- ═══ Hero ═══ -->
-<section class="omega-hero omega-dotgrid{% if hero_demo_side %} omega-hero--side{% endif %}" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
+<section class="omega-hero omega-dotgrid{% if hero_demo_side %} omega-hero--side{% endif %}" data-omega-first-paint data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="40">
     {% if hero_demo_side %}
       <div class="omega-hero__split">
         <div class="omega-hero__copy">{{ hero_copy }}</div>
@@ -263,7 +272,7 @@ in place, unchanged. {% endcomment %}
         {% for card in args.cards %}
           <div class="omega-hero__card">
             {% iftruthy card.icon %}
-              <span class="omega-hero__card-ico">{% omega_icon card.icon %}</span>
+              <span class="omega-hero__card-ico"><i class="fa-solid fa-{{ card.icon }}"></i></span>
             {% endiftruthy %}
             {%- comment %} A value is TEXT, never markup (#580). {% endcomment -%}
             <span class="omega-hero__card-num">{{ card.number | escape_once }}</span>

@@ -99,7 +99,7 @@ For automated releases, store credentials as encrypted GitHub Actions secrets. A
   run: npm run build
 ```
 
-**The store credentials are not the only secret CI needs.** A dispatched run has no `.env`, so `GOOGLE_ANALYTICS_SECRET` — the Measurement Protocol secret the build BAKES into `build.js` — only reaches the build through the workflow env. Without it, a CI-published extension shipped an empty secret and sent no analytics events, silently ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)). The scaffolded `publish.yml` injects it, and a build-mode build of a brand that HAS `analytics.providers.google.id` fails loudly when the secret is empty rather than publishing a dead sender.
+**The store credentials are not the only secret CI needs.** A dispatched run has no `.env`, so `GOOGLE_ANALYTICS_SECRET` — the Measurement Protocol secret the build BAKES into `OMEGA_BUILD_JSON` — only reaches the build through the workflow env. Without it, a CI-published extension shipped an empty secret and sent no analytics events, silently ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)). The scaffolded `publish.yml` injects it, and a build-mode build of a brand that HAS `analytics.providers.google.id` fails loudly when the secret is empty rather than publishing a dead sender.
 
 Same pattern EM uses for its desktop apps. Each store does its own review afterward (Chrome / Firefox: hours to a few days; Edge: typically same day).
 

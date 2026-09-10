@@ -1,6 +1,6 @@
 // omega.json5 — the ONE config file for every OMEGA project type.
 //
-// Shared sections (brand, cloud, analytics, payment, monitoring, oauth2)
+// Shared sections (brand, cloud, analytics, payment, monitoring, connections)
 // sit at the top level with identical spelling in every omega.json5. Backend
 // settings live under targets.backend — key presence under `targets` means
 // "this project supports this target".
@@ -62,7 +62,20 @@
       },
     },
   },
-  oauth2: {},
+  connections: {},
+  // The feature catalog (#647): every feature is defined ONCE here — name,
+  // icon, definition, and a `usage` block on the ones that are METERED (day
+  // pacing is the default; `pace: false` opts out; `mirror` names the document
+  // kinds a feature's counters also land on). No `usage` block = a perk. The
+  // products below name only their VALUE.
+  features: {
+    requests: {
+      name: 'API Requests',
+      icon: 'bolt',
+      definition: 'Calls this project may make per month.',
+      usage: {},
+    },
+  },
   payment: {
     providers: {
       stripe: {
@@ -80,7 +93,7 @@
         id: 'basic',
         name: 'Basic',
         type: 'subscription',
-        limits: {
+        features: {
           requests: 100,
         },
       },
@@ -88,7 +101,7 @@
         id: 'premium',
         name: 'Premium',
         type: 'subscription',
-        limits: {
+        features: {
           requests: 1000,
         },
         trial: {
@@ -113,7 +126,7 @@
         id: 'ultimate',
         name: 'Ultimate',
         type: 'subscription',
-        limits: {
+        features: {
           requests: 10000,
         },
         prices: {

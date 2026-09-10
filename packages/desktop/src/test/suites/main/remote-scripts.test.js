@@ -1,7 +1,9 @@
 // Main-layer tests for lib/remote-scripts.js — boot wiring, URL resolution,
 // config gating, hashing, execution, storage round-trips.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'remote-scripts (main)',
@@ -271,4 +273,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -16,7 +16,8 @@
  * Firestore — the call is allowed to reject at that seam and the assertions read the
  * captured ctx output.
  */
-const post = require('../../../src/manager/routes/user/signup/post.js');
+const post = require('../../../dist/manager/routes/user/signup/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { keyNames } = post;
 
@@ -61,7 +62,7 @@ async function captureStartingLine() {
   return captured.find((line) => line.includes('signup(): Starting'));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'routes/user/signup/post log privacy',
   type: 'group',
 
@@ -108,4 +109,4 @@ module.exports = {
       },
     },
   ],
-};
+});

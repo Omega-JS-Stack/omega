@@ -23,7 +23,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-refund-amount-uid';
 const ORDER_ID = '5100-5100-5100';
@@ -150,7 +151,7 @@ function resourceMissing() {
   return error;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A refund is recorded with the amount the provider says came back, never the one its payload claimed',
   type: 'group',
   timeout: 30000,
@@ -219,4 +220,4 @@ module.exports = {
       },
     },
   ],
-};
+});

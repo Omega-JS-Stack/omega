@@ -5,7 +5,7 @@
  * produces ONE omega.json5 object per the mapping table in docs/shared/config.md:
  *
  * - Shared sections to the TOP LEVEL with unified spellings:
- *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526), `theme`, `oauth2`,
+ *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526), `theme`, `connections`,
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment` (`processors` → `providers` — #425),
  *   `web_manager.sentry` → `monitoring.providers.sentry` (#485),
@@ -14,19 +14,21 @@
  *   (`google-adsense` → `adsense` + camelCase slots — #23),
  *   `recaptcha` → `captcha.providers.recaptcha` (camelCase sub-keys),
  *   `cloudflare` → `edge.providers.cloudflare`.
- * - `meta` to the TOP LEVEL (#607 — a real shared section now, the site's
- *   default page meta; a page overrides it bare in frontmatter).
  * - Everything web-only under `targets.web`: presentation sections (favicon,
  *   manifest, icons),
  *   blog/engine config (permalink, pagination,
- *   collections, defaults, generators — codemod rule 8's home), the
+ *   defaults, generators — codemod rule 8's home), the
  *   remaining `web_manager` client-settings blob (renamed `client` on the way
  *   out — #1: WebManager is not an OMEGA concept), and the UJM-json build
  *   settings (distribute, purgecss, imagemin, workflows).
- * - Dropped with notes: Jekyll machinery keys, the legacy `download` /
- *   `extension` page maps (#610 — derived from targets.desktop.releases and
- *   targets.extension.listings now), `webpack` (esbuild now), `gems` (Ruby is
- *   gone), secret-shaped keys (they belong in .env).
+ * - Dropped with notes: Jekyll machinery keys, the legacy `meta` block (#607 —
+ *   omega.json5 has NO meta section; the site-wide default is brand.name /
+ *   brand.description and per-page meta is page frontmatter), the legacy
+ *   `download` / `extension` page maps (#610 — derived from
+ *   targets.desktop.releases and targets.extension.listings now), `webpack`
+ *   (esbuild now), `gems` (Ruby is gone), the legacy `collections` block
+ *   (#589 — an OMEGA collection needs a grouping `field` no Jekyll collection
+ *   carries), secret-shaped keys (they belong in .env).
  *
  * The engine composes the runtime shape back together (cloud.config →
  * client.firebase.app.config, payment → client.payment) in
@@ -49,13 +51,9 @@ const DROPPED_JEKYLL_KEYS = [
 const WEB_SECTION_ORDER = [
   'favicon', 'manifest', 'icons',
   'permalink', 'pagination',
-  'collections', 'defaults', 'generators', 'client',
+  'defaults', 'generators', 'client',
 ];
 
-// _config.yml sections that land at the TOP level: `meta` is a real shared
-// config section since #607 (the site's default page meta), not a web-only
-// presentation block.
-const SHARED_SECTION_ORDER = ['meta'];
 
 // The UJM page maps #610 retired: the /download page, the /extension page and
 // their shortlinks derive from `targets.desktop.releases` and
@@ -182,8 +180,34 @@ function convertConfig({ jekyll, ujm }) {
     }
     if (providers.adsense) {
       providers.adsense = renameKeys(providers.adsense, ADSENSE_SLOT_KEYS);
+
+      // The two retired gates are DROPPED, one note each (#628). Carried
+      // through, an `enabled: false` emitted a config that is retired on
+      // arrival (#527 deleted the manager's skip and never shipped `units`)
+      // while the `client` id beside it manages the account and renders the
+      // units — the gate reading exactly like it still works.
+      let dropped = false;
+      for (const key of ['enabled', 'units']) {
+        if (!(key in providers.adsense)) continue;
+        delete providers.adsense[key];
+        dropped = true;
+        notes.push(
+          `_config.yml adsense \`${key}\` dropped (#527) — there is no \`advertising.providers.adsense.${key}\`: `
+          + '`client` presence is the ONE adsense switch (the managed account, the rendered units and the ads.txt '
+          + 'record together). Omit the block to serve no ads and manage the account by hand',
+        );
+      }
+
+      // A gates-ONLY block converts to NOTHING — the note's own instruction.
+      // Left behind, the emptied `adsense: {}` reads as an authored opt-in to
+      // the managed account, the exact outcome the dropped gate meant to
+      // refuse. An adsense block that arrived empty on its own IS that opt-in,
+      // so only a block the drop emptied is pruned.
+      if (dropped && isEmpty(providers.adsense)) delete providers.adsense;
     }
-    omega.advertising = { ...(advertising.providers ? advertising : {}), providers };
+    const section = { ...(advertising.providers ? advertising : {}), providers };
+    if (isEmpty(providers)) delete section.providers;
+    if (!isEmpty(section)) omega.advertising = section;
   }
 
   // ---- recaptcha → captcha.providers.recaptcha (camelCase sub-keys, #23)
@@ -270,8 +294,11 @@ function convertConfig({ jekyll, ujm }) {
     notes.push('`web_manager.cookieConsent` → `client.consent` (#383); palette/theme/type and the banner copy are gone — the panel paints from tokens and the visitor\'s region picks opt-in vs opt-out');
   }
 
-  const oauth2 = take('oauth2');
-  if (!isEmpty(oauth2)) omega.oauth2 = oauth2;
+  const connections = take('oauth2');
+  if (!isEmpty(connections)) {
+    omega.connections = connections;
+    notes.push('`oauth2` → `connections` (#788) — the per-provider block is unchanged; rename the `OAUTH2_<PROVIDER>_CLIENT_ID`/`_SECRET` pair in the .env to `CONNECTIONS_<PROVIDER>_*`, move `targets/backend/src/oauth2/` to `src/connections/`, and register `<site>/connections/callback` as the redirect URI at each provider');
+  }
 
   // ---- the UJM page maps #610 retired — dropped with the block that replaced them
   for (const [key, replacement] of Object.entries(RETIRED_PAGE_MAPS)) {
@@ -280,10 +307,40 @@ function convertConfig({ jekyll, ujm }) {
     notes.push(`_config.yml \`${key}\` dropped (#610) — the page and its shortlinks derive from \`${replacement}\`; declare the target and delete the hand-written links`);
   }
 
-  // ---- shared sections from _config.yml
-  for (const key of SHARED_SECTION_ORDER) {
-    const value = take(key);
-    if (!isEmpty(value)) omega[key] = value;
+  // ---- Jekyll collections DROPPED, one note each (#589). A Jekyll collection
+  // declares `{ output, permalink, title }`; `targets.web.collections` declares
+  // a GROUPING — `field`, the dotted frontmatter path its category pages group
+  // on — and readCollections hard-fails without it. Nothing in the legacy block
+  // says what that field is, so carrying it verbatim wrote a config whose FIRST
+  // build died, and deriving one would be a guess wearing a fact's clothes. The
+  // #696 ruling: drop it and NAME the manual step.
+  const collections = take('collections');
+  if (!isEmpty(collections)) {
+    // Jekyll takes a LIST of names as well as a mapping (`collections: [recipes,
+    // docs]` — the documented shorthand for the block form). Normalized to the
+    // names, or every note below is about a collection called "0".
+    const names = Array.isArray(collections) ? collections.map(String) : Object.keys(collections);
+    for (const name of names) {
+      notes.push(
+        `_config.yml \`collections.${name}\` dropped (#589) — a Jekyll collection carries no grouping field and `
+        + `\`targets.web.collections\` requires one. Declare \`targets.web.collections.${name}\` by hand with its `
+        + '`field` (the dotted frontmatter path its category pages group on, e.g. `doc.category`), then move the '
+        + `documents to \`src/_${name}/\``,
+      );
+    }
+  }
+
+  // ---- the legacy `meta` block DROPPED (#607, Ian 2026-08-26). omega.json5
+  // has no meta section: the site-wide default is the brand block the head
+  // falls back to, and everything per-page lives in that page's frontmatter.
+  // Carrying it would write a config the validator refuses (retired-keys.js)
+  // — and a silently ignored one before that.
+  const legacyMeta = take('meta');
+  if (!isEmpty(legacyMeta)) {
+    notes.push(
+      '_config.yml `meta` dropped (#607) — omega.json5 has no meta section. Put the site-wide title/description in '
+      + '`brand.name` / `brand.description` (the head falls back to them), and anything per-page in that page\'s own `meta:` frontmatter',
+    );
   }
 
   // ---- web-scoped sections from _config.yml
@@ -307,9 +364,17 @@ function convertConfig({ jekyll, ujm }) {
     notes.push(`_config.yml \`${key}\` carried to targets.web.${key} (unrecognized section — verify)`);
   }
 
-  if (web.collections) notes.push('custom collections carried to targets.web.collections — engine-level custom collections land with the consumer-theme migrations (verify before deploy)');
   if (web.generators) notes.push('dynamic-page generators carried to targets.web.generators — verify engine coverage');
   if (web.defaults) notes.push('Jekyll per-collection defaults carried to targets.web.defaults (codemod rule 8)');
+
+  // The sitemap delta (#564). Unconditional: every UJM site shipped the blog
+  // taxonomy and its pagination in sitemap.xml, and OMEGA's index posture
+  // leaves them out, so the `<loc>` count drops on the first build. Named here
+  // so a brand's changelog can record it instead of filing it as a regression.
+  notes.push(
+    'sitemap.xml shrinks: the blog taxonomy (/blog/tags/*, /blog/categories/*) and every listing\'s /page/N '
+    + 'are noindex AND unlisted in OMEGA (#564 — one flag, both signals); posts, pages and /blog itself stay listed',
+  );
 
   // ---- ultimate-jekyll-manager.json → build settings
   if (ujm) {

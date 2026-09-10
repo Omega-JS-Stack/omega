@@ -10,9 +10,10 @@
  *
  * Run: npx omega test backend:cli/setup-retired
  */
-const { COMMANDS, tokensOf, matchCommand, defaultCommand, buildHelpText } = require('../../src/cli/command-table.js');
+const { COMMANDS, tokensOf, matchCommand, defaultCommand, buildHelpText } = require('../../dist/cli/command-table.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'The setup command is retired — the verbs carry its work',
   type: 'group',
 
@@ -60,4 +61,4 @@ module.exports = {
       },
     },
   ],
-};
+});

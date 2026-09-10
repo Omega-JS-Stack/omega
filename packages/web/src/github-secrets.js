@@ -31,12 +31,14 @@ const TARGET = 'web';
  * Collect the publishable secrets for a target: the schema's web delivery set,
  * valued from the COMPOSED env.
  *
- * @param {object} options
- * @param {string} options.targetDir - The target root (its .env is the local layer)
+ * Positional `targetDir`, the shape its desktop and extension siblings already
+ * take ([#723](https://github.com/Omega-JS-Stack/omega/issues/723)).
+ *
+ * @param {string} targetDir - The target root (its .env is the local layer)
  * @returns {Object<string, string>} key → value, ready to publish
  */
-function collectEnvSecrets(options) {
-  return collectTargetSecrets({ targetDir: (options || {}).targetDir, target: TARGET });
+function collectEnvSecrets(targetDir) {
+  return collectTargetSecrets({ targetDir, target: TARGET });
 }
 
 /**

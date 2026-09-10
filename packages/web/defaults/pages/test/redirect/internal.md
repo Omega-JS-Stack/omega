@@ -2,8 +2,6 @@
 layout: modules/utilities/redirect
 permalink: /test/redirect/internal
 
-sitemap:
-  include: false
 meta:
   title: "Internal redirect test page"
   description: "This is a test Internal Redirect page for the Ultimate Jekyll Manager."

@@ -45,17 +45,18 @@
  */
 const { buildUser, callHandler, withEnvironment, PRODUCTION_ENVIRONMENT } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/cancel/post.js');
-const isTrialing = require('../../../src/manager/routes/payments/cancel/_is-trialing.js');
+const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
+const isTrialing = require('../../../dist/manager/routes/payments/cancel/_is-trialing.js');
 
-const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const ChargebeeLib = require('../../../src/manager/libraries/payment/providers/chargebee.js');
-const PayPalLib = require('../../../src/manager/libraries/payment/providers/paypal.js');
+const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const PayPalLib = require('../../../dist/manager/libraries/payment/providers/paypal.js');
 
-const stripeCancel = require('../../../src/manager/routes/payments/cancel/providers/stripe.js');
-const chargebeeCancel = require('../../../src/manager/routes/payments/cancel/providers/chargebee.js');
-const paypalCancel = require('../../../src/manager/routes/payments/cancel/providers/paypal.js');
-const testCancel = require('../../../src/manager/routes/payments/cancel/providers/test.js');
+const stripeCancel = require('../../../dist/manager/routes/payments/cancel/providers/stripe.js');
+const chargebeeCancel = require('../../../dist/manager/routes/payments/cancel/providers/chargebee.js');
+const paypalCancel = require('../../../dist/manager/routes/payments/cancel/providers/paypal.js');
+const testCancel = require('../../../dist/manager/routes/payments/cancel/providers/test.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const DAY = 24 * 60 * 60;
 
@@ -175,7 +176,7 @@ async function cancelVia(provider, { trialing, ctx }) {
   return recorder.logs;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment cancel endpoint: a trial cancels immediately',
   type: 'group',
   timeout: 15000,
@@ -424,4 +425,4 @@ module.exports = {
       },
     },
   ],
-};
+});

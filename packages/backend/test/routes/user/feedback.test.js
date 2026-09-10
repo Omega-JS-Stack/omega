@@ -4,7 +4,9 @@
  * Requires authentication, saves feedback to Firestore
  * Note: Makes external call to ITW getApp endpoint
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User submit feedback',
   type: 'group',
   tests: [
@@ -101,4 +103,4 @@ module.exports = {
       },
     },
   ],
-};
+});

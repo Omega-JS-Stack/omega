@@ -2,7 +2,9 @@
 // inside a tab that has loaded popup.html (chrome-extension://<id>/popup.html),
 // has DOM + chrome.* APIs, and matches the harness's expected page shape.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'view',
   context: 'popup',
@@ -48,4 +50,4 @@ module.exports = {
       },
     },
   ],
-};
+});

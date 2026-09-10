@@ -1,4 +1,4 @@
-const { TEST_ACCOUNTS } = require('../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS } = require('../../dist/test/test-accounts.js');
 
 /**
  * Test: Account Structure Validation

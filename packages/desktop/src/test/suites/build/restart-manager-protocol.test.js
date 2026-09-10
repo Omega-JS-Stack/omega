@@ -3,8 +3,9 @@
 
 const path = require('path');
 const protocol = require('../../../lib/restart-manager/protocol.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'restart-manager protocol SSOT (build)',
@@ -154,4 +155,4 @@ module.exports = {
       },
     },
   ],
-};
+});

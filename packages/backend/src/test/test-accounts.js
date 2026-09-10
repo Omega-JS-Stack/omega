@@ -1,5 +1,6 @@
 const uuid = require('uuid');
 const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
+const { isCountedFeature, isPacedFeature, dayShare } = require('@omega.js/account/features');
 
 // Deterministic password for EVERY seeded persona (N6) — makes manual dev signin
 // possible: boot the emulators, open an emulator-connected dev site, and sign in
@@ -314,7 +315,8 @@ function getLastWrite(subscription) {
  *
  * Demo-safe by construction: every IP is an IANA documentation block (RFC 5737 —
  * routable nowhere), every telephone number is in the 555-01xx fictional range,
- * and the companies are invented. Nothing here can reach, or name, a real person.
+ * and the companies and street addresses are invented. Nothing here can reach, or
+ * name, a real person.
  *
  * A locale bundles everything that must AGREE about where a persona lives — the
  * geolocation the request carried, the location on their profile, their phone's
@@ -323,16 +325,21 @@ function getLastWrite(subscription) {
  *
  * `areaCode` carries no trunk zero: `personal.telephone.national` is a NUMBER on
  * the schema, and a leading zero cannot survive one.
+ *
+ * `postalCode` is written the way its own country writes one — a US ZIP, a
+ * Canadian forward-sortation pair, a UK outward/inward code — because the
+ * account page collects it as free text and the ad platforms normalize each
+ * country's own shape ([#663](https://github.com/Omega-JS-Stack/omega/issues/663)).
  */
 const PROFILE_LOCALES = [
-  { continent: 'NA', country: 'US', region: 'California', city: 'San Diego', latitude: 32.7157, longitude: -117.1611, language: 'en-US', callingCode: 1, areaCode: '619', ipBlock: '192.0.2' },
-  { continent: 'NA', country: 'US', region: 'New York', city: 'Brooklyn', latitude: 40.6782, longitude: -73.9442, language: 'en-US', callingCode: 1, areaCode: '212', ipBlock: '192.0.2' },
-  { continent: 'NA', country: 'CA', region: 'Ontario', city: 'Toronto', latitude: 43.6532, longitude: -79.3832, language: 'en-CA', callingCode: 1, areaCode: '416', ipBlock: '198.51.100' },
-  { continent: 'EU', country: 'GB', region: 'England', city: 'Manchester', latitude: 53.4808, longitude: -2.2426, language: 'en-GB', callingCode: 44, areaCode: '161', ipBlock: '198.51.100' },
-  { continent: 'EU', country: 'DE', region: 'Bavaria', city: 'Munich', latitude: 48.1351, longitude: 11.5820, language: 'de-DE', callingCode: 49, areaCode: '89', ipBlock: '198.51.100' },
-  { continent: 'EU', country: 'ES', region: 'Catalonia', city: 'Barcelona', latitude: 41.3874, longitude: 2.1686, language: 'es-ES', callingCode: 34, areaCode: '933', ipBlock: '203.0.113' },
-  { continent: 'OC', country: 'AU', region: 'Victoria', city: 'Melbourne', latitude: -37.8136, longitude: 144.9631, language: 'en-AU', callingCode: 61, areaCode: '3', ipBlock: '203.0.113' },
-  { continent: 'SA', country: 'BR', region: 'Sao Paulo', city: 'Campinas', latitude: -22.9099, longitude: -47.0626, language: 'pt-BR', callingCode: 55, areaCode: '19', ipBlock: '203.0.113' },
+  { continent: 'NA', country: 'US', region: 'California', city: 'San Diego', postalCode: '92101', latitude: 32.7157, longitude: -117.1611, language: 'en-US', callingCode: 1, areaCode: '619', ipBlock: '192.0.2' },
+  { continent: 'NA', country: 'US', region: 'New York', city: 'Brooklyn', postalCode: '11201', latitude: 40.6782, longitude: -73.9442, language: 'en-US', callingCode: 1, areaCode: '212', ipBlock: '192.0.2' },
+  { continent: 'NA', country: 'CA', region: 'Ontario', city: 'Toronto', postalCode: 'M5H 2N2', latitude: 43.6532, longitude: -79.3832, language: 'en-CA', callingCode: 1, areaCode: '416', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'GB', region: 'England', city: 'Manchester', postalCode: 'M1 1AE', latitude: 53.4808, longitude: -2.2426, language: 'en-GB', callingCode: 44, areaCode: '161', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'DE', region: 'Bavaria', city: 'Munich', postalCode: '80331', latitude: 48.1351, longitude: 11.5820, language: 'de-DE', callingCode: 49, areaCode: '89', ipBlock: '198.51.100' },
+  { continent: 'EU', country: 'ES', region: 'Catalonia', city: 'Barcelona', postalCode: '08001', latitude: 41.3874, longitude: 2.1686, language: 'es-ES', callingCode: 34, areaCode: '933', ipBlock: '203.0.113' },
+  { continent: 'OC', country: 'AU', region: 'Victoria', city: 'Melbourne', postalCode: '3000', latitude: -37.8136, longitude: 144.9631, language: 'en-AU', callingCode: 61, areaCode: '3', ipBlock: '203.0.113' },
+  { continent: 'SA', country: 'BR', region: 'Sao Paulo', city: 'Campinas', postalCode: '13010-001', latitude: -22.9099, longitude: -47.0626, language: 'pt-BR', callingCode: 55, areaCode: '19', ipBlock: '203.0.113' },
 ];
 
 /**
@@ -354,6 +361,7 @@ const PROFILE_CLIENTS = [
 
 const PROFILE_FIRST_NAMES = ['Adrian', 'Beatriz', 'Camille', 'Desmond', 'Elena', 'Felix', 'Greta', 'Hugo', 'Imani', 'Julien', 'Klara', 'Lucas', 'Mira', 'Nadia', 'Omar', 'Priya', 'Rafael', 'Sofia', 'Theo', 'Ursula', 'Viktor', 'Wren', 'Yara', 'Zane'];
 const PROFILE_LAST_NAMES = ['Alvarez', 'Bennett', 'Castellanos', 'Dubois', 'Espinoza', 'Fairbanks', 'Gallagher', 'Haddad', 'Ishikawa', 'Jensen', 'Kowalski', 'Laurent', 'Moreau', 'Nakamura', 'Okafor', 'Petrov', 'Quintero', 'Rossi', 'Sandoval', 'Thorne', 'Ueda', 'Vasquez', 'Whitfield', 'Ziegler'];
+const PROFILE_STREETS = ['12 Harbour Lane', '48 Linden Street', '117 Marlowe Avenue', '205 Kestrel Road', '9 Alderway Close', '341 Beacon Street', '76 Juniper Walk', '158 Copperfield Row'];
 const PROFILE_COMPANIES = ['Northgate Labs', 'Harbourline Studio', 'Meridian Works', 'Copperleaf Media', 'Foxglove Analytics', 'Ridgeway Supply', 'Lanternhouse Co', 'Saltmarsh Digital'];
 const PROFILE_POSITIONS = ['Product Designer', 'Operations Lead', 'Staff Engineer', 'Marketing Manager', 'Founder', 'Data Analyst', 'Content Editor', 'Support Lead'];
 const PROFILE_GENDERS = ['female', 'male', 'non-binary'];
@@ -410,6 +418,8 @@ function seededProfile(key, domain) {
         country: locale.country,
         region: locale.region,
         city: locale.city,
+        postalCode: locale.postalCode,
+        street: pick(PROFILE_STREETS, key, 'street'),
       },
       name: {
         first: pick(PROFILE_FIRST_NAMES, key, 'first'),
@@ -653,6 +663,77 @@ function buildSessionFixtures(key, accounts) {
   return sessions;
 }
 
+// The marker the usage persona carries instead of hand-typed counters: only the
+// SEED knows the brand's feature catalog and the persona's resolved plan, so the
+// spread is resolved there ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+const USAGE_SPREAD = '$usageSpread';
+
+// The five states the usage persona exists to show, in the order the account
+// page draws them. Each is a function of that feature's own monthly limit, so
+// the seed reads right on any brand's numbers.
+const USAGE_SPREAD_STATES = [
+  { name: 'untouched', monthly: () => 0, daily: () => 0 },
+  { name: 'half spent', monthly: (limit) => Math.floor(limit / 2), daily: () => 0 },
+  // The day's share is gone while the month still has room: the refusal that
+  // says "try again tomorrow"
+  { name: 'day cap hit', monthly: (limit) => Math.floor(limit / 4), daily: (limit, dayShare) => dayShare },
+  // The month is gone: the refusal that says "upgrade"
+  { name: 'month cap hit', monthly: (limit) => limit, daily: () => 0 },
+  // Admin-granted credits on top of the plan — the month is spent, and the
+  // account still has room because of them
+  { name: 'override credits', monthly: (limit) => limit, daily: () => 0, override: (limit) => limit * 2 },
+];
+
+/**
+ * Expand the usage persona's spread against the brand's own feature catalog and
+ * the plan it resolved to: one state per COUNTED feature, in catalog order, so
+ * every bar on the account page tells a different story and each tells one.
+ *
+ * A brand whose catalog names fewer counted features simply seeds fewer states —
+ * never a counter for a feature nothing defines.
+ *
+ * @param {object} subscription - The persona's RESOLVED subscription block
+ * @param {object} [config] - @omega.js/backend config
+ * @returns {object} A `usage` block: counters per feature, plus `overrides`
+ */
+function resolveSeededUsage(subscription, config) {
+  const catalog = config?.features || {};
+  const productId = subscription?.product?.id;
+  const product = (config?.payment?.products || []).find((p) => p.id === productId) || {};
+  const values = product.features || {};
+
+  const counted = Object.keys(catalog).filter((id) => isCountedFeature(catalog[id]));
+  const usage = { overrides: {} };
+
+  counted.forEach((id, index) => {
+    const state = USAGE_SPREAD_STATES[index % USAGE_SPREAD_STATES.length];
+    const limit = typeof values[id] === 'number' && values[id] > 0 ? values[id] : 0;
+
+    // Unlimited (or unpriced) has no bar worth previewing — a state built from
+    // a limit that does not exist would be fiction
+    if (!limit) {
+      return;
+    }
+
+    const override = state.override ? state.override(limit) : null;
+    const effective = override === null ? limit : override;
+    const share = isPacedFeature(catalog[id]) ? dayShare(effective) : 0;
+
+    usage[id] = {
+      monthly: state.monthly(limit),
+      daily: state.daily(limit, share),
+      total: state.monthly(limit) * 3,
+      last: getStamp(),
+    };
+
+    if (override !== null) {
+      usage.overrides[id] = override;
+    }
+  });
+
+  return usage;
+}
+
 /**
  * Static test accounts - always created with fixed properties
  * Used for testing access control levels
@@ -784,6 +865,31 @@ const STATIC_ACCOUNTS = {
     properties: {
       roles: {},
       subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getDaysAgo(4), cancellation: { pending: false }, payment: getTestPayment('refunded', { order: false, startDate: getDaysAgo(5) }) },
+    },
+  },
+  // The USAGE persona ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
+  // — the ONE exception to "one persona, one purpose" that Ian asked for, and
+  // it is a deliberate one: a usage bar is only worth previewing beside its
+  // neighbours, so the spread lives on DIFFERENT features of ONE account and
+  // each feature still tells exactly one story. Sign in as it from the website
+  // like any other persona and the account page shows every state at once:
+  //   - a feature nobody has touched (the empty bar),
+  //   - one half spent (the ordinary case),
+  //   - one whose DAY share is gone while the month still has room
+  //     (the "try again tomorrow" refusal),
+  //   - one whose MONTH is gone (the "upgrade" refusal),
+  //   - one carrying admin-granted override credits on top of the plan.
+  // The feature ids are the brand catalog's, so a brand whose catalog names
+  // other features simply seeds fewer bars — never a bar with no definition.
+  'usage-spread': {
+    id: 'usage-spread',
+    uid: '_test-usage-spread',
+    email: '_test.usage-spread@{domain}',
+    palette: 'Usage',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'premium' }, status: 'active', expires: getCycleExpires(), cancellation: { pending: false }, payment: getTestPayment('usage-spread') },
+      usage: USAGE_SPREAD,
     },
   },
   delete: {
@@ -918,6 +1024,18 @@ const JOURNEY_ACCOUNTS = {
     id: 'signup-referred-invalid',
     uid: '_test-signup-referred-invalid',
     email: '_test.signup-referred-invalid@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  // Signs up so the four onboarding emails can be read back out of the
+  // testing-mode capture and the queue ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)) — its own account, because the
+  // signup is the act under test and no other suite may have spent it.
+  'signup-emails': {
+    id: 'signup-emails',
+    uid: '_test-signup-emails',
+    email: '_test.signup-emails@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -1167,6 +1285,19 @@ const JOURNEY_ACCOUNTS = {
     id: 'intent-discount-amount-trial',
     uid: '_test-intent-discount-amount-trial',
     email: '_test.intent-discount-amount-trial@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  // The zero-total refusal's purchaser ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)).
+  // This case is REFUSED before any provider runs, so it buys nothing — it
+  // still needs an account of its own, because the route reads a real auth user
+  // and user doc before it looks at the price at all.
+  'intent-discount-zero-total': {
+    id: 'intent-discount-zero-total',
+    uid: '_test-intent-discount-zero-total',
+    email: '_test.intent-discount-zero-total@{domain}',
     properties: {
       roles: {},
       subscription: { product: { id: 'basic' }, status: 'active' },
@@ -1688,6 +1819,37 @@ function seededConsent() {
 }
 
 /**
+ * The whole seed TABLE — the framework's own accounts, then the project's, in
+ * declaration order. The one merge every seed surface reads, so a project
+ * persona reaches all of them or none of them
+ * ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)).
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js,
+ *   keyed by id. A project account may override a built-in one by reusing its key.
+ * @returns {object} The merged table, keyed by account id
+ */
+function getAccountTable(extraAccounts) {
+  return { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+}
+
+/**
+ * The personas a HUMAN switches between: every seeded account carrying a
+ * `palette` label, in the order the seeder declares them. What
+ * `GET /test/roster` hands the dev palette.
+ *
+ * Composed from the TABLE rather than the assembled definitions: a localpart is
+ * the part of a declared email before the `@`, so it needs no domain and no
+ * catalog to resolve, and the labels only exist on the table.
+ *
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
+ * @returns {{ localpart: string, label: string }[]} The roster, in declaration order
+ */
+function getPaletteRoster(extraAccounts) {
+  return Object.values(getAccountTable(extraAccounts))
+    .filter((account) => account.palette)
+    .map((account) => ({ localpart: (account.email || '').split('@')[0], label: account.palette }));
+}
+
+/**
  * Get all test account definitions with resolved emails and dynamic product IDs
  * @param {string} domain - Domain for email addresses (e.g., 'itwcreativeworks.com')
  * @param {object} [config] - @omega.js/backend config (used to resolve first paid product)
@@ -1699,7 +1861,7 @@ function seededConsent() {
 function getAccountDefinitions(domain, config, extraAccounts) {
   const accounts = {};
 
-  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const all = getAccountTable(extraAccounts);
 
   for (const [key, account] of Object.entries(all)) {
     const properties = JSON.parse(JSON.stringify(account.properties || {}));
@@ -1709,6 +1871,12 @@ function getAccountDefinitions(domain, config, extraAccounts) {
     // end of the cycle it is being billed on.
     if (properties.subscription) {
       properties.subscription = resolveSeededSubscription(properties.subscription, config);
+    }
+
+    // The usage persona's spread (#647): one state per counted feature the
+    // brand's own catalog defines, priced by the plan it just resolved to.
+    if (properties.usage === USAGE_SPREAD) {
+      properties.usage = resolveSeededUsage(properties.subscription, config);
     }
 
     // Every persona is a FULL account, journey ones included (Ian 2026-08-17,
@@ -2472,6 +2640,8 @@ module.exports = {
   TEST_ACCOUNT_PASSWORD,
   getFirstPaidProduct,
   getPlanPricing,
+  getAccountTable,
+  getPaletteRoster,
   getAccountDefinitions,
   fetchPrivateKeys,
   resolveWipeProjectId,

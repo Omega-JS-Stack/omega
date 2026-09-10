@@ -697,6 +697,41 @@ test('authentication: wrong-project OAuth client is flagged, credentials not sav
   assert.equal(jetpack.exists(path.join(context.brandRoot, '.omega', 'secrets', 'google-oauth.json')), false);
 });
 
+test('authentication: an unchanged google-oauth.json is NOT rewritten on the next run (#623)', async () => {
+  const handler = require('../src/services/cloud/ensure/authentication.js');
+  const api = fakeFirebase(convergedResponses());
+  // Redirect URIs already confirmed, so the run reaches the secret write
+  // without the interactive flow
+  const context = handlerContext(brandConfig({ cloud: { oauthRedirectsConfigured: true } }), api);
+  const secretsPath = path.join(context.brandRoot, '.omega', 'secrets', 'google-oauth.json');
+
+  await handler(context);
+  assert.equal(jetpack.read(secretsPath, 'json').clientSecret, 'fixture-secret');
+
+  // Backdate so a rewrite is unmistakable (same-ms writes hide behind mtime)
+  const backdated = new Date(Date.now() - 60_000);
+  fs.utimesSync(secretsPath, backdated, backdated);
+
+  await handler(context);
+
+  assert.ok(fs.statSync(secretsPath).mtimeMs < Date.now() - 30_000,
+    'a converged secret is read-compared, never re-written (the #590 idiom)');
+});
+
+test('authentication: a DRIFTED google-oauth.json is rewritten (#623)', async () => {
+  const handler = require('../src/services/cloud/ensure/authentication.js');
+  const api = fakeFirebase(convergedResponses());
+  const context = handlerContext(brandConfig({ cloud: { oauthRedirectsConfigured: true } }), api);
+  const secretsPath = path.join(context.brandRoot, '.omega', 'secrets', 'google-oauth.json');
+
+  jetpack.write(secretsPath, { clientId: `${PROJECT_NUMBER}-abc.apps.googleusercontent.com`, clientSecret: 'rotated-away' });
+
+  await handler(context);
+
+  assert.equal(jetpack.read(secretsPath, 'json').clientSecret, 'fixture-secret',
+    'the console is the source of truth — a stale secret is replaced');
+});
+
 test('authentication: interactive redirect-URI confirm records completion in config (#434)', async () => {
   const handler = require('../src/services/cloud/ensure/authentication.js');
   const prompt = require('@omega.js/devkit/prompt');
@@ -846,6 +881,28 @@ test('hosting: missing domain is created, ownership TXT + unproxied CNAME writte
   assert.equal(cname.body.content, `${PROJECT}.web.app`);
   assert.equal(cname.body.proxied, false); // unproxied until verified
   assert.ok(!writes.some((w) => w.body?.type === 'A')); // A records skipped
+});
+
+// #588: the op used to ensure an api.{sub}.{domain} per `brand.subdomains`
+// entry, a key nothing else declared or read. Ian's 2026-09-01 call: the web
+// INSTANCE is the subdomain and every instance shares ONE backend, so the
+// default site ensures api.<domain> and nothing per instance.
+test('hosting: a multi-instance brand still ensures api.<domain> alone (#588)', async () => {
+  const handler = require('../src/services/cloud/ensure/hosting.js');
+  const api = fakeFirebase(convergedResponses());
+  const config = brandConfig();
+  config.targets.web = [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }];
+
+  const result = await handler(handlerContext(config, api));
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(result.state.hosting.domains, [{ domain: `api.${DOMAIN}`, status: 'verified' }]);
+
+  // The retired key is inert: its reader is gone, not merely unused
+  const stale = brandConfig();
+  stale.brand.subdomains = ['admin', 'cdn'];
+  const staleResult = await handler(handlerContext(stale, fakeFirebase(convergedResponses())));
+  assert.deepEqual(staleResult.state.hosting.domains, [{ domain: `api.${DOMAIN}`, status: 'verified' }]);
 });
 
 test('hosting: cloud.apiSubdomain = false skips without touching anything', async () => {
@@ -1125,6 +1182,54 @@ test('oauth-consent: an org-less project names the cause, never the generic coul
   assert.match(result.reason, /belongs to no organization/);
   assert.match(printed, /belongs to no organization/);
   assert.ok(!printed.includes('Could not create OAuth consent screen'), 'a known cause never gets the generic line');
+});
+
+// ─── OAuth consent: the branding page is a NAMED manual step (#696) ─────────
+
+const BRANDING_URL = `https://console.cloud.google.com/auth/branding?project=${PROJECT}`;
+
+test('oauth-consent: the walk NAMES the console branding page — Google gives no API for it (#696)', async () => {
+  // The logo, the home/privacy/terms links and the authorized domains live on
+  // a page with no API, so the run cannot reconcile them: it names the page
+  // and says what is safe to change right now (#693's ruling).
+  const capture = () => {
+    const lines = [];
+    const originalLog = console.log;
+    console.log = (...args) => lines.push(args.join(' '));
+    return { lines, restore: () => { console.log = originalLog; } };
+  };
+
+  const existing = fakeFirebase({ listBrands: [{ ...INTERNAL_BRAND, orgInternalOnly: false }] });
+  const read = capture();
+  let result;
+  try {
+    result = await ensureOAuthConsent(handlerContext(brandConfig(), existing));
+  } finally {
+    read.restore();
+  }
+
+  const printed = read.lines.join('\n');
+  assert.equal(result.status, undefined, 'naming a manual step never warns or fails the run');
+  assert.ok(printed.includes(BRANDING_URL), `the branding page URL is named, got:\n${printed}`);
+  assert.match(printed, /safe anytime/, 'the one-line checklist says links + authorized domains are safe anytime');
+  assert.match(printed, /verification review/i, 'and that a logo upload starts the verification review');
+  assert.deepEqual(existing.mutations(), [], 'naming a page mutates nothing');
+
+  // The freshly CREATED screen gets the same naming — a new project is
+  // exactly where the branding page has never been touched
+  const created = fakeFirebase({
+    listBrands: [],
+    getAuthenticatedEmail: 'owner@example.com',
+    createBrand: (projectId, title, email) => ({ name: 'projects/123/brands/b9', applicationTitle: title, supportEmail: email }),
+  });
+  const write = capture();
+  try {
+    await ensureOAuthConsent(handlerContext(brandConfig(), created));
+  } finally {
+    write.restore();
+  }
+
+  assert.ok(write.lines.join('\n').includes(BRANDING_URL), 'the created screen names the branding page too');
 });
 
 // ─── Interactive project selection/creation (config-landing flow) ────────────

@@ -22,7 +22,7 @@ env:
   # entry (@omega.js/config's env-delivery.js), re-rendered by every verb's
   # scaffold. A dispatched run has no `.env`, so this block is the ONLY way the
   # store credentials and the Measurement Protocol secret the build bakes into
-  # build.js reach the runner. Add a key to the schema, not to this file.
+  # every bundle (OMEGA_BUILD_JSON) reach the runner. Add a key to the schema, not to this file.
   [ githubSecrets ]
 
 jobs:

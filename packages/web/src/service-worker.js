@@ -20,9 +20,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const esbuild = require('esbuild');
 const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
-const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
+const { bundle } = require('@omega.js/devkit/bundle');
+const { getEnvironment } = require('./mode-helpers.js');
+
+const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
 
 // Fallback when @omega.js/client's package.json can't be resolved from the
 // clientEntry path — keep in step with packages/client's firebase dependency.
@@ -123,18 +125,20 @@ async function buildServiceWorker(options) {
   const consumerEntry = path.join(options.consumerDir, 'service-worker.js');
   const entry = fs.existsSync(consumerEntry)
     ? consumerEntry
-    : path.resolve(__dirname, '..', 'sw', 'entry.js');
+    : path.resolve(FRAMEWORK_ROOT, 'sw', 'entry.js');
 
-  await esbuild.build({
-    entryPoints: [entry],
-    bundle: true,
-    minify: !options.dev,
+  // The ONE esbuild wrapper (#736/#737): @omega.js/devkit composes the minify
+  // rule and the production `@dev-only` strip this call used to spell out by
+  // hand. `outfile` (#737) is why it can — the worker must land at exactly
+  // `/service-worker.js`, the scope @omega.js/client registers.
+  await bundle({
+    frameworkRoot: FRAMEWORK_ROOT,
+    entries: [entry],
+    dev: Boolean(options.dev),
     // Classic worker script — importScripts() only exists outside module workers
     format: 'iife',
     outfile: path.join(options.outDir, 'service-worker.js'),
-    alias: { '@omega.js/web/service-worker': path.resolve(__dirname, '..', 'sw', 'manager.js') },
-    plugins: options.dev ? [] : [stripDevBlocksPlugin],
-    logLevel: 'silent',
+    alias: { '@omega.js/web/service-worker': path.resolve(FRAMEWORK_ROOT, 'sw', 'manager.js') },
     define: {
       'process.env.NODE_ENV': options.dev ? '"development"' : '"production"',
       __OMEGA_FIREBASE_VERSION__: JSON.stringify(resolveFirebaseVersion(options.clientEntry)),
@@ -149,7 +153,7 @@ async function buildServiceWorker(options) {
  * @param {object} options
  * @param {object} options.siteData - resolved omega config (brand/cloud)
  * @param {string} options.outDir
- * @param {string} [options.environment] - 'development' | 'production'
+ * @param {string} [options.environment] - the build's environment (#717, read through the one surface)
  * @param {string} [options.version] - the consumer package version
  * @param {object} [options.manifest] - buildAssets() manifest (main bundle
  *   URLs — consumed by the SW's cache warm, which is currently disabled
@@ -166,7 +170,7 @@ function writeBuildMeta(options) {
   const meta = {
     brand: site.brand?.id || 'default',
     name: site.brand?.name || site.brand?.id || 'default',
-    environment: options.environment || 'development',
+    environment: getEnvironment.call(options),
     version: options.version || '0.0.0',
     // `timestamp` is the key @omega.js/client's version check reads
     timestamp: now.toISOString(),

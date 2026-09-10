@@ -5,7 +5,6 @@
  */
 
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { DISPLAY_TYPES, formatDateUTC, formatTimeUTC, todayUTC } from './calendar-core.js';
 import { renderEmailPreview, renderPushPreview } from './campaign-preview.js';
@@ -764,8 +763,8 @@ export default class CalendarEvents {
 
     // Status badge
     const statusBadge = campaign.status === 'sent'
-      ? `<span class="badge bg-success">${getPrerenderedIcon('circle-check', 'fa-xs me-1')} Sent</span>`
-      : `<span class="badge bg-danger">${getPrerenderedIcon('triangle-exclamation', 'fa-xs me-1')} Failed</span>`;
+      ? `<span class="badge bg-success"><i class="fa-solid fa-circle-check fa-xs me-1"></i> Sent</span>`
+      : `<span class="badge bg-danger"><i class="fa-solid fa-triangle-exclamation fa-xs me-1"></i> Failed</span>`;
 
     // Overview
     html += '<div class="mb-4">';

@@ -19,6 +19,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-refund-refusal-uid';
 const ORDER_ID = '2402-2402-2402';
@@ -88,7 +89,7 @@ function runRefund({ seed = {}, payload = refundPayload(), eventType = 'charge.r
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A one-time refund with no order behind it is refused on its own event doc, never minted as a purchase',
   type: 'group',
   timeout: 30000,
@@ -166,4 +167,4 @@ module.exports = {
       },
     },
   ],
-};
+});

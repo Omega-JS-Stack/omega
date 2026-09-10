@@ -33,6 +33,7 @@ function makeIcon(className) {
     },
     matches(selector) {
       if (selector.includes('i[data-omega-fa]') && el.dataset.omegaFa !== undefined) return true;
+      if (selector.includes('omega-flag-') && /(^|\s)omega-flag-/.test(el.className)) return true;
       return /i\[class\*="fa-"\]/.test(selector) && /(^|\s)fa-/.test(el.className);
     },
     querySelector(selector) {
@@ -90,6 +91,18 @@ describe('icon-renderer', () => {
       assert.ok(icon.innerHTML.includes('<svg'));
       assert.ok(icon.innerHTML.includes('aria-hidden="true"'));
       assert.ok(icon.innerHTML.includes('viewBox="0 0 512 512"'), 'existing attributes survive');
+    });
+
+    it('#619: renders the country-flag namespace through the same lookup', async () => {
+      const { calls, resolve } = transport();
+      const flag = makeIcon('omega-flag omega-flag-us');
+
+      createIconRenderer({ resolve }).scan(makeRoot([flag]));
+      await settle();
+
+      assert.deepStrictEqual(calls, ['flags/us']);
+      assert.strictEqual(flag.dataset.omegaFa, 'flags/us');
+      assert.ok(flag.innerHTML.includes('<svg'));
     });
 
     it('renders the root itself when the root IS an icon', async () => {

@@ -1,4 +1,5 @@
 const BaseTest = require('./base-test');
+const { frameworkOwnedScripts } = require('../../utils/project-type');
 
 class NpmProjectScriptsTest extends BaseTest {
   getName() {
@@ -6,11 +7,12 @@ class NpmProjectScriptsTest extends BaseTest {
   }
 
   async run() {
-    const bemPackage = require('../../../../package.json');
-    const projectScripts = bemPackage.projectScripts || {};
+    // frameworkOwnedScripts is the ONE home of which keys this framework owns
+    // and at what value (#689) — the same call ensure-target's scaffold makes,
+    // so a check and a verb can never disagree about a target's scripts.
+    const projectScripts = frameworkOwnedScripts(this.self.firebaseProjectPath);
     const consumerScripts = this.context.package.scripts || {};
 
-    // Check if all projectScripts exist in consumer
     for (const [name, command] of Object.entries(projectScripts)) {
       if (consumerScripts[name] !== command) {
         return false;
@@ -21,8 +23,7 @@ class NpmProjectScriptsTest extends BaseTest {
   }
 
   async fix() {
-    const bemPackage = require('../../../../package.json');
-    const projectScripts = bemPackage.projectScripts || {};
+    const projectScripts = frameworkOwnedScripts(this.self.firebaseProjectPath);
 
     // Fresh-read first: npm-driven fixes rewrote the manifest earlier in
     // this run — writing the boot-time snapshot would clobber their installs
@@ -30,7 +31,6 @@ class NpmProjectScriptsTest extends BaseTest {
     const manifest = this.readTargetManifest();
     manifest.scripts = manifest.scripts || {};
 
-    // Copy all projectScripts to consumer
     for (const [name, command] of Object.entries(projectScripts)) {
       manifest.scripts[name] = command;
     }

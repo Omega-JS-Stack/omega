@@ -4,7 +4,9 @@
  *
  * AI inference tests only run when TEST_EXTENDED_MODE is set (requires OPENAI_API_KEY)
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Admin infer contact',
   type: 'group',
   tests: [
@@ -215,4 +217,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -45,18 +45,18 @@ Context fields: `ctx`, `user` (resolved user), `data` (raw request data), `metho
 - `default` — default value if not provided; may be a function (`default: () => ...`)
 - `value` — force-set value (ignores user input — e.g. auto-generated IDs)
 - `required` — `true`/`false` or a function `(ctx, settings, options) => bool`. A key counts as missing when it's `undefined` **or `''`** (null/0/false pass). **NEVER combine with `default`** — see the footgun below
-- `min` / `max` — validation bounds (string length, number range, array length); numbers clamp, strings/arrays truncate at `max`. Enforced **only when declared** — no `min` means negatives pass through, and a declared `0` is a real bound
+- `min` / `max` — validation bounds (string length, number range, array length), enforced per type. `max`: numbers clamp down, strings/arrays truncate. `min`: numbers clamp up, but a **string or array shorter than `min` is REFUSED** — `400 Invalid settings {field}: must be at least N characters` (`must have at least N items` for arrays), never padded. The length refusal is checked post-resolution at the route boundary, like `enum`, so it sees the value the handler would have gotten; unlike `enum`, it applies even when the caller did not send the field (a `default: ''` with `min: 1` refuses every request that omits it). Enforced **only when declared** — no `min` means negatives and empty strings pass through, and a declared `0` is a real bound
 - `enum` — array of allowed values. Enforced for values the caller sends (checked post-coercion): out-of-list → `400 Invalid settings {field}: must be one of [...]`. Absent fields pass — combine with `required` if the field must also be present
 - `clean` — a RegExp (matched chars removed) or function `(value) => cleaned`
 - `sanitize` — per-field opt-out (`false`) for HTML sanitization; only meaningful when the route opts in via `Manager.Middleware(req, res).run('route', { sanitize: true })`. See [sanitization.md](sanitization.md)
 
 ### ⚠️ `required` + `default` footgun
 
-@omega.js/backend checks `required` against the ORIGINAL request value, before defaults apply — so `required: true` on a field with a `default` throws `Required key {field} is missing in settings` before the default is ever used. For fields that must be non-empty but have a derived default (like path-extracted IDs), use `min: 1` instead.
+@omega.js/backend checks `required` against the ORIGINAL request value, before defaults apply — so `required: true` on a field with a `default` throws `Required key {field} is missing in settings` before the default is ever used. For fields that must be non-empty but have a derived default (like path-extracted IDs), use `min: 1` instead — it refuses an empty value with a 400 AFTER the default applies.
 
 ## Zod schemas
 
-A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.test.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, min/max clamp/truncate, `required` fires on `undefined`/`''`, unknown keys stripped):
+A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.test.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, `max` clamp/truncate, a short string/array refused at `min`, `required` fires on `undefined`/`''`, unknown keys stripped):
 
 ```javascript
 const { fields: f } = require('@omega.js/backend/dist/manager/helpers/schema-zod.js'); // framework schemas use a relative path
@@ -71,7 +71,7 @@ module.exports = ({ user }) => f.object({
 });
 ```
 
-Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `enum`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above; `min`/`max` enforce only when declared (no implicit `0` floor — fixed deliberately, see the field-properties list).
+Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `enum`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above; `min`/`max` enforce only when declared (no implicit `0` floor — fixed deliberately, see the field-properties list), and a length `min` refuses with the byte-identical 400 the declarative engine raises.
 
 Exporting **raw zod** (no builders) opts into zod-native semantics instead: invalid input **rejects with 400** rather than coercing. Use deliberately — it's a behavior change from the declarative contract.
 
@@ -106,7 +106,9 @@ id: {
 },
 ```
 
-For GET list endpoints, omit `min` so an empty ID means "list":
+`min: 1` is a real guard: a request with no ID in the path resolves to `''` and is refused with `400 Invalid settings {id}: must be at least 1 character` before the route runs, so a handler never reads or writes the wrong document.
+
+For GET list endpoints, omit `min` so an empty ID means "list" (a declared `min: 1` would refuse the list call):
 
 ```javascript
 id: {

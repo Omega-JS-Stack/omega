@@ -4,9 +4,10 @@
  *
  * The handler used to dump the whole UserRecord (providerData, passwordHash,
  * metadata) plus the event context onto its opening line — per created user, which
- * buries a dev-boot seed. The headline is now `onCreate: <uid> (<email>)` and
- * nothing else; the full record stays reachable one level down, at debug — silent
- * on a normal run, one `OMEGA_DEBUG=1` away.
+ * buries a dev-boot seed. The headline is now `onCreate: <uid>` and nothing else
+ * — the address came off it in the #710 pass, so all four auth triggers spell
+ * their headline the one way the #657 sweep set; the full record stays reachable
+ * one level down, at debug — silent on a normal run, one `OMEGA_DEBUG=1` away.
  *
  * Real everything: a seeded persona's REAL UserRecord from the emulator's Auth,
  * the real Manager and ctx, the real handler. The persona already has a user doc,
@@ -16,7 +17,8 @@
  * Run: npx omega test framework:events/auth-on-create-log
  */
 
-const onCreate = require('../../src/manager/events/auth/on-create.js');
+const onCreate = require('../../dist/manager/events/auth/on-create.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Record every console call the thunk makes, restoring console afterward.
 async function withConsoleRecorder(fn) {
@@ -35,6 +37,14 @@ async function withConsoleRecorder(fn) {
     console.debug = original.debug;
     console.error = original.error;
   }
+}
+
+// A call as one string, the way it lands in Cloud Logging: an address hides just
+// as well inside a payload ARGUMENT as in the message, so a scan that only reads
+// string args cannot see it. Same rendering email/marketing/remove-log-privacy
+// scans with.
+function render(args) {
+  return args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
 }
 
 // The handler forwards the event context straight to the debug line and to the
@@ -90,29 +100,34 @@ async function runHandler({ Manager, user, debug }) {
     });
   });
 
-  return { calls: calls, headlines: calls.log.filter((args) => String(args[1]).startsWith(`onCreate: ${user.uid} (`)) };
+  return { calls: calls, headlines: calls.log.filter((args) => args[1] === `onCreate: ${user.uid}`) };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'auth:on-create logs one headline line, full record at debug',
   type: 'group',
   timeout: 30000,
 
   tests: [
     {
-      name: 'headline-is-uid-and-email-only',
+      name: 'headline-is-the-uid-alone',
       run: async ({ assert, Manager, accounts, firestore }) => {
         const user = await Manager.libraries.admin.auth().getUser(accounts.basic.uid);
 
         await assertDocExists({ assert: assert, firestore: firestore, user: user });
 
-        const { headlines } = await runHandler({ Manager: Manager, user: user, debug: undefined });
+        const { calls, headlines } = await runHandler({ Manager: Manager, user: user, debug: undefined });
 
         assert.equal(headlines.length, 1, `expected one headline line, got ${headlines.length}`);
-        assert.equal(headlines[0][1], `onCreate: ${user.uid} (${user.email})`, headlines[0][1]);
+        assert.equal(headlines[0][1], `onCreate: ${user.uid}`, headlines[0][1]);
 
         // Prefix + message and nothing else — the record is off this line.
         assert.equal(headlines[0].length, 2, `the headline carries a payload: ${JSON.stringify(headlines[0].slice(2)).slice(0, 200)}`);
+
+        // And the address is off every line, not just moved along the headline.
+        const leaked = calls.log.filter((args) => render(args).includes(user.email));
+
+        assert.equal(leaked.length, 0, `the email must not ride any log line: ${leaked.map(render).join(' | ').slice(0, 200)}`);
       },
     },
 
@@ -146,4 +161,4 @@ module.exports = {
       },
     },
   ],
-};
+});

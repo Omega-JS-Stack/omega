@@ -1,4 +1,5 @@
-const { TEST_ACCOUNTS } = require('../../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS } = require('../../../dist/test/test-accounts.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // SSOT: Affiliate code from referrer account definition
 const REFERRER_AFFILIATE_CODE = TEST_ACCOUNTS.referrer.properties.affiliate.code;
@@ -14,7 +15,7 @@ const REFERRER_AFFILIATE_CODE = TEST_ACCOUNTS.referrer.properties.affiliate.code
  * Note: referrer and signup-referred accounts are pre-created by the test runner
  * The referrer has affiliate.code set at creation time (see test-accounts.js)
  */
-module.exports = {
+module.exports = defineCases({
   description: 'User signup flow with affiliate tracking',
   type: 'suite',
   timeout: 60000, // Longer timeout for auth events to process
@@ -575,4 +576,4 @@ module.exports = {
       },
     },
   ],
-};
+});

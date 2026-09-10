@@ -154,6 +154,27 @@ test('env-keys: a key added to the env schema reaches both lanes with no other e
   }
 });
 
+test('the scaffold writes an empty .env.<environment> beside the .env, and gitignores them (#586)', () => {
+  const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: ['backend'] });
+  const file = (relative) => plan.find((entry) => entry.path === relative);
+
+  // `.env` is the base; `.env.<environment>` overlays it for the run's own
+  // environment. Scaffolded EMPTY on purpose — a header comment and nothing
+  // pre-listed, so the base stays the one place a key is documented.
+  for (const environment of ['development', 'testing', 'production']) {
+    const overlay = file(`.env.${environment}`);
+
+    assert.ok(overlay, `.env.${environment} is scaffolded beside the .env`);
+    assert.match(overlay.contents, new RegExp(`\\.env\\.${environment}`), 'the header names the file it is');
+    assert.equal(overlay.contents.split('\n').some((line) => /^[A-Z]/.test(line)), false, 'nothing is pre-listed — a header comment only');
+  }
+
+  // They hold secrets, so they can never be committed
+  const gitignore = file('.gitignore').contents.split('\n');
+  assert.ok(gitignore.includes('.env'), 'the base is ignored');
+  assert.ok(gitignore.includes('.env.*'), 'every overlay is ignored');
+});
+
 test('env-keys: the onboard stub mints the SAME list, double-quoted', () => {
   const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: ['backend'] });
   const stub = plan.find((file) => file.path === '.env').contents;

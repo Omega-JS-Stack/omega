@@ -3,16 +3,18 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const util = require('util');
-const { spawn } = require('child_process');
+const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
+const { javaInstallHint } = require('./setup-tests/helpers');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
 const { refuseWhenCustom } = require('../utils/project-type');
 const { runTargetChecks } = require('../utils/target-checks');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // The Firebase emulator hub — fixed, not part of the N7-allocated map.
 const HUB_PORT = 4400;
@@ -181,7 +183,10 @@ class TestCommand extends BaseCommand {
     // reads current src + composed config. The auto-start emulator path stages
     // again inside startEmulators — idempotent and cheap; THIS call covers the
     // existing-emulator path, where nothing else would refresh the tree.
-    this.ensureStaged();
+    // A test lane composes its .env for TESTING (#586): the run's own
+    // OMEGA_TEST_MODE is set on the emulator child, not on this process, so the
+    // environment is named here rather than sniffed.
+    this.ensureStaged({ environment: 'testing' });
 
     // Get test paths from CLI args (e.g., "bem test admin/" or "bem test general/generate-uuid")
     const testPaths = (argv._ || []).slice(1); // Remove 'test' from args
@@ -372,7 +377,6 @@ class TestCommand extends BaseCommand {
     });
 
     const { stop } = await laneModule.startForwarding({
-      stripePath: stripePath,
       apiKey: decision.key,
       forwardUrl: laneModule.forwardUrl({ hostingPort: emulatorPorts.hosting, webhookKey: testConfig.webhookKey }),
       log: (line) => this.log(chalk.gray(`  [Stripe] ${line}`)),
@@ -393,7 +397,7 @@ class TestCommand extends BaseCommand {
    * Load project configuration from config/omega.json5 and .env
    */
   loadProjectConfig(functionsDir, argv) {
-    const { hasOmegaConfig, loadConfig, loadEnv } = require('@omega.js/config');
+    const { hasOmegaConfig, loadConfig, loadEnv, resolvedBrandHost } = require('@omega.js/config');
 
     // Load the .env cascade first so env vars are available
     loadEnv(functionsDir);
@@ -416,8 +420,10 @@ class TestCommand extends BaseCommand {
     // Derive computed values (not in config file)
     const adminKey = argv.key || process.env.OMEGA_ADMIN_KEY;
     const webhookKey = argv.webhookKey || process.env.OMEGA_WEBHOOK_KEY;
-    const contactEmail = config.brand?.contact?.email || '';
-    const domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
+    // The persona domain is the brand's HOST — one derivation, shared with the
+    // seeder and the dev palette
+    // ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)).
+    const domain = resolvedBrandHost(config);
 
     // Validate required configuration
     if (!config.cloud?.config?.projectId) {
@@ -443,7 +449,7 @@ class TestCommand extends BaseCommand {
     }
 
     if (!domain) {
-      this.logError('Error: Missing brand.contact.email in config/omega.json5');
+      this.logError('Error: Missing brand.url in config/omega.json5 (personas are seeded on the brand host)');
       return null;
     }
 
@@ -780,6 +786,12 @@ class TestCommand extends BaseCommand {
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
+    // The runner's OWN exit code, kept: a no-match answers with a code of its
+    // own inside a brand-root fan-out (#814), and collapsing every non-zero to
+    // 1 here would hide it. powertools registers its close listener before it
+    // hands the child over, so this one has run by the time the catch does.
+    let childExit = 0;
+
     try {
       await powertools.execute(testCommand, {
         log: false,
@@ -802,12 +814,13 @@ class TestCommand extends BaseCommand {
         });
 
         // Clean up log stream when child exits
-        child.on('close', () => {
+        child.on('close', (code) => {
+          childExit = code ?? 1;
           logStream.end();
         });
       });
     } catch (error) {
-      process.exit(1);
+      process.exit(childExit || 1);
     }
   }
 
@@ -824,7 +837,7 @@ class TestCommand extends BaseCommand {
       await powertools.execute('java -version', { log: false });
     } catch (e) {
       this.logError(`Java is required to run tests (Firebase emulators depend on it).`);
-      this.logError(`Install with: brew install openjdk`);
+      this.logError(`Install with: ${javaInstallHint()}`);
       process.exit(1);
     }
 
@@ -834,7 +847,7 @@ class TestCommand extends BaseCommand {
     let started;
 
     try {
-      started = await emulatorCmd.startEmulators();
+      started = await emulatorCmd.startEmulators({ environment: 'testing' });
     } catch (error) {
       this.logError(`Emulator error: ${error.message || error}`);
       process.exit(1);
@@ -854,13 +867,40 @@ class TestCommand extends BaseCommand {
       laneEnv: laneSession.env,
     });
 
-    // Forward Ctrl+C to a clean emulator shutdown
-    const onSigint = async () => {
+    // ONE handler, three signals: this run OWNS the stack it just booted, so
+    // every way it is asked to stop takes the same teardown. Wired to SIGINT
+    // alone, a supervisor's SIGTERM or a closed terminal's SIGHUP took Node's
+    // default action and orphaned the whole firebase tree onto PID 1 — the
+    // [#629](https://github.com/Omega-JS-Stack/omega/issues/629) defect on this
+    // sibling path ([#722](https://github.com/Omega-JS-Stack/omega/issues/722)).
+    //
+    // The signal is DIRECTED at this pid, so it reaches the CLI and nothing
+    // else: the test runner spawned below is this run's child, not its
+    // co-signee, and a teardown that only stops the emulator leaves the suites
+    // running orphaned to PID 1. It is therefore signalled by hand, and the
+    // handler is reentrancy-guarded — a second signal arriving mid-teardown
+    // (SIGINT then SIGTERM is exactly how a supervisor escalates) would
+    // otherwise start the whole thing again underneath the first.
+    let testChild = null;
+    let stopping = false;
+
+    const onStopSignal = async () => {
+      if (stopping) {
+        return;
+      }
+
+      stopping = true;
+
       this.log(chalk.gray('\n  Shutting down emulator...'));
+
+      if (testChild && testChild.exitCode === null && testChild.signalCode === null) {
+        try { testChild.kill('SIGTERM'); } catch (e) { /* already gone */ }
+      }
+
       await shutdown();
       process.exit(130);
     };
-    process.once('SIGINT', onSigint);
+    STOP_SIGNALS.forEach((signal) => process.on(signal, onStopSignal));
 
     // Print the same connection summary the existing-emulator path shows
     this.log('');
@@ -879,7 +919,7 @@ class TestCommand extends BaseCommand {
     let testExitCode = 0;
 
     try {
-      const testChild = spawn('sh', ['-c', testCommand], {
+      testChild = spawnShell(testCommand, {
         cwd: functionsDir,
         env: { ...process.env, FORCE_COLOR: '1' },
         stdio: ['inherit', 'pipe', 'pipe'],
@@ -906,7 +946,18 @@ class TestCommand extends BaseCommand {
       testExitCode = 1;
     } finally {
       laneSession.stop();
-      process.removeListener('SIGINT', onSigint);
+
+      // A stop signal owns the teardown AND the exit from the moment it
+      // arrives: this path is only reached at all because the handler killed
+      // the child this run was waiting on. Tearing down again here would
+      // signal the stack out from under it — and dropping the handlers would
+      // hand the next signal back to Node's default action mid-teardown. So
+      // the process is left to the handler's own exit.
+      if (stopping) {
+        await new Promise(() => {});
+      }
+
+      STOP_SIGNALS.forEach((signal) => process.removeListener(signal, onStopSignal));
       await shutdown();
       await exitPromise;
     }

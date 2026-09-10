@@ -17,12 +17,16 @@ config:
 {% capture company %}{{ resolved.config.brand.company | default: resolved.config.brand.name }}{% endcapture %}
 
 <!-- ═══ Document header ═══ -->
-<section class="omega-legal__head pb-4">
-  <div class="container" data-omega-reveal-stagger="80">
-    {% component "heading/masthead", eyebrow: "Legal", headline: resolved.meta.breadcrumb, h1_class: "mb-2", sub: resolved.meta.description, sub_class: "omega-legal__sub omega-quiet" %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+document body below it never carried a reveal of its own. {% endcomment %}
+<section class="omega-legal__head pb-4" data-omega-first-paint>
+  <div class="container">
+    {% component "heading/masthead", eyebrow: "Legal", headline: resolved.meta.breadcrumb, h1_class: "mb-2", sub: resolved.meta.description, sub_class: "omega-legal__sub omega-quiet", first_paint: true %}
 
     <!-- The legal hub: every policy one hop away, current one marked -->
-    <nav class="omega-legal__hub" aria-label="Legal documents" data-omega-reveal>
+    <nav class="omega-legal__hub" aria-label="Legal documents">
       {% assign legal_docs = "Terms of Service|/terms,Privacy Policy|/privacy,Cookie Policy|/cookies" | split: "," %}
       {% for doc in legal_docs %}
         {% assign parts = doc | split: "|" %}
@@ -52,11 +56,11 @@ config:
           <div class="omega-legal__rail-foot">
             {% iftruthy resolved.config.brand.contact.email %}
               <a class="omega-legal__rail-link" href="mailto:{{ resolved.config.brand.contact.email }}">
-                {% omega_icon "envelope", "fa-xs me-2" %}Questions? Email us
+                <i class="fa-solid fa-envelope fa-xs me-2"></i>Questions? Email us
               </a>
             {% endiftruthy %}
             <button type="button" class="omega-legal__rail-link" data-legal-print>
-              {% omega_icon "print", "fa-xs me-2" %}Print this page
+              <i class="fa-solid fa-print fa-xs me-2"></i>Print this page
             </button>
           </div>
         </div>

@@ -19,10 +19,10 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 | Hook file | When it runs | `ctx` shape |
 |---|---|---|
-| `hooks/build/pre.js`     | Before the build pipeline runs (`defaults` → `distribute` → `webpack` ...) | `{ manager, projectRoot, mode }` |
+| `hooks/build/pre.js`     | Before the build pipeline runs (`defaults` → `distribute` → `bundle` ...) | `{ manager, projectRoot, mode }` |
 | `hooks/build/post.js`    | After the build pipeline finishes, before `electron-builder` packages anything | `{ manager, projectRoot, mode }` |
 | `hooks/release/pre.js`   | Before `electron-builder build --publish always` | `{ manager, projectRoot, mode }` |
-| `hooks/release/post.js`  | After release publishes + mirror-downloads finish | `{ manager, projectRoot, mode }` |
+| `hooks/release/post.js`  | After the release publishes | `{ manager, projectRoot, mode }` |
 | `hooks/notarize/post.js` | After @omega.js/desktop's built-in macOS notarization completes (extension only — @omega.js/desktop's notarize is the real entrypoint) | electron-builder afterSign context |
 
 `mode` is `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`.

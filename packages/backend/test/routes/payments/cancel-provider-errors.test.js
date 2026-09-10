@@ -22,8 +22,9 @@
 const Stripe = require('stripe');
 const { buildUser, callHandler, withEnvironment } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/cancel/post.js');
-const isAlreadyGone = require('../../../src/manager/libraries/payment/provider-errors.js');
+const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
+const isAlreadyGone = require('../../../dist/manager/libraries/payment/provider-errors.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A subscriber on a real provider, old enough to clear the age guard.
 function subscriber(Manager, { uid, status, provider }) {
@@ -57,7 +58,7 @@ function cancelWithoutStripeKey(Manager, user) {
   }));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment cancel endpoint: provider error classification',
   type: 'group',
   timeout: 15000,
@@ -223,4 +224,4 @@ module.exports = {
       },
     },
   ],
-};
+});

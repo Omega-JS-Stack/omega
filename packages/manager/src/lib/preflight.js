@@ -21,13 +21,30 @@
  * The scope leg's boundary: the token store records what the last consent
  * GRANTED — that is what's knowable before a call. The live grant is only
  * proven at call time; the google-auth 403 diagnostics are the backstop.
+ *
+ * The file's OTHER gate is assertFamilyVersions (#794), the lockstep check:
+ * same place in the run (before any service, from `runManage` and `omega dev`
+ * alike) and the opposite verdict — a mixed @omega.js family is REFUSED, not
+ * absorbed, because every service below it would reconcile on top of two
+ * copies of the runtime.
  */
 const fs = require('node:fs');
+const path = require('node:path');
 const chalk = require('chalk').default;
 
-const { REQUIRES } = require('../config.js');
+const { REQUIRES, TARGET_FRAMEWORKS } = require('../config.js');
 const { canPrompt } = require('./run-gates.js');
 const { googleTokenStorePath } = require('./google-auth.js');
+
+// The family's ONE version (#794) — the manager's own, read at run time. A
+// published brand installs the manager and its frameworks from the same
+// release, so the manager's number IS what every target must carry.
+const FAMILY_VERSION = require('../../package.json').version;
+
+// The client rides inside every framework (web/backend/desktop/extension all
+// depend on it), so a drifted client is the second way one brand ends up
+// running two copies of the runtime — checked per target beside the framework.
+const CLIENT_PACKAGE = '@omega.js/client';
 
 /** Shorten a Google scope URL to its trailing name for display. */
 function shortScope(scope) {
@@ -257,4 +274,197 @@ function runPreflight({ services, brandConfig, brandRoot, options = {} }, deps =
   return { findings, gates };
 }
 
-module.exports = { runPreflight, checkService, readTokenStore };
+// ─── The lockstep boot check (#794) ─────────────────────────────────────────
+
+/**
+ * The nearest installed copy of a package, climbing from a target dir toward
+ * the brand root — npm hoists a workspace tree's deps to the root, so the
+ * target's own node_modules is the first place to look and never the only
+ * one (the same "nearest, climbing" resolution `omega update` reports from).
+ *
+ * @param {string} fromDir - Where to start looking (a target dir).
+ * @param {string} brandRoot - Where to stop climbing.
+ * @param {string} packageName - Full package name (`@omega.js/web`).
+ * @returns {string|null} The installed package dir, or null when nothing is installed.
+ */
+function findInstalled(fromDir, brandRoot, packageName) {
+  let current = path.resolve(fromDir);
+  const stop = path.resolve(brandRoot);
+
+  for (;;) {
+    const candidate = path.join(current, 'node_modules', packageName);
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+
+    const parent = path.dirname(current);
+    if (current === stop || parent === current) return null;
+    current = parent;
+  }
+}
+
+/**
+ * Is this install a LINK out of node_modules — the local era's `file:` spec,
+ * or an npm workspace link? Its version is the monorepo's by construction, so
+ * comparing it to a published number says nothing.
+ */
+function isLinkedInstall(installedDir) {
+  try {
+    return fs.lstatSync(installedDir).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The installed version, or the PROBLEM that stopped us reading it. A manifest
+ * that exists but cannot be parsed (or carries no version) is never a pass:
+ * the whole point of the gate is knowing what is installed, and "unknown"
+ * answers that question with silence.
+ *
+ * @param {string} installedDir - An installed package dir.
+ * @returns {{ version: string|null, problem: string|null }}
+ */
+function readInstalledVersion(installedDir) {
+  const manifest = path.join(installedDir, 'package.json');
+  let raw;
+
+  try {
+    raw = fs.readFileSync(manifest, 'utf8');
+  } catch {
+    return { version: null, problem: 'cannot be read' };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { version: null, problem: 'is not valid JSON' };
+  }
+
+  if (typeof parsed.version !== 'string' || parsed.version === '') {
+    return { version: null, problem: 'declares no version' };
+  }
+
+  return { version: parsed.version, problem: null };
+}
+
+/** An Error the CLI prints as its message alone — a refusal is not a bug (#706). */
+function refusal(message) {
+  const error = new Error(message);
+  error.refusal = true;
+  return error;
+}
+
+/** The framework spec a target's own manifest declares, or null. */
+function declaredSpec(targetPath, packageName) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'));
+    return pkg.dependencies?.[packageName] || pkg.devDependencies?.[packageName] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The lockstep gate (#794) — the @omega.js family ships ONE version, so every
+ * target's installed framework (and the `@omega.js/client` under it) must be
+ * the manager's own version. Run before any service, by `runManage` and by
+ * `omega dev` alike: a brand running a backend from one release beside a
+ * client from another validates its config with two validators and serves two
+ * copies of the runtime, and nothing downstream can tell.
+ *
+ * What is NOT a mismatch: a target linked with a `file:` spec (the local era —
+ * its version is the monorepo's by construction), and a target with nothing
+ * installed yet (the install itself is the fix, so it skips with a line).
+ *
+ * @param {object} params
+ * @param {string} params.brandRoot - Brand monorepo root.
+ * @param {Array<{ name, dir, path, target }>} params.targets - Discovered target entries.
+ * @param {string} [params.version] - The family version (defaults to the manager's own).
+ * @returns {{ checked: object[], mismatched: object[], exempt: object[], skipped: object[], unreadable: object[] }}
+ * @throws {Error} ONE refusal (`error.refusal`, so the CLI prints the message
+ *   alone) naming every mismatched target and the fix — or, first, every
+ *   installed manifest that cannot be read.
+ */
+function assertFamilyVersions({ brandRoot, targets = [], version = FAMILY_VERSION }) {
+  const checked = [];
+  const mismatched = [];
+  const exempt = [];
+  const skipped = [];
+  const unreadable = [];
+
+  for (const entry of targets) {
+    const framework = TARGET_FRAMEWORKS[entry.target];
+    // A custom target (#603) maps to no framework — there is nothing to compare
+    if (!framework) continue;
+
+    const spec = declaredSpec(entry.path, framework);
+    if (spec && /^(file|link):/.test(spec)) {
+      exempt.push({ dir: entry.name, framework, reason: spec });
+      continue;
+    }
+
+    const installedDir = findInstalled(entry.path, brandRoot, framework);
+    if (!installedDir) {
+      skipped.push({ dir: entry.name, framework });
+      continue;
+    }
+    if (isLinkedInstall(installedDir)) {
+      exempt.push({ dir: entry.name, framework, reason: 'linked install' });
+      continue;
+    }
+
+    // The client is checked wherever npm placed it: nested under the
+    // framework when the ranges stopped overlapping (the second-copy case
+    // this check exists for), otherwise the hoisted copy the climb finds.
+    const nestedClient = path.join(installedDir, 'node_modules', CLIENT_PACKAGE);
+    const clientDir = fs.existsSync(path.join(nestedClient, 'package.json'))
+      ? nestedClient
+      : findInstalled(entry.path, brandRoot, CLIENT_PACKAGE);
+
+    const reads = [{ name: framework, dir: installedDir, ...readInstalledVersion(installedDir) }];
+    if (clientDir && !isLinkedInstall(clientDir)) {
+      reads.push({ name: CLIENT_PACKAGE, dir: clientDir, ...readInstalledVersion(clientDir) });
+    }
+
+    const broken = reads.filter((read) => read.problem);
+    if (broken.length > 0) {
+      unreadable.push(...broken.map((read) => ({ dir: entry.name, name: read.name, manifest: path.join(read.dir, 'package.json'), problem: read.problem })));
+      continue;
+    }
+
+    const packages = reads.map((read) => ({ name: read.name, version: read.version }));
+    checked.push({ dir: entry.name, packages });
+
+    const drifted = packages.filter((pkg) => pkg.version !== version);
+    if (drifted.length > 0) {
+      mismatched.push({ dir: entry.name, packages: drifted });
+    }
+  }
+
+  for (const entry of skipped) {
+    console.log(`  ${chalk.dim(`⊘ ${entry.dir}: ${entry.framework} is not installed yet — skipped (npm install, or \`omega update --apply\`, is the fix)`)}`);
+  }
+
+  // An install we cannot READ is checked first: it answers "which version is
+  // this" with silence, and a gate that shrugs at silence is not a gate.
+  if (unreadable.length > 0) {
+    const lines = unreadable.map((entry) => `  ${entry.dir}: ${entry.manifest} ${entry.problem}`);
+    throw refusal(
+      `an installed @omega.js package cannot be read (#794):\n${lines.join('\n')}\n`
+      + '  fix: reinstall the brand — `npm install` at the brand root',
+    );
+  }
+
+  if (mismatched.length > 0) {
+    const lines = mismatched.map((entry) => `  ${entry.dir}: ${entry.packages.map((pkg) => `${pkg.name} ${pkg.version}`).join(', ')}`);
+    throw refusal(
+      `the @omega.js family ships ONE version — this brand is mixed (#794):\n${lines.join('\n')}\n`
+      + `  this manager is ${version}\n`
+      + '  fix: run `omega update --apply` at the brand root — it moves every target together',
+    );
+  }
+
+  return { checked, mismatched, exempt, skipped, unreadable };
+}
+
+module.exports = { runPreflight, checkService, readTokenStore, assertFamilyVersions };

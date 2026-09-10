@@ -124,7 +124,7 @@ test('[key=value] matcher with no matching element throws; matcher below a missi
     /no array element with id=ghost/
   );
   assert.throws(
-    () => applyConfigEdits(NASTY, { 'oauth2.providers[id=google].clientId': 'x' }),
+    () => applyConfigEdits(NASTY, { 'connections.providers[id=google].clientId': 'x' }),
     /matcher cannot create array elements/
   );
 });
@@ -194,13 +194,13 @@ test('insert into an empty single-line object: {} becomes a block at the right d
 
 test('insert into a single-line object with entries stays single-line', () => {
   const source = `{
-  oauth2: { google: 'client-id' },
+  connections: { google: 'client-id' },
 }
 `;
-  const result = applyConfigEdits(source, { 'oauth2.github': 'gh-id' });
+  const result = applyConfigEdits(source, { 'connections.github': 'gh-id' });
 
   assert.equal(result, `{
-  oauth2: { google: 'client-id', github: "gh-id" },
+  connections: { google: 'client-id', github: "gh-id" },
 }
 `);
 });

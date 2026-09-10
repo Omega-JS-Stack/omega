@@ -11,6 +11,8 @@ import motionModule from '__main_assets__/js/core/motion.js';
 import languageSwitcherModule from '__main_assets__/js/core/language-switcher.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggle.js';
+import { setupAlertDismiss } from '__main_assets__/js/libs/alert-dismiss.js';
+import { setupCopy } from '__main_assets__/js/libs/omega-copy.js';
 import { configureAnalytics } from '__main_assets__/js/libs/analytics.js';
 
 import omega from '@omega.js/client';
@@ -57,6 +59,15 @@ export default async function ({ manager, options } = {}) {
   // every page has them (the auth pages and the styleguide both carry the eye)
   setupPasswordToggle();
 
+  // The site alerts' × (#719) — delegated, so the banners body.html ships
+  // hidden are dismissible on every page with no per-alert wiring
+  setupAlertDismiss();
+
+  // Every copy control on the site (#709) — one delegated handler, so a
+  // `data-omega-copy` button is wired on every page, including the rows a
+  // page module renders after boot
+  setupCopy();
+
   // Dev palette (development only): the yellow DEV pull-tab — persona
   // switcher + quick links. Dynamic import so production pages never load
   // the chunk; the branch itself is a two-line no-op there.
@@ -75,8 +86,8 @@ export default async function ({ manager, options } = {}) {
         .catch((error) => console.error('Failed to load dev-palette.js:', error));
     }
 
-    // Missing-icon loudness (Ian 2026-07-16): every fallback triangle the
-    // build stamped becomes a console.error in dev
+    // Missing-icon loudness (Ian 2026-07-16): every icon the build could not
+    // resolve becomes a console.error in dev
     import('__main_assets__/js/core/dev-icon-audit.js')
       .then(({ default: devIconAudit }) => devIconAudit())
       .catch((error) => console.error('Failed to load dev-icon-audit.js:', error));

@@ -103,7 +103,7 @@ faqs:
 {% unless resolved.pricing.promo == false %}
   <div id="pricing-promo-banner" class="omega-promo position-fixed top-0 start-0 w-100" style="z-index: 1050;" hidden>
     <div class="py-2 position-relative">
-      <button type="button" class="btn-close position-absolute top-50 end-0 translate-middle-y me-3" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;var n=document.querySelector('.omega-nav');if(n)n.style.marginTop='';var s=document.querySelector('main > section:first-of-type');if(s)s.style.paddingTop=''"></button>
+      <button type="button" class="btn-close position-absolute top-50 end-0 translate-middle-y me-3" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;var n=document.querySelector('.omega-nav');if(n)n.style.marginTop=''"></button>
       <div class="container-fluid">
         <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-5">
           <span id="pricing-promo-badge" class="omega-chip omega-chip--accent">
@@ -125,11 +125,15 @@ faqs:
 {% endunless %}
 
 <!-- Hero Section -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
   <div class="container">
     <div class="row justify-content-center text-center">
-      <div class="col-lg-10" data-omega-reveal-stagger="90">
-        {% component "heading/masthead", eyebrow: "Pricing", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, sub_class: "omega-hero__sub mx-auto" %}
+      <div class="col-lg-10">
+        {% component "heading/masthead", eyebrow: "Pricing", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, sub_class: "omega-hero__sub mx-auto", first_paint: true %}
       </div>
     </div>
   </div>
@@ -146,7 +150,7 @@ faqs:
             <p class="text-muted mb-4">We're putting the finishing touches on our plans. Reach out and we'll get you set up in the meantime.</p>
             <div>
               <a href="/contact" class="btn btn-adaptive btn-lg px-4">
-                {% omega_icon "envelope", "me-2" %}
+                <i class="fa-solid fa-envelope me-2"></i>
                 Contact us
               </a>
             </div>
@@ -294,7 +298,7 @@ faqs:
                       {% else %}
                         Get started
                       {% endif %}
-                      <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+                      <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
                     </a>
                   {% endiftruthy %}
                   {% iffalsy plan.url %}
@@ -304,7 +308,7 @@ faqs:
                       {% else %}
                         Get started
                       {% endif %}
-                      <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+                      <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
                     </button>
                   {% endiffalsy %}
                 </div>
@@ -318,7 +322,7 @@ faqs:
         sets pricing.guarantee and the line appears. {% endcomment %}
         {% iftruthy resolved.pricing.guarantee %}
           <p class="small text-center omega-quiet mb-0" data-omega-reveal>
-            <span class="omega-guarantee-icon me-1">{% omega_icon "shield-halved" %}</span>
+            <span class="omega-guarantee-icon me-1"><i class="fa-solid fa-shield-halved"></i></span>
             {{ resolved.pricing.guarantee }}
           </p>
         {% endiftruthy %}
@@ -349,7 +353,7 @@ faqs:
           <ul class="omega-band__features">
             {% for feature in _enterprise.features %}
               <li>
-                <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
+                <span class="omega-feature-check text-success"><i class="fa-solid fa-check fa-sm"></i></span>
                 <span>
                   {% if feature.value == 'Unlimited' %}
                     Unlimited
@@ -372,7 +376,7 @@ faqs:
       <div class="omega-band__actions">
         <a href="{{ _enterprise.url }}" class="btn btn-outline-adaptive fw-semibold omega-hover-nudge" data-plan-enterprise="{{ _enterprise.id }}">
           Contact us
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       </div>
     </div>
@@ -412,7 +416,7 @@ faqs:
             <div class="d-grid omega-price-card__cta">
               <button class="btn btn-adaptive fw-semibold omega-hover-nudge" data-plan-id="{{ product.id }}" data-plan-type="one-time">
                 Buy now
-                <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+                <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
               </button>
             </div>
           </div>
@@ -435,7 +439,7 @@ faqs:
       <div class="d-md-none">
         <small class="text-muted">
           <span class="me-2">Swipe to see more</span>
-          {% omega_icon "arrow-right", "fa-sm" %}
+          <i class="fa-solid fa-arrow-right fa-sm"></i>
         </small>
       </div>
     </div>
@@ -474,12 +478,12 @@ faqs:
                   circle-xmark icons was the same data telling two stories.
                   {% endcomment -%}
                   {% if _cell %}
-                    <span class="omega-compare__yes text-success">{% omega_icon "circle-check", "fa-md" %}</span>
+                    <span class="omega-compare__yes text-success"><i class="fa-solid fa-circle-check fa-md"></i></span>
                     {% if _cell != true %}
                       <span class="omega-compare__label">{{ _cell | omega_commaify | escape_once }}</span>
                     {% endif %}
                   {% else %}
-                    <span class="omega-compare__no">{% omega_icon "circle-xmark", "fa-md" %}</span>
+                    <span class="omega-compare__no"><i class="fa-solid fa-circle-xmark fa-md"></i></span>
                   {% endif %}
                 </td>
               {% endfor %}
@@ -503,7 +507,7 @@ faqs:
           {% iftruthy item.show_stars %}
             <div class="mt-1" style="color: var(--omega-accent);">
               {% for i in (1..5) %}
-                {% omega_icon "star", "fa-xs" %}
+                <i class="fa-solid fa-star fa-xs"></i>
               {% endfor %}
             </div>
           {% endiftruthy %}
@@ -549,12 +553,12 @@ accordion here and out of the FAQPage schema in core/foot.html. The test is
           <div class="omega-fragment{% iftruthy resolved.pricing.guarantee %} pb-5{% endiftruthy %}">
             <span class="omega-micro omega-fragment__label">How billing behaves</span>
             <div class="omega-fragment__msg">
-              <span class="omega-fragment__msg-mark">{% omega_icon "arrows-rotate", "fa-xs" %}</span>
+              <span class="omega-fragment__msg-mark"><i class="fa-solid fa-arrows-rotate fa-xs"></i></span>
               <span>Switch plans anytime, <strong>prorated</strong> automatically</span>
             </div>
             {% iftruthy resolved.pricing.guarantee %}
               <div class="omega-fragment__msg">
-                <span class="omega-fragment__msg-mark">{% omega_icon "rotate-left", "fa-xs" %}</span>
+                <span class="omega-fragment__msg-mark"><i class="fa-solid fa-rotate-left fa-xs"></i></span>
                 <span>Changed your mind? <strong>Refunded.</strong></span>
               </div>
             {% endiftruthy %}

@@ -92,7 +92,8 @@ app:
   <div class="omega-launch">
     <!-- Brand mark -->
     <span class="omega-launch__mark">
-      <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
+      {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+      <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
     </span>
 
     <!-- Header -->
@@ -108,7 +109,7 @@ app:
     <!-- Error Alert (Hidden by default) -->
     <div id="error-alert" class="alert alert-warning mb-4 text-start" role="alert" hidden>
       <div class="d-flex align-items-center">
-        {% omega_icon "triangle-exclamation", "me-2" %}
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
         <div>
           <strong>App not installed?</strong><br>
           <small>Download {{ resolved.config.brand.name }} for your platform below.</small>
@@ -119,11 +120,11 @@ app:
     <!-- Action Buttons -->
     <div class="d-grid gap-2 d-sm-block">
       <a id="launch-button" href="{{ resolved.app.protocol }}" class="btn btn-adaptive mb-2 mb-sm-0 me-sm-2">
-        {% omega_icon "rocket", "fa-sm me-2" %}
+        <i class="fa-solid fa-rocket fa-sm me-2"></i>
         <span>Launch app</span>
       </a>
       <a id="download-button" href="/download" class="btn btn-outline-adaptive mb-2 mb-sm-0">
-        {% omega_icon "download", "fa-sm me-2" %}
+        <i class="fa-solid fa-download fa-sm me-2"></i>
         <span>Download app</span>
       </a>
     </div>

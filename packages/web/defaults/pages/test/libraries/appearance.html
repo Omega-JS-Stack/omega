@@ -2,8 +2,6 @@
 layout: frontend/core/base
 permalink: /test/libraries/appearance
 
-sitemap:
-  include: false
 meta:
   title: "Appearance test page"
   description: "Testing the appearance switching system (dark, light, system modes)."
@@ -31,15 +29,15 @@ meta:
             <label class="form-label">Dropdown Switcher</label>
             <div class="dropdown">
               <button class="btn btn-outline-adaptive dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <span data-appearance-icon="light" hidden>{% omega_icon "sun", "fa-md me-2" %}</span>
-                <span data-appearance-icon="dark" hidden>{% omega_icon "moon", "fa-md me-2" %}</span>
-                <span data-appearance-icon="system" hidden>{% omega_icon "circle-half-stroke", "fa-md me-2" %}</span>
+                <span data-appearance-icon="light" hidden><i class="fa-solid fa-sun fa-md me-2"></i></span>
+                <span data-appearance-icon="dark" hidden><i class="fa-solid fa-moon fa-md me-2"></i></span>
+                <span data-appearance-icon="system" hidden><i class="fa-solid fa-circle-half-stroke fa-md me-2"></i></span>
                 <span data-appearance-current></span>
               </button>
               <ul class="dropdown-menu w-100">
-                <li><a class="dropdown-item" href="#" data-appearance-set="light">{% omega_icon "sun", "fa-md me-2" %} Light</a></li>
-                <li><a class="dropdown-item" href="#" data-appearance-set="dark">{% omega_icon "moon", "fa-md me-2" %} Dark</a></li>
-                <li><a class="dropdown-item" href="#" data-appearance-set="system">{% omega_icon "circle-half-stroke", "fa-md me-2" %} System</a></li>
+                <li><a class="dropdown-item" href="#" data-appearance-set="light"><i class="fa-solid fa-sun fa-md me-2"></i> Light</a></li>
+                <li><a class="dropdown-item" href="#" data-appearance-set="dark"><i class="fa-solid fa-moon fa-md me-2"></i> Dark</a></li>
+                <li><a class="dropdown-item" href="#" data-appearance-set="system"><i class="fa-solid fa-circle-half-stroke fa-md me-2"></i> System</a></li>
               </ul>
             </div>
           </div>
@@ -49,13 +47,13 @@ meta:
             <label class="form-label">Button Group Switcher</label>
             <div class="btn-group w-100" role="group">
               <button type="button" class="btn btn-outline-adaptive" data-appearance-set="light">
-                {% omega_icon "sun", "fa-md me-1" %} Light
+                <i class="fa-solid fa-sun fa-md me-1"></i> Light
               </button>
               <button type="button" class="btn btn-outline-adaptive" data-appearance-set="dark">
-                {% omega_icon "moon", "fa-md me-1" %} Dark
+                <i class="fa-solid fa-moon fa-md me-1"></i> Dark
               </button>
               <button type="button" class="btn btn-outline-adaptive" data-appearance-set="system">
-                {% omega_icon "circle-half-stroke", "fa-md me-1" %} System
+                <i class="fa-solid fa-circle-half-stroke fa-md me-1"></i> System
               </button>
             </div>
           </div>
@@ -65,13 +63,13 @@ meta:
             <label class="form-label">Programmatic Controls</label>
             <div class="d-flex gap-2 flex-wrap">
               <button type="button" class="btn btn-primary btn-sm" id="btn-toggle">
-                {% omega_icon "repeat", "fa-md me-1" %} Toggle (dark/light)
+                <i class="fa-solid fa-repeat fa-md me-1"></i> Toggle (dark/light)
               </button>
               <button type="button" class="btn btn-secondary btn-sm" id="btn-cycle">
-                {% omega_icon "arrows-spin", "fa-md me-1" %} Cycle (all 3)
+                <i class="fa-solid fa-arrows-spin fa-md me-1"></i> Cycle (all 3)
               </button>
               <button type="button" class="btn btn-warning btn-sm" id="btn-clear">
-                {% omega_icon "trash", "fa-md me-1" %} Clear Preference
+                <i class="fa-solid fa-trash fa-md me-1"></i> Clear Preference
               </button>
             </div>
           </div>
@@ -98,7 +96,7 @@ meta:
             <small class="text-muted">Live values (updates automatically)</small>
           </div>
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh">
-            {% omega_icon "arrows-rotate", "fa-md" %}
+            <i class="fa-solid fa-arrows-rotate fa-md"></i>
           </button>
         </div>
         <div class="card-body">
@@ -141,7 +139,7 @@ meta:
             <small class="text-muted">Theme change events</small>
           </div>
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-clear-log">
-            {% omega_icon "trash", "fa-md" %}
+            <i class="fa-solid fa-trash fa-md"></i>
           </button>
         </div>
         <div class="card-body p-0">

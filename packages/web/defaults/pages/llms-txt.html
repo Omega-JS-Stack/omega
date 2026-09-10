@@ -1,35 +1,26 @@
 ---
 permalink: /llms.txt
-sitemap:
-  include: false
 meta:
   index: false
 ---
 {%- comment -%}
 llms.txt (llmstxt.org) — the markdown brief an LLM reads instead of crawling
 the site. Generated from site metadata + the same URL-sorted page collection
-sitemap.xml and pages.json walk, with the same exclusions (test, admin,
-redirects, sitemap-excluded and draft pages, the machine files themselves).
+sitemap.xml and pages.json walk, filtered by the same one resolved index flag
+(#564), so the machine files can never disagree about a page.
 A consumer file at /llms.txt suppresses this one like any default page.
 {%- endcomment -%}
 # {{ resolved.config.brand.name }}
 
-> {{ resolved.config.meta.description | default: resolved.config.brand.description | default: resolved.config.brand.name }}
+> {{ resolved.config.brand.description | default: resolved.config.brand.name }}
 
-{% if resolved.config.brand.description and resolved.config.meta.description -%}
-{{ resolved.config.brand.description }}
-
-{% endif -%}
 ## Pages
 {% for item in collections.allByUrl -%}
   {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-  {%- assign prefix5 = item.url | slice: 0, 5 -%}
-  {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
-  {%- assign prefix7 = item.url | slice: 0, 7 -%}
-  {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
-  {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
-  {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
-  {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
+  {%- comment -%}#564: the ONE resolved flag, the only test this file makes. A page the
+  site tells crawlers to skip is not a page an LLM should be handed either. The rule and
+  its rationale live in sitemap.html.{%- endcomment -%}
+  {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
   {%- if item.data.post.id -%}{%- continue -%}{%- endif -%}
   {%- comment -%} omega_rendered: layout-contributed meta holds raw Liquid
       until the owning page renders it (#141) {%- endcomment -%}
@@ -42,7 +33,10 @@ A consumer file at /llms.txt suppresses this one like any default page.
 ## Posts
 {% for item in posts -%}
   {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-  {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
+  {%- comment -%}The same one flag the Pages walk reads (#564): a post is indexed by
+  the posture, but a draft, or a site-wide `targets.web.meta.index: false`, noindexes it
+  like everything else, and this file follows the flag.{%- endcomment -%}
+  {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
   {%- assign post_meta_title = item | omega_rendered: 'meta.title' -%}
   {%- assign post_meta_desc = item | omega_rendered: 'meta.description' -%}
   {%- assign post_title = item | omega_rendered: 'post.title' | default: post_meta_title | default: item.url -%}

@@ -7,9 +7,10 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { sanitizeImagesForEmail } = require('../../src/manager/libraries/email/constants.js');
+const { sanitizeImagesForEmail } = require('../../dist/manager/libraries/email/constants.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email image sanitization (brand.images → email-safe URLs)',
   type: 'group',
   tests: [
@@ -62,4 +63,4 @@ module.exports = {
       },
     },
   ],
-};
+});

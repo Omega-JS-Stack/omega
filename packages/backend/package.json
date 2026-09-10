@@ -2,7 +2,7 @@
   "name": "@omega.js/backend",
   "version": "0.1.0",
   "description": "OMEGA backend framework — build, test, and deploy Firebase Cloud Functions backends",
-  "private": true,
+  "private": false,
   "main": "dist/manager/index.js",
   "files": [
     "bin/",
@@ -28,16 +28,25 @@
     "node": ">=22"
   },
   "omega": {
-    "functionsRuntime": "22"
+    "functionsRuntime": "22",
+    "testLanes": [
+      "stripe-live"
+    ]
   },
   "projectScripts": {
-    "start": "npx omega serve",
-    "deploy": "npx omega deploy",
-    "emulator": "npx omega emulator",
+    "start": "omega serve",
+    "deploy": "omega deploy",
+    "emulator": "omega emulator",
     "test": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
     "test:static": "npm test",
-    "test:emulator": "npx omega test"
+    "test:emulator": "omega test"
   },
+  "projectScriptsCustomOwned": [
+    "start",
+    "deploy",
+    "emulator",
+    "test:emulator"
+  ],
   "keywords": [
     "omega",
     "firebase",
@@ -76,7 +85,7 @@
     "@inquirer/prompts": "^8.5.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
-    "@omega.js/client": "^0.1.0",
+    "@omega.js/client": "0.1.0",
     "@resvg/resvg-js": "^2.6.2",
     "@sendgrid/mail": "^8.1.6",
     "@sentry/node": "^10.54.0",

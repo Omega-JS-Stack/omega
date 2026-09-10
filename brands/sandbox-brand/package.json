@@ -6,11 +6,10 @@
     "targets/*"
   ],
   "scripts": {
-    "test": "node e2e/run.js",
+    "test": "node test/e2e/run.js",
     "test:backend": "cd targets/backend && npm run test:offline"
   },
   "devDependencies": {
-    "@omega.js/manager": "file:../../packages/manager",
-    "puppeteer": "^24.43.1"
+    "@omega.js/manager": "file:../../packages/manager"
   }
 }

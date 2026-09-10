@@ -17,6 +17,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Suites that talk to the RUNNING emulator over raw fetch (the http client
 // already carries apiUrl for everything else)
@@ -44,7 +45,7 @@ function suiteFiles() {
   return files;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'live-lane suites address the lane they booted',
   type: 'group',
 
@@ -86,4 +87,4 @@ module.exports = {
       },
     },
   ],
-};
+});

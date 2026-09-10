@@ -22,7 +22,8 @@
  */
 const { buildUser, callHandler, withEnvironment, PRODUCTION_ENVIRONMENT } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/cancel/post.js');
+const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A paid subscriber whose subscription is minutes old — the shape the age guard exists for.
 function youngSubscriber(Manager, { uid, admin }) {
@@ -55,7 +56,7 @@ function cancel(Manager, user) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment cancel endpoint: skipGuards is privileged',
   type: 'group',
   timeout: 15000,
@@ -122,4 +123,4 @@ module.exports = {
       },
     },
   ],
-};
+});

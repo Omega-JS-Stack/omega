@@ -5,7 +5,8 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
+const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { resolveSchema } = OpenAI._internals;
 
 function noopLog() {}
@@ -30,7 +31,7 @@ function ensureFixtures() {
   jetpack.write(INVALID_SCHEMA_PATH, '{ not valid json !!!');
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'AI schema resolution (inline vs file path)',
   type: 'group',
 
@@ -121,4 +122,4 @@ module.exports = {
   async cleanup() {
     jetpack.remove(FIXTURES_DIR);
   },
-};
+});

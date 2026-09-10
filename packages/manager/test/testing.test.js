@@ -21,7 +21,7 @@ const service = require('../src/services/testing/index.js');
 
 const HOMEPAGE = 'https://fixture-brand.test';
 const API_URL = 'https://api.fixture-brand.test/omega/health';
-const GH_CMD = 'gh run list --repo sandbox-org/fixture-brand --limit 1 --json status,conclusion,name';
+const GH_CMD = 'gh run list --repo sandbox-org/fixture-brand-omega --limit 1 --json status,conclusion,name';
 const GIT_CMD = 'git status --porcelain -- .';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -450,7 +450,7 @@ test('testing: not a git repository → working tree check silently absent', asy
   assert.ok(!names.includes('working tree'));
 });
 
-test('testing: GitHub Actions success — exact gh command, repo defaults to brandId', async () => {
+test('testing: GitHub Actions success — exact gh command, repo defaults to `<brand.id>-omega`', async () => {
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
@@ -478,6 +478,27 @@ test('testing: github.repo overrides the repo name in the gh command', async () 
 
   const report = await runService(
     brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'custom-repo' } } } }),
+    { root, targets, fetch, exec },
+  );
+
+  assert.equal(report.status, 'success');
+  assert.ok(exec.calls.some(([c]) => c === cmd));
+});
+
+test('testing: an owner/name slug carries its OWN owner into the gh command', async () => {
+  const root = stageBrand();
+  const targets = [stageWebTarget(root)];
+  const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
+  // ../omega-brand's real shape: the repo sits under the paid company org while
+  // `org` still names the brand's own org.
+  const cmd = 'gh run list --repo itw-creative-works/acme-app --limit 1 --json status,conclusion,name';
+  const exec = fakeExec({
+    [GIT_CMD]: '',
+    [cmd]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
+  });
+
+  const report = await runService(
+    brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'itw-creative-works/acme-app' } } } }),
     { root, targets, fetch, exec },
   );
 

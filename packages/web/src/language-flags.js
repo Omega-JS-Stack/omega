@@ -1,15 +1,15 @@
 /**
  * Language flag aliases for the client-side switcher (#129).
  *
- * The retired footer dropdown drew its flags at BUILD time (`{% omega_icon <lang> %}`
- * → template-kit's tryLoadFlag → the core flag set via the language→country
- * map). The switcher renders in the BROWSER from the page's own hreflang tags,
- * so no build-time lookup can run for it — but the flag set already ships:
+ * The retired footer dropdown drew its flags at BUILD time, through the core
+ * flag set and the language→country map. The switcher renders in the BROWSER
+ * from the page's own hreflang tags, so no build-time lookup can run for it —
+ * but the flag set already ships:
  * emitIcons copies `core/icons/` wholesale, so `core/icons/flags/us.svg` lands
- * at `assets/fa/flags/us.svg` in every build and dev boot.
+ * at `assets/icons/flags/us.svg` in every build and dev boot.
  *
  * This pass writes LANGUAGE-named copies into their own namespace,
- * `assets/fa/flags/lang/<code>.svg`, so a browser row needs only its hreflang
+ * `assets/icons/flags/lang/<code>.svg`, so a browser row needs only its hreflang
  * code and carries no map of its own. The map stays template-kit's — the one
  * home. The namespace is not cosmetic: language codes and country codes share
  * a space (`ar` is Arabic AND Argentina, `ca` is Catalan AND Canada), so
@@ -17,6 +17,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { ICONS_DIR } = require('@omega.js/devkit/icons');
 const { LANGUAGE_TO_COUNTRY } = require('@omega.js/template-kit');
 
 /**
@@ -28,7 +29,7 @@ const { LANGUAGE_TO_COUNTRY } = require('@omega.js/template-kit');
  * @returns {{ files: number, dest: string }} aliases written + the alias dir
  */
 function emitLanguageFlags(options) {
-  const flags = path.join(options.outDir, 'assets', 'fa', 'flags');
+  const flags = path.join(options.outDir, 'assets', ICONS_DIR, 'flags');
   const dest = path.join(flags, 'lang');
 
   // No flag set in this output (a build with no core icons dir) — nothing to alias

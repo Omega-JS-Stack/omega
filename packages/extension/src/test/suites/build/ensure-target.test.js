@@ -17,6 +17,7 @@ const Manager = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
 const { deployPrecheck } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const cli = require(path.join(SRC, 'cli.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
 
@@ -31,7 +32,7 @@ function stageConsumer() {
   return tmp;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'ensure-target — the local half every verb runs (#675)',
@@ -71,6 +72,41 @@ module.exports = {
       },
     },
     {
+      name: 'refuses a workspace root, loudly, without writing a single file (#699)',
+      run: async (ctx) => {
+        // The accident: `omega deploy` at a workspace root scaffolded a whole
+        // extension target into it — src/, hooks/, workflows, rewritten root
+        // scripts — before failing anyway. Parity with the same case in
+        // @omega.js/desktop's suite (#706).
+        const tmp = stageConsumer();
+        const manifestPath = path.join(tmp, 'package.json');
+        const manifest = jetpack.read(manifestPath, 'json');
+        manifest.workspaces = ['packages/*'];
+        jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+        const before = jetpack.read(manifestPath);
+
+        try {
+          let refusal = null;
+          try {
+            await ensureTarget({ projectDir: tmp });
+          } catch (e) {
+            refusal = e;
+          }
+
+          ctx.expect(refusal).toBeTruthy();
+          ctx.expect(refusal.message).toMatch(/refusing to scaffold into/);
+          ctx.expect(refusal.message).toMatch(/declares "workspaces"/);
+          ctx.expect(refusal.message.includes(tmp)).toBe(true);
+
+          // Nothing scaffolded, and the manifest is byte-identical.
+          ctx.expect(jetpack.list(tmp)).toEqual(['package.json']);
+          ctx.expect(jetpack.read(manifestPath)).toBe(before);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'deploy precheck: --no-secrets skips every step, bare deploy runs it',
       run: async (ctx) => {
         const quiet = { log() {}, warn() {}, error() {} };
@@ -102,4 +138,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -9,11 +9,9 @@
 
 module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
-  // Initialize Usage to check auth level
-  const usage = await Manager.Usage().init(ctx, {
-    unauthenticatedMode: 'firestore',
-  });
-  const isAdmin = usage.user.roles?.admin;
+  // The caller the middleware authenticated — the usage counter is lazy now
+  // and was never the right place to read a role from (#647)
+  const isAdmin = ctx.getUser().roles?.admin;
 
   // Admin only endpoint
   if (!isAdmin) {

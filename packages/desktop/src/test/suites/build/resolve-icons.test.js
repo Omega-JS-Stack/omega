@@ -6,6 +6,7 @@ const fs      = require('fs');
 const os      = require('os');
 const jetpack = require('fs-jetpack');
 const sharp   = require('sharp');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function stage() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-icons-'));
@@ -32,7 +33,7 @@ function fakePng(p) {
   fs.writeFileSync(p, Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'resolve-icons — convention waterfall + retina derivation',
@@ -292,4 +293,4 @@ module.exports = {
       },
     },
   ],
-};
+});

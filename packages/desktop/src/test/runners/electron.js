@@ -4,6 +4,7 @@
 const path = require('path');
 const { spawn } = require('child_process');
 const chalk = require('chalk').default;
+const { renderEvent } = require('./render-event.js');
 
 function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter, projectRoot }) {
   rendererSuiteFiles = rendererSuiteFiles || [];
@@ -50,8 +51,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
     });
 
     let buffer = '';
-    let counts = { passed: 0, failed: 0, skipped: 0 };
-    let currentSuite = null;
+    const counts = { passed: 0, failed: 0, skipped: 0 };
 
     child.stdout.on('data', (chunk) => {
       buffer += chunk.toString();
@@ -60,7 +60,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
         if (line.startsWith('__EM_TEST__')) {
-          handleEvent(JSON.parse(line.slice('__EM_TEST__'.length)));
+          renderEvent(JSON.parse(line.slice('__EM_TEST__'.length)), counts);
         } else if (line.trim().length > 0) {
           // Pass-through other electron stdout (logger lines from @omega.js/desktop init, etc.)
           // Indent so they don't disrupt the layout.
@@ -83,36 +83,6 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
         console.log(chalk.gray(`[harness exit code=${code} signal=${signal}]`));
       }
     });
-
-    function handleEvent(evt) {
-      if (evt.event === 'suite-start') {
-        currentSuite = evt.name;
-        console.log(chalk.cyan(`    ⤷ ${evt.name}`));
-      } else if (evt.event === 'result') {
-        const indent = evt.suite ? '      ' : '    ';
-        if (evt.passed) {
-          console.log(chalk.green(`${indent}✓ ${evt.name}`) + chalk.gray(` (${evt.duration}ms)`));
-          counts.passed += 1;
-        } else {
-          console.log(chalk.red(`${indent}✗ ${evt.name}`) + chalk.gray(` (${evt.duration}ms)`));
-          if (evt.error) console.log(chalk.red(`${indent}  ${evt.error}`));
-          counts.failed += 1;
-        }
-      } else if (evt.event === 'skip') {
-        const indent = evt.name && evt.name.includes(' → ') ? '      ' : '    ';
-        const count = evt.count || 1;
-        console.log(chalk.yellow(`${indent}○ ${evt.name}`) + chalk.gray(` (skipped: ${evt.reason})`));
-        counts.skipped += count;
-      } else if (evt.event === 'suite-stopped') {
-        console.log(chalk.yellow(`        Skipping ${evt.remaining} remaining test(s) in suite`));
-      } else if (evt.event === 'cleanup-warn') {
-        console.log(chalk.yellow(`        ⚠ Cleanup warning (${evt.name}): ${evt.message}`));
-      } else if (evt.event === 'fatal') {
-        console.log(chalk.red(`    ✗ Harness fatal: ${evt.message}`));
-        if (evt.stack) console.log(chalk.gray(`      ${evt.stack.split('\n').slice(0, 3).join('\n      ')}`));
-        counts.failed += 1;
-      }
-    }
 
     child.on('error', (err) => reject(err));
     child.on('exit', (_code) => resolve(counts));

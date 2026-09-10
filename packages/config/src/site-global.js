@@ -31,8 +31,20 @@
  * The desktop derivation is OPT-IN (#124): only a brand that carries a
  * `targets.desktop.releases` block gets releases/latest links — merely
  * declaring a desktop target derives nothing, since the release may not
- * exist yet.
+ * exist yet. WHICH repo those links address is not decided here: it is
+ * [repo.js](repo.js)'s `releasesRepo`, the one home of the brand's public
+ * releases repo (#799).
+ *
+ * Beside the hub sits `downloads` ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)):
+ * one DIRECT-download URL per artifact, so a download button hands over a file
+ * instead of a GitHub page. The filenames are
+ * [desktop-artifacts.js](desktop-artifacts.js)'s — the same rule
+ * @omega.js/desktop packages under — and they carry no version, so releasing a
+ * desktop build never touches the website.
  */
+
+const { desktopProductName, desktopArtifactNames } = require('./desktop-artifacts.js');
+const { releasesRepo } = require('./repo.js');
 
 // Keys that are resolution machinery, not site content
 const MACHINERY_KEYS = ['targets', 'enabled'];
@@ -56,31 +68,58 @@ function desktopReleasesEnabled(config) {
 }
 
 /**
- * The GitHub releases URL a desktop target's downloads point at.
- * Repo precedence: targets.desktop.releases.repo (where built artifacts
- * live) → repo.providers.github.repo (the brand website repo) → brand.id (the derivation
- * default for the repo name). No repo.providers.github.org → no URL.
+ * The GitHub releases URL a desktop target's downloads point at: the brand's ONE
+ * public releases repo, whose address `@omega.js/config`'s `releasesRepo` owns
+ * (#799). Nothing is derived here; a repo the derivation cannot address (no
+ * owner, no brand.id) yields no URL.
  * @param {object} config - resolved config object
  * @returns {string|undefined}
  */
 function desktopReleasesUrl(config) {
   const desktop = targetEntry(config, 'desktop');
-  const org = config?.repo?.providers?.github?.org;
-  const repo = desktop?.releases?.repo;
-
-  if (repo && org) return `https://github.com/${org}/${repo}/releases/latest`;
 
   // Idempotence: the build pipeline applies toSiteGlobal more than once
-  // (consumer.js loadSiteData, then engine.js configureOmega). On a second
-  // pass the raw releases.repo is gone — the curated view's own URL is the
-  // authority, and re-deriving from repo.providers.github.repo/brand.id would silently
-  // change it.
-  if (desktop?.releasesUrl) return desktop.releasesUrl;
+  // (consumer.js loadSiteData, then engine.js configureOmega). On a second pass
+  // the raw releases block is gone, so the curated view's own URL is the
+  // authority: re-deriving would rename a brand's explicit releases.repo to the
+  // `<brand.id>-releases` default behind its back.
+  if (!desktop?.releases && desktop?.releasesUrl) return desktop.releasesUrl;
 
-  const fallback = config?.repo?.providers?.github?.repo || config?.brand?.id;
-  if (!org || !fallback) return undefined;
+  const { repo } = releasesRepo(config);
 
-  return `https://github.com/${org}/${fallback}/releases/latest`;
+  return repo ? `https://github.com/${repo}/releases/latest` : undefined;
+}
+
+/**
+ * The direct-download URL of every desktop artifact, keyed platform → artifact
+ * (#620). GitHub's `/releases/latest/download/<asset>` serves the newest
+ * release's asset by name, which only holds because the names are versionless.
+ * @param {object} config - resolved config object
+ * @param {string} releasesUrl - the derived releases hub URL
+ * @returns {object|undefined}
+ */
+function desktopDownloads(config, releasesUrl) {
+  const desktop = targetEntry(config, 'desktop');
+
+  // Idempotence, same trap as the URL above: the second toSiteGlobal pass sees
+  // the curated view, which carries no app block and no brand-derived product
+  // name — the curated URLs are the authority by then.
+  if (desktop?.downloads) return desktop.downloads;
+
+  // No product name (an invalid config — brand.name is required) derives
+  // nothing: a guessed filename is a download button that 404s.
+  const names = desktopArtifactNames(desktopProductName({ app: desktop?.app, brand: config?.brand }));
+  if (!Object.keys(names).length) return undefined;
+
+  const downloads = {};
+  for (const [platform, artifacts] of Object.entries(names)) {
+    downloads[platform] = {};
+    for (const [artifact, filename] of Object.entries(artifacts)) {
+      downloads[platform][artifact] = `${releasesUrl}/download/${filename}`;
+    }
+  }
+
+  return downloads;
 }
 
 /**
@@ -110,7 +149,11 @@ function curateTarget(name, config) {
 
   if (name === 'desktop' && desktopReleasesEnabled(config)) {
     const releasesUrl = desktopReleasesUrl(config);
-    if (releasesUrl) view.releasesUrl = releasesUrl;
+    if (releasesUrl) {
+      view.releasesUrl = releasesUrl;
+      const downloads = desktopDownloads(config, releasesUrl);
+      if (downloads) view.downloads = downloads;
+    }
   }
 
   if (name === 'extension') {

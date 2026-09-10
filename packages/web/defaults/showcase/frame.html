@@ -13,8 +13,6 @@ pagination:
   alias: variant
 permalink: "{{ variant.url }}.html"
 eleventyExcludeFromCollections: true
-sitemap:
-  include: false
 # Chrome-less on purpose: the frame carries the theme's real asset bundles
 # (the layout chain owns <head>), and nothing else — nav and footer belong to
 # the gallery page around the iframe, never inside it.

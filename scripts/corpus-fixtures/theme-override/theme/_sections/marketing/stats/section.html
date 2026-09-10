@@ -1,0 +1,35 @@
+<!-- Corpus tier-2 override marker -->
+<div data-corpus-override="section-html" hidden></div>
+
+{% if args.items and args.items.size > 0 %}
+  <section>
+    <div class="container">
+      {%- comment %} A stat's color names a slot in the ONE categorical palette
+      (core/css/core/_tones.scss). The whitelist is the point: anything else —
+      a hex, a Bootstrap name — paints nothing, so a band can never colour
+      outside the theme. {% endcomment -%}
+      {% assign tone_slots = "tone-1,tone-2,tone-3,tone-4,tone-5,tone-6" | split: "," %}
+      <div class="omega-stats" data-omega-reveal-stagger="80">
+        {% for stat in args.items %}
+          {% capture stat_class %}omega-stat{% if tone_slots contains stat.color %} omega-{{ stat.color }}{% endif %}{% endcapture %}
+          <div class="{{ stat_class }}" data-omega-reveal>
+            {% iftruthy stat.icon %}
+              <span class="omega-icon-chip omega-stat__icon"><i class="fa-solid fa-{{ stat.icon }} fa-sm"></i></span>
+            {% endiftruthy %}
+            {%- comment %} A value is TEXT, never markup (#580): a stat like
+            `<200ms` opened a tag the minifier then ate, printing a visible
+            `< div>`. escape_once so a brand's `&lt;` workaround still renders.
+            {% endcomment -%}
+            <div class="omega-stat__num" data-omega-countup>{{ stat.number | escape_once }}</div>
+            <div class="omega-stat__label">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="omega-stat__sub">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>{% if args.after != blank %}
+
+      {{ args.after }}{% endif %}
+    </div>
+  </section>
+{% endif %}

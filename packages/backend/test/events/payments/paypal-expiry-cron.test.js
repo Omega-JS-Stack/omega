@@ -11,6 +11,8 @@
  * cron now takes the same staleness discipline the webhook trigger takes: anything
  * stamped after this run's read wins, and the cron stands down.
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const HOUR = 60 * 60;
 const DAY = 24 * HOUR;
 
@@ -20,7 +22,7 @@ const RACE_UID = '_test-paypal-expire-race';
 const EXPIRE_ORDER = '_test-order-paypal-expire';
 const RACE_ORDER = '_test-order-paypal-expire-race';
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal expiry cron: the order flips with the subscription, and a newer webhook wins',
   type: 'suite',
   timeout: 180000,
@@ -114,7 +116,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 
 /**
  * Seed a PayPal subscriber whose pending cancellation has run out its paid term,

@@ -14,7 +14,8 @@
  * technique test/helpers/dev-only-routes.test.js uses, because no emulator
  * runs in a production environment.
  */
-const Middleware = require('../../src/manager/helpers/middleware.js');
+const Middleware = require('../../dist/manager/helpers/middleware.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { isDevOnlyRouteBlocked } = Middleware;
 
@@ -30,7 +31,7 @@ const PAYLOAD_KEYS = [
   'testExtendedMode',
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'Health route (public liveness probe)',
   type: 'group',
 
@@ -106,4 +107,4 @@ module.exports = {
       },
     },
   ],
-};
+});

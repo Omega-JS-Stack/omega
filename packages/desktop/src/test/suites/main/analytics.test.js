@@ -3,6 +3,7 @@
 // auth-bridge user_id flipping, IPC handlers.
 
 const { v5: uuidv5 } = require('uuid');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 async function reinit(ctx, env, configOverrides) {
   ctx.manager.analytics.shutdown();
@@ -29,7 +30,7 @@ async function reinit(ctx, env, configOverrides) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'analytics (main)',
@@ -360,4 +361,4 @@ module.exports = {
       },
     },
   ],
-};
+});

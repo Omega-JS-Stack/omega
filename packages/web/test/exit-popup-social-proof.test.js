@@ -59,7 +59,7 @@ test('unconfigured: the four shipped portraits stand beside the subscriber line'
     );
   }
   assert.equal((block.match(/alt=""/g) || []).length, 4, 'decorative: the line carries the meaning');
-  assert.ok(!block.includes('data-icon="user"'), 'real photos, not glyph slots');
+  assert.ok(!block.includes('data-omega-fa="solid/user"'), 'real photos, not glyph slots');
 
   // The framework never hotlinks — every default face is a local path
   assert.ok(!/data-lazy="@src https?:/.test(block), 'no external image URL, ever');
@@ -91,7 +91,7 @@ test('an explicit empty list falls back to neutral glyph slots', async () => {
 
   assert.equal((block.match(/modal-exit-avatar/g) || []).length, 4, 'the row keeps its four slots');
   assert.ok(!block.includes('<img'), 'opting out of faces means no image');
-  assert.ok(block.includes('data-icon="user"'), 'a neutral glyph fills the empty slot');
+  assert.ok(block.includes('data-omega-fa="solid/user"'), 'a neutral glyph fills the empty slot');
 });
 
 test('configured: the brand faces render lazily, decorative', async () => {
@@ -112,5 +112,5 @@ test('configured: the brand faces render lazily, decorative', async () => {
   assert.ok(block.includes('data-lazy="@src /assets/images/a.jpg"'), 'first face lazy-loads its configured source');
   assert.ok(block.includes('data-lazy="@src /assets/images/b.jpg"'), 'second face too');
   assert.equal((block.match(/alt=""/g) || []).length, 2, 'decorative: the line carries the meaning');
-  assert.ok(!block.includes('data-icon="user"'), 'configured faces replace the neutral glyphs');
+  assert.ok(!block.includes('data-omega-fa="solid/user"'), 'configured faces replace the neutral glyphs');
 });

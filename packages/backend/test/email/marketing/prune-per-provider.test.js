@@ -22,10 +22,11 @@
  * extended-mode marketing-lifecycle suite.
  */
 const assert = require('node:assert');
-const cron = require('../../../src/manager/events/cron/daily/marketing-prune.js');
-const Manager = require('../../../src/manager/index.js');
-const sendgridProvider = require('../../../src/manager/libraries/email/providers/sendgrid.js');
-const beehiivProvider = require('../../../src/manager/libraries/email/providers/beehiiv.js');
+const cron = require('../../../dist/manager/events/cron/daily/marketing-prune.js');
+const Manager = require('../../../dist/manager/index.js');
+const sendgridProvider = require('../../../dist/manager/libraries/email/providers/sendgrid.js');
+const beehiivProvider = require('../../../dist/manager/libraries/email/providers/beehiiv.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const {
   stagePrune,
@@ -290,7 +291,7 @@ const INACTIVE_CASES = [
   },
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing prune is strictly per-provider (SendGrid lane + Beehiiv lane)',
   type: 'group',
 
@@ -758,4 +759,4 @@ module.exports = {
       },
     },
   ],
-};
+});

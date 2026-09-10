@@ -47,9 +47,9 @@ config:
               <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
                 {% for i in (1..5) %}
                   {% if i <= recipe.rating %}
-                    {% omega_icon "star", "text-warning" %}
+                    <i class="fa-solid fa-star text-warning"></i>
                   {% else %}
-                    {% omega_icon "star", "text-body-tertiary" %}
+                    <i class="fa-solid fa-star text-body-tertiary"></i>
                   {% endif %}
                 {% endfor %}
               </div>
@@ -77,7 +77,7 @@ config:
 
           <!-- Jump to Recipe Button -->
           <a href="#recipe-card" class="btn btn-primary btn-lg px-5 py-3 fw-semibold">
-            {% omega_icon "arrow-down", "me-2" %}
+            <i class="fa-solid fa-arrow-down me-2"></i>
             Jump to Recipe
           </a>
         </div>
@@ -153,9 +153,9 @@ config:
             <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
               {% for i in (1..5) %}
                 {% if i <= recipe.rating %}
-                  {% omega_icon "star", "text-warning" %}
+                  <i class="fa-solid fa-star text-warning"></i>
                 {% else %}
-                  {% omega_icon "star", "opacity-50" %}
+                  <i class="fa-solid fa-star opacity-50"></i>
                 {% endif %}
               {% endfor %}
             </div>
@@ -164,13 +164,13 @@ config:
             <!-- Action Buttons -->
             <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
               <button class="btn btn-adaptive btn-sm" onclick="window.print()">
-                {% omega_icon "print", "me-1" %} Print
+                <i class="fa-solid fa-print me-1"></i> Print
               </button>
               <button class="btn btn-adaptive btn-sm recipe-save-btn">
-                {% omega_icon "bookmark", "me-1" %} Save
+                <i class="fa-solid fa-bookmark me-1"></i> Save
               </button>
               <button class="btn btn-adaptive btn-sm recipe-rate-btn">
-                {% omega_icon "star", "me-1" %} Rate
+                <i class="fa-solid fa-star me-1"></i> Rate
               </button>
             </div>
 
@@ -233,7 +233,7 @@ config:
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" id="cookModeToggle">
                 <label class="form-check-label fw-semibold" for="cookModeToggle" id="cookModeLabel">
-                  {% omega_icon "pot-food", "me-1" %}
+                  <i class="fa-solid fa-pot-food me-1"></i>
                   Cook Mode
                 </label>
               </div>
@@ -246,7 +246,7 @@ config:
             <!-- Ingredients Section -->
             <div class="mb-5">
               <h3 class="h4 fw-bold mb-4">
-                {% omega_icon "basket-shopping", "me-2 text-primary" %}
+                <i class="fa-solid fa-basket-shopping me-2 text-primary"></i>
                 Ingredients
               </h3>
 
@@ -273,7 +273,7 @@ config:
             <!-- Instructions Section -->
             <div class="mb-5">
               <h3 class="h4 fw-bold mb-4">
-                {% omega_icon "list-ol", "me-2 text-primary" %}
+                <i class="fa-solid fa-list-ol me-2 text-primary"></i>
                 Instructions
               </h3>
 
@@ -296,7 +296,7 @@ config:
             {% iftruthy recipe.notes %}
             <div class="mb-0">
               <h3 class="h4 fw-bold mb-4">
-                {% omega_icon "lightbulb", "me-2 text-primary" %}
+                <i class="fa-solid fa-lightbulb me-2 text-primary"></i>
                 Notes
               </h3>
 
@@ -332,7 +332,7 @@ config:
           <h2 class="h3 fw-bold mb-3">Looking for more?</h2>
           <p class="text-body-secondary mb-4">Explore our full collection of recipes or browse other categories.</p>
           <a href="/recipes" class="btn btn-warning px-4 py-2 fw-semibold">
-            {% omega_icon "grid", "me-2" %}
+            <i class="fa-solid fa-grid me-2"></i>
             View all recipes
           </a>
         </div>
@@ -344,7 +344,7 @@ config:
 <!-- Floating Jump to Recipe Button -->
 <div id="floating-recipe-btn" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 d-none" style="z-index: 1040;">
   <a href="#recipe-card" class="btn btn-primary btn-lg btn-glow px-5 py-3 fw-semibold rounded-pill">
-    {% omega_icon "arrow-down", "me-2" %}
+    <i class="fa-solid fa-arrow-down me-2"></i>
     Jump to Recipe
   </a>
 </div>

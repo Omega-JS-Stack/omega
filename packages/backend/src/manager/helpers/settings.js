@@ -7,7 +7,7 @@ const path = require('path');
 const _ = require('lodash');
 const moment = require('moment');
 const { isZodSchema, resolveZodSchema, buildSchemaMap } = require('./schema-zod.js');
-const { iterateSchema, resolveSchema, enforceEnums } = require('./schema-engine.js');
+const { iterateSchema, resolveSchema, enforceEnums, enforceMins } = require('./schema-engine.js');
 
 
 function Settings(m) {
@@ -107,6 +107,7 @@ Settings.prototype.resolve = function (ctx, schema, settings, options) {
   // Declarative engine (shared pipeline in helpers/schema-engine.js)
   const resolvedSchema = {};
   const enumPaths = [];
+  const minPaths = [];
 
   // Required walk — BEFORE resolution, against the RAW input, so defaults never mask
   // a missing required key. A key counts as missing when undefined or ''
@@ -142,6 +143,11 @@ Settings.prototype.resolve = function (ctx, schema, settings, options) {
       enumPaths.push({ path: path, allowed: schemaNode.enum });
     }
 
+    // Collect min-carrying fields for the post-resolution length floor
+    if (typeof schemaNode.min !== 'undefined') {
+      minPaths.push({ path: path, min: schemaNode.min });
+    }
+
     // Update schema
     _.set(resolvedSchema, path, resolvedNode);
   });
@@ -151,6 +157,9 @@ Settings.prototype.resolve = function (ctx, schema, settings, options) {
 
   // Enforce enums (sent values checked post-coercion; absent fields pass)
   enforceEnums(ctx, settings, self.settings, enumPaths);
+
+  // Enforce min lengths (strings/arrays refuse; numbers already clamped)
+  enforceMins(ctx, self.settings, minPaths);
 
   // Set schema
   self.schema = resolvedSchema;

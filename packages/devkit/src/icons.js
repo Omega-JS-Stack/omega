@@ -20,7 +20,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { PACKAGES } = require('@omega.js/client/modules/icon-core.js');
+const {
+  PACKAGES, ICONS_DIR, candidateRelPaths, buildAliasMap,
+} = require('@omega.js/client/modules/icon-core.js');
 
 /**
  * Resolve the icon roots for a build.
@@ -62,8 +64,8 @@ function resolveFontAwesomeRoots(env = process.env) {
 /**
  * Emit the merged icon set into a build output — feeds the browser-side
  * auto-render (@omega.js/client icon-renderer): web fetches from the
- * site's own /assets/fa/, extension pages from
- * chrome.runtime.getURL('assets/fa/…'). Only icons a page actually uses
+ * site's own /assets/icons/, extension pages from
+ * chrome.runtime.getURL('assets/icons/…'). Only icons a page actually uses
  * ever transfer.
  *
  * @param {object} options
@@ -75,7 +77,7 @@ function resolveFontAwesomeRoots(env = process.env) {
  */
 function emitIcons(options) {
   const svgsDirs = options.svgsDirs || resolveFontAwesomeRoots().svgsDirs;
-  const dest = path.join(options.outDir, 'assets', 'fa');
+  const dest = path.join(options.outDir, 'assets', ICONS_DIR);
 
   // Lowest priority first — later copies overwrite, so the chain's best
   // source (and finally the curated core set) wins per file.
@@ -97,4 +99,80 @@ function emitIcons(options) {
   return { files, dest };
 }
 
-module.exports = { resolveFontAwesomeRoots, emitIcons };
+/**
+ * The flag set carries hardcoded width/height="512" on the root — strip them
+ * so icon-core's standard 1em inline-icon sizing applies (Font Awesome
+ * sources never carry dimensions; the flags are the exception).
+ *
+ * @param {string} svg - Raw SVG source.
+ * @returns {string} SVG with any root width/height removed.
+ */
+function stripRootSize(svg) {
+  return svg.replace(/<svg([^>]*)>/, (match, attrs) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, '')}>`);
+}
+
+/**
+ * A build-time icon reader over a resolved chain — the file-reading half of
+ * icon-core, which owns every decision ABOUT the files (candidate order,
+ * aliases) but reads none of them. Web's build-time inlining pass
+ * (@omega.js/web src/inline-icons.js) is the caller; the browser reads the
+ * SAME bytes at runtime out of what `emitIcons` shipped.
+ *
+ * Aliases and file contents are cached for the process — a site inlines the
+ * same chrome icons on every one of its pages.
+ *
+ * @param {object} options
+ * @param {string[]} options.svgsDirs - Ordered icon roots, best-first (each
+ *   holding `<style>/<name>.svg`).
+ * @param {string} [options.aliasFile] - icon-families.json for alias
+ *   resolution ('search' → 'magnifying-glass').
+ * @returns {function(string, string): (string|null)} (name, style) → raw SVG.
+ */
+function createIconLoader(options) {
+  const dirs = options.svgsDirs || [];
+  const cache = new Map();
+  let aliases = null;
+
+  const aliasFor = (name) => {
+    if (!aliases) {
+      aliases = new Map();
+      try {
+        aliases = buildAliasMap(JSON.parse(fs.readFileSync(options.aliasFile, 'utf8')));
+      } catch {
+        // No (readable) metadata in this chain — resolve without aliases.
+      }
+    }
+    return aliases.get(name) || null;
+  };
+
+  return function loadIcon(name, style) {
+    const key = `${style}/${name}`;
+    if (cache.has(key)) return cache.get(key);
+
+    const alias = aliasFor(name);
+    let svg = null;
+
+    for (const dir of dirs) {
+      for (const candidate of (alias ? [name, alias] : [name])) {
+        for (const rel of candidateRelPaths(candidate, style)) {
+          try {
+            svg = fs.readFileSync(path.join(dir, rel), 'utf8');
+          } catch {
+            continue;
+          }
+          break;
+        }
+        if (svg) break;
+      }
+      if (svg) break;
+    }
+
+    if (svg) svg = stripRootSize(svg);
+    cache.set(key, svg);
+    return svg;
+  };
+}
+
+// ICONS_DIR is icon-core's, re-exported here so the build side has one import
+// for the whole icon contract.
+module.exports = { ICONS_DIR, resolveFontAwesomeRoots, emitIcons, createIconLoader };

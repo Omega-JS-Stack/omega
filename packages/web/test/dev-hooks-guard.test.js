@@ -83,6 +83,9 @@ const ALLOWED_GLOBALS = {
   TiktokAnalyticsObject: 'the TikTok pixel snippet\'s own name marker, verbatim from the vendor bootstrap',
   onbeforeunload: 'a standard window handler, not a helper',
   __OMEGA_SIGNOUT_IN_PROGRESS: 'auth flow coordination across modules, production behaviour',
+  // The first-paint bundle hands the running motion instance to the main
+  // bundle (#585) — window is the only channel between separate entries.
+  __omegaMotion: 'the first-paint → main-bundle motion handoff, production behaviour (core/js/first-paint.js)',
   __OMEGA_REVERSING_SIGNUP: 'auth flow coordination across modules, production behaviour',
   __OMEGA_CUSTOM_TOKEN_SIGNIN: 'auth flow coordination across modules, production behaviour',
   // Kept deliberately (#342): the e2e flows lane reads `window._checkout.state`

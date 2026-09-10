@@ -32,8 +32,9 @@ const { spawn } = require('child_process');
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 
-const EmulatorCommand = require('../../src/cli/commands/emulator.js');
-const WatchCommand = require('../../src/cli/commands/watch.js');
+const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const WatchCommand = require('../../dist/cli/commands/watch.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { isStoppableEmulatorProcess, listListeningPids, PORT_LOOKUP_TIMEOUT_MS } = EmulatorCommand;
 
@@ -43,6 +44,10 @@ const OURS = 'demo-sandbox-brand';
 const FIRESTORE_JAR = 'java -jar cloud-firestore-emulator-v1.21.0.jar --host 127.0.0.1 --port 8080 --project_id demo-sandbox-brand';
 const PUBSUB_JAR = 'java -jar cloud-pubsub-emulator-0.8.34-all.jar --host=127.0.0.1 --port=8085';
 const NEIGHBOUR_JAR = FIRESTORE_JAR.replace(OURS, 'demo-other-brand');
+// The reload watcher, from the same ps: a nodemon the CLI process spawns, not
+// firebase-tools — so the record's walk down from the emulator child never
+// reaches it ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+const NODEMON_WATCHER = 'nodemon --on-change-only --delay 1 --watch /omega/packages/backend/src --ext js,json --exec node-e-writes-.temp/emulator.log.reset';
 
 // Stand-ins for `firebase emulators:start`, on PATH as `firebase`. A real
 // firebase boot needs a real project and half a minute; what the boot path owes
@@ -260,12 +265,182 @@ async function withRealWatcherStandIn(fn) {
   }
 }
 
+/**
+ * The stub `firebase`, on PATH: a process group shaped like firebase-tools' own
+ * — a shell with a child of its own — that reports ready and then idles until
+ * something signals it. `$$` is the group leader the run spawned; `$!` is a
+ * member only the GROUP signal reaches. Neither ever binds a port, and no real
+ * emulator is involved.
+ * @param {string} groupPath - Where the stub records its two pids.
+ * @returns {string} The script body.
+ */
+function firebaseGroupThenIdles(groupPath) {
+  return [
+    '#!/bin/sh',
+    "node -e 'setTimeout(() => {}, 30000)' &",
+    `printf '%s %s\\n' "$$" "$!" > "${groupPath}"`,
+    'echo "All emulators ready!"',
+    'wait',
+    '',
+  ].join('\n');
+}
+
+/**
+ * The run under test, as a REAL child process. A signal is only a signal when
+ * it arrives at a process: in-process cases can call the stop path but can
+ * never prove that SIGHUP reaches it at all.
+ *
+ * Three seams are neutralized for the same reasons bootableCommand() names, and
+ * one more: the recorded-pid reap is proven by the cases above, and here it
+ * would send the run looking at ports outside the throwaway project — so the
+ * group signal stands on its own.
+ */
+const SIGNAL_DRIVER = `
+const fs = require('fs');
+const { spawn } = require('child_process');
+const [, , projectDir, commandPath, watchPath, statePath] = process.argv;
+
+const EmulatorCommand = require(commandPath);
+const WatchCommand = require(watchPath);
+
+WatchCommand.prototype.startBackground = function () {
+  const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { detached: true, stdio: 'ignore' });
+  child.unref();
+  fs.writeFileSync(statePath, String(child.pid));
+
+  return child;
+};
+
+const command = new EmulatorCommand({
+  firebaseProjectPath: projectDir,
+  argv: { https: false, seed: false },
+  options: {},
+});
+
+command.attachVerbLog = () => '';
+command.ensureStaged = () => {};
+command.startStageWatch = () => ({ close: () => {} });
+command.terminateRecordedEmulatorProcesses = async () => {};
+
+command.execute();
+`;
+
+/**
+ * Poll until `check` passes or the window closes.
+ * @param {Function} check - Returns truthy when the wait is over.
+ * @param {number} timeoutMs - How long to keep looking.
+ * @returns {Promise<boolean>} Whether it passed inside the window.
+ */
+async function waitUntil(check, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (check()) {
+      return true;
+    }
+
+    await powertools.wait(50);
+  }
+
+  return check();
+}
+
+/**
+ * Boot the emulator command in its own process and wait for it to report ready.
+ * Returns the handle plus every pid the run is now responsible for.
+ */
+async function bootedRun() {
+  const dir = path.join(os.tmpdir(), `omega-signal-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const groupPath = path.join(dir, 'group.txt');
+  const statePath = path.join(dir, 'watcher.txt');
+
+  // Kernel-assigned ports, exactly as bootableCommand does: free, so nothing
+  // bumps, and nowhere near the classic map.
+  const emulators = {};
+  const taken = new Set();
+  for (const name of ['auth', 'functions', 'firestore', 'database', 'hosting', 'storage', 'pubsub', 'ui']) {
+    let port = await freePort();
+    while (taken.has(port)) port = await freePort();
+    taken.add(port);
+    emulators[name] = { port: port };
+  }
+
+  jetpack.write(path.join(dir, 'firebase.json'), JSON.stringify({ emulators }, null, 2));
+  jetpack.dir(path.join(dir, 'dist'));
+  jetpack.write(path.join(dir, 'driver.js'), SIGNAL_DRIVER);
+  jetpack.file(path.join(dir, 'bin', 'firebase'), { content: firebaseGroupThenIdles(groupPath), mode: '755' });
+
+  // Detached: the run gets its OWN process group, so the signal below lands on
+  // that ONE process and nothing else — the strictly harder case, and the one
+  // `omega dev`'s stop and a closed terminal both produce.
+  const child = spawn(process.execPath, [
+    path.join(dir, 'driver.js'),
+    dir,
+    require.resolve('../../dist/cli/commands/emulator.js'),
+    require.resolve('../../dist/cli/commands/watch.js'),
+    statePath,
+  ], {
+    env: { ...process.env, PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}` },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+
+  let output = '';
+  child.stdout.on('data', (data) => { output += data.toString(); });
+  child.stderr.on('data', (data) => { output += data.toString(); });
+
+  const ready = await waitUntil(() => /Emulator ready/.test(output) && jetpack.exists(groupPath) && jetpack.exists(statePath), 60000);
+  const [leader, member] = String(jetpack.read(groupPath) || '').trim().split(/\s+/).map(Number);
+  const watcher = Number(jetpack.read(statePath));
+
+  return {
+    child: child,
+    ready: ready,
+    output: () => output,
+    stubPids: [leader, member].filter(Number.isInteger),
+    watcher: watcher,
+    cleanup: () => {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { /* already gone */ }
+      stopAll([leader, member, watcher, child.pid].filter(Number.isInteger));
+      jetpack.remove(dir);
+    },
+  };
+}
+
+/**
+ * Boot the run, signal it with `signal`, and prove nothing it started is left.
+ * Every process signalled here is one this case spawned.
+ * @param {object} assert - The case assertions.
+ * @param {string} signal - The stop signal under test.
+ */
+async function stopsEverything(assert, signal) {
+  const run = await bootedRun();
+
+  try {
+    assert.equal(run.ready, true, `the run must come up before it can be stopped: ${run.output()}`);
+    assert.equal(run.stubPids.length, 2, 'the stub emulator reported its group leader and a member');
+    assert.equal(Number.isInteger(run.watcher), true, 'the run started a background watcher');
+
+    process.kill(run.child.pid, signal);
+
+    assert.equal(await exitedWithin(run.child, 30000), true, `the run must take its stop path on ${signal}: ${run.output()}`);
+    assert.equal(
+      await waitUntil(() => run.stubPids.every((pid) => !isAlive(pid)), 15000),
+      true,
+      `the emulator process group must be gone after ${signal} (still alive: ${run.stubPids.filter((pid) => isAlive(pid)).join(', ')})`,
+    );
+    assert.equal(await waitUntil(() => !isAlive(run.watcher), 15000), true, `no watcher may outlive the run on ${signal}`);
+  } finally {
+    run.cleanup();
+  }
+}
+
 // The stop path also sweeps the ports it was handed, and on a defaults run the
 // SHARED hub/storage numbers with them. A unit test's map is synthetic, so the
 // shared pair is never this record's business — every direct call below says so.
 const NO_SHARED_SWEEP = { sweepShared: false };
 
-module.exports = {
+module.exports = defineCases({
   description: 'emulator stop path: the recorded stack goes down with it',
   type: 'group',
   timeout: 30000,
@@ -557,5 +732,57 @@ module.exports = {
         });
       },
     },
+
+    // ─── the stop path is reached on EVERY way this run is asked to stop ───
+
+    {
+      name: 'the-record-names-the-background-watcher-the-descent-cannot-reach',
+      async run({ assert }) {
+        // The record walks DOWN from the emulator child, which covers
+        // firebase-tools' own tree — the jars and every functions runtime
+        // worker it forks. The reload watcher hangs off the CLI process
+        // instead, so the walk never sees it: unnamed, a run that dies without
+        // teardown leaves a nodemon no later stop path can even name.
+        const root = spawnDetached(FIRESTORE_JAR);
+        const watcher = spawnDetached(NODEMON_WATCHER);
+        const { command, cleanup } = commandWithRecord([]);
+
+        try {
+          command.backgroundWatcherPid = watcher;
+          const pids = command.writeEmulatorPidRecord(root, OURS);
+
+          assert.equal(pids.includes(root), true, 'the emulator child is the record\'s root');
+          assert.equal(pids.includes(watcher), true, 'the background watcher is recorded with it');
+          assert.equal(command.readEmulatorOwnership().pids.includes(watcher), true, 'and it survives the round trip through the file');
+          assert.equal(isStoppableEmulatorProcess({ pid: watcher, command: NODEMON_WATCHER }, command.readEmulatorOwnership()), true, 'so the stop path may signal it');
+        } finally {
+          stopAll([root, watcher]);
+          cleanup();
+        }
+      },
+    },
+
+    {
+      name: 'a-programmatic-stop-takes-the-whole-stack-down',
+      timeout: 120000,
+      async run({ assert }) {
+        // `omega dev` stops its backend child with SIGTERM. The stop path was
+        // wired to SIGINT alone, so the default action killed THIS process and
+        // left the detached group — and the watcher — running.
+        await stopsEverything(assert, 'SIGTERM');
+      },
+    },
+
+    {
+      name: 'a-closed-terminal-takes-the-whole-stack-down',
+      timeout: 120000,
+      async run({ assert }) {
+        // A closed terminal sends SIGHUP, and it orphaned the same tree: four
+        // generations of parentless java emulators on one machine, one of them
+        // still holding 8080 four days later
+        // ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+        await stopsEverything(assert, 'SIGHUP');
+      },
+    },
   ],
-};
+});

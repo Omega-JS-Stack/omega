@@ -11,6 +11,7 @@ const fs   = require('fs');
 const os   = require('os');
 
 const { resolveThemeId, DEFAULT_THEME_ID } = require('../../../lib/theme.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // A themes dir shaped like the framework's own: theme dirs plus the `_template`
 // scaffold, which is not a selectable theme.
@@ -28,7 +29,7 @@ function captureLogger() {
   return { warnings, warn: (message) => warnings.push(message), log: () => {} };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'theme resolution — unknown ids fall back with one actionable warning',
@@ -85,7 +86,7 @@ module.exports = {
       },
     },
     {
-      name: 'every resolve site sharing the bad id warns ONCE (sass + webpack, one build)',
+      name: 'every resolve site sharing the bad id warns ONCE (sass + bundler, one build)',
       run: (ctx) => {
         const themesDir = stageThemes();
         const logger = captureLogger();
@@ -111,4 +112,4 @@ module.exports = {
       },
     },
   ],
-};
+});

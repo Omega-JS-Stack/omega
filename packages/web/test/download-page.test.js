@@ -17,10 +17,12 @@ const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'download-test');
 
 // A brand that opted into desktop releases (#124). Since #610 that is the ONLY
-// download declaration there is: one releases hub answers every desktop
-// artifact — one for mac, TWO for linux (.deb + snap) — and mobile derives
-// nothing while MAM is parked.
+// download declaration there is: the curated view answers every desktop
+// artifact — one for mac, TWO for linux (.deb + AppImage) — and mobile derives
+// nothing while MAM is parked. Since #620 each button hands over the FILE
+// (a versionless asset on the latest release), never the releases page.
 const RELEASES = 'https://github.com/mini-org/mini-desktop/releases/latest';
+const DL = (asset) => `${RELEASES}/download/MiniCo-${asset}`;
 const withDownloads = {
   ...miniData,
   repo: { providers: { github: { org: 'mini-org', repo: 'mini-site' } } },
@@ -42,9 +44,12 @@ test('#14: two artifacts ride side by side — one does not', async () => {
   const download = pages.get('/download');
 
   const splits = download.match(/omega-dl-card__actions omega-dl-card__actions--split/g) || [];
-  assert.equal(splits.length, 1, 'only Linux (.deb + snap) splits its action row');
-  assert.ok(download.includes('Debian package') && download.includes('Snap package'), 'both Linux artifacts render');
-  assert.equal(download.split(RELEASES).length - 1, 4, 'every desktop artifact points at the releases hub');
+  assert.equal(splits.length, 1, 'only Linux (.deb + AppImage) splits its action row');
+  assert.ok(download.includes('Debian package') && download.includes('AppImage'), 'both Linux artifacts render');
+  for (const asset of ['mac-universal.dmg', 'windows-universal.exe', 'linux-debian.deb', 'linux-appimage.AppImage']) {
+    assert.ok(download.includes(`href="${DL(asset)}"`), `${asset} is a direct download, not the releases page`);
+  }
+  assert.ok(!download.includes(`href="${RELEASES}"`), 'no button lands on GitHub');
   assert.ok(!download.includes('btn-adaptive w-100'), 'action width is the flex row\'s job now');
 });
 
@@ -88,7 +93,11 @@ test('QA: /download keeps its hero masthead and drops the second lead-in', async
   const h1s = download.match(/<h1[^>]*>/g) || [];
   assert.equal(h1s.length, 1, 'exactly one h1 (SEO checklist)');
   assert.ok(!h1s[0].includes('visually-hidden'), 'the h1 is visible, not screen-reader only');
-  assert.ok(download.includes('<span class="omega-micro d-block mb-3" data-omega-reveal>Download</span>'),
+  // No reveal attribute since #467: the download hero is the page's first
+  // viewport, so its masthead rides `first_paint: true`
+  // (test/first-paint-bands.test.js owns that promise); /extension below rides
+  // the same switch since the #467 follow-up.
+  assert.ok(download.includes('<span class="omega-micro d-block mb-3">Download</span>'),
     'the masthead eyebrow renders');
   assert.ok(download.includes('Take MiniCo with you'), 'the hero headline renders');
   assert.ok(download.includes('omega-hero__sub'), 'the hero sub line renders');
@@ -107,7 +116,9 @@ test('QA: /extension echoes it — hero masthead kept, second lead-in gone', asy
   const h1s = extension.match(/<h1[^>]*>/g) || [];
   assert.equal(h1s.length, 1, 'exactly one h1 (SEO checklist)');
   assert.ok(!h1s[0].includes('visually-hidden'), 'the h1 is visible, not screen-reader only');
-  assert.ok(extension.includes('<span class="omega-micro d-block mb-3" data-omega-reveal>Extension</span>'),
+  // #467: /extension's masthead is its opening band, so the eyebrow paints with
+  // the document — the reveal attribute is gone by design, not by accident.
+  assert.ok(extension.includes('<span class="omega-micro d-block mb-3">Extension</span>'),
     'the masthead eyebrow renders');
   assert.ok(extension.includes('One tab away, in <em>every</em> browser'), 'the hero headline renders');
   assert.ok(extension.includes('omega-hero__sub'), 'the hero sub line renders');
@@ -148,6 +159,22 @@ test('QA: the modal is instructions only — no started card, no dismiss button'
   assert.ok(!scss.includes('.omega-dl-modal__started'), 'the dead rule went with the markup');
   const help = scss.match(/\.omega-dl-modal__help \{[^}]*\}/)[0];
   assert.ok(!help.includes('display: flex'), 'the help note sets as prose, not as gapped flex items');
+});
+
+test('QA: the Linux modal names the REAL deb file and instructs nothing the pipeline never builds', async () => {
+  const pages = await buildWith(withDownloads);
+  const download = pages.get('/download');
+
+  // The install command is the basename of the SAME derived URL the Debian
+  // button links (#620), so the file the user downloaded is the file the
+  // command installs — a rename lands in both or in neither.
+  assert.ok(download.includes('value="sudo dpkg -i MiniCo-linux-debian.deb"'),
+    'the dpkg step names the derived asset');
+  assert.ok(!download.includes('_amd64.deb'), 'the hand-spelled legacy filename is gone');
+
+  // deb + AppImage are the only linux artifacts there have ever been.
+  assert.ok(!download.includes('sudo rpm -i'), 'no rpm instruction — no rpm artifact exists');
+  assert.ok(!download.includes('Fedora/RHEL'), 'its label went with it');
 });
 
 test('#14: OS/browser detection on BOTH pages comes from the shared client logic', () => {

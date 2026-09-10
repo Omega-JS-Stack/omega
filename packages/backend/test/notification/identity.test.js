@@ -11,7 +11,8 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { buildPayload } = require('../../src/manager/libraries/notification.js');
+const { buildPayload } = require('../../dist/manager/libraries/notification.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The identity the framework used to hardcode. Nothing may ever emit these again.
 const FRAMEWORK_IDENTITY = /ITW Creative Works|itwcreativeworks/i;
@@ -24,7 +25,7 @@ const brand = {
 
 const brandWithoutImages = { name: 'Acme', url: 'https://acme.example' };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Push notification identity (icon + click target come from config)',
   type: 'group',
   tests: [
@@ -151,4 +152,4 @@ module.exports = {
       },
     },
   ],
-};
+});

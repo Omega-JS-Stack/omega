@@ -3,7 +3,9 @@
 // name sanitization (the IPC channel must never read outside the icon
 // directories), caching, and the IPC round-trip.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'fontawesome (main)',
@@ -142,4 +144,4 @@ module.exports = {
       },
     },
   ],
-};
+});

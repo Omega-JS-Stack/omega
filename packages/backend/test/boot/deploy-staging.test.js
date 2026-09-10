@@ -21,6 +21,7 @@ const jetpack = require('fs-jetpack');
 const stageLocalPackages = require('../../dist/cli/utils/stage-local-packages.js');
 const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const { loadConfig } = require('../helpers/_shared-config.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const BACKEND_BIN = path.resolve(__dirname, '../../bin/omega-backend');
 
@@ -28,7 +29,7 @@ function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-stage-'));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Deploy staging — local file: deps pack into the functions upload',
   type: 'group',
   timeout: 120000,
@@ -346,7 +347,7 @@ module.exports = {
     },
 
     {
-      name: 'stage-functions-strips-dev-only-keys-from-the-deploy-artifact',
+      name: 'stage-functions-composes-the-artifact-for-ONE-environment',
       async run({ assert }) {
         const tmp = makeTmp();
         const targetRoot = path.join(tmp, 'targets', 'backend');
@@ -358,36 +359,34 @@ module.exports = {
         jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({ name: 'acme-backend', private: true }));
         jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
 
-        // The target .env carries the live payment secrets AND their dev
-        // twins, which the local emulator reads and no deploy may ever upload.
-        // dist/.env is COMPOSED from the cascade by schema (#678): keys only,
-        // no marker comments — a verbatim copy is the OLD contract.
-        const authored = [
+        // The base .env is the live account; `.env.development` overlays the
+        // test credential a local run uses (#586). dist/.env is COMPOSED from
+        // the cascade by schema (#678): keys only, no marker comments — a
+        // verbatim copy is the OLD contract.
+        jetpack.write(path.join(targetRoot, '.env'), [
           'STRIPE_SECRET_KEY="sk_live_fixture"',
-          'STRIPE_SECRET_KEY_DEV="sk_test_fixture"',
-          'CHARGEBEE_API_KEY_DEV="test_fixture"',
           'OMEGA_ADMIN_KEY="fixture-admin-key"',
           '',
-        ].join('\n');
-        jetpack.write(path.join(targetRoot, '.env'), authored);
+        ].join('\n'));
+        jetpack.write(path.join(targetRoot, '.env.development'), 'STRIPE_SECRET_KEY="sk_test_fixture"\n');
 
-        // A LOCAL stage composes every key, dev twins included — the emulator
-        // needs them
-        const local = stageFunctions({ projectDir: targetRoot });
+        // A LOCAL stage composes base + development — the emulator gets the
+        // test credential and never touches the live account
+        const local = stageFunctions({ projectDir: targetRoot, environment: 'development' });
         const localStaged = jetpack.read(path.join(local.distDir, '.env'));
-        for (const line of ['STRIPE_SECRET_KEY="sk_live_fixture"', 'STRIPE_SECRET_KEY_DEV="sk_test_fixture"', 'CHARGEBEE_API_KEY_DEV="test_fixture"', 'OMEGA_ADMIN_KEY="fixture-admin-key"']) {
-          assert.equal(localStaged.includes(line), true, `a local stage composes ${line.split('=')[0]}`);
-        }
+        assert.equal(/^STRIPE_SECRET_KEY="sk_test_fixture"$/m.test(localStaged), true, 'the development overlay wins locally');
+        assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(localStaged), true, 'keys no overlay touches come from the base');
 
-        // The DEPLOY stage drops every dev-only row and nothing else
-        const deploy = stageFunctions({ projectDir: targetRoot, deploy: true });
+        // The DEPLOY stage composes base + production. No `.env.production`
+        // exists, so the base ships — and the development overlay's value never
+        // rides the upload, neither as a row nor as a value
+        const deploy = stageFunctions({ projectDir: targetRoot, environment: 'production' });
         const staged = jetpack.read(path.join(deploy.distDir, '.env'));
 
-        assert.equal(/^STRIPE_SECRET_KEY_DEV=/m.test(staged), false, 'the Stripe dev twin never rides the artifact');
-        assert.equal(/^CHARGEBEE_API_KEY_DEV=/m.test(staged), false, 'the Chargebee dev twin never rides the artifact');
-        assert.equal(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), true, 'the live key still rides it');
+        assert.equal(/^STRIPE_SECRET_KEY="sk_live_fixture"$/m.test(staged), true, 'the deployed artifact carries the live key');
+        assert.equal(staged.includes('sk_test_fixture'), false, "another environment's value never rides the upload");
+        assert.equal(/_DEV=/.test(staged), false, 'the _DEV twins are gone from the mechanism entirely (#586)');
         assert.equal(/^OMEGA_ADMIN_KEY="fixture-admin-key"$/m.test(staged), true, 'unrelated keys are untouched');
-        assert.equal(staged.includes('sk_test_fixture'), false, 'no dev VALUE survives either');
 
         jetpack.remove(tmp);
       },
@@ -444,4 +443,4 @@ module.exports = {
       },
     },
   ],
-};
+});

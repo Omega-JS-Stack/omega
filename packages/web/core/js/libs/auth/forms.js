@@ -7,6 +7,7 @@ import omega from '@omega.js/client';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { handleEmailSignin, handleEmailSignup, handlePasswordReset } from '__main_assets__/js/libs/auth/email.js';
 import { signInWithProvider } from '__main_assets__/js/libs/auth/oauth.js';
+import { clearOrphanMarkers } from '__main_assets__/js/libs/auth/orphan.js';
 
 function stateChangeHandler(ctx, { state }) {
   // Hide initializing spinners and show hidden elements when state changes from initializing
@@ -93,6 +94,13 @@ function clearConsentError() {
 // Read the consent checkboxes and stash to storage. Survives the post-signup redirect
 // the same way attribution does. @omega.js/backend's /user/signup route picks it up via sendUserSignupMetadata.
 function captureSignupConsent(data) {
+  // A deliberate signup voids any orphan marker this browser holds
+  // ([#703](https://github.com/Omega-JS-Stack/omega/issues/703)): the failed-delete
+  // backstop deletes a marked account at auth-ready, and somebody agreeing to the
+  // terms for the account they are about to sign into must never meet it. Cleared
+  // BEFORE the Firebase call, like the stash below.
+  clearOrphanMarkers();
+
   const legalLabel = document.querySelector('label[for="consent-legal"]')?.innerText?.trim() || null;
   const marketingLabel = document.querySelector('label[for="consent-marketing"]')?.innerText?.trim() || null;
 

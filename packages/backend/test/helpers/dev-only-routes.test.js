@@ -17,11 +17,12 @@
  */
 const fs = require('fs');
 const path = require('path');
-const Middleware = require('../../src/manager/helpers/middleware.js');
+const Middleware = require('../../dist/manager/helpers/middleware.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { isDevOnlyRouteBlocked, isRouteOutsideRoutesDir, DEV_ONLY_ROUTE_FOLDER } = Middleware;
 
-const ROUTES_DIR = path.resolve(__dirname, '../../src/manager/routes');
+const ROUTES_DIR = path.resolve(__dirname, '../../dist/manager/routes');
 
 // Every route the framework ships in the dev-only folder, read off DISK rather
 // than listed here — a route added tomorrow joins this test automatically.
@@ -58,7 +59,7 @@ function withEnv(overrides, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Development-only route folder gate',
   type: 'group',
 
@@ -221,4 +222,4 @@ module.exports = {
       },
     },
   ],
-};
+});

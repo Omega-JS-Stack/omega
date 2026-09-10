@@ -8,10 +8,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'background.js'), 'utf8');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'background.js cache warming — disabled behind CACHE_WARMING_ENABLED',
@@ -40,4 +41,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -34,6 +34,16 @@ const Logger = require('./logger');
 const SCOPE = '@omega.js/';
 const DEFAULT_MONOREPO = path.join(os.homedir(), 'Developer', 'Repositories', 'Omega', 'omega');
 const WATCH_LOCK = path.join('.omega', 'dev-watch.lock');
+// The marker a vendor-propagation pass holds while it re-prepares frameworks
+// (#622) — the same pid-stamped shape as the watch lock, so an abandoned one
+// reads as idle.
+const VENDOR_PROPAGATION_LOCK = path.join('.omega', 'vendor-propagation.lock');
+// Where scripts/watch-all.js tees its output (#197). A boot that did NOT spawn
+// the watch reads its state from here — the file is truncated per launch and
+// its header names the pid that owns it.
+const WATCH_LOG = path.join('.temp', 'logs', 'watch-all.log');
+const WATCH_LOG_HEADER = /^# omega log — \S+ — pid=(\d+)$/;
+const WATCH_LOG_POLL_MS = 200;
 
 /**
  * Check whether a directory is the Omega monorepo root (package.json named
@@ -343,19 +353,23 @@ async function linkLocalPackages(options) {
 }
 
 /**
- * Flip a brand tree's @omega.js `file:` specs back to registry ranges — the
+ * Flip a brand tree's @omega.js `file:` specs back to registry specs — the
  * publish-day inverse of linkLocalPackages(). Every file:-spec'd entry in
- * every target manifest becomes `^<version>` of the CURRENTLY LINKED copy (read
- * from the file: target's own package.json — no monorepo lookup, no registry
- * call, so it works on any machine), then ONE `npm install` re-resolves the
- * tree from the registry. Idempotent: registry-spec'd entries are untouched;
+ * every target manifest becomes the EXACT `<version>` of the CURRENTLY LINKED
+ * copy (read from the file: target's own package.json — no monorepo lookup, no
+ * registry call, so it works on any machine), then ONE `npm install`
+ * re-resolves the tree from the registry. Exact, never a caret (#794): the
+ * @omega.js family ships lockstep, so a caret here would let one target float
+ * ahead of its siblings on the next release and put two copies of
+ * @omega.js/client in one brand. An explicit `range` still wins verbatim — the
+ * caller owns that string. Idempotent: registry-spec'd entries are untouched;
  * nothing to flip → no install. Same transactional manifest restore as the
  * linker when the install fails.
  * @param {object} options
  * @param {string} options.dir - Any directory inside the brand.
  * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
  * @param {boolean} [options.dryRun] - Plan only, write and install nothing.
- * @param {string} [options.range] - Explicit range for every flipped entry (e.g. '^0.1.0').
+ * @param {string} [options.range] - Explicit spec for every flipped entry, used verbatim (e.g. '0.1.0').
  * @returns {Promise<Array<{name: string, dir: string, spec: string, action: 'flip'|'skip'|'unresolvable'}>>}
  */
 async function restoreRegistrySpecs(options) {
@@ -384,7 +398,7 @@ async function restoreRegistrySpecs(options) {
       if (!spec) {
         const target = path.resolve(targetDir, entry.spec.slice('file:'.length));
         try {
-          spec = `^${JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8')).version}`;
+          spec = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8')).version;
         } catch (e) {
           actions.push({ name: entry.name, dir: entry.dir, spec: entry.spec, action: 'unresolvable' });
           logger && logger.warn(`${entry.name}: cannot read ${target}/package.json — pass { range } or fix the link`);
@@ -418,13 +432,13 @@ async function restoreRegistrySpecs(options) {
 }
 
 /**
- * Read the watch lock and return the live owner pid — clearing the lock when
- * its process is gone.
- * @param {string} monorepoRoot - Monorepo root path.
- * @returns {number|null} Live pid, or null when unlocked.
+ * Read a pid-stamped lock file and return the live owner pid — clearing the
+ * file when its process is gone. Signal 0 delivers nothing; it only asks
+ * whether the pid is still there.
+ * @param {string} lockPath - Absolute path of the lock file.
+ * @returns {number|null} Live pid, or null when unlocked (or stale).
  */
-function readLiveWatchPid(monorepoRoot) {
-  const lockPath = path.join(monorepoRoot, WATCH_LOCK);
+function readLivePid(lockPath) {
   let pid;
 
   try {
@@ -441,6 +455,27 @@ function readLiveWatchPid(monorepoRoot) {
     fs.rmSync(lockPath, { force: true });
     return null;
   }
+}
+
+/**
+ * Read the watch lock and return the live owner pid — clearing the lock when
+ * its process is gone.
+ * @param {string} monorepoRoot - Monorepo root path.
+ * @returns {number|null} Live pid, or null when unlocked.
+ */
+function readLiveWatchPid(monorepoRoot) {
+  return readLivePid(path.join(monorepoRoot, WATCH_LOCK));
+}
+
+/**
+ * Whether a vendor-propagation pass is re-preparing the frameworks right now
+ * ([#622](https://github.com/Omega-JS-Stack/omega/issues/622)) — a marker
+ * whose owner process is gone (a watch killed mid-pass) reads as idle.
+ * @param {string} monorepoRoot - Monorepo root path.
+ * @returns {boolean}
+ */
+function vendorPropagationActive(monorepoRoot) {
+  return readLivePid(path.join(monorepoRoot, VENDOR_PROPAGATION_LOCK)) !== null;
 }
 
 /**
@@ -558,6 +593,145 @@ function createWatchReadyTracker() {
 }
 
 /**
+ * Readiness for a watch this process did NOT start
+ * ([#622](https://github.com/Omega-JS-Stack/omega/issues/622)).
+ *
+ * A boot that reuses a running watch has no child stdout to read, and skipping
+ * the gate is what let a leg require a framework dist mid-purge: the watch may
+ * be seconds old with its initial prepare still landing, or a vendor
+ * propagation pass may be re-preparing every framework right now. Both are
+ * readable from OUTSIDE the watch — its tee'd log (`.temp/logs/watch-all.log`)
+ * fed through the same tracker the fresh branch uses, plus the propagation
+ * marker — so the wait costs a long-idle watch nothing (every package has
+ * already printed its ready line) and holds a boot only while something is
+ * genuinely in flight.
+ *
+ * The log is only believed when its header pid IS the lock owner's: watch-all
+ * truncates the file at launch, so a header naming anyone else is a log this
+ * watch never wrote and there is nothing to gate on. Same three outcomes as the
+ * fresh branch, and it never rejects: 'ready', 'exit' (the watch died while we
+ * waited — nothing is coming) or 'timeout' after WATCH_READY_TIMEOUT_MS.
+ * @param {object} options
+ * @param {string} options.monorepoRoot - Monorepo root path.
+ * @param {number} options.pid - The running watch's pid (the lock owner).
+ * @param {object} [options.logger] - Logger with log (silent when omitted); warnings carry the watch's own tag.
+ * @returns {Promise<'ready'|'exit'|'timeout'>}
+ */
+function awaitRunningWatchReady(options) {
+  const { monorepoRoot, pid, logger } = options;
+
+  let fd;
+  try {
+    fd = fs.openSync(path.join(monorepoRoot, WATCH_LOG), 'r');
+  } catch (e) {
+    // No log to read (a CI run skips the tee) — a boot never pays the timeout
+    // for a file that does not exist.
+    return Promise.resolve('ready');
+  }
+
+  let tracker = createWatchReadyTracker();
+  let headerPid = null;
+  let offset = 0;
+  let carry = '';
+  const drain = () => {
+    const size = fs.fstatSync(fd).size;
+    // A relaunch truncates the log — re-read the new one from its header, and
+    // keep nothing the old file said: a fresh tracker, and headerPid back to
+    // null ("no header read yet"), so the new log's own header is what decides
+    // whether any of this belongs to the watch this boot waits on.
+    if (size < offset) {
+      offset = 0;
+      carry = '';
+      tracker = createWatchReadyTracker();
+      headerPid = null;
+    }
+    if (size === offset) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(size - offset);
+    // readSync may return short — advance by what was READ, never by the size
+    // stat'd above, or the gap becomes garbage bytes appended to carry.
+    const read = fs.readSync(fd, buffer, 0, buffer.length, offset);
+    offset += read;
+    carry += buffer.toString('utf8', 0, read);
+    const lines = carry.split('\n');
+    carry = lines.pop();
+    for (const line of lines) {
+      const header = WATCH_LOG_HEADER.exec(line.trim());
+      if (header) {
+        headerPid = Number(header[1]);
+      }
+      tracker.push(line);
+    }
+  };
+  const settled = () => tracker.isReady() && !vendorPropagationActive(monorepoRoot);
+
+  drain();
+  if (headerPid !== pid) {
+    fs.closeSync(fd);
+    logger && logger.log(`Monorepo watch (pid ${pid}) writes no log this boot can read — booting without a readiness wait`);
+    return Promise.resolve('ready');
+  }
+  if (settled()) {
+    fs.closeSync(fd);
+    return Promise.resolve('ready');
+  }
+
+  const stragglers = tracker.pending();
+  logger && logger.log(`Monorepo watch (pid ${pid}) is mid-prepare${stragglers.length > 0 ? ` (${stragglers.join(', ')})` : ''} — waiting for it to land`);
+  // Warnings carry the watch's own identity, the way the spawned branch's do —
+  // a caller's logger is only guaranteed to have log().
+  const watchLogger = new Logger('watch');
+
+  return new Promise((resolve) => {
+    // Deliberately NOT unref'd: while the gate holds, this wait is the only
+    // thing the boot is doing, and an unref'd timer would let the process fall
+    // out from under it.
+    const poll = setInterval(() => {
+      drain();
+      // Checked BEFORE the verdict: a relaunched log clears the header, and
+      // until the new one names a pid there is nothing to judge (truncate and
+      // header write are two steps). Once it names a pid that is NOT the one
+      // this boot waits on, every line in the file belongs to a different
+      // watch — unreadable state, so the gate settles the way it does for a
+      // watch that died, rather than settling 'ready' off another's lines.
+      if (headerPid !== null && headerPid !== pid) {
+        watchLogger.warn(`Watch (pid ${pid}) no longer owns its log (now written by pid ${headerPid}) — continuing anyway`);
+        finish('exit');
+        return;
+      }
+      if (settled()) {
+        finish('ready');
+        return;
+      }
+      try {
+        process.kill(pid, 0);
+      } catch (e) {
+        // The watch died mid-wait — that pass is never landing, and the boot's
+        // own freshness sweep already ruled on the dists.
+        watchLogger.warn(`Watch (pid ${pid}) exited before its prepare landed — continuing anyway`);
+        finish('exit');
+      }
+    }, WATCH_LOG_POLL_MS);
+    const deadline = setTimeout(() => {
+      const pendingNames = tracker.pending();
+      watchLogger.warn(`Watch still preparing after ${WATCH_READY_TIMEOUT_MS / 1000}s${pendingNames.length > 0 ? ` (${pendingNames.join(', ')})` : ''} — continuing anyway`);
+      finish('timeout');
+    }, WATCH_READY_TIMEOUT_MS);
+
+    // Declared after the timers it clears — every path that calls it runs on a
+    // later tick, so the bindings are live by then.
+    const finish = (outcome) => {
+      clearInterval(poll);
+      clearTimeout(deadline);
+      fs.closeSync(fd);
+      resolve(outcome);
+    };
+  });
+}
+
+/**
  * Spawn the monorepo's src→dist watch (`npm start` at the monorepo root) as a
  * SESSION-SCOPED child, unless one is already running (lock held by a live
  * process — the watch script itself takes the lock).
@@ -576,8 +750,9 @@ function createWatchReadyTracker() {
  * child exits before reporting, or after WATCH_READY_TIMEOUT_MS with one
  * warning naming the stragglers — it never rejects, and resolves with which of
  * the three settled it ('ready' | 'exit' | 'timeout') so a caller only claims
- * success on 'ready'. An already-running watch has no initial pass to wait
- * for, so its `ready` is resolved with 'ready'.
+ * success on 'ready'. An ALREADY-RUNNING watch gates too — the same three
+ * outcomes, read from its log instead of a child's stdout
+ * (awaitRunningWatchReady, [#622](https://github.com/Omega-JS-Stack/omega/issues/622)).
  * @param {object} options
  * @param {string} options.monorepoRoot - Monorepo root path.
  * @param {object} [options.logger] - Logger with log (silent when omitted).
@@ -589,7 +764,7 @@ function startMonorepoWatch(options) {
   const livePid = readLiveWatchPid(monorepoRoot);
   if (livePid) {
     logger && logger.log(`Monorepo watch already running (pid ${livePid}) — leaving it be`);
-    return { alreadyRunning: true, pid: livePid, child: null, ready: Promise.resolve('ready') };
+    return { alreadyRunning: true, pid: livePid, child: null, ready: awaitRunningWatchReady({ monorepoRoot, pid: livePid, logger }) };
   }
 
   const child = spawn('npm', ['start'], { cwd: monorepoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -676,6 +851,11 @@ function startMonorepoWatch(options) {
  * inside the debounce window fold into one pass; edits landing mid-pass queue
  * exactly one follow-up pass. A dependent's prepare failing is logged and
  * never stops the rest of the pass.
+ *
+ * A running pass holds `.omega/vendor-propagation.lock` (pid inside) for its
+ * whole life, so a brand booting on these dists can wait it out instead of
+ * requiring a framework mid-purge
+ * ([#622](https://github.com/Omega-JS-Stack/omega/issues/622)).
  * @param {object} options
  * @param {string} options.packagesDir - The monorepo's packages/ directory.
  * @param {string[]} options.packages - Vendorable package dir names to watch (missing src/ dirs are skipped).
@@ -720,6 +900,15 @@ function startVendorPropagation(options) {
     });
   })));
 
+  // The monorepo root by construction: packagesDir IS <root>/packages, so the
+  // marker lands beside the watch lock, where a booting brand looks for it.
+  const markerPath = path.join(path.dirname(packagesDir), VENDOR_PROPAGATION_LOCK);
+  const holdMarker = () => {
+    fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+    fs.writeFileSync(markerPath, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }, null, 2));
+  };
+  const releaseMarker = () => fs.rmSync(markerPath, { force: true });
+
   let timer = null;
   let running = false;
   let pending = false;
@@ -727,38 +916,49 @@ function startVendorPropagation(options) {
   const dirty = new Set();
 
   const pass = async () => {
-    running = true;
-    do {
-      pending = false;
-      const changed = [...dirty];
-      dirty.clear();
+    try {
+      running = true;
+      // A pass DELETES each dependent's dist before recopying it, so a target
+      // booting into one requires a half-purged framework (#622). The marker
+      // says "a purge is in flight" to anything that gates on it (a brand
+      // boot's readiness wait) — pid-stamped, so a watch killed mid-pass
+      // leaves nothing a later boot honors. Held INSIDE the try so the finally
+      // owns the whole lifecycle: no throw can leave the flag or the marker up.
+      holdMarker();
+      do {
+        pending = false;
+        const changed = [...dirty];
+        dirty.clear();
 
-      // A spurious trigger with nothing dirty (fs watchers can replay stale
-      // events under load) is a no-op, never a full re-prepare
-      if (changed.length === 0) {
-        continue;
-      }
+        // A spurious trigger with nothing dirty (fs watchers can replay stale
+        // events under load) is a no-op, never a full re-prepare
+        if (changed.length === 0) {
+          continue;
+        }
 
-      // Scope: skip dependents whose dist/vendor embeds none of the changed
-      // packages (a missing vendor tree means not-yet-prepared — always run)
-      const affected = dependents.filter((dependent) => {
-        const vendorRoot = path.join(dependent.dir, 'dist', 'vendor');
-        return !fs.existsSync(vendorRoot)
-          || changed.some((name) => fs.existsSync(path.join(vendorRoot, name)));
-      });
-      const skipped = dependents.length - affected.length;
-      log(`${changed.join(', ')} changed — re-preparing ${affected.map((d) => d.name).join(', ') || '(none)'}${skipped > 0 ? ` (${skipped} unaffected)` : ''}`);
+        // Scope: skip dependents whose dist/vendor embeds none of the changed
+        // packages (a missing vendor tree means not-yet-prepared — always run)
+        const affected = dependents.filter((dependent) => {
+          const vendorRoot = path.join(dependent.dir, 'dist', 'vendor');
+          return !fs.existsSync(vendorRoot)
+            || changed.some((name) => fs.existsSync(path.join(vendorRoot, name)));
+        });
+        const skipped = dependents.length - affected.length;
+        log(`${changed.join(', ')} changed — re-preparing ${affected.map((d) => d.name).join(', ') || '(none)'}${skipped > 0 ? ` (${skipped} unaffected)` : ''}`);
 
-      if (closed) {
-        break;
-      }
-      await Promise.all(affected.map((dependent) =>
-        Promise.resolve()
-          .then(() => runPrepare(dependent))
-          .catch((error) => log(`prepare failed in ${dependent.name}: ${error.message}`))
-      ));
-    } while (pending && !closed);
-    running = false;
+        if (closed) {
+          break;
+        }
+        await Promise.all(affected.map((dependent) =>
+          Promise.resolve()
+            .then(() => runPrepare(dependent))
+            .catch((error) => log(`prepare failed in ${dependent.name}: ${error.message}`))
+        ));
+      } while (pending && !closed);
+    } finally {
+      releaseMarker();
+      running = false;
+    }
   };
 
   const trigger = () => {
@@ -769,6 +969,10 @@ function startVendorPropagation(options) {
       pending = true;
       return;
     }
+    // Floated on purpose, and un-caught on purpose: prepare failures are
+    // already handled per-dependent, so a rejection here means the marker
+    // machinery itself broke — a watch that cannot say "a purge is in flight"
+    // crashes loudly rather than purge dists behind a gate no boot can see.
     pass();
   };
 
@@ -1673,6 +1877,8 @@ function freshnessSweep(options) {
 module.exports = {
   DEFAULT_MONOREPO,
   WATCH_LOCK,
+  WATCH_LOG,
+  VENDOR_PROPAGATION_LOCK,
   HEAL_LOCK,
   isMonorepoRoot,
   resolveMonorepoRoot,
@@ -1684,8 +1890,10 @@ module.exports = {
   restoreRegistrySpecs,
   resolveLinkedMonorepo,
   createWatchReadyTracker,
+  awaitRunningWatchReady,
   startMonorepoWatch,
   startVendorPropagation,
+  vendorPropagationActive,
   readLiveWatchPid,
   acquireWatchLock,
   releaseWatchLock,

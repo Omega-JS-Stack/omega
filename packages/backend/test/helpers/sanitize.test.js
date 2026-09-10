@@ -9,13 +9,14 @@
  * - All non-schema fields (no schema, sanitize everything)
  * - Combo: schema + non-schema fields together
  */
-const Utilities = require('../../src/manager/helpers/utilities.js');
+const Utilities = require('../../dist/manager/helpers/utilities.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock Manager
 const Manager = { libraries: {} };
 const utilities = new Utilities(Manager);
 
-module.exports = {
+module.exports = defineCases({
   description: 'Utilities.sanitize()',
   type: 'group',
 
@@ -219,4 +220,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -12,8 +12,9 @@ const JSON5 = require('json5');
 //   // ========== End OMEGA Rules ==========
 //
 // Pre-family formats ({{ backend-manager }} placeholders, ///---omega---///
-// bracket markers, etc.) are NOT matched here — converting legacy files is the
-// migration tooling's job (Ian 2026-07-10).
+// bracket markers, etc.) are NOT matched here — converting legacy files is
+// `npx omega migrate:markers`' job, run alone
+// ([#40](https://github.com/Omega-JS-Stack/omega/issues/40); Ian 2026-07-10).
 const omegaAllRulesRegex = /(\/\/ ========== OMEGA Rules \(v.*?\) ==========)(.*?)(\/\/ ========== End OMEGA Rules ==========)/sgm;
 
 function loadJSON(path) {
@@ -36,10 +37,36 @@ function isLocal(name) {
   return name && name.indexOf('file:') > -1;
 }
 
+/**
+ * The install line for the JDK the Firebase emulators need, for THIS host.
+ * Every platform gets openjdk from a different manager — Homebrew on macOS,
+ * winget on Windows, apt on Linux — so the one string the java-installed check
+ * and `omega test`'s preflight both print lives here.
+ *
+ * Same rule as devkit's `mkcertInstallHint`: the line OPENS with something
+ * pasteable, and an alternative goes in a sentence after it, never spliced into
+ * the command a reader will copy.
+ *
+ * @param {string} [platform] - Host platform (test seam)
+ * @returns {string} The command to run, then any alternative
+ */
+function javaInstallHint(platform = process.platform) {
+  if (platform === 'darwin') {
+    return 'brew install openjdk';
+  }
+
+  if (platform === 'win32') {
+    return 'winget install Microsoft.OpenJDK.21. Chocolatey works too: choco install openjdk.';
+  }
+
+  return 'sudo apt install default-jdk';
+}
+
 module.exports = {
   omegaAllRulesRegex,
   loadJSON,
   saveJSON5,
   hasContent,
   isLocal,
+  javaInstallHint,
 };

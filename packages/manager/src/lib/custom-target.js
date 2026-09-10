@@ -9,7 +9,9 @@
  * The manager runs each verb through `npm run <verb>` when the script is
  * there and SKIPS IT LOUDLY when it is not — a verb that quietly did nothing
  * is indistinguishable from one that worked. Nothing is inferred, defaulted,
- * or synthesized: no script, no verb.
+ * or synthesized: no script, no verb. This module holds only what a custom
+ * target IS (its names, its dirs, the scripts it declares); the run itself has
+ * one home for every target type, `framework-bin.js`'s `resolveTargetRun`.
  *
  * What a custom target does NOT get is every framework service op — there is
  * no framework to reconcile. Discovery leaves `entry.target` null, so the
@@ -23,15 +25,9 @@
  * dir does not: there is no @omega.js/config in there to walk the cascade.
  */
 const path = require('node:path');
-const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { isCustomTargetEntry, normalizeTargetInstances, instanceTargetDir } = require('@omega.js/config');
-const { runCommand } = require('./run-command.js');
-
-// The verbs, in the order a full pass runs them. Build before test before
-// deploy is the only order that can be right; start and clean are the ends.
-const CUSTOM_VERBS = ['start', 'build', 'test', 'deploy', 'clean'];
 
 /**
  * The custom target NAMES a brand config declares.
@@ -72,51 +68,8 @@ function targetScripts(targetPath) {
   return (pkg && typeof pkg.scripts === 'object' && pkg.scripts) || {};
 }
 
-/**
- * Run one verb on a custom target. Present script → `npm run <verb>` in the
- * target dir (under the target's own Node — runCommand's .nvmrc rule, same as
- * every framework leg). Absent → the loud skip.
- *
- * @param {object} entry - A discoverTargets entry ({ name, dir, path }).
- * @param {string} verb - One of CUSTOM_VERBS.
- * @param {object} [deps] - Test seam: { run } replaces runCommand.
- * @returns {Promise<{ verb, ran: boolean, skipped?: boolean, success?: boolean, error?: string }>}
- */
-async function runCustomVerb(entry, verb, deps = {}) {
-  const scripts = targetScripts(entry.path);
-
-  if (!scripts[verb]) {
-    console.log(`  ${chalk.dim('⊘')} ${chalk.bold(entry.name)} ${chalk.dim(`— no "${verb}" script in ${entry.dir}/package.json, skipped`)}`);
-    return { verb, ran: false, skipped: true };
-  }
-
-  console.log(`  ${chalk.cyan('→')} ${chalk.bold(entry.name)} ${chalk.dim(`— npm run ${verb} (${scripts[verb]})`)}`);
-  const result = await (deps.run || runCommand)('npm', ['run', verb], entry.path);
-
-  return { verb, ran: true, success: result.success, ...(result.error ? { error: result.error } : {}) };
-}
-
-/**
- * Run several verbs on a custom target, in the given order.
- *
- * @param {object} entry - A discoverTargets entry.
- * @param {string[]} verbs - Verbs to run, in order.
- * @param {object} [deps] - Test seam: { run } replaces runCommand.
- * @returns {Promise<Array<object>>} One runCustomVerb result per verb.
- */
-async function runCustomVerbs(entry, verbs, deps = {}) {
-  const results = [];
-  for (const verb of verbs) {
-    results.push(await runCustomVerb(entry, verb, deps));
-  }
-  return results;
-}
-
 module.exports = {
-  CUSTOM_VERBS,
   customTargetNames,
   customTargetDirs,
   targetScripts,
-  runCustomVerb,
-  runCustomVerbs,
 };

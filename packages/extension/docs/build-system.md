@@ -1,6 +1,6 @@
 # Build System
 
-@omega.js/extension uses **gulp + webpack + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
+@omega.js/extension uses **gulp + esbuild + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
 
 ## Pipeline overview
 
@@ -12,7 +12,7 @@ src/
 ├── views/<component>/index.html             # HTML templates
 ├── _locales/en/messages.json                # i18n catalog source
 ├── assets/
-│   ├── js/components/<component>/index.js   # entry points (webpack bundles these)
+│   ├── js/components/<component>/index.js   # entry points (esbuild bundles these)
 │   ├── css/main.scss + components/          # SCSS
 │   └── images/icon.png                      # source icon (1024×1024)
 └── ...
@@ -21,7 +21,7 @@ dist/
 ├── manifest.json                            # still JSON5 — used by serve, not Chrome
 ├── views/<component>/index.html             # templated
 ├── assets/
-│   ├── js/components/<component>.bundle.js  # webpack output
+│   ├── js/components/<component>.bundle.js  # esbuild output
 │   ├── css/components/<component>.bundle.css # sass output
 │   └── images/                              # icons (multiple sizes)
 └── _locales/<lang>/messages.json            # auto-translated (see docs/translations.md)
@@ -45,40 +45,70 @@ Auto-loaded from [src/gulp/tasks/](../src/gulp/tasks/) via [src/gulp/main.js](..
 | `defaults` | [tasks/defaults.js](../src/gulp/tasks/defaults.js) | Copy framework defaults from `dist/defaults/` to consumer project on first run / setup. See [defaults.md](defaults.md). |
 | `distribute` | [tasks/distribute.js](../src/gulp/tasks/distribute.js) | Copy consumer's `src/` files (HTML, manifest, locales, **static images**, etc.) to `dist/` |
 | `sass` | [tasks/sass.js](../src/gulp/tasks/sass.js) | Compile SCSS → CSS bundles with the load-path system (see [css.md](css.md)) |
-| `webpack` | [tasks/webpack.js](../src/gulp/tasks/webpack.js) | Bundle JS per component entry point with Babel transpilation |
+| `bundle` | [tasks/bundle.js](../src/gulp/tasks/bundle.js) | Bundle JS per component entry point with esbuild |
 | `html` | [tasks/html.js](../src/gulp/tasks/html.js) | Run views through the two-step templating system (see [templating.md](templating.md)) |
 | `icons` | [tasks/icons.js](../src/gulp/tasks/icons.js) | Generate icon variants from `src/assets/images/icon.png` |
-| `translate` | [tasks/translate.js](../src/gulp/tasks/translate.js) | Auto-translate `_locales/en/messages.json` to 16 languages via Claude CLI (see [translations.md](translations.md)) |
+| `translate` | [tasks/translate.js](../src/gulp/tasks/translate.js) | Auto-translate `config/messages.json` to the configured `translation.languages` (see [translations.md](translations.md)) |
 | `package` | [tasks/package.js](../src/gulp/tasks/package.js) | Bundle dist/ into packaged/<browser>/raw + zip; runs `build:pre` / `build:post` hooks ([hooks.md](hooks.md)) |
 | `serve` | [tasks/serve.js](../src/gulp/tasks/serve.js) | Dev server: WebSocket-based live reload, watches `src/` |
 | `audit` | [tasks/audit.js](../src/gulp/tasks/audit.js) | Build-pipeline-specific checks (icons exist, manifest is valid, etc.) |
 
 ### Static assets
 
-`distribute` copies everything under `src/` EXCEPT what another task owns: `.js` (webpack), `.css/.scss/.sass` (sass), and `src/views/**/*.html` (the html task). Static images (`.png`, `.jpg`, `.svg`, `.webp`, …) copy as-is, byte-for-byte — this framework ships no imagemin task, so nothing else would carry them to `dist/` ([#259](https://github.com/Omega-JS-Stack/omega/issues/259)). Consumers never need a `hooks/build/pre.js` copy step for images.
+`distribute` copies everything under `src/` EXCEPT what another task owns: `.js` (bundle), `.css/.scss/.sass` (sass), and `src/views/**/*.html` (the html task). Static images (`.png`, `.jpg`, `.svg`, `.webp`, …) copy as-is, byte-for-byte — this framework ships no imagemin task, so nothing else would carry them to `dist/` ([#259](https://github.com/Omega-JS-Stack/omega/issues/259)). Consumers never need a `hooks/build/pre.js` copy step for images.
 
-## Webpack
+## Bundling
 
-[src/gulp/tasks/webpack.js](../src/gulp/tasks/webpack.js) discovers component entry points (`src/assets/js/components/<name>/index.js`) and bundles each to `dist/assets/js/components/<name>.bundle.js`.
+[src/gulp/tasks/bundle.js](../src/gulp/tasks/bundle.js) discovers component entry points (`src/assets/js/components/<name>/index.js`) and bundles each to `dist/assets/js/components/<name>.bundle.js`.
 
-**Babel transpilation** — `@babel/preset-env` so the bundles work in older browsers. SW + content scripts have stricter constraints (no `eval`, no ES module syntax at top level in some configs).
+The bundler is esbuild through @omega.js/devkit's ONE `bundle()` wrapper ([#738](https://github.com/Omega-JS-Stack/omega/issues/738) — webpack, `babel-loader` and `@babel/preset-env` left with it, and the gulp task, the file and the log tag were renamed off `webpack` at the same time). The wrapper supplies what every framework shares: the framework-deps resolve hook ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)), the production `@dev-only` strip ([#18](https://github.com/Omega-JS-Stack/omega/issues/18)), the minify/sourcemap rules by mode, and one timing line per build.
 
-**Template replacement** — a webpack plugin replaces these markers in bundles at build time:
+### One call, every lane
+
+Background service worker, content scripts, popup / options / sidepanel / pages all take the same options: `format: 'iife'`, `platform: 'browser'`, no code splitting. webpack needed three configs precisely to switch splitting OFF per lane (MV3's CSP lets neither a service worker nor a content script fetch a chunk); esbuild's iife format has no splitting at all, so each bundle is one self-contained file. Every bundle carries its own `OMEGA_BUILD_JSON` snapshot, content scripts included: in the default isolated world that is invisible to the host page, but a consumer that registers a content script with `world: 'MAIN'` publishes the whole config object onto the page's `window`, readable by any script there. Keep MAIN-world scripts free of anything you would not put in page source.
+
+### Syntax floor — the manifest answers it
+
+esbuild's `target` replaces preset-env's browserslist guess, and it is READ from the manifest rather than hardcoded: `minimum_chrome_version` and `browser_specific_settings.gecko.strict_min_version` are where a project already declares which browsers it supports, so raising either moves the bundler with it. Undeclared, each side falls back to its MV3 minimum — Chrome 88 (where MV3 shipped) and Firefox 91 (the `strict_min_version` the framework's default manifest ships) — which is the `chrome88, firefox91` a scaffolded project compiles to. esbuild compiles SYNTAX to that floor and never polyfills a runtime API.
+
+### Node built-ins
+
+Browser bundles answer `fs` / `path` / `crypto` / `os` / `util` / `assert` / `stream` / `buffer` / `process` with an empty module (@omega.js/devkit's `emptyModulesPlugin`, the esbuild answer to webpack's `resolve.fallback`): libraries bundled through @omega.js/client import them on code paths their browser builds never take.
+
+### The build snapshot — `OMEGA_BUILD_JSON`, baked into every bundle
+
+Every emitted bundle carries its own copy of the build snapshot. It is not a file: `bundle.js` composes it once per build (`composeBuildJson()`) and esbuild bakes it in two ways, which is the same shape @omega.js/desktop uses ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)):
+
+- **`define`** replaces the bare identifier `OMEGA_BUILD_JSON` with the literal at compile time, so framework and consumer code can read the snapshot without reaching for a global.
+- **`banner`** prepends a one-line IIFE that assigns the same value onto `globalThis`, `self` and `window`. That is what `background.js` reads as `self.OMEGA_BUILD_JSON` and what every page context reads as `window.OMEGA_BUILD_JSON`, and it lands ahead of the bundle's own code so the snapshot is always already there.
+
+What it holds: `timestamp`, `repo`, `environment`, `license` (the build's verdict — a fact about the BUILD, never inside `config`), `packages`, and `config` — the blob the contexts hand @omega.js/client (brand, cloud, theme, analytics with the baked `GOOGLE_ANALYTICS_SECRET`, advertising, and in non-production builds the resolved `dev.ports` / `dev.origin` map, the only channel a browser context has to a bumped local stack).
+
+Before #743 the same blob was written as `packaged/<browser>/raw/build.js` — a JSONP file the service worker loaded with `importScripts('/build.js')` and every page loaded with its own `<script src="/build.js">` tag — plus a `build.json` sidecar nothing read. **Neither file is written any more.** Inspecting a built artifact means reading the bake back out of a bundle (`src/gulp/tasks/utils/build-json.js` `readBakedBuildJson()` runs the banner the way a browser would).
+
+### Template replacement
+
+A post-emit pass over the bundles replaces these markers at build time:
 - `%%% version %%%` → `package.json#version`
 - `%%% brand.name %%%` → config brand name
 - `%%% brand.url %%%` → config brand URL
 - `%%% environment %%%` → `'production'` or `'development'`
 - `%%% liveReloadPort %%%` → WebSocket port (35729 default)
-- `%%% webManagerConfiguration %%%` → JSON config blob
 
-**Strip-dev-blocks** — [src/gulp/plugins/webpack/strip-dev-blocks.js](../src/gulp/plugins/webpack/strip-dev-blocks.js) removes `/* dev */ ... /* /dev */` blocks from production bundles.
+A key nothing answers is left INTACT rather than emptied, so unrelated `%%%` text in consumer code survives. The pass runs over the EMITTED files (not the sources) because the tokens reach the bundle from vendored and `@omega.js/client` code too, which a source-level hook would never see; the one cost is that in a DEV build a line carrying a replaced token has shifted source-map columns after the token — production builds ship no maps at all.
 
-**Custom aliases** — set via `resolve.alias` in webpack.js:
+### Dev-only blocks
+
+Production bundles drop everything between `/* @dev-only:start */` and `/* @dev-only:end */`. The markers and the cut live in ONE home (`@omega.js/devkit/strip-dev-blocks`) and the wrapper registers the esbuild plugin for production builds only; dev builds keep the blocks. "Production" here is `Manager.actLikeProduction()`, so an `OMEGA_AUDIT_FORCE=true` audit run strips too — it inspects the artifact a release would ship.
+
+### Aliases
+
+esbuild `alias` in bundle.js:
 ```js
-resolve: {
-  alias: {
-    '__theme__': path.resolve(paths.root, 'assets/themes/<active-theme>'),
-  }
+alias: {
+  '__main_assets__':    '<framework>/dist/assets',
+  '__project_assets__': '<project>/src/assets',
+  '__theme__':          '<framework>/dist/assets/themes/<active-theme>',
 }
 ```
 
@@ -96,7 +126,7 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 
 1. **Pre-hook** — runs `hooks/build/pre.js` if present (the flat `hooks/build:pre.js` still resolves as a transition fallback)
 2. **Per-browser manifest normalization** — converts JSON5 → strict JSON for Chrome/Edge/Opera (Firefox tolerates JSON5 but normalized anyway)
-3. **Per-browser asset copy** to `packaged/<browser>/raw/`
+3. **Per-browser asset copy** to `packaged/<browser>/raw/` — the bundles arrive with the snapshot already baked in, so the package lane writes no `build.js` / `build.json` of its own ([#743](https://github.com/Omega-JS-Stack/omega/issues/743))
 4. **Zip** to `packaged/<browser>/<name>.zip`
 5. **Post-hook** — runs `hooks/build/post.js`
 6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).

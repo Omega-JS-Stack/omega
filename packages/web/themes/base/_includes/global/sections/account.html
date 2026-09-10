@@ -46,7 +46,7 @@
       {% capture child_class %}dropdown-item d-flex align-items-center text-body {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
       {% capture child_content %}
         {% if child.icon %}
-          {% omega_icon child.icon, "fa-md me-3" %}
+          <i class="fa-solid fa-{{ child.icon }} fa-md me-3"></i>
         {% endif %}
         <span>{{ child.label }}</span>
       {% endcapture %}

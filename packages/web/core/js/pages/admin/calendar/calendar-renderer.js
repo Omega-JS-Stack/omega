@@ -4,7 +4,6 @@
  * All dates/times are UTC. No local time APIs.
  */
 
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { VIEW_MODES, DAY_ABBREVS, MONTH_NAMES, TYPE_COLORS, formatDateUTC, formatTimeUTC, parseDateUTC } from './calendar-core.js';
 
@@ -46,10 +45,10 @@ export default class CalendarRenderer {
     this.$toolbar.innerHTML = `
       <div class="calendar-toolbar-nav">
         <button type="button" class="btn btn-sm btn-outline-adaptive" data-calendar-nav="-1" title="Previous">
-          ${getPrerenderedIcon('chevron-left', 'fa-sm')}
+          <i class="fa-solid fa-chevron-left fa-sm"></i>
         </button>
         <button type="button" class="btn btn-sm btn-outline-adaptive" data-calendar-nav="1" title="Next">
-          ${getPrerenderedIcon('chevron-right', 'fa-sm')}
+          <i class="fa-solid fa-chevron-right fa-sm"></i>
         </button>
         <button type="button" class="btn btn-sm btn-outline-adaptive ms-1" data-calendar-today>
           Today
@@ -83,7 +82,7 @@ export default class CalendarRenderer {
 
   _getViewIcon(mode) {
     const icons = { day: 'calendar-day', week: 'calendar-week', month: 'calendar', year: 'grid-2', list: 'table-list' };
-    return getPrerenderedIcon(icons[mode], 'fa-sm');
+    return `<i class="fa-solid fa-${icons[mode]} fa-sm"></i>`;
   }
 
   // ============================================
@@ -360,17 +359,17 @@ export default class CalendarRenderer {
       const isRecurring = core.isRecurring(campaign);
 
       const typeBadge = campaign.type === 'email'
-        ? `<span class="badge" style="background-color: ${TYPE_COLORS.email}">${getPrerenderedIcon('envelope', 'fa-xs me-1')} Email</span>`
-        : `<span class="badge" style="background-color: ${TYPE_COLORS.push}">${getPrerenderedIcon('bell', 'fa-xs me-1')} Push</span>`;
+        ? `<span class="badge" style="background-color: ${TYPE_COLORS.email}"><i class="fa-solid fa-envelope fa-xs me-1"></i> Email</span>`
+        : `<span class="badge" style="background-color: ${TYPE_COLORS.push}"><i class="fa-solid fa-bell fa-xs me-1"></i> Push</span>`;
 
       let statusBadge = '<span class="badge bg-secondary">Pending</span>';
       if (campaign.status === 'sent') {
-        statusBadge = `<span class="badge bg-success">${getPrerenderedIcon('circle-check', 'fa-xs me-1')} Sent</span>`;
+        statusBadge = `<span class="badge bg-success"><i class="fa-solid fa-circle-check fa-xs me-1"></i> Sent</span>`;
       } else if (campaign.status === 'failed') {
-        statusBadge = `<span class="badge bg-danger">${getPrerenderedIcon('triangle-exclamation', 'fa-xs me-1')} Failed</span>`;
+        statusBadge = `<span class="badge bg-danger"><i class="fa-solid fa-triangle-exclamation fa-xs me-1"></i> Failed</span>`;
       }
 
-      const recurringIcon = isRecurring ? getPrerenderedIcon('repeat', 'fa-xs me-1 text-muted') : '';
+      const recurringIcon = isRecurring ? '<i class="fa-solid fa-repeat fa-xs me-1 text-muted"></i>' : '';
 
       html += `<tr class="calendar-list-row" data-campaign-id="${campaign.id}" style="opacity: ${statusStyle.opacity}">
         <td style="width: 60px">${timeStr}</td>
@@ -403,11 +402,11 @@ export default class CalendarRenderer {
     const name = (campaign.settings && campaign.settings.name) || 'Untitled';
     const isDraggable = core.isEditable(campaign) || campaign._virtual;
     const isRecurring = core.isRecurring(campaign);
-    const statusIcon = statusStyle.icon ? getPrerenderedIcon(statusStyle.icon, 'fa-xs') : '';
+    const statusIcon = statusStyle.icon ? `<i class="fa-solid fa-${statusStyle.icon} fa-xs"></i>` : '';
     const typeIcon = campaign.type === 'email'
-      ? getPrerenderedIcon('envelope', 'fa-xs')
-      : getPrerenderedIcon('bell', 'fa-xs');
-    const recurringIcon = isRecurring ? getPrerenderedIcon('repeat', 'fa-xs') : '';
+      ? '<i class="fa-solid fa-envelope fa-xs"></i>'
+      : '<i class="fa-solid fa-bell fa-xs"></i>';
+    const recurringIcon = isRecurring ? '<i class="fa-solid fa-repeat fa-xs"></i>' : '';
 
     let pillClass = 'calendar-event';
     if (campaign.status === 'failed') { pillClass += ' calendar-event--failed'; }
@@ -443,8 +442,8 @@ export default class CalendarRenderer {
     const name = (campaign.settings && campaign.settings.name) || 'Untitled';
     const isDraggable = core.isEditable(campaign) || campaign._virtual;
     const isRecurring = core.isRecurring(campaign);
-    const statusIcon = statusStyle.icon ? getPrerenderedIcon(statusStyle.icon, 'fa-xs me-1') : '';
-    const recurringIcon = isRecurring ? getPrerenderedIcon('repeat', 'fa-xs me-1') : '';
+    const statusIcon = statusStyle.icon ? `<i class="fa-solid fa-${statusStyle.icon} fa-xs me-1"></i>` : '';
+    const recurringIcon = isRecurring ? '<i class="fa-solid fa-repeat fa-xs me-1"></i>' : '';
 
     const col = layout ? layout.col : 0;
     const totalCols = layout ? layout.totalCols : 1;

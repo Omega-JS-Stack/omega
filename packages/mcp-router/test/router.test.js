@@ -100,6 +100,8 @@ test('router__list_upstreams reports every layer with its disk and session state
     locked: false,
     active_this_session: true,
     spawned: false,
+    pid: null,
+    idle_ms: null,
     tool_count: 2,
     last_error: null,
   });

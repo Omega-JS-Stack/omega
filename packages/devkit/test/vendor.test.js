@@ -48,6 +48,18 @@ function snapshot(dir) {
 
 const HOST_DEPS = { chalk: '*', 'node-powertools': '*' };
 
+// The self-containment gate's pattern (#713): a raw REFERENCE to any vendorable
+// surviving into a shipped tree is a broken install, those packages never being
+// published. Hardcoding the alternation is what let it drift two names behind
+// the tool's own list — it is derived here, and ci.yml's pack-smoke grep derives
+// the same alternation from the same export. The prefixes mirror the tool's
+// REFERENCE_PATTERNS, so a package NAME in prose or in a log tag (every vendored
+// logger.js carries its own) is not a reference.
+const RAW_PRIVATE_REF = new RegExp(
+  `(?:require(?:\\.resolve)?\\(\\s*|from\\s+|import\\s*\\(\\s*|import\\s+)`
+  + `['"]@omega\\.js\\/(${vendorDevkit.VENDORABLE_PACKAGES.join('|')})(?:['"/])`,
+);
+
 test('copies devkit into dist/vendor, rewrites requires, and the result loads + runs', (t) => {
   const root = makeFixture('vendor-ok', {
     packageJSON: { name: 'fixture-host', version: '1.0.0', dependencies: HOST_DEPS },
@@ -427,6 +439,37 @@ test('omega.vendorAssets copies declared cross-package assets into dist (with or
   assert.equal(result.rewritten, 0);
 });
 
+test('omega.vendorAssets resolves a source package whose own dist is not built yet', (t) => {
+  // A fresh tree prepares packages in whatever order npm picks, so desktop's
+  // prepare can run before web has written dist/index.js. The assets come from
+  // web's sources, so a missing entry must not stop the copy.
+  const root = makeFixture('vendor-assets-unbuilt', {
+    packageJSON: {
+      name: 'fixture-assets-unbuilt-host',
+      version: '1.0.0',
+      dependencies: HOST_DEPS,
+      omega: {
+        vendorAssets: [
+          { package: '@omega.js/fakeweb', from: 'core/css/tokens/_index.scss', to: 'assets/css/tokens/_index.scss' },
+        ],
+      },
+    },
+    files: {
+      'dist/untouched.js': `module.exports = 1;`,
+      // `main` names a file that does not exist: the package has not been prepared
+      'node_modules/@omega.js/fakeweb/package.json': JSON.stringify({ name: '@omega.js/fakeweb', version: '0.0.1', main: './dist/index.js' }),
+      'node_modules/@omega.js/fakeweb/core/css/tokens/_index.scss': `:root { --omega-unbuilt: 1; }`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root });
+
+  const copied = path.join(root, 'dist', 'assets', 'css', 'tokens', '_index.scss');
+  assert.equal(fs.readFileSync(copied, 'utf8'), `:root { --omega-unbuilt: 1; }`, 'copied from the unbuilt package');
+  assert.equal(result.assets.length, 1);
+});
+
 test('omega.vendorAssets fails loud on a missing source and on dist-escaping targets', (t) => {
   const host = (vendorAssets) => makeFixture('vendor-assets-bad', {
     packageJSON: { name: 'fixture-assets-bad', version: '1.0.0', dependencies: HOST_DEPS, omega: { vendorAssets } },
@@ -458,7 +501,7 @@ test('a dist reference to a publishable @omega.js package (not a runtime dep) fa
   assert.throws(() => vendorDevkit({ cwd: root }), /not a vendorable private utility.*declare it as a runtime dependency/);
 });
 
-test('template-kit is vendorable; its @omega.js/client require stays a package require', (t) => {
+test('template-kit vendors private-clean', (t) => {
   const root = makeFixture('vendor-template-kit', {
     packageJSON: {
       name: 'fixture-web-host',
@@ -485,12 +528,13 @@ test('template-kit is vendorable; its @omega.js/client require stays a package r
   assert.match(rewritten, /require\('\.\.\/vendor\/template-kit\/filters\.js'\)/);
   assert.ok(!rewritten.includes('@omega.js/template-kit'));
 
-  // The vendored closure is private-clean, and @omega.js/client references
-  // survive as PACKAGE requires (client is a published runtime dep of the
-  // host — never vendored, resolves from the consumer install).
+  // The vendored closure carries no raw reference to a private package. (It
+  // carries none to @omega.js/client either since #619 moved icon-core's
+  // build-side reads to @omega.js/devkit — a client reference here would
+  // survive as a PACKAGE require, client being a published runtime dep of
+  // every host, but template-kit no longer makes one.)
   const vendorRoot = path.join(root, 'dist', 'vendor', 'template-kit');
   assert.ok(fs.existsSync(vendorRoot), 'missing vendored template-kit tree');
-  let clientRefs = 0;
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, entry.name);
@@ -499,12 +543,122 @@ test('template-kit is vendorable; its @omega.js/client require stays a package r
         continue;
       }
       const contents = fs.readFileSync(abs, 'utf8');
-      assert.ok(!/['"]@omega\.js\/(template-kit|devkit|config|account)/.test(contents), `raw private ref left in ${abs}`);
-      if (contents.includes('@omega.js/client')) clientRefs += 1;
+      assert.ok(!RAW_PRIVATE_REF.test(contents), `raw private ref left in ${abs}`);
     }
   };
   walk(vendorRoot);
-  if (fs.existsSync(path.join(vendorRoot, 'tags', 'media.js'))) {
-    assert.ok(clientRefs >= 1, 'tags/media.js must keep its @omega.js/client package require');
+});
+
+test('#713: the self-containment scan covers EVERY vendorable — a planted analytics require is detected', (t) => {
+  // analytics and monitoring joined VENDORABLE_PACKAGES after the scan's
+  // alternation was written, so a raw require of either could have ridden a
+  // published dist out undetected and broken the install on `npm i`.
+  for (const name of vendorDevkit.VENDORABLE_PACKAGES) {
+    assert.match(`const x = require('@omega.js/${name}');`, RAW_PRIVATE_REF, `${name} is invisible to the scan`);
   }
+
+  // And the real lane: a dist that references analytics vendors private-clean.
+  const root = makeFixture('vendor-analytics', {
+    packageJSON: {
+      name: 'fixture-analytics-host',
+      version: '1.0.0',
+      // The vendored closures' own runtime deps — the host-dependency guard
+      // demands them declared before it will fold these trees in.
+      dependencies: { ...HOST_DEPS, uuid: '*', '@sentry/node': '*' },
+    },
+    files: {
+      'dist/lib/track.js': [
+        `const analytics = require('@omega.js/analytics');`,
+        `const monitoring = require('@omega.js/monitoring/node');`,
+        `module.exports = { analytics, monitoring };`,
+      ].join('\n'),
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const planted = fs.readFileSync(path.join(root, 'dist', 'lib', 'track.js'), 'utf8');
+  assert.match(planted, RAW_PRIVATE_REF, 'the planted raw reference is what the gate must catch');
+
+  vendorDevkit({ cwd: root });
+
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      assert.ok(!RAW_PRIVATE_REF.test(fs.readFileSync(abs, 'utf8')), `raw private ref left in ${abs}`);
+    }
+  };
+  walk(path.join(root, 'dist'));
+});
+
+test('#739: cross-vendor requires INSIDE dist/vendor are rewritten, and a vendorable only a vendored file needs is vendored too', (t) => {
+  // The real case: every framework vendored devkit's target-secrets.js and
+  // license.js verbatim, so the copies kept requiring '@omega.js/config',
+  // '@omega.js/config/env-delivery' and '@omega.js/account'. Those resolved in
+  // the monorepo through the workspace symlinks and threw MODULE_NOT_FOUND in a
+  // published tarball, the private packages never shipping. The host here
+  // references devkit ALONE — config and account arrive purely through the
+  // vendored files' own requires.
+  const root = makeFixture('vendor-cross', {
+    packageJSON: {
+      name: 'fixture-cross-host',
+      version: '1.0.0',
+      // The vendored closures' runtime deps — the host-dependency guard demands
+      // them declared before it will fold these trees in.
+      dependencies: {
+        ...HOST_DEPS,
+        json5: '*',
+        dotenv: '*',
+        'fs-jetpack': '*',
+      },
+    },
+    files: {
+      'dist/lib/secrets.js': [
+        `const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');`,
+        `const { resolveLicenseVerdict } = require('@omega.js/devkit/license');`,
+        `module.exports = { publishTargetSecrets, resolveLicenseVerdict };`,
+      ].join('\n'),
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root });
+
+  // Closure: neither package is referenced by the host, both ship anyway
+  assert.ok(result.vendored.config, 'config was never vendored');
+  assert.ok(result.vendored.account, 'account was never vendored');
+
+  // The vendored devkit copies point at their siblings, subpath preserved
+  const vendorDevkitDir = path.join(root, 'dist', 'vendor', 'devkit');
+  const secrets = fs.readFileSync(path.join(vendorDevkitDir, 'target-secrets.js'), 'utf8');
+  assert.match(secrets, /require\('\.\.\/config\/index\.js'\)/);
+  assert.match(secrets, /require\('\.\.\/config\/env-delivery\.js'\)/);
+  const license = fs.readFileSync(path.join(vendorDevkitDir, 'license.js'), 'utf8');
+  assert.match(license, /require\('\.\.\/config\/index\.js'\)/);
+  assert.match(license, /require\('\.\.\/account\/index\.js'\)/);
+
+  // Those relative paths resolve from the vendored file's own directory
+  for (const specifier of ['../config/index.js', '../config/env-delivery.js', '../account/index.js']) {
+    assert.ok(require.resolve(specifier, { paths: [vendorDevkitDir] }), `${specifier} does not resolve`);
+  }
+
+  // And the vendored module actually loads through them
+  const loaded = require(path.join(vendorDevkitDir, 'license.js'));
+  assert.equal(typeof loaded.resolveLicenseVerdict, 'function');
+
+  // Nothing raw survives anywhere in the shipped tree
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      assert.ok(!RAW_PRIVATE_REF.test(fs.readFileSync(abs, 'utf8')), `raw private ref left in ${abs}`);
+    }
+  };
+  walk(path.join(root, 'dist'));
 });

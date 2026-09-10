@@ -38,7 +38,7 @@ has to be acknowledged at all renders through backend's `redactSecret()`
 
 **A third party's credential is a credential.** An OAuth token exchange response holds the
 access, refresh and id tokens; the identity a provider answers with is the user's PII. Both
-used to ride `ctx.log` on every OAuth2 link
+used to ride `ctx.log` on every connection link
 ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)) — a line names the provider,
 the uid and whether the exchange succeeded, and nothing else. The same rule reaches an
 HTTP helper's own switches: `wonderful-fetch`'s `log: true` prints its whole configuration,
@@ -137,13 +137,19 @@ surface attaches it at its entry point.
 | `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
 | firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
 | **Desktop extras** | | |
-| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines — `packages/desktop/docs/logging.md` |
+| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; kept across boots, rotating at 10 MB — `packages/desktop/docs/logging.md` |
+| `npx omega logs [runtime\|dev\|build\|test]` (desktop's own verb — read, not write) | tails whichever of the four `<targetRoot>/logs/` files was named, `runtime` by default | the print/follow/open surface for all of the above; backend's `omega logs` is a different verb (the Cloud Logging tail, one row up) |
 | `npm run release` | `<targetRoot>/logs/ci.log` | the GH Actions release run, streamed locally |
 | Windows code-signing | `<targetRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
-| **Brand root** | | |
+| **Brand root** — every verb tees to its OWN `logs/<verb>.log` ([#623](https://github.com/Omega-JS-Stack/omega/issues/623)), so one verb never truncates another's record. A FAN-OUT log holds the walk's own verdict — its header, its loud skips, its summary — because `runCommand` spawns each target with stdio inherit, so a target's output goes past the tee into that target's own log above | | |
 | `omega manage` (the service walk) | `<brandRoot>/logs/manage.log` | the whole service walk |
 | `omega dev` (the fan-out) | `<brandRoot>/logs/dev.log` | the boot walk, then every dev leg's prefixed output (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
-| the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `page.log` |
+| `omega build` / `omega clean` (the fan-outs) | `<brandRoot>/logs/build.log` · `<brandRoot>/logs/clean.log` | the walk order, every loud skip, the per-target summary |
+| `omega deploy` (the fan-out) | `<brandRoot>/logs/deploy.log` | the delivery lane, then which target published in which order and the summary — the backend's own transcript additionally lands in `targets/backend/dist/deploy.log` (the other targets keep no per-target deploy log) |
+| `omega update` (the fan-out) | `<brandRoot>/logs/update.log` | which target was checked and what it reported/applied |
+| `omega test` (the fan-out) | `<brandRoot>/logs/test.log` | which target ran which scope, and the aggregate verdict |
+| `omega pipeline` (the live full-cycle test) | `<brandRoot>/logs/pipeline.log` | the child invocation, the deploy/verify legs, the scorecard and the PASS/FAIL verdict |
+| the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/test/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `dev.log`, `page.log` |
 | **This monorepo** | | |
 | every root test lane (`npm test`, `npm run test:packages`, …) | `.temp/logs/<lane>.log` | the lane's own lines plus every child command's output — `test:packages` → `.temp/logs/test-packages.log` |
 | `npm start` (the watcher) | `.temp/logs/watch-all.log` | is it alive, did it respawn, what did it rebuild |

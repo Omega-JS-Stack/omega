@@ -3,6 +3,7 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'commands', 'logs.js');
 
@@ -20,7 +21,7 @@ function withCwd(dir, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'logs command — `npx omega logs`',
@@ -118,5 +119,108 @@ module.exports = {
         }
       },
     },
+    {
+      name: 'surface positional: resolves <cwd>/logs/<surface>.log',
+      run: async (ctx) => {
+        const cmd = require(MOD_PATH);
+        for (const surface of ['dev', 'build', 'test']) {
+          const tmp = freshTmp();
+          try {
+            let captured = '';
+            const origLog = console.log;
+            console.log = (...a) => { captured += a.join(' ') + '\n'; };
+            try {
+              await withCwd(tmp, async () => {
+                await cmd({ _: ['logs', surface], path: true });
+              });
+            } finally {
+              console.log = origLog;
+            }
+            ctx.expect(captured).toMatch(new RegExp(`logs[\\\\/]${surface}\\.log`));
+          } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+          }
+        }
+      },
+    },
+    {
+      name: 'no surface positional: still resolves runtime.log',
+      run: async (ctx) => {
+        const cmd = require(MOD_PATH);
+        const tmp = freshTmp();
+        try {
+          let captured = '';
+          const origLog = console.log;
+          console.log = (...a) => { captured += a.join(' ') + '\n'; };
+          try {
+            await withCwd(tmp, async () => {
+              await cmd({ _: ['logs'], path: true });
+            });
+          } finally {
+            console.log = origLog;
+          }
+          ctx.expect(captured).toMatch(/logs[\\/]runtime\.log/);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'default mode: tails the named surface, not runtime.log',
+      run: async (ctx) => {
+        const cmd = require(MOD_PATH);
+        const tmp = freshTmp();
+        try {
+          const logsDir = path.join(tmp, 'logs');
+          fs.mkdirSync(logsDir, { recursive: true });
+          fs.writeFileSync(path.join(logsDir, 'dev.log'), Array.from({ length: 100 }, (_, i) => `dev line ${i}`).join('\n') + '\n');
+          fs.writeFileSync(path.join(logsDir, 'runtime.log'), 'runtime line\n');
+
+          let captured = '';
+          const origStdoutWrite = process.stdout.write.bind(process.stdout);
+          const origLog = console.log;
+          console.log = (...a) => { captured += a.join(' ') + '\n'; };
+          process.stdout.write = (s) => { captured += s; return true; };
+          try {
+            await withCwd(tmp, async () => {
+              await cmd({ _: ['logs', 'dev'], lines: 5 });
+            });
+          } finally {
+            console.log = origLog;
+            process.stdout.write = origStdoutWrite;
+          }
+          ctx.expect(captured).toMatch(/logs[\\/]dev\.log/);
+          ctx.expect(captured).toContain('dev line 99');
+          // The runtime log must stay out of a `logs dev` read entirely.
+          ctx.expect(captured.includes('runtime line')).toBe(false);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'unknown surface: fails with a message naming the four surfaces',
+      run: async (ctx) => {
+        const cmd = require(MOD_PATH);
+        const tmp = freshTmp();
+        try {
+          let error = null;
+          await withCwd(tmp, async () => {
+            try {
+              await cmd({ _: ['logs', 'bogus'], path: true });
+            } catch (e) {
+              error = e;
+            }
+          });
+          ctx.expect(error).toBeTruthy();
+          ctx.expect(error.message).toContain('bogus');
+          for (const surface of ['runtime', 'dev', 'build', 'test']) {
+            ctx.expect(error.message).toContain(surface);
+          }
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
   ],
-};
+});

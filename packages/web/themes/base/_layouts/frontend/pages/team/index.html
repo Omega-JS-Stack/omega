@@ -52,9 +52,13 @@ join_cta:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: "Team", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    {% component "heading/masthead", eyebrow: "Team", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, first_paint: true %}
 
     {% assign _team_count = site.team | size %}
   </div>
@@ -112,7 +116,7 @@ join_cta:
                     {% assign link_icon = link.id %}
                     {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
                     <a href="{{ link.url }}" class="omega-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                      {% omega_icon link_icon, "fa-sm" %}
+                      <i class="fa-solid fa-{{ link_icon }} fa-sm"></i>
                     </a>
                   {% endfor %}
                 </div>
@@ -138,7 +142,7 @@ join_cta:
         {% for item in resolved.principles.items %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon item.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ item.icon }} fa-sm"></i></span>
               <strong>{{ item.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ item.description }}</span>

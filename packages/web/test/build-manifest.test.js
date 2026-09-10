@@ -76,7 +76,7 @@ test('packages: an unresolvable client still leaves a usable manifest', () => {
 });
 
 test('repo: derived through @omega.js/config, the one repo derivation', () => {
-  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract' }, 'owner from github.org, name from brand.id');
+  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract-omega' }, 'owner from github.org, name derived as `<brand.id>-omega`');
   assert.deepEqual(
     emit({ siteData: { ...SITE_DATA, repo: { providers: { github: { repo: 'itw-creative-works/omega-brand' } } } } }).json.repo,
     { user: 'itw-creative-works', name: 'omega-brand' },

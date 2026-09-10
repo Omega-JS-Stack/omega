@@ -20,6 +20,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { get: _get, set: _set } = require('lodash');
+const { resolvedBrandHost } = require('@omega.js/config');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const PALETTE_DIR = path.join(CORE_DIR, 'js', 'core');
@@ -45,6 +46,11 @@ const ROSTER = [
 ];
 
 const ROSTER_URL = '/omega/test/roster';
+
+// The resolved config the client hands the palette. The playground's, so every
+// case that does not care about the brand host reads the same addresses it
+// always did.
+const CONFIG = { brand: { url: 'https://playground.omegajs.dev' } };
 
 let building = null;
 
@@ -134,7 +140,7 @@ function makeDocument() {
 }
 
 /** The minimum client the palette reaches for, plus the captured calls. */
-function makeClient(storage, roster, signedInAtBoot) {
+function makeClient(storage, roster, signedInAtBoot, config) {
   const signIns = [];
   const requests = [];
   const listeners = [];
@@ -156,7 +162,7 @@ function makeClient(storage, roster, signedInAtBoot) {
     // that swaps this between attempts is an emulator finishing its boot.
     roster,
     user: signedInAtBoot ? { email: signedInAtBoot } : null,
-    config: { brand: { url: 'https://playground.omegajs.dev' } },
+    config,
     auth: () => ({
       // The real listener hands over the settled auth state the moment it is
       // registered. `signedInAtBoot` is that case, and it lands while the
@@ -203,11 +209,11 @@ function makeClient(storage, roster, signedInAtBoot) {
 }
 
 /** Boot the real palette against one stub client + document; hand back the seams. */
-async function boot(storage = {}, { pathname = '/', roster = ROSTER, signedInAtBoot = null } = {}) {
+async function boot(storage = {}, { pathname = '/', roster = ROSTER, signedInAtBoot = null, config = CONFIG } = {}) {
   await bundleOnce();
 
   const doc = makeDocument();
-  const client = makeClient(storage, roster, signedInAtBoot);
+  const client = makeClient(storage, roster, signedInAtBoot, config);
   const reloads = [];
   const timers = [];
 
@@ -500,6 +506,62 @@ test('dev palette: choosing a persona signs it in and reloads', async () => {
     'the chosen persona should be signed in with the shared test password',
   );
   assert.deepStrictEqual(reloads, [true], 'and the page reloads as that persona');
+});
+
+test('#708: the address a persona signs in on is the one the seeder seeded it on', async () => {
+  // The switchboard config that found the bug: a support address on the apex —
+  // a normal thing to publish — and the site on a subdomain of it. The seeder
+  // used to split that contact address, so it created accounts on a domain the
+  // palette never composes and every switch failed auth/user-not-found.
+  const config = {
+    brand: {
+      url: 'https://switchboard.streamforge.app',
+      contact: { email: 'support@streamforge.app' },
+    },
+  };
+
+  const { personas, client } = await boot({}, { config });
+
+  const dropdown = personas();
+  dropdown.value = '_test.premium-active';
+  await dropdown.change();
+
+  assert.deepStrictEqual(
+    client.signIns,
+    [{ email: '_test.premium-active@switchboard.streamforge.app', password: 'omega-test-password' }],
+    'the palette signs in on the brand HOST, never on the support address\'s domain',
+  );
+
+  // And the pin that keeps the two sides from drifting again: the address is
+  // composed against the SAME derivation the seeder now runs — @omega.js/config's
+  // resolvedBrandHost — not a lookalike of it. The seed side is pinned where it
+  // is owned (packages/backend test/helpers/persona-domain.test.js).
+  assert.strictEqual(
+    client.signIns[0].email,
+    `_test.premium-active@${resolvedBrandHost(config)}`,
+    'the palette and the seeder compose the same address, function for function',
+  );
+});
+
+// #588 flipped the precedence this pins: the persona domain is a BRAND fact.
+// The seeder runs against the ONE backend every instance shares, so an admin
+// instance whose own url is admin.<brand host> still signs in at the brand
+// host, and asking for `@admin.<host>` would name an account nothing ever seeded.
+test('#708/#588: an instance signs in on the BRAND host, not its own', async () => {
+  const config = { url: 'https://second.omegajs.dev', brand: { url: 'https://playground.omegajs.dev' } };
+
+  const { personas, client } = await boot({}, { config });
+
+  const dropdown = personas();
+  dropdown.value = '_test.premium-active';
+  await dropdown.change();
+
+  assert.strictEqual(client.signIns[0].email, '_test.premium-active@playground.omegajs.dev');
+  assert.strictEqual(
+    client.signIns[0].email,
+    `_test.premium-active@${resolvedBrandHost(config)}`,
+    'the palette and the seeder compose the same address, or the personas are unreachable again',
+  );
 });
 
 test('dev palette: the placeholder does nothing, and a failed switch stays usable', async () => {

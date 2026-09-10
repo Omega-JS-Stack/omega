@@ -8,7 +8,9 @@
  * Uses the test provider for initial trial, then cancel endpoint for cancellation.
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: trial → cancel during trial → immediate cancellation',
   type: 'suite',
   timeout: 30000,
@@ -127,4 +129,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,23 +1,26 @@
 // @dev-only block stripping (cp268, UJM strip-dev-blocks loader parity) — the
 // integration proof that a PRODUCTION buildAssets run drops the block from the
-// emitted bundle while a dev build keeps it. The markers and the cut itself are
-// @omega.js/devkit's, one home (#18) — their unit coverage lives there.
+// emitted bundle while a dev build keeps it. The markers, the cut and the
+// esbuild plugin that applies it are all @omega.js/devkit's, one home (#18,
+// #736) — their unit coverage lives there.
 const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
-const shared = require('@omega.js/devkit/strip-dev-blocks');
-const { stripDevBlocks, START_MARKER, END_MARKER } = require('../src/strip-dev-blocks.js');
+const { stripDevBlocks, START_MARKER, END_MARKER } = require('@omega.js/devkit/strip-dev-blocks');
+const { stripDevBlocksPlugin } = require('@omega.js/devkit/strip-dev-blocks-plugin');
 const { buildAssets } = require('../src/assets.js');
 
 const PKG = path.resolve(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
 
 test('web strips through the one home rather than its own copy of the contract', () => {
-  assert.equal(stripDevBlocks, shared.stripDevBlocks);
-  assert.equal(START_MARKER, shared.START_MARKER);
-  assert.equal(END_MARKER, shared.END_MARKER);
+  // The plugin web's bundles carry is devkit's, not a web-side rebuild of it.
+  assert.equal(stripDevBlocksPlugin.name, 'omega-strip-dev-blocks');
+  assert.equal(typeof stripDevBlocks, 'function');
+  assert.equal(START_MARKER, '/* @dev-only:start */');
+  assert.equal(END_MARKER, '/* @dev-only:end */');
 });
 
 test('build integration: production bundle drops dev-only blocks, dev bundle keeps them', async () => {
@@ -88,7 +91,9 @@ async function buildPageGraph(dev, name, page) {
     dev,
     only: 'js',
   });
-  const graph = readGraph(outDir, manifest.js.pages[page]);
+  // Every layer's module for the page (#624) — the graph the browser evaluates
+  // is all of them.
+  const graph = manifest.js.pages[page].map((url) => readGraph(outDir, url)).join('\n');
   fs.rmSync(outDir, { recursive: true, force: true });
   return graph;
 }

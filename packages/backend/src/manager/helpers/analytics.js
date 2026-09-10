@@ -177,7 +177,7 @@ function Analytics(Manager, options) {
       sha256_street: hashGA4Street(authUser?.personal?.location?.street) || undefined,
       city: ga4Place(authUser?.personal?.location?.city || self.request.city) || undefined,
       region: ga4Place(authUser?.personal?.location?.region || self.request.region) || undefined,
-      postal_code: ga4PostalCode(authUser?.personal?.location?.zip) || undefined,
+      postal_code: ga4PostalCode(authUser?.personal?.location?.postalCode) || undefined,
       country: ga4Country(authUser?.personal?.location?.country || self.request.country) || undefined,
     }
   }

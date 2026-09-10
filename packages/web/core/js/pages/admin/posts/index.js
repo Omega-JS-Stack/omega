@@ -9,7 +9,6 @@
 
 // Libraries
 import { formatTimeAgo } from '__main_assets__/js/libs/admin-helpers.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
@@ -169,7 +168,7 @@ function renderRow(post) {
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('newspaper', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-newspaper fa-sm"></i></span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 320px;">${escape(title)}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 320px; font-size: 0.7rem;">${escape(pathname)}</div>
@@ -182,19 +181,19 @@ function renderRow(post) {
     <td>
       <div class="dropdown">
         <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Post actions">
-          ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
+          <i class="fa-solid fa-ellipsis-vertical fa-sm"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><a class="dropdown-item small" href="${escape(editorHref)}">
-            ${getPrerenderedIcon('pen', 'fa-sm me-2')}
+            <i class="fa-solid fa-pen fa-sm me-2"></i>
             Edit post
           </a></li>
           <li><a class="dropdown-item small" href="${escape(url)}" target="_blank" rel="noopener">
-            ${getPrerenderedIcon('arrow-up-right-from-square', 'fa-sm me-2')}
+            <i class="fa-solid fa-arrow-up-right-from-square fa-sm me-2"></i>
             View live
           </a></li>
           <li><a class="dropdown-item small btn-copy-url" href="#">
-            ${getPrerenderedIcon('copy', 'fa-sm me-2')}
+            <i class="fa-solid fa-copy fa-sm me-2"></i>
             Copy URL
           </a></li>
         </ul>

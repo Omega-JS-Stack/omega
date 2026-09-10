@@ -7,7 +7,9 @@
 // no closures, no require. The main harness pre-registered a couple of test-only
 // IPC channels (desktop:__test:echo, desktop:__test:read-last-log) for these tests to use.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'renderer ⇄ main round-trip',
@@ -102,4 +104,4 @@ module.exports = {
       },
     },
   ],
-};
+});

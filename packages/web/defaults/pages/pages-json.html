@@ -1,7 +1,5 @@
 ---
 permalink: /pages.json
-sitemap:
-  include: false
 meta:
   index: false
 ---
@@ -9,13 +7,12 @@ meta:
   {%- assign first = true -%}
   {%- for item in collections.allByUrl -%}
     {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-    {%- assign prefix5 = item.url | slice: 0, 5 -%}
-    {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
-    {%- assign prefix7 = item.url | slice: 0, 7 -%}
-    {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
-    {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
+    {%- comment -%}#564: the ONE resolved flag, the only test this file makes. A page
+    the site tells crawlers to skip is not a site-search hit either. The rule and its
+    rationale live in sitemap.html. `search.include` is the separate opt-out for a page
+    that IS indexed and simply should not answer the site's own search.{%- endcomment -%}
     {%- if item.data.search.include == false -%}{%- continue -%}{%- endif -%}
-    {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
+    {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
     {%- if item.data.post.id -%}
       {%- assign page_type = 'post' -%}
     {%- else -%}

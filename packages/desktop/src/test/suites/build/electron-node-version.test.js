@@ -4,8 +4,9 @@
 // Network-dependent: skipped if OMEGA_TEST_OFFLINE=true.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'electron-node-version — resolve bundled Node from electron version',
@@ -45,4 +46,4 @@ module.exports = {
       },
     },
   ],
-};
+});

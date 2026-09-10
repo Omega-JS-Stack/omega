@@ -73,7 +73,10 @@ test('#179: every theme renders its OWN homepage layout (no cross-build layout-c
     newsflash: 'newsflash-hero', // its own index layout
   };
   for (const theme of THEMES) {
-    const html = page(theme, 'index.html');
+    // Markup only: the inlined critical CSS (#750) carries the shared base
+    // section rules (`.omega-hero{...}`) into every theme's head, and a
+    // selector in a style block is not a rendered layout
+    const html = page(theme, 'index.html').replace(/<style[\s\S]*?<\/style>/g, '');
     assert.ok(html.includes(markers[theme]), `${theme}: homepage missing its own markup (${markers[theme]})`);
     for (const other of THEMES.filter((id) => id !== theme)) {
       assert.ok(!html.includes(markers[other]), `${theme}: homepage rendered ${other} markup (${markers[other]})`);
@@ -114,7 +117,9 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
   for (const theme of THEMES) {
     for (const file of ['terms.html', 'privacy.html', 'cookies.html']) {
       const html = page(theme, file);
-      const region = html.slice(html.indexOf('data-legal-doc'), html.indexOf('omega-legal__doc-foot'));
+      // Anchored on the MARKUP: the page's own sheet is inlined in the head
+      // (#767), so the bare class token first appears in a selector up there.
+      const region = html.slice(html.indexOf('data-legal-doc'), html.indexOf('class="omega-legal__doc-foot'));
       // #92: a commented-out clause is still SHIPPED bytes — a draft parked in
       // an HTML comment reaches every consumer's legal page verbatim, raw
       // markdown and all. Comments in a legal document carry no draft copy.
@@ -135,8 +140,8 @@ test('#9: every legal page gets the same document treatment as terms/privacy', (
 });
 
 // #86: consumers cannot fix stock-chrome icon misses, so a Pro-only icon name
-// in packaged markup must break the build lane. omega_icon (template-kit media.js)
-// tags every unresolved name onto its fallback triangle.
+// in packaged markup must break the build lane. The build's inlining pass
+// (#619) marks every unresolved name on the element it left empty.
 test('#86: no stock page ships a missing-icon marker', () => {
   for (const theme of THEMES) {
     const outDir = themeOutDir(theme);

@@ -1,0 +1,9 @@
+/*
+ * SITE-layer wildcard page sheet — it does NOT replace the core layer's
+ * css/pages/blog/[slug].scss or the active theme's. Under the one page-asset
+ * rule every layer's sheet loads, in layer order, so this one lands LAST and
+ * wins the cascade.
+ */
+.consumer-blog-probe {
+  color: rebeccapurple;
+}

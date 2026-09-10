@@ -6,97 +6,34 @@
  * per-target contract is docs/shared/deploys.md).
  *
  *   omega deploy                       → every target, backend first
- *   omega deploy --only backend        → one target (target key or dir name)
- *   omega deploy --only web,backend    → explicit set
- *   omega deploy --except web          → everything minus
+ *   omega deploy --target=backend      → one target (target key or dir name)
+ *   omega deploy --target=web,backend  → explicit set
  *   omega deploy --dry-run             → forwarded — each target prints its plan
  *
  * ORDER: the DELIVERY lane first (#678) — the same `BOOT_SERVICES` walk an
  * `omega dev` boot runs, so config, assets and certs reach the targets before
  * anything publishes them — then backend, then web, then the rest: the API
- * must be live before the site that points at it. Every flag except --only/--except
+ * must be live before the site that points at it. Every flag but --target=
  * forwards verbatim to each target's framework deploy (--dry-run, --no-sync,
  * --direct, --platforms, …); targets run sequentially with streamed output. A
  * failing target STOPS the run (a broken API is no base for the site) unless
- * --continue-on-error; any failure → exit 1. A filter matching nothing is an
- * error, never a deploy-everything fallback — and deploys stay deliberate:
+ * --continue-on-error; any failure → exit 1. A --target= token matching
+ * nothing is an error, never a deploy-everything fallback — and deploys stay deliberate:
  * nothing invokes this command but the human-typed verb (D13).
  */
 const path = require('node:path');
 const chalk = require('chalk').default;
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 
 const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { resolveTargetRun } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
-
-// Deploy order — backend's API goes live before the surfaces that call it.
-// A custom target (#603) has no rank, so it lands after every framework one.
-const DEPLOY_ORDER = ['backend', 'web', 'extension', 'desktop', 'mobile'];
-
-// Brand-level flags consumed HERE — everything else forwards to the targets.
-// `_`/`$0` are yargs bookkeeping; continue-on-error is the manage-parity
-// bail switch; only/except are the target filter.
-const CONSUMED_KEYS = new Set(['_', '$0', 'only', 'except', 'continue-on-error', 'continueOnError']);
-
-/**
- * Pure target selection — which targets deploy for a given flag set, in order.
- * Filter tokens match a target's key ('web') or its dir name ('website').
- *
- * @param {object} input
- * @param {Array<{ name: string, target: string|null }>} input.targets - the target-mapped target dirs
- * @param {string} [input.only] - comma list: exact set to deploy
- * @param {string} [input.except] - comma list: subtract from the set
- * @returns {{ selected: Array, unknown: string[] }}
- */
-function selectDeployTargets({ targets, only, except }) {
-  const parse = (value) => String(value || '').split(',').map((part) => part.trim()).filter(Boolean);
-  const matches = (entry, token) => entry.target === token || entry.name === token;
-
-  const onlyTokens = parse(only);
-  const exceptTokens = parse(except);
-  const unknown = [...onlyTokens, ...exceptTokens].filter((token) => !targets.some((entry) => matches(entry, token)));
-
-  const selected = targets
-    .filter((entry) => (onlyTokens.length === 0 || onlyTokens.some((token) => matches(entry, token)))
-      && !exceptTokens.some((token) => matches(entry, token)))
-    .sort((a, b) => {
-      const rank = (entry) => {
-        const index = DEPLOY_ORDER.indexOf(entry.target);
-        return index === -1 ? DEPLOY_ORDER.length : index;
-      };
-      return rank(a) - rank(b);
-    });
-
-  return { selected, unknown };
-}
-
-/**
- * Rebuild forwardable CLI flags from the yargs-parsed options: brand-level
- * keys are consumed, camelCase twins of kebab-case flags are skipped (yargs
- * mints both), booleans re-spell as --flag/--no-flag, values as --flag=value.
- */
-function buildForwardedFlags(options) {
-  const flags = [];
-
-  for (const [key, value] of Object.entries(options)) {
-    if (CONSUMED_KEYS.has(key)) continue;
-    if (value === undefined || value === null) continue;
-    // Skip yargs' camelCase duplicate when the kebab-case original exists
-    if (/[A-Z]/.test(key) && key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`) in options) continue;
-
-    const values = Array.isArray(value) ? value : [value];
-    for (const entry of values) {
-      if (entry === true) flags.push(`--${key}`);
-      else if (entry === false) flags.push(`--no-${key}`);
-      else flags.push(`--${key}=${entry}`);
-    }
-  }
-
-  return flags;
-}
+const { DEPLOY_ORDER, PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('../lib/target-selection.js');
 
 module.exports = async (options = {}) => {
+  assertPickerFlags(options);
+
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
     console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s deploy.'));
@@ -104,16 +41,18 @@ module.exports = async (options = {}) => {
     return;
   }
 
-  const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
-  const { selected, unknown } = selectDeployTargets({ targets, only: options.only, except: options.except });
+  // Tee the whole fan-out — delivery lane included — to
+  // <brandRoot>/logs/deploy.log (#623): the publish verdict on disk. Only the
+  // backend keeps its own dist/deploy.log; this file is the one full record.
+  attachLogFile(path.join(brandRoot, 'logs', 'deploy.log'));
 
-  for (const token of unknown) {
-    console.log(chalk.yellow(`  ⚠ Unknown deploy filter "${token}" — know targets/dirs: ${targets.map((entry) => entry.target || entry.name).join(', ')}`));
-  }
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
+  const { selected } = selectTargets({ targets, target: options[PICKER_FLAG] });
 
   if (selected.length === 0) {
-    // Never fall back to deploy-everything on a bad filter — deploys publish.
-    console.error(chalk.red('✗ No target matches the requested deploy set — nothing deployed.'));
+    // Only an empty brand reaches here: a picker token that named nothing
+    // already stopped the run in the selector (#780).
+    console.error(chalk.red('✗ This brand has no targets under targets/ — nothing deployed.'));
     process.exitCode = 1;
     return;
   }
@@ -197,6 +136,8 @@ module.exports = async (options = {}) => {
   }
 };
 
-module.exports.selectDeployTargets = selectDeployTargets;
+// Re-exported for readers that came to the deploy command for them — the one
+// home is lib/target-selection.js.
+module.exports.selectTargets = selectTargets;
 module.exports.buildForwardedFlags = buildForwardedFlags;
 module.exports.DEPLOY_ORDER = DEPLOY_ORDER;

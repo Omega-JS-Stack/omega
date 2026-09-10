@@ -51,8 +51,9 @@ showcase:
     - title: "Smart automation"
       description: "Focus on what matters while our intelligent platform handles routine tasks automatically, working 24/7 to keep your business running smoothly."
 
-# Features Section
-features:
+# Highlights Section — named `highlights`, not `features`: `features` is a
+# CONFIG section now (the feature catalog, #647) and a page key may not shadow one
+highlights:
   superheadline:
     text: "How it works"
   headline: "Design made"
@@ -162,10 +163,10 @@ config:
       <div class="col-lg-5">
         <div class="d-grid gap-3 neo-hero__actions">
           <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-dark btn-lg">
-            {% omega_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
+            <i class="fa-solid fa-{{ resolved.hero.primary_button.icon }} me-2"></i>{{ resolved.hero.primary_button.text }}
           </a>
           <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-light btn-lg">
-            {% omega_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
+            <i class="fa-solid fa-{{ resolved.hero.secondary_button.icon }} me-2"></i>{{ resolved.hero.secondary_button.text }}
           </a>
         </div>
       </div>
@@ -221,25 +222,25 @@ config:
 <section class="neo-steps bg-body-tertiary">
   <div class="container">
     <header class="neo-section-head mb-5">
-      {% iftruthy resolved.features.superheadline.text %}
+      {% iftruthy resolved.highlights.superheadline.text %}
         <span class="neo-kicker mb-3">
-          {{ resolved.features.superheadline.text }}
+          {{ resolved.highlights.superheadline.text }}
         </span>
       {% endiftruthy %}
       <h2 class="neo-section-head__title">
-        {{ resolved.features.headline }}
-        <span class="neo-accent">{{ resolved.features.headline_accent }}</span>
+        {{ resolved.highlights.headline }}
+        <span class="neo-accent">{{ resolved.highlights.headline_accent }}</span>
       </h2>
     </header>
 
     <div class="row g-4">
-      {% for feature in resolved.features.items %}
+      {% for feature in resolved.highlights.items %}
         <div class="col-md-4">
           <div class="card neo-step-card h-100">
             <div class="card-body">
               <div class="neo-step-card__top">
                 <span class="neo-step-card__num">{{ forloop.index }}</span>
-                <span class="neo-step-card__icon">{% omega_icon feature.icon %}</span>
+                <span class="neo-step-card__icon"><i class="fa-solid fa-{{ feature.icon }}"></i></span>
               </div>
               <h3 class="neo-step-card__title">{{ feature.title }}</h3>
               <p class="neo-step-card__desc">{{ feature.description }}</p>
@@ -249,10 +250,10 @@ config:
       {% endfor %}
     </div>
 
-    {% iftruthy resolved.features.cta_button %}
+    {% iftruthy resolved.highlights.cta_button %}
       <div class="text-center mt-5">
-        <a href="{{ resolved.features.cta_button.href }}" class="btn btn-warning btn-lg">
-          {% omega_icon resolved.features.cta_button.icon, "me-2" %}{{ resolved.features.cta_button.text }}
+        <a href="{{ resolved.highlights.cta_button.href }}" class="btn btn-warning btn-lg">
+          <i class="fa-solid fa-{{ resolved.highlights.cta_button.icon }} me-2"></i>{{ resolved.highlights.cta_button.text }}
         </a>
       </div>
     {% endiftruthy %}

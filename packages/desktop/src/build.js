@@ -87,24 +87,6 @@ Manager.isServerMode = function () {
 };
 Manager.prototype.isServerMode = Manager.isServerMode;
 
-// Quick mode: skips slow / network-bound operations during setup, clean, and gulp tasks.
-// Mirrors UJM's UJ_QUICK pattern. Triggered by `--quick` / `-q` CLI flag OR `OMEGA_QUICK=true` env.
-// CLI flag is preferred ergonomically; env var lets nested tools (gulp tasks, child processes)
-// still see the signal without re-parsing argv.
-Manager.isQuickMode = function () {
-  if (process.env.OMEGA_QUICK === 'true') return true;
-  try {
-    const argv = getArgv() || {};
-    if (argv.quick === true || argv.q === true) {
-      // Propagate so child processes (gulp, electron, npm install shell-outs) inherit it.
-      process.env.OMEGA_QUICK = 'true';
-      return true;
-    }
-  } catch (_) { /* yargs not available — fall through */ }
-  return false;
-};
-Manager.prototype.isQuickMode = Manager.isQuickMode;
-
 Manager.actLikeProduction = function () {
   return Boolean(Manager.isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
 };
@@ -233,8 +215,8 @@ Manager.triggerRebuild = function (files, logger) {
 Manager.prototype.triggerRebuild = Manager.triggerRebuild;
 
 // Generic require passthrough (lets gulp tasks dynamically load lib modules).
-// Only ever called from gulp tasks (release / package), which run un-bundled — so plain require
-// is fine. Don't change this to __non_webpack_require__; that adds noise without solving anything.
+// Only ever called from gulp tasks (release / package / bundle), which run
+// un-bundled — so plain require is fine.
 Manager.require = function (p) {
   return require(p);
 };

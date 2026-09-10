@@ -105,7 +105,7 @@ const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 
 ## Configuration File
 
-Create `config/omega.json5` in your functions directory (the first verb scaffolds it from the template). Shared sections (`brand`, `cloud`, `analytics`, `payment`, `monitoring`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
+Create `config/omega.json5` in your functions directory (the first verb scaffolds it from the template). Shared sections (`brand`, `cloud`, `analytics`, `payment`, `monitoring`, `connections`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
 
 ```json5
 {
@@ -206,10 +206,9 @@ Route.prototype.main = async function (ctx) {
   // Track analytics
   analytics.event('my_event', { action: 'test' });
 
-  // Validate usage limits
-  await usage.validate('requests');
-  usage.increment('requests');
-  await usage.update();
+  // Count a use of a metered feature — check, count and write in ONE call,
+  // throwing a 429 over limit
+  await usage.consume('requests');
 
   // Send response
   ctx.respond({ success: true, data: settings });
@@ -471,7 +470,7 @@ const userProps = Manager.User(existingData, { defaults: true }).properties;
   api: { clientId, privateKey },
   usage: { requests: { monthly, daily, total, last } },
   personal: { birthday, gender, location, name, company, telephone },
-  oauth2: {}
+  connections: {}
 }
 
 // Methods
@@ -505,35 +504,29 @@ analytics.event('purchase', {
 Track and limit API usage:
 
 ```javascript
-const usage = await Manager.Usage().init(ctx, {
-  app: 'my-app',                    // App ID for limits
-  key: 'custom-key',                // Optional custom key (default: user UID or IP)
-  whitelistKeys: ['admin-key'],     // Keys that bypass limits
-  unauthenticatedMode: 'firestore', // 'firestore' or 'local'
-  refetch: false,                   // Force refetch app limits
-  log: true,                        // Enable logging
-});
+// The middleware attaches `ctx.usage` to every route. Attaching is I/O-free —
+// the counter resolves the account on its first consume()/read()
+const usage = ctx.usage;
 
-// Check and validate limits
-const currentUsage = usage.getUsage('requests');  // Get current monthly usage
-const limit = usage.getLimit('requests');         // Get plan limit (monthly)
-await usage.validate('requests');                 // Throws if over daily or monthly limit
+// Read the state WITHOUT counting: the effective limit (per-user overrides
+// applied), both counters, and what is left of each
+const state = await usage.read('requests');
+// → { limit, planLimit, override, used, left, day: { limit, used, left }, ... }
 
-// Increment usage (increments monthly, daily, and total counters)
-usage.increment('requests', 1);
-usage.set('requests', 0);  // Reset monthly to specific value
+// Count a use: check both counters, refuse with a 429 naming which one hit,
+// else count and write. Returns what is left.
+const left = await usage.consume('requests');       // { used, left, day: { used, left } }
+await usage.consume('requests', 5);                 // a bigger bite
 
-// Save to Firestore
-await usage.update();
-
-// Whitelist keys
+// Whitelist keys (they never get refused, and still count)
 usage.addWhitelistKeys(['another-key']);
 
-// Proxy usage: bill a different user and mirror writes to additional docs
-await usage.setUser('owner-uid');          // Switch target user (fetches from Firestore)
-usage.addMirror('agents/agent-id');        // Also write usage to this doc on update()
-usage.setMirrors(['agents/a', 'orgs/b']); // Overwrite mirror list
+// An anonymous key is EXPLICIT — a SEPARATE counter, so a key can never move a
+// signed-in user's own counters into the anonymous store
+await usage.forKey(ctx.request.geolocation.ip).consume('signups', 1, { limit: 5 });
 ```
+
+A feature is defined ONCE in the top-level `features` catalog (name, icon, definition, and the `usage` block that meters it); each product names only its VALUE. Mirrors are declared there too — no call-site mirror API. Full reference: [docs/usage-rate-limiting.md](docs/usage-rate-limiting.md).
 
 ### Middleware
 

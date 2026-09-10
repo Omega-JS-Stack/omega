@@ -7,6 +7,7 @@ const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
 const jetpack = require('fs-jetpack');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const auditPath = path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'audit.js');
 
@@ -63,7 +64,7 @@ function runAudit(cwd, env = {}) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'gulp/audit — config + filesystem validation',
@@ -114,6 +115,39 @@ module.exports = {
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeNull();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'publish mode: no releases.repo still passes, since the default names `<brand.id>-releases` (#799)',
+      run: async (ctx) => {
+        const tmp = stageConsumer(
+          { brand: { id: 'acme', name: 'Acme', images: { icon: 'icon.png' } }, repo: { providers: { github: { org: 'Acme-Org' } } } },
+          { releases: {} },
+        );
+        jetpack.write(path.join(tmp, 'icon.png'), 'stub');
+        try {
+          const err = await runAudit(tmp, { OMEGA_BUILD_MODE: 'true', OMEGA_IS_PUBLISH: 'true' });
+          ctx.expect(err).toBeNull();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'publish mode: an UNADDRESSABLE releases repo fails, naming the default (#799)',
+      run: async (ctx) => {
+        // No brand.id and no github org: nothing in the config can name a repo,
+        // which is the only way the gate fires now.
+        const tmp = stageConsumer({ brand: { name: 'Acme', images: { icon: 'icon.png' } } }, { releases: {} });
+        jetpack.write(path.join(tmp, 'icon.png'), 'stub');
+        try {
+          const err = await runAudit(tmp, { OMEGA_BUILD_MODE: 'true', OMEGA_IS_PUBLISH: 'true' });
+          ctx.expect(err).toBeDefined();
+          ctx.expect(err.message).toMatch(/releases repo is unaddressable/);
+          ctx.expect(err.message).toMatch(/<brand\.id>-releases/);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -234,4 +268,4 @@ module.exports = {
       },
     },
   ],
-};
+});

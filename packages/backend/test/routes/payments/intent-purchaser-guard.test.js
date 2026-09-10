@@ -15,9 +15,10 @@
  * Run: npm test -- backend:routes/payments/intent-purchaser-guard
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
-const { TEST_ACCOUNT_PASSWORD } = require('../../../src/test/test-accounts.js');
+const { TEST_ACCOUNT_PASSWORD } = require('../../../dist/test/test-accounts.js');
 
-const handler = require('../../../src/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const NO_AUTH_UID = '_test-intent-no-auth-user';
 const NO_DOC_UID = '_test-intent-no-user-doc';
@@ -53,7 +54,7 @@ function paidProductId(config, skip) {
   return product.id;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment intent refuses a purchaser without both an auth user and a user doc',
   type: 'group',
   timeout: 45000,
@@ -135,4 +136,4 @@ module.exports = {
       },
     },
   ],
-};
+});

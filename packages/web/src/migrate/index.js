@@ -9,6 +9,10 @@
  *   3. Lint: the liquid-lint scanner over the (rewritten) templates.
  *   4. Hygiene: legacy files removed (Gemfile, lockfile, the old configs).
  *   5. Tests: the legacy UJM harness, reported (never rewritten).
+ *   6. Dependencies: bare requires the consumer never declared, reported and
+ *      never installed. The scan is @omega.js/devkit's `src/bare-requires.js`,
+ *      shared with @omega.js/backend's own migrate (#600); web supplies its
+ *      bundler aliases.
  *
  * `check: true` runs everything IN MEMORY — full report, zero writes.
  */
@@ -17,8 +21,12 @@ const path = require('node:path');
 const { loadConfig, resolveConfigPath, findBrandConfigPath } = require('@omega.js/config');
 const { convertConfig, readLegacyConfigs, serializeOmega } = require('./config-convert.js');
 const { runCodemod, collectTemplateFiles } = require('./codemod.js');
+const { configReads: configReadsRule } = require('./rules.js');
 const { lintText } = require('./lint.js');
 const { migrateConsumerAssets } = require('./consumer-assets.js');
+const { collectBareRequires } = require('@omega.js/devkit/bare-requires');
+
+const BUNDLER_ALIASES = ['__main_assets__', '__theme__', '@omega.js/client'];
 
 // Legacy files deleted by a real migration (relative to the consumer root)
 const LEGACY_FILES = [
@@ -92,7 +100,7 @@ function collectLegacyTests(root) {
  */
 function runMigration(root, options = {}) {
   const write = !options.check;
-  const report = { root, check: !write, config: null, codemod: null, lint: [], removed: [], legacyTests: [], errors: [] };
+  const report = { root, check: !write, config: null, codemod: null, lint: [], removed: [], legacyTests: [], bareRequires: [], errors: [] };
 
   // ---- 1. Config conversion
   const { jekyll, ujm, files: legacySources } = readLegacyConfigs(root);
@@ -153,6 +161,33 @@ function runMigration(root, options = {}) {
     report.codemod.totalEdits += assets.edits.length;
   }
 
+  // ---- 2b. The CONFIG file's own string values (#671). `targets.web.meta.title:
+  // "Agency - {{ site.brand.name }}"` is a read like any other and has rendered
+  // empty since #611 — but the codemod walks `src/**` and the build census is
+  // per-template, so nothing saw it. Rewritten in the FILE, not the parsed
+  // object: a brand's omega.json5 carries comments, and re-serializing would
+  // eat them.
+  //
+  // A CHECK run on a legacy root has no file to read — it wrote nothing — so
+  // the scan runs over the config the run WOULD have written. Skipping it there
+  // reported a clean bill for exactly the pre-flight case `--check` is for.
+  const resolvedConfigPath = report.config && report.config.path && path.resolve(root, report.config.path);
+  const configExists = Boolean(resolvedConfigPath) && fs.existsSync(resolvedConfigPath);
+  const configText = configExists ? fs.readFileSync(resolvedConfigPath, 'utf8')
+    : (resolvedConfigPath && report.config.omega ? serializeOmega(report.config.omega) : null);
+  if (configText !== null) {
+    const rel = path.relative(root, resolvedConfigPath);
+    const { text, edits, findings } = configReadsRule.apply(configText);
+    if (edits.length > 0) {
+      // `write` implies the file exists: the conversion branch above wrote it,
+      // and the skip branch resolved one that was already there.
+      if (write) fs.writeFileSync(resolvedConfigPath, text);
+      report.codemod.files.push({ path: rel, edits });
+      report.codemod.totalEdits += edits.length;
+      report.lint.push(...findings.map((finding) => ({ ...finding, file: rel })));
+    }
+  }
+
   // ---- 3. Liquid-lint over the (post-rewrite) templates
   for (const filePath of collectTemplateFiles(path.join(root, 'src'))) {
     report.lint.push(...lintText(fs.readFileSync(filePath, 'utf8'), path.relative(root, filePath)));
@@ -170,6 +205,17 @@ function runMigration(root, options = {}) {
   // ---- 5. Legacy test harness (reported, never rewritten — porting a suite
   // to node:test is by hand)
   report.legacyTests = collectLegacyTests(root);
+
+  // ---- 6. Dependency resolution (#600): a bare require that only the legacy
+  // FLAT install answered. Reported with the fix, never installed. The scan is
+  // devkit's, shared with @omega.js/backend's own migrate; what web adds is its
+  // BUNDLER ALIASES, the specifiers the build resolves for the consumer,
+  // subpaths included ([index.md](../../../../docs/web/index.md): `__main_assets__/*`
+  // to the core layer, `__theme__/*` to the active theme, `@omega.js/client` to
+  // the client package). None is a dependency a consumer may declare, since
+  // installing `@omega.js/client` beside the framework is a SECOND client
+  // runtime, so naming them would hand the report a fix that breaks the project.
+  report.bareRequires = collectBareRequires(root, { aliases: BUNDLER_ALIASES });
 
   return report;
 }

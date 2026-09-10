@@ -58,8 +58,10 @@ class ServeCommand extends BaseCommand {
     // functions/ is staged output (src/dist pillar): stage fresh + re-stage on
     // src edits — firebase serve watches the functions dir, so a re-stage IS
     // the hot reload. Closed when the firebase child exits below.
-    this.ensureStaged();
-    const stageWatch = this.startStageWatch();
+    // `development` is PINNED (#586), the same local lane as the emulator: the
+    // composed dist/.env follows the LANE, never the shell's environment.
+    this.ensureStaged({ environment: 'development' });
+    const stageWatch = this.startStageWatch({ environment: 'development' });
 
     // Start @omega.js/backend watcher in background
     const watcher = new WatchCommand(self);
@@ -118,8 +120,20 @@ class ServeCommand extends BaseCommand {
     };
 
     if (httpsReady) {
-      // Internal calls (getApiUrl → BEMClient) loop through the HTTPS proxy with a self-signed cert
-      firebaseEnv.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      // Internal calls (getApiUrl → BEMClient) loop through the HTTPS proxy
+      // under the local mkcert certificate: the child TRUSTS that root (#795)
+      // instead of switching verification off, so Node prints no warning. A
+      // shell-set value wins verbatim; a host whose mkcert root vanished under
+      // existing certs still takes the old bypass.
+      const { mkcertCaRootPem } = require('@omega.js/devkit/local-https');
+      const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
+
+      if (caPem) {
+        firebaseEnv.NODE_EXTRA_CA_CERTS = caPem;
+      } else {
+        firebaseEnv.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        this.log(chalk.yellow('  mkcert root CA not found — internal calls fall back to NODE_TLS_REJECT_UNAUTHORIZED=0 (Node will warn)'));
+      }
       firebaseEnv.OMEGA_HTTPS_PORT = String(port);
     }
     // Where hosting speaks plain http (N7 env channel — functions inherit)
@@ -167,7 +181,7 @@ class ServeCommand extends BaseCommand {
   // `omega emulator` and web's `omega dev`): mkcert certs in .temp/certs
   // (staleness-checked), TLS proxy on the public port → plain-http target.
   async _startHttpsProxy(httpsPort, httpPort, projectDir) {
-    const { ensureLocalHttpsCerts, startLocalHttpsProxy } = require('@omega.js/devkit/local-https');
+    const { ensureLocalHttpsCerts, startLocalHttpsProxy, mkcertInstallHint } = require('@omega.js/devkit/local-https');
 
     const certs = await ensureLocalHttpsCerts({
       certsDir: path.join(this.getTempPath(), 'certs'),
@@ -176,7 +190,7 @@ class ServeCommand extends BaseCommand {
 
     if (!certs) {
       this.log(chalk.yellow('  HTTPS disabled — could not obtain certificates.'));
-      this.log(chalk.yellow('  Install mkcert for trusted local HTTPS: brew install mkcert && mkcert -install\n'));
+      this.log(chalk.yellow(`  Install mkcert for trusted local HTTPS: ${mkcertInstallHint()}\n`));
       return false;
     }
 

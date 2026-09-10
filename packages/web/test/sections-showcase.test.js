@@ -42,10 +42,10 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
 
   const index = pages.get('/test/sections');
   assert.ok(index.includes('Section library'), 'index masthead');
-  assert.ok(index.includes('/test/sections/section/marketing/hero'), 'entry cards link the per-entry pages');
+  assert.ok(index.includes('/test/sections/marketing/hero'), 'entry cards link the per-entry pages');
   assert.ok(!index.includes('/test/components/heading/masthead'), 'components have their own library now (#602) — this one lists sections');
 
-  const hero = pages.get('/test/sections/section/marketing/hero');
+  const hero = pages.get('/test/sections/marketing/hero');
   assert.ok(hero.includes('<title>marketing/hero · Section library</title>'), 'pagination alias reaches the title through resolved.*');
   assert.ok(hero.includes('<code>rotating</code>'), 'args table renders schema rows');
   assert.ok(hero.includes('&#123;&#123; resolved.config.brand.name }}'), 'defaults display shows RAW tokens (escaped, never liquified)');
@@ -55,20 +55,20 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
   // the frame, never inline beside the docs.
   assert.ok(!hero.includes('class="omega-hero'), 'no inline section render on the entry page');
   assert.equal((hero.match(/<iframe/g) || []).length, 11, 'one lazy iframe per demo variant');
-  assert.ok(hero.includes('src="/test/sections/section/marketing/hero/frames/email-capture"'), 'each iframe points at its own frame page');
+  assert.ok(hero.includes('src="/test/sections/marketing/hero/frames/email-capture"'), 'each iframe points at its own frame page');
   assert.ok(hero.includes('loading="lazy"') && hero.includes('title="Email capture"'), 'lazy, and titled by the variant label');
   assert.ok(hero.includes('&quot;subtext&quot;: &quot;No credit card required&quot;'), 'the variant\'s authored args show as a copyable block');
 
   // The frames themselves: the real section, chrome-less, in its own document
-  const frame = pages.get('/test/sections/section/marketing/hero/frames/email-capture');
+  const frame = pages.get('/test/sections/marketing/hero/frames/email-capture');
   assert.ok(frame.includes('<title>Email capture · marketing/hero · Section library</title>'), 'the variant alias reaches the title through resolved.*');
   assert.ok(frame.includes('class="omega-hero'), 'the section renders live in its frame');
   assert.ok(frame.includes('/assets/css/main-TEST.css') && frame.includes('/assets/js/main-TEST.js'), 'with the theme\'s real asset bundles');
   assert.ok(!frame.includes('<header') && !frame.includes('<footer'), 'and no site chrome — the gallery page owns that');
 
   // Shared bands demo their generic copy; two faq instances coexist by dom_id
-  const faqDuo = pages.get('/test/sections/section/marketing/faq/frames/duo-layout');
-  const faqCentered = pages.get('/test/sections/section/marketing/faq/frames/centered');
+  const faqDuo = pages.get('/test/sections/marketing/faq/frames/duo-layout');
+  const faqCentered = pages.get('/test/sections/marketing/faq/frames/centered');
   assert.ok(faqDuo.includes('demoFaqDuoAccordion') && faqCentered.includes('demoFaqCenterAccordion'), 'variant dom_ids namespace the accordions');
   const sectionHead = pages.get('/test/components/heading/section-head/frames/full-cluster');
   assert.ok(sectionHead.includes('border rounded p-4 omega-section-head'), 'stage_class supplies the natural shell');
@@ -91,11 +91,11 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
  */
 test('#540: an entry page is a navigation rail plus every variant, stacked', async () => {
   const pages = await buildWith(miniData);
-  const hero = pages.get('/test/sections/section/marketing/hero');
+  const hero = pages.get('/test/sections/marketing/hero');
 
   // The rail: the whole library, this entry marked, its variants under it
   assert.ok(hero.includes('aria-label="Section library"'), 'the rail is a nav landmark');
-  assert.ok(hero.includes('/test/sections/section/marketing/faq'), 'a sibling entry is one click away — no trip back to the index');
+  assert.ok(hero.includes('/test/sections/marketing/faq'), 'a sibling entry is one click away — no trip back to the index');
   assert.ok(hero.includes('aria-current="page"'), 'the entry being shown is marked in the rail');
 
   // The rail's variant links are ANCHOR JUMPS — no tab machinery, no reload
@@ -115,13 +115,13 @@ test('#540: an entry page is a navigation rail plus every variant, stacked', asy
 
   // #463's plumbing, untouched
   assert.equal((hero.match(/<iframe/g) || []).length, 11, 'one lazy iframe per demo variant, as built');
-  assert.ok(hero.includes('src="/test/sections/section/marketing/hero/frames/email-capture"'), 'the frame urls are unchanged');
+  assert.ok(hero.includes('src="/test/sections/marketing/hero/frames/email-capture"'), 'the frame urls are unchanged');
   assert.ok(hero.includes('data-omega-showcase-frame'), 'the autosizing hook rides through');
 });
 
 test('#540: the gallery chrome clears the site masthead, and the back link reaches the index', async () => {
   const pages = await buildWith(miniData);
-  const hero = pages.get('/test/sections/section/marketing/hero');
+  const hero = pages.get('/test/sections/marketing/hero');
   const index = pages.get('/test/sections');
 
   // The masthead collision (Ian's screenshot): the shell is the page's FIRST
@@ -139,7 +139,7 @@ test('#540: the gallery chrome clears the site masthead, and the back link reach
   // The index itself: same rail, still no cards, nothing current
   assert.ok(index.includes('aria-label="Section library"'), 'the index carries the same rail');
   assert.ok(!index.includes('card h-100'), 'the stacked entry cards are gone');
-  assert.ok(index.includes('/test/sections/section/marketing/hero'), 'every entry is still one click away');
+  assert.ok(index.includes('/test/sections/marketing/hero'), 'every entry is still one click away');
   assert.ok(!index.includes('aria-current="page"'), 'no entry is current on the index itself');
 });
 
@@ -161,7 +161,7 @@ test('#555: a variant frame boots without the consent banner or the chat widget'
   };
   const pages = await buildWith(overlayData);
 
-  const frame = configOf(pages.get('/test/sections/section/marketing/hero/frames/default'));
+  const frame = configOf(pages.get('/test/sections/marketing/hero/frames/default'));
   assert.equal(frame.consent.enabled, false, 'the frame bakes the consent gate off, so main.js never loads the banner');
   assert.equal(frame.inbound.chat.providers.chatsy.enabled, false, 'and the chat widget off, so the client never mounts chatsy');
 
@@ -177,10 +177,10 @@ test('#555: a variant frame boots without the consent banner or the chat widget'
   const home = pages.get('/');
   assert.equal(configOf(home).consent.enabled, true, 'a real page still ships the consent banner');
   assert.equal(configOf(home).inbound.chat.providers.chatsy.enabled, true, 'and still mounts the chat widget');
-  assert.ok(home.includes('chatsy.ai') && !pages.get('/test/sections/section/marketing/hero/frames/default').includes('chatsy.ai'), 'the chat preconnect hints ride the page, not the frame');
+  assert.ok(home.includes('chatsy.ai') && !pages.get('/test/sections/marketing/hero/frames/default').includes('chatsy.ai'), 'the chat preconnect hints ride the page, not the frame');
 
   // The gallery PAGE around the frames is a page like any other.
-  assert.equal(configOf(pages.get('/test/sections/section/marketing/hero')).consent.enabled, true, 'the gallery page itself is not a frame');
+  assert.equal(configOf(pages.get('/test/sections/marketing/hero')).consent.enabled, true, 'the gallery page itself is not a frame');
 });
 
 test('cp219: the newsflash showcase — overrides and fallthroughs chip their owning layer', async () => {
@@ -194,19 +194,19 @@ test('cp219: the newsflash showcase — overrides and fallthroughs chip their ow
 
   // marketing/cta fork deleted (#177 phase 2): the entry chips the base
   // layer and demos base markup, exactly what a composing page gets.
-  const cta = pages.get('/test/sections/section/marketing/cta');
+  const cta = pages.get('/test/sections/marketing/cta');
   assert.ok(cta.includes('>base<'), 'fallthrough entry chips the base layer');
-  const ctaDemo = pages.get('/test/sections/section/marketing/cta/frames/full-band');
+  const ctaDemo = pages.get('/test/sections/marketing/cta/frames/full-band');
   assert.ok(ctaDemo.includes('omega-cta') && !ctaDemo.includes('cta-panel'), 'the demo renders the base band (what a composing page gets)');
 
-  const hero = pages.get('/test/sections/section/marketing/hero');
+  const hero = pages.get('/test/sections/marketing/hero');
   assert.ok(hero.includes('>base<'), 'fallthrough entry chips the base layer — the doctrine made visible');
-  assert.ok(pages.get('/test/sections/section/marketing/hero/frames/default').includes('omega-hero'), 'fallthrough demo renders the classy base');
+  assert.ok(pages.get('/test/sections/marketing/hero/frames/default').includes('omega-hero'), 'fallthrough demo renders the classy base');
 
-  const newsletter = pages.get('/test/sections/section/marketing/newsletter-cta');
+  const newsletter = pages.get('/test/sections/marketing/newsletter-cta');
   assert.ok(newsletter.includes('inherits js'), 'declared §7 inherit lane surfaces as a docs chip');
-  const slab = pages.get('/test/sections/section/marketing/newsletter-cta/frames/slab-band');
-  const rail = pages.get('/test/sections/section/marketing/newsletter-cta/frames/rail-card');
+  const slab = pages.get('/test/sections/marketing/newsletter-cta/frames/slab-band');
+  const rail = pages.get('/test/sections/marketing/newsletter-cta/frames/rail-card');
   assert.equal(((slab + rail).match(/data-omega-section="marketing\/newsletter-cta"/g) || []).length, 2, 'slab + rail variants both render §7 roots');
   assert.ok(rail.includes('id="demo-signup"'), 'rail anchor knob rides the demo');
 

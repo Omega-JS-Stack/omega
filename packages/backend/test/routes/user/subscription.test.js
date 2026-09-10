@@ -3,7 +3,9 @@
  * Tests the user get subscription info endpoint
  * Returns subscription details for authenticated users
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User get subscription info',
   type: 'group',
   tests: [
@@ -96,4 +98,4 @@ module.exports = {
       },
     },
   ],
-};
+});

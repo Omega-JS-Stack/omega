@@ -78,6 +78,11 @@ test('company init: one command scaffolds the whole workspace', () => {
 
   assert.deepEqual(result.created.sort(), [
     '.env',
+    // Same three overlays the BRAND scaffold plans (#586): a company layer
+    // has per-environment values too, and a stub is where they go
+    '.env.development',
+    '.env.testing',
+    '.env.production',
     '.gitignore',
     path.join('.omega', 'certificates', 'apple', '.gitignore'),
     'README.md',
@@ -95,6 +100,14 @@ test('company init: one command scaffolds the whole workspace', () => {
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.match(env, /^# APPLE_API_ISSUER=$/m, 'the canonical groups render as commented placeholders');
   assert.equal(env.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 0, 'not one key is set');
+
+  // Each overlay is a header and nothing else — the base .env stays the ONE
+  // inventory of keys, an overlay holds only what differs there
+  for (const environment of ['development', 'testing', 'production']) {
+    const overlay = fs.readFileSync(path.join(root, `.env.${environment}`), 'utf8');
+    assert.match(overlay, new RegExp(`^# \\.env\\.${environment} —`), 'the overlay names itself');
+    assert.equal(overlay.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 0, 'an overlay stub sets nothing');
+  }
 
   // The shared signing tree + the default brands root exist and are empty
   for (const dir of ['brands', '.omega/certificates/apple/certificates', '.omega/certificates/apple/csr', '.omega/certificates/apple/profiles']) {
@@ -117,7 +130,7 @@ test('company init: the gitignore keeps every unshareable thing out of git', () 
 
   // Secrets, the signing tree + run output, the logs, and the managed brands
   // (each its OWN repo) — the tracked surface is config + README + .gitignore
-  assert.deepEqual(entries, ['node_modules/', '.omega/', 'logs/', '.env', 'brands/', '.DS_Store']);
+  assert.deepEqual(entries, ['node_modules/', '.omega/', 'logs/', '.env', '.env.*', 'brands/', '.DS_Store']);
 
   // The shared healer runCompany applies must find its entries already there
   assert.equal(ensureOmegaIgnored(root), 'present');
@@ -136,7 +149,7 @@ test('company init: a rerun fills gaps only — not one byte rewritten', () => {
   const { result } = captureOutput(() => runCompanyInit(root));
 
   assert.deepEqual(result.created, [], 'nothing was created the second time');
-  assert.equal(result.kept.length, 5, 'every scaffolded file was kept');
+  assert.equal(result.kept.length, 8, 'every scaffolded file was kept');
   assert.deepEqual(result.dirs, [], 'the tree already existed');
   assert.deepEqual(snapshot(root), before, 'a rerun is a byte-level (and mtime-level) no-op');
 });

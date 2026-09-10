@@ -45,6 +45,10 @@ const TYPE_MAP = { text: 'Text', number: 'Number', date: 'Date' };
 
 const ADDRESS = { line1: '123 Fixture St', line2: 'Unit 4', city: 'Testville', region: 'CA', postalCode: '00000', country: 'USA' };
 
+// The human every transactional send signs off as (#694) — a configured brand
+// always has one, so it rides the default fixture
+const PERSON = { name: 'Fixture Founder' };
+
 const DNS_FIXTURE = {
   mail_cname: { type: 'cname', host: `emailauth.${DOMAIN}`, data: 'u123.wl001.sendgrid.net' },
   dkim1: { type: 'cname', host: `s1._domainkey.${DOMAIN}`, data: 's1.domainkey.u123.wl001.sendgrid.net' },
@@ -72,13 +76,13 @@ const VALIDATION_PENDING = { validation_results: { mail_cname: { valid: false },
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADDRESS, listId = null, groups = null, campaigns = {} } = {}) {
+function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADDRESS, person = PERSON, listId = null, groups = null, campaigns = {} } = {}) {
   return {
     brand: {
       id: 'fixture-brand',
       name: BRAND_NAME,
       url,
-      contact: { email: `support@${DOMAIN}` },
+      contact: { email: `support@${DOMAIN}`, ...(person ? { person } : {}) },
       ...(address ? { address } : {}),
     },
     parent,
@@ -799,6 +803,27 @@ test('campaigns: a brand whose config already carries the ids writes nothing', a
 
 // ─── custom-fields ───────────────────────────────────────────────────────────
 
+test('campaigns: the catalog skips the two name fields SendGrid stores itself (#695)', async () => {
+  // SendGrid keeps first/last name in its RESERVED contact columns, which the
+  // backend's addContact writes natively — so the custom-field lane skips them
+  // on BOTH sides (one `fieldsForProvider()` derivation): never provisioned
+  // here, never written by the contact sync, so the old "no SendGrid ID
+  // (skipped)" warn cannot come back and no duplicate field is ever created.
+  const names = SENDGRID_FIELDS.map((field) => field.name);
+  assert.ok(!names.includes('user_personal_name_first'), `the catalog skips the first-name field, got ${names.join(', ')}`);
+  assert.ok(!names.includes('user_personal_name_last'), `the catalog skips the last-name field, got ${names.join(', ')}`);
+
+  // And an account carrying that view converges with nothing created — the two
+  // names are not missing fields, they are fields SendGrid owns
+  const api = fakeSendgrid(convergedResponses());
+
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.customFields.total, SENDGRID_FIELDS.length);
+  assert.deepEqual(api.callsTo('createCustomField'), []);
+});
+
 test('campaigns: missing and type-mismatched fields are created/recreated from the SSOT', async () => {
   const converged = convergedResponses().getCustomFields;
   const initial = converged.slice(1); // first field missing
@@ -914,6 +939,26 @@ test('campaigns: webhook drift is patched with the minimum diff against the pare
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.callsTo('updateEventWebhookSettings')[0].args[0], { url: parentUrl, dropped: true });
+});
+
+// ─── contact-person (#694) ───────────────────────────────────────────────────
+
+test('campaigns: no brand.contact.person.name FAILS the walk, naming the key (#694)', async () => {
+  // Live bug: the first real signup returned 200 while sendWelcomeEmail,
+  // sendDiscountNudgeEmail and sendCheckupEmail ALL threw "Missing
+  // brand.contact.person.name" — and the walk that provisioned SendGrid for
+  // them stayed green. The walk is the launch gate, so it fails here instead.
+  const api = fakeSendgrid(convergedResponses());
+
+  const result = await runService(brandConfig({ person: null }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /brand\.contact\.person\.name/);
+  assert.deepEqual(result.failed.map((entry) => entry.operation), ['contact-person']);
+
+  // A name configured → the same walk is clean
+  const configured = await runService(brandConfig(), { sendgrid: fakeSendgrid(convergedResponses()), serviceData: { listId: 'lst_1' } });
+  assert.equal(configured.status, 'success');
 });
 
 // ─── Dry-run ─────────────────────────────────────────────────────────────────

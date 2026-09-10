@@ -21,8 +21,7 @@
 const fetch = require('wonderful-fetch');
 const crypto = require('crypto');
 const env = require('../../../libraries/env.js');
-
-const RATE_LIMIT = 5;
+const { MARKETING_RATE_LIMIT } = require('../../../libraries/rate-limits.js');
 
 module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
@@ -46,14 +45,21 @@ async function handleAuthenticated({ ctx, Manager, user, settings, analytics }) 
     return ctx.respond('Invalid action — must be "subscribe" or "unsubscribe"', { code: 400 });
   }
 
-  // Rate-limit per-user (defense against accidental toggling spam)
-  const usage = await Manager.Usage().init(ctx);
-  const currentUsage = usage.getUsage('email-preferences');
-  if (currentUsage >= RATE_LIMIT) {
+  // Rate-limit per-user (defense against accidental toggling spam). consume()
+  // is check, count and write in ONE call and throws the 429 itself
+  // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)); the limit is
+  // EXPLICIT because this is a framework anti-abuse gate, not a plan feature.
+  try {
+    await ctx.usage.consume('email-preferences', 1, { limit: MARKETING_RATE_LIMIT });
+  } catch (e) {
+    // Only a rate limit is a rate limit — a 500 from consume() must not come
+    // back as one
+    if (e.code !== 429) {
+      throw e;
+    }
+
     return ctx.respond('Rate limit exceeded', { code: 429 });
   }
-  usage.increment('email-preferences');
-  await usage.update();
 
   const uid = user.auth.uid;
   const email = user.auth.email;
@@ -140,17 +146,20 @@ async function handleAnonymous({ ctx, Manager, settings, analytics }) {
     return ctx.respond('Invalid signature', { code: 403 });
   }
 
-  // IP rate limiting (anonymous flow — unauthenticated firestore storage)
-  const usage = await Manager.Usage().init(ctx, {
-    unauthenticatedMode: 'firestore',
-    key: ctx.request.geolocation.ip,
-  });
-  const currentUsage = usage.getUsage('email-preferences');
-  if (currentUsage >= RATE_LIMIT) {
+  // IP rate limiting (anonymous flow) — an EXPLICIT keyed counter, which is
+  // the only way an anonymous caller is counted now
+  // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
+  try {
+    await ctx.usage.forKey(ctx.request.geolocation.ip).consume('email-preferences', 1, { limit: MARKETING_RATE_LIMIT });
+  } catch (e) {
+    // Only a rate limit is a rate limit — a 500 from consume() must not come
+    // back as one
+    if (e.code !== 429) {
+      throw e;
+    }
+
     return ctx.respond('Rate limit exceeded', { code: 429 });
   }
-  usage.increment('email-preferences');
-  await usage.update();
 
   // Mirror to the user doc if this email maps to a user (best-effort, silent on miss).
   // Runs BEFORE the provider calls below — on subscribe it writes consent granted first,

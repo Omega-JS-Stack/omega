@@ -4,7 +4,9 @@
  * GET returns sessions for authenticated users from Realtime Database
  * DELETE signs out all sessions (revokes refresh tokens and clears session data)
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User sessions (get and sign-out)',
   type: 'group',
   tests: [
@@ -226,4 +228,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -12,9 +12,10 @@
  *     before crypto.timingSafeEqual, so DIFFERENT-LENGTH inputs must compare
  *     without throwing (timingSafeEqual itself rejects unequal buffers).
  */
-const safeCompare = require('../../src/manager/helpers/safe-compare.js');
+const safeCompare = require('../../dist/manager/helpers/safe-compare.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'safeCompare() constant-time secret comparison',
   type: 'group',
 
@@ -110,4 +111,4 @@ module.exports = {
       },
     },
   ],
-};
+});

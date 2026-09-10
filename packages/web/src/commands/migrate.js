@@ -2,7 +2,8 @@
  * `omega migrate` — convert a UJM (Jekyll) consumer to @omega.js/web in place:
  * legacy configs → config/omega.json5, the codemod rule tables over src/**
  * templates and consumer JS, the liquid-lint scan, legacy-file removal
- * (Gemfile & co), and the legacy test-harness report.
+ * (Gemfile & co), the legacy test-harness report, and the undeclared-dependency
+ * report (#600).
  *
  * `omega migrate --check` runs the full pipeline in memory and prints the
  * report without writing anything — the pre-flight for Phase-4 site waves.
@@ -10,7 +11,7 @@
 const Logger = require('@omega.js/devkit/logger');
 const { runMigration } = require('../migrate/index.js');
 
-const logger = new Logger('omega:migrate');
+const logger = new Logger('migrate');
 
 module.exports = async function (options) {
   const check = Boolean(options.check || options['dry-run']);
@@ -55,6 +56,14 @@ module.exports = async function (options) {
     const count = report.legacyTests.length;
     logger.warn(`Tests: ${count} legacy test file${count === 1 ? '' : 's'} will not be discovered — \`omega test\` runs \`node --test 'test/**/*.test.js'\`, which matches no \`test/<layer>/<name>.js\` and reports a green pass 0. Rename to \`*.test.js\` and port to node:test.`);
     for (const rel of report.legacyTests) logger.warn(`  ${rel}`);
+  }
+
+  // ---- dependency resolution (#600): a bare require only the legacy FLAT
+  // install answered. Lazy ones load fine and 500 on the first real call.
+  if (report.bareRequires.length > 0) {
+    const count = report.bareRequires.length;
+    logger.warn(`Dependencies: ${count} bare require${count === 1 ? '' : 's'} of a package this project does not declare — the legacy flat install resolved them, an OMEGA install resolves them only by hoisting:`);
+    for (const entry of report.bareRequires) logger.warn(`  ${entry.file}:${entry.line} — \`${entry.module}\`: ${entry.fix}`);
   }
 
   // ---- removed files + fatal problems

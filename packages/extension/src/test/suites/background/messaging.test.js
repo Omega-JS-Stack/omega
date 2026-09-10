@@ -4,7 +4,9 @@
 // the SW context, which is the same primitive BXM consumers use for
 // popup ↔ background messaging.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'background',
   description: 'background SW — runtime.sendMessage round-trip',
@@ -39,4 +41,4 @@ module.exports = {
       },
     },
   ],
-};
+});

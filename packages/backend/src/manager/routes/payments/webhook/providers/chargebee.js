@@ -28,6 +28,7 @@ const SUPPORTED_EVENTS = new Set([
   'subscription_resumed',
 
   // Payment events
+  'payment_succeeded',
   'payment_failed',
   'payment_refunded',
 
@@ -102,6 +103,27 @@ module.exports = {
       // transaction is keyed on the order.
       chargeId = eventType === 'subscription_renewed' ? (invoice?.id || null) : null;
       uid = extractUid(subscription, customer);
+
+    } else if (eventType === 'payment_succeeded') {
+      // The paid signal. Note this routes the OPPOSITE way from payment_failed
+      // below on the subscription branch: there, the state diff (active →
+      // suspended) is what names the failure, so the doc has work to do. Here a
+      // renewal's charge is already carried by `subscription_renewed` — the event
+      // the analytics resolver reads as Chargebee's payment — so storing this one
+      // too would book that revenue TWICE, the same double-count Stripe's provider
+      // header documents for `invoice.paid` beside `invoice.payment_succeeded`.
+      if (subscription) {
+        category = null;
+      } else {
+        // A one-time purchase, and the only event that says it was actually PAID.
+        // `invoice_generated` fires for the same purchase but an invoice is born
+        // unpaid, so reading that as the sale would email a receipt to someone who
+        // never paid ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)).
+        category = 'one-time';
+        resourceType = 'invoice';
+        resourceId = invoice?.id || null;
+        uid = extractUid(null, customer);
+      }
 
     } else if (eventType === 'payment_failed') {
       // Payment failure — subscription-related if subscription is present

@@ -3,7 +3,7 @@
  *
  * One file, config/omega.json5 (functions/config/omega.json5 for standalone
  * backends), identical shape everywhere: shared sections (brand,
- * cloud, analytics, payment, monitoring, oauth2, theme) + a `targets`
+ * cloud, analytics, payment, monitoring, connections, theme) + a `targets`
  * object whose KEY PRESENCE says which targets a brand enables and whose
  * values hold target-scoped settings — any shared key inside a target entry
  * overrides the shared value for that surface (one agnostic deep merge).
@@ -24,10 +24,10 @@ const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
 const { chosenProvider } = require('./providers.js');
-const { validateConfig, runSchema, formatErrors } = require('./validate.js');
+const { validateConfig, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
-const { loadEnv, resolveEnvChain, loadEnvChain, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
-const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, devEnvKeys, devEnvKeyMap, envKeysByGroup } = require('./env-schema.js');
+const { loadEnv, reloadEnv, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
+const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, workflowSecretKeys, bakeKeys, publishSecretKeys, renderSecretsBlock } = require('./env-delivery.js');
 const { checkEnvRules } = require('./env-rules.js');
 const { readCompanyRoot, COMPANY_MARKER } = require('./company.js');
@@ -37,8 +37,9 @@ const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js')
 const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
+const { DESKTOP_ARTIFACTS, desktopProductName, sanitizeProductName, desktopArtifactName, desktopArtifactNames } = require('./desktop-artifacts.js');
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
-const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo } = require('./repo.js');
+const { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, releasesRepo } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, readSiblingPorts, readSiblingOrigin, envName, portsToEnv, envPort, envPorts } = require('./ports.js');
 const { DIR_TARGETS, TARGET_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceTargetDir, targetInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
@@ -56,10 +57,21 @@ module.exports = {
   FILE_NAME,
   CONFIG_LOCATIONS,
 
-  // .env cascade (shell > local .env > brand .env > company .env)
+  // .env cascade (shell > local .env > brand .env > company .env), each layer
+  // overlaid by its own `.env.<environment>` file (#586)
   loadEnv,
+  // The reload half: drops what a file layer owns, then loads again, so an
+  // EDITED value lands and the shell still wins (#724)
+  reloadEnv,
   resolveEnvChain,
+  envLayerFiles,
   loadEnvChain,
+  loadEnvRoots,
+
+  // The ONE environment vocabulary ('development' | 'testing' | 'production') —
+  // the overlay's file suffix and every framework's own environment answer
+  ENV_ENVIRONMENTS,
+  envEnvironment,
 
   // The schema's `deliverAs` rename (#678) — the ONE place a brand-level name
   // becomes the name a target's runtime reads
@@ -84,8 +96,6 @@ module.exports = {
   envKeysForTarget,
   generatedEnvKeys,
   requiredEnvKeys,
-  devEnvKeys,
-  devEnvKeyMap,
   envKeysByGroup,
 
   // The delivery renderer (#627) — the ONE derivation of how a declared key
@@ -131,6 +141,14 @@ module.exports = {
   // Template surface
   toSiteGlobal,
 
+  // The desktop release assets' versionless names (#620) — @omega.js/desktop
+  // packages under them, the site links straight at them
+  DESKTOP_ARTIFACTS,
+  desktopProductName,
+  sanitizeProductName,
+  desktopArtifactName,
+  desktopArtifactNames,
+
   // The cancel-flow save offer (#268) — ONE home for the 50%-off default, read
   // by the backend's apply route and baked into the web client blob at build
   resolveWinbackOffer,
@@ -139,7 +157,7 @@ module.exports = {
 
   // Brand repo derivation from the shared repo.providers.github block, overlaid
   // by a target's own github entry (backend: targets.backend.github.repo slug —
-  // "owner/name" or bare name; name → brand.id, owner → repo.providers.github.org)
+  // "owner/name" or bare name; name → `<brand.id>-omega`, owner → repo.providers.github.org)
   parseRepoSlug,
   // demo-* project ids are emulator-only (Firebase's convention) — cloud
   // surfaces short-circuit on this instead of 403ing at Google
@@ -149,11 +167,21 @@ module.exports = {
   // The finished form a framework hands to consumer code (#290) — owner, name,
   // and the "owner/name" slug — so brands never re-derive the rule
   brandRepo,
+  // The brand's ONE public releases repo (#799): `<brand.id>-releases` under the
+  // brand repo's owner unless `targets.desktop.releases` names its own, the one
+  // home every release reader takes its address from
+  releasesRepo,
 
   // Validation
   validateConfig,
   runSchema,
   formatErrors,
+
+  // The brand's own HOST, resolved from an instance `url` or `brand.url` — the
+  // ONE derivation of it ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)):
+  // authDomain validation, and every lane that composes a test persona's email
+  resolvedBrandHost,
+
   findSecretKeys,
   SECRET_KEY_PATTERN,
   findRetiredKeys,

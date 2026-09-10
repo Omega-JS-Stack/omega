@@ -1,7 +1,5 @@
 ---
 layout: blueprint/team/member
-sitemap:
-  include: false
 meta:
   index: false
 

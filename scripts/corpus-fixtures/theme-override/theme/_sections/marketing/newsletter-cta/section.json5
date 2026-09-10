@@ -1,0 +1,25 @@
+{
+  description: 'Corpus tier-2 override of the base newsletter band — the §7 inherit lane\'s proof. This folder replaces the MARKUP and ships no section.js: `inherit: [\'js\']` leaves that lane to the chain, so the base layer\'s own newsletter behavior keeps riding the bundle without a copy. The inherited js\'s DOM contract is therefore part of this markup: form.newsletter-form under the section root, and .button-text inside the submit control.',
+
+  // The folder is its own manifest, so the args its callers pass are declared
+  // here — the same set the base band declares, or every default page that
+  // composes the band warns about an unknown arg.
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    button: 'object',
+    form: 'object',
+    section_class: 'string',
+    narrow: 'boolean',
+    variant: 'string',
+    anchor: 'string',
+    disclaimer: 'string',
+  },
+
+  defaults: {},
+
+  // The declared lane: html and json5 are never inheritable, js is.
+  inherit: ['js'],
+}

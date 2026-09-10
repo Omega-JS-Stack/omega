@@ -14,7 +14,8 @@
  *   - Nothing to fill returns an EMPTY object, so the write carries no
  *     `personal.location` key at all rather than a map of nulls.
  */
-const post = require('../../../src/manager/routes/user/signup/post.js');
+const post = require('../../../dist/manager/routes/user/signup/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { locationFromGeolocation } = post;
 
@@ -30,7 +31,7 @@ const GEOLOCATION = {
   longitude: -122.4194,
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'routes/user/signup/post.locationFromGeolocation',
   type: 'group',
 
@@ -80,4 +81,4 @@ module.exports = {
       },
     },
   ],
-};
+});

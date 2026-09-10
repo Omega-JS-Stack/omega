@@ -11,9 +11,10 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { resolvePerson, resolveSignoff } = require('../../src/manager/libraries/email/prepare.js');
-const { footer } = require('../../src/manager/libraries/email/generators/lib/templates/base.js');
-const feedbackTemplate = require('../../src/manager/libraries/email/generators/lib/templates/feedback.js');
+const { resolvePerson, resolveSignoff } = require('../../dist/manager/libraries/email/prepare.js');
+const { footer } = require('../../dist/manager/libraries/email/generators/lib/templates/base.js');
+const feedbackTemplate = require('../../dist/manager/libraries/email/generators/lib/templates/feedback.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The identity the framework used to hardcode. Nothing may ever emit these again.
 const FRAMEWORK_IDENTITY = /Ian Wiedenman|ianwiedenman|ianwieds|ITW Creative Works|itwcreativeworks/i;
@@ -42,7 +43,7 @@ const brandWithoutPerson = { name: 'Acme', contact: { email: 'support@acme.examp
 function buildWith(brand, settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
+  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
   const Manager = {
     config: {
       brand: { id: 'acme', url: 'https://acme.example', images: {}, ...brand },
@@ -85,7 +86,7 @@ const buildMalformed = () => (malformedBuild = malformedBuild || buildWith({
   contact: { ...brandWithPerson.contact, carbonCopy: [{ name: 'No Address' }] },
 }).catch((error) => error));
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email identity (person, company, audit BCCs come from config)',
   type: 'group',
   tests: [
@@ -317,4 +318,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -156,12 +156,12 @@ cta:
         <div class="d-flex flex-wrap gap-3">
           {% iftruthy resolved.hero.primary_button %}
             <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-primary btn-lg">
-              {% omega_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
+              <i class="fa-solid fa-{{ resolved.hero.primary_button.icon }} me-2"></i>{{ resolved.hero.primary_button.text }}
             </a>
           {% endiftruthy %}
           {% iftruthy resolved.hero.secondary_button %}
             <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-dark btn-lg">
-              {% omega_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
+              <i class="fa-solid fa-{{ resolved.hero.secondary_button.icon }} me-2"></i>{{ resolved.hero.secondary_button.text }}
             </a>
           {% endiftruthy %}
         </div>

@@ -18,6 +18,8 @@
  */
 
 // Record every console call the thunk makes, restoring console afterward.
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function withConsoleRecorder(fn) {
   const calls = { log: [], error: [] };
   const original = { log: console.log, error: console.error };
@@ -65,7 +67,7 @@ function withProductionEnvironment(fn) {
 // [HH:MM:SS] followed by the identity tag.
 const LOCAL_LINE = /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/backend:/;
 
-module.exports = {
+module.exports = defineCases({
   description: 'ctx.log carries the [@omega.js/backend:<module>] identity tag',
   type: 'group',
 
@@ -209,4 +211,4 @@ module.exports = {
       },
     },
   ],
-};
+});

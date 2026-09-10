@@ -12,7 +12,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { projectTestArgs, frameworkTestRuns } = require('../src/commands/test.js');
+const { parseTestScope, noMatchExitCode, NO_MATCH_EXIT_CODE, FANOUT_ENV } = require('@omega.js/devkit/test/scope');
+const { projectTestArgs, frameworkTestRuns, selectedTestFiles } = require('../src/commands/test.js');
 
 const stageTarget = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-test-'));
@@ -68,4 +69,57 @@ test('#344: `omega test web:` runs the watcher lane too, serially, and never in 
     { flags: '', target: 'test/dev-watch*.test.js' },
     { flags: '--test-concurrency=1 ', target: 'test/watch/dev-watch*.test.js' },
   ]);
+});
+
+const stageFramework = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-framework-'));
+  const passing = `const { test } = require('node:test');\ntest('passes', () => {});\n`;
+  fs.mkdirSync(path.join(dir, 'test', 'watch'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'test', 'pricing.test.js'), passing);
+  fs.writeFileSync(path.join(dir, 'test', 'watch', 'dev-watch.test.js'), passing);
+  return dir;
+};
+
+test('#814: a project filter resolves to the files it selects, so a typo is knowable', () => {
+  const dir = stageTarget();
+  const roots = { frameworkRoot: dir, projectRoot: dir };
+  const scopeFor = (target) => parseTestScope([target], { frameworkAliases: ['web'] });
+
+  assert.deepEqual(selectedTestFiles(scopeFor('top'), roots), ['test/top.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('project:nested/deep'), roots), ['test/nested/deep.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('topp'), roots), []);
+
+  // A bare run names no file: the whole suite is the selection, never a typo.
+  assert.ok(selectedTestFiles(scopeFor('project:'), roots).length >= 2);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('#814: a framework filter is selected across BOTH phases, not one at a time', () => {
+  // `web:dev-watch` misses test/*.test.js and hits test/watch/*.test.js. Each
+  // phase alone reads as a no-match; the union is what the run actually gets.
+  const frameworkRoot = stageFramework();
+  const roots = { frameworkRoot, projectRoot: stageTarget() };
+  const scopeFor = (target) => parseTestScope([target], { frameworkAliases: ['web'] });
+
+  assert.deepEqual(selectedTestFiles(scopeFor('web:dev-watch'), roots), ['test/watch/dev-watch.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('web:pricing'), roots), ['test/pricing.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('web:nope'), roots), []);
+
+  // full: reaching ONE of the two sources is still a real selection.
+  assert.deepEqual(selectedTestFiles(scopeFor('full:pricing'), roots), ['test/pricing.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('full:top'), roots), ['test/top.test.js']);
+  assert.deepEqual(selectedTestFiles(scopeFor('full:nope'), roots), []);
+
+  fs.rmSync(roots.frameworkRoot, { recursive: true, force: true });
+  fs.rmSync(roots.projectRoot, { recursive: true, force: true });
+});
+
+test('#814: a no-match exits 1 alone and with its own code inside a brand-root fan-out', () => {
+  // `omega test` at a brand root forwards ONE target to every target, so a
+  // target that does not carry it is a no-op there rather than a failure.
+  assert.equal(FANOUT_ENV, 'OMEGA_TEST_FANOUT');
+  assert.equal(NO_MATCH_EXIT_CODE, 3);
+  assert.equal(noMatchExitCode({}), 1);
+  assert.equal(noMatchExitCode({ OMEGA_TEST_FANOUT: '1' }), 3);
 });

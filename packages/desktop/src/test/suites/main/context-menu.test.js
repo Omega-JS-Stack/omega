@@ -4,7 +4,9 @@
 // the surface that gets called when one fires: the definition fn, the items
 // builder, and the resolver. `buildItems(params)` is the test entry point.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'context-menu (main)',
@@ -360,4 +362,4 @@ module.exports = {
       },
     },
   ],
-};
+});

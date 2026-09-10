@@ -12,7 +12,8 @@
  * (lastIndex advances) — the hazard is pinned below so a caller that loops
  * over the table cannot be surprised by it.
  */
-const Roles = require('../../src/manager/helpers/roles.js');
+const Roles = require('../../dist/manager/helpers/roles.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const roles = new Roles({ libraries: {} });
 
@@ -22,7 +23,7 @@ const idsMatching = (input) => roles.list()
   .filter((role) => new RegExp(role.regex.source, 'i').test(input))
   .map((role) => role.id);
 
-module.exports = {
+module.exports = defineCases({
   description: 'Roles.list() role table',
   type: 'group',
 
@@ -151,4 +152,4 @@ module.exports = {
       },
     },
   ],
-};
+});

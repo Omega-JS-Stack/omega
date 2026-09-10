@@ -57,6 +57,30 @@ test('a built-in collection name is a hard error — those bring their own pages
   assert.throws(() => readCollections({ team: { field: 'member.role' } }), /already an OMEGA collection/);
 });
 
+test('a reserved name is a hard error too — a site build fact, or a config section (#593)', () => {
+  // A declared collection publishes as `site.<name>` (#593), so a name the
+  // build already owns silently WIPES that fact: `pricing` replaces the payment
+  // view-model with [], `data` the json-in-_includes system, `targets` the
+  // curated view. `time`/`omega`/`characters` are not even arrays, so the sync
+  // crashes the build later with "push is not a function".
+  assert.throws(
+    () => readCollections({ pricing: { field: 'plan.tier' } }),
+    /targets\.web\.collections\.pricing is already a site build fact — .*\bpricing\b.*Name your collection something else\./s,
+  );
+  assert.throws(() => readCollections({ data: { field: 'row.kind' } }), /already a site build fact/);
+  assert.throws(() => readCollections({ time: { field: 'slot.day' } }), /already a site build fact/);
+
+  // And a name a config section already owns hard-fails the #611 dead-read
+  // guard on the collection's OWN `{% for r in site.reviews %}` — with advice
+  // (spell it `resolved.config.reviews`) that cannot fix it.
+  assert.throws(
+    () => readCollections({ reviews: { field: 'review.product' } }),
+    /targets\.web\.collections\.reviews is already a config section — .*resolved\.config\.reviews.*Name your collection something else\./s,
+  );
+  assert.throws(() => readCollections({ directory: { field: 'listing.category' } }), /already a config section/);
+  assert.throws(() => readCollections({ blog: { field: 'entry.tag' } }), /already a config section/);
+});
+
 test('the field is required — it is what the category pages group on', () => {
   assert.throws(() => readCollections({ docs: {} }), /targets\.web\.collections\.docs\.field must be the dotted frontmatter path/);
   assert.throws(() => readCollections({ docs: { field: '' } }), /field must be the dotted frontmatter path/);
@@ -117,6 +141,24 @@ test('a document names itself even when it wrote nothing to name itself with (#3
   applyDocumentData(docs, owned, 'CollectionsCo');
   assert.strictEqual(owned.meta.title, 'Start here', 'an explicit meta.title is never rewritten');
   assert.strictEqual(owned.meta.description, 'Install it.', 'and the document\'s own description is the description');
+});
+
+test('a document may spell its name `<namespace>.name` (#596)', () => {
+  const [docs] = readCollections({ docs: { field: 'doc.category' } });
+
+  // soundgrail's products spell it `product.name`; the derived title fell all
+  // the way to a title-cased slug while the description read correctly off the
+  // same namespace.
+  const named = { page: { fileSlug: 'ableton-basics-level-1' }, doc: { name: 'Ableton Basics Lvl. 1' } };
+  applyDocumentData(docs, named, 'CollectionsCo');
+  assert.strictEqual(named.title, 'Ableton Basics Lvl. 1');
+  assert.strictEqual(named.meta.title, 'Ableton Basics Lvl. 1 - Docs - CollectionsCo');
+  assert.strictEqual(named.meta.description, 'Read Ableton Basics Lvl. 1 in the Docs collection.');
+
+  // `title` is still the primary spelling: it wins when a document has both.
+  const both = { page: { fileSlug: 'getting-started' }, doc: { title: 'Getting started', name: 'Never this' } };
+  applyDocumentData(docs, both, 'CollectionsCo');
+  assert.strictEqual(both.title, 'Getting started');
 });
 
 test('dev sampling accepts a declared collection, and still rejects a typo', () => {
@@ -192,9 +234,22 @@ test('every category page titles AND describes its own term (#312)', () => {
   assert.strictEqual(guides.description, 'Browse all The Docs in the Guides category.');
   assert.strictEqual(reference.description, 'Browse all The Docs in the Reference category.');
 
-  assert.notStrictEqual(guides.title, SITE_DATA.meta.title, 'never the site-wide title');
-  assert.notStrictEqual(guides.description, SITE_DATA.meta.description, 'never the site-wide description');
+  assert.notStrictEqual(guides.title, SITE_DATA.brand.name, 'never the site-wide title (brand.name is the head\'s default)');
+  assert.notStrictEqual(guides.description, SITE_DATA.brand.description, 'never the site-wide description (brand.description is the head\'s default)');
   assert.notStrictEqual(guides.description, listing.description, 'and never the listing\'s — a category page is its own page');
+});
+
+test('a generated category page is noindex, and the listing it belongs to is not (#564)', () => {
+  // The blog taxonomy's posture, on a brand's own collection: a category page
+  // is a list of links to pages that are themselves indexed. The generator
+  // sets the flag both the robots tag and sitemap.xml read, so a declared
+  // collection cannot drift from the blog.
+  const robots = (url) => (pages.get(url).match(/<meta name="robots" content="([^"]*)"/) || [])[1];
+
+  assert.strictEqual(robots('/docs/categories/guides'), 'noindex', 'a category term page is thin');
+  assert.strictEqual(robots('/docs'), 'index', 'the listing is the collection\'s canonical page');
+  assert.strictEqual(robots('/docs/2'), 'noindex', 'and page 2 is a duplicate of it');
+  assert.strictEqual(robots('/docs/api'), 'index', 'the documents are the content');
 });
 
 test('every document page titles, describes and headlines ITSELF (#317)', () => {
@@ -211,14 +266,30 @@ test('every document page titles, describes and headlines ITSELF (#317)', () => 
 
   assert.notStrictEqual(api.title, cli.title, 'no two documents share a title');
   assert.notStrictEqual(api.description, cli.description, 'or a description');
-  assert.notStrictEqual(api.title, SITE_DATA.meta.title, 'never the site-wide title');
-  assert.notStrictEqual(api.description, SITE_DATA.meta.description, 'never the site-wide description');
+  assert.notStrictEqual(api.title, SITE_DATA.brand.name, 'never the site-wide title (brand.name is the head\'s default)');
+  assert.notStrictEqual(api.description, SITE_DATA.brand.description, 'never the site-wide description (brand.description is the head\'s default)');
   assert.notStrictEqual(api.description, listing.description, 'and never the listing\'s');
 
   // The page a reader lands on opens with its own name.
   const h1 = (pages.get('/docs/api').match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1];
   assert.ok(h1, 'the document page renders an h1');
   assert.strictEqual(h1.trim(), 'The API');
+});
+
+test('a declared collection publishes as site.<name>, like the built-ins (#593)', () => {
+  // A UJM consumer iterates `{% for product in site.products %}`. Reaching the
+  // brand's own collection only as `collections.docs` (frontmatter under
+  // `.data`) rendered that loop EMPTY on a green build — six blank grid cells
+  // and no warning. The fixture home page iterates `site.docs`.
+  const home = pages.get('/');
+  const listed = [...home.matchAll(/<li data-doc="([^"]*)">([^<]*)<\/li>/g)].map((m) => [m[1], m[2]]);
+
+  assert.deepStrictEqual(listed, [
+    ['/docs/api', 'The API'],
+    ['/docs/cli', 'The CLI'],
+    ['/docs/faq', 'FAQ'],
+    ['/docs/getting-started', 'Getting started'],
+  ], 'every document, in the collection\'s own order, with its frontmatter at the top level (site.posts\' shape)');
 });
 
 test('the listing rails the collection\'s own categories', () => {
@@ -239,16 +310,19 @@ test('a declared collection with nothing in it still gets its page', () => {
 });
 
 test('generated pages stay out of the collections a page that writes no file must stay out of', () => {
-  // Paginated templates are excluded in their own raw frontmatter
-  // (test/collections-gate.test.js pins the rule): no listing page, no
-  // category page, ever reaches the sitemap or the page index.
+  // The category generator is excluded in its own raw frontmatter
+  // (test/collections-gate.test.js pins the rule), and Eleventy adds only page
+  // 0 of a paginated template to collections — so a category page and a
+  // listing page 2..N never reach the sitemap or the page index. The listing's
+  // page 1 is the collection's canonical URL and DOES (#564).
   const sitemap = pages.get('/sitemap.xml');
   const index = pages.get('/pages.json');
 
-  for (const url of ['/docs', '/docs/2', '/docs/categories/guides']) {
+  for (const url of ['/docs/2', '/docs/categories/guides']) {
     assert.ok(!sitemap.includes(`${url}<`), `${url} is not a sitemap url`);
     assert.ok(!index.includes(`"${url}"`), `${url} is not a page-index entry`);
   }
+  assert.ok(sitemap.includes('/docs<'), 'the listing itself IS a sitemap url (#564)');
   assert.ok(sitemap.includes('/docs/api<'), 'the documents themselves DO ship in the sitemap');
 });
 

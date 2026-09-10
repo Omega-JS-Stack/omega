@@ -102,7 +102,7 @@ both-forms error applies to the YAML remainder only):
 ```liquid
 {% section "marketing/hero", data: resolved.hero %}
   {% slot demo_html %}
-    <div class="my-wild-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>
+    <div class="my-wild-demo"><i class="fa-solid fa-rocket"></i> {{ resolved.config.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ```
@@ -146,8 +146,8 @@ named arg keeps the default, so absence semantics survive.
 **Consumer page frontmatter is META-ONLY (Ian 2026-07-19: "not only no more
 frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter"; softened same
 day: no build-fail)**: a real file under `pages/` may carry only `layout`,
-`permalink`, `meta`, `schema`, `config`, `sitemap`, `append` (+ engine
-plumbing). `config` ([#607](https://github.com/Omega-JS-Stack/omega/issues/607))
+`permalink`, `meta`, `schema`, `config`, `sitemap` (+ engine plumbing — every
+key documented in [frontmatter.md](frontmatter.md)). `config` ([#607](https://github.com/Omega-JS-Stack/omega/issues/607))
 is the page's omega.json5 override block — every config section a page or
 layout restates lives under it, including `theme` (shell chrome) and `client`
 (#1: the `@omega.js/client` settings blob — auth policy, cookie consent, exit
@@ -202,7 +202,10 @@ hatch. The rules:
   base for every theme. Base markup is a contract: changing it touches every
   theme, so it gets API-level care and tests.
 - **A theme is a skin by default.** A theme ships tokens plus scss over the
-  base's `omega-*` selectors (and fonts, `_theme.js`). It forks no shared
+  base's `omega-*` selectors (and fonts, `_theme.js` — both optional: base
+  ships the js floor the chain ends at, and a shadowing theme inherits the
+  packaged skin's faces and font files,
+  [#773](https://github.com/Omega-JS-Stack/omega/issues/773)). It forks no shared
   markup. Identical DOM across themes is what makes theme switching safe:
   a consumer's custom css and overrides survive the switch.
 - **Forks are identity, and they are bounded.** A theme forks a surface's
@@ -298,6 +301,16 @@ another page's words.
   it, rendered. The other custom lane is unchanged: `demo.options.content` is
   finished markup authored at the call site, and a named folder wins over it.
   Pinned by `test/hero-animation.test.js`.
+
+  Whichever lane fills it, that markup animates with the document: the hero band
+  is a first-paint band (`data-omega-first-paint`,
+  [#763](https://github.com/Omega-JS-Stack/omega/issues/763)), so a
+  `data-omega-reveal` authored inside it is started by the head's inline starter
+  the moment the band is parsed, instead of waiting for the engine to download
+  and its scroll observer to fire. A hero animation that runs on its own (a
+  `_hero/` folder's js, a css keyframe) still starts from a VISIBLE state, since
+  nothing stamps it. The motion contract is
+  [docs/shared/theming.md](../shared/theming.md).
 - **Dev loop**: theme-layer section edits are covered by the theme-root
   watchers; consumer `src/_sections`/`_components`/`_hero` have their own watch
   entries — scss changes hot-swap css, js changes rebuild + reload.
@@ -315,7 +328,10 @@ another page's words.
   two-line entry over `legal/_document.js` / `legal/_document.scss`.
   Resolver: `resolvePageAsset` (assets.js), consumed by the engine's
   `pageAssets` computed. The `data-asset-path` html attribute died with the
-  mechanism (nothing read it).
+  mechanism (nothing read it). Every layer that ships a file for the resolved
+  key LOADS, in layer order ([#624](https://github.com/Omega-JS-Stack/omega/issues/624))
+  — the same resolver answers `js/layouts/<layout>.js` / `css/layouts/<layout>.scss`
+  keyed by layout name.
 
 ## Update semantics
 
@@ -337,7 +353,16 @@ first-match-wins resolution as the tags) and the pages paginate over it;
 each entry chips its owning layer, so overrides say `newsflash` and
 fallthrough ids say `classy` — the override doctrine, visible.
 
-Each kind's URL SPACE has one home, `KINDS.<kind>.gallery` in [sections.js](../../packages/web/src/sections.js): `url` (the index), `base` (entry pages hang off `<base>/<id>`, frames off `<base>/<id>/frames/<slug>`) and `label`. The library stamps the resolved url onto every entry and variant, so no template ever composes one — a section entry lives at `/test/sections/section/<id>` and a component entry at `/test/components/<id>`.
+Each kind's URL SPACE has one home, `KINDS.<kind>.gallery` in [sections.js](../../packages/web/src/sections.js): `url` (the index), `base` (entry pages hang off `<base>/<id>`, frames off `<base>/<id>/frames/<slug>`) and `label`. The library stamps the resolved url onto every entry and variant, so no template ever composes one.
+
+The two spellings are HARMONIZED (Ian's #602 addendum, 2026-08-26) — `base` IS `url` on both, so the shape is literally the same sentence twice:
+
+| Library | Index | Entry | Frame |
+|---|---|---|---|
+| Sections | `/test/sections` | `/test/sections/<id>` | `/test/sections/<id>/frames/<slug>` |
+| Components | `/test/components` | `/test/components/<id>` | `/test/components/<id>/frames/<slug>` |
+
+Neither carries a kind segment the other lacks. Sections used to hang off `/test/sections/section/<id>` — a leftover of the era when the section space held both kinds; a gallery is development-only ([#554](https://github.com/Omega-JS-Stack/omega/issues/554)), so that spelling was simply dropped, with no redirects. The index and its entries share one url prefix without colliding on disk: an extensionless permalink gets the Jekyll `.html` (`jekyllPermalink` in [engine.js](../../packages/web/src/engine.js)), so `test/sections.html` the file sits beside `test/sections/` the directory.
 
 **It is the agent path.** Building a page means composing entries from this
 gallery, never hand-rolling HTML: the entry page is the args contract and
@@ -367,9 +392,10 @@ the frames are what each variant actually looks like.
   every other display string), and a lazy same-origin `<iframe>` autosized to
   its content by `core/js/libs/showcase-frames.js` (the shared helper both
   galleries' page modules call —
-  `core/js/pages/test/sections/[kind]/[category]/[name]/index.js` and
+  `core/js/pages/test/sections/[category]/[name]/index.js` and
   `core/js/pages/test/components/[category]/[name]/index.js` are the wildcard
-  page-asset entries serving the two generated families). An inline
+  page-asset entries serving the two generated families — mirrored keys for
+  mirrored urls, both two wildcard segments off their index). An inline
   `min-height` is the no-JS fallback — the frame scrolls, never collapses. The
   stack itself is ONE include, `core/_includes/core/showcase/entry-body.html`,
   rendered by the ONE entry-page generator.
@@ -397,7 +423,8 @@ the frames are what each variant actually looks like.
   `defaults/showcase/entry.html` and `defaults/showcase/frame.html` paginate
   the whole library and take their permalink off the entry's own kind-aware
   url, and the two index pages share `core/_includes/core/showcase/index-body.html`.
-  Nothing is generated under `/test/sections/component/…` any more. The living
+  Nothing is generated under `/test/sections/component/…` or
+  `/test/sections/section/…` any more — both kind segments are gone. The living
   styleguide that used to hold the `/test/components` URL is `/test/styleguide`
   (a `defaults/pages` page, so it ships in production builds too — noindex and
   sitemap-excluded like every `/test` page); the galleries ride
@@ -481,7 +508,6 @@ The `{% composition %}` wrap is tri-state, byte-parity with the
 |---|---|
 | No body content | The wrapped default composition |
 | Body content | The body REPLACES the composition (Ian's 2026-07-19 ruling: writing a body means it — what customize materializes; no flag) |
-| Body content + `append: true` | Default composition, content appended BELOW (the legacy UJM contract, kept behind the explicit flag) |
 
 Materialize-then-build is identity: the only sanctioned output delta is
 blank-line runs (the materialized body passes through the blueprint's
@@ -503,7 +529,10 @@ them; pricing's FAQ stays inline: its aside embeds a bespoke guarantee
 object), and the heading components: `heading/masthead` — the interior-page
 head cluster (eyebrow + display h1 + sub) composed inside ~17 layouts' own
 band shells (sub_class/h1_class knobs carry the per-page class variants;
-breadcrumb pages pass no eyebrow) — and `heading/section-head` — the h2-band
+breadcrumb pages pass no eyebrow; `first_paint: true` drops the cluster's
+reveal attributes for a caller whose band is the first viewport,
+[#467](https://github.com/Omega-JS-Stack/omega/issues/467)) — and
+`heading/section-head` — the h2-band
 cluster serving ~18 layout bands AND the sections themselves (bento,
 product-demo, showcase, faq compose it from their markup: **nested
 composition** — sections render on the same engine, so `{% component %}`
@@ -582,10 +611,12 @@ The customize lane (cp220): `omega customize <url>` + the
 `{% composition %}` wrap — see "Customize" above. Classy's home is the
 first composition-lane page (the one pure-composition layout); every other
 URL rides the shell lane until its one-off bands extract. The wrap's
-tri-state guard originally preserved the legacy append contract as the
+guard originally preserved the legacy append contract as the
 default (the slice-suite pin caught the first over-eager version); Ian's
-2026-07-19 ruling flipped it — a body REPLACES the composition, no flag,
-and the legacy add-below contract lives behind an explicit `append: true`.
+2026-07-19 ruling flipped it — a body REPLACES the composition, no flag —
+and #607 deleted the `append: true` escape hatch that kept the legacy
+add-below contract alive beside it: a page that wants the default bands
+writes them, which is exactly what `omega customize <url>` hands it.
 The `composition: true` key is retired (ignored).
 
 The wildcard lane (cp221): page assets went URL-only — `asset_path` died
@@ -728,7 +759,14 @@ playlisteer ports found, each closed in the library rather than brand-side:
   initialize Bootstrap tooltips page-wide, so the affordance works wherever
   the list lands). Three callers — /pricing's plan cards, its one-time cards,
   and `marketing/pricing-cards` — so the hover surface can never exist on one
-  and not the other. The caller keeps the tier note above the extras, because
+  and not the other. **Where the data comes from changed with
+  [#647](https://github.com/Omega-JS-Stack/omega/issues/647), the rendering did
+  not**: the composer now reads the top-level `features` CATALOG for the row
+  order, the name, the icon and the definition, and each product's `features`
+  map for its value alone ([config.md](../shared/config.md)). A feature valued
+  `false` (or absent) is not part of that tier and renders nowhere. The
+  definition BACKFILL is gone with the duplication that needed it — a
+  definition exists in exactly one place now. The caller keeps the tier note above the extras, because
   its WORDING differs by surface: the page says "Everything in <previous>,
   and more:", the band says "and:" (Ian 2026-08-24). The band reads the
   composer's own `commonFeatures`/`extraFeatures` split, falling back to the
@@ -736,10 +774,10 @@ playlisteer ports found, each closed in the library rather than brand-side:
 - The /pricing comparison matrix reads a cell the SAME way (#562, ruling Ian
   2026-08-25). A truthy cell is a YES and draws `circle-check`; a cell that is
   not a bare `true` also prints its own value as `omega-compare__label` beside
-  the mark. `true` stays icon-only, falsy stays `circle-xmark`. **No schema
-  change and no second key**: one `features[].value` feeds both surfaces, so a
-  legacy catalog's `value: "Included"` stops mixing the word with x icons in
-  the same row while the cards keep printing the label. A value the catalog
+  the mark. `true` stays icon-only, falsy stays `circle-xmark`. **One value
+  feeds both surfaces**: a product's `features.<id>` entry is the only number or
+  label either one reads (#647), so a catalog's `"Included"` stops mixing the
+  word with x icons in the same row while the cards keep printing the label. A value the catalog
   authored is TEXT — `omega_commaify` still formats a number, then
   `escape_once` (#580).
 
@@ -771,7 +809,7 @@ playlisteer ports found, each closed in the library rather than brand-side:
   (`omega-tile__ordinal`, tokens only), so reordering a process band
   renumbers itself. Default band unchanged.
 - `marketing/stats` item `icon` + `color` (#518) — the glyph rides the ONE
-  icon mechanism (`omega_icon` in the shared `omega-icon-chip` idiom); `color`
+  icon mechanism (native `fa-*` markup in the shared `omega-icon-chip` idiom); `color`
   names a slot in the categorical token palette (`tone-1`…`tone-6` — the same
   ramp charts and tone chips read, [theming](../shared/theming.md)) and is
   WHITELISTED: anything else — a hex, a Bootstrap name — paints nothing, so a

@@ -15,7 +15,6 @@ const assert = require('node:assert/strict');
 const {
   ENV_SCHEMA, ENV_GROUPS, TARGETS, DELIVERY_MODES,
   envSchemaEntry, envKeysForTarget, envKeysByGroup, envFileGroups, generatedEnvKeys, requiredEnvKeys,
-  devEnvKeys, devEnvKeyMap,
 } = require('../src/index.js');
 
 // The union of the three manager lanes as they stood before the schema
@@ -94,12 +93,6 @@ test('every entry carries the full rule shape', () => {
     if (entry.required) {
       assert.ok('generated' in entry || 'default' in entry, `${where}: a required key needs a generator or a default`);
     }
-    if ('devOf' in entry) {
-      assert.equal(typeof entry.devOf, 'string', `${where}: devOf names the key this one overrides`);
-    }
-    if ('liveShape' in entry) {
-      assert.ok(entry.liveShape instanceof RegExp, `${where}: liveShape is the pattern a LIVE credential matches`);
-    }
   }
 });
 
@@ -114,14 +107,28 @@ test('names are unique and every group is used', () => {
 
 // #636 — a key with no reader is not an inventory entry, it is a prompt for a
 // credential nothing will ever use. COINBASE_API_KEY named a payment provider
-// that does not exist (the backend's payment providers are stripe, paypal,
-// chargebee and test) and APOLLO_API_KEY named an enrichment lane nobody
-// wrote. Both are gone — schema row, `_.env` placeholder, config stub and all.
+// that did not exist and APOLLO_API_KEY named an enrichment lane nobody wrote.
+// Both are gone — schema row, `_.env` placeholder, config stub and all. The
+// crypto provider came back for real in #642, but under the key its API is
+// actually called with (COINBASE_COMMERCE_API_KEY, below): this bare name still
+// reads nowhere, so it stays dead.
 test('the dead keys are gone — no reader, no entry (#636)', () => {
   for (const name of ['COINBASE_API_KEY', 'APOLLO_API_KEY']) {
     assert.equal(envSchemaEntry(name), undefined, `${name} has no reader anywhere — it must not be declared`);
     assert.ok(!envKeysForTarget('backend').includes(name), `${name} must not compose into targets/backend/.env`);
   }
+});
+
+// #642 — the Coinbase Commerce provider's one credential. Secret, backend-only,
+// optional: a brand that sells no crypto never owes it.
+test('COINBASE_COMMERCE_API_KEY is declared like its payment siblings (#642)', () => {
+  const entry = envSchemaEntry('COINBASE_COMMERCE_API_KEY');
+
+  assert.ok(entry, 'the Coinbase Commerce key must be declared — the backend reads it');
+  assert.equal(entry.group, 'payment');
+  assert.equal(entry.secret, true, 'the API key is the whole credential — it never reaches config');
+  assert.equal(entry.required, false);
+  assert.ok(envKeysForTarget('backend').includes('COINBASE_COMMERCE_API_KEY'), 'it composes into targets/backend/.env');
 });
 
 test('every key the manager lanes carried resolves to an entry', () => {
@@ -158,66 +165,25 @@ test('envSchemaEntry(): unknown names miss, dynamic families match their pattern
   assert.equal(envSchemaEntry('NOT_A_REAL_KEY'), undefined);
   assert.equal(envSchemaEntry('GH_TOKEN').owner, 'repo');
 
-  const oauth2 = envSchemaEntry('OAUTH2_GOOGLE_CLIENT_SECRET');
-  assert.ok(oauth2, 'the OAuth2 client family resolves through its pattern');
-  assert.equal(oauth2.secret, true);
+  const connections = envSchemaEntry('CONNECTIONS_GOOGLE_CLIENT_SECRET');
+  assert.ok(connections, 'the connection client family resolves through its pattern');
+  assert.equal(connections.secret, true);
 });
 
-test('the dev-suffixed payment twins are declared, optional, and named after their base key', () => {
-  const twins = ENV_SCHEMA.filter((entry) => entry.devOf);
+test('the payment secrets carry no dev twin and no live shape — the environment overlay replaced them (#586)', () => {
+  // Ruled 2026-08-26: the `<KEY>_DEV` twin system is replaced, before it
+  // shipped, by `.env.<environment>` files overlaying the base `.env` — the
+  // widespread standard. Every key is equal there, and the values are TRUSTED:
+  // no live-shape guard, no payment-specific rule, no key with special
+  // treatment. Both entry fields are gone with the mechanism.
+  assert.deepEqual(ENV_SCHEMA.filter((entry) => 'devOf' in entry || 'liveShape' in entry), []);
 
-  assert.deepEqual(twins.map((entry) => entry.name), [
-    'STRIPE_SECRET_KEY_DEV',
-    'PAYPAL_CLIENT_SECRET_DEV',
-    'CHARGEBEE_API_KEY_DEV',
-  ]);
-
-  for (const entry of twins) {
-    assert.equal(entry.name, `${entry.devOf}_DEV`, `${entry.name}: the twin is the base key plus _DEV`);
-    assert.ok(envSchemaEntry(entry.devOf), `${entry.name}: ${entry.devOf} is itself a declared key`);
-    assert.equal(entry.owner, 'payment', `${entry.name}: owned by the payment service`);
-    assert.equal(entry.secret, true, `${entry.name}: a secret`);
-    assert.equal(entry.required, false, `${entry.name}: optional — a brand with one payment mode boots fine`);
-    assert.ok(!('generated' in entry) && !('default' in entry), `${entry.name}: nobody but the provider can mint it`);
+  for (const base of ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY']) {
+    assert.ok(envSchemaEntry(base), `${base} is still the one declared key`);
+    assert.equal(envSchemaEntry(`${base}_DEV`), undefined, `${base}_DEV must not be declared`);
+    assert.ok(!envKeysForTarget('backend').includes(`${base}_DEV`), `${base}_DEV must not compose into targets/backend/.env`);
+    assert.ok(!envKeysByGroup().payment.includes(`${base}_DEV`), `${base}_DEV must not render into a brand .env`);
   }
-});
-
-test('devEnvKeys()/devEnvKeyMap(): the deploy exclusion set and the base → twin lookup', () => {
-  assert.deepEqual(devEnvKeys(), [
-    'STRIPE_SECRET_KEY_DEV',
-    'PAYPAL_CLIENT_SECRET_DEV',
-    'CHARGEBEE_API_KEY_DEV',
-  ]);
-
-  const map = devEnvKeyMap();
-  assert.equal(map.STRIPE_SECRET_KEY, 'STRIPE_SECRET_KEY_DEV');
-  assert.equal(map.CHARGEBEE_API_KEY, 'CHARGEBEE_API_KEY_DEV');
-  assert.equal(map.GH_TOKEN, undefined, 'only payment secrets carry a dev twin');
-});
-
-test('the dev twins compose into the backend target .env', () => {
-  const composed = envKeysForTarget('backend');
-
-  for (const name of devEnvKeys()) {
-    assert.ok(composed.includes(name), `${name} reaches targets/backend/.env — the emulator reads that file`);
-  }
-  assert.ok(envKeysByGroup().payment.includes('STRIPE_SECRET_KEY_DEV'), 'the twins render beside their base key');
-});
-
-test('liveShape: the providers whose credentials announce a LIVE account', () => {
-  const stripe = envSchemaEntry('STRIPE_SECRET_KEY').liveShape;
-  assert.match('sk_live_abc123', stripe);
-  assert.match('rk_live_abc123', stripe, 'restricted live keys charge real cards too');
-  assert.doesNotMatch('sk_test_abc123', stripe);
-
-  const chargebee = envSchemaEntry('CHARGEBEE_API_KEY').liveShape;
-  assert.match('live_abc123', chargebee);
-  assert.doesNotMatch('test_abc123', chargebee);
-
-  // PayPal credentials carry NO live/sandbox marker (both halves are opaque
-  // 80-char strings), so PAYPAL_CLIENT_SECRET declares no shape — its split is
-  // the _DEV twin alone
-  assert.equal('liveShape' in envSchemaEntry('PAYPAL_CLIENT_SECRET'), false);
 });
 
 test('envKeysByGroup(): file groups render, runtime keys never reach a brand .env', () => {
@@ -250,6 +216,44 @@ test('one AI key per provider — the OMEGA_-prefixed twins are gone', () => {
   }
 });
 
+test('OMEGA_LICENSE_KEY travels CLI → server at deploy, and never into an artifact (#320)', () => {
+  const entry = envSchemaEntry('OMEGA_LICENSE_KEY');
+
+  assert.ok(entry, 'the deploy-time license check reads it, so the schema declares it');
+  assert.equal(entry.group, 'license');
+  assert.equal(entry.secret, true);
+  assert.equal(entry.required, false, 'keyless is a supported state — attribution shown, payments gated');
+  assert.equal('generated' in entry, false, 'omegajs.dev issues it; OMEGA cannot mint it');
+
+  // Every delivery is 'ci': the three targets whose deploys BUILD on an Actions
+  // runner get it in the runner env for the check, and nothing else.
+  assert.deepEqual(entry.targets, ['web', 'desktop', 'extension']);
+  assert.deepEqual(entry.delivery, { web: 'ci', desktop: 'ci', extension: 'ci' });
+
+  // The backend deploys from the CLI, never a runner, so it needs no delivery
+  // at all — and an 'env' one would compose the key into dist/.env and ship it
+  // INSIDE the deployed functions artifact, which is the one thing it must not do.
+  assert.ok(!entry.targets.includes('backend'), 'a backend deploy reads it from the .env cascade in the CLI process');
+  assert.ok(!envKeysForTarget('backend').includes('OMEGA_LICENSE_KEY'), 'it must never compose into targets/backend/.env');
+
+  assert.equal('publicAtRest' in entry, false, 'nothing bakes it — a baked license key is a license key anyone can copy');
+});
+
+test('OMEGA_LICENSE_STATUS is the deploy-written verdict, never a brand-written key (#320)', () => {
+  const entry = envSchemaEntry('OMEGA_LICENSE_STATUS');
+
+  assert.ok(entry, 'the backend payment gate reads it, so the env reader must know it');
+  assert.equal(entry.group, 'runtime', 'a backend deploy WRITES it into dist/.env; no human ever types it');
+  assert.equal(entry.secret, false, 'a computed verdict, not a credential');
+  assert.equal(entry.required, false, 'absent = keyless-dev, exactly today\'s behavior');
+  assert.deepEqual(entry.targets, ['backend']);
+  assert.equal('delivery' in entry, false, 'no runner, no bake — the deploy composes the value itself');
+
+  // The runtime group renders no file line, so a brand .env can never carry it
+  // and the composer can never deliver one down from the brand layer.
+  assert.ok(!envKeysForTarget('backend').includes('OMEGA_LICENSE_STATUS'));
+});
+
 // ─── Delivery: the composer's filter (#678) ───
 
 test('deliverAs: the per-target GA4 secrets rename on delivery, and only there', () => {
@@ -271,8 +275,8 @@ test('deliverAs: the per-target GA4 secrets rename on delivery, and only there',
   }
 });
 
-test('the OAuth2 client family is a FILE key: a human writes it into the brand .env (#678)', () => {
-  const entry = envSchemaEntry('OAUTH2_GOOGLE_CLIENT_ID');
+test('the connection client family is a FILE key: a human writes it into the brand .env (#678)', () => {
+  const entry = envSchemaEntry('CONNECTIONS_GOOGLE_CLIENT_ID');
 
   assert.ok(entry, 'the family resolves through its pattern');
   assert.deepEqual(entry.targets, ['backend']);

@@ -1,7 +1,9 @@
 // Main-layer tests for lib/remote-config.js — fetch + cache + dot-path get +
 // onUpdate listeners + URL derivation from brand.url.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'remote-config (main)',
@@ -184,4 +186,4 @@ module.exports = {
       },
     },
   ],
-};
+});

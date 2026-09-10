@@ -11,9 +11,10 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { renderVertUnit } = require('../../../src/manager/routes/verts/utils.js');
+const { renderVertUnit } = require('../../../dist/manager/routes/verts/utils.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-const UTILS_PATH = path.join(__dirname, '../../../src/manager/routes/verts/utils.js');
+const UTILS_PATH = path.join(__dirname, '../../../dist/manager/routes/verts/utils.js');
 
 function makeVert(overrides) {
   return {
@@ -29,7 +30,7 @@ function makeVert(overrides) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Verts unit document (shared renderer)',
   type: 'group',
   tests: [
@@ -113,4 +114,4 @@ module.exports = {
       },
     },
   ],
-};
+});

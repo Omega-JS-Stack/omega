@@ -9,7 +9,8 @@
  *
  * Run: npx omega test backend:cli/required-indexes
  */
-const requiredIndexes = require('../../src/cli/commands/setup-tests/helpers/required-indexes.js');
+const requiredIndexes = require('../../dist/cli/commands/setup-tests/helpers/required-indexes.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /** The entry serving a composite query, matched on collection + field paths in order */
 function findIndex(collectionGroup, fieldPaths) {
@@ -24,7 +25,7 @@ function findIndex(collectionGroup, fieldPaths) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Required Firestore indexes SSOT',
   type: 'group',
 
@@ -60,4 +61,4 @@ module.exports = {
       },
     },
   ],
-};
+});

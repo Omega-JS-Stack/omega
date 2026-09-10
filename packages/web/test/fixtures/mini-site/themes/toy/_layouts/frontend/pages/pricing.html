@@ -1,1 +1,7 @@
 <div id="toy-theme">TOY THEME PRICING via consumer-local theme</div>
+{%- comment -%}
+  A consumer-local theme's own _includes rung (#773): this include shadows the
+  CORE file of the same name, and Eleventy must treat the theme's _includes as
+  machinery rather than content.
+{%- endcomment -%}
+{% include core/pricing/price-per-unit.html %}

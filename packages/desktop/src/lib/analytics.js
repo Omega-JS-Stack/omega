@@ -43,8 +43,8 @@
 //     },
 //   }
 //
-// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omega.js/backend). Webpack's
-// DefinePlugin injects it at build time so packaged apps don't need .env at runtime.
+// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omega.js/backend). The bundle
+// task's esbuild `define` injects it at build time so packaged apps don't need .env at runtime.
 // Without the secret, the module logs a warning + becomes a no-op.
 
 const LoggerLite = require('./logger-lite.js');
@@ -88,8 +88,8 @@ const analytics = {
     // Presence-driven: providers.google.id presence enables analytics. No separate
     // `enabled` flag (matches @omega.js/backend convention — credentials are the enable signal).
     analytics._measurementId = cfg.providers?.google?.id || null;
-    // Secret comes from env. In packaged builds, webpack's DefinePlugin replaces
-    // `process.env.GOOGLE_ANALYTICS_SECRET` with the build-time literal so the
+    // Secret comes from env. In packaged builds, the bundle task's esbuild `define`
+    // replaces `process.env.GOOGLE_ANALYTICS_SECRET` with the build-time literal so the
     // packaged app has it baked in without shipping .env.
     analytics._apiSecret = process.env.GOOGLE_ANALYTICS_SECRET || null;
 
@@ -99,7 +99,7 @@ const analytics = {
       return;
     }
     if (!analytics._apiSecret) {
-      logger.warn('analytics: GOOGLE_ANALYTICS_SECRET env var not set — disabled. (Set in .env for dev; webpack injects at build time for packaged apps.)');
+      logger.warn('analytics: GOOGLE_ANALYTICS_SECRET env var not set — disabled. (Set in .env for dev; the bundle task bakes it in at build time for packaged apps.)');
       analytics._enabled = false;
       return;
     }

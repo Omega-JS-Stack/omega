@@ -23,7 +23,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The subscriber the subscription actually belongs to, on Stripe's own record
 const OWNER_UID = '_test-refused-intent-owner';
@@ -70,7 +71,7 @@ function runRefusalWhoseStampFails() {
   }));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A refused event whose refusal stamp fails to write still touches nothing else',
   type: 'group',
   timeout: 30000,
@@ -138,4 +139,4 @@ module.exports = {
       },
     },
   ],
-};
+});

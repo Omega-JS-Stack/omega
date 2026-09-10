@@ -726,7 +726,7 @@ import {
 } from '@omega.js/client/modules/utilities';
 // Or: const utils = Manager.utilities();
 
-// Copy to clipboard
+// Copy to clipboard (rejects when the clipboard refuses — catch it)
 await clipboardCopy('Text to copy');
 await clipboardCopy(document.querySelector('#input')); // From element
 

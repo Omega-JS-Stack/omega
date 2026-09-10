@@ -30,8 +30,9 @@
  */
 const crypto = require('crypto');
 const path = require('path');
-const conversions = require('../../src/manager/libraries/analytics/conversions.js');
-const matchData = require('../../src/manager/libraries/analytics/match-data.js');
+const conversions = require('../../dist/manager/libraries/analytics/conversions.js');
+const matchData = require('../../dist/manager/libraries/analytics/match-data.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A uid the way one actually looks — Firebase's alphabet is case-SENSITIVE —
 // carrying the padding a stored id can pick up. A lowercased or untrimmed
@@ -59,7 +60,7 @@ const FULL_USER_DOC = {
     name: { first: 'Ada', last: 'Lovelace' },
     birthday: { timestamp: '1985-02-16T00:00:00.000Z', timestampUNIX: 477273600 },
     gender: 'female',
-    location: { country: 'US', region: 'California', city: 'San Diego', zip: '94035' },
+    location: { country: 'US', region: 'California', city: 'San Diego', postalCode: '94035' },
     telephone: { countryCode: 1, national: 5550102030 },
   },
 };
@@ -154,7 +155,7 @@ const TIKTOK_PIXEL = '_TEST_TIKTOK_PIXEL';
  * @returns {{results: object[], calls: object[], lines: string[]}}
  */
 function fireOnRecordedWire({ production }) {
-  const modulePath = require.resolve('../../src/manager/libraries/analytics/conversions.js');
+  const modulePath = require.resolve('../../dist/manager/libraries/analytics/conversions.js');
   const fetchPath = require.resolve('wonderful-fetch', { paths: [path.dirname(modulePath)] });
   const realFetch = require.cache[fetchPath];
   const savedEnv = { META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN };
@@ -216,7 +217,7 @@ function fireOnRecordedWire({ production }) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Server conversion delivery: match data, consent gating, absent-data tolerance',
   type: 'group',
 
@@ -262,6 +263,35 @@ module.exports = {
         assert.equal(event.custom_data.currency, 'USD');
         assert.deepEqual(event.custom_data.content_ids, ['premium']);
         assert.equal(event.custom_data.fbc, undefined, 'match data never rides the custom data');
+      },
+    },
+
+    {
+      // Meta REQUIRES `action_source` and makes its accuracy a term of use, and
+      // its enum names this exact case: `system_generated`, "for example, a
+      // subscription renewal that's set to auto-pay each month". Every server
+      // fire claimed `website`, which said a person had been on the site for a
+      // charge their card took on its own
+      // ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)). The
+      // catalog decides it per event; the body is where it has to show up.
+      name: 'a-billed-charge-tells-meta-system-generated-and-a-checkout-website',
+      auth: 'none',
+
+      async run({ assert, ctx, Manager }) {
+        const identity = matchData.buildIdentity({ uid: UID, email: EMAIL, request: { ip: IP, userAgent: USER_AGENT } });
+        const actionSourceFor = (event) => conversions.buildMetaBody({
+          descriptor: descriptorFor(deliver({ ctx, Manager, event: event }), 'meta'),
+          identity: identity,
+          eventId: `${event}._test-webhook-event`,
+        }).data[0].action_source;
+
+        for (const event of ['subscription_renew', 'payment_recovered', 'trial_convert']) {
+          assert.equal(actionSourceFor(event), 'system_generated', `${event} bills a card with nobody present`);
+        }
+
+        for (const event of ['purchase', 'trial_start', 'subscription_cancel']) {
+          assert.equal(actionSourceFor(event), 'website', `${event} is something a person did on the site`);
+        }
       },
     },
 
@@ -980,4 +1010,4 @@ module.exports = {
       },
     },
   ],
-};
+});

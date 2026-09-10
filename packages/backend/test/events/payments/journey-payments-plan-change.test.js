@@ -5,7 +5,9 @@
  * Uses test intent for initial subscription, then manual webhook to change plans.
  * Requires at least two paid subscription products in config.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: paid product A → plan-changed → paid product B',
   type: 'suite',
   timeout: 30000,
@@ -141,4 +143,4 @@ module.exports = {
       },
     },
   ],
-};
+});

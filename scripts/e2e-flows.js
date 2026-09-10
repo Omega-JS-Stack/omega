@@ -44,7 +44,6 @@
 const path = require('path');
 const fs = require('fs');
 const net = require('net');
-const { spawn } = require('child_process');
 const { createRequire } = require('module');
 const assert = require('assert');
 
@@ -54,12 +53,22 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'backend');
-const PLAYGROUND_WEBSITE = path.join(ROOT, 'brands', 'omega-playground', 'targets', 'website');
+const PLAYGROUND = path.join(ROOT, 'brands', 'omega-playground');
+const PLAYGROUND_BACKEND = path.join(PLAYGROUND, 'targets', 'backend');
+const PLAYGROUND_WEBSITE = path.join(PLAYGROUND, 'targets', 'website');
+// The hoisted local bins, spawned DIRECTLY (see @omega.js/devkit/test/boot-child)
+const MGR_BIN = path.join(ROOT, 'node_modules', '.bin', 'mgr');
+const OMEGA_BIN = path.join(ROOT, 'node_modules', '.bin', 'omega');
 const LOG_DIR = path.join(ROOT, '.temp', 'flows-e2e');
 const SHOT_DIR = path.join(LOG_DIR, 'screenshots');
 
 const { CLASSIC_PORTS, readPortsFile, resolvePorts, composeTargetConfig, loadEnv } = require('@omega.js/config');
+// The boot mechanism is ONE mechanism (#775): child boot/stop on a ready
+// marker, the classic-port hold, and the browser launcher all live in devkit,
+// so this lane and every brand's own lane share them instead of drifting.
+const { startChild, stopChild } = require('@omega.js/devkit/test/boot-child');
+const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('@omega.js/devkit/test/port-hold');
+const { launchBrowser, resolvePuppeteer } = require('@omega.js/devkit/test/browser');
 const { createStepsLog } = require('./steps-log');
 
 // The billing journeys hand-build the provider webhooks no UI can produce (a
@@ -74,11 +83,6 @@ const EMULATOR_READY_TIMEOUT = 300000;
 const DEV_READY_TIMEOUT = 300000;
 const EMULATOR_READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
-
-// The classics the allocator starts from, plus the two internal ports the
-// HTTPS proxies want (web's 4443, the backend's 5443) — holding those too
-// keeps a bumped stack from landing back on a number a developer's stack uses.
-const CLASSIC_HOLD_PORTS = [...new Set([...Object.values(CLASSIC_PORTS), 4443, 5443])];
 
 // Seeded personas (@omega.js/backend's test-accounts.js — every persona shares
 // the deterministic password, and the domain comes from the brand's contact
@@ -190,134 +194,6 @@ function isPortListening(port) {
     socket.once('error', () => done(false));
     socket.setTimeout(1000, () => done(false));
   });
-}
-
-// -- Port isolation ---------------------------------------------------------
-
-/**
- * Hold one address of one port. Node sets SO_REUSEADDR, so a wildcard
- * listener does NOT stop a 127.0.0.1 bind (and vice versa) — and isPortFree
- * probes all three. Holding all three is what actually makes a port "taken"
- * to both the allocator and firebase-tools' own connect probe.
- * @param {number} port - port to hold
- * @param {string|null} host - bind address (null = wildcard)
- * @returns {Promise<net.Server|null>} the listener, or null when busy
- */
-function holdAddress(port, host) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', () => resolve(null));
-    server.listen(host ? { port, host } : { port }, () => resolve(server));
-  });
-}
-
-/**
- * Hold every classic port for the run's duration.
- * @returns {Promise<{ servers: net.Server[], held: number[], busy: number[] }>}
- */
-async function holdClassicPorts() {
-  const servers = [];
-  const held = [];
-  const busy = [];
-
-  for (const port of CLASSIC_HOLD_PORTS) {
-    const bound = [];
-    for (const host of ['127.0.0.1', '::1', null]) {
-      const server = await holdAddress(port, host);
-      if (server) {
-        bound.push(server);
-      }
-    }
-    // A port nobody else owns binds on all three; anything less means a live
-    // listener is there — leave it alone, the allocator bumps around it.
-    // "Alone" means CLOSING the partial binds too: SO_REUSEADDR lets a
-    // more-specific socket win, so keeping a 127.0.0.1 bind next to someone
-    // else's live listener would steal their localhost traffic for the run.
-    if (bound.length === 3) {
-      held.push(port);
-      servers.push(...bound);
-    } else {
-      busy.push(port);
-      releasePorts(bound);
-    }
-  }
-
-  return { servers, held, busy };
-}
-
-function releasePorts(servers) {
-  for (const server of servers || []) {
-    try { server.close(); } catch (e) { /* already closed */ }
-  }
-}
-
-// -- Child processes --------------------------------------------------------
-
-/**
- * Spawn a long-running child, teeing its output to a log file, and resolve
- * when its ready marker appears.
- * @param {object} options
- * @param {string} options.bin - executable
- * @param {string[]} options.args - argv
- * @param {string} options.cwd - working directory
- * @param {object} options.env - environment
- * @param {string} options.logFile - log path
- * @param {RegExp} options.marker - ready marker (a capture group is returned)
- * @param {number} options.timeout - ms before giving up
- * @returns {{ child: object, ready: Promise<string|null> }}
- */
-function startChild({ bin, args, cwd, env, logFile, marker, timeout }) {
-  fs.mkdirSync(path.dirname(logFile), { recursive: true });
-  const logStream = fs.createWriteStream(logFile);
-
-  // The hoisted local bin is spawned DIRECTLY (not via npx): outside an
-  // npm-script PATH the npx shim routes through the Socket Firewall proxy,
-  // whose proxy env breaks firebase-tools' internal emulator REST calls.
-  const child = spawn(bin, args, {
-    cwd,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  });
-
-  const ready = new Promise((resolve, reject) => {
-    let buffer = '';
-    const timer = setTimeout(() => {
-      reject(new Error(`${path.basename(bin)} ${args[0]} not ready after ${timeout / 1000}s (log: ${path.relative(ROOT, logFile)})`));
-    }, timeout);
-
-    const watch = (chunk) => {
-      const text = chunk.toString();
-      buffer += text;
-      logStream.write(text);
-      const match = buffer.match(marker);
-      if (match) {
-        clearTimeout(timer);
-        resolve(match[1] || null);
-      }
-    };
-
-    child.stdout.on('data', watch);
-    child.stderr.on('data', watch);
-    child.on('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`${path.basename(bin)} ${args[0]} exited early (code ${code}, log: ${path.relative(ROOT, logFile)})`));
-    });
-  });
-
-  return { child, ready };
-}
-
-async function stopChild(child) {
-  if (!child || child.exitCode !== null) {
-    return;
-  }
-  const exited = new Promise((resolve) => child.once('exit', resolve));
-  try { process.kill(-child.pid, 'SIGINT'); } catch (e) { return; }
-  const result = await Promise.race([exited.then(() => 'clean'), sleep(20000)]);
-  if (result !== 'clean') {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { /* already gone */ }
-  }
 }
 
 // -- Browser helpers --------------------------------------------------------
@@ -608,21 +484,39 @@ async function postTestWebhook(apiUrl, event) {
   }
 }
 
+/**
+ * firebase-admin from the backend app's own resolution, initialised ONCE for
+ * the whole run (host-side only). Each caller sets the emulator host its own
+ * service reads (`FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`)
+ * before its first call; setting one only affects THIS process, since both
+ * children were spawned with their environment already snapshotted.
+ * @returns {object} the firebase-admin namespace, default app live
+ */
+function adminApp() {
+  const backendRequire = createRequire(path.join(PLAYGROUND_BACKEND, 'package.json'));
+  const admin = backendRequire('firebase-admin');
+
+  if (admin.apps.length === 0) {
+    const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
+    admin.initializeApp({ projectId: firebaserc.projects.default });
+  }
+
+  return admin;
+}
+
 // ---------------------------------------------------------------------------
 
 async function main() {
   console.log('\nUser-flows e2e (real Chromium: auth, checkout, verts, account, billing journeys)\n');
 
+  // Resolved from the monorepo root, the same walk a brand's lane makes to its
+  // own root. No browser is a SKIP here, never a failure — this lane cannot
+  // run without one, and a machine without Chrome is not a broken product.
   let puppeteer = null;
   try {
-    puppeteer = require('puppeteer');
-    const chrome = puppeteer.executablePath();
-    if (!chrome || !fs.existsSync(chrome)) {
-      throw new Error(`puppeteer's Chrome is not installed at ${chrome}`);
-    }
+    puppeteer = resolvePuppeteer(ROOT);
   } catch (error) {
-    console.log(`⏭ SKIPPED — ${error.message}`);
-    console.log('   install it with `npx puppeteer browsers install chrome`\n');
+    console.log(`⏭ SKIPPED — ${error.message}\n`);
     process.exit(0);
   }
 
@@ -659,6 +553,7 @@ async function main() {
     let siteUrl = null;
     let apiUrl = null;
     let firestorePort = null;
+    let authPort = null;
 
     await step('the classic ports are held so the stack boots beside a live dev', async () => {
       hold = await holdClassicPorts();
@@ -683,13 +578,14 @@ async function main() {
 
     await step('the playground emulator boots + personas seed', async () => {
       emulator = startChild({
-        bin: path.join(ROOT, 'node_modules', '.bin', 'mgr'),
+        bin: MGR_BIN,
         args: ['emulator'],
         cwd: PLAYGROUND_BACKEND,
         env: childEnv,
         logFile: path.join(LOG_DIR, 'emulator.log'),
         marker: EMULATOR_READY_MARKER,
         timeout: EMULATOR_READY_TIMEOUT,
+        relativeTo: ROOT,
       });
       await emulator.ready;
       const ports = readPortsFile(PLAYGROUND_BACKEND);
@@ -701,31 +597,26 @@ async function main() {
       // billing journeys post their provider webhooks to.
       apiUrl = `http://127.0.0.1:${ports.hosting}`;
       firestorePort = ports.firestore;
+      authPort = ports.auth;
       return `auth :${ports.auth}, hosting :${ports.hosting}, functions :${ports.functions}`;
     });
 
     await step('the website serves through the REAL `omega dev` (auth proxy live)', async () => {
       dev = startChild({
-        bin: path.join(ROOT, 'node_modules', '.bin', 'omega'),
+        bin: OMEGA_BIN,
         args: ['dev', `--port=${sitePort}`],
         cwd: PLAYGROUND_WEBSITE,
         env: childEnv,
         logFile: path.join(LOG_DIR, 'dev.log'),
         marker: DEV_READY_MARKER,
         timeout: DEV_READY_TIMEOUT,
+        relativeTo: ROOT,
       });
       siteUrl = await dev.ready;
       return siteUrl;
     });
 
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--ignore-certificate-errors',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    });
+    browser = await launchBrowser({ puppeteer });
 
     // ---- Area 1: auth -----------------------------------------------------
 
@@ -974,6 +865,17 @@ async function main() {
     });
 
     await step('the promo card renders content-sized inside its slot ceiling', async () => {
+      // The host mounts the frame AT the ceiling and shrinks it when the inline
+      // document reports its height, so the promo event precedes the shrink:
+      // wait for the report, or a loaded machine measures the ceiling itself.
+      await vertPage.waitForFunction(
+        () => {
+          const $frame = document.querySelector('[data-omega-vert="house"] iframe.omega-vert-promo');
+          return $frame && $frame.getBoundingClientRect().height < 250;
+        },
+        { timeout: 30000 },
+      ).catch(() => {});
+
       const box = await vertPage.evaluate(() => {
         const $host = document.querySelector('[data-omega-vert="house"]');
         const $frame = $host.querySelector('iframe.omega-vert-promo');
@@ -1075,6 +977,46 @@ async function main() {
       return `${account.email} · ${account.plan} · ${account.status}`;
     });
 
+    await step('a session killed server-side signs the open tab out at the next moment of doubt', async () => {
+      // #798: Firebase asks the Auth server about a persisted session at page
+      // load and at the hourly refresh and at no other moment, so a revoked,
+      // disabled or deleted account kept an open tab signed in until a reload.
+      // Nothing here reloads: the tab stays exactly where the step above left
+      // it, signed in on the account page.
+      //
+      // The admin SDK, pointed at THIS run's auth emulator (the same host-side
+      // lane the billing journeys use for Firestore).
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = `127.0.0.1:${authPort}`;
+      const admin = adminApp();
+
+      // The session dies on the SERVER while the browser still holds a
+      // valid-looking token: what a revocation, a disable and a delete all
+      // look like to an open page, and what a restarted auth emulator does to
+      // a dev session. DISABLING is the lever here because the Auth emulator's
+      // refresh grant never reads `validSince`, so `revokeRefreshTokens` is a
+      // no-op against it while production honours it; a disabled user's
+      // refresh comes back USER_DISABLED, which reaches the client as
+      // `auth/user-disabled`, the same "session is gone" class.
+      await admin.auth().updateUser(personaSeed('premium-active').uid, { disabled: true });
+
+      // The tab comes back into view. @omega.js/client forces a token refresh,
+      // the Auth server refuses it, the client signs out, and the page's auth
+      // policy takes an `authenticated` page's signed-out visitor to the auth
+      // surface: /signin or /signup, whichever the policy picks (the kick-out
+      // step above accepts the same pair).
+      await accountPage.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await accountPage.waitForFunction(
+        () => /^\/(signin|signup)/.test(window.location.pathname),
+        { timeout: 60000 },
+      );
+
+      return accountPage.url();
+    });
+
     await accountPage.close();
 
     // ---- Area 5: billing journeys -----------------------------------------
@@ -1097,18 +1039,12 @@ async function main() {
     await step('the seeded personas\' purchase records stand beside their subscriptions', async () => {
       assert.ok(paidProduct, 'the brand catalog must carry the `premium` plan the journeys buy');
 
-      // firebase-admin from the backend app's own resolution, pointed at the
-      // emulator. Setting the host here only affects THIS process — both
-      // children were spawned with their environment already snapshotted.
+      // The admin SDK, pointed at the emulator. Setting the host here only
+      // affects THIS process.
       process.env.FIRESTORE_EMULATOR_HOST = `127.0.0.1:${firestorePort}`;
-      const backendRequire = createRequire(path.join(PLAYGROUND_BACKEND, 'package.json'));
-      const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
-      const projectId = firebaserc.projects.default;
+      const admin = adminApp();
+      const projectId = admin.app().options.projectId;
 
-      const admin = backendRequire('firebase-admin');
-      if (admin.apps.length === 0) {
-        admin.initializeApp({ projectId });
-      }
       db = admin.firestore();
 
       // The fixtures are @omega.js/backend's own (`seedOrderFixture`, beside the

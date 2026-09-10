@@ -7,10 +7,11 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const PACKAGE_ROOT = path.join(__dirname, '..', '..', '..', '..');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'icon sheet: vendored cross-target sheet + entry wiring',
@@ -70,4 +71,4 @@ module.exports = {
       },
     },
   ],
-};
+});

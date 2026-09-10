@@ -92,7 +92,7 @@ Or return a 404 — fetch failures are caught and logged, never crash. Failure l
 The script runs via `new AsyncFunction('manager', 'require', code)`:
 
 - **`manager`** — the live main-process Manager singleton. Full access to all libs: `manager.storage`, `manager.autoUpdater`, `manager.windows`, `manager.ipc`, etc.
-- **`require`** — the real Node.js `require` (uses `__non_webpack_require__` when webpacked). Can load `fs`, `path`, `child_process`, `electron`, or any installed package.
+- **`require`** — the real Node.js `require`. Can load `fs`, `path`, `child_process`, `electron`, or any installed package.
 - **`await`** — supported natively.
 
 ### Error handling

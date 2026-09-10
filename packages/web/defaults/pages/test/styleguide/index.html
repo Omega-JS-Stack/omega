@@ -2,8 +2,6 @@
 layout: frontend/core/base
 permalink: /test/styleguide
 
-sitemap:
-  include: false
 meta:
   title: "Styleguide"
   description: "Every token, type style, button, form control, and motion attribute in one place: the theme's living styleguide."
@@ -117,7 +115,7 @@ meta:
         <button type="button" class="btn btn-outline-primary">Outline primary</button>
         <button type="button" class="btn btn-adaptive omega-btn-ring">Gradient ring</button>
         <button type="button" class="btn btn-cmd"><span class="omega-cmd-prompt">$</span>npx omega setup</button>
-        <button type="button" class="btn btn-icon" aria-label="Icon button">{% omega_icon "gear" %}</button>
+        <button type="button" class="btn btn-icon" aria-label="Icon button"><i class="fa-solid fa-gear"></i></button>
       </div>
 
       <span class="omega-micro d-block mb-3">Sizes & states</span>
@@ -136,15 +134,15 @@ meta:
       <div class="d-flex flex-wrap align-items-center gap-2">
         <a href="#buttons" class="btn btn-adaptive omega-hover-nudge">
           Continue
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
         <a href="#buttons" class="btn btn-outline-adaptive">
-          {% omega_icon "paper-plane", "fa-sm me-2" %}
+          <i class="fa-solid fa-paper-plane fa-sm me-2"></i>
           Send message
         </a>
         <a href="#buttons" class="btn btn-primary omega-hover-nudge">
           Get free trial
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       </div>
     </div>
@@ -200,8 +198,8 @@ meta:
             <div class="input-group">
               <input type="password" class="form-control" id="sg-password" placeholder="Enter your password"/>
               <button class="btn omega-password-toggle px-3" type="button" aria-label="Toggle password visibility">
-                <span class="omega-password-show">{% omega_icon "eye", "fa-fw" %}</span>
-                <span class="omega-password-hide d-none">{% omega_icon "eye-slash", "fa-fw" %}</span>
+                <span class="omega-password-show"><i class="fa-solid fa-eye fa-fw"></i></span>
+                <span class="omega-password-hide d-none"><i class="fa-solid fa-eye-slash fa-fw"></i></span>
               </button>
             </div>
           </div>
@@ -534,7 +532,7 @@ meta:
   <div class="container">
     <div class="omega-section-head mb-4" data-omega-reveal>
       <span class="omega-micro">Icons</span>
-      <h2 class="omega-display omega-display--section">omega_icon</h2>
+      <h2 class="omega-display omega-display--section">Font Awesome markup</h2>
       <p>Build-time inlined SVGs: solid by default, brands resolve automatically.</p>
     </div>
 
@@ -543,14 +541,14 @@ meta:
       <div class="d-flex flex-wrap gap-3 fs-4 mb-4">
         {% assign _solid = "house|user|gear|bell|check|xmark|magnifying-glass|paper-plane|rocket|heart|bolt|cloud|lock|wand-magic-sparkles|layer-group|headset|palette|shield-halved|circle-question|arrow-right" | split: "|" %}
         {% for name in _solid %}
-          <span title="{{ name }}">{% omega_icon name %}</span>
+          <span title="{{ name }}"><i class="fa-solid fa-{{ name }}"></i></span>
         {% endfor %}
       </div>
       <span class="omega-micro d-block mb-3">Brands</span>
       <div class="d-flex flex-wrap gap-3 fs-4">
         {% assign _brands = "chrome|firefox|edge|safari|opera|brave|apple|windows|linux|android|github|google|x-twitter|discord|slack|youtube" | split: "|" %}
         {% for name in _brands %}
-          <span title="{{ name }}">{% omega_icon name %}</span>
+          <span title="{{ name }}"><i class="fa-solid fa-{{ name }}"></i></span>
         {% endfor %}
       </div>
     </div>

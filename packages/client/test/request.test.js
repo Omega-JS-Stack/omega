@@ -187,6 +187,32 @@ describe('Request Module', () => {
     assert.strictEqual(error.data.message, 'Unauthorized caller');
   });
 
+  it('should probe the session on a 401 and still reject the request (#798)', async () => {
+    fetchStub([
+      { ok: false, status: 401, headers: { 'content-type': 'application/json' }, json: { message: 'Unauthorized caller' } },
+      { ok: false, status: 401, text: 'nope' },
+      { ok: false, status: 403, text: 'forbidden' },
+    ]);
+    const probes = [];
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => 'tok',
+      // The probe rejecting must never become the caller's failure
+      onUnauthorized: () => { probes.push('probe'); return Promise.reject(new Error('probe blew up')); },
+    });
+
+    const error = await request('/omega/user/token', { method: 'POST' }).catch(e => e);
+    assert.strictEqual(probes.length, 1, 'a 401 is a moment of doubt');
+    assert.strictEqual(error.code, 401, 'and the caller still gets its error, unchanged');
+
+    // A public route's 401 is not this user's session: nothing was sent for it
+    await request('/omega/verts/serve', { auth: false }).catch(e => e);
+    assert.strictEqual(probes.length, 1, 'auth: false never probes');
+
+    await request('/omega/user/thing').catch(e => e);
+    assert.strictEqual(probes.length, 1, 'a 403 is an authorization answer, not a dead session');
+  });
+
   it('should parse omega-properties and call onProperties on success AND error', async () => {
     const properties = { code: 200, usage: { current: { credits: { monthly: 5 } }, limits: { credits: 100 } } };
     fetchStub([

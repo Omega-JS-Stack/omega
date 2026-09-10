@@ -3,9 +3,9 @@
  *
  * Code between the markers runs in development and is cut out of every
  * PRODUCTION bundle, so dev warnings and simulation hooks never ship. Each
- * framework registers the strip in its own bundler's terms — web an esbuild
- * plugin, extension and desktop a webpack loader — but the markers and the
- * cut itself live here, once.
+ * Every framework registers the strip the same way now — the esbuild plugin
+ * beside this file, which `bundle.js` composes for production builds — but the
+ * markers and the cut itself live here, once.
  */
 
 const START_MARKER = '/* @dev-only:start */';

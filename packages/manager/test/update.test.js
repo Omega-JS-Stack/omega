@@ -141,6 +141,27 @@ test('a brand-level config or .env edit triggers the build again', async () => {
   assert.equal(buildCount(targetPath), 3, 'a brand .env edit is fresh input');
 });
 
+test('#681: a brand `.env.<environment>` overlay edit triggers the build again', async () => {
+  const { root, targetPath } = stageBrand();
+
+  await run(root, targetPath);
+
+  // The overlay is a real layer of the cascade (#586) and it carries the values
+  // that DIFFER per environment, which is exactly what a build bakes in. The
+  // chain fingerprinted the base `.env` by exact path only, so editing the
+  // overlay left the target converged and the build served the old key.
+  jetpack.write(path.join(root, '.env.development'), 'KEY="from the overlay"\n');
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 2, 'a new brand overlay is fresh input');
+
+  jetpack.write(path.join(root, '.env.development'), 'KEY="edited in the overlay"\n');
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 3, 'a brand overlay edit is fresh input');
+
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 3, 'an untouched overlay leaves the target converged');
+});
+
 // ─── Frameworks ──────────────────────────────────────────────────────────────
 
 test('an installed framework version bump triggers the build again', async () => {

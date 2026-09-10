@@ -17,52 +17,30 @@
  * `OMEGA_*_PORT` map, the test-mode switches — those are the runtime's own
  * facts about itself, not a brand's credentials.
  *
- * It is also where the DEV/LIVE split lives (#586): payment secrets carry an
- * optional `<KEY>_DEV` twin, which every read prefers outside production and
- * ignores in production, and a LIVE-shaped credential is refused outside
- * production outright. Both rules are the schema's data, applied once here, so
- * every provider library gets them without knowing they exist.
+ * A key whose value must differ between a local run and a deployed one is NOT
+ * this reader's business ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)):
+ * the brand's `.env.<environment>` overlay supplies the other value and the
+ * cascade resolves it before anything reaches here, so `env.get()` reads ONE
+ * name in every environment.
  *
  * Values are never printed. Errors name the KEY and the fix.
  */
-const { envSchemaEntry, requiredEnvKeys, devEnvKeyMap } = require('@omega.js/config');
+const { envSchemaEntry, requiredEnvKeys, envEnvironment } = require('@omega.js/config');
 const { checkEnvRules } = require('@omega.js/config/env-rules');
 
 /**
- * The runtime environment — the SINGLE SOURCE OF TRUTH the Manager's
- * `getEnvironment()` and the three `is*()` checks are, and the answer this
- * reader's own dev/live rules gate on (the provider libraries that call
- * `get()` hold no Manager handle). Exactly ONE of three mutually-exclusive
- * values: testing wins, then production, else development.
+ * The runtime environment — what the Manager's `getEnvironment()` and the three
+ * `is*()` checks return. It is @omega.js/config's `envEnvironment()`, the ONE
+ * home of the vocabulary: the same three names the `.env.<environment>` overlay
+ * files are spelled with (#586), so a `.env.development` and a
+ * `Manager.isDevelopment()` can never mean different things.
  *
- * The final `else` is PRODUCTION on purpose: a deployed Cloud Function has no
- * FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so "no signal" IS the
- * normal production state. Defaulting to development would make every deployed
- * function skip real side effects (emails/analytics/webhooks) — and, since
- * #586, prefer a `_DEV` payment secret in front of real customers.
- * (Contrast UJM/BXM, whose deployed artifacts always carry their signal.)
+ * Re-exported here because the provider libraries below already read the
+ * environment through this reader and hold no Manager handle.
  *
  * @returns {'testing'|'production'|'development'} The environment.
  */
-function environment() {
-  // Testing takes precedence — set by the test runner / emulator (OMEGA_TEST_MODE=true).
-  if (process.env.OMEGA_TEST_MODE === 'true') {
-    return 'testing';
-  }
-  if (process.env.ENVIRONMENT === 'production') {
-    return 'production';
-  } else if (
-    process.env.ENVIRONMENT === 'development'
-    || process.env.FUNCTIONS_EMULATOR === true
-    || process.env.FUNCTIONS_EMULATOR === 'true'
-    || process.env.TERM_PROGRAM === 'Apple_Terminal'
-    || process.env.TERM_PROGRAM === 'vscode'
-  ) {
-    return 'development';
-  } else {
-    return 'production';
-  }
-}
+const environment = envEnvironment;
 
 /** How a missing key gets fixed, by who is supposed to provide it. */
 function remedy(entry) {
@@ -72,58 +50,13 @@ function remedy(entry) {
 }
 
 /**
- * The LIVE pattern that governs a name — a `_DEV` twin is governed by its base
- * key's shape, so a live credential pasted into the twin is refused too.
- *
- * @param {object} entry - The schema entry.
- * @returns {RegExp|undefined} The pattern a live credential matches.
- */
-function liveShapeOf(entry) {
-  return entry.liveShape || (entry.devOf ? envSchemaEntry(entry.devOf)?.liveShape : undefined);
-}
-
-/**
- * Refuse a credential that announces a LIVE account on a non-production run
- * (#586). Stripe stamps `sk_live_`/`rk_live_` and Chargebee `live_`, so those
- * two are caught by shape; PayPal's halves are opaque and rely on the `_DEV`
- * twin alone.
- *
- * @param {string} name - The key the value came from.
- * @param {object} entry - Its schema entry.
- * @param {string} value - The resolved value (never printed).
- * @throws {Error} LiveSecretOutsideProductionError (code 500).
- */
-function assertNotLive(name, entry, value) {
-  const shape = liveShapeOf(entry);
-  if (!shape || !value || !shape.test(value)) { return; }
-
-  const base = entry.devOf || name;
-  const error = new Error(
-    `${name} holds a LIVE credential and this process is running in ${environment()} — refusing to use it. `
-    + `A non-production run must never reach a live payment account (a local test purchase would charge a real card). `
-    + `Put the provider's TEST credential in ${base}_DEV — the backend prefers it outside production and no deploy ever uploads it — and keep the live one in ${base} for the deployed backend.`,
-  );
-  error.name = 'LiveSecretOutsideProductionError';
-  error.code = 500;
-  throw error;
-}
-
-/**
- * The resolved value of a declared env key: outside production the key's
- * `_DEV` twin when one is set, else the cascade's value, else the schema's
- * static default, else undefined. An empty string reads as absent — a key set
- * to nothing is not set.
- *
- * In PRODUCTION a `_DEV` key reads as absent, whatever the cascade holds: the
- * deploy lane strips those rows from the upload, and this is the second latch
- * so a stale row that survived some other way still cannot redirect a real
- * customer's payment.
+ * The resolved value of a declared env key: the cascade's value, else the
+ * schema's static default, else undefined. An empty string reads as absent — a
+ * key set to nothing is not set.
  *
  * @param {string} name - The env var name.
  * @returns {string|undefined} The value.
  * @throws {Error} UnknownEnvKeyError when the schema does not declare `name`.
- * @throws {Error} LiveSecretOutsideProductionError when the resolved value is
- *   a live credential on a non-production run (#586).
  */
 function get(name) {
   const entry = envSchemaEntry(name);
@@ -136,19 +69,7 @@ function get(name) {
     throw error;
   }
 
-  const production = environment() === 'production';
-
-  if (entry.devOf && production) { return undefined; }
-
-  // Derived on every read, not cached: the schema is the live list (the
-  // manager's own tests add entries to it at runtime)
-  const twin = production ? undefined : devEnvKeyMap()[name];
-  const source = twin && process.env[twin] ? twin : name;
-  const value = process.env[source] || entry.default;
-
-  if (!production) { assertNotLive(source, envSchemaEntry(source), value); }
-
-  return value;
+  return process.env[name] || entry.default;
 }
 
 /**

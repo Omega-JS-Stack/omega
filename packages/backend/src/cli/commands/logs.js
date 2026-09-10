@@ -5,6 +5,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { resolveProjectId } = require('./firebase-init');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 const SEVERITY_COLORS = {
   DEFAULT: 'gray',
@@ -135,10 +136,13 @@ class LogsCommand extends BaseCommand {
     this.log(chalk.gray(`  Logs saving to: ${logPath}`));
     this.log(chalk.gray('  Tailing logs (Ctrl+C to stop)...\n'));
 
-    // Handle Ctrl+C gracefully
-    process.on('SIGINT', () => {
+    // Every way this tail is asked to stop ends it gracefully, off the ONE
+    // devkit list ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)):
+    // a closed terminal (SIGHUP) used to kill the run mid-poll, leaving the log
+    // file open on a half-written line.
+    STOP_SIGNALS.forEach((signal) => process.on(signal, () => {
       stopped = true;
-    });
+    }));
 
     while (!stopped) {
       try {

@@ -19,9 +19,17 @@
  * and over-fired for the shared-id one (every per-target secret at once,
  * including targets the brand does not even enable). The resolution is
  * @omega.js/config's own (loadConfig with a target overlays targets.<type>);
- * entries no enabled target claims are never evaluated, and the few entries no
- * target reads at all (SENTRY_AUTH_TOKEN — the monitoring SERVICE's) are
- * judged once against the brand config.
+ * entries no enabled target claims are never evaluated.
+ *
+ * The few entries no target reads at all (SENTRY_AUTH_TOKEN — the monitoring
+ * SERVICE's) are judged against the brand config AND every enabled target's
+ * resolved one ([#683](https://github.com/Omega-JS-Stack/omega/issues/683)):
+ * the same disease one level over. A target-less key belongs to a SERVICE, but
+ * the config path that requires it is written wherever that service writes its
+ * values — the monitoring service provisions one Sentry project per surface
+ * and lands the DSN in targets.<t>.monitoring.providers.sentry.dsn with the
+ * shared slot null. Truthy in ANY enabled target (or at the root) owes the key
+ * once; the per-key dedupe below is what makes the union one violation.
  *
  * It WARNS and never fails. A half-configured brand is a normal step on the way
  * to a configured one (the key is a dashboard visit away), and a manage run
@@ -70,6 +78,10 @@ module.exports = async (context) => {
     // brand targets.<type>), so this op and the target's build read one config.
     const { config } = loadConfig(brandRoot, target, { defaults: DEFAULTS });
     collect(checkEnvRules(config, process.env, { target }));
+    // …and the service's own keys against that same view (#683): a target-less
+    // entry names no target, so nothing here scopes it — this asks whether the
+    // path that requires it is truthy on THIS surface.
+    collect(checkEnvRules(config, process.env, { schema: TARGETLESS_SCHEMA }));
   }
 
   if (violations.length === 0) {

@@ -158,4 +158,47 @@ function applyToAmount(amount, discount) {
   return Math.max(0, parseFloat((base - off).toFixed(2)));
 }
 
-module.exports = { validate, applyToAmount, promoShape, DISCOUNT_CODES };
+/**
+ * The first charge for a provider that has no coupon object — applyToAmount()
+ * with the zero-total refusal in front of it.
+ *
+ * Stripe and Chargebee hand their hosted page a real coupon and let it decide
+ * what a zero total means. PayPal and Coinbase are prices THIS framework
+ * computes and sends, and neither a PayPal v2 Order/setup fee nor a Coinbase
+ * charge accepts a zero amount — so a code that covered the whole price was
+ * sent as a real $0.00 charge and came back as a provider 400 the buyer read as
+ * the checkout's generic failure sentence
+ * ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)). It is refused
+ * here instead, before the provider is called at all, and the refusal is coded
+ * 400 so `POST /payments/intent` answers the buyer with THESE words (naming
+ * their code and the price) rather than its neutral 500 line.
+ *
+ * A product priced 0 is NOT this case: it carries no code that could have taken
+ * anything off, and every provider already refuses it with its own "No price
+ * configured for …" — which stays theirs.
+ *
+ * @param {number} listPrice - The charge before any code
+ * @param {object} [discount] - A validate() result, or null for no discount
+ * @param {object} options
+ * @param {string} options.provider - The provider's display name, for the message
+ * @returns {number} The discounted charge, always above zero
+ * @throws {Error} Coded 400 when the code leaves nothing to charge
+ */
+function chargeableAmount(listPrice, discount, { provider }) {
+  const amount = applyToAmount(listPrice, discount);
+
+  // A priced product that discounts to nothing can only have got there through a
+  // code — applyToAmount() returns the base untouched without one — so the
+  // refusal can always name it
+  if (listPrice > 0 && amount <= 0) {
+    const error = new Error(`Discount code ${discount.code} covers the full $${Number(listPrice).toFixed(2)} price, so there is nothing for ${provider} to charge. Remove the code or choose another payment method.`);
+
+    error.code = 400;
+
+    throw error;
+  }
+
+  return amount;
+}
+
+module.exports = { validate, applyToAmount, chargeableAmount, promoShape, DISCOUNT_CODES };

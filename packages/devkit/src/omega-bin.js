@@ -8,6 +8,13 @@
  * the context that owns the CALLER'S cwd — nearest first, walking up — and runs
  * THAT context's CLI:
  *
+ *   - an OMEGA PACKAGE'S OWN ROOT (package.json `name` is `@omega.js/*`) →
+ *     that package's own CLI, or a refusal when it ships none. Checked FIRST,
+ *     ahead of the dependency rule: a framework devDepends on other frameworks
+ *     (extension and desktop on @omega.js/web for vendorAssets, the manager on
+ *     @omega.js/backend), and reading those as a target made `omega test` in
+ *     packages/extension run WEB's CLI, which scaffolded a web target into the
+ *     package ([#757](https://github.com/Omega-JS-Stack/omega/issues/757))
  *   - a TARGET (nearest package.json declaring a framework, including the
  *     backend's functions/ layout) → that framework's CLI
  *   - a BRAND ROOT (config/omega.json5 with no framework declared nearer)
@@ -36,6 +43,11 @@ const FRAMEWORKS = [
 
 const MANAGER = '@omega.js/manager';
 
+// Every package in the OMEGA monorepo carries this name prefix; no consumer
+// target ever does. A manifest with it IS the package, never a project built
+// on top of one (#757).
+const OMEGA_SCOPE = '@omega.js/';
+
 // Dirs that are a VIEW of the target one level up, never a context of their own:
 // a backend's runtime cwd (functions/) and its staged build output (dist/,
 // which carries a COMPOSED config/omega.json5 that would otherwise read as a
@@ -61,6 +73,54 @@ const CONTEXTLESS_VERBS = new Set([
   'cwd',
   'logs', 'log', '--logs', 'logs:read', 'logs:tail', 'logs:stream',
 ]);
+
+// The signing box's verbs. A box that hosts the Windows EV signing runner is a
+// MACHINE, not a project: `omega runner` and `omega sign-windows` read their
+// configuration from the runner home and run from any directory. Both belong
+// to @omega.js/desktop, so with no target they go to desktop's CLI — the host
+// when desktop won the bin link (a bare `npm i -g @omega.js/desktop`), else
+// desktop resolved from the cwd (a monorepo checkout, a brand root) — and
+// refuse naming the install when it is nowhere. They scaffold nothing
+// ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)).
+const BOX_VERBS = new Set(['runner', 'sign-windows']);
+const DESKTOP = '@omega.js/desktop';
+
+/**
+ * The signing-box verb this invocation selects, or null. The ONE reading of
+ * "is this the box's", shared by the dispatcher below and by
+ * @omega.js/desktop's CLI (which skips the project `.env` cascade for exactly
+ * these) — two readings would drift, and the drift is a brand's token reaching
+ * the box.
+ *
+ * Both spellings count: the bare token (`omega runner status`) and the `--`
+ * flag desktop's alias table takes (`omega --runner`, `omega --sign-windows
+ * --smoke`). `--help` is never one: it prints help, in every spelling. A box
+ * verb sitting in an ARGUMENT position is not one either — `omega test runner`
+ * runs the test verb — so the first positional has to be the box verb itself.
+ *
+ * @param {string[]} argv - Arguments after the bin name.
+ * @returns {string|null} The box verb's canonical name, or null.
+ */
+function boxVerbOf(argv) {
+  argv = argv || [];
+  if (argv.includes('--help') || argv.includes('-h')) return null;
+
+  const positional = argv.find((arg) => !arg.startsWith('-'));
+  if (positional && BOX_VERBS.has(positional)) return positional;
+
+  const flag = argv.find((arg) => arg.startsWith('--') && BOX_VERBS.has(arg.slice(2)));
+  return flag ? flag.slice(2) : null;
+}
+
+/**
+ * Boolean half of boxVerbOf — what callers that only need the yes/no ask.
+ *
+ * @param {string[]} argv - Arguments after the bin name.
+ * @returns {boolean}
+ */
+function isBoxVerbArgv(argv) {
+  return boxVerbOf(argv) !== null;
+}
 
 function readPackage(dir) {
   try {
@@ -97,25 +157,36 @@ function isBrandRoot(dir) {
 
 /**
  * Walk up from startDir to the nearest dispatch context. At each level, in
- * order: the dir's own package.json declaring a framework, then
- * brand-root-ness. Framework checks come first so a standalone consumer
- * (framework dep AND its own config/omega.json5 in one dir) dispatches as
- * a target, not a brand. The CLI entry normalizes a functions/ cwd up to the
- * target root (muscle-memory `cd functions` still works).
+ * order: the dir's own package.json being an OMEGA package, then declaring a
+ * framework, then brand-root-ness. IDENTITY beats dependency — a framework
+ * devDepends on other frameworks, and reading those as a target dispatched a
+ * framework's own root to a sibling framework's CLI (#757). Framework checks
+ * then come before the brand check so a standalone consumer (framework dep AND
+ * its own config/omega.json5 in one dir) dispatches as a target, not a brand.
+ * The CLI entry normalizes a functions/ cwd up to the target root
+ * (muscle-memory `cd functions` still works).
  *
  * The walk is BOUNDED at the nearest `.git` (that directory is still checked
  * first): past the repo boundary is somebody else's tree, never this dir's
  * dispatch context. Same bound as @omega.js/config's resolveBrandRoot and the
  * Claude plugin's inject hook.
  *
- * @returns {{ kind: 'framework', name: string, dir: string }
- *   | { kind: 'brand', dir: string } | null} dir = where the framework dep is
- *   declared (framework) / the brand root (brand)
+ * @returns {{ kind: 'self', name: string, dir: string }
+ *   | { kind: 'framework', name: string, dir: string }
+ *   | { kind: 'brand', dir: string } | null} dir = the package's own root
+ *   (self) / where the framework dep is declared (framework) / the brand root
+ *   (brand)
  */
 function findTarget(startDir) {
   let dir = path.resolve(startDir);
   while (true) {
-    const matches = frameworksOf(readPackage(dir));
+    const pkg = readPackage(dir);
+
+    if (pkg && typeof pkg.name === 'string' && pkg.name.startsWith(OMEGA_SCOPE)) {
+      return { kind: 'self', name: pkg.name, dir };
+    }
+
+    const matches = frameworksOf(pkg);
     if (matches.length > 1) {
       // Targets are one-framework-per-target by design — a multi-framework
       // manifest dispatches by FRAMEWORKS order, which must never be silent.
@@ -191,14 +262,47 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2) }) {
     // target into the cwd — a directory that owns no target is never where that
     // should land (#699). Twin of ensure-target's refusal (devkit scaffold-guard.js).
     const verb = verbOf(argv);
+    const boxVerb = boxVerbOf(argv);
+    if (boxVerb) {
+      if (hostName === DESKTOP) return hostRun();
+      const { cliPath } = tryResolveCli(DESKTOP, process.cwd());
+      if (!cliPath) {
+        console.error(`omega: "${boxVerb}" is ${DESKTOP}'s — a signing box runs it from any directory, but ${DESKTOP} is not installed here (from ${process.cwd()}). \`npm i -g ${DESKTOP}\`, then run it again.`);
+        process.exit(1);
+      }
+      console.error(`omega: no target context found from ${process.cwd()} — "${boxVerb}" is a signing-box verb, running ${DESKTOP}`);
+      return require(cliPath).run();
+    }
     if (verb && !CONTEXTLESS_VERBS.has(verb)) {
       console.error(`omega: refusing to run "${verb}" — ${process.cwd()} is not inside an OMEGA target (no framework dependency and no config/omega.json5 above it). Nothing was scaffolded.`);
-      console.error('Run it from a target directory, or `npx omega onboard` to create one here. Without a target, only onboard, help, version, cwd and logs run.');
+      console.error('Run it from a target directory, or `npx omega onboard` to create one here. Without a target, only onboard (create, new), help, version, cwd and logs run; the signing box\'s runner and sign-windows run through @omega.js/desktop.');
       process.exit(1);
     }
 
     console.error(`omega: no target context found from ${process.cwd()} — running ${hostName}`);
     return hostRun();
+  }
+
+  // An OMEGA package's OWN root — run ITS CLI, so `omega test` in
+  // packages/extension runs the extension's self-test. A package is never a
+  // target: nothing here may reach the host fallback, whose ensure-target would
+  // scaffold a consumer project into the framework source tree (#757).
+  if (target.kind === 'self') {
+    if (target.name === hostName) return hostRun();
+
+    const { cliPath, error } = tryResolveCli(target.name, target.dir);
+    if (!cliPath) {
+      // Two different facts share one refusal: a package that exports no
+      // `./cli` at all (config, devkit, ...) versus one that declares it but
+      // cannot resolve it right now (an unbuilt dist, a fresh clone before
+      // `npm install`). Name the one that applies.
+      const reason = error && error.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+        ? 'which ships no CLI'
+        : `whose './cli' did not resolve (${error ? error.message : 'unknown'}; an unbuilt dist? run its prepare)`;
+      console.error(`omega: refusing to run — ${target.dir} is the ${target.name} package itself, ${reason}, and an OMEGA package is never a target. Nothing was scaffolded.`);
+      process.exit(1);
+    }
+    return require(cliPath).run();
   }
 
   // A brand root — the manager owns brand-level commands (`omega test` fans
@@ -238,4 +342,4 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2) }) {
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, verbOf, TARGET_SUBDIRS, CONTEXTLESS_VERBS, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, CONTEXTLESS_VERBS, BOX_VERBS, FRAMEWORKS, MANAGER };

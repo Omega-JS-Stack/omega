@@ -15,6 +15,7 @@ const path = require('path');
 const BXM_ROOT_FROM_SUITE = path.resolve(__dirname, '..', '..', '..', '..');
 const DIST_ROOT           = path.resolve(__dirname, '..', '..', '..');
 const pkg = require(path.join(BXM_ROOT_FROM_SUITE, 'package.json'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Browser-context modules can't be plain-required from Node (they touch chrome.* /
 // window.* without try/catch around the top-level usage). Skip those — the build-layer
@@ -31,7 +32,7 @@ const BROWSER_CONTEXT_KEYS = new Set([
   './offscreen',
 ]);
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'package.json#exports — node-safe entries resolve',
@@ -49,4 +50,4 @@ module.exports = {
         ctx.expect(mod).toBeDefined();
       },
     })),
-};
+});

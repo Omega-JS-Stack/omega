@@ -135,7 +135,7 @@ async function startDevServer(t, fixture) {
         environment: 'development',
         assetManifest: {
           js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
         },
       });
     },

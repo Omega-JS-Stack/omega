@@ -15,7 +15,7 @@
  *
  *   {
  *     name:        'OMEGA_ADMIN_KEY',      // the env var (SCREAMING_SNAKE)
- *     match:       /^OAUTH2_.+$/,          // …or a pattern, for dynamic families
+ *     match:       /^CONNECTIONS_.+$/,     // …or a pattern, for dynamic families
  *     owner:       'workspace',            // the manager service that owns it
  *                                          // ('backend' = the framework itself)
  *     targets:     ['backend'],            // the targets whose runtime READS it
@@ -24,10 +24,6 @@
  *     default:     'value',                // …or a static default, where one applies
  *     secret:      true,                   // never printed, never in omega.json5
  *     required:    true,                   // absent = the backend refuses to boot
- *     devOf:       'STRIPE_SECRET_KEY',    // …or: this key OVERRIDES that one
- *                                          // outside production (see below)
- *     liveShape:   /^sk_live_/,            // the pattern a LIVE credential
- *                                          // matches — refused outside production
  *     deliverAs:   'GOOGLE_ANALYTICS_SECRET', // the name it lands under in the
  *                                          // target's composed .env (see below)
  *     delivery:    { backend: 'env' },      // HOW it reaches each target
@@ -68,19 +64,11 @@
  * verb: composed into dist/.env for the backend, loaded into process.env at
  * CLI boot for the others. Absent = delivered under its own name.
  *
- * `devOf:` marks a DEV-SUFFIXED twin — `<BASE>_DEV`, the value the backend
- * uses outside production ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)).
- * Public payment keys already split per machine through the config merge
- * chain's local layer; secrets did not, so a brand's local emulator ran with
- * the live Stripe/PayPal/Chargebee credential and a local test purchase could
- * charge a real card. A twin is optional and provider-supplied (nobody mints
- * it), the backend's reader prefers it outside production and treats it as
- * absent IN production, and the deploy lane strips every one of them from the
- * upload. `liveShape:` is the other half of that guarantee: the pattern a LIVE
- * credential matches, which the reader refuses outside production. It is
- * declared only where the provider actually stamps one (Stripe's `sk_live_` /
- * `rk_live_`, Chargebee's `live_`); PayPal's halves are opaque, so PayPal is
- * protected by its twin alone.
+ * A key that must differ between a local run and a deployed one is NOT a second
+ * entry here ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)): one
+ * key, and the brand's `.env.<environment>` overlay carries the other value.
+ * The schema declares WHAT a brand supplies, never which environment supplies
+ * it — env.js's cascade owns that.
  *
  * `delivery:` is HOW the key reaches each target it names — the declaration
  * that replaced three unrelated hand-kept lists
@@ -120,6 +108,12 @@ const DELIVERY_MODES = ['env', 'ci', 'bake'];
 // `notes` are the plain comment lines under it, `file: false` marks a group
 // that is schema-only (see the header).
 const ENV_GROUPS = [
+  // The license leads the file: it is the one key a human pastes before anything
+  // else runs, so it is the first line a brand owner reads (#320, Ian 2026-09-09).
+  {
+    id: 'license',
+    comment: 'OMEGA license — your omegajs.dev account API key; a keyless brand runs with payments gated and omega attribution shown',
+  },
   {
     id: 'omega',
     comment: 'Omega keys (auto-generated — minted at scaffold, and by manage when absent; rotate by replacing the value)',
@@ -195,7 +189,7 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    true,
     delivery:    { backend: 'env' },
-    description: 'Grants admin on the brand backend: the header every privileged call carries, and the seed the OAuth2 state cipher derives from.',
+    description: 'Grants admin on the brand backend: the header every privileged call carries, and the seed the connection state cipher derives from.',
   },
   {
     name:        'OMEGA_WEBHOOK_KEY',
@@ -231,6 +225,18 @@ const ENV_SCHEMA = [
     description: 'Signs the unsubscribe link in every email the backend sends, and verifies the signature when a recipient follows one.',
   },
 
+  // ── the OMEGA license — issued by omegajs.dev, pasted by a human ─────────
+  {
+    name:        'OMEGA_LICENSE_KEY',
+    owner:       'workspace',
+    targets:     ['web', 'desktop', 'extension'],
+    group:       'license',
+    secret:      true,
+    required:    false,
+    delivery:    { web: 'ci', desktop: 'ci', extension: 'ci' },
+    description: 'The omegajs.dev account API key that licenses this brand: a deploy checks it with the omega backend and bakes the verdict into the artifact — payments live and no omega attribution, or payments gated and attribution shown. It travels CLI → server at deploy time ONLY: every delivery is `ci` (the three targets whose deploys build on a runner), it never bakes, and the backend — which deploys straight from the CLI — takes no delivery at all, so it can never land in the .env the functions artifact ships with.',
+  },
+
   // ── third-party credentials, by owning service ───────────────────────────
   {
     name:        'GH_TOKEN',
@@ -245,12 +251,12 @@ const ENV_SCHEMA = [
   {
     name:        'CLOUDFLARE_TOKEN',
     owner:       'edge',
-    targets:     ['backend'],
+    targets:     ['web', 'backend'],
     group:       'cloudflare',
     secret:      true,
     required:    false,
-    delivery:    { backend: 'env' },
-    description: 'Cloudflare API token with Zone edit — the edge service and every DNS-writing flow, plus the backend\'s cache-purge calls.',
+    delivery:    { web: 'ci', backend: 'env' },
+    description: 'Cloudflare API token with Zone edit — the edge service and every DNS-writing flow, plus the backend\'s cache-purge calls. The web build workflow\'s post-publish purge step reads it from the runner env, so the publish lane pushes it as a repo secret.',
   },
   {
     name:        'NAMECHEAP_USERNAME',
@@ -377,19 +383,7 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
-    liveShape:   /^(sk|rk)_live_/,
     description: 'Stripe secret key — the backend creates checkout sessions, subscriptions, and refunds with it.',
-  },
-  {
-    name:        'STRIPE_SECRET_KEY_DEV',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    devOf:       'STRIPE_SECRET_KEY',
-    secret:      true,
-    required:    false,
-    delivery:    { backend: 'env' },
-    description: 'Stripe TEST secret key (sk_test_…) — the backend uses it instead of STRIPE_SECRET_KEY outside production, so a local emulator can never charge a real card. Never uploaded by a deploy.',
   },
   {
     name:        'PAYPAL_CLIENT_SECRET',
@@ -402,17 +396,6 @@ const ENV_SCHEMA = [
     description: 'Secret half of the PayPal app credentials (the client id is public and lives in omega.json5).',
   },
   {
-    name:        'PAYPAL_CLIENT_SECRET_DEV',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'payment',
-    devOf:       'PAYPAL_CLIENT_SECRET',
-    secret:      true,
-    required:    false,
-    delivery:    { backend: 'env' },
-    description: "Secret half of the PayPal SANDBOX app — the backend uses it outside production (pair it with the sandbox client id on the local config layer). PayPal credentials carry no live/sandbox marker, so this twin is the only split. Never uploaded by a deploy.",
-  },
-  {
     name:        'CHARGEBEE_API_KEY',
     owner:       'payment',
     targets:     ['backend'],
@@ -420,19 +403,17 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
-    liveShape:   /^live_/,
     description: 'Chargebee API key for the brand site (the site name is public and lives in omega.json5).',
   },
   {
-    name:        'CHARGEBEE_API_KEY_DEV',
+    name:        'COINBASE_COMMERCE_API_KEY',
     owner:       'payment',
     targets:     ['backend'],
     group:       'payment',
-    devOf:       'CHARGEBEE_API_KEY',
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
-    description: "Chargebee TEST-site API key (test_…) — the backend uses it instead of CHARGEBEE_API_KEY outside production. Never uploaded by a deploy.",
+    description: 'Coinbase Commerce API key — the backend creates hosted crypto charges with it. The provider has no public half at all, so payment.providers.coinbase carries only its `enabled` switch.',
   },
   {
     name:        'SLAPFORM_SERVICE_ACCOUNT',
@@ -846,14 +827,14 @@ const ENV_SCHEMA = [
     description: 'ZeroBounce API key — the email-validation provider used when NeverBounce is unset.',
   },
   {
-    match:       /^OAUTH2_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/,
+    match:       /^CONNECTIONS_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/,
     owner:       'backend',
     targets:     ['backend'],
     group:       'backend-services',
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
-    description: "Per-provider OAuth2 client credentials for the backend's user-connection routes (OAUTH2_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET) — pasted into the brand .env from each provider's console; the provider set is open, so the family is a pattern.",
+    description: "Per-provider OAuth client credentials for the backend's user-connection routes (CONNECTIONS_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET) — pasted into the brand .env from each provider's console; the provider set is open, so the family is a pattern.",
   },
 
   // ── machine-owned: written by a service on its first real run ────────────
@@ -976,6 +957,15 @@ const ENV_SCHEMA = [
     description: 'Public Chargebee site name — the backend publishes it into its own env from payment.providers.chargebee.site at boot.',
   },
   {
+    name:        'OMEGA_LICENSE_STATUS',
+    owner:       'workspace',
+    targets:     ['backend'],
+    group:       'runtime',
+    secret:      false,
+    required:    false,
+    description: "The deploy-time license verdict (#320), written into dist/.env by the backend deploy itself — `licensed` or `keyless`. It is COMPUTED, never supplied: the runtime group renders no brand .env line, so nothing composes one down from the brand layer. The payment provider libraries refuse live processing on `keyless`; absent (every local lane, the emulator, a test) is today's behavior exactly.",
+  },
+  {
     name:        'CLAUDE_CODE_OAUTH_TOKEN',
     owner:       'backend',
     targets:     ['backend'],
@@ -1060,30 +1050,6 @@ function requiredEnvKeys(target) {
 }
 
 /**
- * The dev-suffixed keys (#586) — the set a deploy must never upload, and the
- * set the backend reads as absent in production.
- *
- * @returns {string[]} Env var names.
- */
-function devEnvKeys() {
-  return ENV_SCHEMA
-    .filter((entry) => entry.devOf)
-    .map((entry) => entry.name);
-}
-
-/**
- * Base key → the dev-suffixed twin that overrides it outside production, for
- * every key that declares one. The backend's env reader's lookup.
- *
- * @returns {Object<string, string>} Base name → twin name.
- */
-function devEnvKeyMap() {
-  return Object.fromEntries(ENV_SCHEMA
-    .filter((entry) => entry.devOf)
-    .map((entry) => [entry.devOf, entry.name]));
-}
-
-/**
  * Group id → its keys in schema order, every declared group present.
  *
  * @returns {Object<string, string[]>} Group id → env var names.
@@ -1108,7 +1074,5 @@ module.exports = {
   envKeysForTarget,
   generatedEnvKeys,
   requiredEnvKeys,
-  devEnvKeys,
-  devEnvKeyMap,
   envKeysByGroup,
 };

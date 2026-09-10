@@ -5,9 +5,11 @@
 // restores it; cleanup() resets to the pre-suite source and clears the persisted
 // override so later suites (and re-runs) start clean.
 
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
 let originalSource = null;
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'theme (main)',
@@ -132,4 +134,4 @@ module.exports = {
       },
     },
   ],
-};
+});

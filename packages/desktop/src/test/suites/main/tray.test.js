@@ -7,7 +7,9 @@
 // We don't assert on the actual macOS Tray rendering — we'd need a real icon file
 // and would pop UI during tests. Instead we verify the API state surface.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'tray (main)',
@@ -317,4 +319,4 @@ module.exports = {
       },
     },
   ],
-};
+});

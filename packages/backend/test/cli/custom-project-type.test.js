@@ -35,19 +35,20 @@ const os = require('node:os');
 const path = require('node:path');
 
 const powertools = require('node-powertools');
-const { requiredEnvKeys } = require('@omega.js/config');
+const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
 
-const { resolveProjectType, isCustomProject, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS } = require('../../src/cli/utils/project-type.js');
-const BuildCommand = require('../../src/cli/commands/build.js');
-const DeployCommand = require('../../src/cli/commands/deploy.js');
-const EmulatorCommand = require('../../src/cli/commands/emulator.js');
-const ServeCommand = require('../../src/cli/commands/serve.js');
-const { ensureTarget } = require('../../src/cli/utils/ensure-target.js');
-const { stageFunctions } = require('../../src/cli/utils/stage-functions.js');
-const TestCommand = require('../../src/cli/commands/test.js');
-const { getTests } = require('../../src/cli/commands/setup-tests/index.js');
+const { resolveProjectType, isCustomProject, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS } = require('../../dist/cli/utils/project-type.js');
+const BuildCommand = require('../../dist/cli/commands/build.js');
+const DeployCommand = require('../../dist/cli/commands/deploy.js');
+const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
+const ServeCommand = require('../../dist/cli/commands/serve.js');
+const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
+const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
+const TestCommand = require('../../dist/cli/commands/test.js');
+const { getTests } = require('../../dist/cli/commands/setup-tests/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MANAGER_PATH = require.resolve('../../src/manager/index.js');
+const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
 
 /**
  * A backend target on disk: package.json, an authored src/, and a brand
@@ -156,7 +157,7 @@ function bootManager(dir, options = {}) {
 // Every helper a consumer's routes reach for through the Manager handle.
 const HELPERS = ['RouteContext', 'User', 'Analytics', 'ApiManager', 'Roles', 'Usage', 'Middleware', 'BackendRouter', 'EventMiddleware', 'Settings', 'Metadata', 'Email', 'AI', 'Utilities'];
 
-module.exports = {
+module.exports = defineCases({
   description: "Backend custom-server mode (#584): the config switch, the boot, and the Firebase-only verbs' refusal",
   type: 'group',
 
@@ -273,6 +274,31 @@ module.exports = {
           }
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'the brand-owned scripts are exactly the ones running a refused verb',
+
+      async run() {
+        // The declaration the manager walk and this framework's own scaffold
+        // both read (#689). It is DERIVED knowledge — a script key is the
+        // brand's in custom mode precisely because the verb it runs refuses —
+        // so it must never drift from the verb table beside it.
+        const { projectScripts, projectScriptsCustomOwned } = require('../../package.json');
+        const verbOf = (command) => (String(command).match(/(?:^|&& )omega (\S+)/) || [])[1];
+
+        for (const key of projectScriptsCustomOwned) {
+          assert.ok(projectScripts[key], `projectScriptsCustomOwned names ${key}, which projectScripts must declare`);
+          assert.ok(FIREBASE_ONLY_VERBS[verbOf(projectScripts[key])],
+            `\`${key}\` is only the brand's because \`omega ${verbOf(projectScripts[key])}\` refuses in custom mode`);
+        }
+
+        for (const [key, command] of Object.entries(projectScripts)) {
+          if (projectScriptsCustomOwned.includes(key)) continue;
+          assert.strictEqual(FIREBASE_ONLY_VERBS[verbOf(command)], undefined,
+            `\`${key}\` runs a verb this mode refuses — it belongs in projectScriptsCustomOwned`);
         }
       },
     },
@@ -397,4 +423,4 @@ module.exports = {
       },
     },
   ],
-};
+});

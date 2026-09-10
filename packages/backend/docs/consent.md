@@ -92,7 +92,7 @@ Body: { action: 'subscribe' | 'unsubscribe' }
 ```
 
 - Requires authentication (uses the calling user's auth UID and email).
-- Rate-limited per-user via `Manager.Usage().init(ctx)` (5/day).
+- Rate-limited per-user via `ctx.usage.consume('email-preferences', 1, { limit: RATE_LIMIT })` (5 per counting period) — an anti-abuse gate with an explicit limit, not a plan feature ([usage-rate-limiting.md](usage-rate-limiting.md)).
 - Writes `consent.marketing.{status, grantedAt|revokedAt}` to the user doc with `source: 'account'` + server time + server IP.
 - Calls `mailer.sync(uid)` on subscribe, `mailer.remove(email)` on unsubscribe — hits both SendGrid + Beehiiv via the email library.
 

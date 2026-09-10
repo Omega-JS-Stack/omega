@@ -8,7 +8,8 @@ const fetch = require('wonderful-fetch');
 
 // The tool SSOT — expected counts derive from it so the suite catches drift
 // between the served tools and src without going stale on hardcoded numbers
-const TOOLS = require('../../src/mcp/tools.js');
+const TOOLS = require('../../dist/mcp/tools.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 function parseSSE(text) {
   const lines = text.split('\n');
@@ -66,7 +67,7 @@ async function mcpRequest(config, method, params, bearerToken) {
   return parseSSE(text);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'MCP role-based tool scoping',
   type: 'group',
 
@@ -199,4 +200,4 @@ module.exports = {
       },
     },
   ],
-};
+});

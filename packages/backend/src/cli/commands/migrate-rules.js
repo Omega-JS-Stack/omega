@@ -5,6 +5,7 @@ const BaseCommand = require('./base-command');
 const {
   BRAND_RULES_FILE,
   COMPILED_RULES_FILE,
+  MARKER_MIGRATION_COMMAND,
   compileFirestoreRules,
   deferredRulesTarget,
   ensureBrandRulesSource,
@@ -49,6 +50,15 @@ class MigrateRulesCommand extends BaseCommand {
 
     // Half one: the brand's authored source, migrated in place.
     const result = ensureBrandRulesSource({ projectDir: projectDir });
+
+    // A pre-family source is refused untouched, so NEITHER half may run:
+    // repointing firebase.json here would deploy a compile of a file still
+    // carrying `///---...---///` markers ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+    if (result.refused) {
+      this.ui.status('fail', chalk.red(`${BRAND_RULES_FILE} still carries a pre-family marker ('{{ backend-manager }}' or a '///---...---///' block), which this migration does not speak — nothing was changed. Run ${chalk.bold(MARKER_MIGRATION_COMMAND)} first, then run this again.`));
+      process.exitCode = 1;
+      return;
+    }
 
     if (result.created) {
       this.ui.status('add', `Seeded ${BRAND_RULES_FILE} — your rules, compiled with the framework half. It is yours to edit.`);

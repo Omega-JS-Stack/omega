@@ -1,9 +1,10 @@
 // Loads a JS module from an arbitrary path on disk (e.g. consumer's src/tray/index.js).
 //
-// Used by tray/menu/context-menu to load consumer-defined definition files. Webpack would
-// normally rewrite `require(<dynamicPath>)` into a context loader that can't resolve runtime
-// paths, so we use Node's `module.createRequire(...)` to get a real require function. Webpack
-// emits a noisy "Critical dependency" warning at build time but the runtime behavior is correct.
+// Used by tray/menu/context-menu to load consumer-defined definition files. A bundler would
+// normally try to resolve `require(<dynamicPath>)` at build time, which can never work for a
+// runtime path, so we use Node's `module.createRequire(...)` to get a real require function.
+// (In the webpack era this also drew a noisy "Critical dependency" warning at build time; the
+// runtime behavior was correct then too.)
 
 const path   = require('path');
 const Module = require('module');

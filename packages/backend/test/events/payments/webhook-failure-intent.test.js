@@ -10,10 +10,11 @@
  * payload the provider library can read one out of) and fails the intent with it.
  */
 const powertools = require('node-powertools');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ORDER_ID = '9119-9119-9119';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Webhook failure closes out its payments-intent',
   type: 'suite',
   timeout: 30000,
@@ -89,4 +90,4 @@ module.exports = {
       },
     },
   ],
-};
+});

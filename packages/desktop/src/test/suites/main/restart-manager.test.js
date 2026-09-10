@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const protocol = require('../../../lib/restart-manager/protocol.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // ─── Fixture: a real protocol-v1 server ───────────────────────────────────────
 
@@ -78,7 +79,7 @@ function writeRuntime(root, port, overrides) {
   return runtime;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'restart-manager (main)',
@@ -324,4 +325,4 @@ module.exports = {
       },
     },
   ],
-};
+});

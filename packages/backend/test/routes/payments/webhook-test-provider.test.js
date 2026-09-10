@@ -17,6 +17,8 @@
 // Run the thunk with the environment resolving to production. getEnvironment() reads
 // these vars live on every call, so swapping them is the real switch — testing wins
 // over everything else, so it has to come off too.
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 function withProductionEnvironment(fn) {
   const original = {
     OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
@@ -79,7 +81,7 @@ async function callWebhook({ Manager, query, body }) {
     body: body,
   };
   const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-webhook' });
-  const handler = require('../../../src/manager/routes/payments/webhook/post.js');
+  const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
 
   await handler({ ctx, Manager, libraries: Manager.libraries });
 
@@ -88,7 +90,7 @@ async function callWebhook({ Manager, query, body }) {
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
-module.exports = {
+module.exports = defineCases({
   description: 'Webhook test provider is non-production only',
   type: 'group',
 
@@ -151,4 +153,4 @@ module.exports = {
       },
     },
   ],
-};
+});

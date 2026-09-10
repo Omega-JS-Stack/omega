@@ -14,12 +14,13 @@
 //       </div>
 //     </aside>
 //     <header class="omega-shell__topbar">
-//       <div class="omega-shell__topbar-start">
+//       <div class="omega-shell__topbar-start">   (both toggles render only while the page has a rail, #740)
 //         <button data-shell-toggle="drawer" aria-expanded="false" aria-controls="…">…</button>
 //         <button data-shell-toggle="collapse" aria-expanded="true" aria-controls="…">…</button>
 //       </div>
 //       <div class="omega-shell__topbar-end">…</div>
 //     </header>
+//     <button class="omega-shell__drawer-toggle">   (only when the page has a rail and NO topbar, #719)
 //     <main class="omega-shell__main">…</main>
 //     <div class="omega-shell__scrim" data-shell-dismiss></div>
 //   </div>
@@ -108,10 +109,31 @@ $shell-breakpoint: 1200px;
   margin-inline-start: auto;
 }
 
+// The row is PINNED, not auto-placed (#741): a page that turns the topbar off
+// would otherwise land main in the `auto` row, size it to its content, and
+// hand the scroll back to the document. An empty `auto` row is zero height,
+// so row 2 is the whole `1fr` with or without a topbar — and the drawer block
+// below re-places only the column, so the pin holds at every width.
 .omega-shell__main {
   grid-column: 2;
+  grid-row: 2;
   overflow-y: auto;
   padding: var(--omega-shell-pad);
+}
+
+// The floating drawer toggle: a page with a rail and no topbar renders it
+// instead of the topbar's copy ([#719]). It sits above main and below the
+// drawer + scrim, so opening the drawer covers it and the scrim takes the
+// next tap. The layout hides it above the cutover with `d-xl-none` (the rail
+// is on screen there), so this block is geometry only.
+.omega-shell__drawer-toggle {
+  position: fixed;
+  inset-block-start: 12px;
+  inset-inline-start: 12px;
+  z-index: 1035;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
 }
 
 // Scrim only participates in the mobile drawer state.

@@ -10,7 +10,7 @@
  */
 // Value-less flags must be declared boolean — otherwise yargs treats the next
 // positional as the flag's VALUE (mirrors the framework bins).
-const BOOLEAN_FLAGS = ['continue-on-error', 'dry-run', 'execute', 'parallel', 'manage', 'all', 'full', 'verify', 'publish'];
+const BOOLEAN_FLAGS = ['continue-on-error', 'dry-run', 'execute', 'parallel', 'manage', 'all', 'full', 'verify', 'publish', 'extended'];
 
 async function run() {
   // Local-dist freshness guard: a stale locally-linked dist rebuilds and the

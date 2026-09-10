@@ -9,9 +9,10 @@
 
 const table = require('../../dist/cli/command-table.js');
 const UpdateCommand = require('../../dist/cli/commands/update.js');
-const devkitUpdate = require('@omega.js/devkit/update');
+const devkitUpdate = require('../../dist/vendor/devkit/update.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Update command — devkit-shared verb wired into the @omega.js/backend CLI',
   type: 'group',
 
@@ -59,4 +60,4 @@ module.exports = {
       },
     },
   ],
-};
+});

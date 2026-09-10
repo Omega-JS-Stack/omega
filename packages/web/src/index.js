@@ -16,6 +16,7 @@ const { PATHS, resolveClientEntry } = require('./paths.js');
 const { consumerPaths, loadSiteData } = require('./consumer.js');
 const { scaffoldDefaults } = require('./scaffold.js');
 const { runMigration } = require('./migrate/index.js');
+const { getEnvironment, isDevelopment, isProduction, isTesting } = require('./mode-helpers.js');
 
 module.exports = {
   configureOmega,
@@ -33,4 +34,8 @@ module.exports = {
   loadSiteData,
   scaffoldDefaults,
   runMigration,
+  getEnvironment,
+  isDevelopment,
+  isProduction,
+  isTesting,
 };

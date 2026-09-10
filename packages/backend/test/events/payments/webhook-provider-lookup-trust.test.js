@@ -29,7 +29,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-journey-flows-upgrade';
 const ORDER_ID = '5060-5060-5060';
@@ -101,7 +102,7 @@ function runSubscriptionUpdated(sdk) {
   }));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A payment webhook is processed off the provider lookup, never off its own payload',
   type: 'group',
   timeout: 30000,
@@ -202,4 +203,4 @@ module.exports = {
       },
     },
   ],
-};
+});

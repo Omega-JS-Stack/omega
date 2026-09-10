@@ -1,0 +1,5 @@
+(function(){var __omegaBuildJson={"timestamp":"2026-09-01T00:00:00.000Z","repo":{"user":"fixture","name":"fixture"},"environment":"development","license":{"status":"keyless","payments":"gated","attribution":"shown"},"packages":{"@omega.js/extension":"0.1.0"},"config":{"runtime":"browser-extension","version":"0.1.0","environment":"development","brand":{"id":"bxm-fixture","name":"BXM Fixture Consumer"},"omega":{"environment":"development","cache_breaker":1788300000}}};if(typeof globalThis!=='undefined'){globalThis.OMEGA_BUILD_JSON=__omegaBuildJson;}if(typeof self!=='undefined'){self.OMEGA_BUILD_JSON=__omegaBuildJson;}if(typeof window!=='undefined'){window.OMEGA_BUILD_JSON=__omegaBuildJson;}})();
+// The fixture's page-context "bundle" — every emitted bundle carries its OWN copy
+// of the bake (#743), which is what replaced the single `/build.js` file each page
+// used to load with its own <script> tag. See background.js for the full note.
+document.getElementById('main-content').dataset.brand = window.OMEGA_BUILD_JSON.config.brand.id;

@@ -7,6 +7,7 @@
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('serve');
 const { spawn } = require('child_process');
+const { watchEnvChain } = require('@omega.js/devkit/env-watch');
 
 const projectRoot = Manager.getRootPath('project');
 
@@ -54,9 +55,54 @@ function resolveElectron(projectRoot) {
   return require(require.resolve('electron', { paths: [projectRoot] }));
 }
 
+/**
+ * The ENV lane's watcher (#681): every layer of the `.env` chain — company,
+ * brand, this target — and each layer's `.env.<environment>` overlay. A change
+ * reloads the cascade into process.env, and the log line names the FILE, never
+ * a value. Resolution and watching live in @omega.js/devkit/env-watch, shared
+ * with the web and extension dev lanes; this binds desktop's own target name.
+ *
+ * PRE-WIRING on desktop — it has NO consumer yet, and saying otherwise would be
+ * a lie. Two reasons, both structural:
+ *   1. The dev pipeline is `series(build, serve)` (gulp/main.js) — a ONE-SHOT
+ *      build that has already finished before this arms. Desktop runs no
+ *      watch+rebuild lane, so there is no "next rebuild" to read a new value.
+ *   2. `start()` spawns electron with a `childEnv` SNAPSHOT of process.env, so
+ *      a later reload in this gulp process cannot reach the running app.
+ * It stays wired because it is the shared devkit bind and it costs one unref'd
+ * watch; it becomes real the day desktop grows a watch+rebuild lane. Until
+ * then, do not claim desktop in the reload-lane docs.
+ *
+ * Scope even once that lands (the shared contract): a NEW key AND an EDITED
+ * value both land on the next rebuild, and a key dropped from the file is
+ * dropped from the process — `reloadEnv` re-reads what a file layer owns
+ * ([#724](https://github.com/Omega-JS-Stack/omega/issues/724)). A SHELL-set
+ * value still wins over every file, whatever the file now says.
+ *
+ * `serve` is where it arms because it is the dev lane's only long-running task
+ * — the build/package/publish series never include it, so a one-shot build
+ * never opens a watch it would have to close.
+ * @param {string} root - the target root
+ * @param {object} [options]
+ * @param {string} [options.environment] - the environment whose overlay counts
+ * @returns {{ inputs: Array<{ layer: string, path: string }>, close: function }}
+ */
+function watchEnvSources(root, options) {
+  return watchEnvChain({
+    projectDir: root,
+    target: 'desktop',
+    environment: options && options.environment,
+    log: (line) => logger.log(line),
+  });
+}
+
 function start(ports, done) {
   const port = ports.livereload;
   logger.log(`serve — livereload port=${port}`);
+
+  // PRE-WIRING, no consumer yet: the build above already ran one-shot and the
+  // electron child below snapshots env at spawn. See watchEnvSources.
+  watchEnvSources(projectRoot);
 
   // Resolve the electron binary from the consumer project (see resolveElectron).
   let electronBin;
@@ -142,3 +188,4 @@ function start(ports, done) {
 };
 
 module.exports.resolveElectron = resolveElectron;
+module.exports.watchEnvSources = watchEnvSources;

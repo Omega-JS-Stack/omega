@@ -3,7 +3,9 @@
  * Verifies the full marketing pipeline end-to-end: prepare → render → audience → SendGrid Single Send.
  * Sends to test_admin segment only.
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Marketing campaign send',
   auth: 'admin',
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
@@ -42,4 +44,4 @@ module.exports = {
     assert.ok(sg.id, 'Should have Single Send ID');
     assert.equal(sg.scheduled, true, 'Should be scheduled');
   },
-};
+});

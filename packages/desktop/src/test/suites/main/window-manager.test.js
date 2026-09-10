@@ -6,7 +6,9 @@
 // actual file-loading in createNamed (it logs an error and returns the BrowserWindow anyway,
 // which is enough to verify the registry behavior).
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'window-manager (main)',
@@ -228,4 +230,4 @@ module.exports = {
       },
     },
   ],
-};
+});

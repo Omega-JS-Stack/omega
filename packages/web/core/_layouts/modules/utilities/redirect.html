@@ -1,9 +1,6 @@
 ---
 layout: frontend/core/cover
 
-sitemap:
-  include: false
-
 meta:
   index: false
 ---
@@ -88,7 +85,7 @@ meta:
   <div class="omega-redirect">
     <!-- Brand mark -->
     <a class="omega-redirect__mark" href="/" aria-label="{{ resolved.config.brand.name }}">
-      <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }}"/>
+      <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }}"/>
     </a>
 
     <!-- Header -->
@@ -105,14 +102,14 @@ meta:
     <div class="d-grid gap-2 d-sm-block text-center">
       <a id="home-button" class="btn btn-outline-adaptive mb-2 mb-sm-0 me-sm-2" href="/">
         <span class="d-inline-flex align-items-center">
-          {% omega_icon "house", "fa-sm me-2" %}
+          <i class="fa-solid fa-house fa-sm me-2"></i>
           Return home
         </span>
       </a>
       <noscript>
         <a id="redirect-button" class="btn btn-adaptive mb-2 mb-sm-0" href="{{ url }}">
           <span class="d-inline-flex align-items-center">
-            {% omega_icon "arrow-right", "fa-sm me-2" %}
+            <i class="fa-solid fa-arrow-right fa-sm me-2"></i>
             Take me there
           </span>
         </a>
@@ -121,13 +118,12 @@ meta:
   </div>
 </section>
 
-<!-- Redirect configuration for external script -->
+<!-- Redirect configuration, read by this layout's own script
+     (core/js/layouts/modules/utilities/redirect.js — the layout-keyed asset
+     lane loads it from the foot, hashed, on every page this layout renders) -->
 <div id="redirect-config" style="display: none;"
   data-url="{{ url }}"
   data-querystring="{{ querystring }}"
   data-site-url="{{ resolved.config.url }}"
   data-environment="{{ jekyll.environment }}">
 </div>
-
-<!-- Load redirect module script -->
-<script type="text/javascript" src="{{ '/assets/js/modules/redirect.bundle.js' | omega_cachebreak }}" async></script>

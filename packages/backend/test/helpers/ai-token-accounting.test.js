@@ -11,8 +11,9 @@
  * not a mock) whose `[[delay:ms]]` directive makes the calls resolve out of
  * order. No network involved by design.
  */
-const AI = require('../../src/manager/libraries/ai/index.js');
-const { emptyTokens, buildTokens, addTokens } = require('../../src/manager/libraries/ai/tokens.js');
+const AI = require('../../dist/manager/libraries/ai/index.js');
+const { emptyTokens, buildTokens, addTokens } = require('../../dist/manager/libraries/ai/tokens.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // No Manager — the test provider falls back to the OMEGA_TEST_MODE signal, which
 // the test runner sets
@@ -38,7 +39,7 @@ const LONG_CALL = {
   ],
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'AI token accounting (per-call usage, parallel callers)',
   type: 'group',
   tests: [
@@ -146,4 +147,4 @@ module.exports = {
       },
     },
   ],
-};
+});

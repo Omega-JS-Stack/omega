@@ -10,6 +10,12 @@
  * credentials: the cache is part of the repo, and the default claude provider
  * rides the local Claude Code install.
  *
+ * The framework's OWN default pages are excluded from all of that — from the
+ * PROVIDER, that is (#605). They still get their copies, from the translations
+ * packaged with @omega.js/web (#621, ./packaged-defaults.js): the same chrome
+ * on every brand is translated once, in the framework, and read back here for
+ * free.
+ *
  * dist/sitemap.xml is rewritten afterwards (./sitemap.js) so the produced
  * copies are listed with the same hreflang story the pages carry.
  */
@@ -30,8 +36,10 @@ const {
 } = require('@omega.js/devkit/translate');
 const { collectTextNodes } = require('./collect-text-nodes.js');
 const { defaultExcludedRoutes } = require('./default-routes.js');
+const { packagedLanguages, loadPackaged, resolvePackaged, pageNamespace } = require('./packaged-defaults.js');
 const { updateSitemap } = require('./sitemap.js');
 const { readPathPrefixStamp, stripPathPrefix } = require('../path-prefix.js');
+const { PATHS } = require('../paths.js');
 
 // System folders never translated. The framework's default PAGES are derived
 // from the defaults tree instead (./default-routes.js) — these are the folders
@@ -53,17 +61,29 @@ function routeOf(relPath) {
 }
 
 /**
+ * The routes a brand excluded by hand, normalized ('/blog/' → 'blog').
+ * @param {object} config - resolved config (translation.exclude)
+ * @returns {string[]}
+ */
+function userExcludedRoutes(config) {
+  return (config.translation?.exclude || []).map((entry) => String(entry).replace(/^\/+|\/+$/g, ''));
+}
+
+/**
  * Build the route-exclusion test from config + the framework's own sets. Every
  * KNOWN language code is excluded as a folder (not just the configured ones) so
  * copies from a previous run never get re-collected as source pages.
  * `translation.exclude` is for BRAND pages only (#605): the framework's default
  * pages exclude themselves, derived from the defaults tree, and each one guards
- * its subtree too (nothing under /app or /payment is marketing copy).
+ * its subtree too (nothing under /app or /payment is marketing copy). Excluded
+ * here means excluded from PROVIDER calls — the framework's own default pages
+ * still get copies, from the translations packaged with it (#621, the
+ * default-page pass below).
  * @param {object} config - resolved config (translation.exclude, socials)
  * @returns {Function} (route: string) → boolean
  */
 function buildExclusionTest(config) {
-  const userExcludes = (config.translation?.exclude || []).map((entry) => String(entry).replace(/^\/+|\/+$/g, ''));
+  const userExcludes = userExcludedRoutes(config);
   const frameworkRoutes = [...defaultExcludedRoutes()];
 
   const files = new Set([
@@ -172,6 +192,160 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
 }
 
 /**
+ * Build one translated copy on a fresh DOM: apply the translations
+ * positionally over the collector's walk, then localize the document chrome
+ * and rewrite the internal links.
+ * @param {object} options
+ * @param {string} options.sourceHtml - the built source page
+ * @param {Array<string|undefined>} options.translated - translations aligned with
+ *   collectTextNodes order; undefined leaves that node in the source language
+ * @param {string} options.lang - target language
+ * @param {string} options.route - the page's route
+ * @param {string} options.baseUrl - site origin (carries the base path when mounted)
+ * @param {Function} options.isExcluded - route exclusion test
+ * @param {string} options.pathPrefix - the base path the site is served under
+ * @returns {object} cheerio root, ready for alternates + write
+ */
+function renderCopy(options) {
+  const { sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix } = options;
+  const $ = cheerio.load(sourceHtml);
+
+  collectTextNodes($).forEach((n, i) => {
+    const value = translated[i];
+    if (value === undefined) {
+      return;
+    }
+
+    if (n.type === 'data') {
+      n.reference.data = value;
+    } else if (n.type === 'text') {
+      n.node.text(value);
+    } else if (n.type === 'attr') {
+      n.node.attr(n.attr, value);
+    }
+  });
+
+  // Localize the document chrome
+  const pageUrl = `${baseUrl}/${lang}${route ? `/${route}` : ''}`;
+  $('html').attr('lang', lang);
+  $('html').attr('dir', isRTL(lang) ? 'rtl' : 'ltr');
+  $('link[rel="canonical"]').attr('href', pageUrl);
+  $('meta[property="og:url"]').attr('content', pageUrl);
+  $('meta[property="og:locale"]').attr('content', ogLocale(lang));
+
+  rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix);
+
+  return $;
+}
+
+/**
+ * Where a language copy lands.
+ *
+ * Canonical URLs are extensionless (about.html ↔ /about), so the language HOME
+ * must land as <lang>.html for /es to resolve as a FILE. An es/index.html
+ * forces GitHub Pages' directory redirect (/es → /es/), which fights the zone's
+ * strip-trailing-slash rule into a 301 loop (live find, launch night
+ * 2026-07-19).
+ * @param {string} relPath - the source page's path relative to the output dir
+ * @param {string} lang - target language
+ * @returns {string} path relative to the output dir
+ */
+function copyTargetRel(relPath, lang) {
+  return relPath === 'index.html' ? `${lang}.html` : path.join(lang, relPath);
+}
+
+/**
+ * Produce /{lang}/ copies of the framework's OWN default pages from the
+ * translations PACKAGED with @omega.js/web (#621).
+ *
+ * These routes stay excluded from provider calls — the auth, account, payment
+ * and portal chrome never costs a brand a token — but the copy the framework
+ * wrote is copy the framework already translated, so the copies ship anyway,
+ * offline, from the committed package cache. A string the package does not
+ * carry (copy the consumer overrode, a page the framework has not regenerated
+ * for) stays in the source language and is COUNTED, never guessed at; a route
+ * the package carries nothing for at all (the legal boilerplate, by design)
+ * gets no copy, so hreflang keeps telling the truth.
+ * @param {object} options
+ * @param {string} options.outDir - built site dir
+ * @param {string[]} options.files - default-route pages, relative to outDir
+ * @param {object} options.settings - resolved translation settings
+ * @param {string} options.brand - the consuming brand's name (sentinel swap)
+ * @param {string} options.baseUrl - site origin
+ * @param {Function} options.isExcluded - route exclusion test
+ * @param {string} options.pathPrefix - the base path the site is served under
+ * @param {string} options.packagedRoot - the packaged translations root
+ * @param {object} options.logger - devkit logger
+ * @returns {{ produced: Map<string, string[]>, pages: number, strings: number, misses: number }}
+ */
+function translateDefaultPages(options) {
+  const { outDir, files, settings, brand, baseUrl, isExcluded, pathPrefix, packagedRoot, logger } = options;
+  const produced = new Map();
+  const outcome = { produced, pages: 0, strings: 0, misses: 0 };
+
+  if (!brand) {
+    logger.warn('Default pages: brand.name is not set, so the packaged translations cannot be brand-swapped — default pages stay untranslated');
+    return outcome;
+  }
+
+  // What the package actually ships is the FOLDERS it ships, never a list.
+  const shipped = packagedLanguages(packagedRoot);
+  const missing = settings.languages.filter((lang) => !shipped.includes(lang));
+  const languages = settings.languages.filter((lang) => shipped.includes(lang));
+
+  if (missing.length) {
+    logger.log(`Default pages: @omega.js/web ships no translations for ${missing.join(', ')} — those copies stay in ${settings.default}`);
+  }
+
+  if (!languages.length) {
+    return outcome;
+  }
+
+  for (const relPath of files) {
+    const route = routeOf(relPath);
+    const sourceHtml = jetpack.read(path.join(outDir, relPath));
+    const strings = collectTextNodes(cheerio.load(sourceHtml)).map((n) => n.text);
+    const producedLangs = [];
+    const copies = [];
+
+    for (const lang of languages) {
+      const { translated, hits, misses } = resolvePackaged({
+        strings,
+        brand,
+        cache: loadPackaged(packagedRoot, lang, route),
+      });
+
+      if (!hits) {
+        logger.log(`⊘ [${lang}] /${route} — no packaged translations for this default page`);
+        continue;
+      }
+
+      logger.log(`✓ [${lang}] /${route} — ${hits} packaged string(s)${misses ? `, ${misses} not packaged (left in ${settings.default})` : ''}`);
+      outcome.strings += hits;
+      outcome.misses += misses;
+
+      copies.push({
+        targetRel: copyTargetRel(relPath, lang),
+        $: renderCopy({ sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix }),
+      });
+      producedLangs.push(lang);
+    }
+
+    for (const { targetRel, $ } of copies) {
+      insertAlternates($, producedLangs, settings.default, route, baseUrl);
+      jetpack.write(path.join(outDir, targetRel), $.html());
+    }
+
+    if (producedLangs.length) {
+      produced.set(relPath, producedLangs);
+      outcome.pages++;
+    }
+  }
+
+  return outcome;
+}
+
+/**
  * Translate the built site into every configured language.
  * @param {object} options
  * @param {string} options.root - consumer project root (translations/ cache home)
@@ -184,8 +358,11 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  *   any cold (uncached) string are skipped whole (listed in stats.skippedCold)
  *   instead of shipping mixed-language copies — `omega build` runs this way;
  *   explicit `omega translate` owns live-LLM translation (friction #24)
+ * @param {string} [options.packagedRoot] - the default-page translations
+ *   packaged with @omega.js/web (#621); default: the ones in this install
  * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings,
- *   cachedStrings, failures (page-language pairs skipped whole), usage, skippedCold }
+ *   cachedStrings, failures (page-language pairs skipped whole), usage,
+ *   skippedCold, defaultPages, packagedStrings, packagedMisses }
  */
 async function translateSite(options) {
   const { root, outDir, config } = options;
@@ -206,23 +383,38 @@ async function translateSite(options) {
   const isExcluded = buildExclusionTest(config);
 
   // Collect translatable pages
-  const allFiles = jetpack.find(outDir, { matching: '**/*.html' })
-    .map((file) => path.relative(outDir, file))
-    .filter((relPath) => !isExcluded(routeOf(relPath)));
+  const allHtml = jetpack.find(outDir, { matching: '**/*.html' })
+    .map((file) => path.relative(outDir, file));
 
-  const files = options.only
-    ? allFiles.filter((relPath) => relPath === options.only || routeOf(relPath) === options.only.replace(/^\/+|\/+$/g, ''))
-    : allFiles;
+  const onlyFilter = (relPath) => relPath === options.only || routeOf(relPath) === options.only.replace(/^\/+|\/+$/g, '');
+  const allFiles = allHtml.filter((relPath) => !isExcluded(routeOf(relPath)));
+  const files = options.only ? allFiles.filter(onlyFilter) : allFiles;
+
+  // The framework's OWN default pages (#621): excluded above from provider
+  // calls, collected here for the packaged-cache pass. A system folder, a
+  // language folder from a previous run, and a route the brand excluded by
+  // hand are all still out — the pass only ever reaches pages the framework
+  // itself wrote.
+  const guardedFolders = [...SYSTEM_EXCLUDED_FOLDERS, ...Object.keys(LANGUAGE_NAMES), ...userExcludedRoutes(config)];
+  const defaultRoutes = defaultExcludedRoutes();
+  const allDefaultFiles = allHtml.filter((relPath) => {
+    const route = routeOf(relPath);
+
+    return defaultRoutes.has(route)
+      && !guardedFolders.some((folder) => route === folder || route.startsWith(`${folder}/`));
+  });
+  const defaultFiles = options.only ? allDefaultFiles.filter(onlyFilter) : allDefaultFiles;
 
   // Base path (#355): the build stamped the mount point on every page it
   // emitted, so the pass reads it off the site itself — no caller plumbing,
   // and `omega translate` run on its own gets it too. dist IS the mount root,
   // so only the URLs carry it; the copies' file paths never do (#359).
-  const pathPrefix = files.length ? readPathPrefixStamp(jetpack.read(path.join(outDir, files[0]))) : '';
+  const prefixSource = files[0] || defaultFiles[0];
+  const pathPrefix = prefixSource ? readPathPrefixStamp(jetpack.read(path.join(outDir, prefixSource))) : '';
 
   logger.log(`Translating ${files.length} pages into ${settings.languages.length} language(s): ${settings.languages.join(', ')} (provider: ${provider.name}${provider.model ? `/${provider.model}` : ''})`);
 
-  const stats = { pages: 0, languages: settings.languages, newStrings: 0, cachedStrings: 0, failures: [], usage: { input: 0, output: 0 }, skippedCold: [] };
+  const stats = { pages: 0, languages: settings.languages, newStrings: 0, cachedStrings: 0, failures: [], usage: { input: 0, output: 0 }, skippedCold: [], defaultPages: 0, packagedStrings: 0, packagedMisses: 0 };
   const translatedRoutes = new Map(); // relPath → langs successfully produced
   const total = files.length * settings.languages.length;
   let done = 0;
@@ -230,7 +422,7 @@ async function translateSite(options) {
   for (const relPath of files) {
     const route = routeOf(relPath);
     const sourceHtml = jetpack.read(path.join(outDir, relPath));
-    const namespace = `pages/${route || 'home'}`;
+    const namespace = pageNamespace(route);
 
     // Source strings (collected once per page from a throwaway DOM)
     const strings = collectTextNodes(cheerio.load(sourceHtml)).map((n) => n.text);
@@ -299,40 +491,10 @@ async function translateSite(options) {
 
       saveCache(cacheRoot, lang, namespace, cache, strings);
 
-      // Build the translated page on a fresh DOM
-      const $ = cheerio.load(sourceHtml);
-      collectTextNodes($).forEach((n, i) => {
-        const value = translated[i];
-        if (value === undefined) {
-          return;
-        }
-
-        if (n.type === 'data') {
-          n.reference.data = value;
-        } else if (n.type === 'text') {
-          n.node.text(value);
-        } else if (n.type === 'attr') {
-          n.node.attr(n.attr, value);
-        }
+      copies.push({
+        targetRel: copyTargetRel(relPath, lang),
+        $: renderCopy({ sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix }),
       });
-
-      // Localize the document chrome
-      const pageUrl = `${baseUrl}/${lang}${route ? `/${route}` : ''}`;
-      $('html').attr('lang', lang);
-      $('html').attr('dir', isRTL(lang) ? 'rtl' : 'ltr');
-      $('link[rel="canonical"]').attr('href', pageUrl);
-      $('meta[property="og:url"]').attr('content', pageUrl);
-      $('meta[property="og:locale"]').attr('content', ogLocale(lang));
-
-      rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix);
-
-      // Canonical URLs are extensionless (about.html ↔ /about), so the
-      // language HOME must land as <lang>.html for /es to resolve as a FILE.
-      // An es/index.html forces GitHub Pages' directory redirect (/es →
-      // /es/), which fights the zone's strip-trailing-slash rule into a
-      // 301 loop (live find, launch night 2026-07-19).
-      const targetRel = relPath === 'index.html' ? `${lang}.html` : path.join(lang, relPath);
-      copies.push({ targetRel, $ });
       producedLangs.push(lang);
     }
 
@@ -348,6 +510,31 @@ async function translateSite(options) {
       translatedRoutes.set(relPath, producedLangs);
       stats.pages++;
     }
+  }
+
+  // The framework's own default pages, from the cache packaged with
+  // @omega.js/web (#621) — zero provider calls, so this runs on every pass,
+  // cachedOnly included. Their copies join translatedRoutes, which is what
+  // gives them hreflang alternates and sitemap entries like any other page.
+  const defaults = translateDefaultPages({
+    outDir,
+    files: defaultFiles,
+    settings,
+    brand,
+    baseUrl,
+    isExcluded,
+    pathPrefix,
+    packagedRoot: options.packagedRoot || PATHS.translations,
+    logger,
+  });
+
+  stats.defaultPages = defaults.pages;
+  stats.packagedStrings = defaults.strings;
+  stats.packagedMisses = defaults.misses;
+  defaults.produced.forEach((langs, relPath) => translatedRoutes.set(relPath, langs));
+
+  if (defaults.pages) {
+    logger.log(`Default pages: ${defaults.pages} translated from the packaged cache (${defaults.strings} strings${defaults.misses ? `, ${defaults.misses} not packaged` : ''})`);
   }
 
   // Stitch alternates into the ORIGINALS — only for pages actually translated
@@ -378,4 +565,4 @@ async function translateSite(options) {
   return stats;
 }
 
-module.exports = { translateSite, routeOf, collectTextNodes };
+module.exports = { translateSite, routeOf, collectTextNodes, SYSTEM_EXCLUDED_FOLDERS };

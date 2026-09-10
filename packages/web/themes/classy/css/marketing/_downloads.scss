@@ -131,11 +131,10 @@
   border-radius: var(--omega-radius-m);
   color: var(--omega-ink);
   text-decoration: none;
-  transition: transform var(--omega-speed) var(--omega-ease), box-shadow var(--omega-speed) var(--omega-ease);
+  transition: box-shadow var(--omega-speed) var(--omega-ease);
 
   &:hover {
     color: var(--omega-ink);
-    transform: translateY(-2px);
     box-shadow: var(--omega-shadow-2);
   }
 

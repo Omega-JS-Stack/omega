@@ -8,10 +8,11 @@
 // no-op instead of a crash.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const FRAMEWORK_ROOT = path.join(__dirname, '..', '..', '..', '..');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'sentry — the @omega.js/monitoring wiring',
@@ -60,9 +61,9 @@ module.exports = {
       // renderer's ONLY channel and it hands the client `buildJson.config`
       // alone — so the app's version has to ride INSIDE that object, not only
       // in the sibling `package` key.
-      name: 'the webpack bake folds the app version into the config the renderer hands the client',
+      name: 'the bundle bake folds the app version into the config the renderer hands the client',
       run: (ctx) => {
-        const { composeBuildConfig } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'webpack.js'));
+        const { composeBuildConfig } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'));
 
         const packaged = composeBuildConfig({ brand: { id: 'paperloom' } }, null, { version: '3.1.4' });
         ctx.expect(packaged.version).toBe('3.1.4');
@@ -85,4 +86,4 @@ module.exports = {
       },
     },
   ],
-};
+});

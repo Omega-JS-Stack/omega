@@ -224,10 +224,10 @@ test('#644: /token warms the backend before it waits for auth', async () => {
   assert.strictEqual(requests.length, 1, 'and it is the only thing on the wire while auth is pending');
 });
 
-test('#644: /oauth2 warms the backend before it waits for auth', async () => {
-  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'oauth2', 'index.js'));
+test('#644: /connections/callback warms the backend before it waits for auth', async () => {
+  const { requests } = await bootPage(path.join(CORE_DIR, 'js', 'pages', 'connections', 'callback', 'index.js'));
 
-  assertWakeup(requests, '/oauth2');
+  assertWakeup(requests, '/connections/callback');
   assert.strictEqual(requests.length, 1, 'the tokenize POST is still behind the auth settle');
 });
 

@@ -5,9 +5,11 @@ meta:
   title: "Email preferences - {{ resolved.config.brand.name }}"
   description: "Manage your email preferences for {{ resolved.config.brand.name }}."
   breadcrumb: "Email preferences"
+  # A per-recipient utility page reached from an email link, never from search.
+  # #564 makes this ONE decision with the sitemap opt-out below, which is also
+  # the only half a built page carries (#468's orphan check reads it there).
+  index: false
 
-sitemap:
-  include: false
 ---
 
 {{ content | omega_content_format }}

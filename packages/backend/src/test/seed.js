@@ -19,16 +19,18 @@ const testAccounts = require('./test-accounts.js');
  * @param {string} frameworkTestsDir - @omega.js/backend's own test/ directory
  * @param {string} [projectTestsDir] - Consumer project's test/ directory
  * @param {object} [ctx] - Context passed to _init.js functions ({ config, Manager })
- * @returns {{ accounts: object, setups: Function[] }}
+ * @returns {{ accounts: object, setups: Function[], failed: boolean }}
  */
 function loadInitHooks(frameworkTestsDir, projectTestsDir, ctx) {
-  const hooks = [
+  const loaded = [
     loadInit(frameworkTestsDir, '@omega.js/backend core', ctx),
   ];
 
   if (projectTestsDir && jetpack.exists(projectTestsDir)) {
-    hooks.push(loadInit(projectTestsDir, 'project', ctx));
+    loaded.push(loadInit(projectTestsDir, 'project', ctx));
   }
+
+  const hooks = loaded.map((entry) => entry.hook);
 
   const accounts = {};
   for (const h of hooks) {
@@ -45,31 +47,101 @@ function loadInitHooks(frameworkTestsDir, projectTestsDir, ctx) {
   return {
     accounts,
     setups: hooks.filter((h) => typeof h.setup === 'function').map((h) => h.setup),
+    failed: loaded.some((entry) => entry.failed),
   };
+}
+
+// The accounts the last loadSeedAccounts() resolved, kept per project dir. A
+// functions process serves ONE project, so this is a single slot in practice.
+const seedAccountsCache = new Map();
+
+/**
+ * The accounts the `_init.js` hooks declare — the project's own personas, the
+ * `extraAccounts` half of every seed surface — resolved OUTSIDE a seeding run
+ * ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)): the roster
+ * route serves them from the functions process, which never ran the seed.
+ *
+ * Cached per project dir because a request must not re-read (and re-execute) a
+ * consumer's `_init.js` every time the palette asks. `test/_init.js` sits
+ * outside `dist/`, so an edit to it does not reload this process — but a
+ * changed persona has to be re-SEEDED to exist at all, and that is an emulator
+ * restart, which reloads it here too.
+ *
+ * Only a SUCCESSFUL read is cached ([#733](https://github.com/Omega-JS-Stack/omega/issues/733)):
+ * a broken `_init.js` is not an answer to remember, so the failure serves `{}`
+ * (behind the red log the load already prints) and the NEXT call re-reads the
+ * file the developer just fixed, instead of holding an empty roster until the
+ * emulator restarts.
+ *
+ * @param {object} options
+ * @param {string} options.projectDir - Firebase project directory (holds test/)
+ * @param {object} [options.config] - Resolved brand config, passed to the hooks
+ * @param {object} [options.Manager] - Backend Manager instance, passed to the hooks
+ * @returns {object} Accounts keyed by id (empty when the project declares none)
+ */
+function loadSeedAccounts({ projectDir, config, Manager }) {
+  if (!seedAccountsCache.has(projectDir)) {
+    const frameworkTestsDir = path.resolve(__dirname, '../../test');
+    const projectTestsDir = path.join(projectDir, 'test');
+
+    const hooks = loadInitHooks(frameworkTestsDir, projectTestsDir, { config, Manager });
+
+    if (hooks.failed) {
+      return {};
+    }
+
+    seedAccountsCache.set(projectDir, hooks.accounts);
+  }
+
+  return seedAccountsCache.get(projectDir);
 }
 
 /**
  * Load a single test/_init.js hook from a test root.
+ *
+ * @returns {{ hook: object, failed?: boolean }} The hook module (`{}` when the
+ *   root declares none), and whether the load BROKE — which a caller that
+ *   remembers what it read must not remember.
  */
 function loadInit(testDir, label, ctx) {
   const initPath = path.join(testDir, '_init.js');
 
   if (!jetpack.exists(initPath)) {
-    return {};
+    return { hook: {} };
   }
 
   try {
     const fn = require(initPath);
     if (typeof fn !== 'function') {
       console.log(chalk.red(`  ✗ ${label} test/_init.js must export a function: module.exports = (ctx) => ({ ... })`));
-      return {};
+      return failedInit(initPath);
     }
     const mod = fn(ctx || {});
-    return mod && typeof mod === 'object' ? mod : {};
+    // A factory that returns no object (the classic `(ctx) => { accounts: ... }`
+    // arrow-body typo returns undefined) is the third broken shape — remembered
+    // as "declares none" it would stick for the process lifetime (#733).
+    if (!mod || typeof mod !== 'object') {
+      console.log(chalk.red(`  ✗ ${label} test/_init.js hook factory must RETURN an object, got ${mod === null ? 'null' : typeof mod}`));
+      return failedInit(initPath);
+    }
+    return { hook: mod };
   } catch (e) {
     console.log(chalk.red(`  ✗ Failed to load ${label} test/_init.js: ${e.message}`));
-    return {};
+    return failedInit(initPath);
   }
+}
+
+/**
+ * A broken load, forgotten everywhere. Node drops a module that threw while
+ * being EVALUATED, but a file that required cleanly and then broke — an
+ * exported non-function, a hook factory that threw when called — stays in
+ * `require.cache`, so a retry would keep re-reading the same broken module
+ * however many times the developer fixes the file (#733).
+ */
+function failedInit(initPath) {
+  delete require.cache[require.resolve(initPath)];
+
+  return { hook: {}, failed: true };
 }
 
 /**
@@ -167,4 +239,4 @@ async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) 
   return { accounts, created: result.created };
 }
 
-module.exports = { seed, loadInitHooks };
+module.exports = { seed, loadInitHooks, loadSeedAccounts };

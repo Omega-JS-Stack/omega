@@ -74,6 +74,8 @@ The source prefix is standardized across all four OMEGA frameworks:
 
 A source-prefixed target excludes the other source entirely; the path part (if any) matches by relative path prefix (relative to each source's `test/` root).
 
+A target that names a path and matches NO file is a hard error: the run prints `No test file matches "<target>"` and exits 1, so a typo'd path, or a suite renamed out from under a target, can never run silently green ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). A run that named no file (bare, or a bare source prefix) still exits 0 when there is nothing to run. Inside a brand-root fan-out the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and the same miss answers with exit 3 instead: a path another target carries is a no-op here, and the brand run fails only when EVERY target missed ([docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b)).
+
 #### `--filter` — match test names/descriptions
 
 `--filter` is **orthogonal** to the positional target: it matches a substring against test **names/descriptions** within the files the target already selected. They compose.

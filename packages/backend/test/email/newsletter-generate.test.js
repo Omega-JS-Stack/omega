@@ -82,8 +82,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const fetch = require('wonderful-fetch');
 const jetpack = require('fs-jetpack');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Generate a newsletter preview (fixture by default, full AI pipeline with TEST_EXTENDED_MODE)',
   auth: 'none',
   timeout: 300000, // 5 min — AI structure + image generation + GitHub upload + Beehiiv draft
@@ -172,8 +173,8 @@ module.exports = {
         newsletterConfig.template = requestedFixture;
       }
 
-      const { renderNewsletter } = require('../../src/manager/libraries/email/generators/lib/mjml-template.js');
-      const { renderMarkdown } = require('../../src/manager/libraries/email/generators/lib/markdown-renderer.js');
+      const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
+      const { renderMarkdown } = require('../../dist/manager/libraries/email/generators/lib/markdown-renderer.js');
 
       const renderStart = Date.now();
       const { html, mjml, template: templateName } = await renderNewsletter({
@@ -260,8 +261,8 @@ module.exports = {
         }
       }
 
-      const { renderNewsletter } = require('../../src/manager/libraries/email/generators/lib/mjml-template.js');
-      const { renderMarkdown } = require('../../src/manager/libraries/email/generators/lib/markdown-renderer.js');
+      const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
+      const { renderMarkdown } = require('../../dist/manager/libraries/email/generators/lib/markdown-renderer.js');
 
       const renderStart = Date.now();
       const { html, mjml, template: templateName } = await renderNewsletter({
@@ -401,7 +402,7 @@ module.exports = {
     };
 
     // --- Run the production generator with the local-persist image hook ---
-    const generator = require('../../src/manager/libraries/email/generators/newsletter.js');
+    const generator = require('../../dist/manager/libraries/email/generators/newsletter.js');
 
     // EXTENDED mode mirrors the production cron's newsletter side effects:
     // GH upload always happens (PNGs + newsletter.html), Beehiiv draft upload
@@ -563,7 +564,7 @@ module.exports = {
       }
     }
   },
-};
+});
 
 /**
  * Upload the rendered HTML to Beehiiv as a draft post (never sends). Uses the

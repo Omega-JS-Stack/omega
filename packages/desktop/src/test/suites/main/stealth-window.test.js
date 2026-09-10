@@ -7,7 +7,9 @@
 // (_surface — covered by window-manager.test.js); THESE tests prove windows
 // that never touch window-manager can't flash or steal focus during a test run.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'stealth-window — raw BrowserWindow stealth (main)',
@@ -69,4 +71,4 @@ module.exports = {
       },
     },
   ],
-};
+});

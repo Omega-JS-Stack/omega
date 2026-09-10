@@ -3,10 +3,11 @@
 
 const path = require('path');
 const fs   = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'context.js');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'context (main)',
@@ -151,4 +152,4 @@ module.exports = {
       },
     },
   ],
-};
+});

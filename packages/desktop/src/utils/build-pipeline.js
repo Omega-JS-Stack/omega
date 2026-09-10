@@ -1,7 +1,7 @@
 // The build-mode pipeline shared by the `build`, `package`, and `publish` verbs.
 //
 // The CLI verbs are canonical and the synced projectScripts are thin
-// `npx omega <verb>` aliases, so a verb must run the pipeline ITSELF and never
+// `omega <verb>` aliases, so a verb must run the pipeline ITSELF and never
 // shell back to `npm run build` / `npm run publish` — that would recurse. Each
 // verb declares its plan as data (env flags + ordered steps) and this runner
 // executes it; `npm run gulp -- <task>` is the one safe shell-out (the consumer's
@@ -37,7 +37,7 @@ async function runPipeline(plan, options, runners) {
   options = options || {};
   runners = runners || RUNNERS;
 
-  // Set in-process so every child (gulp → webpack → electron-builder) inherits them.
+  // Set in-process so every child (gulp → esbuild → electron-builder) inherits them.
   Object.entries(plan.env || {}).forEach(([key, value]) => {
     process.env[key] = value;
   });

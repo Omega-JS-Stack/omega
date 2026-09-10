@@ -3,9 +3,11 @@
  * Tests the admin Realtime Database read/write endpoints
  * Requires admin authentication
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const TEST_PATH = '_test/database-test';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin Realtime Database read/write operations',
   type: 'group',
   tests: [
@@ -128,4 +130,4 @@ module.exports = {
     },
 
   ],
-};
+});

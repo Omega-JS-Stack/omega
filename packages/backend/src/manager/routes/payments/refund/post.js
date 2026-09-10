@@ -1,10 +1,7 @@
 const path = require('path');
 const loadProvider = require('../../../libraries/load-provider.js');
 const powertools = require('node-powertools');
-
-// Payments older than this are not eligible for a refund, whatever was bought.
-const REFUND_WINDOW_SECONDS = 6 * 30 * 24 * 60 * 60;
-const OUTSIDE_WINDOW_MESSAGE = 'Payments older than 6 months are not eligible for refunds';
+const { OUTSIDE_WINDOW_MESSAGE, isWithinRefundWindow, oneTimeRefundRefusal } = require('../../../libraries/payment/refund-policy.js');
 
 /**
  * POST /payments/refund
@@ -133,34 +130,19 @@ async function refundOneTimePurchase({ ctx, uid, settings }) {
     return ctx.respond('Order not found', { code: 400 });
   }
 
-  if (order.type !== 'one-time') {
-    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, type=${order.type}`);
-    return ctx.respond('That order is not a one-time purchase', { code: 400 });
-  }
+  // Type, already-refunded, age and payment details, in the ONE place that
+  // decides them: the account page's orders list offers its refund button off
+  // the same predicate, so a button it offers is a refund this route accepts
+  // ([#672](https://github.com/Omega-JS-Stack/omega/issues/672)).
+  const refusal = oneTimeRefundRefusal(order);
 
-  // requests.refund covers the in-app path; unified.status covers a refund issued
-  // from the provider dashboard, which arrives by webhook and writes no request
-  if (order.requests?.refund || order.unified?.status === 'refunded') {
-    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, already refunded (request=${!!order.requests?.refund}, status=${order.unified?.status})`);
-    return ctx.respond('This purchase has already been refunded', { code: 400 });
-  }
-
-  // The purchase date is the order's creation; the last webhook write is the fallback
-  const purchasedUNIX = order.metadata?.created?.timestampUNIX
-    || order.unified?.payment?.updatedBy?.date?.timestampUNIX;
-
-  if (!isWithinRefundWindow(purchasedUNIX)) {
-    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, purchase too old (created=${new Date(purchasedUNIX * 1000).toISOString()})`);
-    return ctx.respond(OUTSIDE_WINDOW_MESSAGE, { code: 400 });
+  if (refusal) {
+    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, ${refusal.reason} (type=${order.type}, status=${order.unified?.status}, request=${!!order.requests?.refund})`);
+    return ctx.respond(refusal.message, { code: 400 });
   }
 
   const provider = order.provider || order.unified?.payment?.provider;
   const resourceId = order.resourceId || order.unified?.payment?.resourceId;
-
-  if (!provider || !resourceId) {
-    ctx.log(`Refund rejected: uid=${uid}, orderId=${orderId}, missing provider=${provider} or resourceId=${resourceId}`);
-    return ctx.respond('Order payment details not found', { code: 400 });
-  }
 
   // Load the provider module
   let providerModule;
@@ -223,16 +205,3 @@ async function storeRefundRequest({ ctx, orderId, refund, settings }) {
   ctx.log(`Stored refund request on payments-orders/${orderId}: reason=${settings.reason}, amount=${refund.amount}`);
 }
 
-/**
- * Is a payment recent enough to refund? An absent date cannot disqualify one.
- *
- * @param {number} [paidUNIX] - When the payment happened
- * @returns {boolean}
- */
-function isWithinRefundWindow(paidUNIX) {
-  if (!paidUNIX) {
-    return true;
-  }
-
-  return paidUNIX >= Math.floor(Date.now() / 1000) - REFUND_WINDOW_SECONDS;
-}

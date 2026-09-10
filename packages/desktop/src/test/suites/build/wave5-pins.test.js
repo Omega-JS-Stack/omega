@@ -4,10 +4,11 @@
 
 const path = require('path');
 const fs = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'wave-5 source pins (desktop)',
@@ -31,4 +32,4 @@ module.exports = {
       },
     },
   ],
-};
+});

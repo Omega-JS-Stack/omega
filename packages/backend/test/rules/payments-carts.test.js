@@ -15,7 +15,9 @@
  *
  * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Firestore security rules for payments-carts documents',
   type: 'group',
   timeout: 30000,
@@ -401,4 +403,4 @@ module.exports = {
       },
     },
   ],
-};
+});

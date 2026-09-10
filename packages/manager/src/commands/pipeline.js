@@ -42,6 +42,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
 
 const { resolveBrandRoot, loadBrand, discoverTargets } = require('../lib/brand.js');
 const { runVerifyLegs, VERIFY_LEGS } = require('../lib/verify-live.js');
@@ -185,6 +186,11 @@ module.exports = async (argv = {}) => {
     process.exitCode = 1;
     return;
   }
+
+  // Tee the run to <brandRoot>/logs/pipeline.log (#623) — the scorecard is the
+  // verdict worth keeping; the children spawn with stdio inherit, so each leg's
+  // own output stays in its own log.
+  attachLogFile(path.join(brandRoot, 'logs', 'pipeline.log'));
 
   const requireExtra = String(argv.require || '').split(',').map((s) => s.trim()).filter(Boolean);
   const childArgs = buildChildArgs(argv);

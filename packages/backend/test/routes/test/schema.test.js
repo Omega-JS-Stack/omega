@@ -3,7 +3,9 @@
  * Comprehensive schema validation tests
  * Tests all field types, options, and plan-based variations
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Schema validation',
   type: 'group',
   timeout: 30000,
@@ -551,4 +553,4 @@ module.exports = {
       },
     },
   ],
-};
+});

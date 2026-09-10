@@ -20,6 +20,8 @@ const {
   startLocalHttpsProxy,
   checkCertProblem,
   findCertPair,
+  mkcertInstallHint,
+  mkcertCaRootPem,
 } = require('../src/local-https.js');
 
 const hasMkcert = (() => {
@@ -44,6 +46,80 @@ test('exports the expected surface', () => {
   assert.equal(typeof startLocalHttpsProxy, 'function');
   assert.equal(typeof checkCertProblem, 'function');
   assert.equal(typeof findCertPair, 'function');
+  assert.equal(typeof mkcertInstallHint, 'function');
+  assert.equal(typeof mkcertCaRootPem, 'function');
+});
+
+// The root CA path is what a spawned process trusts through
+// NODE_EXTRA_CA_CERTS (#795), so "no mkcert" has to answer null rather than a
+// path that verifies nothing. The lookup is injected — no real mkcert runs.
+test('mkcertCaRootPem: no mkcert on the host → null', () => {
+  const answer = mkcertCaRootPem({ exec: () => { throw new Error('command not found: mkcert'); } });
+
+  assert.equal(answer, null);
+});
+
+test('mkcertCaRootPem: a CAROOT holding rootCA.pem → the joined path', () => {
+  const dir = tmpDir('caroot');
+  fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
+
+  assert.equal(mkcertCaRootPem({ exec: () => `${dir}\n` }), path.join(dir, 'rootCA.pem'));
+});
+
+test('mkcertCaRootPem: a CAROOT without the root file → null', () => {
+  const dir = tmpDir('caroot-empty');
+
+  assert.equal(mkcertCaRootPem({ exec: () => `${dir}\n` }), null);
+});
+
+test('mkcertCaRootPem: memoised — three call sites, one shell call', () => {
+  const dir = tmpDir('caroot-memo');
+  fs.writeFileSync(path.join(dir, 'rootCA.pem'), 'root-ca-bytes');
+
+  let calls = 0;
+  const exec = () => { calls += 1; return `${dir}\n`; };
+
+  assert.equal(mkcertCaRootPem({ exec }), path.join(dir, 'rootCA.pem'));
+  assert.equal(mkcertCaRootPem({ exec }), path.join(dir, 'rootCA.pem'));
+  assert.equal(calls, 1, 'the second call answers from the memo');
+});
+
+// The hint is the ONLY thing a host without mkcert gets, so it has to name a
+// manager that host actually has. Platform is an argument so all three branches
+// are pinned from one machine.
+test('mkcertInstallHint: every platform gets its own manager', () => {
+  assert.equal(mkcertInstallHint('darwin'), 'brew install mkcert && mkcert -install');
+
+  // Windows: Chocolatey IS the command; scoop is named after it, not spliced in.
+  assert.equal(mkcertInstallHint('win32').split('.')[0], 'choco install mkcert && mkcert -install');
+  assert.match(mkcertInstallHint('win32'), /scoop/i, 'scoop is still named');
+
+  // Linux, per mkcert's README: certutil from apt, mkcert from the release binary.
+  assert.match(mkcertInstallHint('linux'), /apt install libnss3-tools/);
+  assert.match(mkcertInstallHint('linux'), /github\.com\/FiloSottile\/mkcert\/releases/);
+
+  for (const platform of ['darwin', 'win32', 'linux', 'freebsd']) {
+    const hint = mkcertInstallHint(platform);
+    assert.match(hint, /mkcert -install/, `${platform} must still trust the CA`);
+  }
+
+  // The bug this replaces: every host was told `brew install mkcert`.
+  for (const platform of ['win32', 'linux', 'freebsd']) {
+    assert.doesNotMatch(mkcertInstallHint(platform), /brew install/, `${platform} has no Homebrew`);
+  }
+});
+
+test('mkcertInstallHint: the line OPENS with something pasteable', () => {
+  // A reader copies the head of the line; an alternative buried inside the
+  // command is a command that does not run.
+  for (const platform of ['darwin', 'win32', 'linux']) {
+    const head = mkcertInstallHint(platform).split('.')[0];
+    assert.doesNotMatch(head, /\(or\b|\bor:/, `${platform} splices an alternative into the command`);
+  }
+});
+
+test('mkcertInstallHint: defaults to the host platform', () => {
+  assert.equal(mkcertInstallHint(), mkcertInstallHint(process.platform));
 });
 
 test('findCertPair: empty dir → null', () => {

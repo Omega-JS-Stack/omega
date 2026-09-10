@@ -5,49 +5,35 @@
 <!-- Master - Outdated Alert Box -->
 <div
   class="main-alert main-alert-top main-alert-fixed main-alert-outdated bg-danger animation-fade-in"
-  role="alert" aria-live="polite" aria-label="Outdated browser"
+  role="alert" aria-label="Outdated browser"
   hidden>
-  <span class="main-alert-close">&times;</span>
+  <button type="button" class="main-alert-close" aria-label="Close">&times;</button>
   <div>
-    {% omega_icon "warning", "fa-bounce me-2" %}
+    <i class="fa-solid fa-warning fa-bounce me-2"></i>
     You are using an outdated browser that our site <strong>DOES NOT</strong> support. Please <a href="https://www.google.com/chrome" rel="nofollow" target="_blank">click here</a> to update your browser.
   </div>
 </div>
 <div
   class="main-alert main-alert-top main-alert-fixed main-alert-suspended bg-danger animation-fade-in"
-  role="alert" aria-live="polite" aria-label="Payment method issue"
+  role="alert" aria-label="Payment method issue"
   hidden>
-  <span class="main-alert-close">&times;</span>
+  <button type="button" class="main-alert-close" aria-label="Close">&times;</button>
   <div>
-    {% omega_icon "warning", "fa-bounce me-2" %}
+    <i class="fa-solid fa-warning fa-bounce me-2"></i>
     There is a <strong>problem with your payment method</strong>. To continue using <strong>{{ resolved.config.brand.name }}</strong>, please <a href="/dashboard/account#billing" target="_blank">update your payment method</a>.
   </div>
 </div>
 <!-- <div
   class="main-alert main-alert-top main-alert-fixed main-alert-sale bg-primary animation-fade-in"
-  role="alert" aria-live="polite" aria-label="Flash sale"
+  role="alert" aria-label="Flash sale"
   hidden>
-  <span class="main-alert-close">&times;</span>
+  <button type="button" class="main-alert-close" aria-label="Close">&times;</button>
   <div>
     <i class="fa-solid fa-stopwatch fa-beat me-2"></i>
     <strong>FLASH SALE!</strong>
     Save <strong>15%</strong> at checkout, today only! <a href="/pricing" target="_blank">Claim discount</a>.
   </div>
 </div> -->
-
-<!-- Prerendered Icons -->
-{%- assign icons = resolved.prerender_icons | default: empty -%}
-{%- iftruthy icons -%}
-  <!-- Pre-rendered Icon Templates -->
-  <div id="prerendered-icons" class="d-none" aria-hidden="true">
-    {%- for icon in icons -%}
-      {%- assign icon_name = icon.name | default: icon -%}
-      <div data-icon="{{ icon_name }}">
-        {% omega_icon icon_name, "" %}
-      </div>
-    {%- endfor -%}
-  </div>
-{%- endiftruthy -%}
 
 <!-- Script - Iframe detection -->
 <script type="text/javascript">

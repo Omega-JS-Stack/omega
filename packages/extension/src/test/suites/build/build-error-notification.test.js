@@ -12,12 +12,13 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // The live message from the versionless-manifest package test — apostrophe,
 // parentheses, quotes and a colon in one string.
 const NASTY = `Cannot build the manifest: the extension app's package.json has no "version" (Chrome refuses to load a manifest without one)`;
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'Manager — build-error notification argv is shell-free',
@@ -42,8 +43,8 @@ module.exports = {
     {
       name: 'title carries the plugin name and the flags notifly expects',
       run: (ctx) => {
-        const args = Manager.getBuildErrorNotificationArgs('Webpack', 'boom');
-        ctx.expect(args[args.indexOf('--title') + 1]).toBe('Build Error: Webpack');
+        const args = Manager.getBuildErrorNotificationArgs('Bundle', 'boom');
+        ctx.expect(args[args.indexOf('--title') + 1]).toBe('Build Error: Bundle');
         // No --appIcon: the old value was a machine-specific absolute path (#126)
         ctx.expect(args.includes('--appIcon')).toBe(false);
         ctx.expect(args.includes('--timeout')).toBe(true);
@@ -118,4 +119,4 @@ module.exports = {
       },
     },
   ],
-};
+});

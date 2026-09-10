@@ -2,6 +2,7 @@ const powertools = require('node-powertools');
 const fetchFailure = require('../fetch-failure.js');
 const assertRefundLinkage = require('../refund-linkage.js');
 const env = require('../../env.js');
+const assertLicensedPayments = require('../license.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -58,6 +59,10 @@ const PayPal = {
    * @returns {Promise<string>} Access token
    */
   async init() {
+    // A keyless deploy runs no live payments (#320) — before the token, and
+    // before the cache below can hand one back
+    assertLicensedPayments('PayPal');
+
     // Return cached token if still valid (with 60s buffer)
     if (cachedToken && Date.now() < tokenExpiresAt - 60000) {
       return cachedToken;
@@ -235,6 +240,7 @@ const PayPal = {
       // An order fetch IS the capture, so its failure also means the money never moved
       throw fetchFailure(e, {
         provider: 'paypal',
+        fn: 'fetchResource',
         resourceType,
         resourceId,
         consequence: resourceType === 'order'
@@ -345,13 +351,24 @@ const PayPal = {
 
   /**
    * Resolve a PayPal plan ID from product config at runtime
-   * Fetches plans for the PayPal product ID and matches by interval + amount
+   * Fetches plans for the PayPal product ID and matches by interval + amount +
+   * TRIAL-cycle presence — the manager's own matching rule
+   *
+   * PayPal puts a trial on the PLAN, never on the subscribe call, so a product
+   * with trial days carries a TWIN pair per interval: one with the TRIAL cycle
+   * and one without. `trial` picks between them, which is the only way a buyer
+   * who is not owed a trial gets a plan with no free cycle on it
+   * ([#761](https://github.com/Omega-JS-Stack/omega/issues/761)). A trial
+   * product whose skip-trial twin has not been minted yet (the manager walk has
+   * not run since) throws rather than falling back to the trial twin — the fix
+   * is a manage run, never a free period nobody granted.
    *
    * @param {object} product - Product from config
    * @param {string} frequency - 'monthly', 'annually', etc.
+   * @param {boolean} [trial=false] - Whether this checkout is taking the trial
    * @returns {Promise<string>} PayPal plan ID
    */
-  async resolvePlanId(product, frequency) {
+  async resolvePlanId(product, frequency, trial = false) {
     if (product.archived) {
       throw new Error(`Product ${product.id} is archived`);
     }
@@ -378,7 +395,7 @@ const PayPal = {
     // Map frequency to PayPal interval unit
     const intervalUnit = FREQUENCY_TO_INTERVAL[frequency] || 'MONTH';
 
-    // Find matching active plan by interval + amount
+    // Find matching active plan by interval + amount + trial-cycle presence
     for (const plan of plans) {
       if (plan.status !== 'ACTIVE') {
         continue;
@@ -392,13 +409,14 @@ const PayPal = {
 
       const planInterval = cycle.frequency?.interval_unit;
       const planAmount = parseFloat(cycle.pricing_scheme?.fixed_price?.value || '0');
+      const planHasTrial = !!plan.billing_cycles?.find(c => c.tenure_type === 'TRIAL');
 
-      if (planInterval === intervalUnit && planAmount === expectedAmount) {
+      if (planInterval === intervalUnit && planAmount === expectedAmount && planHasTrial === !!trial) {
         return plan.id;
       }
     }
 
-    throw new Error(`No active PayPal plan for ${product.id}/${frequency} at $${expectedAmount} (product: ${paypalProductId})`);
+    throw new Error(`No active PayPal plan for ${product.id}/${frequency} at $${expectedAmount} ${trial ? 'with' : 'without'} a trial cycle (product: ${paypalProductId}) — run the manager payment walk to mint it`);
   },
 
   /**
@@ -489,7 +507,7 @@ const PayPal = {
     try {
       refund = await this.request(endpoint);
     } catch (e) {
-      throw fetchFailure(e, { provider: 'paypal', resourceType: 'refund', resourceId: refundId });
+      throw fetchFailure(e, { provider: 'paypal', fn: 'getRefundDetails', resourceType: 'refund', resourceId: refundId });
     }
 
     // The refund is a SECOND record, keyed by an id the payload chose: without a

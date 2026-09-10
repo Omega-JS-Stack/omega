@@ -23,6 +23,10 @@
  * - **Chargebee** — `libraries/payment/providers/chargebee.js` stamps
  *   `err.statusCode` from the HTTP response; a deleted subscription answers 404
  *   (`resource_not_found`).
+ * - **Coinbase Commerce** — `libraries/payment/providers/coinbase.js` stamps
+ *   `err.statusCode` from the HTTP response the same way, so a charge Coinbase
+ *   does not have (404) needs no rule of its own here
+ *   ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
  * - **PayPal** — `libraries/payment/providers/paypal.js` throws a plain Error
  *   whose message carries the status: `PayPal API 404: …` (`RESOURCE_NOT_FOUND`).
  *   PayPal's other "already gone" answer — 422 with issue

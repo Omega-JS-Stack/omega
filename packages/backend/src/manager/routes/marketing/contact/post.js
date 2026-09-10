@@ -5,14 +5,11 @@
 const recaptcha = require('../../../libraries/recaptcha.js');
 const { validate: validateEmail, ALL_CHECKS } = require('../../../libraries/email/validation.js');
 const { inferContact } = require('../../../libraries/infer-contact.js');
+const { MARKETING_RATE_LIMIT } = require('../../../libraries/rate-limits.js');
 
 module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
-  // Initialize Usage to check auth level
-  const usage = await Manager.Usage().init(ctx, {
-    unauthenticatedMode: 'firestore',
-  });
-  const isAdmin = usage.user.roles?.admin;
+  const isAdmin = ctx.getUser().roles?.admin;
 
   // Extract parameters
   const email = (settings.email || '').trim().toLowerCase();
@@ -80,12 +77,22 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
       }
     }
 
-    // Check rate limit via Usage API
+    // Rate limit — consume() is check, count and write in ONE call and throws
+    // the 429 itself ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+    // An EXPLICIT limit: this is a framework anti-abuse gate on a public route,
+    // not a plan feature a brand prices in its features catalog.
+    // Counted per CALLER IP: this lane is public, so an EXPLICIT keyed counter
+    // is the honest one — a signed-in subscriber and a stranger cost the brand
+    // the same, and forKey() can never move a signed-in user's own counters.
     try {
-      await usage.validate('marketing-subscribe', { useCaptchaResponse: false });
-      usage.increment('marketing-subscribe');
-      await usage.update();
+      await ctx.usage.forKey(ctx.request.geolocation.ip).consume('marketing-subscribe', 1, { limit: MARKETING_RATE_LIMIT });
     } catch (e) {
+      // Only a rate limit is a rate limit — a 500 from consume() (a Firestore
+      // outage, a misconfigured catalog) must not come back as one
+      if (e.code !== 429) {
+        throw e;
+      }
+
       return ctx.respond('Rate limit exceeded', { code: 429 });
     }
   }

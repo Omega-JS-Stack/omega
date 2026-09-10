@@ -4,6 +4,7 @@
 // to a no-op via require.cache injection before calling process().
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const CLI_PATH = path.join(__dirname, '..', '..', '..', 'cli.js');
 const COMMANDS_DIR = path.join(__dirname, '..', '..', '..', 'commands');
@@ -29,7 +30,7 @@ function freshCli() {
   return require(CLI_PATH);
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'cli — alias resolution + dispatch',
@@ -146,4 +147,4 @@ module.exports = {
       },
     },
   ],
-};
+});

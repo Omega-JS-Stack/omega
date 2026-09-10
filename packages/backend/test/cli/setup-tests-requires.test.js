@@ -11,10 +11,11 @@
  */
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const DIR = path.join(__dirname, '..', '..', 'src', 'cli', 'commands', 'setup-tests');
+const DIR = path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'setup-tests');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Setup-tests relative requires resolve',
   type: 'group',
   tests: [
@@ -41,4 +42,4 @@ module.exports = {
       },
     },
   ],
-};
+});

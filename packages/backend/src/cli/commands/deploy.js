@@ -6,6 +6,8 @@ const stageLocalPackages = require('../utils/stage-local-packages');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { refuseWhenCustom } = require('../utils/project-type');
+const { loadConfig, loadEnv } = require('@omega.js/config');
+const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 
 const DEFAULT_REGION = 'us-central1';
 
@@ -21,11 +23,31 @@ class DeployCommand extends BaseCommand {
     attachLogFile(logPath);
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
+    // The .env cascade, loaded HERE because nothing else in the CLI boot does:
+    // the license key below is read from this process's environment, and a
+    // licensed brand keeps OMEGA_LICENSE_KEY in the brand root's .env. Named
+    // `production` — the same environment the stage below composes dist/.env
+    // for (#586), so the verdict and the artifact read one overlay.
+    loadEnv(path.join(self.firebaseProjectPath, 'dist'), { environment: 'production' });
+
+    // The license check ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)),
+    // once per deploy and BEFORE the stage: a backend deploy runs straight
+    // from the CLI, so the key comes out of the .env cascade in this process
+    // and never near the artifact. The verdict itself rides the composed
+    // dist/.env as OMEGA_LICENSE_STATUS — a keyless deploy gates the payment
+    // provider libraries at runtime. A key that cannot be answered for throws
+    // here, which stops the deploy rather than shipping the wrong verdict.
+    const licenseStatus = (await resolveLicenseStamp({
+      config: loadConfig(self.firebaseProjectPath, 'backend').config,
+      production: true,
+    })).status;
+    this.log(chalk.gray(`  License: ${licenseStatus}\n`));
+
     // dist/ is staged output (src/dist pillar): a fresh stage carries the
     // composed config + public/ hosting boilerplate across the upload boundary.
-    // `deploy` also drops the .env's dev-only payment rows — a test credential
-    // has no business inside a deployed runtime's env (#586).
-    this.ensureStaged({ deploy: true });
+    // The upload is composed for PRODUCTION — base .env + `.env.production`,
+    // and no other environment's overlay ever rides along (#586).
+    this.ensureStaged({ environment: 'production', licenseStatus });
 
     // --only pass-through (e.g. `omega deploy --only hosting` — deploys
     // hosting on Spark plans where functions would demand Blaze)

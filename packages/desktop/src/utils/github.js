@@ -1,37 +1,16 @@
-// Shared GitHub helpers used by setup, push-secrets, and the release pipeline.
+// Shared GitHub helpers used by push-secrets and the release pipeline.
 //
-// Repo discovery: parse the consumer's package.json `repository.url` first, then fall back to
-// `git remote get-url origin`. Returns `{ owner, repo }` or throws.
+// WHICH repo a verb addresses is not decided here: the app repo is
+// @omega.js/config's `brandRepo` and the releases repo its `releasesRepo`, from
+// config/omega.json5 alone (#799). The old package.json/git-remote discovery is
+// gone: a brand nested in another repo (a target inside a brand monorepo, the
+// playground inside the framework monorepo) resolved to the ENCLOSING repo.
 //
 // Octokit factory: returns an authenticated client when GH_TOKEN is set. Returns null otherwise so
 // callers can choose to no-op or bail with a friendly message.
 //
-// Repo ensure: idempotently create a repo under <owner> if it doesn't exist. Used by setup to
-// auto-provision update-server / download-server.
-
-const path    = require('path');
-const jetpack = require('fs-jetpack');
-
-async function discoverRepo(projectRoot) {
-  const pkg = jetpack.read(path.join(projectRoot, 'package.json'), 'json') || {};
-  const url = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url;
-
-  if (url) {
-    const m = url.match(/github\.com[/:]([^/]+)\/([^/.]+?)(?:\.git)?$/);
-    if (m) {
-      return { owner: m[1], repo: m[2] };
-    }
-  }
-
-  try {
-    const { execute } = require('node-powertools');
-    const remote = await execute('git config --get remote.origin.url', { log: false });
-    const m = String(remote || '').match(/github\.com[/:]([^/]+)\/([^/.]+?)(?:\.git)?$/);
-    if (m) return { owner: m[1], repo: m[2] };
-  } catch (e) { /* ignore */ }
-
-  throw new Error('Could not determine GitHub owner/repo. Set package.json `repository.url` or git remote origin.');
-}
+// Repo ensure: idempotently create a repo under <owner> if it doesn't exist. Used by the
+// deploy precheck to auto-provision the brand's public releases repo.
 
 // silent: true — pass a no-op logger so transient 404s during polling (e.g. fetching
 // in-progress job logs) don't spam the console. Errors still surface via thrown rejections.
@@ -89,7 +68,6 @@ async function ensureRepo(octokit, owner, repo, opts = {}) {
 }
 
 module.exports = {
-  discoverRepo,
   getOctokit,
   ensureRepo,
 };

@@ -7,8 +7,9 @@
 const path = require('path');
 
 const ext = require(path.join(__dirname, '..', '..', '..', 'lib', 'extension.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'lib/extension — safe-fallback in Node context',
@@ -78,4 +79,4 @@ module.exports = {
       },
     },
   ],
-};
+});

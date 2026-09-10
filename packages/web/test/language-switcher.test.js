@@ -112,7 +112,7 @@ test('html: every row carries its flag BEFORE the name, fetched by its own code'
   assert.equal(html.match(/<img class="omega-language-flag"/g).length, 3, 'one flag per language row');
   assert.match(
     html,
-    /<img class="omega-language-flag" data-omega-language-flag src="\/assets\/fa\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
+    /<img class="omega-language-flag" data-omega-language-flag src="\/assets\/icons\/flags\/lang\/es\.svg" alt="" loading="lazy">Español/,
     'the flag precedes the label, from the emitted core set, at the row\'s own hreflang code',
   );
   assert.ok(!html.includes('alt="Español"'), 'the flag is decorative — the label beside it already names the language');
@@ -136,7 +136,7 @@ test('mount: a translated page renders one row per produced language and unhides
   const doc = makeDocument({ lang: 'es', alternates: EN_ES_FR, flags: [flag] });
 
   assert.equal(mountLanguageSwitcher(doc), 3, 'en + es + fr — x-default is not a language');
-  assert.ok(doc.list.innerHTML.includes('src="/assets/fa/flags/lang/en.svg"'), 'each row ships its flag');
+  assert.ok(doc.list.innerHTML.includes('src="/assets/icons/flags/lang/en.svg"'), 'each row ships its flag');
   assert.ok(typeof flag.handlers.error === 'function', 'the mount wires the missing-flag fallback');
   assert.equal(doc.mount.hidden, false, 'a real choice shows the control');
   assert.ok(doc.list.innerHTML.includes('href="https://example.com/fr/about"'), 'each produced copy is reachable');

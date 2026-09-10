@@ -4,7 +4,7 @@
 // imagemin handles them", but no imagemin task exists in this framework: a
 // consumer's images never reached dist/ and every project needed a build:pre
 // hook to copy them by hand. Images now copy as-is; the exclusions that DO have
-// an owning task (webpack, sass, the html task) stay.
+// an owning task (bundle, sass, the html task) stay.
 //
 // The task module reads its project from cwd at REQUIRE time, so each test
 // stages a temp project, chdirs into it, and requires the task fresh — the same
@@ -13,6 +13,7 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC       = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'distribute.js');
@@ -51,7 +52,7 @@ async function inProject(dir, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'distribute task — the static-image lane',
@@ -86,7 +87,7 @@ module.exports = {
       run: async (ctx) => {
         const tmp = stageProject({
           'src/manifest.json': `{ manifest_version: 3, name: 'Staged' }`,
-          'src/assets/js/components/popup/index.js': `// webpack owns this\n`,
+          'src/assets/js/components/popup/index.js': `// the bundle task owns this\n`,
           'src/assets/css/main.scss': `// the sass task owns this\n`,
           'src/views/popup/index.html': `<!-- the html task owns this -->\n`,
         });
@@ -107,4 +108,4 @@ module.exports = {
       },
     },
   ],
-};
+});

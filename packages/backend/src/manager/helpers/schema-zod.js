@@ -34,7 +34,7 @@
 
 const { z } = require('zod');
 const _ = require('lodash');
-const { FIELD_OPTIONS, resolveFieldValue, enforceEnums } = require('./schema-engine.js');
+const { FIELD_OPTIONS, resolveFieldValue, enforceEnums, enforceMins } = require('./schema-engine.js');
 
 /**
  * Detect a zod schema (any version with the zod 4 internal marker).
@@ -50,9 +50,10 @@ function isZodSchema(x) {
  * Resolve settings against a zod schema — the zod counterpart of the declarative
  * walk in Settings.resolve().
  * Required semantics (fires on undefined/'', function support, checkRequired
- * opt-out) and enum enforcement (sent values checked post-coercion; absent fields
- * pass) run from the ._omegaMeta registry that fields.object() builds; the error
- * messages and codes match the declarative engine exactly.
+ * opt-out), enum enforcement (sent values checked post-coercion; absent fields
+ * pass) and the min length floor (short strings/arrays refuse) run from the
+ * ._omegaMeta registry that fields.object() builds; the error messages and codes
+ * match the declarative engine exactly.
  * @param {object} ctx - RouteContext (report)
  * @param {import('zod').ZodType} schema - Zod schema (usually from fields.object())
  * @param {object} settings - Raw request data
@@ -88,13 +89,19 @@ function resolveZodSchema(ctx, schema, settings, options) {
     throw ctx.report(`Invalid settings${where}: ${first ? first.message : 'validation failed'}`, {code: 400});
   }
 
-  // Enum enforcement — post-resolution, same layer as the declarative engine
+  // Enum + min enforcement — post-resolution, same layer as the declarative engine
   if (meta) {
     const enumPaths = Object.entries(meta.paths)
       .filter(([, node]) => Array.isArray(node.enum))
       .map(([path, node]) => ({ path: path, allowed: node.enum }));
 
     enforceEnums(ctx, settings, result.data, enumPaths);
+
+    const minPaths = Object.entries(meta.paths)
+      .filter(([, node]) => typeof node.min !== 'undefined')
+      .map(([path, node]) => ({ path: path, min: node.min }));
+
+    enforceMins(ctx, result.data, minPaths);
   }
 
   return result.data;
@@ -143,6 +150,7 @@ function field(opts) {
     required: opts.required || false,
     sanitize: opts.sanitize !== false,
     enum: opts.enum,
+    min: opts.min,
   };
 
   return type;

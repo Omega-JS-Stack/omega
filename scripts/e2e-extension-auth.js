@@ -9,11 +9,15 @@
  * from node.
  *
  * Proof, in order:
- *   1. The playground extension app BUILDS (real gulp pipeline) as a TESTING
+ *   1. The playground backend emulator boots (auth + functions + hosting) on
+ *      its RESOLVED ports — bumped ones whenever the classics are busy.
+ *   2. The playground extension app BUILDS (real gulp pipeline) as a TESTING
  *      build — `omega.environment: 'testing'`, which is what makes the SW's
  *      Firebase auth talk to the local auth emulator and getApiUrl() resolve
- *      to the local hosting emulator.
- *   2. The playground backend emulator boots (auth + functions + hosting).
+ *      to the local hosting emulator. Building AFTER the boot is what bakes
+ *      the live ports into OMEGA_BUILD_JSON's `config.dev.ports`, the only
+ *      channel a browser context has
+ *      ([#744](https://github.com/Omega-JS-Stack/omega/issues/744)).
  *   3. A real user signs up against the AUTH emulator and a custom token is
  *      minted for it at POST /omega/user/token (the node-side setup).
  *   4. Chrome loads the built extension unpacked. A tab lands on the brand host
@@ -61,17 +65,15 @@ const LOG_DIR = path.join(ROOT, '.temp', 'extension-auth-e2e');
 const EXTENSION_DIR = path.join(LOG_DIR, 'extension');
 
 const { readPortsFile } = require('@omega.js/config');
+// The snapshot is baked into every emitted bundle since
+// [#743](https://github.com/Omega-JS-Stack/omega/issues/743) — there is no
+// build.json sidecar to read, so this lane reads it back the way a browser does.
+const { readBakedBuildJson } = require(path.join(ROOT, 'packages', 'extension', 'src', 'gulp', 'tasks', 'utils', 'build-json.js'));
 const { createStepsLog } = require('./steps-log');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const BUILD_TIMEOUT = 300000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
-
-// The extension contexts have no `process.env`, so a BUMPED emulator port can
-// never reach them — the SW resolves the classic defaults (hosting 5002 in
-// url-helpers, auth 9099 in background.js). The lane therefore requires the
-// classic ports and says so loudly rather than testing a stack nobody is on.
-const REQUIRED_PORTS = { hosting: 5002, auth: 9099 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripAnsi = (text) => text.replace(/\x1B\[[0-9;]*m/g, '');
@@ -164,8 +166,9 @@ function startEmulator() {
   // PATH the npx shim routes through the Socket Firewall proxy, which breaks
   // firebase-tools' internal emulator REST calls.
   // --no-https: with mkcert present the interactive command fronts hosting
-  // with TLS and moves plain hosting to :5443 — but the extension SW speaks
-  // plain http to the classic :5002 and has no way to learn otherwise.
+  // with TLS and moves plain hosting to an internal port — and Chrome would
+  // then have to trust the mkcert root for every SW fetch, which this lane
+  // does not set up. Plain http keeps the wire itself the thing under test.
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
   const child = spawn(mgrBin, ['emulator', '--no-seed', '--no-https'], {
     cwd: PLAYGROUND_BACKEND,
@@ -240,8 +243,22 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
+    await step('playground emulator boots (auth, functions, hosting)', async () => {
+      emulator = startEmulator();
+      await emulator.ready;
+      ports = readPortsFile(PLAYGROUND_BACKEND);
+      if (!ports?.hosting || !ports?.auth) {
+        throw new Error(`resolved port map incomplete: ${JSON.stringify(ports)}`);
+      }
+      return `hosting :${ports.hosting}, auth :${ports.auth}`;
+    });
+
     let buildConfig = null;
 
+    // The build runs AFTER the boot on purpose: the bundle task bakes the
+    // sibling backend's resolved ports into the snapshot's `dev.ports`, which is
+    // the ONLY channel the extension contexts have — so a bumped stack reaches
+    // the SW ([#744](https://github.com/Omega-JS-Stack/omega/issues/744)).
     await step('the playground extension builds as a TESTING build', async () => {
       await buildExtension();
 
@@ -249,14 +266,28 @@ async function main() {
       if (!fs.existsSync(manifestPath)) {
         throw new Error(`no packaged build at ${PACKAGED_DIR}`);
       }
-      buildConfig = JSON.parse(fs.readFileSync(path.join(PACKAGED_DIR, 'build.json'), 'utf8')).config;
+      // Read it out of the SERVICE WORKER's own bundle — the artifact whose bake
+      // this lane is about, rather than a sidecar that only described it.
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const serviceWorker = manifest.background?.service_worker;
+      if (!serviceWorker) {
+        throw new Error('the packaged manifest declares no background.service_worker — nothing to read the bake from');
+      }
+      buildConfig = readBakedBuildJson(path.join(PACKAGED_DIR, serviceWorker)).config;
       if (buildConfig.omega?.environment !== 'testing') {
         throw new Error(`build is not a testing build (omega.environment: ${buildConfig.omega?.environment})`);
       }
       if (!buildConfig.cloud?.config?.apiKey) {
         throw new Error('build config carries no cloud.config — the SW cannot initialize Firebase');
       }
-      return `brand ${buildConfig.brand.url}`;
+
+      // The bake is the mechanism under test: what the SW will reach for
+      // hosting (getApiUrl) and auth (background.js) must be the live stack.
+      const baked = buildConfig.dev?.ports || {};
+      if (baked.hosting !== ports.hosting || baked.auth !== ports.auth) {
+        throw new Error(`the build baked hosting :${baked.hosting}, auth :${baked.auth}, but the live emulator is on hosting :${ports.hosting}, auth :${ports.auth}`);
+      }
+      return `brand ${buildConfig.brand.url}, baked hosting :${baked.hosting}, auth :${baked.auth}`;
     });
 
     let popupPath = null;
@@ -275,18 +306,6 @@ async function main() {
         throw new Error('the built manifest declares no action.default_popup — no context to sync from');
       }
       return path.relative(ROOT, EXTENSION_DIR);
-    });
-
-    await step('playground emulator boots (auth, functions, hosting)', async () => {
-      emulator = startEmulator();
-      await emulator.ready;
-      ports = readPortsFile(PLAYGROUND_BACKEND);
-      for (const [name, wanted] of Object.entries(REQUIRED_PORTS)) {
-        if (ports?.[name] !== wanted) {
-          throw new Error(`this lane needs the CLASSIC ${name} port :${wanted} (the extension has no way to learn a bumped one) — got :${ports?.[name]}; free :${wanted} and re-run`);
-        }
-      }
-      return `hosting :${ports.hosting}, auth :${ports.auth}`;
     });
 
     const apiBase = `http://127.0.0.1:${ports.hosting}`;

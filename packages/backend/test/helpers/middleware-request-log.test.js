@@ -16,7 +16,8 @@
  * directly. The wiring half is proven by the emulator: every authenticated
  * route suite still round-trips green through these same two lines.
  */
-const Middleware = require('../../src/manager/helpers/middleware.js');
+const Middleware = require('../../dist/manager/helpers/middleware.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { redactHeadersForLog, redactDataForLog } = Middleware;
 
@@ -31,7 +32,7 @@ function serialize(value) {
   return JSON.stringify(value);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Middleware request log redaction — no credential reaches a log line',
   type: 'group',
 
@@ -130,4 +131,4 @@ module.exports = {
       },
     },
   ],
-};
+});

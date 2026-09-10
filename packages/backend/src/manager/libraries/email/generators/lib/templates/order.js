@@ -18,6 +18,7 @@ const PROVIDER_NAMES = {
   stripe: 'Stripe',
   paypal: 'PayPal',
   chargebee: 'Chargebee',
+  coinbase: 'Crypto',
 };
 
 // Events that show the price summary table
@@ -252,8 +253,18 @@ function _explanation(event, order, data, brand) {
       break;
 
     case 'payment-failed':
-      html = `<p style="color: #718096;">Your payment method was declined. Your access has been suspended, but your subscription is <strong>not cancelled</strong> &mdash; charges will continue to accrue.</p>
-      <p style="color: #718096;">Please update your payment method to restore access.</p>`;
+      // A one-time buyer has no subscription to keep accruing and no payment
+      // method on file to update — telling them otherwise describes somebody
+      // else's account. Both twins send this same event (transitions/one-time/
+      // purchase-failed.js delegates to the subscription one), so the ORDER's
+      // type is what decides which of them the mail is for.
+      if (order.type === 'subscription') {
+        html = `<p style="color: #718096;">Your payment method was declined. Your access has been suspended, but your subscription is <strong>not cancelled</strong> &mdash; charges will continue to accrue.</p>
+        <p style="color: #718096;">Please update your payment method to restore access.</p>`;
+      } else {
+        html = `<p style="color: #718096;">Your payment of <strong>$${payment.price || computed.totalToday || '0.00'}</strong> for <strong>${escape(productName)}</strong> was declined, so the purchase did not go through and you have not been charged.</p>
+        <p style="color: #718096;">Nothing is owed. If you still want it, you can buy it again from our <a href="${brandUrl}/pricing">pricing page</a>.</p>`;
+      }
       break;
 
     case 'payment-recovered':
@@ -315,15 +326,29 @@ function _explanation(event, order, data, brand) {
 function _ctaButton(event, brand, order) {
   const brandUrl = brand?.url || '#';
 
+  // A one-time receipt sends the customer to the ORDERS list, which is where
+  // that purchase actually appears — the account page's other sections are all
+  // subscription surfaces, and a one-time purchase writes nothing to any of them
+  // ([#672](https://github.com/Omega-JS-Stack/omega/issues/672)).
+  const accountUrl = order?.type === 'one-time'
+    ? `${brandUrl}/dashboard/account#orders`
+    : `${brandUrl}/dashboard/account`;
+
+  // A declined ONE-TIME purchase has no payment method to update: the buyer's
+  // only surface is the order itself, which the orders list is the one page to show
+  const paymentFailed = order?.type === 'one-time'
+    ? { text: 'View your order &rarr;', url: accountUrl }
+    : { text: 'Update payment method &rarr;', url: `${brandUrl}/dashboard/account#billing` };
+
   const variants = {
-    'confirmation': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
-    'payment-failed': { text: 'Update payment method &rarr;', url: `${brandUrl}/dashboard/account#billing` },
+    'confirmation': { text: 'Go to your dashboard &rarr;', url: accountUrl },
+    'payment-failed': paymentFailed,
     'payment-recovered': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
     'cancellation-requested': { text: 'Manage subscription &rarr;', url: `${brandUrl}/dashboard/account#billing` },
     'cancelled': { text: 'Re-subscribe &rarr;', url: `${brandUrl}/pricing` },
     'plan-changed': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
     'trial-ending': { text: 'Manage subscription &rarr;', url: `${brandUrl}/dashboard/account#billing` },
-    'refunded': { text: 'Go to your account &rarr;', url: `${brandUrl}/dashboard/account` },
+    'refunded': { text: 'Go to your account &rarr;', url: accountUrl },
     'abandoned-cart': { text: 'Complete checkout &rarr;', url: order._computed?.checkoutUrl || `${brandUrl}/pricing` },
   };
 

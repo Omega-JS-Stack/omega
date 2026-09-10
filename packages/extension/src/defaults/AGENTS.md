@@ -1,11 +1,15 @@
 # ========== Default Values ==========
 # OMEGA Extension (@omega.js/extension) consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md) with the same sections in the same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates (src/defaults/AGENTS.md ×N; web's lives at scaffold/AGENTS.md).
+  Same sections in the same order: framework-specific extras may be inserted; canonical sections are never reordered/renamed. Edit every framework consumer template together.
+  The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
 
 ## Framework
 
-This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave). The framework provides one-line bootstrap per extension context, a component-based architecture (view + styles + script per context), a multi-browser build/release pipeline that produces store-uploadable zips, cross-context auth synchronization, and a built-in four-layer test framework.
+This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave).
+- The framework provides one-line bootstrap per extension context, a component-based architecture (view + styles + script per context), and a multi-browser build/release pipeline that produces store-uploadable zips.
+- It also carries cross-context auth synchronization and a built-in four-layer test framework.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
@@ -17,7 +21,9 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensi
 
 ## 🚨 READ @omega.js/client TOO
 
-**OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context (background service worker, popup, options, sidepanel, content scripts).** It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
+**OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context (background service worker, popup, options, sidepanel, content scripts).**
+- It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
+- Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
 
 **Required reading:**
 - **`node_modules/@omega.js/AGENTS.md`** → `docs/client/index.md`, the @omega.js/client guide: identity, module list, conventions
@@ -26,7 +32,7 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensi
 ## Quick start
 
 ```bash
-npm start                   # dev with live reload (gulp → webpack → serve)
+npm start                   # dev with live reload (gulp → esbuild → serve)
 npm run build               # production build → dist/ + packaged/<browser>/raw/ + .zip per browser
 OMEGA_IS_PUBLISH=true npm run build   # build + auto-upload to Chrome / Firefox / Edge stores
 npx omega test                # run YOUR project's test suites (bare runs never include the framework corpus)
@@ -48,15 +54,16 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 ## Where things live
 
 - `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here; they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
-- `config/messages.json`: i18n source. Auto-translated to 16 languages at build time via the Claude CLI (only missing keys regenerated).
+- `config/messages.json`: i18n source. Auto-translated at build time to the languages in `translation.languages` (omega.json5); only missing keys regenerated, cache committed under `translations/`.
 - `config/description.md`: store-listing description (used by the publish step).
-- `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension. Anything you DO declare wins outright — an array you write replaces the framework's, and an empty one ships nothing. The firefox artifact needs `browser_specific_settings.gecko.id` (packaging fails without it) and gets `side_panel` translated to `sidebar_action` automatically.
+- `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension.
+  - Anything you DO declare wins outright — an array you write replaces the framework's, and an empty one ships nothing.
+  - The firefox artifact needs `browser_specific_settings.gecko.id` (packaging fails without it) and gets `side_panel` translated to `sidebar_action` automatically.
 - `src/assets/images/`: static images. They copy to `dist/` as-is — no hook, no imagemin step.
 - `src/views/<context>/index.html`: per-context HTML (popup / options / sidepanel / pages).
 - `src/assets/js/components/<context>/index.js`: per-context script entry. One-line bootstrap of `@omega.js/extension/<context>`.
 - `src/assets/css/components/<context>/index.scss`: per-context styles.
 - `src/assets/js/components/background.js`: MV3 service worker entry. Source of truth for auth + messaging.
-- `src/_locales/en/messages.json`: Chrome `__MSG_*__` placeholders (auto-translated to 16 langs at build).
 - `hooks/build/{pre,post}.js`: optional lifecycle hooks.
 - `test/**/*.js`: your project test suites (framework auto-runs them alongside its own).
 
@@ -87,13 +94,15 @@ Auth UI is declarative: add `.omega-signin` / `.omega-signout` / `.omega-account
 
 ## Dependency resolution
 
-- **Do NOT install framework dependencies directly** (`firebase`, `@omega.js/client`, etc.). the framework's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in the framework's webpack config, not your `package.json`.
+- **Do NOT install framework dependencies directly** (`firebase`, `@omega.js/client`, etc.). The framework's bundler resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in the framework's declared dependencies, not your `package.json`.
 - **@omega.js/client owns Firebase.** Never `import firebase from 'firebase/app'`. Use `import omega from '@omega.js/client'` → `omega.auth()`, `omega.firestore()`.
 - **`Manager.require(name)`** resolves from the framework's module context at runtime for unbundled code (gulp tasks, test fixtures).
 
 ## Testing
 
-Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/background/`), **UI** (`test/view/`: real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test. See `test/README.md` and `node_modules/@omega.js/extension/docs/test-framework.md`.
+Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/background/`), **UI** (`test/view/`: real events on the real DOM), and **end-to-end** (`test/boot/`).
+- Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
+- See `test/README.md` and `node_modules/@omega.js/extension/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
 

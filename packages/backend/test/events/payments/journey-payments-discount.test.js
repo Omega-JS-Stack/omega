@@ -5,7 +5,9 @@
  * Verifies the discount flows through: intent → order → transition → email template
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: subscription with discount code',
   type: 'suite',
   timeout: 30000,
@@ -86,4 +88,4 @@ module.exports = {
       },
     },
   ],
-};
+});

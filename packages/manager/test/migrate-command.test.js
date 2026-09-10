@@ -23,7 +23,8 @@ const JSON5 = require('json5');
 
 const migrateCommand = require('../src/commands/migrate.js');
 
-// A converted brand still carrying both #610 page maps and a #23 rekey.
+// A converted brand still carrying both #610 page maps, the #466 redirect map
+// and a #23 rekey.
 const CONVERTED = `// Fixture Brand — brand-level omega.json5
 {
   brand: {
@@ -46,7 +47,10 @@ const CONVERTED = `// Fixture Brand — brand-level omega.json5
 
       extension: { chrome: 'https://chrome.test/abc' }, // store listings
 
-      redirects: [], // keep me
+      // Path redirects — the QR short code.
+      redirects: [{ from: '/c/:id', to: '/code?id=:id' }],
+
+      imagemin: {}, // keep me
     },
     backend: {}, // enabled, defaults
   },
@@ -94,6 +98,7 @@ test('migrate: every retired key is deleted from the authored config, one line e
   const parsed = JSON5.parse(readConfig(brand));
   assert.equal(parsed.targets.web.download, undefined);
   assert.equal(parsed.targets.web.extension, undefined);
+  assert.equal(parsed.targets.web.redirects, undefined);
   assert.equal(parsed.slapform, undefined);
   assert.equal(code, undefined, 'a successful migrate exits clean');
 
@@ -101,6 +106,7 @@ test('migrate: every retired key is deleted from the authored config, one line e
   for (const [key, replacement] of [
     ['targets.web.download', 'targets.desktop.releases'],
     ['targets.web.extension', 'targets.extension.listings'],
+    ['targets.web.redirects', 'edge.providers.cloudflare.rules.redirect'],
     ['slapform', 'forms.providers.slapform'],
   ]) {
     const line = text.split('\n').find((entry) => entry.includes(key));
@@ -116,12 +122,13 @@ test('migrate: everything the retired keys sat beside survives, byte for byte', 
 
   assert.ok(written.includes('// Fixture Brand — brand-level omega.json5'));
   assert.ok(written.includes("id: 'fixture-brand',"));
-  assert.ok(written.includes('redirects: [], // keep me'));
+  assert.ok(written.includes('imagemin: {}, // keep me'));
   assert.ok(written.includes('backend: {}, // enabled, defaults'));
   // The removed keys took their own documentation with them
   assert.ok(!written.includes('The download page map'));
   assert.ok(!written.includes('Contact form provider'));
   assert.ok(!written.includes('store listings'));
+  assert.ok(!written.includes('the QR short code'));
   // And the config still loads
   assert.equal(JSON5.parse(written).brand.name, 'Fixture Brand');
 });

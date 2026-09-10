@@ -11,6 +11,7 @@
  * 4. Clean up the test file
  */
 const { Octokit } = require('@octokit/rest');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Test post configuration
 const TEST_POST_SLUG = 'backend-test-post';
@@ -36,7 +37,7 @@ post:
   return `---\n${frontmatter}\n---\n\n${body}`;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin edit post on GitHub',
   type: 'suite',
   timeout: 300000, // 5 minutes total for the suite
@@ -365,4 +366,4 @@ module.exports = {
       },
     },
   ],
-};
+});

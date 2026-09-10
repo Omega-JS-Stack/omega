@@ -6,6 +6,7 @@
 // Libraries
 import omega from '@omega.js/client';
 import { extractBlockingFunctionMessage, isUserError } from '__main_assets__/js/libs/auth/errors.js';
+import { markOrphanedAccount } from '__main_assets__/js/libs/auth/orphan.js';
 import { trackLogin, trackSignup } from '__main_assets__/js/libs/auth/tracking.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -82,9 +83,13 @@ export async function reverseAccidentalSignup(ctx, newUser) {
   try {
     await newUser.delete();
   } catch (e) {
-    // Best-effort. If delete fails (network/token issue), the page-load consent guard
-    // is the backstop — the orphan account will be signed out on every future visit.
+    // Best-effort. A delete that fails (network/token issue) leaves a live account
+    // with no consent on record, and nothing about the account says so later — so
+    // the uid is marked HERE, in the only place that knows: libs/auth/orphan.js
+    // retries the delete at auth-ready on a later visit, and signs the user out if
+    // that fails too ([#703](https://github.com/Omega-JS-Stack/omega/issues/703)).
     logger.error('Failed to delete accidental account:', e);
+    markOrphanedAccount(newUser.uid);
     omega.sentry().captureException(new Error('Failed to reverse accidental signup', { cause: e }));
   }
 

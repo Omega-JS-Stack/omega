@@ -142,7 +142,7 @@ test('company: loadCompanyConfig strips the brands key and hard-fails on secret-
   assert.equal(layer.monitoring.providers.sentry.dsn, 'https://company@sentry.example/1');
   assert.equal('brands' in layer, false);
 
-  const leaky = stageCompany({ config: `{ oauth2: { clientSecret: 'oops' }, brands: { roots: ['./brands'] } }` });
+  const leaky = stageCompany({ config: `{ connections: { clientSecret: 'oops' }, brands: { roots: ['./brands'] } }` });
   assert.throws(() => loadCompanyConfig(leaky.root), /Secret-shaped keys in company config/);
 });
 

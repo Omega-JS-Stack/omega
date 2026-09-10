@@ -4,11 +4,12 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Stripe = require('../../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../../dist/manager/libraries/payment/providers/stripe.js');
 
 // Real Stripe CLI fixtures (generated via `stripe trigger`)
 const FIXTURE_SESSION = require('../../../fixtures/stripe/checkout-session-completed.json');
 const FIXTURE_INVOICE_FAILED = require('../../../fixtures/stripe/invoice-payment-failed.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock config matching the @omega.js/backend template (new flat price structure)
 const MOCK_CONFIG = {
@@ -33,7 +34,7 @@ function toUnifiedOneTime(rawResource, options) {
   return Stripe.toUnifiedOneTime(rawResource, { config: MOCK_CONFIG, ...options });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Stripe toUnifiedOneTime() transformation',
   type: 'group',
 
@@ -303,4 +304,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -48,15 +48,19 @@
  * any surface any framework builds.
  *
  * {% composition %}…{% endcomposition %} (spec §8) wraps a page layout's
- * default section composition. Three page states, all byte-parity with the
+ * default section composition. Two page states, both byte-parity with the
  * `{{ content | omega_content_format }}` layout line the wrap replaces:
  *   - empty page → the wrapped one-liners render (absence is the spine)
  *   - body content → the body REPLACES the composition (a page that writes
  *     a body means it — Ian's 2026-07-19 ruling; what `omega customize
  *     <url>` materializes supersedes the default while the sections inside
  *     keep flowing from the theme)
- *   - body content + `append: true` frontmatter → the body renders BELOW
- *     the composition (the legacy add-below contract, opt-in)
+ *
+ * The legacy UJM add-below flag (`append: true`) is GONE (#607, Ian
+ * 2026-08-26): a page that wants the default bands AND its own prose writes
+ * the bands itself — `omega customize <url>` materializes exactly that — and
+ * body content always renders below the sections THE BODY ITSELF calls, never
+ * below the layout composition it replaced.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -85,11 +89,20 @@ const logger = new Logger('sections');
 // /test/components read like a second view of /test/sections instead of a
 // library of its own. ONE generator, kind-aware paths: the showcase templates
 // read these off the entry and never compose a url.
+//
+// The two spellings are HARMONIZED (Ian's #602 addendum, 2026-08-26): `base`
+// IS `url` on both, so an entry is `<index>/<id>` in either library and
+// neither carries a kind segment the other lacks. Sections used to hang off
+// `/test/sections/section/<id>`, which read as a leftover of the era when the
+// section space held both kinds; a gallery is dev-only (#554), so that
+// spelling just goes — no redirects. The index's own permalink gains the
+// `.html` Jekyll extension (engine.js jekyllPermalink), so `/test/sections`
+// the FILE and `/test/sections/` the DIRECTORY never collide.
 const KINDS = {
   section: {
     dirname: '_sections',
     basename: 'section',
-    gallery: { kind: 'section', url: '/test/sections', base: '/test/sections/section', label: 'Section library' },
+    gallery: { kind: 'section', url: '/test/sections', base: '/test/sections', label: 'Section library' },
   },
   component: {
     dirname: '_components',
@@ -774,26 +787,20 @@ function registerSectionTags(engine, options) {
 
       // Ian's ruling (2026-07-19): a page that writes a body MEANS it — the
       // body REPLACES the layout's default composition, no flag needed (the
-      // old `composition: true` key is retired). The rare page that wants
-      // the legacy add-below contract — body rendered BELOW the default
-      // composition, exactly like the `{{ content | omega_content_format }}`
-      // line this wrap replaced — declares `append: true`.
-      if (!blank && !read('append')) {
+      // old `composition: true` key is retired, and #607 retired the legacy
+      // add-below `append: true` escape hatch with it — a page that wants the
+      // default bands writes them, which is what `omega customize` hands it).
+      if (!blank) {
         if (!contentParity) contentParity = this.liquid.parse('{{ content | omega_content_format }}');
         emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
         return;
       }
 
       emitter.write(yield this.liquid.renderer.renderTemplates(this.tpls, context));
-      if (blank) {
-        // Blank content still flows through (it is only whitespace) — byte-
-        // parity with the replaced layout line, which emitted the chain's
-        // newlines.
-        if (typeof content === 'string') emitter.write(content);
-      } else {
-        if (!contentParity) contentParity = this.liquid.parse('{{ content | omega_content_format }}');
-        emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
-      }
+      // Blank content still flows through (it is only whitespace) — byte-
+      // parity with the replaced layout line, which emitted the chain's
+      // newlines.
+      if (typeof content === 'string') emitter.write(content);
     },
   });
 

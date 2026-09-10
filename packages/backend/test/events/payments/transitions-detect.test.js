@@ -20,10 +20,12 @@
  */
 const fs = require('fs');
 const path = require('path');
-const transitions = require('../../../src/manager/events/firestore/payments-webhooks/transitions/index.js');
-const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
-const paypalProvider = require('../../../src/manager/routes/payments/webhook/providers/paypal.js');
-const chargebeeProvider = require('../../../src/manager/routes/payments/webhook/providers/chargebee.js');
+const transitions = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/index.js');
+const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
+const paypalProvider = require('../../../dist/manager/routes/payments/webhook/providers/paypal.js');
+const chargebeeProvider = require('../../../dist/manager/routes/payments/webhook/providers/chargebee.js');
+const coinbaseProvider = require('../../../dist/manager/routes/payments/webhook/providers/coinbase.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Every transition name the detector can return, and the category whose folder
 // holds its handler file
@@ -73,7 +75,7 @@ function cancelledSubscription() {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment transition detection (state rules, refund events + idempotency)',
   type: 'group',
 
@@ -409,7 +411,7 @@ module.exports = {
       async run({ assert }) {
         // dispatch() resolves <category>/<name>.js by name — a rule whose handler
         // file is missing logs "not found" and silently sends the customer nothing
-        const root = path.join(__dirname, '../../../src/manager/events/firestore/payments-webhooks/transitions');
+        const root = path.join(__dirname, '../../../dist/manager/events/firestore/payments-webhooks/transitions');
 
         for (const [category, name] of HANDLED_TRANSITIONS) {
           const handlerPath = path.join(root, category, `${name}.js`);
@@ -528,6 +530,168 @@ module.exports = {
       },
     },
 
+    {
+      name: 'a-chargebee-one-time-failure-detects-through-the-provider-fold',
+      async run({ assert }) {
+        // The fold the pipeline runs: the provider categorizes a
+        // subscription-less payment_failed as one-time, and the detector reads
+        // the provider's OWN event string off that same parse. Reading only
+        // Stripe's string left the Chargebee half of this path detecting
+        // nothing, so the failed-payment email never sent
+        // ([#714](https://github.com/Omega-JS-Stack/omega/issues/714)).
+        const parsed = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_cb_onetime_fail',
+            event_type: 'payment_failed',
+            content: {
+              invoice: { id: 'inv_cb_onetime_fail' },
+              customer: { id: 'cust_cb_onetime', meta_data: '{"uid":"_test-cb-onetime-fail"}' },
+            },
+          },
+        });
+
+        assert.equal(parsed.category, 'one-time', 'A subscription-less Chargebee payment_failed parses as one-time');
+
+        const detected = transitions.detectTransition(parsed.category, null, { product: { id: 'credits' }, status: 'failed' }, parsed.eventType);
+
+        assert.equal(detected, 'purchase-failed', 'Chargebee payment_failed should detect purchase-failed for a one-time purchase');
+      },
+    },
+
+    {
+      name: 'a-chargebee-one-time-purchase-detects-through-the-provider-fold',
+      async run({ assert }) {
+        // The success half of the same fold: a subscription-less
+        // payment_succeeded is the honest paid signal for a one-time purchase.
+        // Nothing on this side read it, so a paid Chargebee one-time sent no
+        // receipt and fired no purchase analytics
+        // ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)).
+        const parsed = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_cb_onetime_paid',
+            event_type: 'payment_succeeded',
+            content: {
+              invoice: { id: 'inv_cb_onetime_paid' },
+              customer: { id: 'cust_cb_onetime', meta_data: '{"uid":"_test-cb-onetime-paid"}' },
+            },
+          },
+        });
+
+        assert.equal(parsed.category, 'one-time', 'A subscription-less Chargebee payment_succeeded parses as one-time');
+
+        const detected = transitions.detectTransition(parsed.category, null, { product: { id: 'credits' }, status: 'completed' }, parsed.eventType);
+
+        assert.equal(detected, 'purchase-completed', 'Chargebee payment_succeeded should detect purchase-completed for a one-time purchase');
+      },
+    },
+
+    {
+      name: 'a-coinbase-charge-detects-through-the-provider-fold',
+      async run({ assert }) {
+        // Crypto's half of the same fold: every Coinbase Commerce event is about
+        // a CHARGE, which is one purchase, so the provider categorizes all three
+        // as one-time and the detector reads the provider's own event strings
+        // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
+        const confirmed = coinbaseProvider.parseWebhook({
+          body: {
+            id: '_test-delivery',
+            event: {
+              id: '_test-evt-coinbase-confirmed',
+              type: 'charge:confirmed',
+              data: { id: 'ch_coinbase_confirmed', metadata: { uid: '_test-coinbase-fold', orderId: 'ord-1', productId: 'credits' } },
+            },
+          },
+        });
+
+        assert.equal(confirmed.category, 'one-time', 'A confirmed crypto charge parses as one-time');
+        assert.equal(
+          transitions.detectTransition(confirmed.category, null, { product: { id: 'credits' }, status: 'completed' }, confirmed.eventType),
+          'purchase-completed',
+          'charge:confirmed should detect purchase-completed — the crypto settled',
+        );
+      },
+    },
+
+    {
+      name: 'an-unsettled-or-expired-crypto-charge-detects-nothing',
+      async run({ assert }) {
+        // Both write their order (so the account page tells the truth about it)
+        // and neither may MAIL: charge:pending is money detected on-chain but not
+        // confirmed, and charge:failed is an expired hosted page — the abandoned
+        // -checkout population, watched by the person who walked away from it,
+        // which is exactly the population checkout-declined refuses to mail. An
+        // abandoned Stripe session sends nothing either ([#642]).
+        assert.equal(transitions.detectOneTimeTransition('charge:pending'), null, 'Nothing is mailed for money that has not settled');
+        assert.equal(transitions.detectOneTimeTransition('charge:failed'), null, 'And nothing is mailed for a checkout nobody paid');
+      },
+    },
+
+    {
+      name: 'a-chargebee-renewal-charge-never-reaches-the-one-time-side',
+      async run({ assert }) {
+        // With a subscription present, payment_succeeded is the renewal's charge
+        // and `subscription_renewed` already carries it — so the provider gives it
+        // no category, no doc is stored, and nothing double-fires ([#729]).
+        const parsed = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_cb_renewal_paid',
+            event_type: 'payment_succeeded',
+            content: {
+              subscription: { id: 'sub_cb_renewal', meta_data: '{"uid":"_test-cb-renewal"}' },
+              invoice: { id: 'inv_cb_renewal', subscription_id: 'sub_cb_renewal' },
+            },
+          },
+        });
+
+        assert.equal(parsed.category, null, 'A Chargebee payment_succeeded carrying a subscription parses as null');
+        assert.equal(transitions.detectTransition(parsed.category, null, {}, parsed.eventType), null, 'No category → no transition');
+      },
+    },
+
+    {
+      name: 'an-unpaid-chargebee-invoice-detects-nothing',
+      async run({ assert }) {
+        // `invoice_generated` still stores its one-time doc, but an invoice is
+        // born UNPAID (the Chargebee library maps `payment_due`/`not_paid` →
+        // failed), so it must stay transition-less — mapping it would email a
+        // receipt for a purchase nobody paid for ([#729]).
+        const parsed = chargebeeProvider.parseWebhook({
+          body: {
+            id: 'ev_cb_invoice_generated',
+            event_type: 'invoice_generated',
+            content: {
+              invoice: { id: 'inv_cb_unpaid' },
+              customer: { id: 'cust_cb_onetime', meta_data: '{"uid":"_test-cb-unpaid"}' },
+            },
+          },
+        });
+
+        assert.equal(parsed.category, 'one-time', 'A non-recurring invoice_generated still parses as one-time');
+
+        const detected = transitions.detectTransition(parsed.category, null, { product: { id: 'credits' }, status: 'pending' }, parsed.eventType);
+
+        assert.equal(detected, null, 'invoice_generated is not a paid signal — no transition, no receipt');
+      },
+    },
+
+    {
+      name: 'a-redelivered-chargebee-purchase-dispatches-nothing',
+      async run({ assert }) {
+        // The new arm is event-type-only like the rest of this side, so it needs
+        // the same idempotency guard — one purchase, one receipt
+        assert.equal(
+          transitions.detectOneTimeTransition('payment_succeeded', { previouslyCompleted: true }),
+          null,
+          'A reprocessed Chargebee purchase should dispatch nothing',
+        );
+        assert.equal(
+          transitions.detectOneTimeTransition('payment_succeeded', { previouslyCompleted: false }),
+          'purchase-completed',
+          'A first-pass Chargebee purchase should still dispatch',
+        );
+      },
+    },
+
     // ─── Refund idempotency ───
 
     {
@@ -600,4 +764,4 @@ module.exports = {
       },
     },
   ],
-};
+});

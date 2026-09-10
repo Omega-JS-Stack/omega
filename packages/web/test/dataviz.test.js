@@ -1,14 +1,14 @@
 /**
  * The data-display surface (#72), ported from the workkit tower: the chart
- * helper (`core/js/libs/charts.js` — lazy Chart.js, token colors, the chart
- * slot), the `data/org-chart` component's animated connectors, the
+ * helper (`core/js/libs/charts.js` — lazy @tanstack/charts, token colors, the
+ * chart slot), the `data/org-chart` component's animated connectors, the
  * categorical tone tokens/utilities, and the `.omega-interactive` card
  * affordance.
  *
- * The four chart BUILDERS (bar/stacked/doughnut/line) are not pinned here —
- * Chart.js needs a real 2d context, which node has none of. What is pinned is
- * everything around them: the load lane, the token reads, and the slot markup
- * that write-on-change rendering depends on.
+ * The four chart BUILDERS (bar/stacked/doughnut/line) ARE pinned here (#772):
+ * a TanStack definition is renderer-neutral, so `createChartScene` compiles
+ * one into real geometry with no DOM at all. Around them sit the load lane,
+ * the token reads, and the slot markup write-on-change rendering depends on.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -32,6 +32,26 @@ function stubTokens(tokens) {
   global.getComputedStyle = () => ({ getPropertyValue: (name) => tokens[name] || '' });
 }
 
+/**
+ * The painted point markers in a compiled scene. A line mark anchors every
+ * reading with an interaction dot whether or not it paints one, so the count
+ * that answers "did `points: true` survive" is the marker's own scene node.
+ */
+function markers(scene) {
+  const found = [];
+  const walk = (nodes) => nodes.forEach((node) => {
+    if (node.kind === 'dot' && node.key.endsWith(':dot')) {
+      found.push(node);
+    }
+    if (node.children) {
+      walk(node.children);
+    }
+  });
+
+  walk(scene.nodes);
+  return found.length;
+}
+
 // ─── Chart helper ────────────────────────────────────────────────────────────
 
 test('chartSlot: no library yet → the figures-are-in-the-table line, never a hole', () => {
@@ -44,7 +64,7 @@ test('chartSlot: an unusable id is a programmer error and crashes', () => {
   assert.throws(() => charts.chartSlot(''), /not a usable element id/);
 });
 
-test('loadCharts: pulls the real Chart.js on demand, once', async () => {
+test('loadCharts: pulls the real @tanstack/charts on demand, once', async () => {
   assert.equal(await charts.loadCharts(), true);
   assert.equal(charts.chartsReady(), true, 'the sync gate render paths read flips');
   assert.equal(await charts.loadCharts(), true, 'idempotent — safe on every poll');
@@ -53,8 +73,8 @@ test('loadCharts: pulls the real Chart.js on demand, once', async () => {
 test('chartSlot: the box carries the height AND stamps its series for write-on-change', () => {
   const markup = charts.chartSlot('chart-signups', 180, [3, 1, '4']);
 
-  assert.match(markup, /<canvas id="chart-signups"><\/canvas>/);
-  assert.match(markup, /height: 180px/, 'a canvas has no intrinsic height — the box carries it');
+  assert.match(markup, /<div id="chart-signups" style="height: 100%;"><\/div>/, 'an SVG chart has no canvas — the host is a div');
+  assert.match(markup, /height: 180px/, 'the host is told the height the box carries');
   assert.match(markup, /data-series="3,1,4"/, 'data-only changes reach swap() through the stamp');
   assert.match(charts.chartSlot('chart-signups'), /data-series=""/, 'no series → an empty stamp, not "undefined"');
 });
@@ -90,7 +110,7 @@ test('chartColors: a sheet-less page still draws — bootstrap/hardcoded fallbac
   assert.equal(colors.palette.length, 6);
 });
 
-test('resolveColor: Chart.js needs a real color, so var() tokens resolve first', () => {
+test('resolveColor: a color scale range is real colors, so var() tokens resolve first', () => {
   stubTokens({ '--omega-accent': '#3b5bdb', '--omega-ok': '#12925c' });
 
   assert.equal(charts.resolveColor('var(--omega-ok)'), '#12925c');
@@ -98,22 +118,178 @@ test('resolveColor: Chart.js needs a real color, so var() tokens resolve first',
   assert.equal(charts.resolveColor('var(--nope)'), '#3b5bdb', 'an unset token falls back to the accent');
 });
 
-test('charts.js names Chart.js ONLY in the lazy import — a chartless page pays nothing', () => {
-  const source = fs.readFileSync(path.join(PKG, 'core', 'js', 'libs', 'charts.js'), 'utf8');
+// #772: a TanStack definition is renderer-neutral — `createChartScene` turns
+// one into real scales, points and geometry with no DOM at all — so the four
+// builders are pinned right here instead of only in a real browser.
+test('#772: all four builders compile a scene with the geometry their data implies', async () => {
+  stubTokens({
+    '--omega-ink-muted': '#6d6d6c',
+    '--omega-line': '#e8e8e6',
+    '--omega-accent': '#3b5bdb',
+    '--omega-chart-1': '#3b5bdb',
+    '--omega-chart-2': '#0f8fa9',
+    '--omega-ok': '#12925c',
+    '--omega-warn': '#a06a08',
+    '--omega-danger': '#b0416a',
+  });
 
-  assert.ok(!/^import .*chart\.js/m.test(source), 'no static import — esbuild would fold it into the entry');
-  assert.match(source, /await import\('chart\.js\/auto'\)/, 'the split chunk is fetched when a page asks');
+  const { createChartScene } = await import('@tanstack/charts');
+  const size = { width: 400, height: 200 };
+  const labels = ['Mon', 'Tue', 'Wed'];
+  const values = [3, 7, 5];
+  const series = [{ label: 'A', values }, { label: 'B', values: [1, 2, 3] }];
+  const scene = (kind, data) => createChartScene(charts.chartDefinition(kind, data), size);
+
+  // One bar per label, and the plot has real room to draw them in.
+  const bar = scene('bar', { labels, values, label: 'Signups' });
+  assert.equal(bar.points.length, labels.length, 'one bar per label');
+  assert.ok(bar.chart.width > 0 && bar.chart.height > 0, 'the plot has area after the guides are measured');
+  assert.deepEqual(bar.scales.x.domain, labels, 'the categorical axis IS the labels, in order');
+
+  // horizontal transposes it: the labels run down the y axis.
+  const ranked = scene('bar', { labels, values, horizontal: true });
+  assert.equal(ranked.points.length, labels.length, 'one row per label');
+  assert.deepEqual(ranked.scales.y.domain, labels, 'ranked rows put the categories on y');
+
+  // Stacked: one point per label per series, painted off the ramp in order.
+  const stacked = scene('stacked', { labels, series });
+  assert.equal(stacked.points.length, labels.length * series.length, 'labels × series');
+  assert.deepEqual(stacked.colors.range, ['#3b5bdb', '#0f8fa9'], 'series ride the categorical ramp, in order');
+
+  // The doughnut: one arc per value, and status tokens resolved to real hues.
+  const doughnut = scene('doughnut', {
+    labels,
+    values,
+    colors: ['var(--omega-ok)', 'var(--omega-warn)', 'var(--omega-danger)'],
+  });
+  assert.equal(doughnut.points.length, values.length, 'one arc per value');
+  assert.deepEqual(doughnut.colors.range, ['#12925c', '#a06a08', '#b0416a'], 'STATUS beats the categorical ramp');
+
+  // The line: one point per value, and `points: true` paints a marker on each
+  // one, so a single reading is visible where a bare polyline shows nothing.
+  const line = scene('line', { labels, series: [{ label: 'A', values }] });
+  assert.equal(line.points.length, values.length, 'one point per value');
+  assert.equal(markers(line), values.length, 'every reading is painted, not just joined');
+
+  for (const [kind, drawn] of Object.entries({ bar, ranked, stacked, doughnut, line })) {
+    assert.equal(drawn.theme.grid, '#e8e8e6', `${kind} draws its gridlines in the token sheet's line color`);
+  }
+
+  // A polled page repaints on every feed answer, so an animated chart would
+  // spend most of its life growing back out of the axis. Off, said out loud.
+  for (const kind of ['bar', 'stacked', 'doughnut', 'line']) {
+    const definition = charts.chartDefinition(kind, { labels, values, series });
+    assert.equal(definition.svgAnimation, false, `${kind} draws in the first painted frame`);
+  }
 });
 
-// #74: the admin dashboard carried its own getChartColors and a STATIC
-// `import 'chart.js'`, which folded the library into the entry every admin
-// visit paid for. It goes through the helper now — keeping status hues,
-// because a plan slice means healthy/attention/trouble, not "category 3".
-test('#74: the admin dashboard draws through the helper, and never names Chart.js', () => {
+// A chart here counts THINGS, and the library's default tick policy is a
+// responsive COUNT of ticks — on a small domain that lands on 0.5, and half a
+// signup is not a reading. The rendered LABEL is what the reader sees, and the
+// library's own formatter prints "0.0"/"1.0" once the domain is that small, so
+// the labels are the claim. Every shape carrying a value axis is pinned.
+test('#772: a count axis is labelled in whole numbers, never half a signup', async () => {
+  stubTokens({ '--omega-accent': '#3b5bdb' });
+
+  const { createChartScene } = await import('@tanstack/charts');
+  const size = { width: 400, height: 200 };
+  const labels = ['Mon', 'Tue', 'Wed'];
+  const values = [0, 1, 1]; // the domain the library halves AND prints decimal
+  const series = [{ label: 'A', values }, { label: 'B', values: [1, 0, 0] }];
+  const ticks = (kind, data, dimension) => createChartScene(charts.chartDefinition(kind, data), size)
+    .scales[dimension].ticks;
+  const axisLabels = (...args) => ticks(...args).map((tick) => tick.label);
+
+  const axes = {
+    bar: axisLabels('bar', { labels, values }, 'y'),
+    ranked: axisLabels('bar', { labels, values, horizontal: true }, 'x'),
+    stacked: axisLabels('stacked', { labels, series }, 'y'),
+    line: axisLabels('line', { labels, series }, 'y'),
+  };
+
+  for (const [kind, drawn] of Object.entries(axes)) {
+    assert.ok(drawn.length > 1, `${kind} draws a readable axis, not a single mark`);
+    for (const label of drawn) {
+      assert.match(label, /^-?\d+$/, `${kind} prints a plain integer, got "${label}" of ${JSON.stringify(drawn)}`);
+    }
+  }
+
+  // The ladder keeps the labels round as the counts grow, not just integral.
+  assert.deepEqual(axisLabels('bar', { labels, values: [140, 22, 3] }, 'y'), ['0', '50', '100', '150']);
+
+  // A negative reading widens the span DOWN instead of falling out of the
+  // plot, and zero stays in view — a bar's length is read from the baseline.
+  const negative = ticks('bar', { labels, values: [-5, 3, 10] }, 'y');
+  const [lowest] = createChartScene(charts.chartDefinition('bar', { labels, values: [-5, 3, 10] }), size).scales.y.domain;
+
+  assert.ok(lowest <= -5, `the axis reaches the lowest reading, got ${lowest}`);
+  assert.ok(negative.some((tick) => tick.value === 0), 'zero stays on the axis');
+  assert.deepEqual(negative.map((tick) => tick.label), ['-5', '0', '5', '10']);
+});
+
+// #800: a hover named the CHANNELS — "x" and "y", the library's own default —
+// instead of the thing being read. Every builder formats its own line now, and
+// the data argument carries the unit (`format`) or the whole line (`tooltip`),
+// so a page whose chart data is nothing but JSON still reads correctly.
+test('#800: a tooltip names the series and the label, in the data\'s own units', async () => {
+  stubTokens({ '--omega-accent': '#3b5bdb' });
+
+  const { createChartScene } = await import('@tanstack/charts');
+  const size = { width: 400, height: 200 };
+  const labels = ['Mon', 'Tue', 'Wed'];
+  const values = [3, 7, 5];
+  const series = [{ label: 'A', values }, { label: 'B', values: [1, 2, 3] }];
+  // The line a hover prints: the definition's own format, over the point the
+  // compiled scene hands the tooltip.
+  const hover = (kind, data, index = 1) => {
+    const definition = charts.chartDefinition(kind, data);
+    return definition.tooltip.format(createChartScene(definition, size).points[index]);
+  };
+
+  assert.equal(hover('bar', { labels, values }), 'Tue: 7', 'a bar says its label, never "x"');
+  assert.equal(hover('line', { labels, series }), 'A · Tue: 7', 'a line names the series the reading belongs to');
+  assert.equal(hover('stacked', { labels, series }), 'A · Tue: 7', 'so does a segment of a stack');
+  assert.equal(hover('doughnut', { labels, values }, 0), 'Mon: 3 (20.0%)', 'the doughnut keeps its share of the whole');
+
+  // A count prints as itself; a fraction gets two places without anyone saying so.
+  assert.equal(hover('bar', { labels, values: [3, 7.456, 5] }), 'Tue: 7.46');
+
+  // The unit travels with the DATA, so an island carrying JSON alone prints
+  // money as money — in the tooltip and on the axis it is read against.
+  const money = { labels, values, format: { prefix: '$', decimals: 2 } };
+  assert.equal(hover('bar', money), 'Tue: $7.00');
+  assert.deepEqual(
+    createChartScene(charts.chartDefinition('bar', money), size).scales.y.ticks.map((tick) => tick.label),
+    ['$0.00', '$2.00', '$4.00', '$6.00', '$8.00'],
+    'the axis says the same unit as the tooltip',
+  );
+  assert.equal(hover('line', { labels, series, format: { suffix: '%' } }), 'A · Tue: 7%');
+
+  // A page with JS owns the line outright.
+  assert.equal(
+    hover('bar', { labels, values, tooltip: (point) => `${point.datum.value} signups on ${point.datum.label}` }),
+    '7 signups on Tue',
+    'an authored tooltip beats the default outright',
+  );
+});
+
+test('charts.js names the library ONLY in lazy imports — a chartless page pays nothing', () => {
+  const source = fs.readFileSync(path.join(PKG, 'core', 'js', 'libs', 'charts.js'), 'utf8');
+
+  assert.ok(!/^import .*@tanstack\/charts/m.test(source), 'no static import — esbuild would fold it into the entry');
+  assert.match(source, /import\('@tanstack\/charts'\)/, 'the split chunk is fetched when a page asks');
+  assert.match(source, /import\('@tanstack\/charts\/polar'\)/, 'polar geometry is its own capability subpath');
+});
+
+// #74: the admin dashboard carried its own getChartColors and a STATIC import
+// of the chart library, which folded it into the entry every admin visit paid
+// for. It goes through the helper now — keeping status hues, because a plan
+// slice means healthy/attention/trouble, not "category 3".
+test('#74: the admin dashboard draws through the helper, and never names the library', () => {
   const source = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'admin', 'index.js'), 'utf8');
 
-  assert.ok(!/from ['"]chart\.js/.test(source), 'the page never imports the library — delivery stays the helper\'s to change');
-  assert.ok(!/\bnew Chart\b/.test(source), 'and never constructs one');
+  assert.ok(!/from ['"]@tanstack\/charts/.test(source), 'the page never imports the library — delivery stays the helper\'s to change');
+  assert.ok(!/\bmountChart\b/.test(source), 'and never mounts one');
   assert.ok(!/getChartColors/.test(source), 'no second copy of the token reads');
   assert.match(source, /import \{[^}]*loadCharts[^}]*\} from '__main_assets__\/js\/libs\/charts\.js'/, 'the lazy load goes through the helper');
   assert.match(source, /await loadCharts\(\)/, 'and it is awaited before a builder is called');
@@ -126,20 +302,20 @@ test('#74: the admin dashboard draws through the helper, and never names Chart.j
   assert.ok(!/colors\.palette/.test(source), 'nothing reaches for the categorical ramp');
 });
 
-test('#74: the admin chart canvases sit in height-bearing boxes (the helper drops the aspect ratio)', () => {
+test('#74: the admin chart hosts sit in height-bearing boxes (the helper is told the height)', () => {
   const layout = fs.readFileSync(path.join(PKG, 'core', '_layouts', 'blueprint', 'admin', 'dashboard', 'index.html'), 'utf8');
   const css = sass.compile(path.join(PKG, 'core', 'css', 'pages', 'admin', 'index.scss'), {
     logger: { warn: () => {}, debug: () => {} },
   }).css;
 
   for (const id of ['chart-signups', 'chart-plans']) {
-    assert.match(layout, new RegExp(`admin-chart-box[^>]*>\\s*<canvas id="${id}"`), `${id} is wrapped in the sized box`);
+    assert.match(layout, new RegExp(`admin-chart-box[^>]*>\\s*<div id="${id}" class="h-100"`), `${id} is a host div filling the sized box`);
   }
-  assert.match(css, /\.admin-chart-box\s*\{[^}]*position: relative/s, 'the box is the canvas\' positioning parent');
-  assert.match(css, /\.admin-chart-box\s*\{[^}]*height: \d+px/s, 'a canvas has no intrinsic height — the box carries it');
+  assert.match(css, /\.admin-chart-box\s*\{[^}]*position: relative/s, 'the box is the host\' positioning parent');
+  assert.match(css, /\.admin-chart-box\s*\{[^}]*height: \d+px/s, 'the box carries the height the helper measures off it');
 });
 
-test('the real bundler splits Chart.js into its own chunk — the page entry stays free of it', async () => {
+test('the real bundler splits the library into its own chunk — the page entry stays free of it', async () => {
   // A one-page consumer layer that does what a charting page does: import the
   // framework helper, never the library.
   const layer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-charts-'));
@@ -162,15 +338,20 @@ test('the real bundler splits Chart.js into its own chunk — the page entry sta
     clientEntry: path.join(PKG, '..', 'client', 'src', 'index.js'),
   });
 
-  // Chart.js' own words — present in the library, nowhere else.
-  const MARKER = "Failed to create chart: can't acquire context";
+  // The library's own default palette — present in its bundle, nowhere else.
+  const MARKER = 'var(--ts-chart-1, #2563eb)';
   const files = fs.readdirSync(path.join(outDir, 'assets', 'js', 'chunks')).map((name) => path.join(outDir, 'assets', 'js', 'chunks', name));
-  const entry = path.join(outDir, manifest.js.pages.index.slice(1));
-  const carriers = [...files, entry].filter((file) => fs.readFileSync(file, 'utf8').includes(MARKER));
+  // A manifest key holds EVERY layer's bundle for that page (#624), and each
+  // one is an entry the browser loads — so the claim is about all of them.
+  const entries = manifest.js.pages.index.map((url) => path.join(outDir, url.slice(1)));
+  const carriers = [...files, ...entries].filter((file) => fs.readFileSync(file, 'utf8').includes(MARKER));
 
-  assert.equal(carriers.length, 1, `Chart.js lands in exactly one file (found ${carriers.length})`);
+  assert.ok(entries.length >= 1, 'the charting page bundled');
+  assert.equal(carriers.length, 1, `the library lands in exactly one file (found ${carriers.length})`);
   assert.ok(carriers[0].includes(`${path.sep}chunks${path.sep}`), 'and that file is a chunk, fetched only when a page asks');
-  assert.ok(!fs.readFileSync(entry, 'utf8').includes(MARKER), 'the page entry never carries the library');
+  for (const entry of entries) {
+    assert.ok(!fs.readFileSync(entry, 'utf8').includes(MARKER), `no page entry carries the library (${path.basename(entry)})`);
+  }
 });
 
 // ─── The org-chart component ─────────────────────────────────────────────────

@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Chargebee = require('../../../../src/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../../dist/manager/libraries/payment/providers/chargebee.js');
 
 // Chargebee fixtures
 const FIXTURE_ACTIVE = require('../../../fixtures/chargebee/subscription-active.json');
@@ -13,6 +13,7 @@ const FIXTURE_TRIAL = require('../../../fixtures/chargebee/subscription-in-trial
 const FIXTURE_NON_RENEWING = require('../../../fixtures/chargebee/subscription-non-renewing.json');
 const FIXTURE_PAUSED = require('../../../fixtures/chargebee/subscription-paused.json');
 const FIXTURE_LEGACY = require('../../../fixtures/chargebee/subscription-legacy-plan.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock config matching the @omega.js/backend template
 const MOCK_CONFIG = {
@@ -43,7 +44,7 @@ function toUnifiedSubscription(rawSubscription, options) {
   return Chargebee.toUnifiedSubscription(rawSubscription, { config: MOCK_CONFIG, ...options });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Chargebee toUnifiedSubscription() transformation',
   type: 'group',
 
@@ -645,4 +646,4 @@ module.exports = {
       },
     },
   ],
-};
+});

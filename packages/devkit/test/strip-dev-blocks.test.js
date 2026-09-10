@@ -1,12 +1,11 @@
 // Unit tests for src/strip-dev-blocks.js — the ONE home of the `@dev-only` marker
-// contract (#18). Web's esbuild plugin, extension's webpack loader, and desktop's
-// webpack lane all cut through this, so the marker TEXT is part of the contract:
-// every source file in the ecosystem writes those exact comments.
+// contract (#18). Every framework's bundle lane cuts through this via the esbuild
+// plugin src/strip-dev-blocks-plugin.js, so the marker TEXT is part of the
+// contract: every source file in the ecosystem writes those exact comments.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { stripDevBlocks, START_MARKER, END_MARKER } = require('../src/strip-dev-blocks');
-const stripDevBlocksLoader = require('../src/strip-dev-blocks-loader');
 
 test('the markers are the exact comment text every framework source writes', () => {
   assert.equal(START_MARKER, '/* @dev-only:start */');
@@ -38,9 +37,4 @@ test('source without markers is returned unchanged', () => {
 test('an unterminated block is left alone rather than swallowing the rest of the file', () => {
   const source = `${START_MARKER}\nconst dangling = 1;\nconst tail = 2;\n`;
   assert.equal(stripDevBlocks(source), source);
-});
-
-test('the webpack loader form strips unconditionally — the lane decides when', () => {
-  const source = `const keep = 1;\n${START_MARKER}\nconst dev = "SENTINEL";\n${END_MARKER}\n`;
-  assert.equal(stripDevBlocksLoader(source), 'const keep = 1;\n\n');
 });

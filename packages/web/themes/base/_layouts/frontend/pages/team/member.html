@@ -54,7 +54,7 @@ layout: frontend/core/base
                 {% assign link_icon = link.id %}
                 {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
                 <a href="{{ link.url }}" class="omega-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                  {% omega_icon link_icon, "fa-sm" %}
+                  <i class="fa-solid fa-{{ link_icon }} fa-sm"></i>
                 </a>
               {% endfor %}
             </span>
@@ -96,7 +96,7 @@ layout: frontend/core/base
         <h2 class="omega-panel-head justify-content-start h5 mb-0">More of the team</h2>
         <a href="/team" class="text-decoration-none small">
           Everyone
-          {% omega_icon "arrow-right", "fa-xs ms-1" %}
+          <i class="fa-solid fa-arrow-right fa-xs ms-1"></i>
         </a>
       </div>
 

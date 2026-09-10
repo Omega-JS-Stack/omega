@@ -17,6 +17,9 @@ steps:
     description: "{{ resolved.config.brand.name }} is now pinned and ready to use"
 ---
 
+{% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one —
+`brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+{% assign brandmark_src = assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark %}
 <!-- Main content -->
 <section class="col-12 col-md-10 col-lg-8 col-xl-7">
   <div class="card">
@@ -46,7 +49,7 @@ steps:
             <h5 class="step-title">{{ resolved.steps[0].title }}</h5>
           <p class="text-muted mb-3">{{ resolved.steps[0].description }}</p>
           <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center position-relative">
-            <div class="extension-visual">
+            <div class="extension-visual" aria-hidden="true">
               <div class="extension-toolbar d-flex align-items-center justify-content-end gap-2 bg-body rounded-3 p-2 border">
                 <!-- Mock URL bar -->
                 <div class="extension-url-bar flex-grow-1 bg-body-secondary rounded px-3 py-1 small text-muted me-2 text-truncate">
@@ -54,15 +57,15 @@ steps:
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% omega_icon "shield", "fa-sm" %}
+                  <i class="fa-solid fa-shield fa-sm"></i>
                 </button>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% omega_icon "bookmark", "fa-sm" %}
+                  <i class="fa-solid fa-bookmark fa-sm"></i>
                 </button>
                 <!-- Puzzle piece - highlighted -->
                 <div class="extension-puzzle-target position-relative">
-                  <button type="button" class="btn btn-sm btn-primary">
-                    {% omega_icon "puzzle-piece", "fa-sm" %}
+                  <button type="button" class="btn btn-sm btn-primary" tabindex="-1">
+                    <i class="fa-solid fa-puzzle-piece fa-sm"></i>
                   </button>
                   <div class="click-indicator position-absolute top-50 start-50">
                     <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
@@ -85,13 +88,13 @@ steps:
             <h5 class="step-title">{{ resolved.steps[1].title }}</h5>
           <p class="text-muted mb-3">{{ resolved.steps[1].description }}</p>
           <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center position-relative">
-            <div class="extension-visual">
+            <div class="extension-visual" aria-hidden="true">
               <div class="extension-dropdown bg-body rounded-3 border shadow-sm mx-auto">
                 <!-- Dropdown header -->
                 <div class="extension-dropdown-header d-flex align-items-center justify-content-between p-2 border-bottom bg-body-secondary">
                   <span class="small fw-bold">Extensions</span>
                   <button type="button" class="btn btn-sm p-0 opacity-50" disabled>
-                    {% omega_icon "gear", "fa-sm" %}
+                    <i class="fa-solid fa-gear fa-sm"></i>
                   </button>
                 </div>
                 <!-- Extension list -->
@@ -99,23 +102,23 @@ steps:
                   <!-- Other extension (dimmed) -->
                   <div class="extension-dropdown-item d-flex align-items-center gap-3 p-2 rounded opacity-50">
                     <div class="extension-item-icon bg-body-secondary rounded p-1 d-flex align-items-center justify-content-center">
-                      {% omega_icon "shield", "fa-xs" %}
+                      <i class="fa-solid fa-shield fa-xs"></i>
                     </div>
                     <span class="small flex-grow-1">AdBlocker</span>
                     <button type="button" class="btn btn-sm p-1" disabled>
-                      {% omega_icon "thumbtack", "fa-xs text-muted" %}
+                      <i class="fa-solid fa-thumbtack fa-xs text-muted"></i>
                     </button>
                   </div>
                   <!-- Our extension (highlighted with pin click) -->
                   <div class="extension-dropdown-item d-flex align-items-center gap-3 p-2 rounded bg-primary bg-opacity-10 border border-primary">
                     <div class="extension-item-icon rounded p-1 d-flex align-items-center justify-content-center">
-                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="extension-brandmark" alt="{{ resolved.config.brand.name }}"/>
+                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="extension-brandmark" alt="{{ resolved.config.brand.name }}"/>
                     </div>
                     <span class="small flex-grow-1 fw-bold">{{ resolved.config.brand.name }}</span>
                     <!-- Pin button - highlighted with click animation -->
                     <div class="extension-pin-target position-relative">
-                      <button type="button" class="btn btn-sm btn-primary p-1">
-                        {% omega_icon "thumbtack", "fa-xs" %}
+                      <button type="button" class="btn btn-sm btn-primary p-1" tabindex="-1">
+                        <i class="fa-solid fa-thumbtack fa-xs"></i>
                       </button>
                       <div class="click-indicator position-absolute top-50 start-50">
                         <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
@@ -140,7 +143,7 @@ steps:
             <h5 class="step-title">{{ resolved.steps[2].title }}</h5>
           <p class="text-muted mb-3">{{ resolved.steps[2].description }}</p>
           <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center position-relative">
-            <div class="extension-visual">
+            <div class="extension-visual" aria-hidden="true">
               <div class="extension-toolbar d-flex align-items-center justify-content-end gap-2 bg-body rounded-3 p-2 border">
                 <!-- Mock URL bar -->
                 <div class="extension-url-bar flex-grow-1 bg-body-secondary rounded px-3 py-1 small text-muted me-2 text-truncate">
@@ -148,19 +151,19 @@ steps:
                 </div>
                 <!-- Extension icons -->
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% omega_icon "shield", "fa-sm" %}
+                  <i class="fa-solid fa-shield fa-sm"></i>
                 </button>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% omega_icon "bookmark", "fa-sm" %}
+                  <i class="fa-solid fa-bookmark fa-sm"></i>
                 </button>
                 <!-- Our extension - now pinned! -->
                 <div class="extension-pinned-target position-relative">
-                  <button type="button" class="btn btn-sm btn-primary animation-flex">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="extension-toolbar-brandmark" alt="{{ resolved.config.brand.name }}"/>
+                  <button type="button" class="btn btn-sm btn-primary animation-flex" tabindex="-1">
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="extension-toolbar-brandmark" alt="{{ resolved.config.brand.name }}"/>
                   </button>
                 </div>
                 <button type="button" class="btn btn-sm btn-secondary opacity-50" disabled>
-                  {% omega_icon "puzzle-piece", "fa-sm" %}
+                  <i class="fa-solid fa-puzzle-piece fa-sm"></i>
                 </button>
               </div>
             </div>
@@ -172,11 +175,11 @@ steps:
         <!-- Slideshow Navigation -->
         <div class="steps-slideshow-nav">
           <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-            {% omega_icon "chevron-left", "me-1" %} Back
+            <i class="fa-solid fa-chevron-left me-1"></i> Back
           </button>
           <div class="steps-dots"></div>
           <button type="button" class="btn btn-adaptive btn-sm step-next">
-            <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+            <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
           </button>
         </div>
       </div>
@@ -185,7 +188,7 @@ steps:
       <div class="text-center mt-4" data-omega-reveal>
         <a href="/" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
           Start using {{ resolved.config.brand.name }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       </div>
     </div>

@@ -26,7 +26,7 @@ config:
           {% if forloop.first %}
             <span class="newsflash-ticker__dot"></span><b>LATEST</b>
           {% else %}
-            {% omega_icon "bolt" %}
+            <i class="fa-solid fa-bolt"></i>
           {% endif %}
           <a href="{{ resolved.config.url }}{{ post.url }}">{{ post.post.title }}</a>
         </span>

@@ -1,5 +1,6 @@
-const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture, buildSessionFixtures } = require('../../src/test/test-accounts.js');
-const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialing.js');
+const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture, buildSessionFixtures } = require('../../dist/test/test-accounts.js');
+const isTrialing = require('../../dist/manager/routes/payments/cancel/_is-trialing.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /**
  * Test: the seeded personas' billing data ([#263](https://github.com/Omega-JS-Stack/omega/issues/263))
@@ -25,7 +26,7 @@ const isTrialing = require('../../src/manager/routes/payments/cancel/_is-trialin
  *
  * Run: npx omega test helpers/seeded-personas
  */
-module.exports = {
+module.exports = defineCases({
   description: 'Seeded personas carry legitimate billing data',
   type: 'group',
   auth: 'none',
@@ -369,6 +370,7 @@ module.exports = {
             ['_test.premium-suspended', 'Suspended'],
             ['_test.premium-cancelling', 'Cancelling'],
             ['_test.refunded', 'Refunded'],
+            ['_test.usage-spread', 'Usage'],
             ['_test.referrer', 'Referrer'],
             ['_test.referred', 'Referred'],
             ['_test.journey-flows-upgrade', 'Journey: Upgrade'],
@@ -731,7 +733,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 
 /**
  * The leaves a REAL user doc carries a value in — the sections `routes/user/signup`
@@ -745,6 +747,8 @@ const REAL_ACCOUNT_LEAVES = [
   'personal.location.country',
   'personal.location.region',
   'personal.location.city',
+  'personal.location.postalCode',
+  'personal.location.street',
   'personal.company.name',
   'personal.company.position',
   'personal.telephone.countryCode',

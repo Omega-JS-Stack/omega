@@ -32,7 +32,7 @@ export function pathPrefix() {
  * Mount a root-relative site path under the base path. Anything else — an
  * absolute or protocol-relative URL, a bare-relative path, an anchor — already
  * resolves correctly and passes through.
- * @param {string} path - e.g. '/assets/fa/solid/star.svg'
+ * @param {string} path - e.g. '/assets/icons/solid/star.svg'
  * @returns {string}
  */
 export function siteUrl(path) {

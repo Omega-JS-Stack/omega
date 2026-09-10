@@ -3,7 +3,6 @@
  */
 
 // Libraries
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { loadCharts, barChart, doughnutChart } from '__main_assets__/js/libs/charts.js';
@@ -232,13 +231,13 @@ async function loadSubscriberData() {
 // Charts
 // ============================================
 // Both charts go through the framework's chart helper
-// (core/js/libs/charts.js): it owns the lazy Chart.js chunk, the token reads,
-// and the four builders, so this page never names the library (#74).
+// (core/js/libs/charts.js): it owns the lazy @tanstack/charts chunks, the token
+// reads, and the four builders, so this page never names the library (#74).
 
 async function renderPlanChart(plans) {
   const $loading = document.getElementById('chart-plans-loading');
-  const $canvas = document.getElementById('chart-plans');
-  if (!$canvas) {
+  const $host = document.getElementById('chart-plans');
+  if (!$host) {
     return;
   }
 
@@ -262,7 +261,7 @@ async function renderPlanChart(plans) {
   if ($loading) {
     $loading.classList.add('d-none');
   }
-  $canvas.parentElement.classList.remove('d-none');
+  $host.parentElement.classList.remove('d-none');
 
   doughnutChart('chart-plans', {
     labels: labels.map(capitalize),
@@ -273,8 +272,8 @@ async function renderPlanChart(plans) {
 
 async function renderSignupsChart(labels, values) {
   const $loading = document.getElementById('chart-signups-loading');
-  const $canvas = document.getElementById('chart-signups');
-  if (!$canvas) {
+  const $host = document.getElementById('chart-signups');
+  if (!$host) {
     return;
   }
 
@@ -288,7 +287,7 @@ async function renderSignupsChart(labels, values) {
   if ($loading) {
     $loading.classList.add('d-none');
   }
-  $canvas.parentElement.classList.remove('d-none');
+  $host.parentElement.classList.remove('d-none');
 
   barChart('chart-signups', { labels, values, label: 'Signups' });
 }

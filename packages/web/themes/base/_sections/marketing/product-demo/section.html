@@ -20,7 +20,7 @@
               aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
             >
               {% iftruthy tab.icon %}
-                {% omega_icon tab.icon, "fa-sm me-2" %}
+                <i class="fa-solid fa-{{ tab.icon }} fa-sm me-2"></i>
               {% endiftruthy %}
               {{ tab.label }}
             </button>
@@ -42,7 +42,7 @@
             <div class="d-flex flex-wrap justify-content-center gap-3 gap-md-4 mb-4">
               {% for feature in tab.features %}
                 <div class="d-flex align-items-center">
-                  {% omega_icon "check", "text-success me-2" %}
+                  <i class="fa-solid fa-check text-success me-2"></i>
                   <span>{{ feature }}</span>
                 </div>
               {% endfor %}

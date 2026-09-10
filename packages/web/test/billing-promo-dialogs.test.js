@@ -64,7 +64,7 @@ test('#323: the save offer opens like the exit popup, not like a form letter', a
   assert.ok(!modal.includes('modal-footer'), 'and no footer rail of equal buttons');
 
   assert.match(modal, /class="omega-dialog-mark"/, 'the accent mark carries the icon');
-  assert.match(modal, /data-icon="gift"/, 'and the icon is the offer it makes, inlined at build');
+  assert.match(modal, /data-omega-fa="solid\/gift"><svg/, 'and the icon is the offer it makes, inlined at build');
   assert.match(modal, /text-center/, 'the whole block is centered');
 
   // The headline is the OFFER, in the brand's own number — bound from the same

@@ -5,7 +5,7 @@ import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
 import { attachTo as attachUrlHelpers } from './utils/url-helpers.js';
 import { createRequest } from '@omega.js/client/modules/request.js';
 
-// Firebase (static imports - dynamic import() doesn't work in service workers with webpack chunking)
+// Firebase (static imports - a service worker cannot fetch code at runtime under MV3, so dynamic import() is not an option)
 import { initializeApp, getApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
 
@@ -25,19 +25,15 @@ const installLogger = new LoggerLite('install');
 const CACHE_WARMING_ENABLED = false;
 
 // Auth emulator port for TESTING builds. An extension context has no
-// `process.env`, so the resolved map arrives BAKED in build.js's `dev.ports`
-// ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)); the classic
-// default is the fallback for a build made with no stack up (mirrors
+// `process.env`, so the resolved map arrives BAKED in OMEGA_BUILD_JSON's
+// `config.dev.ports` ([#300](https://github.com/Omega-JS-Stack/omega/issues/300));
+// the classic default is the fallback for a build made with no stack up (mirrors
 // url-helpers' classic-5002 hosting note).
 const AUTH_EMULATOR_PORT = 9099;
 
-// Import build config at the top level (synchronous)
-importScripts('/build.js');
-
 // ⚠️⚠️⚠️ CRITICAL: Setup global listeners BEFORE any async operations ⚠️⚠️⚠️
 // https://stackoverflow.com/questions/78270541/cant-catch-fcm-notificationclick-event-in-service-worker-using-firebase-messa
-// Note: ES6 static imports above are fine - they're hoisted and bundled by webpack.
-// The issue is with importScripts() calls which must be synchronous at top-level.
+// Note: ES6 static imports above are fine - they're hoisted and bundled by the build.
 setupGlobalHandlers();
 
 // Class
@@ -49,7 +45,8 @@ class Manager {
     this.authLogger = null;
     this.serviceWorker = null;
 
-    // Load config from build.js
+    // Load the snapshot the bundle baked in (#743 — the banner assigns it onto
+    // self/globalThis ahead of this file's own code, so it is always already there).
     this.config = serviceWorker.OMEGA_BUILD_JSON?.config || {};
 
     // Defaults

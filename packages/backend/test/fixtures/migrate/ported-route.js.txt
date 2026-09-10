@@ -1,0 +1,11 @@
+const { inferContact } = require('../../../libraries/infer-contact.js');
+
+module.exports = async ({ ctx, settings }) => {
+  const jetpack = require('fs-jetpack');
+  const { wait } = require('node-powertools');
+  const fs = require('node:fs');
+
+  await wait(1);
+
+  return ctx.respond({ ok: jetpack.exists(settings.path) && fs.existsSync(settings.path) });
+};

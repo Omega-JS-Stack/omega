@@ -1,5 +1,17 @@
 // Mock browser globals for Node.js testing
 
+// Every listener registration is RECORDED as well as ignored. The session
+// probe's moments of doubt (#798) are wired at boot with nothing to observe
+// but the registration itself; the handlers still do nothing by default, so
+// every other suite behaves exactly as it did.
+global.__omegaListeners = { window: {}, document: {} };
+
+function recordListener(target, type, handler) {
+  const listeners = global.__omegaListeners[target];
+  listeners[type] = listeners[type] || [];
+  listeners[type].push(handler);
+}
+
 global.window = {
   location: {
     href: 'http://localhost:3000/test',
@@ -16,7 +28,7 @@ global.window = {
   innerHeight: 768,
   devicePixelRatio: 1,
   matchMedia: () => ({ matches: false }),
-  addEventListener: () => {},
+  addEventListener: (type, handler) => recordListener('window', type, handler),
   removeEventListener: () => {},
   localStorage: {
     _data: {},
@@ -114,7 +126,7 @@ global.document = {
   head: {
     appendChild: () => {},
   },
-  addEventListener: () => {},
+  addEventListener: (type, handler) => recordListener('document', type, handler),
   removeEventListener: () => {},
   querySelectorAll: () => [],
   querySelector: () => null,

@@ -5,6 +5,7 @@
  * Run: npx omega test backend:mcp/protocol
  */
 const fetch = require('wonderful-fetch');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 function parseSSE(text) {
   const lines = text.split('\n');
@@ -65,7 +66,7 @@ async function mcpRequest(config, method, params, bearerToken, options) {
   return parseSSE(text);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'MCP protocol endpoint (Streamable HTTP)',
   type: 'group',
 
@@ -274,4 +275,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -10,10 +10,11 @@
 ## Auth (`auth.js`)
 
 - **Class**: `Auth`
-- **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `resolveSubscription(account?)`
+- **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `probeSession()`, `resolveSubscription(account?)`
 - **Bindings**: Updates `auth` and `usage` context on auth settle
+- **`probeSession()`** ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): the forced token refresh the client runs at a moment of doubt (tab visible, network back, a 401). Resolves `'signed-out' | 'alive' | 'gone' | 'unknown'`; a non-network `auth/*` error signs the user out, a network error keeps them, and probes coalesce to one in flight. Full contract: [docs/client/index.md](../../../docs/client/index.md)
 - **Listener state**: `callback({ user, account, resolved, accountDenied? })` — `account` resolves to the empty schema shape when the doc is not written yet (a NORMAL pending state); `accountDenied: true` rides along only when Firestore rules refused the read, the one REAL failure ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)); web signs out on it
-- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omega.js/backend, UJM, and @omega.js/desktop) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
+- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with the EFFECTIVE limits of the resolved plan to produce the `usage` bindings key. Both halves are config — the `features` catalog says what a feature is and whether it is counted, the product's `features` map says what the tier promises — and the arithmetic is `@omega.js/account`'s, the same module @omega.js/backend's gate reads ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). Per feature: `{ monthly, daily, total, limit, left, override, day: { limit, used, left } }`, with a per-user `usage.overrides.<feature>` winning over the plan's number
 
 ### resolveSubscription(account?)
 
@@ -55,7 +56,8 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 - **`wakeup: true`** ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)): a fire-and-forget GET that warms a cold backend and nothing else — `omega.request(WAKEUP_ROUTE, { wakeup: true })`, with `WAKEUP_ROUTE` exported by this module (the ONE route every surface pings, [#644](https://github.com/Omega-JS-Stack/omega/issues/644)). It appends `wakeup=true` to the URL, mints no ID token, reads no response body, returns `undefined`, and RESOLVES rather than throwing when the network is down. @omega.js/backend's middleware answers a wakeup before it loads a route or authenticates, so every route is the same warm-up at the same price and none of them runs.
 - **Behavior**: leading-`/` paths resolve through `getApiUrl()`; absolute URLs pass through. A fresh Firebase ID token rides as `Authorization: Bearer` when signed in. Non-ok responses THROW an `Error` carrying `.code` (HTTP status), `.data` (parsed body), and `.properties`.
 - **omega-properties**: the backend assistant attaches this header (code, tag, usage current+limits, schema, additional) to every response; `omega.request()` parses it on success AND error, and merges server usage into the `usage` bindings key — `data-omega-bind` elements refresh automatically.
-- **Standalone**: non-singleton contexts (desktop main, extension service worker) build their own via `createRequest({ getApiUrl, getIdToken, onProperties })` from `@omega.js/client/modules/request.js` — the desktop client-bridge and the extension background token sync both do.
+- **Standalone**: non-singleton contexts (desktop main, extension service worker) build their own via `createRequest({ getApiUrl, getIdToken, onProperties, onUnauthorized })` from `@omega.js/client/modules/request.js` — the desktop client-bridge and the extension background token sync both do. `onProperties` and `onUnauthorized` are optional; only `getApiUrl` and `getIdToken` are required.
+- **401 probes the session** ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): a 401 on a request that asked for auth calls the optional `onUnauthorized` dep (the singleton passes `omega.auth().probeSession()`) without awaiting it and swallowing its rejection, then throws the caller's error unchanged. `auth: false` requests and every other status never call it.
 
 ## Device (`device.js`) — local device stats
 
@@ -124,6 +126,7 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 ## Utilities (`utilities.js`)
 
 - **Exports**: `clipboardCopy()`, `escapeHTML()`, `sanitizeURL()`, `renderMarkdown()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
+- **clipboardCopy(input)**: copies a string or an element's value/text; the returned promise REJECTS when the clipboard refuses (denied permission, blurred document) — the legacy lane reads `execCommand`'s return, so no lane reports a failed copy as success ([#726](https://github.com/Omega-JS-Stack/omega/issues/726)).
 - **escapeHTML(input)**: walks strings, arrays and objects recursively; escapes `& < > " '` (quotes too, so an escaped value is safe inside an attribute). Non-strings pass through.
 - **sanitizeURL(url)**: returns the URL unchanged when it resolves to `http:`/`https:`, `''` for every other scheme (`javascript:`, `data:`, …).
 
@@ -158,6 +161,15 @@ Untrusted text as safe markup — an escape-first mini renderer for API answers 
 - **Source resolution** (`advertising.providers.inhouse.source`): `'self'` → `getApiUrl()`, `'company'` → `config.company.url` through the api derivation, full URL → verbatim
 - **Element vocabulary**: `data-omega-vert` (type: `display`/`in-article`/`in-feed`/`multiplex`/`house`), `data-omega-vert-size` (preset or px), `data-omega-vert-id`, `data-omega-vert-tags` — the web `verts/unit` section and the phase-4 desktop/extension binding share it
 - **Events**: `omega-vert:fill` / `omega-vert:no-fill` / `omega-vert:click` / `omega-vert:reload` bubble from the host (+ `onFill`/`onNoFill`/`onClick`/`onReload` callbacks)
+
+## Features (`features.js`) — the features contract in the browser
+
+- **Shape**: a plain re-export, not a class — `import { resolveFeatures } from '@omega.js/client/modules/features.js'`
+- **Exposes**: `isCountedFeature`, `isPacedFeature`, `featureMirrors`, `featureOverride`, `featureCounters`, `productFeatureValue`, `daysInMonth`, `dayShare`, `resolveFeature`, `resolveFeatures`
+- **Why it exists**: the derivations live ONCE, in `@omega.js/account` — the same module @omega.js/backend's `consume` gate reads — so the number that refuses a request and the number a usage bar draws can never be two different numbers. `@omega.js/account` is a private package a consumer's install never resolves by name, and this package's dist carries it vendored, so this module is the DOOR a frontend goes through. Same idiom as `analytics.js` fronting `@omega.js/analytics` ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
+- **The catalog is config**, not a module export: `omega.config.features`, which the embedding framework's build bridges in beside `omega.config.payment`
+- **`resolveFeature(id, { catalog, product, account, now })`** returns everything a surface needs to speak about one feature: `{ id, name, icon, definition, counted, paced, mirror, value, limit, planLimit, override, used, left, total, day: { limit, used, left } }`. `-1` is the unlimited sentinel wherever a limit or a remainder can appear
+- **Callers**: @omega.js/web's `payment-config.js` (`getProductLimits` is the catalog-aware read) and the account page's billing panel (plan bullets and usage bars); `auth.js`'s `_resolveUsage` reaches the same functions directly
 
 ## Motion (`motion.js`)
 

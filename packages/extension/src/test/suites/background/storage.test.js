@@ -2,7 +2,9 @@
 // the storage-permission grant (which has to be declared in the harness
 // manifest) and the actual SW-side storage API that BXM consumers use.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'background',
   description: 'background SW — chrome.storage.local round-trip',
@@ -41,4 +43,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -10,6 +10,12 @@
     url: 'https://sandbox-brand.example.com',
     contact: {
       email: 'support@sandbox-brand.example.com',
+      // The human who signs the personal-signoff emails (welcome, nudge, checkup).
+      // The corpus RENDERS those for real now that a testing send is captured
+      // rather than delivered ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)), and a missing person fails the send loudly.
+      person: {
+        name: 'Sandy Sandbox',
+      },
     },
     address: {
       line1: '123 Main St',
@@ -46,7 +52,48 @@
       },
     },
   },
-  oauth2: {},
+  // FAKE ASM group ids, like every other value here. A transactional send resolves
+  // its unsubscribe group from config and fails loudly without one ([#649](https://github.com/Omega-JS-Stack/omega/issues/649)); the
+  // corpus now renders every one of those emails into the testing-mode capture
+  // ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)), so this offline fixture declares its own ids instead of waiting on a
+  // manage walk it will never run.
+  marketing: {
+    campaigns: {
+      providers: {
+        sendgrid: {
+          groups: {
+            orders: 900001,
+            hello: 900002,
+            account: 900003,
+            marketing: 900004,
+            security: 900005,
+            newsletter: 900006,
+            internal: 900007,
+          },
+        },
+      },
+    },
+  },
+  connections: {
+    // A BRAND-defined provider (#771): its module is
+    // targets/backend/src/connections/sandbox-pkce.js, and `name` + `logo` are
+    // what the account page draws its card from — no template row anywhere.
+    'sandbox-pkce': {
+      enabled: true,
+      name: 'Sandbox PKCE',
+      logo: '/assets/images/brand/brandmark.svg',
+    },
+  },
+  // The feature catalog (#647): every feature defined ONCE, and the products
+  // below name only their value.
+  features: {
+    requests: {
+      name: 'API Requests',
+      icon: 'bolt',
+      definition: 'Calls this project may make per month.',
+      usage: {},
+    },
+  },
   payment: {
     providers: {
       stripe: {
@@ -64,16 +111,16 @@
         id: 'basic',
         name: 'Basic',
         type: 'subscription',
-        limits: {
-          requests: 100,
+        features: {
+          requests: 10000,
         },
       },
       {
         id: 'premium',
         name: 'Premium',
         type: 'subscription',
-        limits: {
-          requests: 1000,
+        features: {
+          requests: 100000,
         },
         trial: {
           days: 14,
@@ -97,8 +144,8 @@
         id: 'ultimate',
         name: 'Ultimate',
         type: 'subscription',
-        limits: {
-          requests: 10000,
+        features: {
+          requests: -1,
         },
         prices: {
           monthly: 19.99,

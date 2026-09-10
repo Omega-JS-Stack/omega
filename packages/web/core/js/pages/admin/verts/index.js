@@ -10,7 +10,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 
 // State
@@ -160,7 +159,7 @@ function renderRow(vert) {
   $row.innerHTML = `
     <td>
       <div class="d-flex align-items-center gap-2">
-        <span class="omega-icon-chip omega-icon-chip--neutral">${getPrerenderedIcon('rectangle-list', 'fa-sm')}</span>
+        <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-rectangle-list fa-sm"></i></span>
         <div class="min-w-0">
           <div class="text-truncate fw-semibold" style="max-width: 220px;">${escape(vert.title || 'Untitled')}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(vert.id || '')}</div>
@@ -174,21 +173,21 @@ function renderRow(vert) {
     <td>
       <div class="dropdown">
         <button class="omega-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="Vert actions">
-          ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
+          <i class="fa-solid fa-ellipsis-vertical fa-sm"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><a class="dropdown-item small btn-edit-vert" href="#">
-            ${getPrerenderedIcon('pen', 'fa-sm me-2')}
+            <i class="fa-solid fa-pen fa-sm me-2"></i>
             Edit vert
           </a></li>
           <li><a class="dropdown-item small btn-toggle-vert" href="#">
             ${enabled
-              ? `${getPrerenderedIcon('toggle-off', 'fa-sm me-2')} Disable vert`
-              : `${getPrerenderedIcon('toggle-on', 'fa-sm me-2')} Enable vert`}
+              ? `<i class="fa-solid fa-toggle-off fa-sm me-2"></i> Disable vert`
+              : `<i class="fa-solid fa-toggle-on fa-sm me-2"></i> Enable vert`}
           </a></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item small text-danger btn-delete-vert" href="#">
-            ${getPrerenderedIcon('trash', 'fa-sm me-2')}
+            <i class="fa-solid fa-trash fa-sm me-2"></i>
             Delete vert
           </a></li>
         </ul>

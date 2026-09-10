@@ -15,22 +15,35 @@ const fs = require('node:fs');
 const BASELINE_KNOWLEDGE = fs.readFileSync(join(__dirname, '..', 'data', 'baseline-knowledge.md'), 'utf8').trimEnd();
 
 /**
- * Format a product's limits as a human-readable string
+ * Format what a product promises as a human-readable string
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
  *
- * @param {Object} limits - e.g., { requests: 100 } or { submissions: 50, forms: 2 }
- * @returns {string} - e.g., "100 requests" or "unlimited submissions, 2 forms"
+ * A product's `features` map names only VALUES; the top-level `features`
+ * catalog is what says what each id is CALLED, so the agent quotes the brand's
+ * own words rather than a raw key. A `false` (or absent) value is not part of
+ * the tier and is never mentioned.
+ *
+ * @param {Object} values - the product's `features` map, e.g. { requests: 100, support: true }
+ * @param {Object} catalog - the top-level `features` catalog
+ * @returns {string} - e.g., "100 API Requests, unlimited Saves, Priority support"
  */
-function formatLimits(limits) {
-  if (!limits) {
+function formatFeatures(values, catalog) {
+  if (!values) {
     return '';
   }
 
-  return Object.entries(limits)
+  return Object.entries(values)
+    .filter(([, value]) => value !== false && value !== '' && value !== undefined && value !== null)
     .map(([key, value]) => {
+      const name = catalog?.[key]?.name || key;
+
       if (value === -1) {
-        return `unlimited ${key}`;
+        return `unlimited ${name}`;
       }
-      return `${value} ${key}`;
+      if (value === true) {
+        return name;
+      }
+      return `${value} ${name}`;
     })
     .join(', ');
 }
@@ -84,9 +97,9 @@ function generatePricing(brandConfig) {
       parts.push('(free)');
     }
 
-    const limits = formatLimits(product.limits);
-    if (limits) {
-      parts.push(`- ${limits}`);
+    const features = formatFeatures(product.features, brandConfig.features);
+    if (features) {
+      parts.push(`- ${features}`);
     }
 
     if (product.trial?.days) {

@@ -12,12 +12,13 @@ const jetpack = require('fs-jetpack');
 const Manager = require('../../../build.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { copyDefaults } = require('../../../commands/lib/ensure-target.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const package = Manager.getPackage('main');
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 const CUSTOM_MARKER = '# ========== Custom Values ==========';
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'defaults scaffold (devkit engine)',
@@ -188,4 +189,4 @@ module.exports = {
       },
     },
   ],
-};
+});

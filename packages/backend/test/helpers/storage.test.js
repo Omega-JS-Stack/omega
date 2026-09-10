@@ -15,6 +15,7 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const os = require('os');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Create a minimal Manager mock with storage()
 const STORAGE_DIR = path.join(os.tmpdir(), `backend-storage-test-${Date.now()}`);
@@ -44,7 +45,7 @@ function createStorage(name) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Manager.storage()',
   type: 'group',
 
@@ -191,4 +192,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -7,11 +7,15 @@
  * One optional key: `repo.providers.github.repo` (or, on a backend load, the
  * target-overlaid `targets.backend.github.repo`, which wins) — either a bare name
  * ("omega-brand") or an "owner/name" slug ("itw-creative-works/omega-brand").
- * Defaults: name falls to `brand.id`, owner falls to `repo.providers.github.org`. The slug's owner slot
- * carries the legacy omega-manager orgMain/orgWebsite split (Ian
- * 2026-07-19): most ITW brands house the brand repo under the paid company
- * org (itw-creative-works) while `repo.providers.github.org` keeps naming the brand's own
- * org for org-profile reconciliation. The retired `repoWebsite` URL key
+ * Defaults: name falls to `<brand.id>-omega`, owner falls to `repo.providers.github.org`.
+ * That name is the `<brand.id>-<role>` repo rule (Ian 2026-09-07,
+ * [#809](https://github.com/Omega-JS-Stack/omega/issues/809)): every repo a brand
+ * owns is its id plus the role it plays, `omega` for the source monorepo beside
+ * the `releases` one below, so nobody types a repo name to get the right one.
+ * The slug's owner slot carries the legacy omega-manager orgMain/orgWebsite
+ * split (Ian 2026-07-19): most ITW brands house the brand repo under the paid
+ * company org (itw-creative-works) while `repo.providers.github.org` keeps
+ * naming the brand's own org for org-profile reconciliation. The retired `repoWebsite` URL key
  * (2026-07-19, Ian: "we no longer need it — that was for when the website
  * lived NOT in the monorepo") is superseded by this slug: one repo per
  * brand, named by the brand.
@@ -49,14 +53,20 @@ function githubKeys(config) {
 }
 
 /**
- * The brand repo's bare name (no owner).
+ * The brand repo's bare name (no owner): a typed slug or bare name, else the
+ * `<brand.id>-omega` default of the `<brand.id>-<role>` rule.
  *
  * @param {object} config - Composed omega config (brand + local layers).
  * @returns {string} Repo name ('' when nothing in the chain resolves).
  */
 function brandRepoName(config) {
   const github = githubKeys(config);
-  return parseRepoSlug(github.repo).name || config?.brand?.id || '';
+  // The id half is trimmed like a typed slug: the role suffix is appended to
+  // it, so untrimmed whitespace would sit INSIDE the composed name.
+  const id = (config?.brand?.id || '').trim();
+
+  return parseRepoSlug(github.repo).name
+    || (id ? `${id}-omega` : '');
 }
 
 /**
@@ -87,4 +97,46 @@ function brandRepo(config) {
   return { owner, name, repo: owner && name ? `${owner}/${name}` : '' };
 }
 
-module.exports = { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo };
+/**
+ * The releases keys the derivation reads: the desktop target's own `releases`
+ * block, overlaid by the top-level one a desktop-resolved config carries (the
+ * merge chain overlays `targets.desktop` onto the top level, so the overlay is
+ * the resolved value). Both shapes are live: the site global reads a raw config,
+ * where the block sits under the target, while every desktop verb reads the
+ * resolved one.
+ *
+ * @param {object} config - Composed omega config (raw or desktop-resolved).
+ * @returns {object} Merged `{ enabled, owner, repo }` keys.
+ */
+function releasesKeys(config) {
+  const target = config?.targets?.desktop;
+  const entry = target && typeof target === 'object' && !Array.isArray(target) ? target.releases : undefined;
+
+  return { ...(entry || {}), ...(config?.releases || {}) };
+}
+
+/**
+ * The brand's ONE public releases repo: where the versioned `v<x.y.z>` releases
+ * that feed electron-updater live, and where the website's versionless
+ * `/releases/latest/download/<asset>` links point ([#620](https://github.com/Omega-JS-Stack/omega/issues/620),
+ * [#799](https://github.com/Omega-JS-Stack/omega/issues/799)). One repo per
+ * brand, named after it: `<brand.id>-releases` by default, under the brand
+ * repo's own owner, so a brand that declares nothing still has an address.
+ *
+ * This is the ONE home of that rule. Every reader takes it from here (the site
+ * global's download links, @omega.js/desktop's electron-builder publish block,
+ * its release-repo provisioning, its finalize-release upload), so the feed a
+ * shipped app polls and the URL a download button carries can never disagree.
+ *
+ * @param {object} config - Composed omega config (raw or desktop-resolved).
+ * @returns {{ owner: string, name: string, repo: string }} `repo` is the slug, '' unless BOTH halves resolve (half an address addresses nothing).
+ */
+function releasesRepo(config) {
+  const releases = releasesKeys(config);
+  const owner = releases.owner || brandRepoOwner(config);
+  const name = releases.repo || (config?.brand?.id ? `${config.brand.id}-releases` : '');
+
+  return { owner, name, repo: owner && name ? `${owner}/${name}` : '' };
+}
+
+module.exports = { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, releasesRepo };

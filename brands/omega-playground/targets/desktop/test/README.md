@@ -10,8 +10,10 @@ Match the framework's four layers — OMEGA Desktop's test runner discovers file
 |---|---|---|
 | `test/build/` | Plain Node | Build-time logic, config validation, pure utilities |
 | `test/main/` | Spawned Electron main process | IPC, storage, windows, anything that needs `app.*` |
-| `test/renderer/` | Hidden BrowserWindow | Renderer-side logic, DOM, preload bridge |
+| `test/renderer/` | Hidden BrowserWindow | Renderer-side logic, DOM, preload bridge (add `view: '<name>'` to load one of your `src/views/`) |
 | `test/boot/` | Consumer's actual built bundle | End-to-end smoke tests (does the app boot, does main show a window, do IPC handlers register) |
+
+A renderer suite that declares `view: '<name>'` runs against that view of YOUR app instead of the framework's harness page: the framework builds the app first, so the page carries your real preload, IPC handlers and config. It rides the boot lane, so `--layer=boot` (or the default `all`) runs it and `--layer=renderer` does not.
 
 ## Coverage
 
@@ -19,17 +21,22 @@ Every feature ships with tests at every layer it has a surface in — logic (`bu
 
 ## Quick example
 
+The real suites beside this file are the worked example: [`build/config.test.js`](build/config.test.js) asserts the identity this project's `config/omega.json5` resolves to, [`boot/app-boots.test.js`](boot/app-boots.test.js) boots the real built bundle and asserts what `src/main.js` and `src/integrations/` wire up, and [`renderer/main-view.test.js`](renderer/main-view.test.js) (`view: 'main'`) asserts what `src/views/main/` puts on screen.
+
 ```js
 // test/build/my-feature.test.js
-const assert = require('@omega.js/desktop/test/assert');
+const Manager = require('@omega.js/desktop/build');
 
 module.exports = {
-  'my feature does the thing': async () => {
-    const result = await doTheThing();
-    assert.equal(result, 'expected');
+  layer: 'build',
+  description: 'the project config carries a brand id',
+  run: (ctx) => {
+    ctx.expect(Manager.getConfig().brand.id).toBeTruthy();
   },
 };
 ```
+
+That is the standalone form: one test per file. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library (there is nothing to require). The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
 
 ## See also
 

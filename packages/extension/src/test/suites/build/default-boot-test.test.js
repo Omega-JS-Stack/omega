@@ -17,6 +17,7 @@ const os   = require('os');
 
 const DEFAULT_BOOT_TEST = path.join(__dirname, '..', '..', '..', 'defaults', 'test', 'boot', 'externally-connectable.test.js');
 const expect = require('../../assert.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Stage a temp consumer project; `config` is the config/omega.json5 body (omit for none).
 function stageProject(config) {
@@ -44,7 +45,7 @@ async function inspectFrom(dir, manifest) {
 
 const BRAND = `{ brand: { id: 'staged', name: 'Staged', url: 'https://staged.example.com' } }`;
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'the scaffolded default boot test — externally_connectable',
@@ -96,4 +97,4 @@ module.exports = {
       },
     },
   ],
-};
+});

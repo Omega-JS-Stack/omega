@@ -65,11 +65,26 @@ collapse.show();
 
 ## Rebuilding the bundle
 
-The bundle is built from @omega.js/desktop's vendored Bootstrap source
-(`the Bootstrap 5.3 source (vendored themes tree)`, v5.3.x) plus `@popperjs/core` (an @omega.js/desktop
-dependency), webpack production mode, UMD output
-(`library: { name: 'bootstrap', export: 'default' }`). Rebuild only when the
-vendored Bootstrap source is upgraded.
+`assets/js/bootstrap.bundle.js` is a COMMITTED prebuilt artifact — no gulp task
+rebuilds it, so a normal build never regenerates it. The checked-in bytes are a
+legacy webpack UMD build, from before [#737](https://github.com/Omega-JS-Stack/omega/issues/737)
+took webpack out of desktop.
+
+Rebuild only when the vendored Bootstrap source is upgraded, with esbuild — the
+one bundler desktop still has. The input is @omega.js/desktop's vendored
+Bootstrap 5.3 source (the vendored themes tree) plus `@popperjs/core` (an
+@omega.js/desktop dependency), and the output has to keep the contract its two
+consumers rely on: `require()` hands back the Bootstrap namespace
+(`renderer.js` reads `.Tooltip` off it and assigns `window.bootstrap` itself),
+so the format is CommonJS:
+
+```bash
+esbuild bootstrap.js --bundle --minify --format=cjs \
+  --outfile=src/assets/js/bootstrap.bundle.js
+```
+
+Use `--format=iife --global-name=bootstrap` only if the bundle is ever loaded by
+a plain `<script>` tag instead — nothing does that today.
 
 Note: the bundle reads `document.documentElement` at import time — the renderer
 bootstrap defers loading it until the document exists (relevant when wiring

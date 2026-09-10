@@ -26,7 +26,7 @@ const TEST_PASSWORD = 'omega-test-password';
 const ROSTER_RETRY_MS = 2000;
 
 // Font Awesome Free "flask" (fontawesome.com/license/free — CC BY 4.0),
-// inlined because this module injects at runtime (no omega_icon at this layer)
+// inlined verbatim: the palette injects before the icon watcher can reach it
 const FLASK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M288 0L128 0C110.3 0 96 14.3 96 32s14.3 32 32 32L128 215.5 7.5 426.3C2.6 435 0 444.7 0 454.7 0 486.4 25.6 512 57.3 512l333.4 0c31.6 0 57.3-25.6 57.3-57.3 0-10-2.6-19.8-7.5-28.4L320 215.5 320 64c17.7 0 32-14.3 32-32S337.7 0 320 0L288 0zM192 215.5l0-151.5 64 0 0 151.5c0 11.1 2.9 22.1 8.4 31.8l41.6 72.7-164 0 41.6-72.7c5.5-9.7 8.4-20.6 8.4-31.8z"/></svg>';
 
 const STYLES = `
@@ -190,12 +190,25 @@ const STYLES = `
 
 /**
  * The brand's persona email domain (personas are seeded against the brand
- * host — playground.omegajs.dev for the playground).
+ * host — playground.omegajs.dev for the playground). The ONE derivation of it
+ * ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)): the seeder
+ * runs @omega.js/config's `resolvedBrandHost`, and this is the same function
+ * for a browser that cannot require it: `brand.url` first, the top-level
+ * `url` only as its fallback, so a persona is signed in on the host it was
+ * seeded on. The persona domain is a BRAND fact, not an instance one
+ * ([#588](https://github.com/Omega-JS-Stack/omega/issues/588)): the seeder
+ * runs against the backend every instance shares, so an admin instance signs
+ * in at the brand host too, and reading its own url here would ask for an
+ * account nothing ever seeded. Falling back to the host this page is served
+ * from is the browser's own answer to the same question, and a brand with no
+ * URL at all seeds nothing.
  * @returns {string}
  */
 function personaDomain() {
+  const url = omega.config.brand?.url || omega.config.url || '';
+
   try {
-    return new URL(omega.config.brand?.url || '').hostname;
+    return new URL(url.includes('://') ? url : `https://${url}`).hostname.toLowerCase();
   } catch {
     return window.location.hostname;
   }

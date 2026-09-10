@@ -6,10 +6,15 @@
  * webhook). Product IDs are written back to omega.json5
  * (payment.products[id=…] — comment-preserving) and mirrored in state.
  *
+ * Coinbase Commerce (crypto, #642) reconciles NOTHING — no catalog, no webhook
+ * API — so it has no operations and no client; its whole surface here is the
+ * credential ask, gated on payment.providers.coinbase.enabled.
+ *
  * Auth is per provider, from config + the brand .env:
  *   - Stripe:    STRIPE_SECRET_KEY
  *   - PayPal:    payment.providers.paypal.clientId + PAYPAL_CLIENT_SECRET
  *   - Chargebee: payment.providers.chargebee.site + CHARGEBEE_API_KEY
+ *   - Coinbase:  COINBASE_COMMERCE_API_KEY (no public half at all)
  * When an enabled provider's credentials are missing, interactive runs
  * offer the setup flow (lib/provider-setup.js — dashboard browser open,
  * public keys land in omega.json5, secrets in the brand .env); otherwise
@@ -18,7 +23,7 @@
  * need OMEGA_WEBHOOK_KEY, which the setup MINTS through the shared contract
  * (it is OMEGA's own key, #635) rather than asking anyone for.
  *
- * --provider=stripe|paypal|chargebee narrows the run to one provider's
+ * --provider=stripe|paypal|chargebee|coinbase narrows the run to one provider's
  * operations (omega-manager's flag, unchanged).
  */
 const { serviceInputSpec } = require('../../config.js');
@@ -30,7 +35,7 @@ const { ChargebeeAPI } = require('./lib/chargebee-api.js');
 const { paidProducts } = require('./lib/payment-utils.js');
 const { providerSetupFlow } = require('./lib/provider-setup.js');
 
-const PROVIDERS = ['paypal', 'stripe', 'chargebee'];
+const PROVIDERS = ['paypal', 'stripe', 'chargebee', 'coinbase'];
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -52,7 +57,7 @@ module.exports.run = createServiceRunner({
 
     const providerFilter = context.options?.provider || null;
     if (providerFilter && !PROVIDERS.includes(providerFilter)) {
-      return { skip: true, reason: `unknown --provider "${providerFilter}" (paypal | stripe | chargebee)` };
+      return { skip: true, reason: `unknown --provider "${providerFilter}" (paypal | stripe | chargebee | coinbase)` };
     }
     const wanted = (name) => !providerFilter || providerFilter === name;
 
@@ -95,12 +100,30 @@ module.exports.run = createServiceRunner({
         || (site && process.env.CHARGEBEE_API_KEY ? new ChargebeeAPI(site, process.env.CHARGEBEE_API_KEY) : null);
     }
 
+    // Coinbase Commerce (crypto, [#642](https://github.com/Omega-JS-Stack/omega/issues/642))
+    // has NO operations and therefore no API client: a charge is created ad hoc
+    // at checkout, there is no product catalog to reconcile, and the webhook
+    // endpoint is set by hand in its dashboard (the API manages none). Its whole
+    // manage-time surface is the CREDENTIAL, so the shared setup contract asks
+    // for it right here (#608) and nothing below reads it.
+    //
+    // Gated on the provider being switched ON, because `enabled` IS the whole
+    // switch for this one (there is no public datum to gate on — the API key is
+    // the entire credential): a brand that never turned crypto on is never asked
+    // for a key it has no use for.
+    if (wanted('coinbase') && providers().coinbase?.enabled === true && !process.env.COINBASE_COMMERCE_API_KEY) {
+      await providerSetupFlow(context, 'coinbase');
+    }
+
     if (!stripeApi && !paypalApi && !chargebeeApi) {
       return {
         skip: true,
-        reason: providerFilter
-          ? `provider "${providerFilter}" not configured`
-          : 'no payment provider configured (STRIPE_SECRET_KEY, paypal.clientId + PAYPAL_CLIENT_SECRET, or chargebee.site + CHARGEBEE_API_KEY)',
+        reason: providerFilter === 'coinbase'
+          // Asked for above and that is all there is: crypto reconciles nothing
+          ? 'coinbase has nothing to reconcile — Coinbase Commerce has no product catalog and no webhook API; its key is the whole surface'
+          : providerFilter
+            ? `provider "${providerFilter}" not configured`
+            : 'no payment provider configured (STRIPE_SECRET_KEY, paypal.clientId + PAYPAL_CLIENT_SECRET, or chargebee.site + CHARGEBEE_API_KEY)',
       };
     }
 

@@ -5,7 +5,9 @@
  * Uses the test provider for initial trial, then manual webhook for trial-to-active
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: basic → trial → active paid via test provider',
   type: 'suite',
   timeout: 30000,
@@ -168,4 +170,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,0 +1,15 @@
+{%- comment -%}
+  The corpus tier-2 override's INCLUDE marker (cell `shape-theme-override`).
+
+  This shadows `core/_includes/core/body.html` — the smallest include the home
+  page renders — and it is deliberately NOT a copy of it. The include lane is
+  whole-file first-match-wins, so a clone would be 100 lines of framework
+  chrome drifting out of sync with the file it mirrors, for one marker. What
+  the framework's body chrome carries (the skip link, the three hidden alert
+  bars, the iframe-detection script) is presentation this fixture has no claim
+  on: no corpus invariant reads it, and the framework's own copy stays pinned
+  by its own tests. So the shadow is the marker plus the one piece of the
+  contract a page genuinely loses without it — the skip link.
+{%- endcomment -%}
+<a href="#main-content" class="visually-hidden-focusable">Skip to main content</a>
+<div data-corpus-override="include" hidden></div>

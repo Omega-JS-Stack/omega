@@ -20,7 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
-const { instanceIdFromDirName, resolveInstanceUrl } = require('@omega.js/config');
+const { brandRepo, brandRepoName, instanceIdFromDirName, resolveInstanceUrl } = require('@omega.js/config');
 const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
 
 const MAX_RETRIES = 3;
@@ -299,9 +299,10 @@ function checkWorkingTree(recorder, ctx) {
 
 /**
  * Homepage check — the deployed site answers on ITS instance's URL: the
- * instance entry's url (multi-instance targets), falling back to the brand
- * URL for the single-instance world. Deploy records key per instance too, so
- * a never-deployed admin instance nudges without failing a live main.
+ * instance entry's url (multi-instance targets), else the id AS a subdomain of
+ * the brand host (#588), falling back to the brand URL for the single-instance
+ * world. Deploy records key per instance too, so a never-deployed admin
+ * instance nudges without failing a live main.
  */
 async function checkHomepage(recorder, entry, ctx) {
   const instance = instanceIdFromDirName(entry.name, entry.target);
@@ -418,7 +419,9 @@ function checkGitHubActions(recorder, ctx) {
   const github = ctx.brandConfig.repo?.providers?.github || {};
   if (!github.org) return;
 
-  const repo = `${github.org}/${github.repo || ctx.brandId}`;
+  // BOTH halves from the one derivation (an `owner/name` slug owns itself); the
+  // service's own brand id stands in for a config that names no brand.
+  const repo = brandRepo(ctx.brandConfig).repo || `${github.org}/${brandRepoName({ brand: { id: ctx.brandId } })}`;
 
   if (ctx.dryRun) {
     recorder.would(`gh run list --repo ${repo}`);

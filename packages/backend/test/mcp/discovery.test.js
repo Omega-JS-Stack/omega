@@ -5,8 +5,9 @@
  * Run: npx omega test backend:mcp/discovery
  */
 const fetch = require('wonderful-fetch');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'MCP OAuth discovery endpoints',
   type: 'group',
 
@@ -48,4 +49,4 @@ module.exports = {
       },
     },
   ],
-};
+});

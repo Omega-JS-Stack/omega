@@ -1,14 +1,14 @@
 // Build-layer pin for the background SW's auth-emulator gate (#46).
 //
 // The SW connects Firebase Auth to the local emulator ONLY on a testing build.
-// Its whole signal is what the package task BAKED into build.js: a service
-// worker has no `process.env`, so `Manager.isTesting()` resolves from
+// Its whole signal is what the bundle task BAKED into OMEGA_BUILD_JSON: a
+// service worker has no `process.env`, so `Manager.isTesting()` resolves from
 // `config.omega.environment` (mode-helpers step 1). This suite drives that for
-// real — the actual generateBuildJs under each build mode, feeding the actual
+// real — the actual composeBuildJson under each build mode, feeding the actual
 // snapshot into the actual mode-helpers — and then pins that the emulator call
 // sits behind exactly that check. background.js itself is a browser-context ES
-// module (importScripts at module scope), so the call site is pinned by source,
-// same model as cache-warming.test.js / verts-binding.test.js.
+// module, so the call site is pinned by source, same model as
+// cache-warming.test.js / verts-binding.test.js.
 //
 // In a real SW `chrome.runtime.getManifest()` also answers (packed → production,
 // unpacked → development); testing still wins because the config check comes first.
@@ -18,11 +18,12 @@ const fs   = require('fs');
 const os   = require('os');
 
 const SRC       = path.join(__dirname, '..', '..', '..');
-const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'package.js');
+const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'bundle.js');
 const helpers   = require(path.join(SRC, 'utils', 'mode-helpers.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const BACKGROUND = fs.readFileSync(path.join(SRC, 'background.js'), 'utf8');
 
-// Bake a real build.json with the given build mode, and hand back its `config`
+// Compose a real snapshot under the given build mode and hand back its `config`
 // blob — exactly what the SW reads out of OMEGA_BUILD_JSON.
 async function bakeConfig(mode) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-emulator-gate-'));
@@ -44,8 +45,7 @@ async function bakeConfig(mode) {
 
   try {
     process.chdir(tmp);
-    await require(TASK_PATH).generateBuildJs(tmp);
-    return JSON.parse(fs.readFileSync(path.join(tmp, 'build.json'), 'utf8')).config;
+    return (await require(TASK_PATH).composeBuildJson()).config;
   } finally {
     process.chdir(oldCwd);
     for (const [k, v] of Object.entries(originals)) {
@@ -74,7 +74,7 @@ function isTestingInServiceWorker(config) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'background auth-emulator gate — testing builds only',
@@ -110,9 +110,9 @@ module.exports = {
         ctx.expect(calls.length).toBe(1);
         ctx.expect(/if \(this\.isTesting\(\)\) \{\s*const port = this\.config\?\.dev\?\.ports\?\.auth \|\| AUTH_EMULATOR_PORT;\s*this\.authLogger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{port\}`/.test(BACKGROUND)).toBe(true);
         // The baked map first (#300 — a SW can't read a bumped OMEGA_AUTH_PORT,
-        // so build.js carries it), the classic port as the fallback
+        // so the bake carries it), the classic port as the fallback
         ctx.expect(BACKGROUND).toMatch(/const AUTH_EMULATOR_PORT = 9099;/);
       },
     },
   ],
-};
+});

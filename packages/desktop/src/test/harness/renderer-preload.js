@@ -80,7 +80,7 @@ try {
 
 // Wire the renderer Manager's DOM enhancements (FontAwesome auto-render +
 // Bootstrap tooltip auto-init) against THIS document. In production these run
-// in the page world (the consumer's webpack bundle); here the preload world
+// in the page world (the consumer's esbuild bundle); here the preload world
 // stands in — the DOM is shared, so injected SVGs / tooltip tips are visible
 // to page-world test suites. The Manager reads `window.desktop.ipc` which only
 // exists in the page world, so hand it the preload's ipcRenderer directly.

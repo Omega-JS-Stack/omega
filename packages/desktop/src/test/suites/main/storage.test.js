@@ -2,7 +2,9 @@
 //
 // ctx.manager is a fully-initialized @omega.js/desktop Manager (skipWindowCreation: true).
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'storage (main)',
@@ -84,4 +86,4 @@ module.exports = {
       },
     },
   ],
-};
+});

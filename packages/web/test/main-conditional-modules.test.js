@@ -42,6 +42,8 @@ function recorderModule(id) {
     `const record = () => globalThis.__loaded.push(${JSON.stringify(id)});`,
     `export default record;`,
     `export const setupPasswordToggle = record;`,
+    `export const setupAlertDismiss = record;`,
+    `export const setupCopy = record;`,
     `export const configureAnalytics = record;`,
   ].join('\n');
 }

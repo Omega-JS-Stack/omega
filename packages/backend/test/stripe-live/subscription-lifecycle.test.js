@@ -27,9 +27,11 @@
  *
  * Run: npx omega test --lane=stripe-live
  */
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const PERSONA = 'basic';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Stripe LIVE lane: real test-mode events through the real webhook door',
   type: 'suite',
   timeout: 180000,
@@ -60,7 +62,7 @@ module.exports = {
         // between a config price and a checkout, and it matches on interval and
         // amount to the cent. The lane created these fixtures on the way in, so
         // a failure here means the catalogue and the account disagree.
-        const StripeLib = require('../../src/manager/libraries/payment/providers/stripe.js');
+        const StripeLib = require('../../dist/manager/libraries/payment/providers/stripe.js');
         const products = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.prices && !p.archived);
 
         assert.ok(products.length > 0, 'the brand configures at least one paid product to resolve');
@@ -87,7 +89,7 @@ module.exports = {
           skip('the stripe-live lane is not open');
         }
 
-        const { trigger } = require('../../src/cli/commands/test-lanes/stripe-live.js');
+        const { trigger } = require('../../dist/cli/commands/test-lanes/stripe-live.js');
         const uid = accounts[PERSONA].uid;
         const before = await firestore.collection('payments-webhooks').where('owner', '==', uid).get();
         const seen = new Set(before.docs.map((d) => d.id));
@@ -96,8 +98,7 @@ module.exports = {
         // pipeline refuses an event it cannot attribute ([#399]) — so the
         // trigger puts one on, which is exactly what a real checkout does.
         await trigger({
-          stripePath: process.env.STRIPE_CLI_PATH,
-          apiKey: process.env.STRIPE_SECRET_KEY_DEV || process.env.STRIPE_SECRET_KEY,
+          apiKey: process.env.STRIPE_SECRET_KEY,
           event: 'customer.subscription.created',
           overrides: [`subscription:metadata.uid=${uid}`],
         });
@@ -137,4 +138,4 @@ module.exports = {
       },
     },
   ],
-};
+});

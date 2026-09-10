@@ -40,7 +40,9 @@ const AuthCommand = require('./commands/auth');
 const LogsCommand = require('./commands/logs');
 const UpdateCommand = require('./commands/update');
 const McpCommand = require('./commands/mcp');
+const MigrateCommand = require('./commands/migrate');
 const MigrateRulesCommand = require('./commands/migrate-rules');
+const MigrateMarkersCommand = require('./commands/migrate-markers');
 
 // Returned by an args-taking command's match() when the command was named but no
 // argument was given — the branch that must name the real spellings instead of
@@ -87,7 +89,7 @@ function matchCommand(command, options) {
 const COMMANDS = [
   {
     name: 'version',
-    aliases: ['v', '-v', '-version'],
+    aliases: ['v', '-v', '--version'],
     description: 'print the framework version',
     run: (self) => new VersionCommand(self).execute(),
   },
@@ -115,7 +117,7 @@ const COMMANDS = [
   },
   {
     name: 'install',
-    aliases: ['i'],
+    aliases: ['-i', 'i', '--install'],
     args: { local: ['dev', 'development'], live: ['prod', 'production'] },
     description: 'switch the installed framework copy',
     run: (self, mode, command) => {
@@ -196,7 +198,7 @@ const COMMANDS = [
   },
   {
     name: 'update',
-    aliases: ['outdated', 'out'],
+    aliases: ['-u', '--update', 'outdated', 'out'],
     description: 'dependency freshness report',
     run: (self) => new UpdateCommand(self).execute(),
   },
@@ -206,6 +208,14 @@ const COMMANDS = [
     run: (self) => new McpCommand(self).execute(),
   },
   {
+    // The ported-project REPORT: today the dependency-resolution scan (#600),
+    // shared with @omega.js/web's own migrate through devkit. It changes
+    // nothing, which is what separates it from the two conversions below.
+    name: 'migrate',
+    description: 'report what a ported backend still owes: bare requires of packages it never declared',
+    run: (self) => new MigrateCommand(self).execute(),
+  },
+  {
     // The one-time move onto the compiled rules model — run ALONE and
     // deliberately, because it changes what the live project enforces. Setup
     // defers to it instead of healing the tree on the way to a deploy (#522).
@@ -213,6 +223,15 @@ const COMMANDS = [
     aliases: ['migrate:firestore-rules'],
     description: 'migrate legacy firestore.rules onto the compiled model (changes live posture)',
     run: (self) => new MigrateRulesCommand(self).execute(),
+  },
+  {
+    // The one-time conversion of the PRE-FAMILY marker formats a tree carried
+    // over from BEM still holds. Evergreen verbs speak only the family grammar,
+    // so they detect those shapes and point here instead of converting
+    // ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
+    name: 'migrate:markers',
+    description: 'convert pre-family marker formats ({{ backend-manager }}, # BEM>>>, ///---…---///) to the family grammar',
+    run: (self) => new MigrateMarkersCommand(self).execute(),
   },
 ];
 

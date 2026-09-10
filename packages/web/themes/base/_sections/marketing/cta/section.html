@@ -16,7 +16,7 @@
           {% iftruthy args.primary_button.text %}
             <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
               {{ args.primary_button.text }}
-              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+              <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
             </a>
           {% endiftruthy %}
           {% iftruthy args.command %}
@@ -29,7 +29,7 @@
             {% if args.secondary_button.nudge %}
               <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
                 {{ args.secondary_button.text }}
-                <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+                <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
               </a>
             {% else %}
               <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">

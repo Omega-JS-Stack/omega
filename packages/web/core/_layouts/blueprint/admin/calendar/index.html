@@ -6,38 +6,6 @@ meta:
   description: "Schedule and manage marketing campaigns: emails and push notifications"
   breadcrumb: "Calendar"
 
-prerender_icons:
-  - name: "chevron-left"
-  - name: "chevron-right"
-  - name: "plus"
-  - name: "pen"
-  - name: "trash"
-  - name: "clock"
-  - name: "envelope"
-  - name: "bell"
-  - name: "paper-plane"
-  - name: "calendar-day"
-  - name: "calendar-week"
-  - name: "calendar"
-  - name: "table-cells-large"
-  - name: "mobile"
-  - name: "circle-check"
-  - name: "triangle-exclamation"
-  - name: "xmark"
-  - name: "rotate-right"
-  - name: "eye"
-  - name: "link"
-  - name: "tags"
-  - name: "users"
-  - name: "bullhorn"
-  - name: "code"
-  - name: "sliders"
-  - name: "arrow-up-right-from-square"
-  - name: "repeat"
-  - name: "wifi"
-  - name: "battery-full"
-  - name: "table-list"
-  - name: "vial"
 config:
   theme:
     header:
@@ -74,7 +42,7 @@ config:
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="campaign-modal-title">
-          {% omega_icon "plus", "fa-md me-2" %}
+          <i class="fa-solid fa-plus fa-md me-2"></i>
           <span id="campaign-modal-title-text">Create campaign</span>
           <small class="text-muted fw-normal ms-2 d-none" id="campaign-modal-id" style="font-size: 0.6rem"></small>
         </h5>
@@ -85,21 +53,21 @@ config:
 
           <!-- Campaign Type -->
           <h6 class="mb-3">
-            {% omega_icon "bullhorn", "me-2" %}
+            <i class="fa-solid fa-bullhorn me-2"></i>
             Campaign type
           </h6>
           <div class="row mb-4">
             <div class="col-6">
               <input type="radio" class="btn-check" name="campaign.type" id="campaign-type-email" value="email" checked autocomplete="off">
               <label class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center" for="campaign-type-email">
-                {% omega_icon "envelope", "fa-sm me-2" %}
+                <i class="fa-solid fa-envelope fa-sm me-2"></i>
                 Email
               </label>
             </div>
             <div class="col-6">
               <input type="radio" class="btn-check" name="campaign.type" id="campaign-type-push" value="push" autocomplete="off">
               <label class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center" for="campaign-type-push">
-                {% omega_icon "bell", "fa-sm me-2" %}
+                <i class="fa-solid fa-bell fa-sm me-2"></i>
                 Push notification
               </label>
             </div>
@@ -109,12 +77,12 @@ config:
           <ul class="nav nav-tabs mb-3" id="campaign-content-tabs" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active" id="tab-edit" data-bs-toggle="tab" data-bs-target="#panel-edit" type="button" role="tab">
-                {% omega_icon "pen", "fa-sm me-1" %} Edit
+                <i class="fa-solid fa-pen fa-sm me-1"></i> Edit
               </button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link" id="tab-preview" data-bs-toggle="tab" data-bs-target="#panel-preview" type="button" role="tab">
-                {% omega_icon "eye", "fa-sm me-1" %} Preview
+                <i class="fa-solid fa-eye fa-sm me-1"></i> Preview
               </button>
             </li>
           </ul>
@@ -244,7 +212,7 @@ config:
 
             <div class="mb-3">
               <label for="campaign-push-tags" class="form-label">
-                {% omega_icon "tags", "fa-sm me-1" %}
+                <i class="fa-solid fa-tags fa-sm me-1"></i>
                 Filter by tags
                 <small class="text-muted fw-normal ms-1">(comma-separated)</small>
               </label>
@@ -296,7 +264,7 @@ config:
 
           <!-- Schedule -->
           <h6 class="mb-3 mt-4">
-            {% omega_icon "clock", "me-2" %}
+            <i class="fa-solid fa-clock me-2"></i>
             Schedule
             <small class="text-muted fw-normal ms-1">(UTC)</small>
           </h6>
@@ -327,7 +295,7 @@ config:
             </div>
             <div class="col-md-3 d-flex align-items-end">
               <button type="button" class="btn btn-md btn-outline-primary w-100" id="btn-send-now">
-                {% omega_icon "clock", "fa-sm me-1" %}
+                <i class="fa-solid fa-clock fa-sm me-1"></i>
                 Set now
               </button>
             </div>
@@ -338,7 +306,7 @@ config:
 
           <!-- Recurrence -->
           <h6 class="mb-3 mt-4">
-            {% omega_icon "repeat", "me-2" %}
+            <i class="fa-solid fa-repeat me-2"></i>
             Recurrence
             <small class="text-muted fw-normal ms-1">(optional)</small>
           </h6>
@@ -441,7 +409,7 @@ config:
 
           <!-- Targeting -->
           <h6 class="mb-3 mt-4">
-            {% omega_icon "users", "me-2" %}
+            <i class="fa-solid fa-users me-2"></i>
             Targeting
           </h6>
 
@@ -521,7 +489,7 @@ config:
           <!-- Advanced Settings (collapsible) -->
           <h6 class="mb-3 mt-4">
             <a class="text-decoration-none" data-bs-toggle="collapse" href="#advanced-settings" role="button" aria-expanded="false">
-              {% omega_icon "sliders", "me-2" %}
+              <i class="fa-solid fa-sliders me-2"></i>
               Advanced settings
               <small class="text-muted fw-normal ms-1">(optional)</small>
             </a>
@@ -575,17 +543,17 @@ config:
           <div class="modal-footer d-flex justify-content-between">
             <div>
               <button type="submit" name="action" value="delete" formnovalidate class="btn btn-outline-danger d-none" id="btn-delete-campaign">
-                {% omega_icon "trash", "fa-sm me-1" %}
+                <i class="fa-solid fa-trash fa-sm me-1"></i>
                 <span class="button-text">Delete</span>
               </button>
             </div>
             <div class="d-flex gap-2">
               <button type="submit" name="action" value="test" formnovalidate class="btn btn-outline-warning" id="btn-send-test">
-                {% omega_icon "vial", "fa-sm me-1" %}
+                <i class="fa-solid fa-vial fa-sm me-1"></i>
                 <span class="button-text">Send test</span>
               </button>
               <button type="submit" name="action" value="save" class="btn btn-adaptive" id="btn-save-campaign">
-                {% omega_icon "paper-plane", "fa-sm me-1" %}
+                <i class="fa-solid fa-paper-plane fa-sm me-1"></i>
                 <span class="button-text">Save campaign</span>
               </button>
             </div>
@@ -602,7 +570,7 @@ config:
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="campaign-results-title">
-          {% omega_icon "eye", "fa-md me-2" %}
+          <i class="fa-solid fa-eye fa-md me-2"></i>
           <span id="campaign-results-title-text">Campaign details</span>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -612,7 +580,7 @@ config:
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-danger d-none" id="btn-retry-campaign">
-          {% omega_icon "rotate-right", "fa-sm me-1" %}
+          <i class="fa-solid fa-rotate-right fa-sm me-1"></i>
           Retry (Create new)
         </button>
         <button type="button" class="btn btn-outline-adaptive" data-bs-dismiss="modal">Close</button>

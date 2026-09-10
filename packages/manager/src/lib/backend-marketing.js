@@ -12,7 +12,7 @@
  * only writer is the legacy-contact import script, which hasn't ported —
  * the field rides that port.
  */
-const { FIELDS, SEGMENTS, GROUP_KEYS } = require('@omega.js/backend/dist/manager/libraries/email/constants.js');
+const { FIELDS, SEGMENTS, GROUP_KEYS, fieldsForProvider } = require('@omega.js/backend/dist/manager/libraries/email/constants.js');
 
 // Array shapes for handlers that iterate
 const BEM_FIELDS = Object.entries(FIELDS).map(([name, field]) => ({
@@ -30,9 +30,15 @@ const BEM_SEGMENTS = Object.entries(SEGMENTS).map(([name, segment]) => ({
   skip: segment.skip || [],
 }));
 
-/** Fields a given provider should provision (honors each field's skip list). */
+const BEM_FIELDS_BY_NAME = Object.fromEntries(BEM_FIELDS.map((field) => [field.name, field]));
+
+/**
+ * Fields a given provider should provision — @omega.js/backend's OWN view of its
+ * catalog (#695), so what OMEGA creates and what the backend's contact sync
+ * writes can never be two different lists.
+ */
 function fieldsFor(provider) {
-  return BEM_FIELDS.filter((field) => !field.skip.includes(provider));
+  return fieldsForProvider(provider).map((name) => BEM_FIELDS_BY_NAME[name]);
 }
 
 /** Segments a given provider should provision (honors each segment's skip list). */

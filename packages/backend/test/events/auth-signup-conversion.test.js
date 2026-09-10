@@ -22,7 +22,8 @@
  *
  * Run: npx omega test framework:events/auth-signup-conversion
  */
-const onCreate = require('../../src/manager/events/auth/on-create.js');
+const onCreate = require('../../dist/manager/events/auth/on-create.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const EVENT_CONTEXT = {
   eventType: 'providers/firebase.auth/eventTypes/user.create',
@@ -83,7 +84,7 @@ async function runHandler({ Manager, user }) {
   return { calls: calls, delivery: delivery };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'auth:on-create writes the doc and fires no conversion (the post-auth request owns sign_up)',
   type: 'group',
   timeout: 30000,
@@ -137,4 +138,4 @@ module.exports = {
       },
     },
   ],
-};
+});

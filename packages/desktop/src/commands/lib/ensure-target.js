@@ -42,7 +42,7 @@ const package = Manager.getPackage('main');
 
 /**
  * Sync the consumer manifest: the omega verb scripts, the npm-private latch,
- * and the electron main entry (the gulp webpack task's output bundle).
+ * and the electron main entry (the gulp `bundle` task's output bundle).
  * Identical content is not a write (#590).
  */
 function setupScripts(projectDir, result) {
@@ -61,7 +61,7 @@ function setupScripts(projectDir, result) {
   project.private = true;
 
   // Point electron at the built main bundle.
-  // The gulp `webpack` task emits dist/main.bundle.js; the consumer's src/main.js is the *source* entry.
+  // The gulp `bundle` task emits dist/main.bundle.js; the consumer's src/main.js is the *source* entry.
   project.main = 'dist/main.bundle.js';
 
   // Save the project — npm's own shape, trailing newline included. `jetpack.write`

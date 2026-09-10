@@ -6,11 +6,13 @@
 // uses it), and anything the framework does not declare is untouched and fails with
 // the bundler's normal resolution error.
 //
-// @omega.js/web wires its esbuild resolve hook around this reader
-// (packages/web/src/assets.js). Desktop and extension deliver the same contract
-// without it: their webpack configs list the FRAMEWORK's node_modules before the
-// consumer's, so the framework's copy wins for every name it declares (and, the
-// accepted trade, for the transitives it carries) — see docs/devkit/index.md and #87.
+// `bundle.js` wires the esbuild resolve hook around this reader, so every
+// framework bundling through it gets the contract (it was @omega.js/web's own
+// hook in packages/web/src/assets.js until #736). @omega.js/desktop bundles
+// through the same hook since #737, @omega.js/extension since #738 — where it
+// replaced webpack's `resolve.modules` ordering, which also won for the
+// transitives the framework merely carries, a trade this reader does NOT make.
+// See docs/devkit/index.md and #87.
 
 const fs = require('fs');
 const path = require('path');

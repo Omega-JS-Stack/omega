@@ -14,36 +14,40 @@ them — an unauthored rail is the bare grid it has always been. {% endcomment %
   {% component "heading/section-head", superheadline: args.facts_head.superheadline.text, headline: args.facts_head.headline, headline_accent: args.facts_head.headline_accent, sub: args.facts_head.subheadline %}
 {% endcapture %}
 {% assign facts_head = facts_head | strip %}
-<section class="omega-dotgrid{% if args.image != blank %} omega-photo-lead-band{% endif %}" data-omega-dotfield>
+{% comment %} #467 (after #749): about/hero IS the about page's first viewport,
+so the whole band paints with the document — data-omega-first-paint on the
+section, and no reveal attributes or stagger container inside it. The bands
+below keep the scroll lane. {% endcomment %}
+<section class="omega-dotgrid{% if args.image != blank %} omega-photo-lead-band{% endif %}" data-omega-first-paint data-omega-dotfield>
   <div class="container">
     {% if args.image != blank %}
       <!-- Photo lead: the picture opens the page, the words ride it -->
-      <figure class="omega-photo-lead" data-omega-reveal>
+      <figure class="omega-photo-lead">
         <img class="omega-photo-lead__img" src="{{ args.placeholder }}" data-lazy="@src {{ args.image }}" alt="{{ args.image_alt }}"/>
-        <figcaption class="omega-photo-lead__words" data-omega-reveal-stagger="90">
-          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description, sub_class: "omega-photo-lead__sub" %}
+        <figcaption class="omega-photo-lead__words">
+          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description, sub_class: "omega-photo-lead__sub", first_paint: true %}
         </figcaption>
       </figure>
 
       {% if args.facts %}
         {% iftruthy facts_head %}
-          <div class="omega-section-head mt-5" data-omega-reveal>
+          <div class="omega-section-head mt-5">
             {{ facts_head }}
           </div>
         {% endiftruthy %}
-        <div class="omega-facts omega-photo-lead__facts" style="--omega-facts-cols: 4;" data-omega-reveal>
+        <div class="omega-facts omega-photo-lead__facts" style="--omega-facts-cols: 4;">
           {{ facts_rail }}
         </div>
       {% endif %}
     {% else %}
       <div class="omega-hero-split">
-        <div data-omega-reveal-stagger="90">
-          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description %}
+        <div>
+          {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description, first_paint: true %}
         </div>
 
         {% if args.facts %}
           {% iftruthy facts_head %}
-            <div data-omega-reveal="left">
+            <div>
               <div class="omega-section-head mb-4">
                 {{ facts_head }}
               </div>
@@ -53,7 +57,7 @@ them — an unauthored rail is the bare grid it has always been. {% endcomment %
             </div>
           {% endiftruthy %}
           {% iffalsy facts_head %}
-            <div class="omega-facts" style="--omega-facts-cols: 2;" data-omega-reveal="left">
+            <div class="omega-facts" style="--omega-facts-cols: 2;">
               {{ facts_rail }}
             </div>
           {% endiffalsy %}

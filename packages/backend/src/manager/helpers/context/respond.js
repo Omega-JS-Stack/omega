@@ -14,6 +14,8 @@
  * faults (4xx) never do. No per-call flags.
  */
 
+const { redactResponseForLog } = require('../middleware.js');
+
 const methods = {
   respond(response, options) {
     const self = this;
@@ -79,7 +81,7 @@ const methods = {
     }
 
     if (options.log) {
-      self.log(`Sending response (${options.code}):`, JSON.stringify(response));
+      self.log(`Sending response (${options.code}):`, JSON.stringify(redactResponseForLog(response)));
     }
 
     // If it is an object, send as json
@@ -174,7 +176,7 @@ function _sendError(self, e, options) {
     self.clearLogPrefix();
 
     // Log
-    self.log(`Sending response (${options.code}):`, JSON.stringify(sendable));
+    self.log(`Sending response (${options.code}):`, JSON.stringify(redactResponseForLog(sendable)));
 
     // Send response
     res
@@ -193,9 +195,13 @@ function attachHeaderProperties(self, options, error) {
   const headers = {
     code: options.code,
     tag: self.tag,
+    // What the counter already KNOWS — never a read of its own. The counter is
+    // lazy ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)), so a
+    // route that counted nothing reports nothing, and this header builder
+    // stays synchronous.
     usage: {
-      current: self.usage ? self.usage.getUsage() : {},
-      limits: self.usage ? self.usage.getLimit() : {},
+      current: self.usage ? self.usage.counters() : {},
+      limits: self.usage ? self.usage.limits() : {},
     },
     schema: self.schema || {},
     additional: options.additional || {},

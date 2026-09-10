@@ -15,12 +15,13 @@
  */
 const { buildUser, callHandler, recordingResponse } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/plan/post.js');
+const handler = require('../../../dist/manager/routes/payments/plan/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDERS = ['stripe', 'chargebee', 'paypal', 'test'];
 
 function providerModule(name) {
-  return require(`../../../src/manager/routes/payments/plan/providers/${name}.js`);
+  return require(`../../../dist/manager/routes/payments/plan/providers/${name}.js`);
 }
 
 // Two distinct paid subscription products from the brand's own config — the
@@ -99,7 +100,7 @@ function frequencyOf(product) {
   return Object.keys(product.prices)[0];
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment plan endpoint: guards + provider capability gate',
   type: 'group',
   timeout: 15000,
@@ -363,4 +364,4 @@ module.exports = {
       },
     },
   ],
-};
+});

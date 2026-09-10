@@ -13,11 +13,12 @@
  *
  * Run: npx omega test backend:cli/target
  */
-const { resolveTarget } = require('../../src/cli/utils/target.js');
+const { resolveTarget } = require('../../dist/cli/utils/target.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const FIREBASE_INIT_PATH = require.resolve('../../src/cli/commands/firebase-init.js');
-const FIRESTORE_PATH = require.resolve('../../src/cli/commands/firestore.js');
-const AUTH_PATH = require.resolve('../../src/cli/commands/auth.js');
+const FIREBASE_INIT_PATH = require.resolve('../../dist/cli/commands/firebase-init.js');
+const FIRESTORE_PATH = require.resolve('../../dist/cli/commands/firestore.js');
+const AUTH_PATH = require.resolve('../../dist/cli/commands/auth.js');
 
 // A firebase-admin stand-in: the writes the subcommands make, recorded.
 function recordingAdmin() {
@@ -89,7 +90,7 @@ async function runSubcommand(commandPath, args, argv) {
   return { emulator: asked[0]?.emulator, output: printed.join('\n'), writes: admin.writes };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'CLI target selection — emulator by default, live only with --production',
   type: 'group',
 
@@ -178,4 +179,4 @@ module.exports = {
       },
     },
   ],
-};
+});

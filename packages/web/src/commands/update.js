@@ -8,7 +8,7 @@
 const Logger = require('@omega.js/devkit/logger');
 const { runUpdate } = require('@omega.js/devkit/update');
 
-const logger = new Logger('omega:update');
+const logger = new Logger('update');
 
 module.exports = async function (options) {
   await runUpdate({

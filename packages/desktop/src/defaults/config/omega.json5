@@ -32,8 +32,8 @@
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret
   // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omega.js/backend convention) so
-  // it's not committed. Webpack's DefinePlugin bakes the secret into packaged
-  // builds at build time so production apps don't need .env at runtime.
+  // it's not committed. The build's esbuild `define` bakes the secret into
+  // packaged builds at build time so production apps don't need .env at runtime.
   // client_id / user_id are uuidv5(deviceId/firebaseUid, projectId-namespace)
   // so the same human gets unified events across desktop + web + backend.
   analytics: {
@@ -233,24 +233,18 @@
       //   any other → { width: 800,  height: 600, hideOnClose: false, view: name   }
       // Add a `windows: {}` block here only if you want to override defaults persistently.
 
-      // Releases — public repo where built artifacts (and the auto-update feed) live.
+      // Releases: the ONE public repo where built artifacts (and the auto-update feed) live.
       // The app repo can stay private; this one MUST be public for unauthenticated downloads + auto-updates.
-      // owner defaults to the app repo's owner, so a single line `repo: 'update-server'` is usually all you need.
-      // setup auto-creates this repo if it doesn't exist (uses GH_TOKEN).
+      // Both keys default: repo is `<brand.id>-releases` and owner is the brand repo's owner, so the whole
+      // block can stay empty (`releases: {}`) and still address a repo.
+      // `npx omega deploy`'s precheck auto-creates it if it doesn't exist (uses GH_TOKEN).
+      // Artifact names carry NO version (MyApp-mac-universal.dmg), so this repo also serves the marketing
+      // site: https://github.com/<owner>/<repo>/releases/latest/download/<asset> never changes across
+      // versions, and the website derives its download buttons from it. See docs/releasing.md.
       releases: {
         enabled: true,
-        owner:   null,              // null = use app repo owner
-        repo:    'update-server',
-      },
-      // Downloads — fixed-name mirror release. After every successful release, @omega.js/desktop re-uploads the
-      // versioned artifacts (MyApp-1.0.1.dmg) to a stable tag with stable names (MyApp-mac-arm64.dmg).
-      // Marketing site links to https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>
-      // and that link never changes across versions.
-      downloads: {
-        enabled: true,
-        owner:   null,              // null = use app repo owner
-        repo:    'download-server',
-        tag:     'installer',
+        // owner: null,             // null = the brand repo's owner
+        // repo:  'myapp-releases', // default: `<brand.id>-releases`
       },
       // Deep links: scheme is automatically `<brand.id>://...`. Built-in routes:
       //   auth/token  → @omega.js/client auth token handoff

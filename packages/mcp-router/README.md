@@ -6,6 +6,8 @@ An MCP client that declares five servers pays for five: every one is launched, e
 
 Tools surface to the client as `<upstream>__<tool>` — inside Claude Code that reads `mcp__mcp-router__chrome-devtools__click`.
 
+A child is as short-lived as its use: it starts on the first call that needs it, and it is closed once nothing has called it for 15 minutes — with everything it started, not just the pid the router holds — after which the next call spawns a fresh one. A call in flight is never closed under, and a call that lands while a close is running is served by a fresh child rather than failing. When the host goes away, by a signal or simply by closing the router's stdin, the router closes every upstream, waits out the grace that kills what they started, and exits.
+
 The omega Claude plugin launches the router straight from the monorepo checkout it ships in, and on a bare clone the bin installs its own dependencies on first launch — no install step for a user, no publish for a dev editing the checkout.
 
 ## What ships with it
@@ -23,7 +25,7 @@ An `on-demand` upstream stays invisible until a session asks for it — that is 
 
 ## The meta-tools (per session, from inside the client)
 
-- `router__list_upstreams` — every upstream, its on-disk enabled state, whether it is locked, whether it is active in this session, and its cached tool count.
+- `router__list_upstreams` — every upstream, its on-disk enabled state, whether it is locked, whether it is active in this session, its cached tool count, and — when a child is running — that child's `pid` and how long it has been idle (`idle_ms`).
 - `router__enable_upstream {name, env?}` — activate for THIS session, unless the upstream is locked. `env` sets vars on the child (passing it restarts a running child so they take effect).
 - `router__disable_upstream {name}` — deactivate and stop the child. Disk is untouched.
 - `router__refresh_upstream {name}` — spawn once, re-read the tool list, and cache it.
@@ -79,6 +81,7 @@ Registering the router with a client is not this CLI's job: the omega Claude plu
 | `MCP_ROUTER_SERVERS_DIR` | Overrides the overlay servers dir (tests, power users) |
 | `MCP_ROUTER_ENV_FILE` | Overrides the overlay `.env` path |
 | `MCP_ROUTER_SPAWN_TIMEOUT_MS` | How long a cold spawn (or either refresh surface's one-shot: `router__refresh_upstream` and `omega-mcp refresh` share one helper) gets to finish the MCP handshake before it is given up on (default `30000`) |
+| `MCP_ROUTER_IDLE_MS` | How long an upstream's child may sit with no call before the router closes it; the sweep runs at a quarter of it, floored at a second (default `900000`) |
 
 ### Placeholders
 

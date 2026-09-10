@@ -18,13 +18,16 @@
  *   firestore.rules         the brand's rules SOURCE half (the stage compiles it)
  *   database.rules.json     the emulator dies ENOENT without it
  *   package.json engines    the FRAMEWORK's pinned Cloud Functions runtime
+ *   package.json scripts    the standard verb scripts, rewritten to their
+ *                           defaults (#689 — the framework owns those keys)
  *   src/defaults/**         the defaults tree (copy-if-missing; AGENTS.md and
  *                           .gitignore live-sync their Default section)
  *
- * Everything here is copy-if-missing or merge-in-place: a consumer file is
- * never clobbered, and a run that changes nothing writes nothing and says
- * nothing. Anything that needs the network is NOT here — that belongs to the
- * verb that needs it.
+ * Everything here is copy-if-missing or merge-in-place — the one exception is
+ * the standard scripts above, which the framework owns outright in every
+ * target that isn't a custom server. A run that changes nothing writes nothing
+ * and says nothing. Anything that needs the network is NOT here — that belongs
+ * to the verb that needs it.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -34,7 +37,7 @@ const omegaConfig = require('@omega.js/config');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
-const { isCustomProject, FIREBASE_ONLY_SCAFFOLD } = require('./project-type');
+const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD } = require('./project-type');
 
 // The framework's own manifest — its `omega.functionsRuntime` is the pinned
 // Cloud Functions runtime every consumer app inherits (SSOT with the .nvmrc
@@ -180,12 +183,24 @@ function scaffoldConfigs(projectDir, result) {
 }
 
 /**
- * Stamp engines.node on the TARGET manifest — the stage step carries it into
- * the derived dist/package.json (Cloud Functions runtime detection). Derived
- * from the FRAMEWORK's pinned runtime, never the ambient node: a scaffold must
- * produce the same app under any shell (cp195 journey catch — an ambient-24
- * run stamped 24 against the v22/* .nvmrc and boot died on the Manager.init
- * version mismatch). A consumer-authored value is never overwritten.
+ * Sync the TARGET manifest — the engines pin and the standard verb scripts.
+ *
+ * engines.node: the stage step carries it into the derived dist/package.json
+ * (Cloud Functions runtime detection). Derived from the FRAMEWORK's pinned
+ * runtime, never the ambient node: a scaffold must produce the same app under
+ * any shell (cp195 journey catch — an ambient-24 run stamped 24 against the
+ * v22/* .nvmrc and boot died on the Manager.init version mismatch). A
+ * consumer-authored value is never overwritten.
+ *
+ * scripts: the opposite policy, and the same one the three sibling frameworks
+ * already run ([#689](https://github.com/Omega-JS-Stack/omega/issues/689)) —
+ * every key this framework declares is FRAMEWORK-owned and takes its default
+ * on every verb run, so an edited standard script heals instead of drifting
+ * (hook points are the customization seam). Keys the framework never declares
+ * are the consumer's own and are never touched; a custom-server backend keeps
+ * the ones its mode refuses (frameworkOwnedScripts is the one home of that).
+ *
+ * Identical content is not a write.
  *
  * @param {string} projectDir - The target root.
  * @param {{ written: string[], changed: string[] }} result - Collector.
@@ -193,14 +208,29 @@ function scaffoldConfigs(projectDir, result) {
 function scaffoldPackageJson(projectDir, result) {
   const manifestPath = path.join(projectDir, 'package.json');
   const manifest = loadJSON(manifestPath);
+  const changes = [];
 
-  if (manifest.engines && manifest.engines.node) return;
+  if (!(manifest.engines && manifest.engines.node)) {
+    const nodeVersion = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
+    manifest.engines = manifest.engines || {};
+    manifest.engines.node = nodeVersion;
+    changes.push(`engines.node = ${nodeVersion}`);
+  }
 
-  const nodeVersion = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
-  manifest.engines = manifest.engines || {};
-  manifest.engines.node = nodeVersion;
-  jetpack.write(manifestPath, JSON.stringify(manifest, null, 2));
-  result.changed.push(`package.json (engines.node = ${nodeVersion})`);
+  const owned = frameworkOwnedScripts(projectDir);
+  manifest.scripts = manifest.scripts || {};
+  for (const [key, command] of Object.entries(owned)) {
+    if (manifest.scripts[key] === command) continue;
+    manifest.scripts[key] = command;
+    changes.push(`scripts.${key}`);
+  }
+
+  if (changes.length === 0) return;
+
+  // npm's own shape, trailing newline included — the same byte contract the
+  // three sibling writers and the manager walk keep (jetpack.write emits none).
+  jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  result.changed.push(`package.json (${changes.join(', ')})`);
 }
 
 /**

@@ -1,6 +1,5 @@
 {
   "url": "https://ports.example.com",
   "brand": { "id": "ports", "name": "PortsCo", "description": "Real-layout port fixture brand", "type": "Corporation" },
-  "meta": { "title": "PortsCo - Real Layout Ports", "description": "A2 migration-cost fixture" },
   "theme": { "id": "classy" }
 }

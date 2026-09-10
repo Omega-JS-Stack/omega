@@ -24,10 +24,11 @@
  * config hole at all; it stays the integration surface for the happy paths.
  */
 const assert = require('node:assert');
-const cron = require('../../src/manager/events/cron/frequent/marketing-campaigns.js');
-const newsletter = require('../../src/manager/libraries/email/generators/newsletter.js');
-const Marketing = require('../../src/manager/libraries/email/marketing/index.js');
-const { getNextFutureOccurrence } = require('../../src/manager/libraries/email/constants.js');
+const cron = require('../../dist/manager/events/cron/frequent/marketing-campaigns.js');
+const newsletter = require('../../dist/manager/libraries/email/generators/newsletter.js');
+const Marketing = require('../../dist/manager/libraries/email/marketing/index.js');
+const { getNextFutureOccurrence } = require('../../dist/manager/libraries/email/constants.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The config-hole message the email library actually throws (prepare.js).
 const EMAIL_CONFIG_HOLE = 'Missing brand.contact.email in config/omega.json5';
@@ -170,7 +171,7 @@ function generatorCampaign(now, extra = {}) {
 
 const WEEKLY = { pattern: 'weekly', hour: 10, minute: 0, day: 1 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Campaign config faults finalize as failed (no forever-retry)',
   type: 'group',
   timeout: 30000,
@@ -372,4 +373,4 @@ module.exports = {
       },
     },
   ],
-};
+});

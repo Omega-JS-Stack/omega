@@ -20,9 +20,10 @@
  * mutated. Everything else (the discount validation, the arithmetic, the template
  * data) is the real path.
  */
-const newSubscription = require('../../../src/manager/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
-const purchaseCompleted = require('../../../src/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
-const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
+const newSubscription = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
+const purchaseCompleted = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
+const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PRICE = 49.99;
 const UID = '_test-transition-promo';
@@ -100,7 +101,7 @@ async function runOneTime(Manager, discount) {
   return { computed: captured.sent?.data?.content?._computed, captured };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Order-confirmation transitions: promo line + totals per discount shape',
   type: 'group',
   timeout: 15000,
@@ -188,4 +189,4 @@ module.exports = {
       },
     },
   ],
-};
+});

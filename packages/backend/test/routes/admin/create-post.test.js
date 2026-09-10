@@ -7,9 +7,10 @@
 const { Octokit } = require('@octokit/rest');
 const sharp = require('sharp');
 
-const { IMAGE_MAX_DIMENSION } = require('../../../src/manager/routes/admin/post/post');
+const { IMAGE_MAX_DIMENSION } = require('../../../dist/manager/routes/admin/post/post');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin create post on GitHub',
   type: 'suite',
   timeout: 300000, // 5 minutes total for the suite
@@ -358,4 +359,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -4,7 +4,22 @@
 // Manager because the URL helpers route through `this.config` and `this.getEnvironment()`).
 // The manager (already bootstrapped by the test harness) is the natural object under test.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+// Every case that pins a CLASSIC local answer silences the whole baked `dev`
+// block: the `dev.ports` map (#745) and the `dev.origin` the website publishes
+// (#747). The harness manager loads src/defaults' config, which carries no `dev`
+// block, so today this is a no-op guard; it exists so a harness that one day
+// seeds a real build blob cannot turn these classic pins red.
+function withoutBakedPorts(manager, fn) {
+  const original = manager.config.dev;
+  delete manager.config.dev;
+  try { return fn(); } finally {
+    if (original !== undefined) manager.config.dev = original;
+  }
+}
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'url-helpers (cross-context)',
@@ -70,7 +85,9 @@ module.exports = {
         const orig = m.config.cloud.config.projectId;
         m.config.cloud.config.projectId = 'demo-app';
         try {
-          ctx.expect(m.getFunctionsUrl('development')).toBe('http://localhost:5001/demo-app/us-central1');
+          withoutBakedPorts(m, () => {
+            ctx.expect(m.getFunctionsUrl('development')).toBe('http://localhost:5001/demo-app/us-central1');
+          });
         } finally { m.config.cloud.config.projectId = orig; }
       },
     },
@@ -111,7 +128,9 @@ module.exports = {
         delete process.env.OMEGA_HTTPS_PORT;
         delete process.env.OMEGA_HOSTING_PORT;
         try {
-          ctx.expect(ctx.manager.getApiUrl('development')).toBe('http://localhost:5002');
+          withoutBakedPorts(ctx.manager, () => {
+            ctx.expect(ctx.manager.getApiUrl('development')).toBe('http://localhost:5002');
+          });
         } finally {
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
           if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting;
@@ -128,7 +147,9 @@ module.exports = {
         delete process.env.OMEGA_HTTPS_PORT;
         delete process.env.OMEGA_HOSTING_PORT;
         try {
-          ctx.expect(ctx.manager.getApiUrl('testing')).toBe('http://localhost:5002');
+          withoutBakedPorts(ctx.manager, () => {
+            ctx.expect(ctx.manager.getApiUrl('testing')).toBe('http://localhost:5002');
+          });
         } finally {
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
           if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting;
@@ -151,6 +172,33 @@ module.exports = {
           process.env.OMEGA_HTTPS_PORT = '5443';
           ctx.expect(m.getApiUrl('development')).toBe('https://localhost:5443');
         } finally {
+          if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps; else delete process.env.OMEGA_HTTPS_PORT;
+          if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting; else delete process.env.OMEGA_HOSTING_PORT;
+        }
+      },
+    },
+    {
+      // #745: the baked `dev.ports` map (written by the bundle task from the
+      // sibling backend's ports file) is the second channel, behind the env
+      // and ahead of the classics, on the REAL main-process Manager shape.
+      name: 'getApiUrl: dev follows the baked dev.ports map when no env is published',
+      run: (ctx) => {
+        const m = ctx.manager;
+        const origDev = m.config.dev;
+        const origHttps = process.env.OMEGA_HTTPS_PORT;
+        const origHosting = process.env.OMEGA_HOSTING_PORT;
+        try {
+          delete process.env.OMEGA_HTTPS_PORT;
+          delete process.env.OMEGA_HOSTING_PORT;
+          m.config.dev = { ports: { hosting: 5012 } };
+          ctx.expect(m.getApiUrl('development')).toBe('http://localhost:5012');
+          m.config.dev = { ports: { hosting: 5012, https: 5003 } };
+          ctx.expect(m.getApiUrl('development')).toBe('https://localhost:5003');
+          process.env.OMEGA_HOSTING_PORT = '5099';
+          delete m.config.dev.ports.https;
+          ctx.expect(m.getApiUrl('development')).toBe('http://localhost:5099');
+        } finally {
+          if (origDev !== undefined) m.config.dev = origDev; else delete m.config.dev;
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps; else delete process.env.OMEGA_HTTPS_PORT;
           if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting; else delete process.env.OMEGA_HOSTING_PORT;
         }
@@ -195,12 +243,14 @@ module.exports = {
       },
     },
     {
-      name: 'getWebsiteUrl: dev returns http://localhost:4000 (`omega dev` speaks plain http)',
+      name: 'getWebsiteUrl: dev returns the classic dev origin https://localhost:4000',
       run: (ctx) => {
         const orig = process.env.OMEGA_WEBSITE_PORT;
         delete process.env.OMEGA_WEBSITE_PORT;
         try {
-          ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('http://localhost:4000');
+          withoutBakedPorts(ctx.manager, () => {
+            ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('https://localhost:4000');
+          });
         } finally {
           if (orig !== undefined) process.env.OMEGA_WEBSITE_PORT = orig;
         }
@@ -212,9 +262,29 @@ module.exports = {
         const orig = process.env.OMEGA_WEBSITE_PORT;
         try {
           process.env.OMEGA_WEBSITE_PORT = '4001';
-          ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('http://localhost:4001');
+          ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('https://localhost:4001');
         } finally {
           if (orig !== undefined) process.env.OMEGA_WEBSITE_PORT = orig; else delete process.env.OMEGA_WEBSITE_PORT;
+        }
+      },
+    },
+    {
+      // #747: the baked `dev.origin` (the live website's published origin,
+      // scheme included) is the complete fact and outranks the env port, on
+      // the REAL main-process Manager shape; getAuthUrl rides it by construction.
+      name: 'getWebsiteUrl: dev follows the baked dev.origin over OMEGA_WEBSITE_PORT',
+      run: (ctx) => {
+        const m = ctx.manager;
+        const origDev = m.config.dev;
+        const origPort = process.env.OMEGA_WEBSITE_PORT;
+        try {
+          process.env.OMEGA_WEBSITE_PORT = '4001';
+          m.config.dev = { origin: 'https://localhost:4123' };
+          ctx.expect(m.getWebsiteUrl('development')).toBe('https://localhost:4123');
+          ctx.expect(new URL(m.getAuthUrl('development')).origin).toBe('https://localhost:4123');
+        } finally {
+          if (origDev !== undefined) m.config.dev = origDev; else delete m.config.dev;
+          if (origPort !== undefined) process.env.OMEGA_WEBSITE_PORT = origPort; else delete process.env.OMEGA_WEBSITE_PORT;
         }
       },
     },
@@ -256,13 +326,15 @@ module.exports = {
         const origId = m.config.brand.id;
         m.config.brand.id = 'demo';
         try {
-          const url = new URL(m.getAuthUrl('development'));
-          ctx.expect(url.origin).toBe('http://localhost:4000');
-          ctx.expect(url.pathname).toBe('/signin');
-          const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
-          ctx.expect(tokenUrl.origin).toBe('http://localhost:4000');
-          ctx.expect(tokenUrl.pathname).toBe('/token');
-          ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
+          withoutBakedPorts(m, () => {
+            const url = new URL(m.getAuthUrl('development'));
+            ctx.expect(url.origin).toBe('https://localhost:4000');
+            ctx.expect(url.pathname).toBe('/signin');
+            const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+            ctx.expect(tokenUrl.origin).toBe('https://localhost:4000');
+            ctx.expect(tokenUrl.pathname).toBe('/token');
+            ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
+          });
         } finally {
           if (origId !== undefined) m.config.brand.id = origId; else delete m.config.brand.id;
         }
@@ -340,7 +412,9 @@ module.exports = {
         delete process.env.OMEGA_TEST_MODE;
         try {
           m.config.em.environment = 'development';
-          ctx.expect(m.getWebsiteUrl()).toBe('http://localhost:4000');
+          withoutBakedPorts(m, () => {
+            ctx.expect(m.getWebsiteUrl()).toBe('https://localhost:4000');
+          });
           m.config.em.environment = 'production';
           ctx.expect(m.getWebsiteUrl()).toBe('https://example.com');
         } finally {
@@ -352,4 +426,4 @@ module.exports = {
       },
     },
   ],
-};
+});

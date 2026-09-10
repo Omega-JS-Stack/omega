@@ -10,7 +10,7 @@
         <div class="p-4 p-md-5 text-center">
           <!-- Icon -->
           <div class="mb-4">
-            <span class="animation-hand-wave d-inline-block">{% omega_icon "hand", "fa-2xl" %}</span>
+            <span class="animation-hand-wave d-inline-block"><i class="fa-solid fa-hand fa-2xl"></i></span>
           </div>
 
           <!-- Title -->
@@ -39,7 +39,7 @@
           <div class="d-flex flex-column align-items-center">
             <a href="/" class="modal-exit-button btn btn-adaptive btn-lg px-5 mb-1" data-bs-dismiss="modal">
               <span class="modal-exit-button-text">Show me more</span>
-              {% omega_icon "arrow-right", "fa-sm ms-2" %}
+              <i class="fa-solid fa-arrow-right fa-sm ms-2"></i>
             </a>
             <a href="#" class="modal-exit-dismiss btn btn-link text-decoration-none small" data-bs-dismiss="modal">
               Maybe later
@@ -74,7 +74,7 @@
               {% else %}
                 {% for i in (1..4) %}
                   <span class="modal-exit-avatar avatar avatar-sm rounded-circle{% unless forloop.last %} me-n2{% endunless %}">
-                    {% omega_icon "user", "fa-xs" %}
+                    <i class="fa-solid fa-user fa-xs"></i>
                   </span>
                 {% endfor %}
               {% endif %}
@@ -133,7 +133,7 @@
     forms: {% if slapform %}{ providers: { slapform: { formId: {{ slapform.formId | jsonify }} } } }{% else %}null{% endif %},
     {% assign chatsy = resolved.config.inbound.chat.providers.chatsy %}
     inbound: {% if chatsy %}{ chat: { providers: { chatsy: { enabled: {{ chatsy.enabled | jsonify }}, agentId: {{ chatsy.agentId | jsonify }}, settings: {{ chatsy.settings | jsonify }} } } } }{% else %}null{% endif %},
-    oauth2: {{ resolved.config.oauth2 | jsonify }},
+    connections: {{ resolved.config.connections | jsonify }},
   };
 </script>
 
@@ -143,10 +143,19 @@
      always runs before the page module (bootPage). -->
 <script type="module" src="{{ assetManifest.js.main }}"></script>
 
-<!-- Page module (present only when a js/pages entry exists for this page) -->
-{% iftruthy pageAssets.js %}
-  <script type="module" src="{{ pageAssets.js }}"></script>
-{% endiftruthy %}
+<!-- Layout modules: one per layout in this page's chain, outermost first
+     (js/layouts/<layout>.js) -->
+{% for layoutJs in layoutAssets.js %}
+  <script type="module" src="{{ layoutJs }}"></script>
+{% endfor %}
+
+<!-- Page modules: EVERY layer that ships one for this URL, in layer order —
+     core, then the theme, then the consumer (#624). A framework page script
+     always runs, the theme decorates, the consumer adds; module scripts execute
+     in document order, so the list order IS the run order. -->
+{% for pageJs in pageAssets.js %}
+  <script type="module" src="{{ pageJs }}"></script>
+{% endfor %}
 
 <!-- Script to quickly handle nav user state -->
 <script type="text/javascript">

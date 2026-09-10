@@ -16,9 +16,12 @@ const { publishSecretKeys, bakeKeys, renderSecretsBlock, WORKFLOW_OWNED_KEYS } =
 
 const SRC = path.join(__dirname, '..', '..', '..');
 const { scaffoldDefaults } = require(path.join(SRC, 'gulp', 'tasks', 'defaults.js'));
-const packageTask = require(path.join(SRC, 'gulp', 'tasks', 'package.js'));
+// The bake seam is the BUNDLE's since #743 — the snapshot is baked into every
+// emitted bundle, so the schema's bake list and its guard live with it.
+const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
 const { publishEnvSecrets } = require(path.join(SRC, 'commands', 'lib', 'push-secrets.js'));
 const { STEPS } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const quiet = { log() {}, warn() {}, error() {} };
 
@@ -41,7 +44,7 @@ function declareRepo(dir, slug) {
   ].join('\n'));
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'env delivery (#627) — the workflow block, the bake list, and push-secrets from ONE schema',
@@ -93,18 +96,18 @@ module.exports = {
       run: (ctx) => {
         // The hardcoded `process.env.GOOGLE_ANALYTICS_SECRET` read is gone: the
         // key set is the schema's, so a new baked key is one schema entry.
-        ctx.expect(packageTask.BAKED_KEYS).toEqual(bakeKeys('extension'));
-        ctx.expect(packageTask.BAKED_KEYS).toEqual(['GOOGLE_ANALYTICS_SECRET']);
+        ctx.expect(bundleTask.BAKED_KEYS).toEqual(bakeKeys('extension'));
+        ctx.expect(bundleTask.BAKED_KEYS).toEqual(['GOOGLE_ANALYTICS_SECRET']);
 
         const saved = process.env.GOOGLE_ANALYTICS_SECRET;
         try {
           process.env.GOOGLE_ANALYTICS_SECRET = 'fixture-mp-secret';
-          ctx.expect(packageTask.readBakedEnv().GOOGLE_ANALYTICS_SECRET).toBe('fixture-mp-secret');
+          ctx.expect(bundleTask.readBakedEnv().GOOGLE_ANALYTICS_SECRET).toBe('fixture-mp-secret');
 
           delete process.env.GOOGLE_ANALYTICS_SECRET;
           // Absent is the empty string, never undefined — the baked snapshot is
           // JSON and a missing key would read as "no analytics config at all".
-          ctx.expect(packageTask.readBakedEnv().GOOGLE_ANALYTICS_SECRET).toBe('');
+          ctx.expect(bundleTask.readBakedEnv().GOOGLE_ANALYTICS_SECRET).toBe('');
         } finally {
           if (saved === undefined) delete process.env.GOOGLE_ANALYTICS_SECRET;
           else process.env.GOOGLE_ANALYTICS_SECRET = saved;
@@ -121,7 +124,7 @@ module.exports = {
         const configured = { analytics: { providers: { google: { id: 'G-FIXTURE' } } } };
         let thrown = null;
         try {
-          packageTask.readBakedEnv({}, { config: configured, build: true, logger: quiet });
+          bundleTask.readBakedEnv({}, { config: configured, build: true, logger: quiet });
         } catch (e) {
           thrown = e;
         }
@@ -135,16 +138,16 @@ module.exports = {
         // normal step on the way to a configured one.
         const said = [];
         const loud = { log() {}, warn: (m) => said.push(m), error() {} };
-        const baked = packageTask.readBakedEnv({}, { config: configured, build: false, logger: loud });
+        const baked = bundleTask.readBakedEnv({}, { config: configured, build: false, logger: loud });
         ctx.expect(baked.GOOGLE_ANALYTICS_SECRET).toBe('');
         ctx.expect(said.join('\n')).toContain('GOOGLE_ANALYTICS_SECRET_EXTENSION');
 
         // The secret under its DELIVERED name is the value the build holds.
-        ctx.expect(packageTask.readBakedEnv({ GOOGLE_ANALYTICS_SECRET: 'shh' }, { config: configured, build: true, logger: quiet }).GOOGLE_ANALYTICS_SECRET)
+        ctx.expect(bundleTask.readBakedEnv({ GOOGLE_ANALYTICS_SECRET: 'shh' }, { config: configured, build: true, logger: quiet }).GOOGLE_ANALYTICS_SECRET)
           .toBe('shh');
 
         // No stream configured, nothing owed.
-        ctx.expect(packageTask.readBakedEnv({}, { config: {}, build: true, logger: quiet }).GOOGLE_ANALYTICS_SECRET).toBe('');
+        ctx.expect(bundleTask.readBakedEnv({}, { config: {}, build: true, logger: quiet }).GOOGLE_ANALYTICS_SECRET).toBe('');
       },
     },
     {
@@ -233,4 +236,4 @@ module.exports = {
       },
     },
   ],
-};
+});

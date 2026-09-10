@@ -4,6 +4,7 @@
 // matching, config resolvers, dispatch, and that every module loads cleanly.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const COMMANDS_DIR = path.join(__dirname, '..', '..', '..', 'commands');
 
@@ -14,7 +15,7 @@ const PAGES = [
   { type: 'other', url: 'app://overlay/' },
 ];
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'mgr cdp — CLI toolkit pure parts',
@@ -85,4 +86,4 @@ module.exports = {
       },
     },
   ],
-};
+});

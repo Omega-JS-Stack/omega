@@ -26,10 +26,37 @@ const path = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
+const { envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
+
 const { runCommand } = require('../../../lib/run-command.js');
 const { readCompanyMarker } = require('../../../lib/company.js');
 const { fingerprintTarget, resolvePackageDir } = require('../lib/fingerprint.js');
 const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
+
+/**
+ * One env LAYER's files: the base `.env` plus its `.env.<environment>` overlays.
+ *
+ * The overlay spelling is @omega.js/config's (`envLayerFiles`, #586), never a
+ * join written out here, and EVERY environment is fingerprinted because a build
+ * can run under any of them and an absent file digests as `absent` either way.
+ * Fingerprinting the base file by exact path was the gap ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)):
+ * an overlay is a real layer of the cascade and carries the values that DIFFER
+ * per environment, so an overlay edit left the target converged and its build
+ * served the old value.
+ *
+ * @param {string} label - The layer's fingerprint label ('brand-env').
+ * @param {string} root - The dir whose `.env` is this layer.
+ * @returns {Array<{ label: string, file: string }>} One entry per layer file.
+ */
+function envLayerEntries(label, root) {
+  const base = path.join(root, '.env');
+  const files = [...new Set(ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles(base, environment)))];
+
+  return files.map((file) => ({
+    label: file === base ? label : `${label}.${file.slice(base.length + 1)}`,
+    file,
+  }));
+}
 
 /**
  * The merge-chain files OUTSIDE the target tree that its build still reads:
@@ -40,14 +67,14 @@ const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
 function chainFiles(brandRoot) {
   const files = [
     { label: 'brand-config', file: path.join(brandRoot, 'config', 'omega.json5') },
-    { label: 'brand-env', file: path.join(brandRoot, '.env') },
+    ...envLayerEntries('brand-env', brandRoot),
   ];
 
   const marker = readCompanyMarker(brandRoot);
   if (marker) {
     files.push(
       { label: 'company-config', file: path.join(marker.companyRoot, 'config', 'omega.json5') },
-      { label: 'company-env', file: path.join(marker.companyRoot, '.env') },
+      ...envLayerEntries('company-env', marker.companyRoot),
     );
   }
 

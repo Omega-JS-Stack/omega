@@ -134,10 +134,12 @@ Buy an EV code-signing cert from Sectigo, DigiCert, SSL.com, etc. Get a physical
 3. Set `.env` (on the runner):
    ```
    # config: { signing: { windows: { strategy: 'self-hosted' } } }
-   WIN_EV_TOKEN_PATH=<container path or label>
+   WIN_EV_TOKEN_PATH=<cert SHA1 thumbprint, or a path to a .pfx>
    WIN_CSC_KEY_PASSWORD=<token PIN>
    ```
 4. The `windows-sign` job in `.github/workflows/build.yml` will route signing to that runner.
+
+Setting the box up is [`docs/runner.md`](runner.md) — the runner home, the Startup-folder auto-start, the commands, and the Session 0 / Session 1 rule that makes the whole thing work.
 
 `npx omega sign-windows` is the strategy-aware command that drives `signtool` (or the cloud provider CLI).
 
@@ -161,10 +163,10 @@ If no signing runner is available, CI uploads the unsigned `.exe` and a develope
 
 ## Pushing secrets to GitHub Actions
 
-@omega.js/desktop ships a command that pushes the target's **composed env** to the repo's GitHub Actions secrets, encrypted with the repo's libsodium public key. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
+@omega.js/desktop ships a command that pushes the target's **composed env** to the repo's GitHub Actions secrets over the same shared `gh` transport that the web and extension publish verbs use (`gh secret set`, which seals each value with the repo's public key locally): values travel on **stdin**, never in argv, and are never logged. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
 
 ```bash
-# Make sure the brand root's .env has GH_TOKEN (a PAT with `repo` scope) plus all your signing creds
+# Make sure the brand root's .env holds your signing creds, and that `gh auth login` has run
 npx omega push-secrets
 
 # Push only specific keys
@@ -174,9 +176,10 @@ npx omega push-secrets --only=CSC_LINK,CSC_KEY_PASSWORD
 Behavior:
 - The source is `composeTargetEnv({ targetDir, target: 'desktop' })`: company `.env` ← brand `.env` ← target `.env`, the brand-side layers filtered by the env schema to the keys the desktop target reads. The brand root's `.env` is the one file you keep; a target `.env` is an optional per-key override.
 - Files only — the shell is never a source — and an empty value never claims a key, so unset keys simply don't publish.
-- Auto-detects "is this a path?" — relative or absolute paths ending in `.p12`/`.pem`/`.cer`/`.p8`/`.provisionprofile`/`.crt`/`.key`/`.json` that exist on disk get base64-encoded.
-- Discovers `owner/repo` from `package.json`'s `repository.url` or git remote.
-- Logs key NAMES and the layer each came from; never a value.
+- Auto-detects "is this a path?" — relative or absolute paths ending in `.p12`/`.pem`/`.cer`/`.p8`/`.provisionprofile`/`.crt`/`.key`/`.json` that exist on disk (target root first, brand root second) get base64-encoded.
+- Publishes to the git remote's `owner/repo`, and REFUSES unless the brand's own config claims it (`repo.providers.github`) — a fork, a template clone or a vendored target never arms a stranger's Actions with your certificates.
+- No PAT: the credential is `gh`'s auth session. A missing or signed-out `gh` fails loudly with install/auth instructions; a CI run, an empty cascade, a remote-less checkout or a repo mismatch skips loudly.
+- Logs key NAMES only; never a value.
 
 The corresponding decode step in CI looks like:
 
@@ -215,7 +218,9 @@ GitHub Actions secrets you'll need (per repo):
 | `APPLE_API_KEY_ID` | Plain string |
 | `APPLE_API_ISSUER` | UUID |
 | `APPLE_TEAM_ID` | 10-char team ID |
-| `WIN_CSC_LINK` (cloud) | Cloud signing creds (provider-specific) |
+| `WIN_EV_TOKEN_PATH` | Windows EV cert reference — SHA1 thumbprint or `.pfx` path (the ONE name; the `WIN_CSC_LINK` alias is gone) |
+| `WIN_CSC_KEY_PASSWORD` | EV token PIN / `.pfx` password |
+| `SIGNTOOL_PATH` | Full path to `signtool.exe` on the signing runner |
 
 The workflow base64-decodes secrets into temp files inside `config/certs/` at job start, runs the build, and the runner's ephemeral filesystem cleans up afterward. Local `.env` files are never committed and never shipped.
 

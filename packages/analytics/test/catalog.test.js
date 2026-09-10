@@ -247,6 +247,120 @@ test('every item rides TikTok\'s contents array, not just the first', () => {
   ]);
 });
 
+// The 2026-09-02 standards review against the live references
+// ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)): Meta's pixel
+// reference marks `contents` required for Advantage+ catalog ads on Purchase,
+// ViewContent, AddToCart and Search, and TikTok's Events API 2.0 documents
+// `content_ids` beside `contents` and an `order_id` in `properties`.
+
+test('Meta commerce carries the documented contents[] beside content_ids', () => {
+  const facebook = meta.resolve('purchase', PURCHASE_PARAMS);
+
+  // Meta's own field list for a contents object is `id`, `quantity`,
+  // `item_price`, `delivery_category`, never GA4's item_id/price spelling.
+  assert.deepEqual(facebook.payload.contents, [{ id: 'pro', quantity: 1, item_price: 49.99 }]);
+  assert.deepEqual(facebook.payload.content_ids, ['pro'], 'and content_ids stays: Meta accepts either');
+});
+
+test('the order id reaches both ad platforms under their own order_id', () => {
+  // Both platforms document an `order_id` for the transaction, and both were
+  // getting the charge id only as the dedupe `event_id`, a field neither
+  // surfaces as the order.
+  assert.strictEqual(meta.resolve('purchase', PURCHASE_PARAMS).payload.order_id, 'ORD-1');
+  assert.strictEqual(tiktok.resolve('purchase', PURCHASE_PARAMS).payload.order_id, 'ORD-1');
+
+  // A funnel event has no transaction to name, and `compact()` keeps the key off.
+  const cart = meta.resolve('add_to_cart', { currency: 'USD', value: 49.99, items: PURCHASE_PARAMS.items });
+  assert.strictEqual('order_id' in cart.payload, false);
+});
+
+test('TikTok carries content_ids beside contents, the pair its 2.0 properties document', () => {
+  const tt = tiktok.resolve('purchase', PURCHASE_PARAMS);
+
+  assert.deepEqual(tt.payload.content_ids, ['pro']);
+  assert.strictEqual(tt.payload.contents[0].content_id, 'pro', 'the contents array keeps the product detail');
+});
+
+test('Meta\'s content_name only rides an event with ONE product', () => {
+  // Meta documents it as "name of the page/product", singular, and it had been
+  // naming items[0] for a whole cart, which labels the wrong basket.
+  assert.strictEqual(meta.resolve('purchase', PURCHASE_PARAMS).payload.content_name, 'Pro Plan');
+
+  const multi = meta.resolve('purchase', {
+    ...PURCHASE_PARAMS,
+    items: [
+      { item_id: 'pro', item_name: 'Pro Plan', price: 40, quantity: 1 },
+      { item_id: 'addon', item_name: 'Extra Seat', price: 9.99, quantity: 2 },
+    ],
+  });
+
+  assert.strictEqual('content_name' in multi.payload, false, 'two products have no one name');
+  assert.deepEqual(multi.payload.content_ids, ['pro', 'addon'], 'the ids still name every one of them');
+  assert.deepEqual(multi.payload.contents, [
+    { id: 'pro', quantity: 1, item_price: 40 },
+    { id: 'addon', quantity: 2, item_price: 9.99 },
+  ]);
+});
+
+test('a charge nobody is present for tells Meta action_source system_generated', () => {
+  // Meta's enum names this case itself: `system_generated`, "for example, a
+  // subscription renewal that's set to auto-pay each month". A person clicked
+  // nothing on these, so `website` was a claim about where the conversion
+  // happened that was not true, on a field Meta requires be accurate
+  // ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
+  for (const name of ['subscription_renew', 'payment_recovered', 'trial_convert']) {
+    assert.strictEqual(meta.resolve(name, PURCHASE_PARAMS).actionSource, 'system_generated', `${name} is billed, never visited`);
+  }
+
+  // Everything a PERSON did keeps the default the transport supplies: a
+  // checkout, a trial a visitor started, a cancellation they clicked.
+  for (const name of ['purchase', 'trial_start', 'subscription_cancel', 'refund']) {
+    assert.strictEqual('actionSource' in meta.resolve(name, PURCHASE_PARAMS), false, `${name} overrides nothing`);
+  }
+
+  // Meta's field alone: TikTok's 2.0 envelope has no action_source at all.
+  assert.strictEqual('actionSource' in tiktok.resolve('subscription_renew', PURCHASE_PARAMS), false);
+});
+
+test('num_items counts the UNITS bought, not the lines they came on', () => {
+  // Meta: "the number of items that a user tries to buy during checkout", so
+  // two seats on one line are two items [#498].
+  const multi = meta.resolve('purchase', {
+    ...PURCHASE_PARAMS,
+    items: [
+      { item_id: 'pro', item_name: 'Pro Plan', price: 40, quantity: 1 },
+      { item_id: 'addon', item_name: 'Extra Seat', price: 9.99, quantity: 2 },
+    ],
+  });
+
+  assert.strictEqual(multi.payload.num_items, 3);
+
+  // A line that names no quantity is one of that thing, never none of it.
+  const bare = meta.resolve('purchase', { ...PURCHASE_PARAMS, items: [{ item_id: 'pro', item_name: 'Pro Plan', price: 40 }] });
+
+  assert.strictEqual(bare.payload.num_items, 1);
+});
+
+test('the zero-value audience signals keep every amount off the wire', () => {
+  // `contents` grew an `item_price` on Meta's side, which is the amount itself,
+  // so the exclusion signal drops the array outright. `content_ids` already
+  // names the plan, and Meta REQUIRES id + quantity in a contents object, so a
+  // stripped-down one would be worse than none.
+  for (const name of ['subscription_cancel', 'refund']) {
+    const facebook = meta.resolve(name, PURCHASE_PARAMS);
+
+    assert.strictEqual(facebook.payload.value, 0);
+    assert.strictEqual('contents' in facebook.payload, false, `${name} sends Meta no priced contents`);
+    assert.deepEqual(facebook.payload.content_ids, ['pro'], 'the plan still makes the audience');
+
+    const tt = tiktok.resolve(name, PURCHASE_PARAMS);
+
+    assert.strictEqual(tt.payload.value, 0);
+    assert.deepEqual(tt.payload.content_ids, ['pro']);
+    assert.deepEqual(tt.payload.contents, [{ content_id: 'pro', content_name: 'Pro Plan' }], 'TikTok has no other id carrier, minus the money');
+  }
+});
+
 test('a trial start is StartTrial on both ad platforms, and the browser may fire it', () => {
   // TikTok's Subscribe ("subscribes... including paid subscriptions") said a
   // trial was a subscription; StartTrial is the event both platforms define for

@@ -17,8 +17,9 @@
  */
 const { callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/webhook/post.js');
-const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
+const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
+const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
@@ -59,7 +60,7 @@ function deliver(Manager, event) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment webhook: Stripe one-time refunds',
   type: 'group',
   timeout: 30000,
@@ -126,4 +127,4 @@ module.exports = {
       },
     },
   ],
-};
+});

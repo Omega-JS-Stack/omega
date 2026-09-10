@@ -402,6 +402,50 @@ test('secret-shaped keys are validation errors', () => {
   assert.ok(errors.some((e) => e.includes('config.payment.providers.stripe.apiSecret looks like a secret')));
 });
 
+// ─── validateConfig: a product price is a number (#674) ───
+
+test('a bare-number price catalog passes, at every frequency and for `once`', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    payment: {
+      products: [
+        { id: 'premium', type: 'subscription', prices: { monthly: 9.99, annually: 99.99 } },
+        { id: 'credits', type: 'one-time', prices: { once: 49.99 } },
+        { id: 'basic', type: 'subscription' },
+      ],
+    },
+  });
+
+  assert.deepStrictEqual(errors, []);
+});
+
+test('an object-shaped price is refused, naming the product and the key (#674)', () => {
+  // The disagreement it closes: the checkout page unwrapped `{ amount: N }` and
+  // every backend reader took the bare number, so this shape priced the summary
+  // correctly and put `[object Object]` in the confirmation URL's amount.
+  const { errors } = validateConfig({
+    ...VALID,
+    payment: {
+      products: [{ id: 'credits', type: 'one-time', prices: { once: { amount: 49.99 } } }],
+    },
+  });
+
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0].includes('config.payment.products'), errors[0]);
+  assert.ok(errors[0].includes('credits'), errors[0]);
+  assert.ok(errors[0].includes('once'), errors[0]);
+});
+
+test('a subscription price carrying the same object shape is refused too (#674)', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    payment: { products: [{ id: 'premium', type: 'subscription', prices: { monthly: { amount: 9.99 }, annually: 99.99 } }] },
+  });
+
+  assert.equal(errors.length, 1, errors.join(' | '));
+  assert.ok(errors[0].includes('monthly'), errors[0]);
+});
+
 // ─── validateConfig: authDomain is the brand's own host (cp268) ───
 
 test('an authDomain equal to the brand host passes (the playground shape)', () => {
@@ -439,17 +483,34 @@ test('an authDomain on another host fails, naming both values', () => {
   assert.ok(errors[0].includes('playground.omegajs.dev'), 'the brand host');
 });
 
-test("an instance's own url wins over brand.url for the host comparison", () => {
+// #588 (Ian 2026-09-01): the authDomain is a BRAND fact. One Firebase project,
+// one backend, shared by every instance a brand runs, so the comparison reads
+// brand.url and never the instance's own top-level `url` (which a multi-instance
+// target now derives from the instance id). Reading it the other way made a
+// `targets/website-admin` load fail its own brand's authDomain.
+test('authDomain compares against the BRAND host, never the instance url', () => {
   const base = {
     ...VALID,
     brand: { ...VALID.brand, url: 'https://playground.omegajs.dev' },
-    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'admin.omegajs.dev' } },
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'playground.omegajs.dev' } },
   };
 
-  // The target chain merges the instance entry to the top level, so its `url`
-  // is the resolved brand host for THIS target
-  assert.deepStrictEqual(validateConfig({ ...base, url: 'https://admin.omegajs.dev' }, { target: 'web' }).errors, []);
-  assert.strictEqual(validateConfig(base, { target: 'web' }).errors.length, 1, 'without the instance url it is a mismatch');
+  assert.deepStrictEqual(
+    validateConfig({ ...base, url: 'https://admin.omegajs.dev' }, { target: 'web' }).errors,
+    [],
+    "an instance's url does not turn the brand's own authDomain into a mismatch",
+  );
+
+  // ... and it licenses nothing either: an authDomain on the INSTANCE host is
+  // still the mismatch it was, named against the brand host
+  const onInstanceHost = validateConfig({
+    ...base,
+    url: 'https://admin.omegajs.dev',
+    cloud: { provider: 'firebase', config: { projectId: 'omegajs-playground', authDomain: 'admin.omegajs.dev' } },
+  }, { target: 'web' });
+
+  assert.strictEqual(onInstanceHost.errors.length, 1);
+  assert.ok(onInstanceHost.errors[0].includes('playground.omegajs.dev'), 'the brand host is what it names');
 });
 
 test('an absent authDomain passes, and a demo-* project is exempt', () => {
@@ -542,6 +603,53 @@ test('#610: the legacy download and extension page maps are retired — site.tar
   );
 });
 
+test('#466: the web redirect map is retired — the edge owns templated redirects', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { web: { redirects: [{ from: '/c/:id', to: '/code?id=:id' }] } },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.redirects') && e.includes('edge.providers.cloudflare.rules.redirect')),
+    'the map bounces and names the Cloudflare ruleset that answers it now',
+  );
+
+  // The two mechanisms that replaced it are both untouched.
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      edge: { providers: { cloudflare: { rules: { redirect: [{ name: 'Redirect: QR short code' }] } } } },
+    }).errors,
+    [],
+  );
+});
+
+test('#737: the desktop webpack externals override is retired — esbuild has no consumer knob', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { desktop: { em: { webpack: { externals: ['better-sqlite3'] } } } },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.desktop.em.webpack.externals') && e.includes('esbuild')),
+    'the override bounces instead of riding the exempt `targets` namespace unnoticed',
+  );
+});
+
+test('#799: every downloads mirror key is retired and points at the one releases repo', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { desktop: { downloads: { enabled: true, owner: 'Acme-Org', repo: 'download-server', tag: 'installer' } } },
+  });
+
+  for (const key of ['enabled', 'owner', 'repo', 'tag']) {
+    assert.ok(
+      errors.some((e) => e.includes(`config.targets.desktop.downloads.${key} is retired`) && e.includes('#799')),
+      `downloads.${key} should bounce naming the releases repo that replaced the mirror`,
+    );
+  }
+});
+
 // ─── validateConfig: retired PATHS — the de-branding rekey (#23) ───
 
 test('every de-branded top-level key hard-fails and names its new home', () => {
@@ -573,6 +681,215 @@ test('the retired google-adsense provider id bounces at its nested path', () => 
 
   assert.ok(errors.some((e) => e.includes('config.advertising.providers.google-adsense is retired')
     && e.includes('advertising.providers.adsense')));
+});
+
+// #628 — #527 collapsed adsense to ONE switch, the `client` id, and deleted
+// the service's `enabled === false` skip with it. A brand still carrying that
+// gate validated CLEAN, so the key read exactly like it still worked while the
+// AdSense account it was meant to leave alone started being managed. `units`
+// was the other half of the same proposal and never shipped either.
+test('the retired adsense gates bounce toward the one switch (#628)', () => {
+  for (const key of ['enabled', 'units']) {
+    const { errors } = validateConfig({
+      ...VALID,
+      advertising: { providers: { adsense: { client: 'ca-pub-1', [key]: false } } },
+    });
+
+    assert.ok(
+      errors.some((e) => e.includes(`config.advertising.providers.adsense.${key} is retired`)
+        && e.includes('advertising.providers.adsense')
+        && e.includes('#527')),
+      `adsense.${key} must bounce: ${errors.join(' | ')}`,
+    );
+  }
+});
+
+// #607 addendum (Ian 2026-08-26): a title never exists in two places. The
+// config `meta` section shipped for one wave beside the page's own bare
+// `meta:`, so a site default had two homes that could disagree. Title and
+// description are GONE: page frontmatter is the only per-page meta, and the
+// global default is brand.name / brand.description. A brand still carrying
+// them must hear it. #564 narrowed the rows from the whole block to those two
+// keys, because `meta.index` is LIVE at both levels now (below).
+test('#607: config `meta.title` / `meta.description` are retired — page frontmatter is the only meta', () => {
+  const { errors } = validateConfig({ ...VALID, meta: { title: 'Site default', description: 'Site desc' } });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.meta.title is retired') && e.includes('brand.name')),
+    `a config meta.title must bounce and name brand.name: ${errors.join(' | ')}`,
+  );
+  assert.ok(
+    errors.some((e) => e.includes('config.meta.description is retired') && e.includes('brand.description')),
+    `a config meta.description must bounce and name brand.description: ${errors.join(' | ')}`,
+  );
+
+  const web = validateConfig({ ...VALID, targets: { web: { meta: { title: 'Site default' } } } }, { target: 'web' });
+  assert.ok(
+    web.errors.some((e) => e.includes('meta.title is retired') && e.includes('brand.name')),
+    `the targets.web overlay must bounce too: ${web.errors.join(' | ')}`,
+  );
+
+  // The analytics provider named `meta` keeps its name — the retirement is a
+  // PATH, never the key name (retired-keys.js's header rule).
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, analytics: { providers: { meta: { id: '123' } } } }).errors,
+    [],
+  );
+});
+
+// #564 (Ian 2026-09-09, the same-name ruling): the site-wide index switch and
+// the page override of it share ONE name. `seo.index` was the second spelling.
+test('#564: `seo.index` is retired and points at targets.web.meta.index', () => {
+  const { errors } = validateConfig({ ...VALID, seo: { index: false } });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.seo.index is retired') && e.includes('targets.web.meta.index')),
+    `seo.index must bounce naming its replacement: ${errors.join(' | ')}`,
+  );
+
+  // `seo` itself lives on — the manager's seo service reads github.content.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, seo: { github: { content: [] } } }).errors,
+    [],
+  );
+});
+
+test('#564: `targets.web.meta.index` is LIVE, the site-wide default of the page flag', () => {
+  // Authored shape: nothing in the block is retired any more.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, targets: { web: { meta: { index: false } } } }, { target: 'web' }).errors,
+    [],
+    'the authored site default carries no retired key',
+  );
+
+  // Resolved shape: a target's keys land at the top level, which is where the
+  // web schema rule reads them.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, meta: { index: false } }, { target: 'web' }).errors,
+    [],
+    'the resolved site default validates clean',
+  );
+
+  const bad = validateConfig({ ...VALID, meta: { index: 'false' } }, { target: 'web' });
+  assert.ok(
+    bad.errors.some((e) => e.includes('meta.index') && e.includes('boolean')),
+    `a non-boolean must bounce: ${bad.errors.join(' | ')}`,
+  );
+});
+
+// #732 — the array (multi-instance) target form indexes positionally, so the
+// walk's real keyPath is `targets.web.1.meta`. Every `targets.<type>.*` row
+// missed that shape, which is the one a brand with two sites has.
+test('#732: a retired path inside a multi-instance target instance bounces', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: {
+      web: [
+        { id: 'main' },
+        { id: 'docs', meta: { title: 'Site default' }, redirects: [{ from: '/c/:id', to: '/code?id=:id' }] },
+      ],
+    },
+  });
+
+  // The REPORTED path keeps the index — that is where the author finds the key.
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.1.meta.title is retired') && e.includes('brand.name')),
+    `the instance's meta title must bounce at its real path: ${errors.join(' | ')}`,
+  );
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.1.redirects is retired')
+      && e.includes('edge.providers.cloudflare.rules.redirect')),
+    `the instance's redirect map must bounce too: ${errors.join(' | ')}`,
+  );
+
+  // An instance carrying nothing retired is still clean.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, targets: { web: [{ id: 'main' }, { id: 'docs' }] } }).errors,
+    [],
+  );
+});
+
+// #588: brand.subdomains was read by the cloud hosting op and by nothing
+// else. No schema rule, no default, never materialized. Ian's 2026-09-01 call
+// made the web instance the home (the instance id IS the subdomain), so a
+// brand still carrying the list must hear the recipe instead of validating
+// clean while the hosting op quietly reconciles api.{sub}.{domain} domains.
+test('#588: brand.subdomains is retired, since each subdomain is a web instance', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, subdomains: ['admin', 'cdn'] },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.brand.subdomains is retired')
+      && e.includes('targets.web')
+      && e.includes("{ id: 'admin' }")),
+    `the subdomain list must bounce and carry the recipe: ${errors.join(' | ')}`,
+  );
+
+  // The replacement itself validates clean, and one api.<domain> serves them all
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, targets: { web: [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }] } }).errors,
+    [],
+  );
+});
+
+// H1: `subdomains` exists nowhere else in the schema, so it is a NAME test
+// (retired-keys.js's #142 rule), walked at every depth. A brand that pushed the
+// list down into an instance's own brand block must hear it on a whole-file
+// load, which is the shape the manager walk validates.
+test('#588: the subdomains list bounces at every depth, instance arrays included', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { web: [{ id: 'main' }, { id: 'admin', brand: { subdomains: ['x'] } }] },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web.1.brand.subdomains is retired')
+      && e.includes('targets.web')),
+    `the nested list must bounce at its real path: ${errors.join(' | ')}`,
+  );
+});
+
+// #788: the user-connection feature is `connections` now — the product concept
+// is a connection, and a connection will not always be an OAuth grant (an API
+// key or a bot token is one too), so each record names its kind with
+// `type: 'oauth2'` instead. A brand still carrying the old section name would
+// validate clean while every card and every provider credential went unread.
+test('#788: the oauth2 section is retired, since the feature is connections now', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    oauth2: { discord: { enabled: true, name: 'Discord', logo: 'https://cdn.test/discord.svg' } },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.oauth2 is retired') && e.includes('connections')),
+    `the old section must bounce and name its replacement: ${errors.join(' | ')}`,
+  );
+
+  // The replacement itself validates clean, with the same free-form entry
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      connections: { discord: { enabled: true, name: 'Discord', logo: 'https://cdn.test/discord.svg' } },
+    }).errors,
+    [],
+  );
+});
+
+// A NAME test (retired-keys.js's #142 rule): `oauth2` exists nowhere else in
+// the schema, so a brand that pushed the block down into a target override
+// hears it on a whole-file load too.
+test('#788: the oauth2 section bounces at every depth, target overrides included', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { backend: { oauth2: { google: {} } } },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.backend.oauth2 is retired') && e.includes('connections')),
+    `the nested block must bounce at its real path: ${errors.join(' | ')}`,
+  );
 });
 
 test('the new homes themselves validate clean — the provider keeps its own name one level down', () => {

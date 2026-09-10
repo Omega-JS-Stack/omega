@@ -29,6 +29,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-ordering-uid';
 const ORDER_ID = '_test-ordering-order';
@@ -80,7 +81,7 @@ function existingUser(status = 'active') {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Webhook robustness: out-of-order delivery, unknown types, and no-op updates',
   type: 'group',
   timeout: 30000,
@@ -322,4 +323,4 @@ module.exports = {
       },
     },
   ],
-};
+});

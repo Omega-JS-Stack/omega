@@ -36,7 +36,7 @@ test('public credentials pass by design', () => {
   const found = findSecretKeys({
     cloud: { config: { apiKey: 'public-web-key' } },
     payment: { providers: { stripe: { publishableKey: 'pk_test_x' }, paypal: { clientId: 'x' } } },
-    oauth2: { google: { clientId: 'x' } },
+    connections: { google: { clientId: 'x' } },
     brand: { secrets: 'not-a-match-plural' },
   });
 

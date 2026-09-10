@@ -4,13 +4,19 @@
  * plumbing a deploy runs, dist/ is served on an ephemeral loopback port, and
  * Lighthouse scores the home page plus every page path passed as an argument.
  *
+ * Every page also reports its LCP and CLS, and the form factor the run used
+ * (Lighthouse's default preset is mobile emulation on Slow 4G, the same shape
+ * PageSpeed Insights reports for mobile).
+ *
  * Report-only by default (legacy UJM parity: the scores print, the command
- * exits 0). A `--min-<category>` flag ARMS the gate for that category — any
- * page under a stated minimum fails loudly and exits non-zero.
+ * exits 0). A `--min-<category>` flag ARMS the gate for that category, and
+ * `--max-lcp=<ms>` arms the perceived-usability bar (#467) — any page under a
+ * stated minimum, or over the stated LCP, fails loudly and exits non-zero.
  *
  *   omega audit                                   # home page, report only
  *   omega audit /pricing /blog                    # home + two more pages
  *   omega audit --min-performance=90 --min-seo=95 # gated: under = exit 1
+ *   omega audit --max-lcp=1300                    # gated: LCP over 1.3s = exit 1
  */
 const http = require('node:http');
 const fs = require('node:fs');
@@ -19,7 +25,7 @@ const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const { consumerPaths } = require('../consumer.js');
 
-const logger = new Logger('omega:audit');
+const logger = new Logger('audit');
 
 // Lighthouse's own category ids, in report order. Each one's threshold flag is
 // `--min-<id>` — one source for the flags, the printout and the gate.
@@ -30,6 +36,14 @@ const LABELS = {
   accessibility: 'Accessibility',
   'best-practices': 'Best Practices',
   seo: 'SEO',
+};
+
+// The two field metrics the perceived-usability bar is read from: LCP is the
+// #467 gate (`--max-lcp`), CLS rides along because a late shift is the other
+// half of "usable", and both come free with the performance category.
+const METRIC_AUDITS = {
+  lcp: 'largest-contentful-paint',
+  cls: 'cumulative-layout-shift',
 };
 
 const CONTENT_TYPES = {
@@ -59,6 +73,7 @@ module.exports = async function (options) {
 
   // Parse before building — a typo'd flag must not cost a full build first
   const thresholds = parseThresholds(options);
+  const maxLcp = parseMaxLcp(options);
   const pages = parsePages(options);
   const paths = consumerPaths();
 
@@ -80,9 +95,9 @@ module.exports = async function (options) {
     chrome = await launchChrome();
     for (const page of pages) {
       logger.log(`Auditing ${page}...`);
-      const scores = await auditPage(`${server.origin}${page}`, chrome.port);
-      results.push({ page, scores });
-      logger.log(`${page} — ${CATEGORIES.map((category) => `${LABELS[category]} ${formatScore(scores[category])}`).join(' · ')}`);
+      const { scores, metrics } = await auditPage(`${server.origin}${page}`, chrome.port);
+      results.push({ page, scores, metrics });
+      logger.log(`${page} — ${formatSummary(scores, metrics)}`);
     }
   } finally {
     if (chrome) {
@@ -91,22 +106,26 @@ module.exports = async function (options) {
     await server.close();
   }
 
-  if (!Object.keys(thresholds).length) {
-    logger.log('Report only — pass --min-<category> (e.g. --min-performance=90) to gate the exit code');
+  if (!Object.keys(thresholds).length && maxLcp === null) {
+    logger.log('Report only — pass --min-<category> (e.g. --min-performance=90) or --max-lcp=1300 to gate the exit code');
     return results;
   }
 
-  const failures = evaluateScores(results, thresholds);
-  if (failures.length) {
-    for (const failure of failures) {
+  const scoreFailures = evaluateScores(results, thresholds);
+  const lcpFailures = evaluateLcp(results, maxLcp);
+  if (scoreFailures.length || lcpFailures.length) {
+    for (const failure of scoreFailures) {
       logger.error(`${failure.page}: ${LABELS[failure.category]} ${formatScore(failure.score)} is under --min-${failure.category}=${failure.min}`);
     }
-    logger.error(`Audit FAILED — ${failures.length} score(s) under threshold`);
+    for (const failure of lcpFailures) {
+      logger.error(`${failure.page}: LCP ${formatMs(failure.value)} is over --max-lcp=${failure.max}`);
+    }
+    logger.error(`Audit FAILED — ${scoreFailures.length + lcpFailures.length} gate(s) missed`);
     process.exitCode = 1;
     return results;
   }
 
-  logger.log(`Audit passed — every gated score meets its threshold across ${results.length} page(s)`);
+  logger.log(`Audit passed — every armed gate is met across ${results.length} page(s)`);
   return results;
 };
 
@@ -138,6 +157,28 @@ function parseThresholds(options) {
   }
 
   return thresholds;
+}
+
+/**
+ * The perceived-usability bar: `--max-lcp=<ms>` in both the dashed and yargs'
+ * camelized form, null when the flag is absent (report-only, same default as
+ * the category thresholds). Ian's bar is 1s to usable (#467).
+ * @param {object} options - the parsed CLI options
+ * @returns {number|null} the maximum acceptable LCP in milliseconds
+ */
+function parseMaxLcp(options) {
+  const raw = options['max-lcp'] !== undefined ? options['max-lcp'] : options.maxLcp;
+
+  if (raw === undefined || raw === null || raw === '' || raw === false) {
+    return null;
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`--max-lcp must be a duration in milliseconds above 0 (got "${raw}")`);
+  }
+
+  return value;
 }
 
 /**
@@ -279,7 +320,7 @@ async function launchChrome() {
  * Run Lighthouse against one URL through an already-launched Chrome.
  * @param {string} url - the absolute URL to audit
  * @param {number} chromePort - the launched Chrome's debugging port
- * @returns {Promise<Object<string, number|null>>} category id → score out of 100
+ * @returns {Promise<{ scores: object, metrics: object }>} the category scores and the field metrics
  */
 async function auditPage(url, chromePort) {
   // Lighthouse is ESM-only from v10 — dynamic import is how CJS reaches it
@@ -295,7 +336,7 @@ async function auditPage(url, chromePort) {
     skipAudits: ['uses-http2'],
   });
 
-  return categoryScores(result.lhr);
+  return { scores: categoryScores(result.lhr), metrics: pageMetrics(result.lhr) };
 }
 
 /**
@@ -312,6 +353,31 @@ function categoryScores(lhr) {
   }
 
   return scores;
+}
+
+/**
+ * The field metrics beside the scores: LCP in whole milliseconds, CLS as
+ * Lighthouse scored it, and the form factor the run emulated (so a printed
+ * number is never mistaken for the other device class). A metric Lighthouse
+ * did not produce reads null, never 0 — an unmeasured page is not a fast one.
+ * @param {object} lhr - the Lighthouse result object
+ * @returns {{ lcp: number|null, cls: number|null, formFactor: string|null }}
+ */
+function pageMetrics(lhr) {
+  const audits = lhr.audits || {};
+
+  const numeric = (id) => {
+    const value = audits[id] && audits[id].numericValue;
+    return typeof value === 'number' ? value : null;
+  };
+
+  const lcp = numeric(METRIC_AUDITS.lcp);
+
+  return {
+    lcp: lcp === null ? null : Math.round(lcp),
+    cls: numeric(METRIC_AUDITS.cls),
+    formFactor: (lhr.configSettings && lhr.configSettings.formFactor) || null,
+  };
 }
 
 /**
@@ -337,15 +403,66 @@ function evaluateScores(results, thresholds) {
   return failures;
 }
 
+/**
+ * The LCP gate: every page whose largest contentful paint came in over the
+ * bar. No bar = no gate; a MISSING LCP under an armed bar is a failure (same
+ * doctrine as the scores — a run that measured nothing has not passed).
+ * @param {Array<{ page: string, metrics: object }>} results - the per-page results
+ * @param {number|null} maxLcp - the maximum acceptable LCP in milliseconds
+ * @returns {Array<{ page: string, metric: string, value: number|null, max: number }>}
+ */
+function evaluateLcp(results, maxLcp) {
+  if (typeof maxLcp !== 'number') {
+    return [];
+  }
+
+  const failures = [];
+
+  for (const { page, metrics } of results) {
+    const lcp = metrics && metrics.lcp;
+    if (typeof lcp !== 'number' || lcp > maxLcp) {
+      failures.push({ page, metric: 'lcp', value: typeof lcp === 'number' ? lcp : null, max: maxLcp });
+    }
+  }
+
+  return failures;
+}
+
+/**
+ * One page's printed line: the four scores, then the metrics, then the form
+ * factor the run emulated.
+ * @param {Object<string, number|null>} scores - category id → score out of 100
+ * @param {object} metrics - the page's LCP/CLS/form factor
+ * @returns {string} the summary, without the page path
+ */
+function formatSummary(scores, metrics) {
+  const parts = CATEGORIES.map((category) => `${LABELS[category]} ${formatScore(scores[category])}`);
+  parts.push(`LCP ${formatMs(metrics.lcp)}`, `CLS ${formatCls(metrics.cls)}`);
+
+  return `${parts.join(' · ')} (${metrics.formFactor || 'unknown'} emulation)`;
+}
+
 function formatScore(score) {
   return typeof score === 'number' ? `${score}/100` : 'n/a';
 }
 
+function formatMs(ms) {
+  return typeof ms === 'number' ? `${Math.round(ms)} ms` : 'n/a';
+}
+
+function formatCls(cls) {
+  return typeof cls === 'number' ? cls.toFixed(3) : 'n/a';
+}
+
 // Exposed for tests (the command function stays the main export)
 module.exports.parseThresholds = parseThresholds;
+module.exports.parseMaxLcp = parseMaxLcp;
 module.exports.parsePages = parsePages;
 module.exports.evaluateScores = evaluateScores;
+module.exports.evaluateLcp = evaluateLcp;
 module.exports.categoryScores = categoryScores;
+module.exports.pageMetrics = pageMetrics;
+module.exports.formatSummary = formatSummary;
 module.exports.resolveFile = resolveFile;
 module.exports.serveDist = serveDist;
 module.exports.resolveChromePath = resolveChromePath;

@@ -59,7 +59,7 @@ test('#439: cta_button renders the closing CTA in the sibling button idiom, warn
 
   assert.ok(html.includes('<a href="/features" class="btn btn-adaptive btn-lg omega-hover-nudge">'), 'the shared closing-CTA button idiom');
   assert.ok(html.includes('See every feature'), 'the button is named by its own copy');
-  assert.ok(html.includes('<span class="omega-nudge ms-2"><i class="fa fa-sm" data-icon="arrow-right" aria-hidden="true">'), 'the arrow nudge rides along, hidden from the a11y tree (#538)');
+  assert.ok(html.includes('<span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i>'), 'the arrow nudge rides along');
   assert.deepEqual(warnings, [], 'the ported CTA no longer warns as unknown');
 });
 
@@ -94,8 +94,8 @@ test('#439: superheadline takes BOTH shapes — the string unchanged, the object
   // The superheadline is TEXT, always (Ian's 2026-08-22 ruling): an authored
   // icon is ignored on the way in, never an error. TILE icons are untouched.
   assert.ok(object.includes('<span class="omega-micro">Why ACME</span>'), 'the object form renders its label alone');
-  assert.ok(!object.includes('data-icon="rocket"'), 'the authored eyebrow icon is dropped, not rendered');
-  assert.ok(object.includes('data-icon="bolt"'), 'while the tile keeps its own feature icon');
+  assert.ok(!object.includes('fa-rocket'), 'the authored eyebrow icon is dropped, not rendered');
+  assert.ok(object.includes('fa-bolt'), 'while the tile keeps its own feature icon');
   assert.ok(!object.includes('[object Object]'), 'never the raw object');
   assert.deepEqual(warnings, [], 'the object shape carries no type warning');
 });
@@ -123,7 +123,7 @@ test('#512: an authored subheadline still renders its own line', async () => {
 
 test('#512: the demo line lives in the gallery variant now', async () => {
   const pages = await buildWith(miniData, {}, 'bento-args-test');
-  const frame = pages.get('/test/sections/section/marketing/bento/frames/default-grid');
+  const frame = pages.get('/test/sections/marketing/bento/frames/default-grid');
   assert.ok(frame, 'the default-grid variant frame built');
 
   assert.ok(frame.includes('A complete foundation that stays out of your way'), 'sample content, where sample content belongs');

@@ -74,20 +74,24 @@ cta:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: resolved.hero.tagline, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
-    <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    {% component "heading/masthead", eyebrow: resolved.hero.tagline, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, first_paint: true %}
+    <div class="d-flex flex-wrap gap-3 mt-4">
       {% iftruthy resolved.hero.primary_button.text %}
         <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.primary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       {% endiftruthy %}
       {% iftruthy resolved.hero.secondary_button.text %}
         <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.secondary_button.text }}
-          <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+          <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
         </a>
       {% endiftruthy %}
     </div>
@@ -128,7 +132,7 @@ cta:
                 </span>
                 <span class="omega-rowlist__meta">
                   {{ resolved.alternatives.view_comparison }}
-                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                  <i class="fa-solid fa-arrow-right fa-xs ms-2"></i>
                 </span>
               </a>
             {% endfor %}
@@ -159,7 +163,7 @@ cta:
           {% for prop in resolved.value_props.items %}
             <div class="omega-rowlist__item" data-omega-reveal>
               <span class="d-inline-flex align-items-center gap-3">
-                <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon prop.icon, "fa-sm" %}</span>
+                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ prop.icon }} fa-sm"></i></span>
                 <strong>{{ prop.title }}</strong>
               </span>
               <span class="omega-rowlist__meta">{{ prop.description }}</span>

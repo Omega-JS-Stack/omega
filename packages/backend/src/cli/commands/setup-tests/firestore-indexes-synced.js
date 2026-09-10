@@ -27,6 +27,17 @@ class FirestoreIndexesSyncedTest extends BaseTest {
       return true;
     }
 
+    // A shared project's deployed indexes belong to every brand on it, not to
+    // this one. Pulling them down merged ~400 lines of other tenants'
+    // collections into the consumer's authored firestore.indexes.json, silently,
+    // during the commit gate's own test run
+    // ([#716](https://github.com/Omega-JS-Stack/omega/issues/716)). There is no
+    // drift to report here, because there is no one-brand live set to compare to.
+    if (this.isSharedProject) {
+      console.log(chalk.dim(`  shared cloud project (${self.projectId}) — live index sync skipped (its indexes belong to every brand on it)`));
+      return true;
+    }
+
     const IndexesCommand = require('../indexes');
     const indexesCmd = new IndexesCommand(self);
 
@@ -111,6 +122,12 @@ class FirestoreIndexesSyncedTest extends BaseTest {
 
     if (this.isDemoProject) {
       return; // run() never fails demo projects; never touch the live API here
+    }
+
+    // Belt for a direct caller: run() never fails a shared project either, and
+    // the merge below is exactly the write that ships another tenant's indexes.
+    if (this.isSharedProject) {
+      return;
     }
 
     // Belt for a direct caller: run() already downgrades drift to a warning

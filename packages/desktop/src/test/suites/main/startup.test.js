@@ -5,7 +5,9 @@
 // are smoke-tested separately via boot-sequence.test.js. Here we test the
 // startup module's own surface.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'startup (main)',
@@ -124,4 +126,4 @@ module.exports = {
       },
     },
   ],
-};
+});

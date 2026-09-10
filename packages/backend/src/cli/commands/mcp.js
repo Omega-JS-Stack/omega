@@ -6,12 +6,15 @@ class McpCommand extends BaseCommand {
     const self = this;
 
     // dist/ is staged output — a fresh clone has none; the MCP server reads
-    // its config from the staged tree (same view as the runtime)
-    this.ensureStaged();
+    // its config from the staged tree (same view as the runtime). `development`
+    // is PINNED (#586): mcp is a LOCAL lane like emulator/serve, and the stage
+    // and the read below must name the same environment or this process would
+    // read an overlay its own stage never composed.
+    this.ensureStaged({ environment: 'development' });
     const functionsDir = path.join(self.firebaseProjectPath, 'dist');
 
     // Load the .env cascade so OMEGA_ADMIN_KEY is available
-    require('@omega.js/config').loadEnv(functionsDir);
+    require('@omega.js/config').loadEnv(functionsDir, { environment: 'development' });
 
     // Resolve the @omega.js/backend server URL
     const baseUrl = self.argv.url

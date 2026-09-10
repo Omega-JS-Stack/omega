@@ -343,8 +343,14 @@ function errorWithCode(message, code) {
 //
 // Flags:
 //   skip — Array of provider names to skip field creation for (e.g., ['sendgrid'])
-//          SendGrid has first_name/last_name as built-in contact fields
-//          Beehiiv needs them created as custom fields (preset templates)
+//          A skipped field is never provisioned in that provider AND never
+//          written to it — fieldsForProvider() below is the ONE derivation the
+//          provisioning ensure AND every provider's buildFields() read, so the
+//          two lists can't drift (#695). The name fields skip SendGrid because
+//          SendGrid stores first/last name in its RESERVED contact columns,
+//          which addContact writes natively — the custom-field lane skips them,
+//          so the old "no SendGrid ID (skipped)" warn can't come back and no
+//          duplicate custom field is ever provisioned or written.
 const FIELDS = {
   // Brand
   brand_id:                              { display: 'Brand ID', source: 'config', path: 'brand.id', type: 'text' },
@@ -424,6 +430,24 @@ const SEGMENTS = {
 };
 
 /**
+ * The catalog's view of ONE provider — the field names it provisions, and so
+ * the exact set its contact sync may write ([#695](https://github.com/Omega-JS-Stack/omega/issues/695)).
+ *
+ * The ONE derivation of the skip flag: OMEGA's custom-fields ensure provisions
+ * this list (through the manager's lib/backend-marketing.js) and the provider's
+ * buildFields() writes this list, so a field the catalog omits can never become
+ * a runtime "no field ID (skipped)" surprise.
+ *
+ * @param {string} provider - Provider name ('sendgrid', 'beehiiv')
+ * @returns {string[]} The field names that provider owns
+ */
+function fieldsForProvider(provider) {
+  return Object.entries(FIELDS)
+    .filter(([, field]) => !(field.skip || []).includes(provider))
+    .map(([name]) => name);
+}
+
+/**
  * Resolve all field values from a user doc + config.
  * Returns a map of semantic field names → resolved values (type-coerced).
  * Providers use this internally to build their native field format.
@@ -498,6 +522,7 @@ module.exports = {
   escapeHtml,
   safeUrl,
   errorWithCode,
+  fieldsForProvider,
   resolveFieldValues,
   nextWeekday,
   nextNthWeekday,

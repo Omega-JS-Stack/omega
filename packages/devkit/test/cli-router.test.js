@@ -96,14 +96,28 @@ async function captured(fn) {
 test('unknown positional prints the available-command listing and sets exit code 1 (no throw)', async () => {
   const { err, exitCode } = await captured(() => makeMain().process({ _: ['nope'] }));
   assert.match(err, /Unknown command "nope"/);
-  assert.match(err, /Available: boom, install, setup, version/);
+  assert.match(err, /Available: boom, install, refuse, setup, version/);
   assert.equal(exitCode, 1);
 });
 
 test('command errors surface once (own stack, exit code 1) with no wrapper prefix or rethrow', async () => {
   const { err, exitCode } = await captured(() => makeMain().process({ _: ['boom'] }));
   assert.match(err, /kaboom/);
+  // The other half of #706's rule: a BUG still prints its stack. The refusal
+  // twin below asserts the absence, so this one asserts the presence — together
+  // they pin the branch, which a message-only print would otherwise satisfy.
+  assert.match(err, /\n\s+at /, 'a genuine error keeps its stack frames');
   assert.doesNotMatch(err, /Error executing command/);
+  assert.equal(exitCode, 1);
+});
+
+test('a crafted refusal prints its message alone — no stack under it (#706)', async () => {
+  // A refused command renders the SAME way on every surface: the crafted lines,
+  // nothing added. The stack belongs to a bug, and a refusal is not one.
+  const { err, exitCode } = await captured(() => makeMain().process({ _: ['refuse'] }));
+  assert.match(err, /refusing to scaffold into/);
+  assert.doesNotMatch(err, /at Object/, 'a refusal never prints a stack frame');
+  assert.doesNotMatch(err, /^Error: /m, 'nor the Error: prefix a stack carries');
   assert.equal(exitCode, 1);
 });
 

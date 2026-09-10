@@ -4,13 +4,17 @@
 // in build/package/publish with cross-env undeclared → exit 127).
 //
 // Since #117 the build-mode env flags are set in-process by the CLI verbs, so
-// the scripts invoke nothing but `npx omega` — cross-env is gone from the
-// scaffold, from desktop's own deps, and from the peer-dependency map.
+// the scripts invoke nothing but the framework's own verbs — cross-env is gone
+// from the scaffold, from desktop's own deps, and from the peer-dependency map.
+// Those verbs spell BARE since #748 (`omega build`, web's form): npm puts
+// node_modules/.bin on the path inside a script, so the `npx` prefix was
+// redundant there. It stays canonical for docs and the terminal.
 
 const path = require('path');
 const fs = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'projectScripts — npx tools are declared peers',
@@ -45,13 +49,17 @@ module.exports = {
         for (const script of Object.values(scripts)) {
           ctx.expect(String(script).includes('cross-env')).toBe(false);
           ctx.expect(/OMEGA_BUILD_MODE|OMEGA_IS_PUBLISH/.test(String(script))).toBe(false);
+          // Bare verbs inside a package script (#748) — the `npx` prefix is
+          // for docs and the terminal, never for a script npm already puts
+          // node_modules/.bin on the path for.
+          ctx.expect(String(script).includes('npx omega')).toBe(false);
         }
 
-        ctx.expect(scripts.build).toBe('npx omega build');
-        ctx.expect(scripts.package).toBe('npx omega package');
-        ctx.expect(scripts['package:quick']).toBe('npx omega package --quick');
-        ctx.expect(scripts.publish).toBe('npx omega publish');
-        ctx.expect(scripts['release:local']).toBe('npx omega publish --local');
+        ctx.expect(scripts.build).toBe('omega build');
+        ctx.expect(scripts.package).toBe('omega package');
+        ctx.expect(scripts['package:quick']).toBe('omega package --quick');
+        ctx.expect(scripts.publish).toBe('omega publish');
+        ctx.expect(scripts['release:local']).toBe('omega publish --local');
       },
     },
     {
@@ -79,4 +87,4 @@ module.exports = {
       },
     },
   ],
-};
+});

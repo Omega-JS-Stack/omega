@@ -5,7 +5,7 @@
  */
 const fetch = require('wonderful-fetch');
 const Manager = require('../../../index.js');
-const { resolveFieldValues } = require('../constants.js');
+const { resolveFieldValues, fieldsForProvider } = require('../constants.js');
 const env = require('../../env.js');
 
 const BASE_URL = 'https://api.sendgrid.com/v3';
@@ -657,17 +657,26 @@ async function addContact({ email, firstName, lastName, company, customFields })
  * Build SendGrid custom_fields object from a user doc.
  * Resolves all field values, maps to display names, then resolves SendGrid IDs.
  *
+ * The catalog decides which fields SendGrid owns (#695): a field the catalog
+ * skips for SendGrid is never written here, so the only fields that can come
+ * back unmapped are ones OMEGA has yet to provision — a real, actionable warn.
+ *
  * @param {object} userDoc - User document from Firestore
  * @returns {object} Custom fields keyed by SendGrid field ID (e.g., { e1_T: 'basic' })
  */
 async function buildFields(userDoc) {
   const values = resolveFieldValues(userDoc, Manager.config);
+  const owned = new Set(fieldsForProvider('sendgrid'));
   const idMap = await resolveFieldIds();
   const fields = {};
 
   const unmapped = [];
 
   for (const [name, value] of Object.entries(values)) {
+    if (!owned.has(name)) {
+      continue;
+    }
+
     const sgId = idMap[name];
 
     if (sgId) {

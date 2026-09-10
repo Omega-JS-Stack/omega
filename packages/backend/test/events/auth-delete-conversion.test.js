@@ -21,7 +21,8 @@
  *
  * Run: npx omega test framework:events/auth-delete-conversion
  */
-const onDelete = require('../../src/manager/events/auth/on-delete.js');
+const onDelete = require('../../dist/manager/events/auth/on-delete.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const EVENT_CONTEXT = {
   eventType: 'providers/firebase.auth/eventTypes/user.delete',
@@ -75,7 +76,7 @@ async function runHandler({ Manager, uid, doc }) {
   return { calls: calls, delivery: delivery };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'auth:on-delete fires the canonical user_delete conversion',
   type: 'group',
   timeout: 30000,
@@ -134,4 +135,4 @@ module.exports = {
       },
     },
   ],
-};
+});

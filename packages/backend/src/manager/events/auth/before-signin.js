@@ -30,7 +30,14 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  ctx.log(`beforeSignIn: ${user.uid} (${user.email})`, user, context);
+  // The UID and nothing else. The AuthUserRecord carries the email, the display
+  // name and the provider data, the AuthEventContext carries the IP, the user
+  // agent and the credential, and a backend line lands in Cloud Logging for the
+  // whole retention window — so none of it rides this line
+  // ([#657](https://github.com/Omega-JS-Stack/omega/issues/657)). Both stay
+  // reachable one level down, at debug.
+  ctx.log(`beforeSignIn: ${user.uid}`);
+  ctx.debug(`beforeSignIn: ${user.uid} record`, user, context);
 
   const now = new Date();
 

@@ -3,7 +3,7 @@
     href: '/',
     class: 'filter-adaptive',
     text: '{{ resolved.config.brand.name }}',
-    description: '{{ resolved.config.meta.description }}',
+    description: '{{ resolved.config.brand.description }}',
   },
   links: [
     {

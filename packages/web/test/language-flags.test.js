@@ -22,7 +22,7 @@ function emitInto(outDir) {
   fs.rmSync(outDir, { recursive: true, force: true });
   emitIcons({ outDir, coreIconsDir: path.join(PATHS.core, 'icons') });
 
-  return path.join(outDir, 'assets', 'fa', 'flags');
+  return path.join(outDir, 'assets', 'icons', 'flags');
 }
 
 test('emitIcons already ships the core flag set — the aliases only add names to it', () => {

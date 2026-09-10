@@ -18,7 +18,8 @@
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/refund/post.js');
+const handler = require('../../../dist/manager/routes/payments/refund/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const OWNER = '_test-refund-one-time-owner';
 
@@ -63,7 +64,7 @@ function refund(Manager, user, orderId) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment refund endpoint: one-time purchases',
   type: 'group',
   timeout: 15000,
@@ -158,6 +159,29 @@ module.exports = {
     },
 
     {
+      name: 'rejects-a-purchase-that-never-completed',
+      auth: 'none',
+      async run({ assert, Manager, firestore }) {
+        // An abandoned Stripe checkout session stays `open` on the order, with
+        // its provider and resourceId intact — so every other refusal passes it
+        // and the provider is asked to reverse a charge that never happened
+        const orderId = '_test-order-one-time-never-completed';
+        await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
+          unified: {
+            product: { id: 'credits-100', name: '100 Credits' },
+            status: 'open',
+            payment: { provider: 'unknown-provider', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
+          },
+        }));
+
+        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+
+        assert.equal(sent.code, 400, `An incomplete purchase should be refused, not sent to the provider, got ${sent.code}: ${sent.body}`);
+        assert.match(`${sent.body}`, /has not completed/i, 'The rejection should say the purchase never completed');
+      },
+    },
+
+    {
       name: 'rejects-a-purchase-older-than-6-months',
       auth: 'none',
       async run({ assert, Manager, firestore }) {
@@ -227,4 +251,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -466,15 +466,12 @@ async function syncMarketingContact(ctx, uid, email) {
 
 /**
  * Send welcome, checkup, and feedback emails
+ *
+ * No testing-mode gate here: the mailer's own seam captures a testing send instead
+ * of delivering it, so these run for real in every environment and a broken one
+ * fails a test ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)).
  */
 async function sendWelcomeEmails(ctx, uid, firstName) {
-  const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
-
-  if (!shouldSend) {
-    ctx.log(`signup(): Skipping welcome emails (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
-    return;
-  }
-
   await Promise.all([
     sendWelcomeEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendWelcomeEmail failed:', e)),
     sendDiscountNudgeEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendDiscountNudgeEmail failed:', e)),

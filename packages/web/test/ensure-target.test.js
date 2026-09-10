@@ -48,6 +48,26 @@ test('ensureTarget: writes on a fresh target, no-op on the rerun', () => {
   assert.deepStrictEqual(third, { written: [], merged: [], changed: [] }, 'a converged target is a total no-op');
 });
 
+test('ensureTarget: refuses a workspace root, loudly, without writing a single file (#699)', () => {
+  // The accident: `omega deploy` at a workspace root scaffolded a whole website
+  // target into it — src/, workflows, rewritten root scripts — before failing
+  // anyway. Parity with the same case in @omega.js/desktop's suite (#706).
+  const root = tmpConsumer();
+  const manifestPath = path.join(root, 'package.json');
+  fs.writeFileSync(manifestPath, `${JSON.stringify({ name: 'acme', private: true, workspaces: ['targets/*'] }, null, 2)}\n`);
+  const before = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.throws(() => ensureTarget({ projectDir: root }), (error) => {
+    assert.match(error.message, /refusing to scaffold into/);
+    assert.match(error.message, /declares "workspaces"/);
+    assert.ok(error.message.includes(root), `names the directory: ${error.message}`);
+    return true;
+  });
+
+  assert.deepStrictEqual(fs.readdirSync(root), ['package.json'], 'nothing was scaffolded');
+  assert.strictEqual(fs.readFileSync(manifestPath, 'utf8'), before, 'the manifest is byte-identical');
+});
+
 test('deploy precheck: --no-secrets skips every step, bare deploy runs them in order', async () => {
   const ran = [];
   const steps = ['push-secrets'].map((name) => ({ name, run: () => { ran.push(name); } }));

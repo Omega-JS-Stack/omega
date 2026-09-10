@@ -209,17 +209,21 @@ jobs:
       # from its packed tarball in a bare consumer, exactly like a real npm install.
       # Also the self-containment gate for @omega.js vendoring: the WHOLE shipped
       # tree (dist + any shipped test/templates) must contain zero raw requires OR
-      # imports of the PRIVATE @omega.js packages (devkit/config/account/template-kit
-      # — the vendor after-hook rewrites dist references to relative paths; see
-      # packages/devkit/tools/vendor.js). Published @omega.js runtime deps
-      # (@omega.js/client, and @omega.js/backend + @omega.js/mcp-router inside
-      # manager) legitimately stay as package requires — the scratch install maps
-      # them to their local tarballs via overrides until they exist on npm. ALL
-      # SEVEN publishables are covered; scripts/release-check.js is this gate's
-      # laptop mirror.
+      # imports of the PRIVATE @omega.js packages (the vendor after-hook rewrites
+      # dist references to relative paths; see packages/devkit/tools/vendor.js).
+      # The grep names none of them: the alternation is DERIVED from that tool's
+      # own VENDORABLE_PACKAGES (#713 — the hand-written list sat two names
+      # behind it, so a raw analytics/monitoring require could ship undetected).
+      # Published @omega.js runtime deps (@omega.js/client, and @omega.js/backend
+      # + @omega.js/mcp-router inside manager) legitimately stay as package
+      # requires — the scratch install maps them to their local tarballs via
+      # overrides until they exist on npm. ALL SEVEN publishables are covered;
+      # scripts/release-check.js is this gate's laptop mirror.
       - name: Pack and scratch-install each package
         run: |
           set -euo pipefail
+          private_packages=$(node -p "require('./packages/devkit/tools/vendor').VENDORABLE_PACKAGES.join('|')")
+          echo "Private (never-published) packages the scan covers: $private_packages"
           client_tarball=$(npm pack --workspace=packages/client --pack-destination /tmp | tail -1)
           backend_tarball=$(npm pack --workspace=packages/backend --pack-destination /tmp | tail -1)
           router_tarball=$(npm pack --workspace=packages/mcp-router --pack-destination /tmp | tail -1)
@@ -247,7 +251,7 @@ jobs:
               " \
               && npm install --no-audit --no-fund "/tmp/$tarball")
             (cd "$scratch" && node -e "require.resolve('$name'); console.log('$name: resolves OK')")
-            if grep -rE --include='*.js' --include='*.cjs' --include='*.mjs' "(require(\.resolve)?\(|from |import\(|import )['\"]@omega\.js/(devkit|config|account|template-kit)" "$scratch/node_modules/$name"; then
+            if grep -rE --include='*.js' --include='*.cjs' --include='*.mjs' "(require(\.resolve)?\(|from |import\(|import )['\"]@omega\.js/($private_packages)" "$scratch/node_modules/$name"; then
               echo "FAIL: $name ships raw private @omega.js references — vendoring did not run/rewrite"
               exit 1
             fi

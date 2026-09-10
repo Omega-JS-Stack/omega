@@ -2,9 +2,10 @@
  * Test: Chargebee toUnifiedOneTime()
  * Unit tests for the Chargebee library's invoice → unified one-time transformation
  */
-const Chargebee = require('../../../../src/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../../dist/manager/libraries/payment/providers/chargebee.js');
 
 const FIXTURE_INVOICE = require('../../../fixtures/chargebee/invoice-one-time.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const MOCK_CONFIG = {
   payment: {
@@ -22,7 +23,7 @@ function toUnifiedOneTime(rawResource, options) {
   return Chargebee.toUnifiedOneTime(rawResource, { config: MOCK_CONFIG, ...options });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Chargebee toUnifiedOneTime() transformation',
   type: 'group',
 
@@ -144,4 +145,4 @@ module.exports = {
       },
     },
   ],
-};
+});

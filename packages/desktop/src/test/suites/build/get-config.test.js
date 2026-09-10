@@ -5,6 +5,7 @@
 const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function stageConsumer(jsonText) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-getconfig-'));
@@ -28,7 +29,7 @@ function loadConfigInDir(dir) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'Manager.getConfig — omega.json5 resolution + derived defaults',
@@ -133,4 +134,4 @@ module.exports = {
       },
     },
   ],
-};
+});

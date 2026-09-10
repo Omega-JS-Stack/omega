@@ -11,7 +11,7 @@ literal `<` must never open a tag the minifier can eat (#580). {% endcomment %}
   <ul class="omega-price-card__features">
     {% for feature in args.features %}
       <li>
-        <span class="omega-feature-check text-success">{% omega_icon "check", "fa-sm" %}</span>
+        <span class="omega-feature-check text-success"><i class="fa-solid fa-check fa-sm"></i></span>
         <span>
           {% if feature.value and feature.value != true %}
             {{ feature.value | omega_commaify | escape_once }}

@@ -12,19 +12,23 @@ config:
 ---
 
 <!-- ═══ Masthead (document pages: legal, plain-markdown content) ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and no reveal attribute on the hand-rolled h1/p below. The
+bands after it keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
     {% comment %} #491: the h1 is gated on its own arg. Rendered
     unconditionally it shipped a BLANK first h1 on every page that authors no
     breadcrumb — and a body carrying its own title then shipped two, the first
     empty (the checklist's one-h1 rule). {% endcomment %}
     {% iftruthy resolved.meta.breadcrumb %}
-      <h1 class="omega-display omega-display--page" data-omega-reveal>
+      <h1 class="omega-display omega-display--page">
         {{ resolved.meta.breadcrumb }}
       </h1>
     {% endiftruthy %}
     {% iftruthy resolved.meta.description %}
-      <p class="omega-hero-split__sub" data-omega-reveal>
+      <p class="omega-hero-split__sub">
         {{ resolved.meta.description }}
       </p>
     {% endiftruthy %}

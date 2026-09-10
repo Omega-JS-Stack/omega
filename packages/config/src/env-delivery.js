@@ -33,7 +33,7 @@ const { ENV_SCHEMA } = require('./env-schema.js');
 // Keys a generated workflow's own `env:` block already declares. The generated
 // block never restates one (a repeated YAML mapping key is invalid) — they are
 // still PUBLISHED, they just aren't re-rendered.
-const WORKFLOW_OWNED_KEYS = ['GH_TOKEN', 'NODE_VERSION', 'NODE_ENV'];
+const WORKFLOW_OWNED_KEYS = ['GH_TOKEN', 'CLOUDFLARE_TOKEN', 'NODE_VERSION', 'NODE_ENV'];
 
 // Rendered in place of the block when a target delivers nothing, so the
 // generated region is always a valid, self-explaining line of YAML.

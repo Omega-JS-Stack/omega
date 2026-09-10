@@ -10,7 +10,8 @@
  * Driven by the real `test` AI provider (directives scripted into the image
  * prompt), so the retry loop runs for real with no paid API call and no mock.
  */
-const { generateSectionImage } = require('../../src/manager/libraries/email/generators/lib/svg-illustrator.js');
+const { generateSectionImage } = require('../../dist/manager/libraries/email/generators/lib/svg-illustrator.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Scripted reply with no <svg> in it, so BOTH attempts of the retry loop run
 // and the placeholder illustration is what comes back
@@ -19,7 +20,7 @@ const NO_SVG_PROMPT = '[[reply:a description, not markup]]';
 const NEWSLETTER_CONFIG = { provider: { svg: 'test' }, model: { svg: 'test' } };
 const BRAND = { name: 'OMEGA Playground', color: { primary: '#5B5BFF', secondary: '#1E1E2A' } };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Newsletter SVG illustrator (retry token accounting)',
   type: 'group',
   tests: [
@@ -47,4 +48,4 @@ module.exports = {
       },
     },
   ],
-};
+});

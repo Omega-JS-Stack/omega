@@ -23,6 +23,7 @@ test('PATHS points at the packaged dirs, all of which exist', () => {
     defaults: path.join(PKG, 'defaults'),
     scaffold: path.join(PKG, 'scaffold'),
     runtime: path.join(PKG, 'runtime'),
+    translations: path.join(PKG, 'translations'),
   });
 
   for (const [name, dir] of Object.entries(PATHS)) {

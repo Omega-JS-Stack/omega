@@ -14,6 +14,15 @@
  * The sweep covers every template the engine registers: the packaged defaults
  * on disk, and the pages synthesized for a brand's own collections (#207),
  * which are paginated by definition.
+ *
+ * ONE family is exempt, deliberately (#564): a canonical LISTING, whose page 1
+ * is the collection's own URL (`/blog`, `/docs`) and belongs in sitemap.xml.
+ * Eleventy adds only page 0 of a paginated template to collections, so the
+ * exemption exposes exactly that page — never `/blog/page/N`, which the index
+ * flag marks noindex anyway — and a SHUT listing still writes no file, which
+ * every machine-file walk skips on `unless item.url`. An ALIAS-paginated
+ * template (one page per taxonomy term) gets no such exemption: its page 0 is
+ * one arbitrary term.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -78,7 +87,7 @@ function templates(t, siteData) {
     siteData: siteData || SITE_DATA,
     environment: 'development',
     farmDir: path.join(out, 'farm'),
-    assetManifest: { js: { pages: {} }, css: { pages: {}, themePages: {} } },
+    assetManifest: { js: { pages: {} }, css: { pages: {}, layouts: {} } },
   });
   return config.templates;
 }
@@ -89,22 +98,43 @@ function gates(t) {
 
 const excludeGate = (data) => data.eleventyComputed.eleventyExcludeFromCollections;
 
+// The canonical listings (#564): page 1 of each IS a real URL of the site, so
+// it stays in the collections the machine files walk. Every other paginated
+// default excludes itself.
+const LISTING_DEFAULTS = ['pages/blog.md'];
+
+const EXCLUDES = /^eleventyExcludeFromCollections:\s*true\s*$/m;
+const PAGINATES = /^pagination:/m;
+const ALIAS = /^\s+alias:/m;
+
 test('every paginated default spells eleventyExcludeFromCollections in its own frontmatter', () => {
   // defaults/ is the WHOLE set of templates the render gate covers (the engine
   // registers default pages and the showcase; themes ship layouts and
   // sections, never page templates).
-  const offenders = templateFiles(DEFAULTS).filter((file) => {
-    const frontmatter = frontmatterOf(fs.readFileSync(file, 'utf8'));
-    return frontmatter
-      && /^pagination:/m.test(frontmatter)
-      && !/^eleventyExcludeFromCollections:\s*true\s*$/m.test(frontmatter);
-  });
+  const paginated = templateFiles(DEFAULTS)
+    .map((file) => ({ rel: path.relative(DEFAULTS, file).split(path.sep).join('/'), frontmatter: frontmatterOf(fs.readFileSync(file, 'utf8')) }))
+    .filter((entry) => entry.frontmatter && PAGINATES.test(entry.frontmatter));
 
-  assert.deepEqual(offenders.map((file) => path.relative(DEFAULTS, file)), [],
+  const offenders = paginated.filter((entry) => !LISTING_DEFAULTS.includes(entry.rel) && !EXCLUDES.test(entry.frontmatter));
+  assert.deepEqual(offenders.map((entry) => entry.rel), [],
     'Eleventy reads eleventyExcludeFromCollections off RAW frontmatter when it expands pagination, '
     + 'so the render gate\'s computed value never reaches a paginated template — every one of them must '
     + 'carry the literal `eleventyExcludeFromCollections: true`, or its generated pages land in the '
     + 'collections a suppressed page must stay out of');
+});
+
+test('#564: the canonical listing is the ONE exemption, and it is not an alias generator', () => {
+  const listings = LISTING_DEFAULTS.map((rel) => ({ rel, frontmatter: frontmatterOf(fs.readFileSync(path.join(DEFAULTS, rel), 'utf8')) }));
+
+  for (const entry of listings) {
+    assert.ok(PAGINATES.test(entry.frontmatter), `${entry.rel} paginates`);
+    assert.ok(!ALIAS.test(entry.frontmatter),
+      `${entry.rel} must paginate a LISTING, not one page per term — an alias generator's page 0 is one arbitrary term, `
+      + 'and putting that in the sitemap while its siblings stay out is exactly the disagreement #564 reports');
+    assert.ok(!EXCLUDES.test(entry.frontmatter),
+      `${entry.rel} must NOT exclude itself from collections: its page 1 is the canonical listing URL, and a page `
+      + 'cannot be in sitemap.xml if it is not in the walk sitemap.xml reads (#564)');
+  }
 });
 
 test('every synthesized collection page spells it too', (t) => {
@@ -125,8 +155,18 @@ test('every synthesized collection page spells it too', (t) => {
 
   for (const entry of synthesized) {
     const frontmatter = frontmatterOf(entry.raw);
-    assert.ok(/^pagination:/m.test(frontmatter), `${entry.virtual} paginates`);
-    assert.ok(/^eleventyExcludeFromCollections:\s*true\s*$/m.test(frontmatter),
+    assert.ok(PAGINATES.test(frontmatter), `${entry.virtual} paginates`);
+
+    // The listing carries the blog listing's own exemption (#564); the
+    // category generator is an alias generator and keeps the key.
+    if (entry.virtual.endsWith('/index.html')) {
+      assert.ok(!EXCLUDES.test(frontmatter),
+        `${entry.virtual} is the collection's canonical listing — excluding it from collections is what kept `
+        + '/blog and /docs out of sitemap.xml (#564)');
+      continue;
+    }
+
+    assert.ok(EXCLUDES.test(frontmatter),
       `${entry.virtual} must carry the literal \`eleventyExcludeFromCollections: true\` — Eleventy reads it off `
       + 'RAW frontmatter when it expands pagination, so a computed value never reaches a paginated template');
   }

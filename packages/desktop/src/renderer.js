@@ -1,6 +1,6 @@
 // Renderer-process Manager singleton.
 // Consumer entry (per view): `new (require('@omega.js/desktop/renderer'))().initialize()`.
-// Reads window.OMEGA_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omega.js/client + auth.
+// Reads window.OMEGA_BUILD_JSON.config (injected by the bundle task's esbuild `define`), bootstraps @omega.js/client + auth.
 //
 // Auth bridge:
 //   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
@@ -32,8 +32,8 @@ Manager.prototype.initialize = async function (overrides) {
   const self = this;
 
   // Merge runtime overrides on top of build-time config.
-  // OMEGA_BUILD_JSON is injected by webpack DefinePlugin; the BannerPlugin also makes it
-  // available on globalThis.OMEGA_BUILD_JSON for DevTools introspection.
+  // OMEGA_BUILD_JSON is injected by the bundle task's esbuild `define`; its `banner`
+  // also makes it available on globalThis.OMEGA_BUILD_JSON for DevTools introspection.
   const buildJson = (typeof OMEGA_BUILD_JSON !== 'undefined' && OMEGA_BUILD_JSON) || {};
   self.config = Object.assign({}, buildJson.config || {}, overrides || {});
 
@@ -174,7 +174,7 @@ Manager.prototype._wireTooltips = function () {
   const start = () => {
     let Tooltip;
     try {
-      // Prebuilt UMD (Popper inlined) — loads via webpack AND plain require().
+      // Prebuilt UMD (Popper inlined) — loads through the bundle task AND plain require().
       const bootstrap = require('./assets/js/bootstrap.bundle.js');
       Tooltip = bootstrap.Tooltip;
       window.bootstrap = Object.assign(window.bootstrap || {}, bootstrap);

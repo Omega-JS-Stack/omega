@@ -135,7 +135,6 @@ function updatePushUI() {
 async function initPushNotifications() {
   const $status = document.getElementById('push-notification-status');
   const $form = document.getElementById('push-subscribe-form');
-  const $copyBtn = document.getElementById('copy-push-token-btn');
 
   if (!$status) {
     return;
@@ -165,18 +164,4 @@ async function initPushNotifications() {
 
   // Now that the form exists, let updatePushUI set the correct state
   updatePushUI();
-
-  if ($copyBtn) {
-    const $tokenInput = document.getElementById('push-token-value');
-    const originalHtml = $copyBtn.innerHTML;
-    $copyBtn.addEventListener('click', () => {
-      if (!$tokenInput?.value) {
-        return;
-      }
-      navigator.clipboard.writeText($tokenInput.value).then(() => {
-        $copyBtn.textContent = 'Copied!';
-        setTimeout(() => { $copyBtn.innerHTML = originalHtml; }, 2000);
-      });
-    });
-  }
 }

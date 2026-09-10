@@ -24,7 +24,10 @@
 <aside class="omega-shell__sidebar" id="app-sidebar">
   <!-- Brand lockup -->
   {% capture logo_href %}{% assign temp_href = data.logo.href | default: resolved.config.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+  {% comment %} The VISIBLE logo prefers the bridged vector when the mint produced one (#467) —
+    `brand.images.brandmark` stays the raster OG/social and payment sync need, and an
+    authored `data.logo.src` still outranks both. {% endcomment %}
+  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
   {% capture logo_text %}{{ data.logo.text | default: resolved.config.brand.name | omega_liquify }}{% endcapture %}
 
   <a href="{{ logo_href }}" class="omega-side__brand">
@@ -49,7 +52,7 @@
             <span class="omega-side__selector-env d-block">{{ data.selector.env | omega_liquify }}</span>
           {% endiftruthy %}
         </span>
-        <span class="omega-side__selector-chevron">{% omega_icon "arrows-up-down", "fa-xs" %}</span>
+        <span class="omega-side__selector-chevron"><i class="fa-solid fa-arrows-up-down fa-xs"></i></span>
       </button>
       {% if data.selector.dropdown %}
         <ul class="dropdown-menu">
@@ -59,7 +62,7 @@
             {% else %}
               <li>
                 <a class="dropdown-item" href="{{ item.href | default: '#' }}">
-                  {% if item.icon %}{% omega_icon item.icon, "fa-sm me-2" %}{% endif %}
+                  {% if item.icon %}<i class="fa-solid fa-{{ item.icon }} fa-sm me-2"></i>{% endif %}
                   {{ item.label | omega_liquify }}
                 </a>
               </li>
@@ -101,10 +104,10 @@
           <li>
             <button class="omega-side__item {% if dropdown_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
               {% if link.icon %}
-                <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+                <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
               {% endif %}
               <span class="omega-shell__label">{{ link.label }}</span>
-              <span class="omega-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
+              <span class="omega-side__chevron"><i class="fa-solid fa-chevron-right fa-xs"></i></span>
             </button>
             <div class="collapse {% if dropdown_has_active %}show{% endif %}" id="{{ link_id }}">
               <ul class="omega-side__children">
@@ -124,10 +127,10 @@
                     <li>
                       <button class="omega-side__item {% if nested_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
                         {% if child.icon %}
-                          <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                          <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
                         {% endif %}
                         <span class="omega-shell__label">{{ child.label }}</span>
-                        <span class="omega-side__chevron">{% omega_icon "chevron-right", "fa-xs" %}</span>
+                        <span class="omega-side__chevron"><i class="fa-solid fa-chevron-right fa-xs"></i></span>
                       </button>
                       <div class="collapse {% if nested_has_active %}show{% endif %}" id="{{ nested_id }}">
                         <ul class="omega-side__children">
@@ -139,7 +142,7 @@
                               <li>
                                 <a href="{{ grandchild.href }}" class="omega-side__item {{ grandchild_active }}">
                                   {% if grandchild.icon %}
-                                    <span class="omega-side__icon">{% omega_icon grandchild.icon, "fa-sm" %}</span>
+                                    <span class="omega-side__icon"><i class="fa-solid fa-{{ grandchild.icon }} fa-sm"></i></span>
                                   {% endif %}
                                   <span class="omega-shell__label">{{ grandchild.label }}</span>
                                 </a>
@@ -156,7 +159,7 @@
                       {% iftruthy child.href %}
                         <a href="{{ child.href }}" class="omega-side__item {{ child_active }}" {{ child_attributes }}>
                           {% if child.icon %}
-                            <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                            <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
                           {% endif %}
                           <span class="omega-shell__label">{{ child.label }}</span>
                           {% if child.badge %}
@@ -167,7 +170,7 @@
                       {% iffalsy child.href %}
                         <button type="button" class="omega-side__item {% if child.class %}{{ child.class }}{% endif %}" {{ child_attributes }}>
                           {% if child.icon %}
-                            <span class="omega-side__icon">{% omega_icon child.icon, "fa-sm" %}</span>
+                            <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
                           {% endif %}
                           <span class="omega-shell__label">{{ child.label }}</span>
                         </button>
@@ -186,7 +189,7 @@
             {% iftruthy link.href %}
               <a href="{{ link.href }}" class="omega-side__item {{ link_active }}" {{ link_attributes }}>
                 {% if link.icon %}
-                  <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+                  <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
                 {% endif %}
                 <span class="omega-shell__label">{{ link.label }}</span>
                 {% if link.badge %}
@@ -197,7 +200,7 @@
             {% iffalsy link.href %}
               <button type="button" class="omega-side__item" {{ link_attributes }}>
                 {% if link.icon %}
-                  <span class="omega-side__icon">{% omega_icon link.icon, "fa-sm" %}</span>
+                  <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
                 {% endif %}
                 <span class="omega-shell__label">{{ link.label }}</span>
               </button>
@@ -217,7 +220,7 @@
           <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="omega-chip">Sponsored</span>
             <a href="/pricing" class="omega-footer__link" data-omega-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
-              {% omega_icon "xmark", "fa-xs" %}
+              <i class="fa-solid fa-xmark fa-xs"></i>
             </a>
           </div>
           {% section "verts/unit", type: "in-article", size: "rectangle" %}
@@ -237,7 +240,7 @@
           <span class="omega-side__user-email d-block text-truncate" data-omega-bind="@text auth.user.email">email@example.com</span>
         </span>
         <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">
-          {% omega_icon "gear", "fa-sm" %}
+          <i class="fa-solid fa-gear fa-sm"></i>
         </a>
       </div>
     </div>

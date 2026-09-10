@@ -1,0 +1,7 @@
+// A page sheet PAST the inline budget: too much css to carry in every document,
+// so it keeps its hashed file and its link (#767).
+@for $i from 1 through 400 {
+  .consumer-bulky-probe-#{$i} {
+    border-color: rgb(1, 2, 3);
+  }
+}

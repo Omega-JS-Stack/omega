@@ -4,6 +4,7 @@
 // (shell.openExternal, omega.handleAuthToken, windows.get's show/focus surface).
 
 const http = require('http');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Minimal GET helper — resolves { status, body }.
 function get(url) {
@@ -43,7 +44,7 @@ function stubExternals(ctx) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'auth-flow (main)',
@@ -192,4 +193,4 @@ module.exports = {
       },
     },
   ],
-};
+});

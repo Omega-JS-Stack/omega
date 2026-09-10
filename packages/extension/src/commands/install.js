@@ -17,7 +17,7 @@ module.exports = async function (options) {
 
   try {
     // Install production — the publish-day inverse of `i local`: flip every
-    // file: spec in the brand tree to ^<linked version>, one registry install
+    // file: spec in the brand tree to the exact <linked version>, one registry install
     if (['live', 'prod', 'p', 'production'].includes(type)) {
       // Log
       logger.log('Installing production (restoring registry specs tree-wide)...');

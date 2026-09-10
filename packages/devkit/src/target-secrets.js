@@ -34,8 +34,11 @@
  * a skip — it throws the boundary's instructions (install, `gh auth login`, or
  * `omega deploy --no-secrets`).
  *
- * Desktop does NOT bind this: its signing material travels as files and base64
- * blobs over its own Octokit transport, a shape this one does not carry.
+ * Desktop binds it too ([#682](https://github.com/Omega-JS-Stack/omega/issues/682)),
+ * over the `resolveValue` seam: its signing secrets are named by PATH in the
+ * cascade (`CSC_LINK=config/certs/dev-id.p12`) and what CI needs is the FILE, so
+ * it base64-encodes an existing file between COLLECT and PUBLISH. That seam is
+ * the only shape difference between the three binds — the transport is one.
  */
 const { composeTargetEnv } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
@@ -49,15 +52,26 @@ const { resolveRepo } = require('./deploy.js');
  * @param {object} options
  * @param {string} options.targetDir - The target root (its .env is the local layer).
  * @param {string} options.target - Target name ('web', 'extension', …).
+ * @param {function} [options.resolveValue] - `(value, key) => string`, the seam
+ *   applied to each collected value before it travels (desktop base64-encodes
+ *   its file-path signing secrets). A falsy return DROPS the key, exactly as an
+ *   empty composed value does.
  * @returns {Object<string, string>} key → value, ready to publish.
  */
 function collectTargetSecrets(options) {
-  const { targetDir, target } = options;
-  const { values } = composeTargetEnv({ targetDir, target });
+  const { targetDir, target, resolveValue } = options;
+  // PRODUCTION, named rather than sniffed: these values fuel the runner's
+  // release build, and the composer would otherwise default to whatever
+  // environment this shell happens to be
+  // ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)) — the same
+  // determinism the "FILES only, never the shell" rule above buys.
+  const { values } = composeTargetEnv({ targetDir, target, environment: 'production' });
 
   const secrets = {};
   for (const key of publishSecretKeys(target)) {
-    if (values[key]) secrets[key] = values[key];
+    if (!values[key]) continue;
+    const value = resolveValue ? resolveValue(values[key], key) : values[key];
+    if (value) secrets[key] = value;
   }
 
   return secrets;
@@ -97,6 +111,7 @@ function declaredBrandRepo(options) {
  * @param {string} options.target - Target name ('web', 'extension', …).
  * @param {object} options.logger - `{ log, warn, error }`.
  * @param {object} [options.env] - Env map (default: process.env).
+ * @param {function} [options.resolveValue] - Value seam (see collectTargetSecrets).
  * @param {function} [options.execFn] - Injectable `gh` exec (tests).
  * @param {function} [options.gitExecFn] - Injectable `git` exec for remote discovery (tests).
  * @returns {{ skipped: string }|{ published: string[], failed: Array<object> }}
@@ -113,7 +128,7 @@ function publishTargetSecrets(options) {
     return { skipped: 'ci' };
   }
 
-  const secrets = collectTargetSecrets({ targetDir, target });
+  const secrets = collectTargetSecrets({ targetDir, target, resolveValue: options.resolveValue });
   const keys = Object.keys(secrets);
   if (!keys.length) {
     logger.warn('Skipping secret publication — no keys composed for this target from the .env cascade (company/brand/target)');

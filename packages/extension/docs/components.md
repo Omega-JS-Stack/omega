@@ -80,7 +80,7 @@ If you DO need to add a new top-level component type:
 ## See also
 
 - [managers.md](managers.md) — Manager classes, one-line bootstrap per context
-- [build-system.md](build-system.md) — how components compile through webpack/sass/html
+- [build-system.md](build-system.md) — how components compile through esbuild/sass/html
 - [defaults.md](defaults.md) — the `src/defaults/` template system
 - [css.md](css.md) — SCSS load paths for component styles
 - [offscreen.md](offscreen.md) — offscreen document lifecycle + messaging patterns

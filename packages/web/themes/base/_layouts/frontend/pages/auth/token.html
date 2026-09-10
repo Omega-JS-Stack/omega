@@ -7,7 +7,8 @@ layout: frontend/core/cover
     <div class="omega-auth__card text-center">
       <!-- Logo -->
       <div class="omega-auth__brand">
-        <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
+        {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+        <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
@@ -33,8 +34,8 @@ layout: frontend/core/cover
 
       <!-- Actions (hidden until the flow resolves with an error) -->
       <div id="token-actions" class="text-center d-none mt-3">
-        <button type="button" id="token-retry" class="btn btn-adaptive w-100">{% omega_icon "rotate-right", "fa-sm me-2" %}Try again</button>
-        <a href="/" class="btn btn-link btn-sm text-muted d-block mt-2">{% omega_icon "house", "fa-xs me-1" %}Go home</a>
+        <button type="button" id="token-retry" class="btn btn-adaptive w-100"><i class="fa-solid fa-rotate-right fa-sm me-2"></i>Try again</button>
+        <a href="/" class="btn btn-link btn-sm text-muted d-block mt-2"><i class="fa-solid fa-house fa-xs me-1"></i>Go home</a>
       </div>
     </div>
   </div>

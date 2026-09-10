@@ -61,9 +61,13 @@ faqs:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-0" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: "Contact", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-0" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    {% component "heading/masthead", eyebrow: "Contact", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, first_paint: true %}
   </div>
 </section>
 
@@ -78,12 +82,12 @@ faqs:
         <div class="mb-5">
           {% for method in resolved.contact_methods %}
             <a href="{{ method.link }}" class="omega-channel" data-omega-reveal>
-              <span class="omega-icon-chip">{% omega_icon method.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip"><i class="fa-solid fa-{{ method.icon }} fa-sm"></i></span>
               <span class="omega-channel__body">
                 <span class="omega-channel__title d-block">{{ method.title }}</span>
                 <span class="omega-channel__desc d-block">{{ method.description }}</span>
               </span>
-              <span class="omega-channel__arrow">{% omega_icon "arrow-right", "fa-sm" %}</span>
+              <span class="omega-channel__arrow"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
             </a>
           {% endfor %}
         </div>
@@ -193,7 +197,7 @@ faqs:
           <div class="d-flex flex-wrap align-items-center gap-3">
             <button type="submit" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
               Send message
-              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-sm" %}</span>
+              <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
             </button>
           </div>
         </form>

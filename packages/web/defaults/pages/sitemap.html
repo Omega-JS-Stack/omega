@@ -1,7 +1,7 @@
 ---
 permalink: /sitemap.xml
-sitemap:
-  include: false
+meta:
+  index: false
 ---
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset
@@ -12,18 +12,13 @@ sitemap:
   >
   {%- for item in collections.allByUrl -%}
     {%- unless item.url -%}{%- continue -%}{%- endunless -%}
-    {%- assign prefix5 = item.url | slice: 0, 5 -%}
-    {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
-    {%- assign prefix7 = item.url | slice: 0, 7 -%}
-    {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
-    {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
-    {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
-    {%- comment -%}#564: noindex and the sitemap are ONE decision — a page core/head.html
-    marks noindex (its own `meta.index: false`, its layout's, or the config `meta` section's)
-    is never listed here. The URL families head.html answers by url (`/page/N`, `/test/`) are
-    paginated defaults, which the render gate already keeps out of collections.{%- endcomment -%}
-    {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
-    {%- if item.data.draft -%}{%- continue -%}{%- endif %}
+    {%- comment -%}#564: the index posture is ONE decision and this is the ONLY test any
+    machine file makes. The engine resolves it per page (engine.js `resolved`): the site
+    default `targets.web.meta.index`, then the layout's `meta.index`, then the page's own,
+    then the framework's automatic exclusions (drafts, the /test dev surfaces, /admin/,
+    redirect stubs, a listing's pages 2..N). No template keeps a rule list of its own, so
+    the robots tag, sitemap.xml, llms.txt and pages.json can never disagree.{%- endcomment -%}
+    {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif %}
   <url>
     {%- if item.url == '/' %}
     <loc>{{ resolved.config.url }}</loc>

@@ -10,7 +10,9 @@
 // `distSnapshotBefore`; this test re-fingerprints the same tree from inside the booted app.
 // An untouched tree — including one that never existed — matches exactly.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'boot build isolation — the project dist/ is never written',
@@ -49,4 +51,4 @@ module.exports = {
       },
     },
   ],
-};
+});

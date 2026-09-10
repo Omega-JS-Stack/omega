@@ -1,6 +1,6 @@
 // Audit — fail-fast schema + filesystem checks for the consumer's config/omega.json5.
 //
-// Runs as part of `gulp build` between sass/webpack/html and build-config. Catches the
+// Runs as part of `gulp build` between sass/bundle/html and build-config. Catches the
 // "I forgot to set X" / "icon path is wrong" / "main entry was renamed" footguns at build time
 // rather than letting them reach electron-builder (where the error messages are useless).
 //
@@ -12,13 +12,15 @@
 //     app.appId / app.productName are optional — derived from brand.id / brand.name if unset.
 //   - File existence for any path-shaped config value (brand.images.icon).
 //   - Format checks for fields with constrained shapes (brand.id as URL scheme, startup.mode, signing strategy).
-//   - Consumer entrypoints exist (src/main.js, src/preload.js) — these are what webpack will try to bundle.
-//   - In publish mode, releases.repo is set and electron-builder.yml exists.
+//   - Consumer entrypoints exist (src/main.js, src/preload.js) — these are what the `bundle` task hands to esbuild.
+//   - In publish mode, the releases repo RESOLVES (@omega.js/config's releasesRepo:
+//     `<brand.id>-releases` under the brand repo owner unless config names another)
+//     and electron-builder.yml exists.
 
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const Manager = new (require('../../build.js'));
-const { validateConfig } = require('@omega.js/config');
+const { validateConfig, releasesRepo } = require('@omega.js/config');
 
 const logger = Manager.logger('audit');
 
@@ -47,8 +49,11 @@ module.exports = function audit(done) {
     // Icon must exist when packaging — dev runs fine with the default Electron icon.
     fileMustExist(config.brand.images?.icon, 'config.brand.images.icon');
   }
-  if (Manager.isPublishMode() && config.releases?.enabled !== false && !config.releases?.repo) {
-    errors.push('config.releases.repo is required when publishing (e.g. "update-server")');
+  // Publishing needs an ADDRESS for the releases repo, not a hand-written name:
+  // @omega.js/config's releasesRepo defaults it to `<brand.id>-releases` under the
+  // brand repo owner, so only a missing owner (or brand.id) leaves it unaddressable.
+  if (Manager.isPublishMode() && config.releases?.enabled !== false && !releasesRepo(config).repo) {
+    errors.push('the releases repo is unaddressable: set repo.providers.github.org (or targets.desktop.releases.owner) and brand.id. The repo name defaults to "<brand.id>-releases"');
   }
 
   // 3. Soft warnings — not fatal but worth surfacing.

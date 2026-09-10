@@ -1,24 +1,29 @@
 /**
  * Ensure the brand's package.json scripts convention — the root AND each
  * framework target's (npm scripts put node_modules/.bin on PATH, so plain
- * `omega` resolves there). Script VALUES only — no other script, key, or
- * consumer content is ever touched. Idempotent: a converged file rewrites
- * nothing.
+ * `omega` resolves there). Script VALUES only — no other key or consumer
+ * content is ever touched. Idempotent: a converged file rewrites nothing.
  *
  * Root: `deploy: 'omega deploy'` guaranteed plus the start/manage migration
- * (package-scripts.js). Targets: missing scripts fill from the framework's
- * own `projectScripts` manifest declaration — the onboard→dev cycle break
- * (#675): the framework's ensureTarget writes these on the first verb run,
- * but the dev fan-out reaches that verb THROUGH them. The walk only ever
- * FILLS; the framework's own ensureTarget syncs the same keys unconditionally
- * on every verb run and wins from then on. Custom targets (and a
- * custom-server backend, #584) own their scripts and are never touched.
+ * (package-scripts.js). Targets: every key the framework declares in its own
+ * `projectScripts` is FRAMEWORK-owned and is rewritten to the default here,
+ * exactly as that framework's ensureTarget does on every verb run (#689) —
+ * one policy, two writers, so a consumer customizes behavior through hook
+ * points and never by editing a standard script. The walk running it at all
+ * is the onboard→dev cycle break (#675): the dev fan-out reaches those verbs
+ * THROUGH these scripts, so a freshly scaffolded target needs them before any
+ * verb has ever run. Keys the consumer added are never touched.
+ *
+ * The exceptions: a custom TARGET maps to no framework at all (#603), so it
+ * is skipped whole; a custom-server backend is skipped PER KEY (#584) — the
+ * verbs its mode refuses are the brand's own, named by the framework's
+ * `projectScriptsCustomOwned` declaration.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
-const { healPackageScripts, healTargetScripts } = require('../../../lib/package-scripts.js');
+const { healPackageScripts, syncTargetScripts } = require('../../../lib/package-scripts.js');
 const { resolveFrameworkPackage } = require('../../../lib/framework-bin.js');
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
@@ -44,9 +49,9 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
   const targetWork = [];
   const warnings = [];
   for (const entry of targets) {
-    // A custom target's scripts are the brand's own contract (#603), and a
-    // custom-server backend names its own server command (#584)
-    if (!entry.target || entry.projectType === 'custom') continue;
+    // A custom target's scripts are the brand's own contract (#603) — no
+    // framework declares them, so there is nothing to sync against
+    if (!entry.target) continue;
 
     const framework = TARGET_FRAMEWORKS[entry.target];
     const resolved = framework ? resolveFrameworkPackage(entry.path, framework) : null;
@@ -67,8 +72,12 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
       continue;
     }
 
-    const healed = healTargetScripts(targetPkg, resolved.pkg.projectScripts);
-    if (healed.changes.length) targetWork.push({ entry, manifestPath, targetPkg, healed });
+    // A custom-server backend owns the keys whose verbs its mode refuses
+    // (#584) — the framework declares WHICH, so no list lives here (#689)
+    const brandOwnedKeys = entry.projectType === 'custom' ? (resolved.pkg.projectScriptsCustomOwned || []) : [];
+
+    const synced = syncTargetScripts(targetPkg, resolved.pkg.projectScripts, brandOwnedKeys);
+    if (synced.changes.length) targetWork.push({ entry, manifestPath, targetPkg, synced });
   }
 
   if (!changes.length && !targetWork.length && !warnings.length) {
@@ -80,7 +89,7 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
     const parts = [];
     if (changes.length) parts.push(`heal root scripts (${changes.join(', ')})`);
     for (const work of targetWork) {
-      parts.push(`heal ${work.entry.dir} scripts (${work.healed.changes.join(', ')})`);
+      parts.push(`sync ${work.entry.dir} scripts (${work.synced.changes.join(', ')})`);
     }
     return dryRunPlan(parts.join('; '), {
       output: {
@@ -100,11 +109,14 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
   }
 
   for (const work of targetWork) {
-    work.targetPkg.scripts = work.healed.scripts;
+    work.targetPkg.scripts = work.synced.scripts;
     jetpack.write(work.manifestPath, `${JSON.stringify(work.targetPkg, null, 2)}\n`);
-    console.log(`      ${chalk.green('✓')} Healed ${work.entry.dir} scripts \`${work.healed.changes.join('`, `')}\``);
+    // The skipped keys are named per key: a custom-server backend's own verbs
+    // are absent by design, not by omission
+    const brandOwned = work.synced.skipped.length ? chalk.dim(` (brand-owned, untouched: ${work.synced.skipped.join(', ')})`) : '';
+    console.log(`      ${chalk.green('✓')} Synced ${work.entry.dir} scripts \`${work.synced.changes.join('`, `')}\`${brandOwned}`);
     output.targetScripts = output.targetScripts || {};
-    output.targetScripts[work.entry.name] = work.healed.changes;
+    output.targetScripts[work.entry.name] = work.synced.changes;
   }
 
   return {

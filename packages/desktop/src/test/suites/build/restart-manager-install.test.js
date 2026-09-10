@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const install = require('../../../lib/restart-manager/install.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Realistic electron-builder feed fixtures (shapes match what @omega.js/desktop's release
 // pipeline publishes to update-server).
@@ -41,7 +42,7 @@ const LINUX_YML = [
   '    sha512: ddd==',
 ].join('\n');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'restart-manager install machinery (build)',
@@ -84,6 +85,11 @@ module.exports = {
 
         const plain = { version: '3.0.0', files: [{ url: 'RM-3.0.0-mac.zip' }] };
         ctx.expect(install.pickArtifact(plain, 'darwin', 'arm64')).toBe('RM-3.0.0-mac.zip');
+
+        // The versionless name @omega.js/desktop packages under since #620 —
+        // an RM built by the current framework publishes THIS zip.
+        const versionless = { version: '4.0.0', files: [{ url: 'Restart-Manager-mac-universal.zip' }] };
+        ctx.expect(install.pickArtifact(versionless, 'darwin', 'arm64')).toBe('Restart-Manager-mac-universal.zip');
       },
     },
     {
@@ -169,4 +175,4 @@ module.exports = {
       },
     },
   ],
-};
+});

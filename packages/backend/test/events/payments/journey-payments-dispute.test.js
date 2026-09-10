@@ -19,13 +19,15 @@
  *
  * Run: npx omega test backend:events/payments/journey-payments-dispute
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const PERSONA = 'journey-payments-dispute';
 
 // The card the test dispute provider issues against, and the card an alert has to
 // name to match anything at all
 const CARD = '4242';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: chargeback alert → refund + forced cancel via the test dispute provider',
   type: 'suite',
   timeout: 60000,
@@ -185,4 +187,4 @@ module.exports = {
       },
     },
   ],
-};
+});

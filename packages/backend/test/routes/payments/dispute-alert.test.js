@@ -2,7 +2,9 @@
  * Test: POST /payments/dispute-alert
  * Tests the dispute alert endpoint validates requests and saves to Firestore
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Dispute alert endpoint',
   type: 'group',
   timeout: 30000,
@@ -319,4 +321,4 @@ module.exports = {
       },
     },
   ],
-};
+});

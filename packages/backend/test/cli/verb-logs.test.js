@@ -19,8 +19,9 @@ const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const BaseCommand = require('../../src/cli/commands/base-command.js');
-const attachLogFile = require('../../src/cli/utils/attach-log-file.js');
+const BaseCommand = require('../../dist/cli/commands/base-command.js');
+const attachLogFile = require('../../dist/cli/utils/attach-log-file.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A command bound to a throwaway target root — BaseCommand reads its paths off main.
 function commandInTempApp() {
@@ -43,7 +44,7 @@ function withoutCiEnv(run) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'log lanes — the verb tee at the target root, the sweep in dist/',
   type: 'group',
 
@@ -114,4 +115,4 @@ module.exports = {
       },
     },
   ],
-};
+});

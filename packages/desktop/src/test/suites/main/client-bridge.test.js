@@ -3,7 +3,9 @@
 // Real Firebase integration tests live in client-bridge.integration.test.js
 // (gated on OMEGA_TEST_FIREBASE_ADMIN_KEY presence).
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'client-bridge (main, unit)',
@@ -244,4 +246,4 @@ module.exports = {
       },
     },
   ],
-};
+});

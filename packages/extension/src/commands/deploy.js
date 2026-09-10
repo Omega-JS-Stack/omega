@@ -15,7 +15,7 @@
 const { execSync } = require('node:child_process');
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('deploy');
-const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, dispatchRepo, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
 const { ensureTarget } = require('./lib/ensure-target.js');
@@ -64,7 +64,8 @@ module.exports = async function (options) {
     syncWorkingTree({ message: 'Deploy', logger });
   }
 
-  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
+  const { owner, repo } = dispatchAddress();
+  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, owner, repo, dryRun });
 
   if (dispatched) {
     require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'dispatch' } });
@@ -77,3 +78,20 @@ module.exports = async function (options) {
     logger.log(`  then watch: ${plan.runsUrl}`);
   }
 };
+
+/**
+ * The repo this target's CI dispatch addresses: the brand's own, from its
+ * config ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)). A git
+ * remote answers the repo the working tree SITS IN, which inside a brand nested
+ * in another repo is the enclosing one, so the dispatch went to a workflow that
+ * was never there. The rule is `@omega.js/devkit/deploy`'s `dispatchRepo`, the
+ * same call web's deploy and desktop's release verbs make. Exported for tests.
+ *
+ * @returns {{ owner: string, repo: string }} owner and bare repo name
+ * @throws {Error} when the config names no repo
+ */
+function dispatchAddress() {
+  return dispatchRepo(Manager.getConfig());
+}
+
+module.exports.dispatchAddress = dispatchAddress;

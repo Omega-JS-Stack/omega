@@ -125,12 +125,12 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
 
   // Accept either an already-RESOLVED config object, a string path to a consumer
   // project dir, or nothing. Default resolution order (when called with no arg):
-  //   1. OMEGA_BUILD_JSON.config — injected at build time by webpack DefinePlugin. This is
+  //   1. OMEGA_BUILD_JSON.config — injected at build time by the bundle task's esbuild `define`. This is
   //      authoritative in packaged apps because config/omega.json5 is inside the asar —
   //      not loadable from disk. It's the RESOLVED config (Manager.getConfig() output —
   //      shared sections + targets.desktop overlaid) snapshotted at build time.
   //   2. <appRoot>/config/omega.json5 — resolved via @omega.js/config for dev mode where
-  //      @omega.js/desktop is loaded directly (no webpack bundling). appRoot = the consumer project dir.
+  //      @omega.js/desktop is loaded directly (unbundled). appRoot = the consumer project dir.
   if (typeof consumerConfig === 'string') {
     consumerConfig = loadResolvedConfig(consumerConfig);
   } else if (!consumerConfig) {
@@ -470,7 +470,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // by runners/boot.js) then app.exit()s.
   //
   // We use a runtime env-var path (not a static `require('./test/harness/...')`) because
-  // @omega.js/desktop is webpacked into the consumer's bundle, and a static require would either get
+  // @omega.js/desktop is bundled into the consumer's bundle, and a static require would either get
   // inlined (bundling test code into production) or dead-code-eliminated. An env-var
   // path stays external and can only resolve when the runner sets it.
   if (process.env.OMEGA_TEST_BOOT === '1') {
@@ -485,11 +485,10 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
       // live) before our boot harness inspects state.
       setImmediate(() => {
         try {
-          // __non_webpack_require__ is webpack's magic escape hatch — preserves a runtime
-          // require() that webpack won't try to inline. In plain Node it's undefined, so
-          // `typeof` gates the branch without ReferenceError.
-          const realRequire = (typeof __non_webpack_require__ !== 'undefined') ? __non_webpack_require__ : require;
-          const harness = realRequire(harnessPath);
+          // A variable specifier, so the bundler leaves the call alone and it
+          // resolves at RUNTIME against the path the runner set — which is the
+          // whole point (see the env-var note above).
+          const harness = require(harnessPath);
           harness.run(self);
         } catch (e) {
           const { app } = require('electron');
@@ -508,7 +507,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
 };
 
 function loadResolvedConfig(projectDir) {
-  // @omega.js/config is vendored into dist (and bundled by webpack from there) — it
+  // @omega.js/config is vendored into dist (and bundled from there) — it
   // finds config/omega.json5 under the project dir and resolves the desktop target
   // (shared sections + targets.desktop overlaid, brand-monorepo walk-up included).
   const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
@@ -527,8 +526,8 @@ function loadResolvedConfig(projectDir) {
 
 // Require — lets consumer main-process code load @omega.js/desktop's bundled dependencies at runtime
 // (e.g. `manager.require('fs-jetpack')`). Resolves from @omega.js/desktop's module context, not the
-// consumer's. Mirrors @omega.js/backend's Manager.require(). For build-time (webpack) resolution,
-// the webpack config's resolve.modules handles this automatically.
+// consumer's. Mirrors @omega.js/backend's Manager.require(). For build-time resolution, the
+// bundle task's framework-deps resolve hook handles this automatically.
 Manager.prototype.require = function (name) {
   return require(name);
 };

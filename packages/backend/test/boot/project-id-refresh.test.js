@@ -15,6 +15,7 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const ProjectIdConsistencyTest = require('../../dist/cli/commands/setup-tests/project-id-consistency.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 function stage(configProjectId, firebasercProjectId) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'backend-pid-'));
@@ -32,7 +33,7 @@ function stage(configProjectId, firebasercProjectId) {
   return tmp;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Project-id consistency — fix refreshes the shared setup context',
   type: 'group',
   timeout: 30000,
@@ -69,4 +70,4 @@ module.exports = {
       },
     },
   ],
-};
+});

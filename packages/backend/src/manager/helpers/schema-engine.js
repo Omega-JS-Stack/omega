@@ -22,6 +22,9 @@
  *     `max || Infinity` clamped negatives to 0 on every undeclared-min number field
  *     and made declared 0-bounds vanish. Now: no min → negatives pass through;
  *     min: 0 / max: 0 are real bounds.
+ *   - min bounds strings and arrays by LENGTH, at the route boundary: a short
+ *     value is REFUSED with a 400, never padded — see enforceMins()
+ *     ([#789](https://github.com/Omega-JS-Stack/omega/issues/789)).
  *
  * Preserved quirks (wire-visible, kept for parity):
  *   - Coerce-never-reject: single-typed fields force(), multi-typed replace with default.
@@ -32,8 +35,9 @@ const powertools = require('node-powertools');
 const _ = require('lodash');
 
 // Node options accepted by the zod fields builders — one-to-one with declarative
-// schema nodes. `sanitize` is carried for the middleware sanitize pass; `enum` is
-// enforced post-resolution at the route boundary — see enforceEnums().
+// schema nodes. `sanitize` is carried for the middleware sanitize pass; `enum` and
+// the string/array `min` floor are enforced post-resolution at the route boundary —
+// see enforceEnums() and enforceMins().
 const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'clean', 'sanitize', 'enum'];
 
 // Keys that mark a declarative node as a FIELD (leaf) rather than a nested group.
@@ -155,7 +159,7 @@ function enforceValidTypes(value, types, def) {
 
   // NaN and ±Infinity are `number` to typeof, so the check above accepts them
   // and enforceMinMax's comparisons against NaN are all false — the clamp never
-  // fires and the value flows to sinks like usage.increment(), where it poisons
+  // fires and the value flows to sinks like usage.consume(), where it poisons
   // every later limit comparison
   // ([#244](https://github.com/Omega-JS-Stack/omega/issues/244)). A non-finite
   // number is never a usable value: it takes the default, like any other
@@ -169,10 +173,11 @@ function enforceValidTypes(value, types, def) {
 }
 
 /**
- * Bounds: numbers clamp to [min, max]; strings and arrays truncate to max (min is
- * ignored for them). Enforced ONLY when the schema declares them — undeclared min
- * means negatives pass through, and a declared 0 is a real bound (unlike
- * powertools' `min || 0` / `max || Infinity`).
+ * Bounds: numbers clamp to [min, max]; strings and arrays truncate to max. A
+ * string or array shorter than `min` is NOT padded here — length floors are
+ * refusals, enforced at the route boundary by enforceMins(). Enforced ONLY when
+ * the schema declares them — undeclared min means negatives pass through, and a
+ * declared 0 is a real bound (unlike powertools' `min || 0` / `max || Infinity`).
  */
 function enforceMinMax(value, min, max) {
   const isNumber = typeof value === 'number';
@@ -217,6 +222,44 @@ function enforceEnums(ctx, raw, resolved, enumPaths) {
 
     if (!allowed.includes(value)) {
       throw ctx.report(`Invalid settings {${path}}: must be one of [${allowed.join(', ')}]`, {code: 400});
+    }
+  }
+}
+
+/**
+ * Enforce `min` on lengths post-resolution: a resolved string or array shorter
+ * than its declared `min` rejects with 400, in the same shape enforceEnums()
+ * produces. Numbers never reach here below their bound (enforceMinMax clamps
+ * them); values with no length (booleans, objects, null) have no floor.
+ *
+ * Runs at the route boundary (Settings.resolve / resolveZodSchema), NOT inside
+ * resolveFieldValue(): the refusal needs the ctx and the dot-path a single
+ * leaf's resolution never sees, resolveSchema() also serves callers that must
+ * only resolve and never reject (routes/user/settings/validate), and at the
+ * boundary it reads the FINAL value — post forced `value` and `clean` — which
+ * is what the handler sees. A short value is refused rather than padded: the
+ * documented path-id idiom (path-derived default + `min: 1`, NOT `required`)
+ * guarded nothing while min bounded numbers only
+ * ([#789](https://github.com/Omega-JS-Stack/omega/issues/789)).
+ * @param {object} ctx - RouteContext (report)
+ * @param {object} resolved - The resolved settings (length check)
+ * @param {Array<{path: string, min: number}>} minPaths - Fields carrying a min
+ */
+function enforceMins(ctx, resolved, minPaths) {
+  for (const { path, min } of minPaths) {
+    const value = _.get(resolved, path);
+    const isString = typeof value === 'string';
+
+    if (!isString && !Array.isArray(value)) {
+      continue;
+    }
+
+    if (value.length < min) {
+      const bound = isString
+        ? `must be at least ${min} character${min === 1 ? '' : 's'}`
+        : `must have at least ${min} item${min === 1 ? '' : 's'}`;
+
+      throw ctx.report(`Invalid settings {${path}}: ${bound}`, {code: 400});
     }
   }
 }
@@ -268,4 +311,4 @@ function resolveFieldValue(raw, opts) {
   return working;
 }
 
-module.exports = { FIELD_OPTIONS, isFieldNode, iterateSchema, resolveSchema, resolveFieldValue, enforceEnums };
+module.exports = { FIELD_OPTIONS, isFieldNode, iterateSchema, resolveSchema, resolveFieldValue, enforceEnums, enforceMins };

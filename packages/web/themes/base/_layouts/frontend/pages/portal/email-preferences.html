@@ -1,9 +1,6 @@
 ---
 layout: frontend/core/cover
 
-prerender_icons:
-  - name: "bell-slash"
-  - name: "bell"
 ---
 
 <section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
@@ -12,7 +9,8 @@ prerender_icons:
       <!-- Logo -->
       <div class="text-center mb-3">
         <div class="avatar avatar-xl">
-          <img src="{{ resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
+          {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+          <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" alt="{{ resolved.config.brand.name }} Logo"/>
         </div>
       </div>
 
@@ -25,11 +23,11 @@ prerender_icons:
       <!-- Error state (hidden by default) -->
       <div id="email-preferences-error" class="text-center" hidden>
         <div class="alert alert-danger mb-4">
-          {% omega_icon "triangle-exclamation", "me-1" %}
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
           <span id="email-preferences-error-message">Invalid or missing parameters.</span>
         </div>
         <a href="/" class="btn btn-outline-adaptive">
-          {% omega_icon "arrow-left", "me-1" %}
+          <i class="fa-solid fa-arrow-left me-1"></i>
           Back to home
         </a>
       </div>
@@ -48,11 +46,11 @@ prerender_icons:
           <div class="mb-4">
             <div class="d-flex" role="group" aria-label="Email preference action" data-omega-segmented>
               <button type="button" class="btn flex-fill active" data-action="unsubscribe">
-                {% omega_icon "bell-slash", "fa-sm me-1" %}
+                <i class="fa-solid fa-bell-slash fa-sm me-1"></i>
                 Unsubscribe
               </button>
               <button type="button" class="btn flex-fill" data-action="resubscribe">
-                {% omega_icon "bell", "fa-sm me-1" %}
+                <i class="fa-solid fa-bell fa-sm me-1"></i>
                 Resubscribe
               </button>
             </div>
@@ -86,7 +84,7 @@ prerender_icons:
           </div>
 
           <button type="submit" class="btn btn-adaptive w-100 mb-4" id="email-preferences-submit">
-            {% omega_icon "bell-slash", "fa-sm me-2" %}
+            <i class="fa-solid fa-bell-slash fa-sm me-2"></i>
             <span class="button-text">Unsubscribe</span>
           </button>
         </form>
@@ -94,7 +92,7 @@ prerender_icons:
         <!-- Back to Home -->
         <div class="mt-3 pt-3 hairline-top text-center">
           <a href="/" class="btn btn-outline-adaptive btn-sm">
-            {% omega_icon "arrow-left", "fa-xs me-1" %}
+            <i class="fa-solid fa-arrow-left fa-xs me-1"></i>
             Back to home
           </a>
         </div>

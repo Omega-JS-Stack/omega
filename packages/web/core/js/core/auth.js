@@ -1,6 +1,7 @@
 import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { identify, readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
+import { retryOrphanCleanup } from '__main_assets__/js/libs/auth/orphan.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 const logger = createLogger('auth');
@@ -109,6 +110,18 @@ export default function () {
             `Couldn't load your account. Please sign in again.`,
             { type: 'danger', timeout: 8000 }
           );
+          return;
+        }
+
+        // The failed-delete backstop (libs/auth/orphan.js): a reversed accidental
+        // signup whose .delete() never landed left a live consent-less account,
+        // and the browser that failed the delete is the only thing that knows —
+        // so the retry runs here, at auth-ready, on the marked uid and nothing
+        // else ([#703](https://github.com/Omega-JS-Stack/omega/issues/703)). It
+        // returns true once it has handled the user (deleted, or signed out on a
+        // second failure), and a user this page no longer has is not the policy's
+        // business — nor the signup post's.
+        if (await retryOrphanCleanup(state)) {
           return;
         }
 

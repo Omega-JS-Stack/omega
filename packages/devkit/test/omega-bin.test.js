@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTarget, isBrandRoot, verbOf, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
@@ -386,6 +386,16 @@ test('run(): a MUTATING verb with no target context is REFUSED, and writes nothi
   assert.deepEqual(fs.readdirSync(workDir), [], 'the cwd is untouched');
 });
 
+test('run(): the refusal lists every verb that still runs, onboard aliases included (#706)', () => {
+  // The message named onboard/help/version/cwd/logs while the allowlist also
+  // carried `create` and `new` — a reader following it typed the one spelling
+  // it mentioned and never learned the other two work.
+  const { invoke } = stageTargetless();
+  const out = invoke(['deploy']);
+
+  assert.match(out.stderr, /only onboard \(create, new\), help, version, cwd and logs run/);
+});
+
 test('run(): every mutating verb spelling is refused — positional and flag-style alias (#699)', () => {
   const { invoke } = stageTargetless();
   for (const args of [['build'], ['package'], ['test'], ['install', 'local'], ['--deploy'], ['-b'], ['update']]) {
@@ -447,4 +457,193 @@ test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
     process.chdir(cwd0);
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'brand-dispatched');
+});
+
+// ─── A framework's OWN root (#757) ───────────────────────────────────────────
+
+/**
+ * A framework package's own root, as it really ships: an `@omega.js/*` name, a
+ * `./cli` export, and a DEVDEPENDENCY on another framework (packages/extension
+ * and packages/desktop depend on @omega.js/web for their vendorAssets, the
+ * manager on @omega.js/backend). Nothing here is a consumer target.
+ * @param {{ name: string, cli?: boolean, deps?: object }} spec
+ * @returns {{ scratch: string, pkgDir: string, marker: string }}
+ */
+function stageOwnRoot({ name, cli = true, deps = {} }) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-own-'));
+  const pkgDir = path.join(scratch, 'packages', name.split('/').pop());
+  fs.mkdirSync(pkgDir, { recursive: true });
+  fs.mkdirSync(path.join(scratch, '.git'), { recursive: true }); // bound the walk
+
+  const marker = path.join(scratch, 'marker.txt');
+  const manifest = { name, version: '0.1.0', devDependencies: deps, exports: { '.': './index.js' } };
+  if (cli) {
+    manifest.exports['./cli'] = './dist/cli-run.js';
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'cli-run.js'),
+      `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, __filename); } };`
+    );
+  }
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(manifest, null, 2));
+
+  return { scratch, pkgDir, marker };
+}
+
+test('findTarget: a framework\'s OWN root beats the framework it DEPENDS on (#757)', () => {
+  // The bug: packages/extension devDepends on @omega.js/web (vendorAssets), so
+  // the dependency walk named WEB at the extension's own root and `omega test`
+  // there ran an Eleventy build that scaffolded a web target into the package.
+  const { pkgDir } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
+
+  assert.deepEqual(findTarget(pkgDir), {
+    kind: 'self',
+    name: '@omega.js/extension',
+    dir: pkgDir,
+  });
+});
+
+test('findTarget: a deep dir inside a framework package walks up to its own root (#757)', () => {
+  const { pkgDir } = stageOwnRoot({ name: '@omega.js/desktop', deps: { '@omega.js/web': '*' } });
+  const deep = path.join(pkgDir, 'test', 'boot');
+
+  assert.deepEqual(findTarget(deep), { kind: 'self', name: '@omega.js/desktop', dir: pkgDir });
+});
+
+test('findTarget: an @omega.js package with no CLI is still its OWN root, never a target (#757)', () => {
+  const { pkgDir } = stageOwnRoot({ name: '@omega.js/config', cli: false });
+
+  assert.deepEqual(findTarget(pkgDir), { kind: 'self', name: '@omega.js/config', dir: pkgDir });
+});
+
+test('run(): a framework\'s own root dispatches to its OWN ./cli (#757)', async () => {
+  const { pkgDir, marker } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
+
+  const cwd0 = process.cwd();
+  process.chdir(pkgDir);
+  try {
+    await run({
+      hostName: '@omega.js/web',
+      hostRun: () => { throw new Error('the hoist-winner host must not run inside another framework\'s package'); },
+      argv: ['test', 'boot/manifest'],
+    });
+  } finally {
+    process.chdir(cwd0);
+  }
+
+  // realpath: process.chdir() resolves macOS's /var → /private/var symlink, and
+  // the resolved CLI path comes back through the chdir'd cwd.
+  assert.equal(
+    fs.readFileSync(marker, 'utf8'),
+    fs.realpathSync(path.join(pkgDir, 'dist', 'cli-run.js'))
+  );
+});
+
+test('run(): a framework\'s own root with the host match runs hostRun directly (#757)', async () => {
+  const { pkgDir } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
+
+  const cwd0 = process.cwd();
+  let ran = 0;
+  process.chdir(pkgDir);
+  try {
+    await run({ hostName: '@omega.js/extension', hostRun: () => { ran += 1; }, argv: ['test'] });
+  } finally {
+    process.chdir(cwd0);
+  }
+  assert.equal(ran, 1);
+});
+
+test('run(): an @omega.js package that ships no CLI REFUSES, never reaching the host fallback (#757)', () => {
+  // packages/config, packages/devkit and friends: an OMEGA package is never a
+  // target, so there is nothing to scaffold and nothing to hand the host.
+  const { scratch, pkgDir } = stageOwnRoot({ name: '@omega.js/config', cli: false });
+  const runner = path.join(scratch, 'runner.js');
+  fs.writeFileSync(
+    runner,
+    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
+      + `.run({ hostName: '@omega.js/web', hostRun: () => console.log('HOST-RAN') });`
+  );
+
+  const out = require('child_process').spawnSync(
+    process.execPath, [runner, 'build'], { cwd: pkgDir, encoding: 'utf8' }
+  );
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the host CLI must never start inside an OMEGA package');
+  assert.match(out.stderr, /@omega\.js\/config/);
+  assert.match(out.stderr, /Nothing was scaffolded/);
+  assert.deepEqual(fs.readdirSync(pkgDir).sort(), ['package.json'], 'the package is untouched');
+});
+
+// The signing box's verbs with NO target context: a box is a machine, not a
+// project, so `omega runner` / `omega sign-windows` run from any directory
+// through @omega.js/desktop — the host when it is desktop, else desktop
+// resolved from the cwd, else a refusal naming the install (#337).
+function stageBox({ hostName, installDesktop }) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-box-'));
+  const workDir = path.join(scratch, 'work');
+  fs.mkdirSync(workDir);
+  const marker = path.join(scratch, 'marker.txt');
+  if (installDesktop) {
+    const fwDir = path.join(scratch, 'node_modules', '@omega.js', 'desktop');
+    fs.mkdirSync(fwDir, { recursive: true });
+    fs.writeFileSync(path.join(fwDir, 'package.json'), JSON.stringify({ name: '@omega.js/desktop', exports: { './cli': './cli.js' } }));
+    fs.writeFileSync(path.join(fwDir, 'cli.js'), `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, 'desktop-dispatched'); } };`);
+  }
+  const runner = path.join(scratch, 'runner.js');
+  fs.writeFileSync(
+    runner,
+    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
+      + `.run({ hostName: ${JSON.stringify(hostName)}, hostRun: () => console.log('HOST-RAN') });`
+  );
+  return {
+    workDir,
+    marker,
+    invoke: (args) => require('child_process').spawnSync(process.execPath, [runner, ...args], { cwd: workDir, encoding: 'utf8' }),
+  };
+}
+
+test('isBoxVerbArgv: a box verb answers to its bare token AND its -- flag spelling (#337)', () => {
+  // The desktop CLI's alias table takes `--runner` and `--sign-windows`, so both
+  // spellings reach the same command — and both must be recognised HERE, or the
+  // flag form loads a project's .env cascade onto the box.
+  for (const argv of [
+    ['runner'], ['runner', 'status'], ['sign-windows', '--smoke'],
+    ['--runner'], ['--runner', 'status'], ['--sign-windows'], ['--sign-windows', '--smoke'],
+  ]) {
+    assert.equal(isBoxVerbArgv(argv), true, `${argv.join(' ')} is a box invocation`);
+  }
+  for (const argv of [[], ['build'], ['--deploy'], ['test', 'runner'], ['runner', '--help'], ['--runner', '--help']]) {
+    assert.equal(isBoxVerbArgv(argv), false, `${argv.join(' ') || '(bare)'} is not a box invocation`);
+  }
+});
+
+test('run(): the signing-box verbs run with no target when desktop IS the host (a bare global install) (#337)', () => {
+  const { workDir, invoke } = stageBox({ hostName: '@omega.js/desktop', installDesktop: false });
+  for (const args of [['runner', 'status'], ['runner', 'install'], ['sign-windows', '--smoke'], ['--runner', 'status'], ['--sign-windows', '--smoke']]) {
+    const out = invoke(args);
+    assert.equal(out.status, 0, `${args.join(' ')} must run: ${out.stderr}`);
+    assert.ok(out.stdout.includes('HOST-RAN'), `${args.join(' ')} reaches desktop's CLI`);
+  }
+  assert.deepEqual(fs.readdirSync(workDir), [], 'nothing was scaffolded into the cwd');
+});
+
+test('run(): the signing-box verbs dispatch to an installed desktop when another framework won the bin link (#337)', () => {
+  const { workDir, marker, invoke } = stageBox({ hostName: '@omega.js/backend', installDesktop: true });
+  const out = invoke(['runner', 'status']);
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the backend host must not run a desktop verb');
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'desktop-dispatched');
+  assert.match(out.stderr, /signing-box verb, running @omega\.js\/desktop/);
+  assert.deepEqual(fs.readdirSync(workDir), []);
+});
+
+test('run(): the signing-box verbs refuse, naming the install, when desktop is nowhere (#337)', () => {
+  const { workDir, invoke } = stageBox({ hostName: '@omega.js/backend', installDesktop: false });
+  const out = invoke(['sign-windows', '--smoke']);
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false);
+  assert.match(out.stderr, /npm i -g @omega\.js\/desktop/);
+  assert.ok(out.stderr.includes(workDir), `the refusal names the cwd: ${out.stderr}`);
+  assert.deepEqual(fs.readdirSync(workDir), []);
 });

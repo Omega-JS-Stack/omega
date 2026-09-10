@@ -19,6 +19,7 @@ const { toSiteGlobal } = require('@omega.js/config/site-global');
 const { resolveWinbackOffer } = require('@omega.js/config/winback');
 const Logger = require('@omega.js/devkit/logger');
 const reads = require('@omega.js/devkit/reads');
+const { KEYLESS_STAMP } = require('@omega.js/devkit/license');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { applyMarkdownImages } = require('./markdown-images.js');
@@ -32,16 +33,20 @@ const { applyCollectionLimits } = require('./limit-collections.js');
 const { readCollections, collectionPages, applyDocumentData } = require('./dynamic-pages.js');
 const { readSocials, socialPages } = require('./social-pages.js');
 const { readTargetShortlinks, targetShortlinkPages } = require('./target-shortlinks.js');
-const { readRedirects, redirectMap } = require('./redirects.js');
 const { resolvePageAsset } = require('./assets.js');
 const { resolvePathPrefix, prefixHtml } = require('./path-prefix.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
-const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
+const { resolveFontAwesomeRoots, createIconLoader } = require('@omega.js/devkit/icons');
+const { inlineIcons } = require('./inline-icons.js');
+const { getEnvironment } = require('./mode-helpers.js');
 const { ogLocale } = require('@omega.js/devkit/translate');
 const { PATHS } = require('./paths.js');
-const { CONFIG_SECTIONS, PAGE_BARE_SECTIONS, SITE_FACT_KEYS, templateReads } = require('./config-sections.js');
+const {
+  CONFIG_SECTIONS, DEAD_SITE_SECTIONS, SITE_FACT_KEYS, RANDOM_ID_ASSIGN_IDIOM,
+  templateReads, randomIdReads, assignsRandomId,
+} = require('./config-sections.js');
 
 const logger = new Logger('engine');
 
@@ -52,14 +57,15 @@ const logger = new Logger('engine');
 const RESOLVED_OMIT = new Set([
   'collections', 'content', 'page', 'eleventy', 'pkg', 'eleventyComputed',
   'resolved', 'permalink', 'layout', 'tags', 'pagination', 'site', 'assetManifest',
-  'paginator', 'pageAssets', 'jekyll', 'sectionLibrary',
+  'paginator', 'pageAssets', 'layoutAssets', 'jekyll', 'sectionLibrary',
 ]);
 
 // Build-fact keys that do NOT seed `resolved` (bulk/runtime values templates
 // read via site.* directly — mirrors inject-properties.rb's config exclusions;
 // seeding the site collection arrays would make every page's resolved walk all
-// 1,030 post docs).
-const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team', 'updates', 'alternatives']);
+// 1,030 post docs). Every SITE COLLECTION joins them per build — the built-ins
+// and the brand's own alike (SITE_COLLECTIONS below, #593).
+const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time']);
 
 // Consumer PAGE frontmatter is meta-only (Ian's rule, 2026-07-19: content
 // lives in {% section %} calls — and nothing may even TRY to consume it from
@@ -72,15 +78,19 @@ const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time', 'posts', 'team',
 // document, and layouts are theme voice that never renders standalone —
 // neither passes through the guard.
 // `config` is the page's omega.json5 override block (#607) — every config
-// section a page restates lives under it, and `meta` (the one pageBare
-// section) plus `schema` (JSON-LD SEO) keep their bare spelling. `redirect`
-// (the modules/utilities/redirect layout's target — docs/web/index.md) and
-// `prerender_icons` (core/body.html's icon prerender list) are layout
-// MACHINERY a page configures the same way: shipped contracts that worked only
-// from defaults/ and _layouts/ until #247 — a consumer page lost them silently.
+// section a page restates lives under it, and nothing else may: what is in
+// the config file goes under `config:`, what is not may not. Every other key
+// here is PAGE machinery, which is why it has no config home: `meta` (the
+// head walk, the only meta there is) and `schema` (JSON-LD SEO) are the
+// page's own SEO surface, and `redirect` (the modules/utilities/redirect
+// layout's target — docs/web/index.md) is layout MACHINERY a page configures
+// the same way: shipped contracts that worked only from defaults/ and
+// _layouts/ until #247 — a consumer page lost them silently.
+// `sitemap` is NOT here: #564 folded `sitemap.include` into `meta.index`, so
+// there is no longer a way to be indexable and out of the sitemap.
 const PAGE_FRONTMATTER_ALLOW = new Set([
-  'config', ...PAGE_BARE_SECTIONS,
-  'schema', 'append', 'sitemap', 'redirect', 'prerender_icons', 'templateEngineOverride', 'eleventyExcludeFromCollections',
+  'config', 'meta',
+  'schema', 'redirect', 'templateEngineOverride', 'eleventyExcludeFromCollections',
 ]);
 
 // Deep merge shared with the section tag's defaults ← data ← args chain —
@@ -94,6 +104,31 @@ const { deepMerge } = require('./merge.js');
 // same omission the showcase gallery already rides. The boundary is a path
 // SEGMENT, not a bare prefix: /testimonials is brand content.
 const DEV_ONLY_URL_RE = /^\/test(\/|\.|$)/;
+
+/**
+ * The first dead config read in a CONFIG VALUE
+ * ([#671](https://github.com/Omega-JS-Stack/omega/issues/671)). The per-template
+ * census cannot see this one: `targets.web.tagline: "Agency - {{ site.brand.name }}"`
+ * lives in omega.json5, renders through the same Liquid, and has rendered the
+ * brand name EMPTY since #611 on every page that falls through to the default.
+ * Same census, same section list — the address is a config key path instead of
+ * a file and line.
+ * @param {*} node - a config value (walked recursively)
+ * @param {string[]} [trail] - the key path to this node
+ * @returns {{ path: string, read: object }|null}
+ */
+function deadConfigValueRead(node, trail = []) {
+  if (typeof node === 'string') {
+    const read = templateReads(node).find((entry) => entry.root === 'site' && DEAD_SITE_SECTIONS.has(entry.key));
+    return read ? { path: trail.join('.'), read } : null;
+  }
+  if (!node || typeof node !== 'object') return null;
+  for (const [key, value] of Object.entries(node)) {
+    const found = deadConfigValueRead(value, [...trail, key]);
+    if (found) return found;
+  }
+  return null;
+}
 
 /**
  * Configure an Eleventy instance as an OMEGA web engine.
@@ -111,6 +146,7 @@ const DEV_ONLY_URL_RE = /^\/test(\/|\.|$)/;
  * @param {string} [options.version] - the website target's own package version (site.omega.version → the Configuration block)
  * @param {string} [options.pathPrefix] - the base path the built site is served under (#355) — default the domain root
  * @param {string} [options.sampleAnchor] - YYYY-MM-DD rolling-date anchor for sample content (default: OMEGA_SAMPLE_ANCHOR env, then today)
+ * @param {object} [options.license] - the deploy-time license stamp (#320) → site.license (default: the keyless stamp)
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function configureOmega(eleventyConfig, options) {
@@ -142,6 +178,11 @@ function configureOmega(eleventyConfig, options) {
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function buildConfig(eleventyConfig, options) {
+  // The environment (#717): read ONCE, from the one surface every OMEGA
+  // framework answers with. `options.environment` is still the deliberate
+  // override the verbs thread (`omega build` → production) — it just arrives
+  // through getEnvironment() now instead of being compared as a loose string.
+  const environment = getEnvironment.call(options);
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
@@ -160,6 +201,21 @@ function buildConfig(eleventyConfig, options) {
   const config = toSiteGlobal(options.siteData);
   const site = { targets: config.targets };
   delete config.targets;
+
+  // The config-VALUE half of the #611 read guard (#671), before anything reads
+  // one: a dead read here is ONE key in omega.json5 and it silently drains the
+  // brand name out of every page's <title>. The curated targets view is gone
+  // by now — it is a build fact, not a config value.
+  const deadValue = deadConfigValueRead(config);
+  if (deadValue) {
+    throw new Error(
+      `[@omega.js/web:engine] config \`${deadValue.path}\` reads \`${deadValue.read.expression}\` — the brand config left `
+      + `the \`site\` global, which is BUILD FACTS only (${SITE_FACT_KEYS.join(', ')}, plus the collections `
+      + `targets.web.collections declares). Spell it `
+      + `\`${deadValue.read.expression.replace(/^site\./, 'resolved.config.')}\` in omega.json5. `
+      + 'Run `omega migrate` to rewrite it (docs/web/index.md).',
+    );
+  }
 
   const activeTheme = options.activeTheme || (config.theme && config.theme.id) || 'classy';
   const layoutMode = options.layoutMode || 'virtual';
@@ -202,40 +258,33 @@ function buildConfig(eleventyConfig, options) {
   // itself alone; templates and the pricing composer read the brand's section.
   if (config.payment) config.client.payment = { ...config.payment, winback: resolveWinbackOffer(config.payment) };
 
+  // The FEATURES CATALOG rides the same bridge (#647): the account page's usage
+  // bars and plan bullets read names, icons and definitions from it, and a
+  // feature is DEFINED in exactly one place for the server and the browser both.
+  if (config.features) config.client.features = config.features;
+
   // Pricing view-model (C2): payment.products is the ONLY plan source — the
   // seed surfaces as resolved.pricing (cascade still lets consumer frontmatter
   // override presentation). A composed VIEW of the config, not config itself,
   // so it rides the build-fact global. null = honest empty state.
-  site.pricing = composePricing(config.payment);
+  site.pricing = composePricing(config.payment, config.features);
 
   // Brand accent ramp (C3/D6): brand.color → the --omega-accent-* family,
   // emitted by head.html after the CSS bundles. null (no/invalid color) =
   // the token sheet's neutral placeholder stands.
   site.brandTokens = composeBrandTokens(config.brand?.color);
 
+  // The license verdict ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)):
+  // a BUILD fact — the production build's one deploy-time check, whose
+  // `attribution` decides the footer's "Powered by omegajs.dev" block. Nothing
+  // handed in (dev, a test, any lane that runs no check) is the keyless stamp,
+  // which is the state every build ships in today.
+  site.license = options.license || KEYLESS_STAMP;
+
   // ---- Theme layer chain: active theme → base → core
   // (consumer-local themes/<id> beats the packaged theme — C3 tier 2)
   const themeLayers = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
   const layers = [...themeLayers, coreDir];
-
-  // Font preloads: the active theme's normal-weight latin faces are the
-  // first-paint fonts — preloading them eliminates the FOUT (system-font
-  // flash on a cold cache). First theme layer WITH a fonts/ dir wins — a
-  // consumer-local theme that vendors no faces rides the base theme's.
-  // Sorted: readdir order is filesystem-dependent and the emitted HTML
-  // must be deterministic.
-  // EVERY layer is probed, not just up to the winner: the probe is what arms
-  // the dev watch (#200), so a fonts dir that appears in any layer mid-session
-  // resets the config instead of serving the captured face list.
-  const themeFontsDir = themeLayers
-    .map((layer) => path.join(layer, 'fonts'))
-    .filter((dir) => reads.dirExists(dir))[0];
-  site.fontPreloads = themeFontsDir
-    ? reads.readdir(themeFontsDir)
-        .filter((f) => f.endsWith('-normal-latin.woff2'))
-        .sort()
-        .map((f) => `/assets/fonts/${f}`)
-    : [];
 
   // ---- LiquidJS: Jekyll include syntax + layered include roots.
   // timezoneOffset 0: filename dates are UTC midnights; rendering them in UTC
@@ -303,16 +352,28 @@ function buildConfig(eleventyConfig, options) {
   // place, never reassigned: the site object is captured into Eleventy's
   // data cascade at data-init (before collections compute), so replacing the
   // array (or lazy getters) after that is invisible to templates.
-  const SITE_COLLECTIONS = ['posts', 'team', 'updates', 'alternatives'];
+  //
+  // A BRAND's own collection (#207) publishes the same way (#593): a UJM
+  // consumer's `{% for product in site.products %}` is how a declared
+  // collection is read, and reaching templates only as `collections.products`
+  // (frontmatter under `.data`) rendered that loop empty on a green build —
+  // no warning, no output (HARD RULE 5, preserve semantics).
+  const SITE_COLLECTIONS = allCollections.map((collection) => collection.name);
   for (const name of SITE_COLLECTIONS) site[name] = [];
+  // A collection array is a build fact templates read off `site` directly,
+  // never a `resolved` key — the brand's own on exactly the built-ins' terms.
+  const resolvedSiteExclude = new Set([...RESOLVED_SITE_EXCLUDE, ...SITE_COLLECTIONS]);
   const holderSet = collectionsHolder.set.bind(collectionsHolder);
   collectionsHolder.set = (name, docs) => {
     if (SITE_COLLECTIONS.includes(name)) {
       site[name].length = 0;
-      // id rides along (Jekyll doc parity — layouts pass member.id/post.id
-      // to the omega_member/omega_post tags); explicit frontmatter id still wins
-      // via the data spread.
-      site[name].push(...docs.map((doc) => ({ id: doc.id, url: doc.url, date: doc.date, ...doc.data })));
+      // ONE flattener for both lanes (#711): `jekyllDoc` gives a site doc the
+      // same lazy `content` the paginator's docs carry, so a layout reading
+      // `post.content` off site.posts counts the post's real body instead of
+      // an empty string (the newsflash homepage printed "1 min read" for every
+      // cover story and tile). id rides along inside it (Jekyll doc parity —
+      // layouts pass member.id/post.id to the omega_member/omega_post tags).
+      site[name].push(...docs.map((doc) => jekyllDoc(doc)));
     }
     return holderSet(name, docs);
   };
@@ -355,15 +416,6 @@ function buildConfig(eleventyConfig, options) {
       getCollectionNames: () => [...collectionsHolder.keys()],
       fileExists: (file) => fs.existsSync(path.join(options.consumerDir, file)),
       markdown: (content) => md.render(content),
-      icons: {
-        fontAwesomeDirs: [
-          path.join(coreDir, 'icons'),
-          ...fa.svgsDirs,
-        ],
-        aliasFile: fa.aliasFile,
-        flagsDir: path.join(coreDir, 'icons', 'flags'),
-        style: 'solid',
-      },
       logos: { dir: path.join(coreDir, 'logos') },
     });
   });
@@ -405,12 +457,65 @@ function buildConfig(eleventyConfig, options) {
     eleventyConfig.ignores.add(`**/${machineryDir}/**`);
     eleventyConfig.ignores.add(path.join(path.relative(process.cwd(), options.consumerDir), machineryDir, '**'));
   }
+  // A tier-2 theme lives INSIDE the input dir (`<src>/themes/<id>/`), and
+  // everything under it is LAYER SOURCE — never content. The families above
+  // covered a consumer's own machinery dirs but not a theme's copies of them,
+  // so a consumer-local theme shipping an include override failed the build on
+  // a duplicate permalink, and an INACTIVE local theme did it without even
+  // being in the chain ([#773](https://github.com/Omega-JS-Stack/omega/issues/773)).
+  // The whole namespace is the rule, because that is what it means: pages live
+  // in `pages/`, and `resolveThemeLayers` probes exactly this directory.
+  eleventyConfig.ignores.add(path.join(path.relative(process.cwd(), options.consumerDir), 'themes', '**'));
+  // The cwd-relative twin, kept to the machinery families rather than the whole
+  // namespace: unanchored, `**/themes/**` would also swallow a brand's own page
+  // at `pages/themes/…`, and no page is ever called `_includes`.
+  for (const machineryDir of ['_includes', '_layouts', '_sections', '_components', HERO_DIR]) {
+    eleventyConfig.ignores.add(`**/themes/*/${machineryDir}/**`);
+  }
   if (layoutMode === 'farm') {
     composeSymlinkFarm(layoutMap, options.farmDir);
     eleventyConfig.setIncludesDirectory(path.relative(options.consumerDir, options.farmDir));
   } else {
     registerVirtualLayouts(eleventyConfig, layoutMap);
   }
+
+  // The layout CHAIN behind a page, for the layout-keyed asset lane (#624).
+  // Eleventy merges a layout's frontmatter into the cascade but `data.layout`
+  // stays the page's OWN declaration, so the chain is walked here from the same
+  // layered map the render resolves through: `blueprint/careers` →
+  // `modules/utilities/redirect` → `frontend/core/cover`, and every layout in
+  // it contributes its assets.
+  // The one frontmatter fence, read by both hand-parsers below (the layout
+  // chain here, the page's own frontmatter further down).
+  const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
+  const layoutFiles = new Map();
+  for (const [rel, abs] of layoutMap) layoutFiles.set(rel.replace(/\.[^.]+$/, '').split(path.sep).join('/'), abs);
+  const layoutParent = new Map();
+  const parentOf = (name) => {
+    if (layoutParent.has(name)) return layoutParent.get(name);
+    let parent = null;
+    const file = layoutFiles.get(name);
+    if (file) {
+      const match = (reads.read(file) || '').match(FRONTMATTER_RE);
+      try {
+        const own = match ? yaml.load(match[1]) : null;
+        if (own && typeof own.layout === 'string') parent = own.layout;
+      } catch { /* exotic frontmatter — the chain simply ends here */ }
+    }
+    layoutParent.set(name, parent);
+    return parent;
+  };
+  // Outermost FIRST (the root layout, then each layout that renders inside it),
+  // so assets load general → specific exactly as the layer chain does.
+  const layoutChain = (layout) => {
+    const chain = [];
+    let name = typeof layout === 'string' ? layout : null;
+    while (name && !chain.includes(name)) {
+      chain.unshift(name);
+      name = parentOf(name);
+    }
+    return chain;
+  };
 
   // ---- Frontmatter Liquid + collection tagging
   const frontmatter = createFrontmatterResolver({ site });
@@ -443,7 +548,6 @@ function buildConfig(eleventyConfig, options) {
   // same way.
   const pageOwnData = new Map();
   const pageOwnSource = new Map();
-  const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
   const readOwnSource = (inputPath) => {
     if (pageOwnSource.has(inputPath)) return pageOwnSource.get(inputPath);
     let source = null;
@@ -520,10 +624,10 @@ function buildConfig(eleventyConfig, options) {
   // Is a frontmatter key a CONFIG section (#607)? Every section the schema
   // declares for a web build, plus whatever this brand's own omega.json5
   // carries — a brand key with no schema rule yet is still config, and
-  // restating it bare would reach nothing at all.
-  const isConfigSection = (key) => (
-    !PAGE_BARE_SECTIONS.includes(key) && (CONFIG_SECTIONS.has(key) || Object.hasOwn(config, key))
-  );
+  // restating it bare would reach nothing at all. The SAME question decides
+  // both directions of the namespace rule (Ian 2026-08-26): a section spelled
+  // bare is an error, and a key under `config:` that is not one is an error.
+  const isConfigSection = (key) => CONFIG_SECTIONS.has(key) || Object.hasOwn(config, key);
 
   // The READ half of the same seam (#611). A config key restated bare in
   // frontmatter throws above; a config key READ off the `site` global does not
@@ -546,26 +650,45 @@ function buildConfig(eleventyConfig, options) {
   // config-sections.js's `templateReads` — the same census `omega migrate`'s
   // rule 24 rewrites from, so the guard can never fail on something the verb
   // would not have fixed.
-  // `meta` IS flagged here even though the frontmatter lane exempts it: a page
-  // may still SPELL `meta:` bare, but `site.meta` is as dead as any other
-  // config read (the walk lives at `resolved.meta`), and rule 24 rewrites it —
-  // so the guard may demand it.
+  // `meta` IS flagged here even though it is not config at all: a page spells
+  // `meta:` bare, but `site.meta` is as dead as any config read (the walk
+  // lives at `resolved.meta`), and rule 24 rewrites it — so the guard may
+  // demand it. DEAD_SITE_SECTIONS is that list, config sections plus `meta`.
   const configReadsIn = (source) => templateReads(source)
-    .filter((read) => read.root === 'site' && CONFIG_SECTIONS.has(read.key));
+    .filter((read) => read.root === 'site' && DEAD_SITE_SECTIONS.has(read.key));
 
   eleventyConfig.addPreprocessor('omega-frontmatter', 'md,html,liquid', (data) => {
     const inputPath = data.page.inputPath;
+    const ownSource = readOwnSource(inputPath) || '';
+
+    // The OTHER dead read the census owns (#595): UJM's per-render `random_id`
+    // global, which OMEGA does not have — the read renders empty and every id
+    // it scopes collides. A WARNING, not a throw, unlike the config reads
+    // above: `random_id` is an ordinary variable name, so a layout or an
+    // include may legitimately assign it for this page, and a read guard's
+    // false positive is a build a brand cannot fix.
+    if (!assignsRandomId(ownSource)) {
+      const leftover = randomIdReads(ownSource);
+      if (leftover.length) {
+        logger.warn(
+          `${inputPath}:${leftover[0].line}: reads a bare \`random_id\` — UJM's per-render global is gone, so it renders `
+          + `EMPTY and every id built from it collides. Assign it first: \`${RANDOM_ID_ASSIGN_IDIOM}\`. `
+          + 'Run `omega migrate` to write it (docs/web/index.md).',
+        );
+      }
+    }
 
     // The dead-read guard (#611), over every template with a FILE behind it —
     // a page, a collection document, a consumer's own anything. Virtual
     // templates (blueprints, the showcase, sample content) have no source to
     // read and the static lane already covers those surfaces.
-    const deadReads = configReadsIn(readOwnSource(inputPath) || '');
+    const deadReads = configReadsIn(ownSource);
     if (deadReads.length) {
       const first = deadReads[0];
       throw new Error(
         `[@omega.js/web:engine] ${inputPath}:${first.line}: reads \`${first.expression}\` — the brand config left the `
-        + `\`site\` global, which is BUILD FACTS only (${SITE_FACT_KEYS.join(', ')}). Spell it `
+        + `\`site\` global, which is BUILD FACTS only (${SITE_FACT_KEYS.join(', ')}, plus the collections `
+        + `targets.web.collections declares). Spell it `
         + `\`${first.expression.replace(/^site\./, 'resolved.config.')}\``
         + `${deadReads.length > 1 ? ` (and ${deadReads.length - 1} more in this file)` : ''}. `
         + 'Run `omega migrate` to rewrite them (docs/web/index.md).',
@@ -584,6 +707,48 @@ function buildConfig(eleventyConfig, options) {
     // the indexable duplication #312 fixed one layer up.
     if (collection && dynamicCollections.includes(collection)) {
       applyDocumentData(collection, data, config.brand && config.brand.name);
+    }
+
+    // The OTHER half of the namespace rule (#607, Ian 2026-08-26): what is in
+    // the config file goes under `config:`, and what is NOT in the config file
+    // may not. A key under `config:` that no omega.json5 section answers to
+    // merges into `resolved.config` and is read by nothing — a typo (`them:`),
+    // or page data written into the config lane, both silent. It fails here,
+    // for every template that carries frontmatter: a collection document's
+    // `config:` block is the same block a page's is.
+    const ownFrontmatter = readOwnFrontmatter(inputPath) || {};
+    if ('config' in ownFrontmatter) {
+      const ownConfig = ownFrontmatter.config;
+
+      // Before the membership check: a `config:` that is not a MAP of sections
+      // at all. `resolved` deep-merges the page block OVER the seeded config,
+      // and a null (the empty key `config:` with nothing under it), an array or
+      // a scalar REPLACES it — so resolved.config stops being the brand config
+      // for that page and every read under it renders empty, silently. The
+      // shape is the brand's own typo, so it fails here naming what arrived.
+      if (!ownConfig || typeof ownConfig !== 'object' || Array.isArray(ownConfig)) {
+        const shape = ownConfig === null || ownConfig === undefined
+          ? 'an EMPTY key (null)'
+          : (Array.isArray(ownConfig) ? 'an array' : `a ${typeof ownConfig}`);
+        throw new Error(
+          `[@omega.js/web:engine] ${inputPath}: \`config:\` is ${shape} — it must be a MAP of omega.json5 `
+          + 'sections (config:\n  theme:\n    …). Any other shape REPLACES the whole merged config for this page, '
+          + 'so every `resolved.config.*` read on it renders empty. Delete the key, or put the sections under it '
+          + '(docs/web/frontmatter.md).',
+        );
+      }
+
+      const strays = Object.keys(ownConfig).filter((key) => !isConfigSection(key));
+      if (strays.length) {
+        throw new Error(
+          `[@omega.js/web:engine] ${inputPath}: \`config:\` carries `
+          + `${strays.length > 1 ? 'keys' : 'a key'} ${strays.map((key) => `\`${key}\``).join(', ')} that omega.json5 has no `
+          + `${strays.length > 1 ? 'sections' : 'section'} for, so nothing reads `
+          + `${strays.length > 1 ? 'them' : 'it'}. \`config:\` holds omega.json5 sections ONLY `
+          + `(${[...CONFIG_SECTIONS].join(', ')}); page machinery (meta, schema, redirect) stays bare, and page `
+          + 'CONTENT lives in {% section %} calls in the page body (docs/web/frontmatter.md).',
+        );
+      }
     }
 
     // The meta-only guard: real files under pages/ may carry ONLY meta keys
@@ -610,8 +775,8 @@ function buildConfig(eleventyConfig, options) {
           `[@omega.js/web:engine] ${inputPath}: frontmatter restates the config `
           + `${bareConfig.length > 1 ? 'sections' : 'section'} ${bareConfig.map((key) => `\`${key}\``).join(', ')} bare. `
           + 'A page overrides omega.json5 under a `config:` parent '
-          + `(config:\n  ${bareConfig[0]}:\n    …), and \`${PAGE_BARE_SECTIONS.join('`, `')}\` is the only section that keeps its bare spelling. `
-          + 'Run `omega migrate` to move it (docs/web/index.md).',
+          + `(config:\n  ${bareConfig[0]}:\n    …); no config section keeps a bare spelling. `
+          + 'Run `omega migrate` to move it (docs/web/frontmatter.md).',
         );
       }
 
@@ -620,7 +785,7 @@ function buildConfig(eleventyConfig, options) {
         for (const key of contentKeys) delete data[key];
         logger.warn(
           `${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
-          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, config, sitemap, append); `
+          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, config); `
           + `content lives in {% section %} calls in the page body (docs/web/sections.md).`,
         );
       }
@@ -685,7 +850,7 @@ function buildConfig(eleventyConfig, options) {
   // as it covers the framework default that page took over.
   const resolvePermalink = (data) => {
     const permalink = jekyllPermalink(data, allCollections);
-    if (options.environment === 'production' && typeof permalink === 'string' && DEV_ONLY_URL_RE.test(permalink)) {
+    if (environment === 'production' && typeof permalink === 'string' && DEV_ONLY_URL_RE.test(permalink)) {
       return false;
     }
     return permalink;
@@ -700,7 +865,7 @@ function buildConfig(eleventyConfig, options) {
       if (!p || !p.items) return undefined;
       const totalPages = (p.pages || []).length;
       return {
-        posts: p.items.map((item) => ({ url: item.url, date: item.date, ...item.data })),
+        posts: p.items.map(jekyllDoc),
         page: p.pageNumber + 1,
         per_page: p.items.length,
         total_pages: totalPages,
@@ -715,35 +880,59 @@ function buildConfig(eleventyConfig, options) {
     // for flat entries (js/pages/pricing.js), `<key>/index` for per-page dirs
     // (js/pages/pricing/index.js), and [name] wildcard segments for generated
     // page families (js/pages/blog/[slug].js serves every /blog/<slug> post).
+    // Each answer is a LIST — every layer that ships a file for this URL, in
+    // load order (#624), because page assets never replace one another.
     pageAssets: (data) => {
       const manifest = data.assetManifest || {};
       const trimmed = (data.page.url || '/').replace(/^\/|\/$/g, '');
       const base = trimmed === '' ? 'index' : trimmed;
       return {
-        js: resolvePageAsset(manifest.js && manifest.js.pages, base),
-        css: resolvePageAsset(manifest.css && manifest.css.pages, base),
-        themeCss: resolvePageAsset(manifest.css && manifest.css.themePages, base),
+        js: resolvePageAsset(manifest.js && manifest.js.pages, base) || [],
+        css: resolvePageAsset(manifest.css && manifest.css.pages, base) || [],
+      };
+    },
+    // The same lookup, keyed by LAYOUT instead of URL (#624): a page gets every
+    // asset of every layout in its chain, outermost first — the chain, not just
+    // `data.layout`, because a blueprint that sits on the redirect layout
+    // (blueprint/careers) must still get the redirect layout's script.
+    layoutAssets: (data) => {
+      const manifest = data.assetManifest || {};
+      const chain = layoutChain(data.layout);
+      return {
+        js: chain.flatMap((name) => resolvePageAsset(manifest.js && manifest.js.layouts, name) || []),
+        css: chain.flatMap((name) => resolvePageAsset(manifest.css && manifest.css.layouts, name) || []),
       };
     },
     resolved: (data) => {
       // inject-properties.rb parity: resolved = build facts ← layout chain ←
-      // page data, PLUS the two config namespaces (#607).
+      // page data, PLUS the config namespace (#607).
       //
-      // `resolved.config` is the brand config with this page's own `config:`
-      // block merged on top — the seed below puts the brand under the cascade,
-      // and the generic merge that follows lets a layout's or page's `config:`
-      // win key by key. `resolved.meta` is the same walk for the one section
-      // the schema marks pageBare: the config `meta` seeds the BARE namespace
-      // too, so page `meta:` → layout `meta` → config `meta` still merges the
-      // way every head include already reads it.
+      // `resolved.config` is the WHOLE brand config with this page's own
+      // `config:` block merged on top — the seed below puts the entire config
+      // under the cascade (never a filtered subset: a brand section with no
+      // schema rule is config too), and the generic merge that follows lets a
+      // layout's or page's `config:` win key by key. `resolved.meta` carries
+      // ONE seed and nothing more: meta is page machinery (Ian 2026-08-26), so
+      // the walk is the site-wide index floor → page `meta:` → layout `meta`,
+      // with head.html falling back to brand.name / brand.description.
       const out = {};
       for (const key of Object.keys(site)) {
-        if (!RESOLVED_SITE_EXCLUDE.has(key)) out[key] = site[key];
+        if (!resolvedSiteExclude.has(key)) out[key] = site[key];
       }
       out.config = config;
-      for (const section of PAGE_BARE_SECTIONS) {
-        if (config[section] !== undefined) out[section] = config[section];
-      }
+
+      // The site-wide index default (#564, Ian 2026-09-09, one name at both
+      // levels): `targets.web.meta.index` is the SAME key a page writes, so
+      // the site default and the page override never drift apart. It is a
+      // SEED, not a second emission path: every signal reads the one resolved
+      // `meta.index` below, so the robots meta, sitemap.xml, llms.txt and
+      // pages.json cannot disagree. The merge that follows puts page and
+      // layout `meta:` over it, which is how a page's own `meta.index: true`
+      // exempts itself from a noindexed site. Consequential-feature doctrine
+      // (#527): only the LITERAL false takes a whole site off search — absent
+      // or true is today's behavior.
+      if (config.meta && config.meta.index === false) out.meta = { index: false };
+
       for (const key of Object.keys(data)) {
         if (!RESOLVED_OMIT.has(key)) out[key] = deepMerge(out[key], data[key]);
       }
@@ -773,6 +962,33 @@ function buildConfig(eleventyConfig, options) {
           if (isPage && !PAGE_FRONTMATTER_ALLOW.has(key)) continue;
           out[key] = deepMerge(out[key], own[key]);
         }
+      }
+
+      // The index posture's AUTOMATIC exclusions (#564). Everything above is
+      // authored: the site default, the layout's `meta:`, the page's own.
+      // These are the framework's own, applied last because they are not
+      // overridable: a draft is unpublished, a dev surface never ships, an
+      // admin screen is private, a redirect stub is a forwarding URL, and
+      // pages 2..N of a LISTING are duplicates of the canonical page 1. Every
+      // output reads the ONE value they land on, so no template keeps a rule
+      // list of its own and the signals cannot disagree.
+      //
+      // Alias pagination is the other shape the machinery serves (one page per
+      // taxonomy TERM, `size: 1` + `alias`), where a page number is an index
+      // into terms and says nothing about duplication; those pages carry their
+      // own `meta.index` on their layout. Eleventy's computed-data dependency
+      // pass probes with proxies, so the number is only a number on a real
+      // render.
+      const pageNumber = data.pagination && !data.pagination.alias && data.pagination.pageNumber;
+      const url = typeof data.page.url === 'string' ? data.page.url : '';
+      const layoutName = typeof out.layout === 'string' ? out.layout : '';
+
+      if (out.draft
+        || DEV_ONLY_URL_RE.test(url)
+        || url.startsWith('/admin/')
+        || layoutName.includes('redirect')
+        || (typeof pageNumber === 'number' && pageNumber > 0)) {
+        out.meta = { ...out.meta, index: false };
       }
 
       // Layout-frontmatter Liquid: the preprocessor only sees PAGE frontmatter,
@@ -821,7 +1037,7 @@ function buildConfig(eleventyConfig, options) {
     consumerDir: options.consumerDir,
     limits: config.dev && config.dev.limitCollections,
     collections: dynamicCollections,
-    environment: options.environment,
+    environment,
   });
 
   // ---- The live decisions (#200 Lane B): which URLs the consumer's own pages
@@ -833,14 +1049,14 @@ function buildConfig(eleventyConfig, options) {
   const decisions = createDecisions({
     consumerDir: options.consumerDir,
     collectionDirs: SAMPLE_SETS.map((set) => set.collectionDir),
-    environment: options.environment,
+    environment,
   });
   // Re-scan before every REBUILD, so a render can never read a decision older
   // than its own build — whichever watcher saw the file event first. The dev
   // loop's rescan watcher is the prompt lane (it updates and reports the
   // moment a file lands, before any rebuild finishes); this is the ordering
   // guarantee. A production build has exactly one build and one scan.
-  if (options.environment !== 'production') {
+  if (environment !== 'production') {
     eleventyConfig.on('eleventy.before', () => decisions.refresh());
   }
 
@@ -858,12 +1074,12 @@ function buildConfig(eleventyConfig, options) {
   const frameworkPages = [
     ...[...collectLayered([path.join(defaultsDir, 'pages')])]
       .map(([rel, abs]) => ({ virtual: `omega-defaults/${rel}`, label: `defaults/pages/${rel}`, abs })),
-    ...(options.environment === 'production' ? [] : [...collectLayered([path.join(defaultsDir, 'showcase')])]
+    ...(environment === 'production' ? [] : [...collectLayered([path.join(defaultsDir, 'showcase')])]
       .map(([rel, abs]) => ({ virtual: `omega-defaults/showcase/${rel}`, label: `defaults/showcase/${rel}`, abs }))),
   ].map((page) => {
     const raw = reads.read(page.abs);
     return { ...page, raw, url: permalinkOf(raw) };
-  }).filter((page) => !(options.environment === 'production' && DEV_ONLY_URL_RE.test(page.url || '')));
+  }).filter((page) => !(environment === 'production' && DEV_ONLY_URL_RE.test(page.url || '')));
 
   for (const page of frameworkPages) {
     // Registered UNCONDITIONALLY, gated at render time: suppression is a live
@@ -921,7 +1137,7 @@ function buildConfig(eleventyConfig, options) {
   // §8. The FIRST consumer file in a collection — or a production build —
   // removes that collection's samples entirely, and in dev that happens on the
   // very next render: the gate is the live own-content answer.
-  if (options.environment !== 'production') {
+  if (environment !== 'production') {
     const sampleAnchorMs = resolveAnchor(options.sampleAnchor);
     for (const set of SAMPLE_SETS) {
       for (const { name, content } of generateSampleSet(defaultsDir, set, sampleAnchorMs)) {
@@ -959,12 +1175,6 @@ function buildConfig(eleventyConfig, options) {
     version: options.version || null,
     date: { year: buildTime.getFullYear(), iso: site.time },
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
-    // The compiled path-redirect map (#442), JSON or '' — the 404 layout is
-    // its only reader (static hosting serves that page for an unbuilt path,
-    // which is the one hook a captured-segment redirect has). Validated HERE,
-    // so a malformed entry fails the config build instead of quietly
-    // answering nothing.
-    redirects: redirectMap(readRedirects(config.redirects)),
     ...(config.omega || {}),
   };
   // site.characters: the literal-character set templates interpolate rather
@@ -1001,20 +1211,39 @@ function buildConfig(eleventyConfig, options) {
   // registered as a function is evaluated per build, so every re-render bakes
   // what is running RIGHT NOW.
   eleventyConfig.addGlobalData('jekyll', () => ({
-    environment: options.environment || 'development',
+    environment,
     dev: (typeof options.dev === 'function' ? options.dev() : options.dev) || null,
   }));
-  eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
+  // The manifest is a FUNCTION for the same reason (#765): an object handed to
+  // addGlobalData is snapshotted into the data cascade at registration, so a
+  // dev rebuild that folds a new font-preload list into the live manifest was
+  // invisible to every later render — measured: the object form still served
+  // the boot list after a rebuild AND after a template edit, while the
+  // callback form served the new one. The dev lane mutates that object in
+  // place, so the callback re-reads what the last asset build produced.
+  const emptyManifest = { js: { pages: {}, layouts: {} }, css: { pages: {}, layouts: {} } };
+  eleventyConfig.addGlobalData('assetManifest', () => options.assetManifest || emptyManifest);
 
-  // ---- The reveal stagger reaches the PAINT-TIME lane (#585): every band that
-  // authors `data-omega-reveal-stagger="N"` gets `--omega-reveal-step: Nms` on
-  // the same element, so the CSS lead lane multiplies by the rhythm its author
-  // wrote instead of the 90ms fallback. The attribute stays the one home for
-  // the number; this only mirrors it (src/reveal-stagger.js).
-  const { mirrorRevealStagger } = require('./reveal-stagger.js');
-  eleventyConfig.addTransform('omega-reveal-stagger', function (content) {
+  // ---- Icon inlining (#619, dev AND prod): every empty `<i>` whose classes
+  // name an icon gets that icon's SVG inlined, so static chrome costs zero
+  // runtime fetches and never flashes. What the pass emits is exactly what the
+  // runtime watcher would have produced (runtime/icons.js), and the stamp it
+  // leaves is what tells the watcher to leave the element alone.
+  const loadIcon = createIconLoader({
+    svgsDirs: [path.join(coreDir, 'icons'), ...fa.svgsDirs],
+    aliasFile: fa.aliasFile,
+  });
+  // Warn ONCE per name per build: a missing icon in packaged chrome is a
+  // framework bug a consumer cannot fix (#86), and the marker the pass leaves
+  // on the element is what the dev audit reports in the browser.
+  const warnedIcons = new Set();
+  eleventyConfig.addTransform('omega-inline-icons', function (content) {
     if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {
-      return mirrorRevealStagger(content);
+      return inlineIcons(content, loadIcon, (key) => {
+        if (warnedIcons.has(key)) return;
+        warnedIcons.add(key);
+        logger.warn(`no SVG in the icon set for "${key}" — rendering an empty icon`);
+      });
     }
     return content;
   });
@@ -1050,7 +1279,7 @@ function buildConfig(eleventyConfig, options) {
   // ---- Production HTML minification (the UJM minifyHtml successor). Only
   // .html outputs — the meta-files (sitemap.xml, feeds, robots.txt, …) ship
   // exactly as their templates render them.
-  if (options.environment === 'production') {
+  if (environment === 'production') {
     const { minifyHtml } = require('./minify-html.js');
     eleventyConfig.addTransform('omega-minify-html', function (content) {
       if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {
@@ -1061,6 +1290,38 @@ function buildConfig(eleventyConfig, options) {
   }
 
   return { site, config, layers, layoutMap, frontmatter, suppressed: decisions.suppressedUrls(), decisions, collectionsHolder };
+}
+
+/**
+ * One Eleventy collection item as a JEKYLL document: the flat shape layouts
+ * iterate (`post.url`, `post.date`, `post.post.title`) plus Jekyll's
+ * `post.content` — a reference to the item, never a copy.
+ *
+ * `content` is LAZY and non-enumerable (#598). Eleventy renders collection
+ * content AFTER computed data resolves, so reading it here would throw its
+ * premature-use error, and an enumerable getter would throw the same error in
+ * every data walk that copies the doc (the `resolved` merge, the frontmatter
+ * render pass). Read at RENDER time it is the post's real body — which is
+ * what `{% omega_readtime %}` counts: the blog hub's featured card printed
+ * "1 min read" for a twelve-minute post while the post's own page printed 12.
+ *
+ * BOTH doc lanes flatten through here (#711): `paginator.posts` passes raw
+ * Eleventy items, the `site.<name>` arrays pass the collection holder's docs
+ * (collections.js `toDoc`, which forwards `templateContent` the same lazy
+ * way). `id` is the holder doc's — an item has none — and sits before the data
+ * spread so a document's explicit frontmatter id still wins.
+ * @param {object} item - an Eleventy collection item, or a holder doc
+ * @returns {object} the Jekyll doc shape
+ */
+function jekyllDoc(item) {
+  const identity = item.id === undefined ? {} : { id: item.id };
+  const doc = { ...identity, url: item.url, date: item.date, ...item.data };
+  Object.defineProperty(doc, 'content', {
+    get: () => item.templateContent,
+    enumerable: false,
+    configurable: true,
+  });
+  return doc;
 }
 
 /**

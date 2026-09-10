@@ -28,7 +28,7 @@
 // Icon SEMANTICS (valid names/styles, candidate order incl. the brands
 // fallback, the injected root attributes, alias mapping) live in
 // @omega.js/client's icon-core (C4 cp108) — the SAME module web's
-// build-time omega_icon tag uses, so lookup rules and rendered markup can
+// build-time inlining pass uses, so lookup rules and rendered markup can
 // never drift between the surfaces. Aliases ('search' →
 // 'magnifying-glass') resolve through fontawesome-free's own metadata.
 //

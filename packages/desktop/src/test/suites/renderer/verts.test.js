@@ -11,7 +11,9 @@
 // inlines its own poll helper. The binding marker (data-omega-vert-bound) is a
 // DOM attribute because preload-world expandos don't cross contextIsolation.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'verts auto-bind — live [data-omega-vert] binding, house-lane pin',
@@ -95,4 +97,4 @@ module.exports = {
       },
     },
   ],
-};
+});

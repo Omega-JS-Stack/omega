@@ -20,7 +20,8 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 
-const TestCommand = require('../../src/cli/commands/test.js');
+const TestCommand = require('../../dist/cli/commands/test.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { decideEmulatorAdoption, readHubLocatorProjectId } = TestCommand;
 
@@ -58,7 +59,7 @@ async function withTmpDir(fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'omega test adopt-or-bump decision for a running emulator',
   type: 'group',
 
@@ -250,4 +251,4 @@ module.exports = {
       },
     },
   ],
-};
+});

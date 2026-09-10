@@ -33,6 +33,7 @@ const { findRetiredKeys } = require('./retired-keys.js');
 const { isPlainObject } = require('./merge.js');
 const { INSTANCE_ID_PATTERN } = require('./instances.js');
 const { isDemoProject } = require('./demo.js');
+const { isCountedFeature } = require('@omega.js/account/features');
 
 // Firebase's own default authDomain shape: a third-party host by definition
 const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
@@ -147,15 +148,19 @@ function runSchema(config, schema) {
 }
 
 /**
- * The host this (resolved) config's brand lives on. An instance entry's own
- * `url` is already merged to the top level by the target chain, and it wins
- * over the brand-shared `brand.url`, the same precedence
- * instances.resolveInstanceUrl uses.
+ * The host this (resolved) config's BRAND lives on, which is a brand-level
+ * fact and never an instance one (#588, Ian 2026-09-01): one Firebase project,
+ * one backend, one persona domain, shared by every instance a brand runs. So
+ * `brand.url` answers first and the top-level `url` (the instance's own public
+ * url, derived from its id or declared on its entry) is only the fallback for
+ * a config that carries no brand.url at all. Reading them the other way round
+ * made a `targets/website-admin` load fail its own brand's authDomain check
+ * and seeded personas at a different domain than the backend's.
  * @param {object} config - The resolved config object.
  * @returns {string} The lowercase hostname, or '' when no URL is known.
  */
 function resolvedBrandHost(config) {
-  const url = getPath(config, 'url') || getPath(config, 'brand.url');
+  const url = getPath(config, 'brand.url') || getPath(config, 'url');
 
   if (typeof url !== 'string' || !url) {
     return '';
@@ -212,6 +217,134 @@ function validateAuthDomain(config) {
     + `authDomain must be the host the site is served from, which self-hosts /__/auth/* `
     + `(docs/shared/config.md → "authDomain is the brand's own host")`,
   ];
+}
+
+/**
+ * The features catalog and the values each product names against it (#647).
+ *
+ * A feature is defined ONCE, at the top level, and a product names only its
+ * VALUE — which means the two halves have to agree or the promise a page
+ * renders is fiction. Three ways they can disagree, each an error:
+ *   - a value on an id the catalog does not define reads as NOTHING (the same
+ *     silence a retired key used to buy), so the row simply vanishes;
+ *   - a NUMBER on a perk claims a meter that will never count, and the account
+ *     page would draw a usage bar against a limit no gate enforces;
+ *   - a PERK value (true / a string) on a counted feature leaves the gate with
+ *     no number, which reads as zero — the plan advertises the feature and
+ *     every call refuses it.
+ * Plus the catalog's own shape: an entry needs the `name` every surface
+ * prints, and a `usage` block only pages by day or not at all.
+ *
+ * `false` is legal on ANY feature: the tier does not include it, counted or
+ * not, which is what an absent value means too.
+ *
+ * @param {object} config - The resolved config object.
+ * @returns {string[]} Errors; empty when the config passes.
+ */
+function validateFeatures(config) {
+  const errors = [];
+  const catalog = config ? getPath(config, 'features') : undefined;
+
+  if (isPresent(catalog) && !isPlainObject(catalog)) {
+    return [`config.features must be a map of feature id → definition — got ${Array.isArray(catalog) ? 'array' : typeof catalog}`];
+  }
+
+  const entries = isPlainObject(catalog) ? catalog : {};
+
+  Object.entries(entries).forEach(([id, entry]) => {
+    if (!isPlainObject(entry)) {
+      errors.push(`config.features.${id} must be an object — { name, icon, definition, usage? }`);
+      return;
+    }
+
+    if (typeof entry.name !== 'string' || !entry.name.trim()) {
+      errors.push(`config.features.${id}.name is required — it is the label every surface prints (pricing rows, comparison matrix, account usage bars)`);
+    }
+
+    if (entry.usage === undefined) {
+      return;
+    }
+
+    if (!isPlainObject(entry.usage)) {
+      errors.push(`config.features.${id}.usage must be an object — { pace: 'daily' | false, mirror: ['<doc kind>'] }; omit it entirely to make ${id} a perk`);
+      return;
+    }
+
+    if (entry.usage.pace !== undefined && entry.usage.pace !== 'daily' && entry.usage.pace !== false) {
+      errors.push(
+        `config.features.${id}.usage.pace must be 'daily' (the default) or false — a month limit is either spread over the days of the month or spent whenever the user likes`,
+      );
+    }
+
+    if (entry.usage.mirror !== undefined
+      && (!Array.isArray(entry.usage.mirror) || entry.usage.mirror.some((kind) => typeof kind !== 'string'))) {
+      errors.push(`config.features.${id}.usage.mirror must be an array of document kinds — e.g. ['teams']`);
+    }
+  });
+
+  const products = config ? getPath(config, 'payment.products') : undefined;
+
+  if (!Array.isArray(products)) {
+    return errors;
+  }
+
+  products.forEach((product, index) => {
+    const values = isPlainObject(product) ? product.features : undefined;
+    const label = `config.payment.products[${index}] (${(product && product.id) || 'unnamed'})`;
+
+    if (Array.isArray(values)) {
+      errors.push(
+        `${label} features must be a map of values, not a list (#647) — `
+        + `write \`features: { saves: 100, support: true }\` and define each feature ONCE in the top-level \`features\` catalog`,
+      );
+      return;
+    }
+
+    if (values === undefined || values === null) {
+      return;
+    }
+
+    if (!isPlainObject(values)) {
+      errors.push(`${label} features must be a map of feature id → value — got ${typeof values}`);
+      return;
+    }
+
+    Object.entries(values).forEach(([id, value]) => {
+      const entry = entries[id];
+
+      if (!entry) {
+        errors.push(
+          `${label} names the feature "${id}", which the top-level features catalog does not define — `
+          + `add it to \`features\` (nothing reads a value with no definition behind it)`,
+        );
+        return;
+      }
+
+      // Not included is not a claim: `false` says so on any kind of feature.
+      if (value === false) {
+        return;
+      }
+
+      if (isCountedFeature(entry)) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          errors.push(
+            `${label} gives "${id}" the value ${JSON.stringify(value)}, but ${id} is a counted feature `
+            + `(it carries a \`usage\` block) — its value is the MONTHLY limit as a number, or -1 for unlimited`,
+          );
+        }
+        return;
+      }
+
+      if (typeof value === 'number') {
+        errors.push(
+          `${label} gives "${id}" the number ${value}, but ${id} is not a counted feature `
+          + `(no \`usage\` block in the catalog) — give it true or a string, or add \`usage: {}\` to \`features.${id}\` to meter it`,
+        );
+      }
+    });
+  });
+
+  return errors;
 }
 
 /**
@@ -348,6 +481,39 @@ function validateConfig(config, options) {
     errors.push('config.payment.winback sets both percent and amount — a save offer is one shape or the other, never both');
   }
 
+  // ─── a product price has ONE spelling (#674) ───────────────────────────
+  // Every reader takes the bare number: the intent route's confirmation URL,
+  // all three provider libraries' resolvePrice(), the checkout page's own
+  // summary math. The checkout's resolvers ALSO unwrapped `{ amount: N }`, so
+  // an object-shaped price rendered a real total on the page and put
+  // `[object Object]` in the confirmation URL's `amount` — the two sides
+  // disagreeing about the same catalog entry. There is no shared resolver to
+  // put the shape in (the browser bundle cannot reach a build-time package, and
+  // the deployed backend does not carry one either), so the shape is settled
+  // HERE, in the one place both sides' catalog comes from.
+  const products = config ? getPath(config, 'payment.products') : undefined;
+  if (Array.isArray(products)) {
+    products.forEach((product, index) => {
+      const prices = isPlainObject(product) ? product.prices : undefined;
+
+      if (!isPlainObject(prices)) {
+        return;
+      }
+
+      Object.entries(prices).forEach(([key, value]) => {
+        if (typeof value !== 'number') {
+          errors.push(
+            `config.payment.products[${index}] (${product.id || 'unnamed'}) price "${key}" must be a number `
+            + `— write \`${key}: 9.99\`, never \`${key}: { amount: 9.99 }\` (the two sides do not read the object shape the same)`,
+          );
+        }
+      });
+    });
+  }
+
+  // ─── the features catalog and the values products name (#647) ──────────
+  validateFeatures(config).forEach((error) => errors.push(error));
+
   // ─── undeclared paths (#636) ───────────────────────────────────────────
   // A warning, never an error: a brand config outliving one framework version
   // must still build, and the finding is what closes the gap — either the key
@@ -385,4 +551,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, runSchema, formatErrors, getPath };
+module.exports = { validateConfig, runSchema, formatErrors, getPath, resolvedBrandHost };

@@ -30,12 +30,13 @@ const {
   ensureBrandRulesSource,
   extractDocumentsBody,
   needsRulesMigration,
-} = require('../../src/cli/utils/compile-rules.js');
-const { stageFunctions } = require('../../src/cli/utils/stage-functions.js');
+} = require('../../dist/cli/utils/compile-rules.js');
+const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const PACKAGE_DIR = path.join(__dirname, '..', '..');
 const TEMPLATES_DIR = path.join(PACKAGE_DIR, 'templates');
-const FIXTURE_DIR = path.join(PACKAGE_DIR, 'src', 'test', 'fixtures', 'firebase-project');
+const FIXTURE_DIR = path.join(PACKAGE_DIR, 'dist', 'test', 'fixtures', 'firebase-project');
 
 // A pre-#255 consumer file: the brand's own rules above the managed block.
 const LEGACY_SOURCE = [
@@ -138,7 +139,7 @@ function compileSeed() {
   return compileRules({ brandSource: jetpack.read(BRAND_RULES_SEED) }).compiled;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Compiled Firestore rules: two sources, one artifact, merged by match',
   type: 'group',
   timeout: 20000,
@@ -592,10 +593,10 @@ module.exports = {
       auth: 'none',
 
       async run({ assert }) {
-        const exempt = [path.join(PACKAGE_DIR, 'src', 'cli', 'utils', 'compile-rules.js')];
+        const exempt = [path.join(PACKAGE_DIR, 'dist', 'cli', 'utils', 'compile-rules.js')];
         const files = [
           ...jetpack.find(TEMPLATES_DIR, { matching: '*.rules' }).map((file) => path.resolve(file)),
-          ...jetpack.find(path.join(PACKAGE_DIR, 'src', 'cli'), { matching: '*.js' }).map((file) => path.resolve(file)),
+          ...jetpack.find(path.join(PACKAGE_DIR, 'dist', 'cli'), { matching: '*.js' }).map((file) => path.resolve(file)),
         ].filter((file) => !exempt.includes(file));
 
         const offenders = [];
@@ -618,4 +619,4 @@ module.exports = {
       },
     },
   ],
-};
+});

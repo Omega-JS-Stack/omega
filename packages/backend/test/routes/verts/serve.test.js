@@ -8,6 +8,8 @@
  *
  * Run: npx omega test backend:routes/verts/serve
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 async function seedAds(firestore) {
   // Intra-run isolation: wipe docs left by earlier suites (cache/crud/redirect
   // seed verts too) so the no-fill assertion is deterministic
@@ -64,7 +66,7 @@ async function seedAds(firestore) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Verts serve route (HTML unit)',
   type: 'suite',
   tests: [
@@ -180,4 +182,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -39,7 +39,7 @@ runs the container's full width. {% endcomment -%}
               <span class="omega-micro omega-fragment__label">{{ args.feed_label }}</span>
               {% for item in args.feed_items %}
                 <div class="omega-fragment__msg">
-                  <span class="omega-fragment__msg-mark">{% omega_icon item.icon, "fa-xs" %}</span>
+                  <span class="omega-fragment__msg-mark"><i class="fa-solid fa-{{ item.icon }} fa-xs"></i></span>
                   <span>{{ item.text }}</span>
                 </div>
               {% endfor %}

@@ -1,5 +1,7 @@
 // Main-layer tests for lib/usage.js — opens, hours-total accumulation, hours-this-session live.
 
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
 const STORAGE_KEY = 'usage';
 
 async function reinitWithSnapshot(ctx, snapshot) {
@@ -9,7 +11,7 @@ async function reinitWithSnapshot(ctx, snapshot) {
   ctx.manager.usage.initialize(ctx.manager);
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'usage (main)',
@@ -122,4 +124,4 @@ module.exports = {
       },
     },
   ],
-};
+});

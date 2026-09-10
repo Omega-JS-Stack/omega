@@ -1,24 +1,25 @@
 # Translations
 
-`npm run build` automatically translates `src/_locales/en/messages.json` to 16 languages via the Claude CLI. Only missing translations are generated — existing translations are preserved.
+`npm run build` automatically translates `config/messages.json` (and `config/description.md`) to the languages set in `translation.languages` (omega.json5). Only missing translations are generated — existing translations live in the committed `translations/` cache and are preserved.
 
 ## Languages produced
 
-`zh`, `es`, `hi`, `ar`, `pt`, `ru`, `ja`, `de`, `fr`, `ko`, `ur`, `id`, `bn`, `tl`, `vi`, `it`
+Exactly the codes listed in `translation.languages` — there is no fixed set. Unset means translation is OFF (the build logs one skip line). The shared contract, including the supported-code list, is docs/shared/translation.md in the Omega repo.
 
-(Output written to `src/_locales/<lang>/messages.json`, then copied to `dist/_locales/` and `packaged/<browser>/raw/_locales/`.)
+(Output written to `dist/_locales/<lang>/messages.json`, then packaged to `packaged/<browser>/raw/_locales/`.)
 
 ## How it works
 
 [src/gulp/tasks/translate.js](../src/gulp/tasks/translate.js):
 
-1. Reads `src/_locales/en/messages.json` (source of truth — author all your strings here).
-2. For each target language, reads existing `src/_locales/<lang>/messages.json` if present.
-3. Computes the set of keys present in `en` but missing (or empty) in the target language.
-4. Sends the missing keys to Claude CLI (`@anthropic-ai/claude-agent-sdk`) for translation.
-5. Merges results back into the target locale file.
+1. Reads `config/messages.json` (source of truth — author all your strings here).
+2. For each configured language, loads the committed cache at `translations/<lang>/messages.json` (source-string hash → translated message).
+3. Sends ONLY the uncached strings to the translation provider (per-key incremental).
+4. Saves the results back into the cache, then composes `dist/_locales/<lang>/messages.json` from source + cache — a miss falls back to English so the file is always complete.
 
-Existing translations are NEVER overwritten — once a key is translated, it stays. Edit the target language file directly if you want to change a translation.
+`config/description.md` translates the same way, whole-document, cached as `translations/<lang>/description.md` with a source-hash marker — editing the source retranslates it.
+
+Existing translations are NEVER overwritten — once a string is translated, it stays until the source string changes. Edit the cache file directly if you want to change a translation.
 
 ## What gets translated
 
@@ -37,7 +38,7 @@ Keys with a `message` field:
 }
 ```
 
-The `description` field provides context to the translator (helps Claude pick the right translation when a word is ambiguous).
+Only the `message` values are sent for translation; the `description` field stays English (it documents the key for maintainers and the store review).
 
 ## What the scaffold seeds
 
@@ -60,15 +61,11 @@ The [test-framework.md](test-framework.md) ships a `locales.test.js` pattern tha
 
 ## Disabling translations
 
-Don't want auto-translate? Either:
-
-- Don't have `_locales/en/messages.json` (then there's nothing to translate from), or
-- Set the `description` of every key to literal "no-translate" (or comparable convention — adjust `translate.js` to match), or
-- Remove the `translate` task from your gulp pipeline (`gulp/main.js` invocation).
+Leave `translation.languages` unset (or empty) in omega.json5 — translation is opt-in and off by default.
 
 ## Cost / API key
 
-Translations use Claude via `@anthropic-ai/claude-agent-sdk`. You'll need your Claude CLI authenticated (`claude auth`) or the SDK will fail. For most extensions, the cost is one-time per language per key change — typically pennies.
+The default provider is `claude`: it rides the locally-installed Claude Code via `@anthropic-ai/claude-agent-sdk` (declared by this framework), billed to your Claude subscription — no API key. `translation.provider: 'chatgpt'` uses the OpenAI API instead (needs `OPENAI_API_KEY`). Either way the cost is one-time per language per changed string — typically pennies.
 
 ## See also
 

@@ -34,13 +34,13 @@ navigation:
             <div class="d-flex align-items-start gap-3 flex-wrap">
               <span class="omega-icon-chip omega-icon-chip--neutral omega-icon-chip--lg flex-shrink-0">
                 {% if resolved.update.type == "security" %}
-                  {% omega_icon "shield-halved", "fa-lg" %}
+                  <i class="fa-solid fa-shield-halved fa-lg"></i>
                 {% elsif resolved.update.type == "hotfix" %}
-                  {% omega_icon "bug", "fa-lg" %}
+                  <i class="fa-solid fa-bug fa-lg"></i>
                 {% elsif resolved.update.type == "maintenance" %}
-                  {% omega_icon "wrench", "fa-lg" %}
+                  <i class="fa-solid fa-wrench fa-lg"></i>
                 {% else %}
-                  {% omega_icon "rocket", "fa-lg" %}
+                  <i class="fa-solid fa-rocket fa-lg"></i>
                 {% endif %}
               </span>
               <div class="flex-grow-1">
@@ -60,7 +60,7 @@ navigation:
                   <p class="fs-5 text-muted mb-2">{{ resolved.update.title }}</p>
                 {% endiftruthy %}
                 <div class="text-muted small">
-                  {% omega_icon "calendar", "me-1" %}
+                  <i class="fa-solid fa-calendar me-1"></i>
                   {{ resolved.update.date | date: "%B %d, %Y" }}
                 </div>
               </div>
@@ -104,12 +104,12 @@ navigation:
       <div class="col-lg-10">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3" data-omega-reveal>
           <a href="{{ resolved.navigation.back_url }}" class="text-decoration-none">
-            {% omega_icon "arrow-left", "me-1" %}
+            <i class="fa-solid fa-arrow-left me-1"></i>
             {{ resolved.navigation.back_text }}
           </a>
           <a href="/status" class="text-decoration-none">
             View system status
-            {% omega_icon "arrow-right", "ms-1" %}
+            <i class="fa-solid fa-arrow-right ms-1"></i>
           </a>
         </div>
       </div>

@@ -34,9 +34,10 @@ const OWNER_UID = 'uid_owner1';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ chatsy = {}, targets = { web: {}, backend: {} }, images = { brandmark: BRANDMARK }, products } = {}) {
+function brandConfig({ chatsy = {}, targets = { web: {}, backend: {} }, images = { brandmark: BRANDMARK }, products, features } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: URL, description: DESCRIPTION, images },
+    features: features,
     inbound: {
       chat: {
         providers: {
@@ -180,17 +181,28 @@ test('chat: baseline knowledge fills every placeholder — including {website} i
   assert.ok(knowledge.includes('- Plus ($10/month or $100/year) (14-day free trial)'));
 });
 
-test('chat: pricing formats free products, unlimited limits, and skips archived ones', () => {
+test('chat: pricing quotes the CATALOG\'s own words, formats free/unlimited, and skips archived ones', () => {
+  // A product names only VALUES (#647); the catalog says what each id is
+  // called, so the agent never quotes a raw config key at a customer.
   const knowledge = getBaselineKnowledge(brandConfig({
+    features: {
+      requests: { name: 'API Requests', usage: {} },
+      seats: { name: 'Seats', usage: { pace: false } },
+      support: { name: 'Priority support' },
+    },
     products: [
       { id: 'free', name: 'Free', type: 'subscription' },
-      { id: 'pro', name: 'Pro', type: 'subscription', prices: { monthly: 5 }, limits: { requests: -1, seats: 3 } },
+      { id: 'pro', name: 'Pro', type: 'subscription', prices: { monthly: 5 }, features: { requests: -1, seats: 3, support: true, sso: false } },
       { id: 'old', name: 'Old', type: 'subscription', prices: { monthly: 1 }, archived: true },
     ],
   }));
 
   assert.ok(knowledge.includes('- Free (free)'));
-  assert.ok(knowledge.includes('- Pro ($5/month) - unlimited requests, 3 seats'));
+  assert.ok(
+    knowledge.includes('- Pro ($5/month) - unlimited API Requests, 3 Seats, Priority support'),
+    knowledge,
+  );
+  assert.ok(!knowledge.includes('sso'), 'a value of false is not part of the tier and is never mentioned');
   assert.ok(!knowledge.includes('- Old'));
 });
 

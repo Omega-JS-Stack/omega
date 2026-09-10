@@ -11,6 +11,7 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC        = path.join(__dirname, '..', '..', '..');
 const SETUP_PATH = path.join(SRC, 'commands', 'lib', 'ensure-target.js');
@@ -48,7 +49,7 @@ async function inProject(dir, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'ensure-target — the consumer package.json write',
@@ -69,7 +70,7 @@ module.exports = {
 
             // The framework's project scripts landed, npm's own 2-space shape kept
             const written = JSON.parse(contents);
-            ctx.expect(written.scripts.build).toBe('npx omega build');
+            ctx.expect(written.scripts.build).toBe('omega build');
             ctx.expect(written.private).toBe(true);
             ctx.expect(written.main).toBe('dist/main.bundle.js');
             ctx.expect(contents).toContain('\n  "name": "staged-app"');
@@ -122,7 +123,7 @@ module.exports = {
             setup.setupScripts();
 
             const healed = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            ctx.expect(healed.scripts.build).toBe('npx omega build');
+            ctx.expect(healed.scripts.build).toBe('omega build');
             ctx.expect(fs.readFileSync(pkgPath, 'utf8').endsWith('}\n')).toBe(true);
           });
         } finally {
@@ -130,5 +131,42 @@ module.exports = {
         }
       },
     },
+    {
+      name: 'a target still carrying the `npx omega` spelling heals to the bare verb (#748)',
+      run: async (ctx) => {
+        // Package scripts spell the verb bare, web's form — the `npx` prefix
+        // is redundant inside a script (npm puts node_modules/.bin on the
+        // path) and stays canonical only for docs and the terminal. Every
+        // framework-owned key is rewritten on the next verb's ensure pass.
+        const tmp = stageProject({
+          ...CONSUMER_PKG,
+          scripts: { ...CONSUMER_PKG.scripts, build: 'npx omega build', test: 'npx omega test', lint: 'npx eslint .' },
+        });
+        const pkgPath = path.join(tmp, 'package.json');
+
+        try {
+          await inProject(tmp, async (setup) => {
+            setup.setupScripts();
+
+            const healed = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            ctx.expect(healed.scripts.build).toBe('omega build');
+            ctx.expect(healed.scripts.test).toBe('omega test');
+            ctx.expect(healed.scripts.lint).toBe('npx eslint .');
+
+            // Converged: the second pass writes nothing at all
+            const afterFirst = fs.readFileSync(pkgPath, 'utf8');
+            const past = new Date(Date.now() - 60000);
+            fs.utimesSync(pkgPath, past, past);
+
+            setup.setupScripts();
+
+            ctx.expect(Math.round(fs.statSync(pkgPath).mtimeMs)).toBe(Math.round(past.getTime()));
+            ctx.expect(fs.readFileSync(pkgPath, 'utf8')).toBe(afterFirst);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
   ],
-};
+});

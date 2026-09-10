@@ -158,7 +158,7 @@ const tray = {
   // which is populated by `gulp/build-config` using its 3-tier waterfall (consumer config →
   // consumer convention → @omega.js/desktop bundled). So at runtime we just consume what build-config
   // already resolved — no need to re-walk the chain (and `__dirname` is unreliable inside
-  // webpack-bundled main.bundle.js anyway).
+  // esbuild-bundled main.bundle.js anyway).
   //
   // For consumers who skip the gulp build (rare — testing scenarios), we also fall back to
   // the consumer convention `<projectRoot>/config/icons/<platform>/<file>` directly, matching

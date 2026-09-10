@@ -25,6 +25,7 @@ const {
 const { log } = require('./lib/log.js');
 const { resolveSpawn } = require('./lib/env.js');
 const { connectWithDeadline, listToolsOnce } = require('./lib/oneshot.js');
+const { descendantPids, killTree } = require('./lib/kill-tree.js');
 const registry = require('./lib/registry.js');
 
 // ---------- Upstream registry (from disk) ----------
@@ -44,6 +45,8 @@ for (const [name, upstream] of Object.entries(upstreams)) {
     spawning: null,
     lastError: null,
     envOverride: null,
+    inflight: 0,
+    lastActivity: null,
   };
 }
 
@@ -92,39 +95,126 @@ const spawnUpstream = async (name) => {
 
   session[name].client = client;
   session[name].transport = transport;
+  // A fresh child is busy by definition: the call that spawned it is next.
+  session[name].lastActivity = Date.now();
   log('info', `Spawned upstream "${name}" (pid=${transport.pid})`);
 };
 
 /**
- * Close an upstream's child, force-killing it if it outlives the grace period.
+ * Close an upstream's child, force-killing what outlives the grace period.
  *
  * @param {string} name - Upstream name
- * @returns {Promise<void>} Resolves once close() has been attempted
+ * @param {{wait?: boolean}} [options] - `wait` holds the caller until the
+ *   grace has run and every survivor is killed. Shutdown needs it: the timer
+ *   is unref'd everywhere else, so the exit would beat it and orphan the tree.
+ * @returns {Promise<void>} Resolves once close() has been attempted — and once
+ *   the grace has run too, when `wait` is set
  */
-const killUpstream = async (name) => {
+const killUpstream = async (name, { wait = false } = {}) => {
   const state = session[name];
   if (!state || !state.transport) return;
+  // The pid and the WHOLE tree under it are read BEFORE the close, while both
+  // still exist: close() clears the transport's own process handle, so nothing
+  // read afterwards can even name the child. And close() only ever reaches
+  // that ROOT pid — everything below is reparented to init the moment it dies,
+  // out of reach of any later walk, one level at a time as each level goes.
+  // For an `npx`-wrapped upstream the root is only the npm wrapper, so this
+  // capture is the last handle on the real server and the browser it started.
+  const pid = state.transport.pid;
+  const descendants = pid ? descendantPids(pid) : [];
+
+  // The slot is emptied when the close STARTS, not when it finishes: a close
+  // runs for seconds against a child that will not go politely, and a call
+  // landing in that window used to be handed the closing client and fail. With
+  // the slot already empty it takes the lazy-spawn path and gets a fresh
+  // child, and the sweep's next tick sees nothing left to close here. The
+  // transport's own onclose guard stays right — it finds the slot moved on and
+  // leaves it alone.
+  const client = state.client;
+  state.client = null;
+  state.transport = null;
   try {
-    await state.client.close();
+    await client.close();
   } catch (err) {
     log('warn', `client.close() for "${name}" threw: ${err.message}`);
   }
+
   // close() should terminate the child; force-kill after grace period if needed.
-  const transport = state.transport;
-  state.client = null;
-  state.transport = null;
-  setTimeout(() => {
-    if (transport.pid) {
-      try {
-        process.kill(transport.pid, 0);
-        log('warn', `Upstream "${name}" still alive after close(); SIGKILL`);
-        process.kill(transport.pid, 'SIGKILL');
-      } catch {
-        // process is gone — fine
+  const reaped = new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (pid) {
+        try {
+          process.kill(pid, 0);
+          log('warn', `Upstream "${name}" still alive after close(); SIGKILL`);
+          killTree(pid, 'SIGKILL');
+        } catch {
+          // process is gone — fine
+        }
       }
-    }
-  }, 2000).unref();
+      // What the child started outlives it either way. One that already exited
+      // alongside its parent is a no-op (ESRCH); anything else — a pid that
+      // has become somebody else's since the capture — is reported and stepped
+      // over, because the graces after it still have trees to kill.
+      for (const child of descendants) {
+        try {
+          killTree(child, 'SIGKILL');
+        } catch (err) {
+          log('warn', `Killing "${name}" descendant ${child} threw: ${err.message}`);
+        }
+      }
+      resolve();
+    }, 2000);
+
+    // Housekeeping never keeps a router alive that is otherwise done — the one
+    // exception is the caller that asked to wait, which is on its way out and
+    // has to see this through first.
+    if (!wait) timer.unref();
+  });
+
+  if (wait) await reaped;
 };
+
+// ---------- Idle close ----------
+
+// How long an upstream's child may sit unused before the router closes it. A
+// session is open for hours and calls an upstream for minutes: the child used
+// to live for the whole session, which is 2.5 cores of browser for a day of
+// chat. Closing costs one cold spawn on the next call and nothing else.
+// MCP_ROUTER_IDLE_MS is the test seam, alongside the one in oneshot.js.
+const IDLE_MS = Number(process.env.MCP_ROUTER_IDLE_MS) || 15 * 60 * 1000;
+
+// Derived from the limit (never faster than a second) so the seam shrinks the
+// sweep with it: a test does not wait out a cadence tuned for 15 minutes.
+const IDLE_SWEEP_MS = Math.max(1000, Math.floor(IDLE_MS / 4));
+
+/**
+ * Close every spawned upstream that has been idle past the limit.
+ *
+ * A call IN FLIGHT is never closed under: a long tool call is idle by the
+ * clock the whole time it runs, so the counter is what protects it. The
+ * upstream stays active for the session — the next call spawns a fresh child
+ * through the unchanged lazy path.
+ *
+ * @returns {Promise<void>} Resolves once the idle children are closed
+ */
+const sweepIdleUpstreams = async () => {
+  for (const [name, state] of Object.entries(session)) {
+    if (!state.client || state.inflight > 0) continue;
+
+    const idle = Date.now() - state.lastActivity;
+    if (idle <= IDLE_MS) continue;
+
+    log('info', `Closing idle upstream "${name}" (${Math.round(idle / 1000)}s since its last call)`);
+    await killUpstream(name);
+  }
+};
+
+// Unref'd: housekeeping never keeps a router alive that is otherwise done.
+setInterval(() => {
+  // A rejection here would be an unhandled one, and the sweep must never take
+  // a live session's router down with it.
+  sweepIdleUpstreams().catch((err) => log('error', `Idle sweep failed: ${err.message}`));
+}, IDLE_SWEEP_MS).unref();
 
 // ---------- MCP Server ----------
 
@@ -203,6 +293,8 @@ const callMetaTool = async (name, args) => {
       locked: upstream.locked,
       active_this_session: session[upstream.name].active,
       spawned: session[upstream.name].client != null,
+      pid: session[upstream.name].transport ? session[upstream.name].transport.pid : null,
+      idle_ms: session[upstream.name].client ? Date.now() - session[upstream.name].lastActivity : null,
       tool_count: upstream.tools.length,
       last_error: session[upstream.name].lastError,
     }));
@@ -357,9 +449,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       await session[upstreamName].spawning;
     }
-    const result = await session[upstreamName].client.callTool({ name: toolName, arguments: args });
-    session[upstreamName].lastError = null;
-    return result;
+    // Both halves feed the idle sweep: the counter keeps a call in flight from
+    // being closed under, and the stamps at each end are what "idle" measures.
+    session[upstreamName].inflight += 1;
+    session[upstreamName].lastActivity = Date.now();
+    try {
+      const result = await session[upstreamName].client.callTool({ name: toolName, arguments: args });
+      session[upstreamName].lastError = null;
+      return result;
+    } finally {
+      session[upstreamName].inflight -= 1;
+      session[upstreamName].lastActivity = Date.now();
+    }
   } catch (err) {
     const message = err && err.message ? err.message : String(err);
     session[upstreamName].lastError = message;
@@ -373,6 +474,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const main = async () => {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  server.onclose = shutdown;
+  // The SDK's stdio server transport listens for data and errors only, so an
+  // EOF on stdin leaves it open — and a spawned child's handle then holds this
+  // process open for good. EOF IS the host being gone; close through the
+  // transport so there stays ONE way out.
+  process.stdin.on('end', () => transport.close());
   log('info', 'Router ready on stdio');
 };
 
@@ -382,10 +489,27 @@ main().catch((err) => {
 });
 
 // Graceful shutdown — kill any spawned upstreams.
-const shutdown = async () => {
+//
+// ONE run, whatever asks for it: a host tears down by ending stdin, then
+// SIGTERM a moment later, then SIGKILL. That signal lands while the first run
+// is still waiting out its grace, and a second run would find every slot
+// already emptied by the first, await nothing, and exit(0) on top of the timers
+// that had yet to kill the trees. So every trigger gets the SAME promise.
+let shuttingDown = null;
+
+const shutdown = () => (shuttingDown ??= (async () => {
   log('info', 'Shutting down; closing upstreams');
-  await Promise.all(Object.keys(session).map((name) => killUpstream(name)));
+  // The ceiling: a close that never settles must not hold the router past the
+  // host's own SIGKILL, where the exit stops being ours to make.
+  setTimeout(() => process.exit(0), 6000).unref();
+  // Session end is the EVERYDAY close, so the grace is waited out here rather
+  // than skipped: exiting the moment close() returns leaves whatever a
+  // hard-killed wrapper started — a browser, most of the time — running with
+  // nothing left that knows its pid. The graces run concurrently, so this
+  // costs the one grace period, once.
+  await Promise.all(Object.keys(session).map((name) => killUpstream(name, { wait: true })));
   process.exit(0);
-};
+})());
+
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

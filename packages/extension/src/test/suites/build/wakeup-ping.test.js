@@ -16,6 +16,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const AUTH_HELPERS = pathToFileURL(path.join(__dirname, '..', '..', '..', 'lib', 'auth-helpers.js')).href;
 
@@ -54,7 +55,7 @@ function makeContext({ needsSync = false } = {}) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'wakeup ping — a surface warms the backend before it waits on auth (#644)',
@@ -86,4 +87,4 @@ module.exports = {
       },
     },
   ],
-};
+});

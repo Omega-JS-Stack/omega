@@ -16,11 +16,11 @@ const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 
 test('about/hero: image: leads with the photo; without it the statement split is untouched', async () => {
   const pages = await buildWith(miniData);
 
-  assert.ok(pages.get('/test/sections/section/about/hero'), 'the entry is in the library');
+  assert.ok(pages.get('/test/sections/about/hero'), 'the entry is in the library');
 
   // Three demo variants, one embedded-frame page each (#463): statement only,
   // facts rail, photo lead.
-  const FRAMES = '/test/sections/section/about/hero/frames/';
+  const FRAMES = '/test/sections/about/hero/frames/';
   const photo = pages.get(`${FRAMES}photo-lead`);
   const imageless = (pages.get(`${FRAMES}statement-only`) || '') + (pages.get(`${FRAMES}with-facts-rail`) || '');
   assert.ok(photo, 'the photo-lead variant frame built');
@@ -36,10 +36,10 @@ test('about/hero: image: leads with the photo; without it the statement split is
 test('about/letter: image: hangs a photo in the aside; without it the aside is unchanged', async () => {
   const pages = await buildWith(miniData);
 
-  assert.ok(pages.get('/test/sections/section/about/letter'), 'the entry is in the library');
+  assert.ok(pages.get('/test/sections/about/letter'), 'the entry is in the library');
 
   // Two demo variants: the default letter and the one with the aside photo
-  const FRAMES = '/test/sections/section/about/letter/frames/';
+  const FRAMES = '/test/sections/about/letter/frames/';
   const photo = pages.get(`${FRAMES}with-the-aside-photo`);
   const plain = pages.get(`${FRAMES}default-letter`);
   assert.ok(photo && plain, 'both variant frames built');

@@ -184,10 +184,9 @@
 // Legacy interaction/soft-color names still referenced by pages awaiting
 // their skin-arc remake — mapped onto the v2 language.
 .hover-flex {
-  transition: transform var(--omega-speed) var(--omega-ease), border-color var(--omega-speed) var(--omega-ease);
+  transition: border-color var(--omega-speed) var(--omega-ease);
 
   &:hover {
-    transform: translateY(-2px);
     border-color: var(--omega-line-strong);
   }
 }

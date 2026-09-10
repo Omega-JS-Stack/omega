@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # omega:inject — UserPromptSubmit hook
 # Reads the project's package.json and asks the session to invoke the matching
-# framework skill. Once per session; fails open on anything unexpected.
+# framework skill. At a BRAND root the nearest manifest carries the manager
+# alone, so the brand's targets are discovered too (config/omega.json5 and
+# every targets/*/package.json) and the whole set is asked for at once, with
+# the framework map named as required reading.
+# Once per session per skill; fails open on anything unexpected.
 
 set -euo pipefail
 
@@ -38,28 +42,48 @@ if [ -f "$fn_manifest" ]; then
   deps=$(printf '%s\n%s' "$deps" "$fn_deps")
 fi
 
-# package → skill. Every row also matches the manifest's OWN name, which is what
-# covers working inside `packages/<pkg>` in the monorepo. @omega.js/client and
-# the monorepo root are name-only: web, desktop, and extension all depend on the
-# client runtime, so a dependency on it says nothing about what the session
-# works on.
+# package → skill lives in the shared table (hooks/lib/omega-skills.sh), the one
+# the gate hook reads too. These rows only say HOW a package matches: every row
+# matches the manifest's OWN name, which is what covers working inside
+# `packages/<pkg>` in the monorepo, and `name` rows match ONLY that way —
+# web, desktop, and extension all depend on the client runtime, so a dependency
+# on it says nothing about what the session works on.
+skills_lib="$(dirname "${BASH_SOURCE[0]}")/../lib/omega-skills.sh"
+[ -r "$skills_lib" ] || exit 0
+# shellcheck source-path=SCRIPTDIR source=../lib/omega-skills.sh
+. "$skills_lib"
+
 matched=()
-while read -r pkg skill signal; do
+while read -r pkg signal; do
   [ -n "$pkg" ] || continue
+  skill=$(omega_skill_for "$pkg")
+  [ -n "$skill" ] || continue
   if [ "$own_name" = "$pkg" ]; then
     matched+=("$skill")
   elif [ "$signal" != "name" ] && grep -qxF "$pkg" <<<"$deps"; then
     matched+=("$skill")
   fi
 done <<'MAP'
-@omega.js/web omega:web any
-@omega.js/backend omega:backend any
-@omega.js/desktop omega:desktop any
-@omega.js/extension omega:extension any
-@omega.js/manager omega:manager any
-@omega.js/client omega:client name
-omega omega:main name
+@omega.js/web any
+@omega.js/backend any
+@omega.js/desktop any
+@omega.js/extension any
+@omega.js/manager any
+@omega.js/client name
+omega name
 MAP
+
+# Brand-level discovery. A brand root's manifest carries @omega.js/manager and
+# nothing else, so the frameworks a brand actually runs live one level down, in
+# config/omega.json5 and each targets/*/package.json. Read them all: a session
+# at a brand root has to know about every target before it edits one.
+brand_root=$(omega_brand_root "$cwd")
+if [ -n "$brand_root" ]; then
+  while read -r skill; do
+    [ -n "$skill" ] || continue
+    matched+=("$skill")
+  done < <(omega_brand_skills "$brand_root")
+fi
 
 [ "${#matched[@]}" -gt 0 ] || exit 0
 
@@ -84,6 +108,14 @@ else
   skill_list=$(printf ', %s' "${fresh[@]}")
   skill_list="${skill_list:2}"
   ctx="OMEGA project detected: invoke these skills via the Skill tool before responding: ${skill_list}. Follow their rules and the framework docs they route to for any work in this project. (Injected once per session; do not re-invoke on later prompts unless the work shifts.)"
+fi
+
+# In a brand, the skills and the framework map are REQUIRED reading before the
+# first edit, not a suggestion — the gate hook refuses a target edit until the
+# skill that owns it was invoked.
+if [ -n "$brand_root" ]; then
+  ctx="$ctx
+This is an OMEGA brand monorepo: every skill above, plus the framework map it points at (the brand AGENTS.md import line — node_modules/@omega.js/AGENTS.md), is required reading BEFORE the first edit. Writes under targets/ and to config/omega.json5 are refused until the skill owning that surface has been invoked."
 fi
 
 jq -n --arg ctx "$ctx" '{

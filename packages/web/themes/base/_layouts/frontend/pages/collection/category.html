@@ -12,15 +12,19 @@ category_empty: "Nothing in this category yet."
    spelling ("guides"), and the generated page's meta title-cases the same way
    — one presentation of one term (#312). {% endcomment %}
 {% assign category_name = category.name | omega_title_case %}
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    <div class="omega-post-card__eyebrow mb-4">
       <a href="{{ resolved.collection.base }}">{{ resolved.collection.title }}</a>
       <span>/</span>
       <span>{{ category_name }}</span>
     </div>
 
-    {% component "heading/masthead", headline: category_name, sub: resolved.collection.description %}
+    {% component "heading/masthead", headline: category_name, sub: resolved.collection.description, first_paint: true %}
   </div>
 </section>
 
@@ -40,7 +44,7 @@ category_empty: "Nothing in this category yet."
                 <span>{{ entry.title | default: item.data.title | default: item.url }}</span>
                 <span class="omega-rowlist__meta">
                   {{ entry.description | default: item.data.description }}
-                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                  <i class="fa-solid fa-arrow-right fa-xs ms-2"></i>
                 </span>
               </a>
             {% endfor %}
@@ -57,7 +61,7 @@ category_empty: "Nothing in this category yet."
     <div class="row justify-content-center mt-5">
       <div class="col-12 text-center">
         <a href="{{ resolved.collection.base }}" class="btn btn-outline-adaptive">
-          {% omega_icon "arrow-left", "fa-sm me-2" %}
+          <i class="fa-solid fa-arrow-left fa-sm me-2"></i>
           All {{ resolved.collection.title }}
         </a>
       </div>

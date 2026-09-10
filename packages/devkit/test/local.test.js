@@ -536,7 +536,7 @@ test('the real fs watch feeds the same pipeline (recursive, by package name)', a
 
 // ---- restoreRegistrySpecs (the publish-day inverse)
 
-test('restoreRegistrySpecs plans ^<linked version> for file: specs and skips registry specs', async () => {
+test('restoreRegistrySpecs plans the linked version for file: specs and skips registry specs', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-'));
   try {
     // A fake linked package whose version the flip derives
@@ -558,17 +558,55 @@ test('restoreRegistrySpecs plans ^<linked version> for file: specs and skips reg
 
     const actions = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
     assert.deepEqual(actions.map(({ name, spec, action }) => ({ name, spec, action })), [
-      { name: '@omega.js/client', spec: '^0.1.0', action: 'flip' },
+      { name: '@omega.js/client', spec: '0.1.0', action: 'flip' },
       { name: '@omega.js/web', spec: '^0.1.0', action: 'skip' },
     ]);
 
-    // Explicit range override wins over the derived version
+    // Explicit range override wins over the derived version, verbatim
     const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^0.2.0' });
     assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^0.2.0');
 
     // dryRun writes nothing — the file: spec survives verbatim
     const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'package.json'), 'utf8'));
     assert.ok(manifest.dependencies['@omega.js/client'].startsWith('file:'));
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('restoreRegistrySpecs writes the EXACT version, never a caret (#794 lockstep)', async () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-exact-'));
+  try {
+    const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.3.0' }));
+
+    const brand = path.join(scratch, 'brand');
+    const targetDir = path.join(brand, 'targets', 'site');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['targets/*'] }));
+    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
+      name: 'site',
+      dependencies: {
+        '@omega.js/client': `file:${path.relative(targetDir, pkgDir).split(path.sep).join('/')}`,
+      },
+    }));
+
+    // The plan carries the bare version — a caret would let this target float
+    // ahead of its siblings the moment the family releases again
+    const planned = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true });
+    assert.deepEqual(planned.map(({ name, spec, action }) => ({ name, spec, action })), [
+      { name: '@omega.js/client', spec: '0.3.0', action: 'flip' },
+    ]);
+
+    // The planned spec IS the string the flip writes (setDependencySpec takes
+    // it verbatim); the write leg itself stays out of this test because its
+    // install resolves the family from the REGISTRY, which no offline run can
+    // do for an unpublished version.
+
+    // An explicit range still wins verbatim — the caller owns that string
+    const overridden = await local.restoreRegistrySpecs({ dir: targetDir, dryRun: true, range: '^9.9.9' });
+    assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^9.9.9');
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }

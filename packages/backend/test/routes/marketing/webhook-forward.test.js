@@ -12,7 +12,9 @@
  *
  * This file only verifies the GATE: on a non-parent @omega.js/backend, the route is invisible.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Marketing webhook forwarder gating (parent-only)',
   type: 'group',
   timeout: 15000,
@@ -58,4 +60,4 @@ module.exports = {
       },
     },
   ],
-};
+});

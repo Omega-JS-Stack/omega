@@ -1,84 +1,121 @@
 # Usage & Rate Limiting
 
-## Overview
+## The one call
 
-Usage is tracked per-metric (e.g., `requests`, `sponsorships`) with four fields:
-- `monthly`: Current month's count, reset on the 1st of each month by cron
-- `daily`: Current day's count, reset every day by cron
-- `total`: All-time count, never resets
-- `last`: Object with `id`, `timestamp`, `timestampUNIX` of the last usage event
+```js
+module.exports = async ({ ctx }) => {
+  const left = await ctx.usage.consume('saves');   // throws a 429 over limit
 
-## Core API
+  // ... do the work the user paid for
+  return ctx.respond({ saved: true, left: left.left });
+};
+```
 
-Routes receive `usage` in their context object, already initialized for the authenticated user. **Always use these methods** — never manually read/write `usage` fields on Firestore docs; the field path is always `{doc}.usage.{metric}`, and @omega.js/backend creates the structure on first write (do NOT pre-initialize usage fields on document creation).
+`consume` checks both counters, refuses with a 429 that names WHICH one hit, else counts, writes, and returns what is left. There is no "validate then increment then update" dance to get half right — every hand-rolled gate that used to live in a route existed because there was one.
 
-| Method | Sync? | What it does |
-|--------|-------|--------------|
-| `usage.validate(metric)` | async | Validates remaining quota; rejects with 429 over limit (daily caps below; hCaptcha fallback supported) |
-| `usage.increment(metric, value?)` | sync | Increments `total`/`monthly`/`daily` + `last` in memory (default value 1) |
-| `usage.update()` | async | Persists pending changes to the user doc AND all mirrors in parallel — **must be called after `increment()`** |
-| `usage.getLimit(name)` | sync | A specific limit from the user's product config (plan-based) |
-| `usage.getProduct(id?)` | sync | The user's resolved product/plan |
-| `usage.getUsage(name?)` | sync | Current usage for a metric, or the whole usage object |
+## What a feature IS lives in config, once
 
-For anonymous-to-owner billing, call `setUser()` BEFORE `validate()` — validation must check the owner's quota, not the visitor's (see [Proxy Usage](#proxy-usage-setuser--mirrors)).
+A feature is defined ONCE, in the top-level `features` catalog, and each product names only its VALUE ([docs/shared/config.md](../../../docs/shared/config.md)):
 
-## Limits & Daily Caps
-
-Limits are always specified as **monthly** values in product config (e.g., `limits.requests = 100` means 100/month).
-
-**Negative limits are unlimited.** `limits.requests = -1` means the metric is never rate-limited for that product — `validate()` always resolves and no daily caps apply. A limit of `0` (or a metric missing from `limits`) always rejects.
-
-By default, limits are enforced with **daily caps** to prevent users from burning their entire monthly quota in a single day. Two checks are applied:
-
-1. **Flat daily cap**: `ceil(monthlyLimit / daysInMonth)` — max uses per day
-   - e.g., 100/month in a 31-day month = `ceil(100/31)` = 4/day
-2. **Proportional monthly cap**: `ceil(monthlyLimit * dayOfMonth / daysInMonth)` — running total
-   - Prevents accumulating too much too fast even within daily limits
-   - e.g., Day 15 of a 30-day month with 100/month limit = max 50 used so far
-
-Products can opt out of daily caps by setting `rateLimit: 'monthly'` (default is `'daily'`):
-
-```json
+```json5
 {
-  "id": "basic",
-  "limits": { "requests": 100 },
-  "rateLimit": "monthly"
+  features: {
+    saves:   { name: 'Saves', icon: 'feather', definition: 'Notes you can save.',
+               usage: { pace: 'daily', mirror: ['teams'] } },
+    support: { name: 'Priority support', icon: 'headset' },
+  },
+  payment: {
+    products: [
+      { id: 'basic',   name: 'Basic',   features: { saves: 100 } },
+      { id: 'premium', name: 'Premium', features: { saves: -1, support: true } },
+    ],
+  },
 }
 ```
 
-## Proxy Usage (setUser + Mirrors)
+- A `usage` block makes the entry **counted** (metered per user). An entry without one is a **perk** and is never counted — `consume('support')` is a 500, not a silent gate.
+- A counted feature's product value is its **monthly limit**, as a number. `-1` is unlimited. `false` (or absent) means the tier does not include it, which reads as a limit of `0`: every call refuses.
+- A perk's value is `true` / `false` / a string.
+- The validator fails a number on a perk and a perk value on a counted feature, so a plan can never advertise a meter nothing enforces.
 
-Sometimes usage must be billed to a different user than the one making the request (e.g., anonymous visitors consuming an agent owner's credits). Use `setUser()` to swap the target and `addMirror()` / `setMirrors()` to write usage to additional Firestore docs:
+## Two counters, and the day's share
+
+Every counted feature carries two counters per user: **month** and **day**.
+
+| Field | What it is |
+|---|---|
+| `monthly` | This month's count, reset on the 1st by cron |
+| `daily` | Today's count, reset every day by cron |
+| `total` | All-time count, never resets |
+| `last` | `{ timestamp, timestampUNIX }` of the last time it moved |
+
+The day's share is `ceil(monthly limit / days in this month)`, so a quota of 100 in a 31-day month allows 4 a day and can never be burned on day one. **Unused day share expires at midnight** — it never rolls forward.
+
+Pacing by day is the **default**. `usage: { pace: false }` on the catalog entry opts a feature out to a plain monthly counter (`day.limit` reads `-1`, and the day never refuses).
+
+**Either counter full refuses, and the month cap always holds.** `consume` checks the MONTH first — a spent month is not "try again tomorrow":
+
+| State | The 429 says |
+|---|---|
+| Month spent | `You have used all 100 of your Saves this month (100/100). Upgrade your plan for more.` |
+| Day's share spent, month has room | `You have used today's Saves (4/4 of the 100 on your plan this month). Try again tomorrow.` |
+
+## Per-user overrides
+
+`user.usage.overrides.<feature>` is a number that **wins over the plan's**: extra credits granted to one account, not a second pricing tier. The day's share derives from the effective number, so an override of 300 on a 31-day month allows 10 a day rather than the plan's 4.
+
+`usage` is a framework field the Firestore rules deny every client ([templates/firestore.framework.rules](../templates/firestore.framework.rules)), so an override can only ever be server-written — which is what makes it trustworthy as a limit. The reset cron never touches it.
+
+## The API
+
+`ctx.usage` is attached to every route by the middleware. Attaching is **synchronous and I/O-free**: the counter resolves the account on the first `consume`/`read`, so a route that never counts pays nothing.
+
+| Method | What it does |
+|---|---|
+| `consume(feature, amount = 1, options?)` | async — check, count, write. Throws a 429 over limit; returns `{ used, left, day: { used, left } }` |
+| `read(feature)` | async — the same numbers plus `limit`, `planLimit`, `override`, `day.limit`, without counting |
+| `forKey(key)` | A SEPARATE counter for an anonymous key (see below) |
+| `limits()` / `counters()` | What the counter already KNOWS — the `omega-properties` header's `usage.limits` / `usage.current`; empty until it has resolved |
+| `getProduct(id?)` | The account's resolved product |
+| `addWhitelistKeys(keys)` | API keys that never get refused (they still count) |
+
+`options.limit` is for the counters that are **not plan features** — a per-IP signup gate is a security control with its own declared config key (`targets.backend.auth.signup.maxPerIpPerDay`), not a tier anybody buys. An explicit limit supplies the definition the catalog would have, so the catalog lookup and the product read are skipped and the counter is a plain period counter with no day share. The framework's own anti-abuse gates use it: signup-by-IP, `marketing/contact`, `marketing/email-preferences`.
+
+Every derivation — the effective limit, the day share, what is left — lives in `@omega.js/account`'s features module, the SAME one the browser's account page reads through `@omega.js/client/modules/features.js`. The number that refuses a request and the number a usage bar draws can never be two different numbers.
+
+## Anonymous counting is explicit
 
 ```js
-// Switch usage target to the agent owner (fetches their user doc)
-await usage.setUser(ownerUid);
-
-// Also write usage data to the agent doc
-usage.addMirror(`agents/${agentId}`);
-
-// Now validate, increment, and update all operate on the owner's data
-// update() writes to users/{ownerUid} AND agents/{agentId} in parallel
-await usage.validate('credits');
-usage.increment('credits');
-await usage.update();
+await ctx.usage.forKey(ctx.request.geolocation.ip).consume('marketing-subscribe', 1, { limit: 5 });
 ```
 
-**Methods:**
-- `setUser(uid)` — async, fetches `users/{uid}` from Firestore, replaces `self.user`, sets `useUnauthenticatedStorage = false`
-- `setMirrors(paths)` — sync, overwrites the mirror array with the given paths
-- `addMirror(path)` — sync, appends a single path to the mirror array
+`forKey` returns a **separate** counter bound to that key, writing to `usage/{key}` (or a local temp store when `unauthenticatedMode: 'local'`). Passing a key can never silently move a signed-in user's own counters into the anonymous store, which is exactly what the old `options.key` did.
 
-Mirrors are write-only — `update()` writes `{ usage: self.user.usage }` (merge) to each mirror path. No reads are performed on mirrors.
+Keyed counters are **day-only in practice**: the cron wipes the whole anonymous store daily, so an anonymous monthly limit cannot exist.
 
-## Reset Schedule
+**`ctx.usage` refuses a signed-out caller.** `consume`/`read` on a request with no uid throws `usage: no signed-in account to count against; use usage.forKey(<key>) for anonymous callers`. It does not fall back to the anonymous store: routing there silently would be the very bug `forKey` exists to remove, and counting on the user doc would write `users/null` — one document every anonymous caller on earth would share.
+
+## Mirrors are declared in the catalog
+
+`usage: { mirror: ['teams'] }` on a catalog entry says a feature's counters also land on every document the account owns of that kind — resolved from `user.owns.teams` (a framework field, server-written like `usage`). `consume` writes the touched feature's counters to the user doc and every mirror in ONE parallel write:
+
+```
+users/{uid}          ← { usage: { saves: { monthly, daily, total, last } } }
+teams/{teamId}       ← the same patch
+```
+
+It writes **that feature's counters only**, never the whole usage object, so two features counted in the same second cannot overwrite each other. There is no call-site mirror API — nothing to re-derive per route.
+
+## Reset schedule
 
 | Target | Frequency | What happens |
-|--------|-----------|-------------|
+|---|---|---|
 | Local storage | Daily | Cleared entirely |
-| `usage` collection (unauthenticated) | Daily | Deleted entirely |
-| User doc `usage.*.daily` (authenticated) | Daily | Reset to 0 |
-| User doc `usage.*.monthly` (authenticated) | Monthly (1st) | Reset to 0 |
+| `usage` collection (anonymous keys) | Daily | Deleted entirely |
+| User doc `usage.<feature>.daily` | Daily | Reset to 0 |
+| User doc `usage.<feature>.monthly` | Monthly (1st) | Reset to 0 |
+| User doc `usage.overrides` | Never | Untouched — a reset is not a revoke |
 
-The daily cron (`reset-usage.js`) runs at midnight UTC. It collects all users with non-zero counters across all metrics, then performs a single write per user to reset daily (and monthly on the 1st).
+The daily cron (`events/cron/daily/reset-usage.js`) runs at midnight UTC, and performs a single write per user.
+
+**Which counters reset is a question of SHAPE, not of catalog membership.** The cron QUERIES on the counted features the catalog defines plus the framework's own gates (a Firestore query has to name a field path), but once it has the document it clears every counter-shaped key under `usage` — so a counter run against an explicit limit, which by definition has no catalog entry, resets like any other. Sweeping only the catalog left those growing forever, which permanently refused the user after their first few uses.

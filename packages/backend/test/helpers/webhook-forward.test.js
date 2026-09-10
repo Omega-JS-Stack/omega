@@ -44,7 +44,8 @@ require.cache[originalFetchPath] = {
   },
 };
 
-const route = require('../../src/manager/routes/marketing/webhook/forward/post.js');
+const route = require('../../dist/manager/routes/marketing/webhook/forward/post.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Restore the real wonderful-fetch in the require cache so the mock is confined
 // to this file. Without this, the stub leaks process-wide and poisons every
@@ -130,7 +131,7 @@ function withEnv(envOverrides, fn) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'webhook/forward unit tests (mocked admin + fetch)',
   type: 'group',
 
@@ -415,4 +416,4 @@ module.exports = {
       },
     },
   ],
-};
+});

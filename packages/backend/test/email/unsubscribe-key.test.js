@@ -14,7 +14,8 @@
 const assert = require('node:assert');
 const crypto = require('crypto');
 
-const { buildUnsubscribeUrl } = require('../../src/manager/libraries/email/prepare.js');
+const { buildUnsubscribeUrl } = require('../../dist/manager/libraries/email/prepare.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The runner sets a key for the whole run, so every case here forces its own
 // and puts the run's value back — a leaked delete would break every later
@@ -45,7 +46,7 @@ const LINK = {
   websiteUrl: 'https://brand.dev',
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email unsubscribe signing key guard (UNSUBSCRIBE_HMAC_KEY)',
   type: 'group',
   tests: [
@@ -87,4 +88,4 @@ module.exports = {
       },
     },
   ],
-};
+});

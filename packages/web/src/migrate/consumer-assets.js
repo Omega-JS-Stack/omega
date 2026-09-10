@@ -24,10 +24,9 @@
  *
  * Page css (`css/pages/<key>.scss`): the UJM seed pulls the theme's page
  * styles with a same-name `@use 'pages/<key>'` (webpack-era single bundle).
- * The new pipeline ships theme page css as its OWN bundle
- * (pageAssets.themeCss — head.html loads both), so the self-@use would
- * double every theme rule AND self-loop through the loadPaths. The line is
- * dropped.
+ * The new pipeline compiles EVERY layer's sheet for a key and the head links
+ * them all in layer order (#624), so the self-@use would double every
+ * framework rule AND self-loop through the loadPaths. The line is dropped.
  *
  * Page modules (`js/pages/**`) already match the new `{ manager, options }`
  * export-default convention and import '@omega.js/client' (aliased by the asset
@@ -99,7 +98,7 @@ function migrateConsumerAssets(root, options = {}) {
         const selfUse = new RegExp(`^\\s*@use\\s+["']${selfKey}["'][^\\n]*\\n?`, 'm');
         if (selfUse.test(rewritten)) {
           rewritten = rewritten.replace(selfUse, '');
-          edits.push({ rule: 'scss-page-self-use', file: rel, before: `@use '${selfKey}'`, after: '(removed — theme page css loads via pageAssets.themeCss)' });
+          edits.push({ rule: 'scss-page-self-use', file: rel, before: `@use '${selfKey}'`, after: '(removed — every layer\'s page sheet already loads)' });
         }
       }
 

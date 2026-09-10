@@ -26,16 +26,20 @@
  *                                       that drifts across the field; the
  *                                       pointer brightens/grows nearby dots
  *                                       (tracked window-level so fixed
- *                                       overlays like the nav can't blind it)
+ *                                       overlays like the nav can't blind it).
+ *                                       The loop starts only once first paint
+ *                                       has settled and repaints at 30fps
+ *                                       (#752); see whenSettled below
  *
  * Resilience contract (mirrors the stylesheet):
  *   - The page stamps html[data-omega-motion] via an inline head script; the
  *     stylesheet only hides reveal targets under that stamp, so no-JS pages
  *     render fully visible.
  *   - prefers-reduced-motion: reveals resolve instantly, countups render their
- *     final value, rotators hold the first word, marquees stay static, and any
- *     `video[autoplay]` parks paused with its controls on (CSS cannot pause a
- *     video, so this lane owns it for every autoplaying band).
+ *     final value, rotators hold the first word, marquees stay static,
+ *     dotfields paint ONE still grid and never loop, and any `video[autoplay]`
+ *     parks paused with its controls on (CSS cannot pause a video, so this
+ *     lane owns it for every autoplaying band).
  *   - start() is idempotent; a MutationObserver picks up inserted content, and
  *     scan(root) is exposed for callers that render into detached roots.
  */
@@ -43,6 +47,9 @@
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
 const COUNTUP_DURATION = 1200;
 const MARQUEE_SPEED = 80; // px/s — data-omega-marquee="120" overrides per marquee
+const DOTFIELD_FRAME = 1000 / 30; // ms: the field repaints at 30fps, not 60 (#752)
+const DOTFIELD_FRAME_SLOP = 4; // ms: rAF jitter must never drop a beat to 20fps
+const SETTLE_TIMEOUT = 2000; // ms: a permanently busy page still gets its field
 
 /**
  * Whether the user asked for reduced motion.
@@ -52,6 +59,31 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia(REDUCED_QUERY).matches;
+}
+
+/**
+ * Run `fn` once first paint has settled: the first idle callback after the
+ * load event, or the load event itself where requestIdleCallback is missing
+ * (Safari). Ambient canvas work is never worth a frame of the LCP window
+ * ([#752](https://github.com/Omega-JS-Stack/omega/issues/752)).
+ * @param {Document} doc - the target's own document
+ * @param {function} fn - the work that waits for the settle signal
+ */
+function whenSettled(doc, fn) {
+  const idle = () => {
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(fn, { timeout: SETTLE_TIMEOUT });
+      return;
+    }
+    fn();
+  };
+
+  if (doc && doc.readyState !== 'complete') {
+    window.addEventListener('load', idle, { once: true });
+    return;
+  }
+
+  idle();
 }
 
 /**
@@ -188,6 +220,7 @@ function createMotion() {
   let mutationObserver = null;
   let scrollWatchers = [];
   let rotateTimers = new Map();
+  let dotfields = new WeakSet();
   let scrollHandler = null;
 
   // ── reveals ────────────────────────────────────────────────────────────────
@@ -304,32 +337,41 @@ function createMotion() {
 
     // (Re)build: reset to the original set, clone it until half the track
     // covers the container, then double that half so translateX(-50%) loops
-    // seamlessly. Duration scales with the half width → constant px/s.
+    // seamlessly. Duration scales with the half width → constant px/s. The
+    // measure waits for the NEXT frame: reading geometry in the tick that just
+    // replaced the children forces a synchronous reflow (#752).
     const build = () => {
       track.replaceChildren(...setItems);
-      const setWidth = track.getBoundingClientRect().width;
-      const copies = marqueeCopies(setWidth, el.clientWidth);
-      const total = copies * 2 * setItems.length;
 
-      while (track.children.length < total) {
-        const clone = setItems[track.children.length % setItems.length].cloneNode(true);
-        clone.setAttribute('aria-hidden', 'true');
-        // Clones stay mouse-clickable (they occupy most of the viewport as
-        // the track scrolls) but must not duplicate the tab order — so
-        // focusables get tabindex=-1, NOT inert.
-        const FOCUSABLE = 'a, button, input, select, textarea, [tabindex]';
-        if (clone.matches(FOCUSABLE)) {
-          clone.setAttribute('tabindex', '-1');
+      requestAnimationFrame(() => {
+        if (track.children.length !== setItems.length) {
+          return; // a burst (resize, fonts, images) queued two: one rebuild wins
         }
-        clone.querySelectorAll(FOCUSABLE).forEach(($focusable) => {
-          $focusable.setAttribute('tabindex', '-1');
-        });
-        track.appendChild(clone);
-      }
 
-      if (setWidth > 0) {
-        track.style.setProperty('--omega-marquee-speed', `${Math.round((setWidth * copies) / speed)}s`);
-      }
+        const setWidth = track.getBoundingClientRect().width;
+        const copies = marqueeCopies(setWidth, el.clientWidth);
+        const total = copies * 2 * setItems.length;
+
+        while (track.children.length < total) {
+          const clone = setItems[track.children.length % setItems.length].cloneNode(true);
+          clone.setAttribute('aria-hidden', 'true');
+          // Clones stay mouse-clickable (they occupy most of the viewport as
+          // the track scrolls) but must not duplicate the tab order — so
+          // focusables get tabindex=-1, NOT inert.
+          const FOCUSABLE = 'a, button, input, select, textarea, [tabindex]';
+          if (clone.matches(FOCUSABLE)) {
+            clone.setAttribute('tabindex', '-1');
+          }
+          clone.querySelectorAll(FOCUSABLE).forEach(($focusable) => {
+            $focusable.setAttribute('tabindex', '-1');
+          });
+          track.appendChild(clone);
+        }
+
+        if (setWidth > 0) {
+          track.style.setProperty('--omega-marquee-speed', `${Math.round((setWidth * copies) / speed)}s`);
+        }
+      });
     };
 
     build();
@@ -414,14 +456,14 @@ function createMotion() {
   // ── dot field ──────────────────────────────────────────────────────────────
 
   const setupDotfield = (el) => {
-    if (el.dataset.omegaDotfieldReady) {
+    // Installed-here (this engine) or stamped-there (a previous one): the
+    // handoff stamp now waits for the first painted grid, so it cannot double
+    // as the re-entry guard between the scan and the settle signal.
+    if (dotfields.has(el) || el.dataset.omegaDotfieldReady) {
       return;
     }
 
-    if (prefersReducedMotion()) {
-      return; // the static CSS dot grid stays
-    }
-
+    const reduced = prefersReducedMotion();
     const doc = el.ownerDocument;
     const canvas = doc.createElement('canvas');
     canvas.className = 'omega-dotfield__canvas';
@@ -431,7 +473,7 @@ function createMotion() {
       return; // no canvas support — the static CSS dot grid stays
     }
 
-    el.dataset.omegaDotfieldReady = 'true';
+    dotfields.add(el);
     el.prepend(canvas);
 
     const spacing = Number(el.getAttribute('data-omega-dotfield')) || 22;
@@ -441,10 +483,14 @@ function createMotion() {
     let height = 0;
     let dpr = 1;
     let running = false;
+    let settled = false;
     let raf = 0;
+    let painted = false;
     let lastColorRead = 0;
+    let lastPaint = -Infinity;
 
     const readColors = () => {
+      lastColorRead = performance.now();
       const styles = window.getComputedStyle(el);
       colors.base = parseColor(ctx, styles.getPropertyValue('--omega-line-strong')) || colors.base;
     };
@@ -460,21 +506,14 @@ function createMotion() {
     const WAVE_LENGTH = (Math.PI * 2) / 900; // ~900px crest-to-crest diagonal
     const POINTER_RADIUS = 2 * 110 * 110; // gaussian falloff (~110px reach)
 
-    const draw = (now) => {
-      raf = 0;
-      if (!running) {
-        return;
-      }
-
+    // One grid, at time `now` (seconds of wave travel). The whole cost of the
+    // field lives here (every dot is an arc fill), so the loop below rations
+    // it rather than running it on every frame the display offers.
+    const paint = (now) => {
       // Theme flips (data-bs-theme) land within a second
       if (now - lastColorRead > 1000) {
-        lastColorRead = now;
         readColors();
       }
-
-      // Ease the pointer toward its target for a soft trail
-      pointer.x += (pointer.targetX - pointer.x) * 0.12;
-      pointer.y += (pointer.targetY - pointer.y) * 0.12;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
@@ -503,7 +542,41 @@ function createMotion() {
         }
       }
 
+      if (!painted) {
+        painted = true;
+        // The CSS fallback dots (.omega-dotgrid::before) fade out on this
+        // stamp, so it lands with the grid that replaces them and never
+        // before: at scan it left the hero backdrop blank until settle (#752).
+        el.dataset.omegaDotfieldReady = 'true';
+      }
+    };
+
+    const draw = (now) => {
+      raf = 0;
+      if (!running) {
+        return;
+      }
       raf = requestAnimationFrame(draw);
+
+      // Ease the pointer toward its target for a soft trail. Every frame, so
+      // the trail keeps its feel while the grid repaints at half the rate.
+      pointer.x += (pointer.targetX - pointer.x) * 0.12;
+      pointer.y += (pointer.targetY - pointer.y) * 0.12;
+
+      // The wave crawls (~900px crest, a 20s rainbow cycle), so 30fps reads
+      // exactly like 60 and costs half the main thread. The slop absorbs rAF
+      // jitter: without it a 33.3ms budget missed by a hair halves to 20fps.
+      if (now - lastPaint < DOTFIELD_FRAME - DOTFIELD_FRAME_SLOP) {
+        return;
+      }
+      lastPaint = now;
+      paint(now);
+    };
+
+    const startLoop = () => {
+      if (settled && running && !raf) {
+        raf = requestAnimationFrame(draw);
+      }
     };
 
     const setRunning = (on) => {
@@ -511,13 +584,61 @@ function createMotion() {
         return;
       }
       running = on;
-      if (on && !raf) {
-        raf = requestAnimationFrame(draw);
-      }
+      startLoop();
     };
 
-    readColors();
-    resize();
+    // Nothing measures, reads styles or paints until first paint has settled:
+    // an ambient field is never worth a frame of the LCP window (#752).
+    whenSettled(doc, () => {
+      settled = true;
+      readColors();
+      resize();
+
+      if (reduced) {
+        paint(0); // the wave held at its start: one grid, and no loop
+        return;
+      }
+
+      startLoop();
+    });
+
+    if (reduced) {
+      // A visitor who asked for stillness gets the field, still: no pointer
+      // tracking, no visibility loop. It repaints only when what it draws
+      // changes, and re-reads its color there: the animated path's 1s color
+      // poll lives in the loop this path does not have.
+      const restill = (measure) => {
+        if (!settled) {
+          return;
+        }
+        if (measure) {
+          resize();
+        }
+        readColors();
+        paint(0);
+      };
+
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(() => restill(true)).observe(el);
+      }
+      if (typeof MutationObserver === 'function') {
+        // Bound to documentElement, which outlives the field: let go the
+        // moment the field leaves the DOM, or a detached canvas repaints on
+        // every theme flip for the life of the page.
+        const themeObserver = new MutationObserver(() => {
+          if (el.isConnected === false) {
+            themeObserver.disconnect();
+            return;
+          }
+          restill(false);
+        });
+        themeObserver.observe(doc.documentElement, {
+          attributes: true,
+          attributeFilter: ['data-bs-theme'],
+        });
+      }
+      return;
+    }
 
     // Window-level tracking: an el-level pointermove stops firing while the
     // cursor rides a covering element (the fixed nav over a hero), so the
@@ -546,7 +667,11 @@ function createMotion() {
     });
 
     if (typeof ResizeObserver === 'function') {
-      new ResizeObserver(resize).observe(el);
+      new ResizeObserver(() => {
+        if (settled) {
+          resize(); // before settle the canvas is sized by whenSettled, not here
+        }
+      }).observe(el);
     }
 
     // Only draw while on screen and the tab is visible

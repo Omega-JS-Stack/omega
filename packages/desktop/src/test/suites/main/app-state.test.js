@@ -4,9 +4,11 @@
 // state. We test by calling appState.reset() then re-initializing with crafted
 // storage state to simulate first-launch / repeat-launch / crash-recovery / upgrade.
 
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
 const STORAGE_KEY = 'appState';
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'app-state (main)',
@@ -192,4 +194,4 @@ module.exports = {
       },
     },
   ],
-};
+});

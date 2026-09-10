@@ -1,6 +1,5 @@
 {
   "url": "https://mini.example.com",
   "brand": { "id": "mini", "name": "MiniCo", "description": "Mini test brand" },
-  "meta": { "title": "MiniCo - Home of Mini", "description": "Mini meta description" },
   "theme": { "id": "classy" }
 }

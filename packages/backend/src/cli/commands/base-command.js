@@ -1,6 +1,8 @@
 const chalk = require('chalk').default;
 const { confirm } = require('@inquirer/prompts');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
+const { commandOnPath } = require('@omega.js/devkit/command-path');
+const { spawnOnPath } = require('../utils/spawn-shell');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const ui = require('../utils/ui');
@@ -116,11 +118,20 @@ class BaseCommand {
    * is nothing to write.
    *
    * @param {object} [options]
-   * @param {boolean} [options.deploy] - Stage for an UPLOAD: the .env loses its
-   *   dev-only rows (#586). Every local lane re-stages without it, so a deploy
-   *   never leaves the emulator without its dev payment secrets.
+   * @param {string} [options.environment] - The environment the stage is FOR,
+   *   which decides the `.env.<environment>` overlay dist/.env composes with
+   *   ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)). Every
+   *   RUNTIME lane names it, and each one is pinned: a deploy stages
+   *   `production`, a test lane `testing`, the local lanes (emulator, serve,
+   *   mcp) `development` — never the shell's answer, which would let an
+   *   exported ENVIRONMENT stage production credentials into a local boot.
+   *   Omitted (a bare `omega build`) = the running one, envEnvironment().
+   * @param {'licensed'|'keyless'} [options.licenseStatus] - The deploy's license
+   *   verdict, staged into dist/.env as OMEGA_LICENSE_STATUS
+   *   ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)). ONLY the
+   *   deploy lane resolves one; every local lane stages without it.
    */
-  ensureStaged({ deploy = false } = {}) {
+  ensureStaged({ environment, licenseStatus } = {}) {
     const { ensureTarget } = require('../utils/ensure-target');
     const { stageFunctions } = require('../utils/stage-functions');
 
@@ -131,21 +142,28 @@ class BaseCommand {
 
     stageFunctions({
       projectDir: this.main.firebaseProjectPath,
-      deploy,
+      environment,
+      licenseStatus,
       log: (message) => this.log(chalk.gray(`  ${message}`)),
     });
-    this.log(chalk.gray(`  Staged dist/ from src/ (omega build${deploy ? ', deploy: dev-only keys stripped' : ''})`));
+    this.log(chalk.gray(`  Staged dist/ from src/ (omega build${environment ? `, env: ${environment}` : ''})`));
   }
 
   /**
    * Watch src/ and re-stage on change — the Firebase emulator watches dist/
    * natively, so a re-stage IS the hot reload. Returns the watcher handle
    * ({ close }) for shutdown paths.
+   *
+   * @param {object} [options]
+   * @param {string} [options.environment] - The environment every re-stage
+   *   composes dist/.env for — the SAME one ensureStaged used, so a hot reload
+   *   can never swap the artifact's overlay mid-run (#586).
    */
-  startStageWatch() {
+  startStageWatch({ environment } = {}) {
     const { watchAndStage } = require('../utils/stage-functions');
     return watchAndStage({
       projectDir: this.main.firebaseProjectPath,
+      environment,
       log: (message) => this.log(chalk.gray(`  ${message}`)),
     });
   }
@@ -272,9 +290,20 @@ class BaseCommand {
   /**
    * Get info about ALL processes using a specific port
    * @param {number} port - Port number to check
+   * @param {object} [options]
+   * @param {string} [options.platform] - Host platform (test seam)
    * @returns {object[]|null} - Array of process info if port is in use, null otherwise
    */
-  getProcessesOnPort(port) {
+  getProcessesOnPort(port, { platform = process.platform } = {}) {
+    // Unix-only enrichment: `lsof`/`ps` name the squatter so the prompt above can
+    // offer to kill it. Windows has neither, and the real port check callers
+    // depend on is `isPortInUse()` below (an OS-agnostic bind probe) — so a
+    // Windows host reads a busy port as "nobody to name", exactly what the
+    // `lsof`-throws path already answered there.
+    if (platform === 'win32') {
+      return null;
+    }
+
     try {
       const result = execSync(`lsof -ti:${port} 2>/dev/null`, { encoding: 'utf8' });
       const pids = result.trim().split('\n')
@@ -362,11 +391,10 @@ class BaseCommand {
       return null;
     }
 
-    // Check if stripe CLI is installed
-    let stripePath;
-    try {
-      stripePath = execSync('which stripe', { encoding: 'utf8' }).trim();
-    } catch (e) {
+    // Is the stripe CLI installed? Existence only — the spawn below names it
+    // bare and lets the host resolve it (on Windows the probe answers a shim
+    // Node cannot execute).
+    if (!commandOnPath('stripe')) {
       this.log(chalk.gray('  (Stripe webhook forwarding disabled - install Stripe CLI: https://stripe.com/docs/stripe-cli)\n'));
       return null;
     }
@@ -384,7 +412,7 @@ class BaseCommand {
 
     this.log(chalk.gray(`  Stripe webhook forwarding -> localhost:${hostingPort}\n`));
 
-    const stripeProcess = spawn(stripePath, [
+    const stripeProcess = spawnOnPath('stripe', [
       'listen',
       '--forward-to', forwardUrl,
       '--api-key', process.env.STRIPE_SECRET_KEY,

@@ -17,10 +17,12 @@
 // exclusive to this suite, declared in the seed roster, and the half the seed
 // owns here is the AUTH USER — the doc is deleted below on purpose, and proving
 // nothing recreates it is the point.
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const PERSONA = 'webhook-chargebee-unreachable';
 const ORDER_ID = '6161-6161-6161';
 
-module.exports = {
+module.exports = defineCases({
   description: 'A Chargebee lookup that cannot be answered defers instead of processing the payload',
   type: 'suite',
   timeout: 60000,
@@ -101,4 +103,4 @@ module.exports = {
       },
     },
   ],
-};
+});

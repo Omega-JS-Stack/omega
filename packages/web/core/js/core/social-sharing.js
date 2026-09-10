@@ -224,30 +224,34 @@ export default function () {
   function copyToClipboard(shareConfig) {
     const url = shareConfig.url;
 
-    // Use omega utility for clipboard copy
-    omega.utilities().clipboardCopy(url);
-
-    // Show success message
-    showCopySuccess();
+    // Use omega utility for clipboard copy — the confirmation is owed to a copy
+    // that actually happened, and a refused clipboard rejects since #726, so
+    // the failure lane is handled here rather than left unhandled.
+    omega.utilities().clipboardCopy(url)
+      .then(() => showCopySuccess())
+      .catch((error) => console.error('Failed to copy the share link:', error));
 
     // Track
     trackCopyLink(shareConfig);
   }
 
   function showCopySuccess() {
+    // The name class createShareButton gave the copy icon (`fa-link`), which
+    // the confirmation swaps for `fa-check` and puts back. Swapping CLASSES is
+    // the whole job: the runtime icon watcher (#619) re-renders an `<i>` whose
+    // classes change, so the check draws itself.
+    const [, copyIconName] = platforms.copy.icon.split('/');
+
     // Find the copy button and temporarily change its text/icon
     const $copyButtons = document.querySelectorAll('[data-platform="copy"]');
     $copyButtons.forEach($button => {
-      const $iconImg = $button.querySelector('img[data-icon-type="share"]');
+      const $icon = $button.querySelector('i');
       const $label = $button.querySelector('span:not(.me-2)');
 
-      // Store original src/text
-      const originalIconSrc = $iconImg?.src;
-      const originalLabel = $label?.textContent;
-
       // Change to success state
-      if ($iconImg) {
-        $iconImg.src = `${ICON_BASE_URL}/solid/check.svg`;
+      if ($icon) {
+        $icon.classList.remove(`fa-${copyIconName}`);
+        $icon.classList.add('fa-check');
       }
       if ($label) {
         $label.textContent = 'Copied!';
@@ -255,11 +259,17 @@ export default function () {
 
       // Revert after 2 seconds
       setTimeout(() => {
-        if ($iconImg && originalIconSrc) {
-          $iconImg.src = originalIconSrc;
+        if ($icon) {
+          $icon.classList.remove('fa-check');
+          $icon.classList.add(`fa-${copyIconName}`);
         }
-        if ($label && originalLabel) {
-          $label.textContent = originalLabel;
+        // The label to put back is the platform's OWN name, never whatever the
+        // button reads at revert time: reading the DOM meant a second click
+        // inside this 2000ms window captured 'Copied!' as the original and
+        // renamed the button permanently
+        // ([#727](https://github.com/Omega-JS-Stack/omega/issues/727)).
+        if ($label) {
+          $label.textContent = platforms.copy.name;
         }
       }, 2000);
     });

@@ -20,17 +20,21 @@ newsletter_cta:
 ---
 
 <!-- ═══ Masthead — mono eyebrow, huge serif, one dek line, search right ═══ -->
-<section class="omega-dotgrid pb-0" data-omega-dotfield>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-0" data-omega-first-paint data-omega-dotfield>
   <div class="container">
-    <div class="omega-masthead" data-omega-reveal-stagger="90">
+    <div class="omega-masthead">
       <div>
-        {% component "heading/masthead", eyebrow: "Blog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, h1_class: "mb-0", sub: resolved.hero.subheadline, sub_class: "omega-hero-split__sub mt-3 mb-0" %}
+        {% component "heading/masthead", eyebrow: "Blog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, h1_class: "mb-0", sub: resolved.hero.subheadline, sub_class: "omega-hero-split__sub mt-3 mb-0", first_paint: true %}
       </div>
 
-      <div class="omega-masthead__actions" data-omega-reveal>
+      <div class="omega-masthead__actions">
         {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
         <div class="omega-blog-search">
-          <span class="omega-blog-search__icon">{% omega_icon "search", "fa-sm" %}</span>
+          <span class="omega-blog-search__icon"><i class="fa-solid fa-search fa-sm"></i></span>
           <label for="blog-search" class="visually-hidden">Search posts</label>
           <input
             type="search"
@@ -57,7 +61,7 @@ newsletter_cta:
     {% endfor %}
 
     {% if categories.size > 0 %}
-      <nav class="omega-tabs mt-5" aria-label="Post categories" data-omega-reveal>
+      <nav class="omega-tabs mt-5" aria-label="Post categories">
         <a href="/blog" class="active">All</a>
         {% for category in categories %}
           <a href="/blog/categories/{{ category | slugify }}">{{ category }}</a>
@@ -131,7 +135,7 @@ newsletter_cta:
           <div class="mt-2">
             <a href="{{ _featured.url }}" class="btn btn-outline-adaptive btn-sm omega-hover-nudge">
               Read the story
-              <span class="omega-nudge ms-2">{% omega_icon "arrow-right", "fa-xs" %}</span>
+              <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-right fa-xs"></i></span>
             </a>
           </div>
         </div>
@@ -163,14 +167,14 @@ newsletter_cta:
           {% if paginator.previous_page %}
             <li class="page-item">
               <a class="page-link" href="{{ paginator.previous_page_path }}" aria-label="Previous page">
-                {% omega_icon "chevron-left", "fa-xs" %}
+                <i class="fa-solid fa-chevron-left fa-xs"></i>
                 <span class="d-none d-sm-inline ms-1">Previous</span>
               </a>
             </li>
           {% else %}
             <li class="page-item disabled">
               <span class="page-link">
-                {% omega_icon "chevron-left", "fa-xs" %}
+                <i class="fa-solid fa-chevron-left fa-xs"></i>
                 <span class="d-none d-sm-inline ms-1">Previous</span>
               </span>
             </li>
@@ -220,14 +224,14 @@ newsletter_cta:
             <li class="page-item">
               <a class="page-link" href="{{ paginator.next_page_path }}" aria-label="Next page">
                 <span class="d-none d-sm-inline me-1">Next</span>
-                {% omega_icon "chevron-right", "fa-xs" %}
+                <i class="fa-solid fa-chevron-right fa-xs"></i>
               </a>
             </li>
           {% else %}
             <li class="page-item disabled">
               <span class="page-link">
                 <span class="d-none d-sm-inline me-1">Next</span>
-                {% omega_icon "chevron-right", "fa-xs" %}
+                <i class="fa-solid fa-chevron-right fa-xs"></i>
               </span>
             </li>
           {% endif %}

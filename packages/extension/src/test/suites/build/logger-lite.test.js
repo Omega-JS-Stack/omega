@@ -5,6 +5,7 @@
 const path = require('path');
 
 const Logger = require(path.join(__dirname, '..', '..', '..', 'lib', 'logger-lite.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function captureConsole(method, fn) {
   const captured = [];
@@ -14,7 +15,7 @@ function captureConsole(method, fn) {
   return captured;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'lib/logger-lite — identity tag prefix + five-method surface',
@@ -57,4 +58,4 @@ module.exports = {
       },
     },
   ],
-};
+});

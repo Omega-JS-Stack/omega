@@ -143,7 +143,9 @@ function createCliRouter(config) {
     } catch (e) {
       // The command's own error is the only surface — no wrapper prefix, no
       // rethrow (which double-printed via the unhandled-rejection handler).
-      console.error(e.stack || String(e));
+      // A crafted refusal (devkit scaffold-guard.js) prints its message alone:
+      // the stack belongs to a bug, and a refusal is not one (#706).
+      console.error(e && e.refusal ? e.message : (e.stack || String(e)));
       process.exitCode = 1;
     }
   };

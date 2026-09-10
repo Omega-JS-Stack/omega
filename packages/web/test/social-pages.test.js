@@ -101,7 +101,7 @@ test('every entry ships its shortlink at /<platform>, on the redirect module', (
     pages.get('/spotify').includes('data-url="https://open.spotify.com/artist/1k6DRF1jd1tmb1oxEQ0UNq"'),
     'the object form\'s redirect target wins — the artist page, never the derived /user/ URL',
   );
-  assert.ok(pages.get('/spotify').includes('/assets/js/modules/redirect.bundle.js'), 'the shortlink rides the redirect module like a hand-written one');
+  assert.ok(pages.get('/spotify').includes('/assets/js/layouts/modules/utilities/redirect-TEST.js'), 'the shortlink rides the redirect layout\'s script like a hand-written one');
 });
 
 test('a shortlink is noindex and out of every machine file', () => {

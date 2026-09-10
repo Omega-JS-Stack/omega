@@ -1,6 +1,11 @@
-// `npx omega logs` — show / tail / locate the consumer app's runtime log file.
+// `npx omega logs [runtime|dev|build|test]` — show / tail / locate one of the
+// project's log files.
 //
-// Resolves to the same file the runtime logger writes to:
+// The optional positional names the surface (default `runtime`) and resolves to
+// <projectRoot>/logs/<surface>.log — the same four files documented in
+// docs/logging.md. Every flag below works on whichever surface was named.
+//
+// `runtime` resolves to the file the runtime logger writes to:
 //   - Dev (running from a project directory): <projectRoot>/logs/runtime.log
 //   - Outside a project: prints the conventional Electron user-data path the runtime
 //     would resolve to in production, but doesn't read it (we don't know the AppName
@@ -17,11 +22,24 @@ const path    = require('path');
 const fs      = require('fs');
 const jetpack = require('fs-jetpack');
 const { spawn, spawnSync } = require('child_process');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
+
+// The tee'd surfaces a project writes into logs/ — one file each, same names on
+// every framework (docs/shared/logging.md).
+const SURFACES = ['runtime', 'dev', 'build', 'test'];
 
 module.exports = async function logs(options) {
   options = options || {};
+  options._ = options._ || [];
 
-  const logPath = resolveLogPath();
+  // `omega logs dev` → options._ = ['logs', 'dev'], the router's positional
+  // convention. No positional keeps the historical runtime surface.
+  const surface = options._[1] || 'runtime';
+  if (!SURFACES.includes(surface)) {
+    throw new Error(`Unknown log surface "${surface}". Try one of: ${SURFACES.join(', ')}.`);
+  }
+
+  const logPath = resolveLogPath(surface);
   const exists = jetpack.exists(logPath) === 'file';
 
   // --path: print and exit. Pipe-friendly.
@@ -33,7 +51,7 @@ module.exports = async function logs(options) {
   // --open: open in default editor and exit.
   if (options.open) {
     if (!exists) {
-      console.error(`No log file at ${logPath}. Run the app at least once to generate logs.`);
+      console.error(`No log file at ${logPath}. Run the app or verb that writes it at least once to generate logs.`);
       process.exitCode = 1;
       return;
     }
@@ -58,7 +76,7 @@ module.exports = async function logs(options) {
   const lines = parseInt(options.lines, 10) || 50;
   console.log(`Log file: ${logPath}`);
   if (!exists) {
-    console.log('(file does not exist yet — launch the app to generate logs)');
+    console.log('(file does not exist yet — run the app or verb that writes it to generate logs)');
     return;
   }
   console.log(`(last ${lines} lines)`);
@@ -70,13 +88,14 @@ module.exports = async function logs(options) {
   if (!tailLines[tailLines.length - 1]?.endsWith('\n')) process.stdout.write('\n');
 };
 
-// Resolve the runtime log path the same way lib/logger-lite.js does. We don't
-// require logger-lite here because that would attempt to load `electron`, which
-// is only available when running inside the Electron runtime (not from a CLI).
-function resolveLogPath() {
+// Resolve a surface's log path the same way its writer does — for `runtime`,
+// that's lib/logger-lite.js. We don't require logger-lite here because that
+// would attempt to load `electron`, which is only available when running inside
+// the Electron runtime (not from a CLI).
+function resolveLogPath(surface) {
   // CLI runs from the consumer project root, so this matches dev-mode logger
-  // resolution exactly: <cwd>/logs/runtime.log.
-  return path.join(process.cwd(), 'logs', 'runtime.log');
+  // resolution exactly: <cwd>/logs/<surface>.log.
+  return path.join(process.cwd(), 'logs', `${surface}.log`);
 }
 
 // Cross-platform "open in default app" — uses the OS's URL/file handler.
@@ -154,11 +173,13 @@ function tailFollow(logPath) {
       return;
     }
 
-    // Clean up on Ctrl+C.
-    process.on('SIGINT', () => {
+    // Clean up on every way this follow is asked to stop, off the ONE devkit
+    // list ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)): a
+    // closed terminal (SIGHUP) used to kill the run with the watcher still open.
+    STOP_SIGNALS.forEach((signal) => process.on(signal, () => {
       if (watcher) watcher.close();
       console.log('\n(stopped following)');
       resolve();
-    });
+    }));
   });
 }

@@ -11,8 +11,9 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-const { ensureTarget } = require('../../src/cli/utils/ensure-target.js');
+const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
 const frameworkPackage = require('../../package.json');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // ensureTarget() against a bare manifest in a temp dir runs the REAL stamp
 function runScaffoldPackageJson(manifest) {
@@ -26,7 +27,7 @@ function runScaffoldPackageJson(manifest) {
   return written;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'ensureTarget engines.node pin (framework SSOT, never ambient)',
   type: 'group',
 
@@ -64,4 +65,4 @@ module.exports = {
       },
     },
   ],
-};
+});

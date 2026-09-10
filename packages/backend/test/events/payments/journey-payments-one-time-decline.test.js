@@ -12,9 +12,10 @@
  * Uses the journey-payments-one-time account (one-time events don't modify
  * subscription state, so the one-time journeys share it).
  */
-const User = require('../../../src/manager/helpers/user.js');
+const User = require('../../../dist/manager/helpers/user.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: declined one-time checkout → purchase-failed, user untouched',
   type: 'suite',
   timeout: 60000,
@@ -123,4 +124,4 @@ module.exports = {
       },
     },
   ],
-};
+});

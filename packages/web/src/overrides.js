@@ -14,16 +14,17 @@
  *   folder unless the winner declares `inherit` (docs/web/sections.md), so a
  *   materialized asset file carries that note.
  * - includes — consumer → theme layers → core (engine.js includeRoots).
- * - css — ONLY the two stylesheets the sass layer chain actually selects
- *   (assets.js): `main.scss`, resolved across every layer, and the page
- *   entries, whose BASE bucket is the non-theme layers alone (consumer → core;
- *   a theme's page sheet is a second bucket that always loads and cannot be
- *   shadowed). Every other stylesheet is reached by a bare relative
+ * - css — ONLY `main.scss`, the one stylesheet the sass layer chain RESOLVES
+ *   (assets.js): the first layer that ships one wins, and it extends the layers
+ *   below with `@use 'omega:main'`. Page and layout sheets are deliberately
+ *   absent (#624): every layer's sheet for a key loads, so a consumer's copy
+ *   shadows nothing — materializing one would duplicate every rule it carries
+ *   rather than replace it. Every other stylesheet is reached by a bare relative
  *   `@import`/`@use`, which Dart Sass resolves relative to the IMPORTING file
  *   before any loadPath — a consumer copy of `css/base/_utilities.scss` never
- *   loads. Listing those would hand a consumer a file that silently does
- *   nothing, so the map does not list them. Paths carry the `assets/` prefix
- *   because the consumer's css layer root is `src/assets`.
+ *   loads. Listing either kind would hand a consumer a file that does the wrong
+ *   thing, so the map lists neither. Paths carry the `assets/` prefix because
+ *   the consumer's css layer root is `src/assets`.
  * - pages — the URL-addressable default pages, straight from ./customize.js's
  *   listCustomizable (the page lane keeps its own two materialize modes).
  *
@@ -34,14 +35,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { collectProviders, resolveThemeLayers } = require('./layers.js');
-const { isPageEntry } = require('./assets.js');
 const { listCustomizable } = require('./customize.js');
 const { PATHS } = require('./paths.js');
 
-// The two css lanes the sass build selects by layer — assets.js's own filters
-// (`isPageEntry` is its rule for what counts as a page sheet, not a partial).
+// The one css lane the sass build RESOLVES by layer (assets.js).
 const CSS_MAIN = /^main\.scss$/;
-const CSS_PAGE = { test: (rel) => /^pages\/.*\.scss$/.test(rel) && isPageEntry(rel) };
 // Section entries are folders of these four files.
 const SECTION_ENTRY = /^(?:.*\/)?(section|component)\.(html|scss|js|json5)$/;
 
@@ -66,10 +64,9 @@ function overrideLanes({ consumerDir, siteData }) {
   return [
     { kind: 'section', subdirs: ['_sections', '_components'], prefix: '', roots: [consumer, ...themeRoots], filter: SECTION_ENTRY },
     { kind: 'include', subdirs: ['_includes'], prefix: '', roots: [consumer, ...themeRoots, core], filter: undefined },
-    // main.scss layers across the whole chain; page sheets layer only within
-    // the non-theme (base) bucket — assets.js baseCssDirs
+    // main.scss layers across the whole chain — the one sheet a consumer copy
+    // takes over rather than joins
     { kind: 'css', subdirs: ['css'], prefix: 'assets/', roots: [consumerAssets, ...themeRoots, core], filter: CSS_MAIN },
-    { kind: 'css', subdirs: ['css'], prefix: 'assets/', roots: [consumerAssets, core], filter: CSS_PAGE },
   ];
 }
 
@@ -132,13 +129,17 @@ function buildOverrideMap({ consumerDir, siteData }) {
 /**
  * The provenance header for a materialized file, in the file's own comment
  * syntax. JSON carries no comments, so it gets none.
+ * The first line opens with the `omega:consumer-override:` marker on purpose
+ * ([#452](https://github.com/Omega-JS-Stack/omega/issues/452)): a materialize
+ * IS the deliberate consumer copy, so the omega:guard hook — which reads the
+ * first five lines — has to see it declared without anybody typing it back in.
  * @param {object} entry - a map entry
  * @param {string[]} [notes] - extra lines
  * @returns {string} the header (empty when the format has no comment form)
  */
 function provenanceHeader(entry, notes = []) {
   const lines = [
-    `Materialized by \`omega customize ${entry.path}\` — a copy of the ${entry.layer} layer's file.`,
+    `omega:consumer-override: materialized by omega customize ${entry.path} — a copy of the ${entry.layer} layer's file.`,
     'This consumer file now SHADOWS it. Delete it to return to the framework\'s.',
     ...notes,
   ];

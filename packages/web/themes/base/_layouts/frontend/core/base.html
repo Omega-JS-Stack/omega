@@ -20,10 +20,7 @@ config:
 {% endunless %}
 
 <!-- Main Content -->
-<!-- data-omega-reveal-lead (#585): the shell is the one element that knows
-     which band is FIRST on the page, so it is what tells the motion library
-     to play that band's entrance from paint instead of waiting for JS. -->
-<main id="main-content" class="flex-fill {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content" data-omega-reveal-lead>
+<main id="main-content" class="flex-fill {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
   {{ content | omega_content_format }}
 </main>
 

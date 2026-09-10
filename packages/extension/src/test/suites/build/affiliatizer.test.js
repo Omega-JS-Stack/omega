@@ -6,8 +6,9 @@
 const path = require('path');
 
 const Affiliatizer = require(path.join(__dirname, '..', '..', '..', 'lib', 'affiliatizer.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'lib/affiliatizer — URL-match map',
@@ -60,4 +61,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -4,8 +4,9 @@
  * Pure rendering tests — no network, no Firebase, no SendGrid.
  * Verifies the prepare → render pipeline for card, plain, order, feedback templates.
  */
-const { renderEmail } = require('../../src/manager/libraries/email/generators/lib/mjml-template.js');
-const { resolveEmailTemplate: resolveTemplate } = require('../../src/manager/libraries/email/generators/lib/templates/index.js');
+const { renderEmail } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
+const { resolveEmailTemplate: resolveTemplate } = require('../../dist/manager/libraries/email/generators/lib/templates/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const TEST_BRAND = {
   id: 'testco',
@@ -48,7 +49,7 @@ async function render(templateName, dataOverrides = {}) {
   return renderEmail({ brand: TEST_BRAND, template: templateName, data });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email template rendering (card, plain, order, feedback)',
   type: 'suite',
   auth: 'none',
@@ -284,4 +285,4 @@ module.exports = {
       },
     },
   ],
-};
+});

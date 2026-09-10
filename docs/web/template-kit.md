@@ -46,7 +46,6 @@ Two consumption paths (plan §4 A0):
 | `omega_social` | inline | `page.resolved.socials.*` + SOCIAL_URLS data |
 | `omega_language` | inline | LANGUAGES data (184 codes, machine-extracted from the Ruby) |
 | `omega_translation_url` | inline | `site.translation` {default, languages, exclude} |
-| `omega_icon` | inline | `options.icons.{fontAwesomeDirs,aliasFile,flagsDir}` (+ `site.icons.style`); ordered root chain (earlier dirs win — web's engine feeds curated core → brand Pro set when supplied → free floor via `src/fontawesome-roots.js`, C4 cp111), alias resolution from the set's metadata, brands fallback, flag fallback via LANGUAGE_TO_COUNTRY (43 codes), default warning-triangle SVG with warn-once, module cache — semantics shared with desktop via `@omega.js/client/modules/icon-core.js` (C4 cp108). The `<i>` wrapper is `aria-hidden="true"` by default ([#538](https://github.com/Omega-JS-Stack/omega/issues/538)) — icons are decorative beside visible text, so they leave the a11y tree by declaration; the rare meaningful icon passes `label="…"` and gets `role="img"` + `aria-label` instead |
 | `omega_logo` | inline | `options.logos.dir`; per-instance SVG id prefixing (url()/href/xlink:href refs rewritten) |
 | `omega_image` | inline | pure HTML builder (picture + webp sources + lazy placeholders; `max_width`, `webp=false`, external `<img>`) |
 | `omega_video` | inline | pure HTML builder (flag attrs, mime map, lazy sources) |
@@ -122,8 +121,8 @@ cascade / eleventyComputed; Astro: helpers). Plan §4 A1.
 
 ## Usage numbers that set the porting priority (2026-07-06 audit)
 
-UJM theme/blueprints: `omega_icon` 612, `iftruthy` ~370, `omega_content_format` 97,
+UJM theme/blueprints: `uj_icon` 612 (retired — icons are native markup since [#619](https://github.com/Omega-JS-Stack/omega/issues/619)), `iftruthy` ~370, `omega_content_format` 97,
 `iffalsy` 72, `omega_liquify` 71, `omega_member` 62, `omega_cachebreak` 34,
 `omega_title_case` 27, `urlmatches` 19, `omega_commaify` 18, `omega_post` 17,
 `omega_readtime` 15, everything else single digits. somiibo adds only
-`omega_icon`/`omega_liquify`/`omega_content_format` + iftruthy/iffalsy/urlmatches.
+`uj_icon`/`omega_liquify`/`omega_content_format` + iftruthy/iffalsy/urlmatches.

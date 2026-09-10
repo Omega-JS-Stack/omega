@@ -14,6 +14,7 @@ const logger = Manager.logger('sass');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const sass = require('sass');
+const { formatBytes } = require('@omega.js/devkit/bundle');
 
 const projectRoot = Manager.getRootPath('project');
 const packageRoot = Manager.getRootPath('main');
@@ -79,9 +80,3 @@ module.exports = function sassTask(done) {
     done(e);
   }
 };
-
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}kB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
-}

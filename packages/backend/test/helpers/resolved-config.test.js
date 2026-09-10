@@ -18,8 +18,9 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const { resolvedConfigValues } = require('../../src/manager/helpers/resolved-config.js');
+const { resolvedConfigValues } = require('../../dist/manager/helpers/resolved-config.js');
 const { loadConfig, brandRepo } = require('./_shared-config.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A real brand config on disk, composed through the real backend loader — the
 // target overlay is the half of the rule no hand-built object proves.
@@ -39,7 +40,7 @@ function composeBrandConfig(targetsBackend) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'config.resolved — derived values the framework hands consumer code',
   type: 'group',
 
@@ -53,8 +54,8 @@ module.exports = {
 
         assert.deepEqual(resolvedConfigValues(config).github, {
           owner: 'Acme-Org',
-          name: 'acme',
-          repo: 'Acme-Org/acme',
+          name: 'acme-omega',
+          repo: 'Acme-Org/acme-omega',
         });
       },
     },
@@ -102,4 +103,4 @@ module.exports = {
       },
     },
   ],
-};
+});

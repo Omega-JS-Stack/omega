@@ -39,9 +39,11 @@ function spawnOnce(command, args, cwd, env) {
  * @param {string} command - Executable (no shell)
  * @param {string[]} args - Arguments
  * @param {string} cwd - Working directory (its .nvmrc picks the Node)
+ * @param {object} [extraEnv] - Env this run carries on top of the caller's own
+ *   (the test fan-out's OMEGA_TEST_FANOUT signal, #814)
  * @returns {Promise<{ success: boolean, error?: string, code?: number }>}
  */
-async function runCommand(command, args, cwd) {
+async function runCommand(command, args, cwd, extraEnv) {
   let resolved = resolveTargetNode(cwd);
   if (resolved?.error) {
     console.log(`      ${chalk.red('✗')} ${resolved.error}`);
@@ -52,7 +54,7 @@ async function runCommand(command, args, cwd) {
   }
 
   const specBefore = resolved?.spec || null;
-  const result = await spawnOnce(command, args, cwd, { ...process.env, ...nodeEnvFor(resolved) });
+  const result = await spawnOnce(command, args, cwd, { ...process.env, ...nodeEnvFor(resolved), ...extraEnv });
   if (result.success) {
     return result;
   }
@@ -66,7 +68,7 @@ async function runCommand(command, args, cwd) {
   }
 
   console.log(`      ${chalk.dim(`↪ .nvmrc changed to ${resolved.spec} — retrying under Node ${resolved.version || `v${resolved.major}`}`)}`);
-  return spawnOnce(command, args, cwd, { ...process.env, ...nodeEnvFor(resolved) });
+  return spawnOnce(command, args, cwd, { ...process.env, ...nodeEnvFor(resolved), ...extraEnv });
 }
 
 module.exports = { runCommand };

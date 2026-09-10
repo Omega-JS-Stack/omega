@@ -21,6 +21,8 @@
 //
 // Dev simulation: set `OMEGA_DEV_UPDATE=available|unavailable|error` env var. The updater synthesizes
 // the appropriate event sequence so you can test the UI flow without a real update server.
+// `simulate(scenario)` is the same cascade on demand (View > Developer > Simulate update in the
+// default menu), so a QA pass walks all three outcomes without relaunching per scenario.
 //
 // Renderer surface (added to preload.js as `window.desktop.autoUpdater`):
 //   getStatus()      → { code, version, percent, error?, downloadedAt? }
@@ -60,6 +62,15 @@ const STORAGE_KEY = 'autoUpdater';
 const IDLE_INSTALL_THRESHOLD_MS         = 15 * 60 * 1000;   // 15 min — production
 const IDLE_INSTALL_THRESHOLD_MS_TESTING =      3 * 1000;    // 3 sec  — when isTesting()
 const IDLE_TICK_MS_TESTING              =          500;     // 500ms periodic tick when testing
+
+// The dev simulator's scenarios. Doubles as the OMEGA_DEV_UPDATE value set and the
+// argument set simulate() accepts, so the env var and the menu trigger can never drift.
+const SIMULATION_SCENARIOS = ['available', 'unavailable', 'error'];
+
+// The version the simulator claims to have downloaded. A RESERVED sentinel: the
+// reconciler discards any stored pendingUpdate carrying it (see _reconcilePendingUpdate),
+// so an app must never ship a real release at this version.
+const SIMULATED_VERSION = '999.0.0';
 
 // Two separate timers, two different jobs:
 //
@@ -106,7 +117,8 @@ const autoUpdater = {
   _idleEvalIntervalId:  null,
   _pendingTimers: [],
   _userInitiated: false,
-  _devSimulating: false,
+  _devSimulating: false,          // a cascade is running RIGHT NOW (re-entrancy guard)
+  _devSimulationSession: false,   // this process has simulated at least once (see _isSimulating)
 
   // Idle-aware install state.
   _lastActivityAt:     Date.now(),     // bumped by markActive(); seed to "now" so we don't auto-install the instant we boot
@@ -251,6 +263,61 @@ const autoUpdater = {
     return autoUpdater.getStatus();
   },
 
+  // Dev-only runtime trigger for the update simulator, wired to the default menu's
+  // View > Developer > Simulate update items. Runs the same synthetic cascade the
+  // OMEGA_DEV_UPDATE env var drives at boot, except per call, so update UX can be
+  // walked scenario by scenario without relaunching the app (or shipping a release).
+  // Resolves with the status once the cascade is running, exactly like checkNow();
+  // the terminal state arrives over the status broadcast a few hundred ms later.
+  async simulate(scenario) {
+    const name = String(scenario || '').toLowerCase();
+    if (!name) {
+      throw new Error(`simulate(): scenario required, one of ${SIMULATION_SCENARIOS.join('|')}`);
+    }
+    if (!SIMULATION_SCENARIOS.includes(name)) {
+      throw new Error(`simulate(): unknown scenario "${scenario}". Expected one of: ${SIMULATION_SCENARIOS.join(', ')}.`);
+    }
+
+    // Same doctrine as _isSimulating(): a packaged production build may simulate, but
+    // only when it was LAUNCHED for QA with OMEGA_DEV_UPDATE set. Without that opt-in a
+    // shipped binary must never be talked into faking an update it cannot deliver.
+    if (autoUpdater._manager.isProduction() && !autoUpdater._isSimulating()) {
+      throw new Error('simulate(): refused in a production build. Relaunch with OMEGA_DEV_UPDATE set to simulate updates.');
+    }
+
+    // A cascade runs on fire-and-forget timers, so a second one cannot share the state
+    // machine with the first: it would reset the state to idle underneath it and then
+    // lose its own scenario to _runDevSimulation's re-entrancy guard. Refuse loudly
+    // rather than accept a call that silently does nothing.
+    if (autoUpdater._devSimulating) {
+      logger.warn(`simulate(${name}): refused, a simulation is already running.`);
+      throw new Error('simulate(): a simulation is already running. Wait for it to finish before starting another.');
+    }
+
+    // Swap the real electron-updater instance out for the synthetic one and LEAVE it
+    // swapped for the rest of the session. Swapping back is not safe: the cascade is
+    // async and fire-and-forget (there is no moment we know it ended), and the real
+    // library's listeners are still attached to its singleton, so a feed check landing
+    // mid-cascade would overwrite the synthetic states. A session that has simulated is
+    // a QA session; relaunch to get the real updater back. Idempotent when the boot-time
+    // simulator is already wired.
+    autoUpdater._wireDevSimulator();
+
+    // Latch the session ON with the swap, never apart from it: the two facts (a
+    // synthetic library is wired / the updater is simulating) must not disagree.
+    autoUpdater._devSimulationSession = true;
+
+    // Clear the visible state so a second simulation does not inherit the version,
+    // percent, or error the previous one left behind. downloadedAt is deliberately
+    // kept: the 30-day pending-update record is not ours to erase.
+    autoUpdater._userInitiated = true;   // keeps the idle-eval tick from installing a simulated download
+    autoUpdater._setState({ code: 'idle', version: null, percent: 0, error: null, lastCheckedAt: Date.now() });
+
+    logger.log(`simulate(${name}): running the dev update cascade`);
+    await autoUpdater._library.checkForUpdates(name);
+    return autoUpdater.getStatus();
+  },
+
   // Bump the activity timestamp. Called automatically by the built-in activity hooks
   // (renderer mouse/keyboard, browser-window focus). Consumer code can also call this
   // directly from anywhere (`manager.autoUpdater.markActive()`) to force-bump on
@@ -301,6 +368,7 @@ const autoUpdater = {
     autoUpdater._library       = null;
     autoUpdater._userInitiated = false;
     autoUpdater._devSimulating = false;
+    autoUpdater._devSimulationSession = false;
     autoUpdater._promptedForVersion = null;
     autoUpdater._activityHooksWired = false;
 
@@ -319,8 +387,17 @@ const autoUpdater = {
   // setting OMEGA_DEV_UPDATE=available|unavailable|error. NOT the same as
   // `manager.isDevelopment()` (which is the runtime "are we packaged" signal); a
   // packaged production build can absolutely run with OMEGA_DEV_UPDATE set for QA.
+  //
+  // The runtime simulate() latches `_devSimulationSession` for the rest of the process
+  // (cleared by shutdown()). It has to: simulate() leaves the synthetic library wired,
+  // so every LATER trigger drives the simulator too. The feed-check tick would then
+  // produce a fake 'downloaded' that this flag is the only thing keeping out of the
+  // real install path (_evaluateIdleInstall and installNow both bail on it). Reading
+  // only the env var here means a plain dev session could be talked into a native
+  // "restart to update" prompt, `_allowQuit = true`, and a stored pendingUpdate for a
+  // version that does not exist.
   _isSimulating() {
-    return !!process.env.OMEGA_DEV_UPDATE;
+    return !!process.env.OMEGA_DEV_UPDATE || autoUpdater._devSimulationSession;
   },
 
   _idleThresholdMs() {
@@ -506,6 +583,17 @@ const autoUpdater = {
     const pending = m.storage.get(`${STORAGE_KEY}.pendingUpdate`);
     if (!pending || !pending.downloadedAt) return;
 
+    // A simulated record (written by a build from before the simulator stopped
+    // touching this key) can never be applied — nothing ships at the sentinel
+    // version, so the clear-on-apply check below would never match it. Discard
+    // it here, or its fake timestamp gets restored into _state.downloadedAt and
+    // force-installs the first REAL download the moment it lands.
+    if (pending.version === SIMULATED_VERSION) {
+      logger.log(`Discarding simulated pendingUpdate record (v${pending.version}) — the dev simulator never downloaded anything.`);
+      m.storage.set(`${STORAGE_KEY}.pendingUpdate`, null);
+      return;
+    }
+
     const currentVersion = autoUpdater._manager.getVersion();
     if (pending.version === currentVersion) {
       logger.log(`Pending update v${pending.version} appears to be applied — clearing flag.`);
@@ -523,6 +611,17 @@ const autoUpdater = {
   },
 
   _recordDownloadedAt(version) {
+    // The simulator's download is fake, so its record must never reach the
+    // production key: a fake timestamp there outlives the QA session and seeds
+    // the first-download-wins timer for the next REAL download (a fake record
+    // older than maxAgeMs force-installs it on arrival). The in-memory stamp
+    // still happens, so the in-session UI flow reads exactly like a real one.
+    if (autoUpdater._isSimulating()) {
+      autoUpdater._state.downloadedAt = Date.now();
+      logger.log(`Dev simulation — skipping the pendingUpdate write for v${version}.`);
+      return;
+    }
+
     const m = autoUpdater._manager;
     if (!m || !m.storage) return;
 
@@ -597,29 +696,32 @@ const autoUpdater = {
 
   _wireDevSimulator() {
     autoUpdater._library = {
-      checkForUpdates:  async () => autoUpdater._runDevSimulation(),
+      checkForUpdates:  async (scenario) => autoUpdater._runDevSimulation(scenario),
       quitAndInstall:   () => logger.log('Dev simulator: quitAndInstall() called (no-op in dev).'),
       autoDownload:     autoUpdater._options.autoDownload !== false,
       on:               () => {},
     };
   },
 
-  _runDevSimulation() {
+  // `scenario` is the per-call override simulate() passes. The boot-time path (checkNow
+  // while _isSimulating()) passes nothing and falls back to the OMEGA_DEV_UPDATE value
+  // that put the updater in simulation mode to begin with, so that path is unchanged.
+  _runDevSimulation(scenario) {
     if (autoUpdater._devSimulating) return;
     autoUpdater._devSimulating = true;
 
-    const scenario = (process.env.OMEGA_DEV_UPDATE || 'available').toLowerCase();
-    const NEW_VERSION = '999.0.0';
+    const name = (scenario || process.env.OMEGA_DEV_UPDATE || 'available').toLowerCase();
+    const NEW_VERSION = SIMULATED_VERSION;
 
     autoUpdater._setState({ code: 'checking' });
 
     setTimeout(() => {
-      if (scenario === 'unavailable') {
+      if (name === 'unavailable') {
         autoUpdater._setState({ code: 'not-available', version: NEW_VERSION });
         autoUpdater._devSimulating = false;
         return;
       }
-      if (scenario === 'error') {
+      if (name === 'error') {
         autoUpdater._setState({ code: 'error', error: { message: 'Simulated dev-update error' } });
         autoUpdater._devSimulating = false;
         return;

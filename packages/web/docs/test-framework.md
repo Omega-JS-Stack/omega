@@ -37,18 +37,19 @@ npx omega test pages           # project scope, filtered to test/pages*
 ### What project scope actually runs
 
 1. **A production build** — the same code path as `npx omega build` (assets → Eleventy → PurgeCSS → `dist/`, plus translation when configured).
-2. **Smoke checks over the output**, all four of which must pass or the command throws `Smoke checks failed`:
+2. **Smoke checks over the output**, all five of which must pass or the command throws `Smoke checks failed`:
    - the build produced at least one HTML page,
    - `dist/404.html` exists (the guaranteed default page — consumers own their home page) **and** contains `data-theme-id`, proving it rendered through the theme root layout,
    - the asset manifest's `js.main` bundle exists on disk in `dist/`,
-   - **every internal link resolves** ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)) — see below.
+   - **every internal link resolves** ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)) — see below,
+   - **the four built-output audit checks pass** ([#468](https://github.com/Omega-JS-Stack/omega/issues/468)) — page meta, anchor fragments, image `alt`, sitemap orphans — see below.
 3. **Your suite** — `node --test` over `test/` at the target root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
 
 ### The internal link check
 
 Every `href`/`src` in `dist/**/*.html` must land on something the same build wrote ([src/link-resolver.js](../src/link-resolver.js)). Nothing else in a build reads a link and asks whether the far end exists, so a nav pointing at pages that stopped being generated used to ship green.
 
-Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dist/foo.html` or `dist/foo/index.html`, an asset path is the file itself, a relative value resolves against its emitting page's directory, and a trailing slash is the same page. A directory is **not** a page — `/blog` needs `blog.html` or `blog/index.html`, never just `dist/blog/`. Anything with a scheme (`https:`, `mailto:`, `tel:`, `data:`, a brand's own app protocol), a protocol-relative host, or a bare `#fragment` leaves the site and is skipped. Code DISPLAY is skipped too ([#521](https://github.com/Omega-JS-Stack/omega/issues/521)): a `<pre>` block prints escaped source, so an `href=` inside it is characters on the page — a docs snippet, or the section gallery's copyable args block — never a link the page emits.
+Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dist/foo.html` or `dist/foo/index.html`, an asset path is the file itself, a relative value resolves against its emitting page's directory, and a trailing slash is the same page. A mounted project site (a build stamped with a path prefix) is read at its own base path, and a dead link is reported by its SITE url, the form the exception file is written in ([#755](https://github.com/Omega-JS-Stack/omega/issues/755)). A directory is **not** a page — `/blog` needs `blog.html` or `blog/index.html`, never just `dist/blog/`. Anything with a scheme (`https:`, `mailto:`, `tel:`, `data:`, a brand's own app protocol), a protocol-relative host, or a bare `#fragment` leaves the site and is skipped. Code DISPLAY is skipped too ([#521](https://github.com/Omega-JS-Stack/omega/issues/521)): a `<pre>` block prints escaped source, so an `href=` inside it is characters on the page — a docs snippet, or the section gallery's copyable args block — never a link the page emits.
 
 **Exceptions are a last resort, declared per SOURCE PAGE** in `config/link-exceptions.json5` at the target root — no file at all is the state a brand should be in:
 
@@ -63,6 +64,43 @@ Resolution is omega's flat, extensionless URL contract: `/foo` is served by `dis
 - **A declared exception that has started resolving is itself a failure** — an exception standing over a fixed link is a mask over the next regression at that URL, so the list has to shrink when the break is fixed.
 - The file is json5 ([#490](https://github.com/Omega-JS-Stack/omega/issues/490)) because an exception has to carry the reason it exists **beside it**, in a comment — a rationale kept in a worksheet somewhere never travels with the list.
 - A malformed file is a hard error, never a silently empty map — and a file left at the retired `config/link-exceptions.json` name fails loudly with the rename instead of quietly excusing nothing.
+
+### The built-output audit checks
+
+Four more static scans of the same `dist/`, siblings of the link check in every way — same walk, same exception file, same "a declaration that has started passing is itself a failure" rule ([src/dist-audit.js](../src/dist-audit.js)). They are cheap and programmatic on purpose: the heavy audits (Lighthouse, HTML validation, spelling, page speed) cost minutes per run and stay out of this tier.
+
+| Check | What must hold | Read off the build |
+|---|---|---|
+| `meta` | every page ships a non-empty `<title>` **and** `<meta name="description">` | `core/head.html` emits both tags on every page, so a `meta.title` that resolved to nothing ships empty and reads as present to any scan that counts tags — this one reads the value |
+| `fragments` | every in-site `href="/page#id"` and `href="#id"` lands on an element the target page has | a fragment on a page the build never wrote is skipped: that is a dead LINK, and one break must not read as two |
+| `alt` | every `<img>` carries an `alt` attribute | an EMPTY `alt` is the decorative declaration and passes, including the valueless `alt` the minifier collapses it to |
+| `sitemap` | every indexable built page is listed in the emitted `sitemap.xml` | there is exactly ONE opt-out, and the check reads it off dist: a `noindex` page (#564 made noindex and sitemap membership one decision, and the engine stamps the flag on drafts, the `/test` dev surface, `/admin/` and redirect stubs too). A page that must stay out of the sitemap while telling crawlers to index it has no such state any more: make it noindex, or declare `sitemap: true` for it in the exception file. No `sitemap.xml` at all turns the check off |
+
+Pages the build **copies** rather than renders are not audited — Firebase's self-hosted OAuth helpers under `/__/` are vendor markup no brand authored or may edit. A mounted project site is read at its own base path, off the `data-omega-path-prefix` stamp its pages carry.
+
+**Exceptions live in the same `config/link-exceptions.json5`**, one list per check, on the page that OWNS the finding:
+
+```json5
+{
+  // #430: an array is, and stays, the link check's list for that source page.
+  'blog/tags.html': ['/blog/tags/a-and-r'],
+
+  'legal/eula.html': {
+    meta: ['description'],   // the tokens: 'title', 'description'
+    alt: ['/assets/images/seal.png'],   // by src
+    sitemap: true,           // `true` = the whole check on this page
+  },
+
+  // A fragment hangs off the page carrying the ANCHOR, not the pages linking
+  // it: a hash that page routes in JS is right everywhere it is linked, and
+  // 190 nav pages must not each declare the same thing.
+  'careers.html': { fragments: ['#openings'] },
+}
+```
+
+- The checks are `links`, `meta`, `fragments`, `alt`, `sitemap`. A name outside that set is a hard error — a typo that read as "no exception" would turn a declaration off silently.
+- A list excuses those findings; `true` excuses the whole check on that page, and is stale the moment the page has nothing left to excuse.
+- The hashes @omega.js/web's OWN pages route in JavaScript (the account page's `#billing` → `billing-section`, the contact page's `#chat`) cost a brand nothing: the framework declares them, in every language a translated copy is written to.
 
 `@omega.js/web`'s own default pages resolve with **zero exceptions** ([#427](https://github.com/Omega-JS-Stack/omega/issues/427), guarded by the framework suite's `default-page-links` test through the same resolver), so anything the check reports in a brand is the brand's.
 
@@ -89,7 +127,8 @@ One grammar across every framework (parser: [`@omega.js/devkit/test/scope`](../.
 | `<path>` (bare, no prefix) | project scope, filtered to that path |
 | `framework:<path>` / `full:<path>` | the same filter, applied within that source |
 
-- Filters are **path prefixes expanded by the shell**: a project filter becomes `test/<filter>*`, a framework filter becomes `test/<filter>*.test.js`. A filter matching nothing is a hard error, not a silent no-op (the shell hands node the unexpanded literal).
+- Filters are **path prefixes expanded by the shell**: a project filter becomes `test/<filter>*`, a framework filter becomes `test/<filter>*.test.js`.
+- A target that names a path and matches NO file is a hard error: the command resolves the selection itself, ahead of the production build, then prints `No test file matches "<target>"` and exits 1 ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). `node --test` treats a glob that matches nothing as a no-op run, so a typo'd path, or a suite renamed out from under a target, used to run silently green. A run that named no file (bare, or a bare source prefix) still exits 0 when there is nothing to run. Inside a brand-root fan-out the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and the same miss answers with exit 3 instead: a path another target carries is a no-op here, and the brand run fails only when EVERY target missed ([docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b)).
 - Unknown prefixes (`framwork:x`) warn — `Unknown test scope prefix ignored` — and are dropped; if every target was invalid, the run falls back to project scope.
 - Multiple targets union their sources; each path binds to its own source.
 - At a **brand root** (not a target dir) `omega` hands over to `@omega.js/manager`, which fans the same targets out over every target — `web:` routes to the web target only. Table: [docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b).
@@ -114,7 +153,8 @@ test('the build emits a sitemap', () => {
 - `npx omega test` runs the production build **before** your suite, so `dist/` is fresh — assert against it directly.
 - **Name files `*.test.js`** — the suffix is the discovery signal across every OMEGA package ([docs/shared/testing.md](../../../docs/shared/testing.md)).
 - **There is no `_`-prefix exclusion here** — the suffix does that job: the runner executes exactly `test/**/*.test.js`, so helpers and fixtures under `test/` are safe as long as they do not end in `.test.js` (`test/_helper.js`, `test/fixtures/data.js`).
-- There is no `test/_init.js` lifecycle hook, no `ctx`/`expect` object, no `OMEGA_TEST_MODE` signal, and no boot harness — those belong to the desktop/extension/backend runners, not web.
+- There is no `test/_init.js` lifecycle hook, no `ctx`/`expect` object, and no boot harness — those belong to the desktop/extension/backend runners, not web.
+- **`OMEGA_TEST_MODE` is read, but never set here.** Web's build/CLI surface honors it FIRST — `OMEGA_TEST_MODE=true` resolves `getEnvironment()` to `testing` ahead of every other signal, the context's own `environment` included ([src/mode-helpers.js](../src/mode-helpers.js), #717). The web test lane itself sets nothing, so a bare `npx omega test` leaves the environment to the build's own signals; export the variable yourself when a case needs the testing environment.
 
 ## See also
 

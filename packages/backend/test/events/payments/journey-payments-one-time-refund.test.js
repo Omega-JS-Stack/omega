@@ -11,7 +11,9 @@
  *
  * Requires at least one product with type: 'one-time' in config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: one-time purchase → refund endpoint → purchase-refunded',
   type: 'suite',
   timeout: 30000,
@@ -181,4 +183,4 @@ module.exports = {
       },
     },
   ],
-};
+});

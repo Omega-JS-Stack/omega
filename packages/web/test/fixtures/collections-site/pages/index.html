@@ -1,7 +1,16 @@
 ---
 layout: frontend/core/base
 permalink: /
-meta:
-  title: "{{ resolved.config.meta.title }}"
 ---
 <section class="py-5"><h2>CollectionsCo home</h2></section>
+
+{%- comment -%}
+  The UJM read a migrating brand's pages are written with (#593): a declared
+  collection is a SITE collection, iterated as `site.<name>` in the same doc
+  shape as site.posts (url, date, and the document's own frontmatter).
+{%- endcomment -%}
+<ul class="site-docs">
+  {%- for entry in site.docs -%}
+    <li data-doc="{{ entry.url }}">{{ entry.doc.title }}</li>
+  {%- endfor -%}
+</ul>

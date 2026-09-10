@@ -1,0 +1,31 @@
+---
+layout: core/root
+
+config:
+  # D5: system type stacks for now — no webfont request. When Ian picks the
+  # vendored faces, they load here (theme.head.content) and the --omega-font-*
+  # tokens re-point; nothing else changes.
+  theme:
+    # html:
+    #   class: ""
+    body:
+      class: "d-flex flex-column min-vh-100"
+    # main:
+    #   class: "flex-fill"
+---
+
+<!-- Nav (controlled by page/layout front matter) -->
+{% unless resolved.config.theme.nav.enabled == false %}
+  {%- include frontend/sections/nav.html -%}
+{% endunless %}
+
+<!-- Main Content -->
+<main data-corpus-override="layout" id="main-content" class="flex-fill {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
+  {{ content | omega_content_format }}
+</main>
+
+<!-- Footer (controlled by page/layout front matter) -->
+{% unless resolved.config.theme.footer.enabled == false %}
+  {%- include frontend/sections/footer.html -%}
+{% endunless %}
+

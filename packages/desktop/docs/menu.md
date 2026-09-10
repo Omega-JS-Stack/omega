@@ -94,6 +94,8 @@ Every item in @omega.js/desktop's default template carries a stable id you can t
 | `view/developer/toggle-devtools` | Toggle Developer Tools |
 | `view/developer/inspect-elements` | Inspect Element |
 | `view/developer/force-reload` | Force Reload |
+| `view/developer/simulate-update` | Simulate update submenu (see [docs/auto-updater.md](auto-updater.md)) |
+| `view/developer/simulate-update/available`, `.../unavailable`, `.../error` | Run the update simulator for one scenario |
 | `window/minimize`, `window/zoom`, `window/front` | Window submenu (mac) |
 | `window/minimize`, `window/close` | Window submenu (win/linux) |
 

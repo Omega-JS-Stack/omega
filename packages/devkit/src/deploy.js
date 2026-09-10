@@ -30,6 +30,33 @@ function parseRemoteUrl(url) {
 }
 
 /**
+ * The repo a CI dispatch addresses: the BRAND's own repo, from its config
+ * ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)). Every framework's
+ * deploy verb asks this instead of `resolveRepo` above, because a git remote
+ * answers the repo the working tree sits in: inside a brand monorepo nested in
+ * another repo (a brand inside the framework monorepo, a target checked out
+ * under someone else's tree) that is the ENCLOSING repo, so the dispatch went to
+ * a workflow that was never there.
+ *
+ * Half an address addresses nothing, so it throws rather than POST to
+ * `undefined/<name>`.
+ *
+ * @param {object} config - Composed omega config for the target being deployed.
+ * @returns {{ owner: string, repo: string }} the brand repo's owner and bare name
+ * @throws {Error} when the config names no repo
+ */
+function dispatchRepo(config) {
+  const { brandRepo } = require('@omega.js/config');
+  const { owner, name } = brandRepo(config);
+
+  if (!owner || !name) {
+    throw new Error('Could not determine the brand repo to dispatch on. Set repo.providers.github.org (and repo.providers.github.repo when the repo name is not <brand.id>-omega) in config/omega.json5.');
+  }
+
+  return { owner, repo: name };
+}
+
+/**
  * Resolve the GitHub repo for a working directory from its origin remote.
  * @param {object} [options]
  * @param {string} [options.cwd] - repo directory (default: process.cwd())
@@ -247,6 +274,7 @@ function syncWorkingTree(options = {}) {
 
 module.exports = {
   parseRemoteUrl,
+  dispatchRepo,
   resolveRepo,
   resolveToken,
   buildDispatch,

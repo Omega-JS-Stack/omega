@@ -20,17 +20,17 @@ The payment system follows a linear pipeline: **Intent → Webhook → On-Write 
 
 | Outcome | What it means | What the pipeline does |
 |---|---|---|
-| **Not found** | The provider affirmatively does not have the resource (Stripe `resource_missing`/404, a Chargebee 404, `PayPal API 404`) | **Refuse and acknowledge.** Nothing is written — no subscription, no order, no intent, no conversion. The event doc completes with `refusal` = `{ reason: 'resource-not-found', resourceType, resourceId }` and a loud `RESOURCE NOT FOUND` error naming the provider and the resource. Completed, not failed: no retry could ever turn a resource the provider does not have into one it does, so the ladder is not burned and the provider stops redelivering |
+| **Not found** | The provider affirmatively does not have the resource (Stripe `resource_missing`/404, a Chargebee 404, a Coinbase Commerce 404, `PayPal API 404`) | **Refuse and acknowledge.** Nothing is written — no subscription, no order, no intent, no conversion. The event doc completes with `refusal` = `{ reason: 'resource-not-found', resourceType, resourceId }` and a loud `RESOURCE NOT FOUND` error naming the provider and the resource. Completed, not failed: no retry could ever turn a resource the provider does not have into one it does, so the ladder is not burned and the provider stops redelivering |
 | **Unreachable** | A timeout, a 5xx, an expired key — the answer exists and this attempt could not read it | **Defer.** The throw marks the doc `failed`, which is what the [retry sweep](#payments-webhooks-retry-state) re-pends: the redelivery IS the reconciliation mechanism. Still nothing is written off the payload |
 | **Permanent** | The lookup can never even be ATTEMPTED — a malformed envelope, a parser error. Today's one instance: a Stripe refund envelope carrying no charge id at `data.object.id` | **Fail terminally.** The doc is marked `failed` AND `deadLetter: true` on its FIRST attempt, with a loud `PERMANENT FAILURE` line and the envelope's actual shape (`type=`, `data.object.object=`, `data.object keys=[…]`) in the message. Handing `undefined` to the SDK threw something that is not a 404, so this used to classify as unreachable and burn the whole ladder ten minutes at a time before dead-lettering something the first attempt already knew was unprocessable ([#536](https://github.com/Omega-JS-Stack/omega/issues/536)) |
 
-The split is one rule for every provider, in `libraries/payment/provider-errors.js` — the same classifier the cancel route and the trial-lapse sweep force-write against — and `libraries/payment/fetch-failure.js` is what every library's `fetchResource()` throws through, so no provider names its own not-found shape twice. Anything unrecognized is unreachable by construction: an unknown error must never be the one that drops an event.
+The split is one rule for every provider, in `libraries/payment/provider-errors.js` — the same classifier the cancel route and the trial-lapse sweep force-write against — and `libraries/payment/fetch-failure.js` is what every library's lookup throws through — `fetchResource()` and `getRefundDetails()` alike, each naming itself in the message so the failure points at the call that actually missed — so no provider names its own not-found shape twice. Anything unrecognized is unreachable by construction: an unknown error must never be the one that drops an event.
 
 The webhook body is still read for **identifiers** — which event, which resource id, which order a failed event belonged to. What it may never do is say what STATE a resource is in. The one library that reads its own body as an answer is the [test provider](#test-provider): there is no test provider out there to ask, so the emulator's records plus the event body are its API — and the webhook route refuses `provider=test` in production.
 
 ### A lookup that DOES answer says whose event it is
 
-The same rule, one step further in: on a successful lookup the uid comes from `library.getUid(resource)` — the record the provider answered with — and the payload's uid is only what that is **cross-checked** against. Reading the payload's uid first meant an event naming a REAL subscription id with a different `metadata.uid` moved that subscription onto whatever uid the caller typed ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)). Every provider's resource carries the uid this framework put on it: Stripe `metadata.uid`, PayPal `custom_id`, Chargebee `meta_data`/`cf_uid`.
+The same rule, one step further in: on a successful lookup the uid comes from `library.getUid(resource)` — the record the provider answered with — and the payload's uid is only what that is **cross-checked** against. Reading the payload's uid first meant an event naming a REAL subscription id with a different `metadata.uid` moved that subscription onto whatever uid the caller typed ([#509](https://github.com/Omega-JS-Stack/omega/issues/509)). Every provider's resource carries the uid this framework put on it: Stripe `metadata.uid`, PayPal `custom_id`, Chargebee `meta_data`/`cf_uid`, Coinbase Commerce `metadata.uid`.
 
 | The provider's record | The payload | What the pipeline does |
 |---|---|---|
@@ -66,6 +66,7 @@ A refund **updates** a purchase record; it does not redefine it. A one-time refu
 | **PayPal** | The **refund's own record**: `GET /v2/payments/refunds/{id}` for `PAYMENT.CAPTURE.REFUNDED`, `GET /v1/payments/refund/{id}` for the v1 sale refunds. The sale or capture already in hand is the ORIGINAL payment — its amount is the purchase price, which a partial refund makes plainly wrong. The refund's own id rides on the parsed event as `refundId`, kept there because `resourceId` is reassigned to the sale/capture the refund reversed |
 | **Chargebee** | The **credit note**: `GET /credit_notes/{id}`, keyed by the id in the envelope. The subscription or invoice the event resolves to carries no credit-note fields at all, and the envelope's own `content.transaction` amount is no longer a fallback |
 | **Chargebee, no credit note** | The **transaction**: `GET /transactions/{id}`, keyed by `content.transaction.id` — a lookup KEY only, exactly the trust level the credit-note id has. A gateway refund issued without a credit note is a real refund, and dropping the untrusted envelope fallback without putting a trusted one in its place wrote `amount: null` onto the order and into the customer's refund email ([#534](https://github.com/Omega-JS-Stack/omega/issues/534)). Amount comes off `transaction.amount` (cents, like the credit note's `total`); `reason` stays null, because a transaction carries no `reason_code` |
+| **Coinbase Commerce** | **Nothing** — there is no refund record to read, so no coinbase event is ever a refund. `getRefundDetails()` is unreachable by construction and answers with no amount rather than throwing, since throwing inside the pipeline would redeliver an event forever |
 | **Test** | Stripe's reader over the charge it already has — the fetched resource when the event resolved to the charge, otherwise the event body. Never a real Stripe lookup: there is no Stripe account behind a test-provider event to answer one |
 
 A refund lookup that fails is classified by the same seam as any other ([above](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)): not-found refuses the event (the stamp names the lookup that actually missed — `charge`, `refund`, `credit_note`, `transaction`), unreachable defers it, and a Stripe envelope naming no charge id at all fails permanently before the call is made. An event that names no refund record at all — no refund id, or for Chargebee neither a credit note nor a transaction — records **no amount** rather than the payload's, and says so in the log.
@@ -85,6 +86,7 @@ So every refund lookup is linked back. Each provider reads its own back-pointer 
 | **Chargebee** | `invoice` | `reference_invoice_id` (credit note), else `linked_invoices[].invoice_id` (transaction — the event's own invoice counts as the link when it is among them) |
 | **Stripe** | `subscription` | the charge's `subscription`, else its `metadata.uid` against the subscription's own uid |
 | **Stripe** | `charge` | none needed — the charge IS the resource, fetched by the event's `resourceId`, so it is self-consistent |
+| **Coinbase Commerce** | any | none — the provider has no refund record to link back from |
 | **Test** | any | none — the test provider is its own API and looks nothing up |
 
 | The record's back-pointer | What the pipeline does |
@@ -119,7 +121,7 @@ The payment system is cleanly separated into three independent layers:
 
 | Layer | Purpose | Tests |
 |-------|---------|-------|
-| **Provider input** (Stripe, PayPal, Test) | Parse raw webhooks + transform to unified shape | Helper tests per provider (`payment/stripe/to-unified-subscription.js`, `payment/paypal/to-unified-one-time.js`, etc.) |
+| **Provider input** (Stripe, PayPal, Chargebee, Coinbase Commerce, Test) | Parse raw webhooks + transform to unified shape | Helper tests per provider (`payment/stripe/to-unified-subscription.js`, `payment/paypal/to-unified-one-time.js`, `payment/coinbase/parse-webhook.js`, etc.) |
 | **Unified pipeline** (provider-agnostic) | Transition detection, Firestore writes, analytics | Journey tests (`journey-payments-*.js`) |
 | **Transition handlers** (fire-and-forget) | Emails, notifications, side effects | Skipped during tests unless `TEST_EXTENDED_MODE` |
 
@@ -306,13 +308,17 @@ Note: Trials are NOT a separate transition. The `new-subscription` handler check
 
 ### One-Time Transitions
 
-| Transition | Event Type | File |
-|---|---|---|
-| `purchase-refunded` | `charge.refunded` (Stripe), `PAYMENT.SALE.REFUNDED` (PayPal), `payment_refunded` (Chargebee) | `transitions/one-time/purchase-refunded.js` |
-| `purchase-completed` | `checkout.session.completed`, `CHECKOUT.ORDER.APPROVED` | `transitions/one-time/purchase-completed.js` |
-| `purchase-failed` | `invoice.payment_failed` | `transitions/one-time/purchase-failed.js` |
+| Transition | Event Type | File | Email event |
+|---|---|---|---|
+| `purchase-refunded` | `charge.refunded` (Stripe), `PAYMENT.SALE.REFUNDED` (PayPal), `payment_refunded` (Chargebee) | `transitions/one-time/purchase-refunded.js` | `refunded` |
+| `purchase-completed` | `checkout.session.completed`, `CHECKOUT.ORDER.APPROVED`, `payment_succeeded` (Chargebee), `charge:confirmed` (Coinbase) | `transitions/one-time/purchase-completed.js` | `confirmation` |
+| `purchase-failed` | `invoice.payment_failed`, `payment_failed` (Chargebee) | `transitions/one-time/purchase-failed.js` | `payment-failed` |
 
-`purchase-refunded` logs the structured amount/currency/reason (from the provider library's `getRefundDetails()`) and sends nothing — no email template for a refunded one-time purchase exists yet, the same stub shape `purchase-failed.js` uses. Its subscription twin (`subscription/payment-refunded.js`) does send.
+**Every one-time transition mails, through its subscription twin's generator** ([#673](https://github.com/Omega-JS-Stack/omega/issues/673)). `purchase-refunded` and `purchase-failed` were log-only stubs, so a customer refunded on a one-time purchase heard about it from their bank statement; both now send the same `order` template + event the subscription side sends (`subscription/payment-refunded.js`, `subscription/payment-failed.js`), and `purchase-refunded` keeps its structured amount/currency/reason log line as the operator's record.
+
+**Two Coinbase events map to NO transition on purpose** ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)). `charge:pending` and `charge:failed` are both parsed and both write their order — so the account page's Orders list tells the truth about a crypto purchase at every stage — but neither mails. `charge:pending` is crypto detected on-chain and not yet confirmed, so there is nothing settled to book; `charge:failed` is a hosted charge that expired unpaid, which is the ABANDONED-CHECKOUT population (the buyer walked away from the page in front of them), exactly the population `checkout-declined` refuses to mail. An abandoned Stripe session sends nothing either, because Stripe emits no event for it at all.
+
+`purchase-failed` mails where the subscription side's first-checkout twin (`checkout-declined`) deliberately does not, because the populations are opposites. It is reached by an `invoice.payment_failed` whose `billing_reason` no subscription owns — a **manual invoice** (`routes/payments/webhook/providers/stripe.js` routes it to `one-time`; Chargebee's `payment_failed` with no subscription lands in the same category, though `detectOneTimeTransition()` only maps Stripe's event name today). Nobody is standing at a checkout watching a manual invoice fail, so the failure reaches the customer only if this handler tells them.
 
 **Idempotency:** EVERY transition on this side is detected from the event type alone, so the `previouslyCompleted` guard covers the whole one-time side — a webhook doc that already completed once (a redelivery, or a doc put back to `pending`) detects nothing, and the customer is not emailed twice about the same purchase or refund. The subscription side applies the same guard to its one event-type-only path, `payment-refunded`.
 
@@ -352,7 +358,7 @@ Guards: authenticated, `confirmed: true`, an active or suspended paid subscripti
 
 **Analytics consults it too, with one documented widening** (`events/firestore/payments-webhooks/analytics.js` `isInsideTrial()`, which the trial-lapse sweep also reads). Chargebee's in-trial payload names no `current_term_end` at all, so `expires` folds to the epoch and the timestamp match cannot see a Chargebee trial — every Chargebee conversion read as a renewal and every Chargebee lapse reported nothing ([#407](https://github.com/Omega-JS-Stack/omega/issues/407)). An epoch expiry is the ABSENCE of a term, not a term that ended in 1970, so for REPORTING a claimed trial with a real trial expiry and no term at all still counts. That widening stays out of `_is-trialing.js` deliberately: the shared predicate also waives the 24-hour guard, and a guard must never be waived by missing data. Reporting carries no such stake.
 
-**The widening is bounded by the state the payload arrived FROM** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). A degraded delivery carried no term either: the pipeline used to hand over the webhook's own body when the provider API was unreachable, and an active PAID subscription in that body is shaped exactly like a Chargebee trial — same claimed trial, same epoch expiry. Nothing inside such a payload separates them, so the prior state does. That degraded path no longer exists at all — a lookup the provider cannot answer now refuses or defers rather than processing the body ([below](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)) — and the bound stays as the guard for any other object that reaches the transformers without a term. A subscription already paid through a real term did not lose that term by trialing, so a term missing there is a hole in the delivery and the widening does not apply. Unbounded, a renewal on that path matched no branch at all and booked nothing: real revenue, silently unreported. The bound needs one healthy delivery behind it, which is its limit: two degraded deliveries in a row leave no term on either side, so that renewal still books nothing. It fails toward silence, never toward a fabricated number.
+**The widening is bounded by the state the payload arrived FROM** ([#414](https://github.com/Omega-JS-Stack/omega/issues/414)). A degraded delivery carried no term either: the pipeline used to hand over the webhook's own body when the provider API was unreachable, and an active PAID subscription in that body is shaped exactly like a Chargebee trial — same claimed trial, same epoch expiry. Nothing inside such a payload separates them, so the prior state does. That degraded path no longer exists at all — a lookup the provider cannot answer now refuses or defers rather than processing the body ([above](#a-lookup-the-provider-cannot-answer-never-processes-the-payload)) — and the bound stays as the guard for any other object that reaches the transformers without a term. A subscription already paid through a real term did not lose that term by trialing, so a term missing there is a hole in the delivery and the widening does not apply. Unbounded, a renewal on that path matched no branch at all and booked nothing: real revenue, silently unreported. The bound needs one healthy delivery behind it, which is its limit: two degraded deliveries in a row leave no term on either side, so that renewal still books nothing. It fails toward silence, never toward a fabricated number.
 
 The sweep passes no prior state and keeps the unbounded widening. Two other things bound it there: its candidate query only reaches trials whose `trial.expires` sits between 30 days and 24 hours ago, and `trial.outcome` is stamped once and never revisited, so a degraded record can be misread at most once and only inside that window.
 
@@ -443,21 +449,30 @@ Notes on the one-time branch:
 - A one-time purchase writes nothing to `users/{uid}.subscription`, so the order IS the subject — there is no subscription state to check and nothing to cancel.
 - A missing order and somebody else's order answer **identically** ("Order not found"): an order id must never be a probe for whether another user's purchase exists.
 - "Already refunded" covers both paths — `requests.refund` (the in-app path) and `unified.status === 'refunded'` (a refund issued from the provider dashboard, which arrives by webhook and writes no request).
-- One-time refunds are always **FULL**. All four providers implement `processOneTimeRefund` ([Provider Interface](#provider-interface)).
+- One-time refunds are always **FULL**. Stripe, PayPal, Chargebee and the test provider implement `processOneTimeRefund` ([Provider Interface](#provider-interface)).
+- **A crypto purchase is refused before any provider is loaded** ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)). Coinbase Commerce has no refund API at all: returning coins is a manual transfer the merchant makes from its dashboard, at whatever the coin is worth that day, and nothing about it is ever attached to the charge. So `refund-policy.js` carries a `NO_REFUND_PROVIDERS` list and answers `provider-cannot-refund` — in the SAME predicate the account page reads, so the Orders list never offers a button the route would 400. Reaching the provider instead would have answered the customer "try again shortly" for something no retry can fix. `refund/providers/coinbase.js` still exists and still throws from both halves: a missing file makes the route say "Unknown provider", a different and wrong statement ([Capability gating](#capability-gating)).
 
 The refund window is 6 months on both subjects, measured from the subscription's `payment.startDate` or the order's created timestamp; an absent date cannot disqualify a refund.
+
+**The one-time lane is reachable from the account page** ([#672](https://github.com/Omega-JS-Stack/omega/issues/672)). `GET /user/orders` is the read path — `payments-orders` is admin-only to clients and a one-time purchase writes nothing to `users/{uid}`, so the route reads the caller's own orders through the admin SDK and the Firestore rules stay untouched. It hands back a SUMMARY per order (what was bought, when, for how much, its status), never the provider's raw resource, the request context or the attribution. Each summary carries `refundable`, and that answer is `libraries/payment/refund-policy.js`'s `oneTimeRefundRefusal()` — the same predicate the guards above run — so a refund button the account page offers is a refund this route accepts. The account page's Orders section lists them and its Refund section posts the picked `orderId`.
 
 What the pipeline then does with the refund webhook is in [A refund merges into the purchase](#a-refund-merges-into-the-purchase).
 
 ## Provider Interface
 
+**Which key a provider initializes with is the env chain's answer, and only the brand's overlay keeps a live key out of a local run.** Every provider reads its secret through the ONE env reader under the SAME name in every environment, and nothing inspects the value ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)). The whole contract, and why the `.env.development` overlay is the brand's own opt-in, is one paragraph: [docs/backend/index.md](../../../docs/backend/index.md#the-env-reader-librariesenvjs--581).
+
+A deploy without an OMEGA license runs no live payments: `libraries/payment/license.js` refuses Stripe/PayPal/Chargebee `init()` when the deploy stamped `OMEGA_LICENSE_STATUS=keyless` into the artifact's `.env`. The `test` provider is never gated, and an absent status — every local lane, the emulator, every test — behaves exactly as it always has. The check itself is a deploy-time question the CLI asks; nothing here phones home. Contract: [docs/shared/publishing.md](../../../docs/shared/publishing.md#the-license-check-320).
+
 Each provider implements three modules:
+
+A provider implements as much of this as its API HAS. Coinbase Commerce sells one-time charges and nothing else, so it ships an intent, a webhook, a refund refusal and a library, and no cancel/portal/plan/uncancel/winback module at all — every one of those routes acts on a subscription it can never have ([Coinbase Commerce (crypto) is one-time only](#coinbase-commerce-crypto-is-one-time-only)).
 
 **Intent provider** (`routes/payments/intent/providers/{provider}.js`):
 
 ```javascript
 module.exports = {
-  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, Manager, ctx }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, Manager, ctx }) {
     return { id, url, raw };
   },
 };
@@ -556,6 +571,7 @@ module.exports = {
 | **Stripe** | `data.object` |
 | **Chargebee** | `content.<type>` — `content.subscription` first, then `content.invoice` (the same precedence its webhook parser categorizes on) |
 | **PayPal** | `resource` |
+| **Coinbase Commerce** | `event.data` — the delivery envelope wraps an EVENT, and the charge is that event's data |
 | **Test** | delegates to Stripe's (it generates Stripe-shaped payloads) |
 
 Stripe's `fetchResource()` also handles `'charge'`, the resource a one-time refund arrives as. It expands the `payment_intent`, because a charge inherits its metadata from the PaymentIntent that created it — when the charge itself carries none, the intent is the only place `uid`/`orderId`/`productId` live. (The checkout sets them there for exactly this reason: `payment_intent_data.metadata`, not the session's.)
@@ -568,6 +584,7 @@ Products are resolved differently per provider, but always end up matching a pro
 |-----------|-----------------|-----------|
 | **Stripe** | `sub.items.data[0].price.product` or `raw.plan.product` → match `product.stripe.productId` or `legacyProductIds` | `prod_xxx` |
 | **PayPal** | `sub → plan_id → plan → product_id` → match `product.paypal.productId` | PayPal catalog product ID |
+| **Coinbase Commerce** | `charge.metadata.productId` → match `product.id` directly (the charge is created with our own metadata; there is no Coinbase catalog to reconcile against) | our own product id |
 | **Test** | Uses `product.stripe.productId` in Stripe-shaped data | Same as Stripe |
 
 Falls back to `{ id: 'basic' }` if no match found.
@@ -577,6 +594,30 @@ Falls back to `{ id: 'basic' }` if no match found.
 **Stripe:** Uses `metadata.uid` and `metadata.orderId` on subscriptions for UID/order resolution.
 
 **PayPal:** Uses `custom_id` field on subscriptions with format `uid:{uid},orderId:{orderId}`. Product resolution fetches the plan from the subscription, then gets `product_id` from the plan. Plans are scoped by `product_id` query param to avoid cross-brand matches on shared PayPal accounts.
+
+### Coinbase Commerce (crypto) is one-time only
+
+The crypto provider ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)) is the first one that implements a SUBSET of the interface, because the API it wraps has a subset of the concepts. Coinbase Commerce sells a hosted **charge**: one payment, one price, one page. There is no subscription, plan, billing agreement, coupon, portal or refund object anywhere in it.
+
+| Question | Coinbase Commerce's answer |
+|---|---|
+| **Switch** | `payment.providers.coinbase.enabled` — the ONLY provider whose switch is an explicit `enabled` (default OFF) rather than a public datum, because its whole credential is the secret `COINBASE_COMMERCE_API_KEY` and a secret never lives in config |
+| **Auth** | `X-CC-Api-Key` + `X-CC-Version: 2018-03-22` on every call. There is no sandbox HOST — a test-mode key against the same endpoint is the test lane |
+| **Intent** | `POST /charges` with `pricing_type: 'fixed_price'`, and the buyer is redirected to the charge's `hosted_url`. A validated discount code comes off HERE (`applyToAmount`), because the price is one we compute and Coinbase has no coupon object to apply it on its own page |
+| **Identifiers** | `charge.metadata` — a flat string map carrying `uid`, `orderId`, `productId`. There is no `custom_id` string to pack, the way PayPal needs |
+| **Resource** | `charge`, read back at `GET /charges/{id}` (the endpoint takes the id or the short code) |
+| **Status** | the LAST entry of `charge.timeline` — a charge has no status field. `COMPLETED`/`RESOLVED` → `completed`, `NEW`/`PENDING` → `pending`, `EXPIRED`/`CANCELED` → `failed`, anything else passes through lowercased |
+| **Webhook** | `charge:confirmed`, `charge:pending`, `charge:failed`, all category `one-time`. `charge:created` stays out (it is our own intent call answering, not a payment); `charge:delayed` and `charge:resolved` stay out until the merchant decision they encode is specified |
+| **Signature** | **not verified**, like every other provider — the `?key=` check is the one boundary ([Webhook Verification](#webhook-verification)) |
+| **Subscriptions** | `toUnifiedSubscription()` THROWS, and the intent provider refuses a subscription product before it calls Coinbase. Fabricating one would grant recurring access off a single crypto payment |
+| **Refunds** | unsupported by the provider, refused by `refund-policy.js` before dispatch ([Refunds](#refunds)) |
+| **Cancel / portal / plan / uncancel / winback** | no module at all: every one of those routes acts on a SUBSCRIPTION, and no coinbase subscription can exist to reach them |
+
+The checkout hides the crypto button on a subscription product for the same reason the intent provider refuses one, so the two halves cannot disagree.
+
+**The key is asked for through the shared setup contract** (#608): `COINBASE_COMMERCE_API_KEY` is declared in the manager's REQUIRES registry and offered by `services/payment/lib/provider-setup.js` — the only provider flow with no public field to collect, so its gate leads straight to the secret paste, and its "Disable permanently" lands on `payment.providers.coinbase.enabled` rather than on the provider block. The ask fires only when that switch is explicitly `true`; a brand that never turned crypto on is never asked. Beyond the key, the payment service reconciles nothing for Coinbase — there is no catalog, and its webhook endpoint is registered by hand in the Coinbase dashboard.
+
+**Open product question — the buyer reaches the confirmation page before the coins confirm.** Coinbase redirects to `redirect_url` the moment the payment is submitted, while the charge is still `PENDING`, and a one-time confirmation page opens CONFIRMED without polling ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)). So a crypto buyer sees "confirmed" first and their receipt email arrives when `charge:confirmed` lands, which can be minutes later. Nothing here decides that yet; it is the one-time confirmation contract, and changing it is Ian's call.
 
 ### Subscriptionless refunds are one-time
 
@@ -592,9 +633,21 @@ PayPal's `fetchResource()` handles `'sale'` the same way, and it is a two-step r
 
 ## Product Configuration
 
-Products are defined in `config/omega.json5` under `payment.products` (a shared top-level section):
+Products are defined in `config/omega.json5` under `payment.products`, and the features they meter in the sibling top-level `features` catalog (both shared top-level sections):
 
 ```javascript
+// A feature is DEFINED once in the top-level catalog, beside `payment` rather
+// than inside it, and a product names only its VALUE
+// ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+features: {
+  requests: {
+    name: 'API requests',
+    icon: 'bolt',
+    definition: 'Calls to the API you can make per month.',
+    usage: { pace: 'daily' },
+  },
+},
+
 payment: {
   providers: {
     stripe: { publishableKey: 'pk_live_...' },
@@ -605,13 +658,13 @@ payment: {
       id: 'basic',           // Free tier (no prices, no provider keys)
       name: 'Basic',
       type: 'subscription',
-      limits: { requests: 100 },
+      features: { requests: 100 },
     },
     {
       id: 'premium',         // Paid subscription
       name: 'Premium',
       type: 'subscription',
-      limits: { requests: 1000 },
+      features: { requests: 1000 },
       trial: { days: 14 },
       prices: { monthly: 4.99, annually: 49.99 },       // Flat numbers; also supports 'weekly' and 'daily'
       stripe: { productId: 'prod_xxx', legacyProductIds: ['prod_OLD'] },
@@ -630,6 +683,7 @@ payment: {
 ```
 
 Key rules:
+- `features` on a product is a MAP of `<catalog id>: value` — the number is the monthly limit (`-1` unlimited), and the name, icon, definition and pacing live once in the top-level `features` catalog. The retired `limits`, the per-product `features` ARRAY and the product-wide `rateLimit` are validation errors naming their replacement ([docs/shared/config.md](../../../docs/shared/config.md#the-features-catalog-features-and-a-products-values--647))
 - `prices` contains **flat numbers only** — no provider-specific IDs
 - Provider IDs live at the product level: `stripe: { productId }`, `paypal: { productId }`
 - `stripe.productId` is stable — never changes even when prices change
@@ -669,8 +723,15 @@ Reprocessing is safe by construction: the trigger's staleness guard and its `pre
 | Job | Cadence | What it does |
 |---|---|---|
 | `cron/frequent/retry-failed-webhooks.js` | Frequent (10 min) | Re-flips failed webhook events to `pending` under the retry ceiling, then dead-letters ([above](#payments-webhooks-retry-state)) |
+| `cron/frequent/abandoned-carts.js` | Frequent (10 min) | Mails the escalating cart reminders, and defers the ones whose checkout is still live ([below](#abandoned-cart-reminders)) |
 | `cron/daily/trial-lapse-sweep.js` | Daily | Confirms expired trials with the provider and lapses the abandoned ones |
 | `cron/daily/expire-paypal-cancellations.js` | Daily | Closes out PayPal pending cancellations whose term has ended |
+
+### Abandoned cart reminders
+
+The checkout page writes `payments-carts/{uid}` on load (`status: 'pending'`, `reminderIndex: 0`, `nextReminderAt: now + 900`) and the frequent cron mails whatever is due, escalating through `REMINDER_DELAYS` — **15m, 3h, 24h, 48h, 72h** (`libraries/abandoned-cart-config.js`, the SSOT both sides read). A completed purchase marks the cart `completed` from the webhook pipeline, and so does a user who turns out to have an active subscription.
+
+**A cart with checkout activity inside its window is not abandoned** ([#655](https://github.com/Omega-JS-Stack/omega/issues/655)). The reminder clock used to be set ONCE, when the page loaded, and nothing ever moved it — so a shopper who spent 20 minutes on the checkout was mailed "Complete your checkout" two minutes before their purchase went through. `POST /payments/intent` now stamps `lastActivityAt` on the cart (fire-and-forget, an `update` so a checkout reached without a cart tracker never creates one), and the sweep restarts the CURRENT reminder's own delay from that touch: the reminder is deferred, never spent, so the shopper still gets reminder #1 if this checkout goes nowhere. A cart nobody ever took to a checkout carries no activity and reads exactly as it did.
 
 ### Trial lapse sweep
 
@@ -705,7 +766,7 @@ Its candidate query (`subscription.payment.provider` + `subscription.cancellatio
 
 ONE layer gates `POST /payments/webhook`, and the dispute-alert route beside it: **the shared key** — `?key=<OMEGA_WEBHOOK_KEY>`, compared in constant time. Every provider rides it, a mismatch is a 401 before anything else runs, and nothing is parsed or stored until it passes.
 
-Provider signing secrets are deliberately not part of this: no provider verifies a native signature, and the backend holds no signing secret for one ([#634](https://github.com/Omega-JS-Stack/omega/issues/634)). The key is the boundary, which is why it is a minted, brand-owned value and why a manage run leaves exactly one endpoint carrying it.
+Provider signing secrets are deliberately not part of this: no provider verifies a native signature, and the backend holds no signing secret for one ([#634](https://github.com/Omega-JS-Stack/omega/issues/634)). That is a standing rule for every provider added since, Coinbase Commerce included — its `X-CC-Webhook-Signature` header is **not** verified, and its shared secret is never configured or stored here (Ian 2026-08-27). The key is the boundary, which is why it is a minted, brand-owned value and why a manage run leaves exactly one endpoint carrying it.
 
 ## Test Provider
 
@@ -722,6 +783,14 @@ Only the FIRST charge moves. Every code is `duration: 'once'`, so `users/{uid}.s
 **The confirmation URL's `amount` is the ROUTE's job, not a provider's** ([#239](https://github.com/Omega-JS-Stack/omega/issues/239)). `buildConfirmationUrl()` in `routes/payments/intent/post.js` applies the validated discount, so the number is right on every provider. That placement is load-bearing: a real provider applies its coupon on its own hosted page and never revisits this URL, so doing the math provider-side left a discounted Stripe checkout landing on the confirmation page quoting the LIST price — and the client's tracking modules read that param straight into GA4/pixel revenue. A trial quotes `$0` and a coupon takes its cut off nothing.
 
 **The confirmation URL names the product TYPE** ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)). `buildConfirmationUrl()` sets `type=subscription|one-time` beside `frequency`, because the confirmation page holds nothing else about what was bought: it decides whether to WAIT for the webhook by asking whether the purchase writes account state at all, and a checkout that sent the wrong `frequency` (a one-time buy asking for `annually`) left it polling for a plan a one-time purchase never writes until it timed out, on a payment that had completed cleanly. The route also NORMALIZES what a one-time checkout bills on — `frequency` is written `once` beside `trial = false`, next to the guards, rather than taken from the caller — so the intent doc, the provider call and the confirmation URL cannot record a cadence the buyer will never be billed on. The one-time receipt names the PRODUCT in its summary row (`templates/order.js`), where it used to repeat the order id the header already prints.
+
+**Every provider charges the discounted one-time amount** ([#758](https://github.com/Omega-JS-Stack/omega/issues/758)). The split is by what the provider's API HAS: Stripe and Chargebee hand their hosted page a real coupon object (`discounts: [{ coupon }]`, `coupon_ids: [...]`) and it comes off on their side, while a PayPal v2 Order, a Coinbase charge and the test provider's session are prices this framework computes, so those three call `applyToAmount()` on `prices.once` themselves. PayPal's one-time order did neither: it charged the list price while the confirmation URL built beside it quoted the discounted one, so a buyer with a valid code paid full price and landed on a cheaper receipt.
+
+**A PayPal SUBSCRIPTION discounts its first period with a setup fee** ([#759](https://github.com/Omega-JS-Stack/omega/issues/759)). PayPal's Subscriptions API has no coupon object either, and the plan the manager's payment walk created carries ONE infinite `REGULAR` billing cycle (plus a `TRIAL` cycle ahead of it when the product configures trial days), so neither shape the create call offers can move the first payment alone. `plan.billing_cycles` overrides a cycle by `sequence` and carries no `tenure_type` or `frequency`, so it cannot ADD a cheaper first cycle, and re-pricing the single cycle it can reach would ride every renewal with it; pricing a `TRIAL` cycle at the discount is worse, because `resolveTrial()` reads any TRIAL cycle as a claimed trial, which would make a PAYING subscriber read as trialing everywhere the backend asks (access revoked the instant they cancel, the winback offer refusing them). So `intent/providers/paypal.js` charges the discounted period at approval as the plan override's setup fee (`plan.payment_preferences.setup_fee`, at `applyToAmount(prices[frequency], discount)`) and tells the plan's own cycles to start one full period later (`start_time`), which leaves every renewal at the plan's list price. An undiscounted subscription is untouched (no override, no `start_time`, billing starts now), and a free trial still charges nothing today, so a code takes its cut off nothing there. One carve-out remains against Stripe and Chargebee, which attach the coupon beside the trial so it lands on the first PAID invoice: a PayPal trial checkout loses the code entirely, and it cannot follow the trial onto the first paid period without minting a per-buyer plan, which this framework does not do. The override also repeats the plan's `auto_bill_outstanding` and `payment_failure_threshold`, so a partial override can never change a discounted subscriber's retry behavior. Like the coupon builders above, this is proven on the params PayPal is asked to create; that the setup fee is collected at approval when `start_time` sits a period out is a live-sandbox item ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
+
+**A code that covers the WHOLE price is refused, never sent as $0.00** ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)). `chargeableAmount()` in `libraries/payment/discount-codes.js` is `applyToAmount()` with that refusal in front of it, and both providers whose amount this framework computes call it — the PayPal one-time order, the PayPal subscription's setup fee (before the plan lookup, so PayPal is not called at all) and the Coinbase charge — because neither API takes a zero amount, so `WELCOME10OFF` on anything priced at or under $10 came back a provider 400 the buyer read as the checkout's generic failure. The Error is coded 400, which is the one case `POST /payments/intent` answers with the provider path's own words: a 400 naming the code and the list price. Stripe and Chargebee are untouched — their hosted page holds the coupon and decides for itself — a product priced 0 keeps each provider's existing "No price configured …" fault, and a checkout TAKING A FREE TRIAL is skipped outright (`takingTrial`): nothing is charged today whatever code rides along, and the code comes off the first paid period. The checkout page hides the PayPal and crypto buttons on a zero total for the same reason (`core/js/pages/payment/checkout/modules/state.js` in @omega.js/web), so the refusal is a backstop rather than the buyer's first news. Pinned by `test/routes/payments/intent-zero-total.test.js`.
+
+**A trial product carries TWIN PayPal plans, and skipping the trial is a plan choice** ([#761](https://github.com/Omega-JS-Stack/omega/issues/761)). PayPal puts a trial on the PLAN, never on the subscribe call, so the manager's payment walk mints TWO active plans per paid interval on a product that configures `trial.days`: the trial twin (`TRIAL` cycle + `REGULAR`) and the skip-trial twin (`REGULAR` only), named `<Display> (Monthly)` and `<Display> (Monthly, no trial)`. `resolvePlanId(product, frequency, trial)` in `libraries/payment/providers/paypal.js` matches on interval + amount + `TRIAL`-cycle PRESENCE — the manager's own rule, since plan names are display only — and both callers (the checkout and the plan switch) pass the trial value they resolved, so a buyer the route refused a trial subscribes to a plan that has no free cycle on it at all. That is what makes skip-trial real: the old code "skipped" by setting `start_time` five minutes out, which left the plan's `TRIAL` cycle running anyway, so `resolveTrial()` read a PAYING customer as trialing (a cancel inside that window revoked access at once) and the discount had to carve trial products out. Both are gone: the +5 minute nudge is deleted and a returning buyer with a code gets the setup-fee discount like everyone else. A trial checkout still resolves the trial twin and still charges nothing today. **A trial product needs one manage run (`npx omega manage --service=payment`) to mint its no-trial twin** — until then a skip-trial checkout throws the plan lookup's "No active PayPal plan … without a trial cycle" rather than falling back to the trial twin and handing out a free period nobody granted. A product without trial days is unchanged: one plan per interval, one twin.
 
 The test provider's remaining share is the **payload it fabricates**, carrying the coupon the way Stripe reports it: a Stripe-shaped `discount` on the subscription, `amount_total` + `total_details.amount_discount` on a one-time session, and the discounted `amount_due` on a declined checkout's failed first invoice.
 
@@ -779,8 +848,9 @@ Every scenario in [#212](https://github.com/Omega-JS-Stack/omega/issues/212)'s s
 | 8 | payment-method update mid-subscription | `webhook-ordering.test.js` (`a-payment-method-update-refreshes-state-and-emails-nobody`), `routes/payments/portal.test.js`, `portal-return-url.test.js` |
 | 9 | chargebacks / disputes → forced cancel | `journey-payments-dispute.test.js` (end to end), `routes/payments/dispute-alert.test.js`, `dispute-email-status.test.js`, `dedup-race.test.js` |
 | 10 | webhook robustness: duplicates, ordering, unknown types | `webhook-ordering.test.js`, `dedup-race.test.js`, `webhook-retry-sweep.test.js`, `webhook-atomic-writes.test.js`, `routes/payments/webhook.test.js`, `test-processor-doc-shape.test.js`; real deliveries in `test/stripe-live/subscription-lifecycle.test.js` (opt-in lane) |
-| 11 | abandoned checkout — no residue | `journey-payments-abandoned.test.js` |
+| 11 | abandoned checkout — no residue | `journey-payments-abandoned.test.js`; the reminder sweep's activity rule in `events/payments/abandoned-cart-activity.test.js` |
 | 12 | account deletion with an active subscription | `test/routes/user/delete.test.js` (deletion is REFUSED while a paid subscription stands) |
-| 13 | one-time: purchase, refund, re-purchase | `journey-payments-one-time.test.js`, `journey-payments-one-time-decline.test.js`, `journey-payments-one-time-failure.test.js`, `journey-payments-one-time-refund.test.js`, `routes/payments/intent-one-time-metadata.test.js`, `webhook-stripe-refund-one-time.test.js` |
+| 13 | one-time: purchase, refund, re-purchase | `journey-payments-one-time.test.js`, `journey-payments-one-time-decline.test.js`, `journey-payments-one-time-failure.test.js`, `journey-payments-one-time-refund.test.js`, `routes/payments/intent-one-time-metadata.test.js`, `webhook-stripe-refund-one-time.test.js`; the transition mails in `purchase-refunded-handler.test.js` + `purchase-failed-handler.test.js`, the account surface in `routes/user/orders.test.js` + web's `account-orders.test.js` |
+| 14 | order ids are unique | `helpers/payment/order-id.test.js` (mint, collide, retry, fail loudly) |
 
 **Known gaps, pinned rather than hidden:** a frequency-only switch (same product, monthly → annually) matches no transition rule, so no email fires for it — asserted explicitly in `transitions-detect.test.js` so a future rule flips a test rather than passing unnoticed.

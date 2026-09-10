@@ -29,9 +29,16 @@
 //                        The callback owns runner loading, skip messaging, and results
 //                        mutation — framework glue stays framework-side.
 //   bootDefaultTimeout — per-test default for boot-layer inspect() (UJM/BXM 20000, EM 15000)
-//   boot               — { run: async ({ tests, options, results, projectRoot }) => void }
-//                        Called with the aggregated flat boot test list (never empty).
+//   boot:              { run: async ({ tests, suites, options, results, projectRoot }) => void }
+//                        Called with the aggregated flat boot test list plus the boot-BOUND
+//                        suites (at least one of the two is non-empty).
 //                        Owns runner loading, skip messaging, label, and results mutation.
+//   bootBound:         (mod) => boolean, a predicate over a loaded test module. True
+//                        partitions that FILE into the boot layer whatever its `layer` says,
+//                        and hands it to boot.run WHOLE (`suites: [{ file, mod }]`) instead
+//                        of flattening it into the inspect list: for suites that need the
+//                        boot lane's built app but run their own way (EM's `view:` renderer
+//                        suites). Default: () => false. An array-form file is never bound.
 
 const path = require('path');
 const glob = require('glob').globSync;
@@ -39,7 +46,8 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const expect = require('./assert.js');
-const { parseTestScope } = require('./scope.js');
+const { parseTestScope, isPathTargeted } = require('./scope.js');
+const { markRunnerActive } = require('./define-cases.js');
 
 class SkipError extends Error {
   constructor(reason) { super(reason); this.name = 'SkipError'; }
@@ -54,6 +62,7 @@ function createRunner(config) {
   const middleLayers = config.middleLayers || [];
   const layerNames = ['build', ...middleLayers.flatMap((m) => m.layers), 'boot'];
   const bootDefaultTimeout = config.bootDefaultTimeout || 20000;
+  const bootBound = config.bootBound || (() => false);
 
   async function run(options = {}) {
     options.layer    = options.layer    || 'all';
@@ -62,6 +71,10 @@ function createRunner(config) {
     options.reporter = options.reporter || 'pretty';
 
     const startTime = Date.now();
+
+    // Claim the run before any case file is required: defineCases() only lets a
+    // spec through once a real runner is loading it (#630).
+    markRunnerActive();
 
     const sources = discoverTestFiles(options.target);
 
@@ -72,7 +85,9 @@ function createRunner(config) {
     // before any suite. There is no cleanup hook — tests clean up after themselves.
     await runInitSetups();
 
-    const results = { passed: 0, failed: 0, skipped: 0, tests: [] };
+    // noMatch carries the target a run named that selected nothing; the CLI
+    // turns it into a non-zero exit ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+    const results = { passed: 0, failed: 0, skipped: 0, noMatch: null, tests: [] };
 
     if (sources.framework.length > 0) {
       console.log('');
@@ -87,7 +102,16 @@ function createRunner(config) {
     }
 
     if (sources.framework.length === 0 && sources.project.length === 0) {
-      console.log(chalk.gray('  No test files found.'));
+      if (isPathTargeted(sources.scope)) {
+        // The run named a path and got nothing: a typo, or a suite that was
+        // renamed out from under the target. Reporting "0 passing" and exiting
+        // 0 there runs silently green
+        // ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)); the
+        // caller prints the tagged line and fails the run.
+        results.noMatch = options.target;
+      } else {
+        console.log(chalk.gray('  No test files found.'));
+      }
     } else if (options.layer === 'boot'
       && results.passed + results.failed + results.skipped === 0) {
       // Explain the silence: framework boot/ suites are excluded from consumer
@@ -140,7 +164,11 @@ function createRunner(config) {
     // Aggregate every boot test (whether standalone or inside a suite) into one flat list.
     // The boot harness runs them sequentially in a single process to keep startup cost
     // amortized. State doesn't carry across boot tests.
+    //
+    // Boot-BOUND files (config.bootBound) are the exception: they ride this lane for its
+    // built app, but the framework glue runs them its own way, so they stay whole.
     const tests = [];
+    const suites = [];
 
     for (const file of files) {
       let mod;
@@ -156,6 +184,20 @@ function createRunner(config) {
       }
 
       if (Array.isArray(mod))                      mod = { type: 'group', tests: mod };
+
+      if (bootBound(mod)) {
+        // The filter reads the same way it does for the inspect list below: a test whose
+        // own name misses it is dropped, and a suite with nothing left never runs.
+        const bound = (mod.tests || []).filter((t) => !options.filter
+          || String(t.name || t.description || '').includes(options.filter));
+        if (options.filter && bound.length === 0) continue;
+        suites.push({
+          file,
+          mod: bound.length === (mod.tests || []).length ? mod : { ...mod, tests: bound },
+        });
+        continue;
+      }
+
       if (Array.isArray(mod.tests))                {/* multi-test */ }
       else if (typeof mod.inspect === 'function')  mod = { tests: [mod] };
 
@@ -172,16 +214,18 @@ function createRunner(config) {
       }
     }
 
-    if (tests.length === 0) return;
+    if (tests.length === 0 && suites.length === 0) return;
 
-    await config.boot.run({ tests, options, results, projectRoot: process.cwd() });
+    await config.boot.run({ tests, suites, options, results, projectRoot: process.cwd() });
   }
 
   function peekLayer(file) {
     try {
       delete require.cache[require.resolve(file)];
-      const mod = require(file);
-      if (Array.isArray(mod)) return 'build';
+      let mod = require(file);
+      if (Array.isArray(mod)) mod = { type: 'group', tests: mod };
+      // A boot-bound file belongs to the boot lane whatever its own layer says.
+      if (bootBound(mod)) return 'boot';
       return mod.layer || 'build';
     } catch (e) {
       return null;
@@ -349,6 +393,12 @@ function createRunner(config) {
     console.log(chalk.gray(`\n    Total: ${total} tests in ${durationMs}ms\n`));
   }
 
+  // A relative path in the scope grammar's own spelling: forward slashes,
+  // whatever separator the OS handed back.
+  function toPosix(p) {
+    return String(p).split(path.sep).join('/').replace(/\\/g, '/');
+  }
+
   // Narrow a source's file list by that source's scope filters (C5: source
   // selection already happened in parseTestScope — this only path-matches).
   function filterBySource(source, files, scope) {
@@ -361,10 +411,16 @@ function createRunner(config) {
       return files;
     }
 
+    // The scope grammar is written with forward slashes (`desktop:build/runner`)
+    // on every platform; path.relative answers with the OS separator, so on
+    // Windows `build\runner.test.js` never matched `build/runner` and every
+    // scoped run reported "No test files found" ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)).
+    // Both sides are compared in slash form.
     return files.filter((file) => {
-      const rel = relativizePath(file, source);
+      const rel = toPosix(relativizePath(file, source));
       const relNoExt = rel.replace(/\.js$/, '').replace(/\.test$/, '');
-      return filters.some((pathPart) => {
+      return filters.some((rawPart) => {
+        const pathPart = toPosix(rawPart);
         const partNoExt = pathPart.replace(/\.js$/, '').replace(/\.test$/, '');
         return rel.startsWith(pathPart)
           || relNoExt === partNoExt
@@ -426,6 +482,7 @@ function createRunner(config) {
     return {
       framework: filterBySource('framework', framework, scope),
       project:   filterBySource('project',   project,   scope),
+      scope,
     };
   }
 

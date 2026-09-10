@@ -23,16 +23,17 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const FirestoreRulesFileTest = require('../../src/cli/commands/setup-tests/firestore-rules-file.js');
-const FirestoreRulesInJsonTest = require('../../src/cli/commands/setup-tests/firestore-rules-in-json.js');
-const MigrateRulesCommand = require('../../src/cli/commands/migrate-rules.js');
+const FirestoreRulesFileTest = require('../../dist/cli/commands/setup-tests/firestore-rules-file.js');
+const FirestoreRulesInJsonTest = require('../../dist/cli/commands/setup-tests/firestore-rules-in-json.js');
+const MigrateRulesCommand = require('../../dist/cli/commands/migrate-rules.js');
 const {
   BRAND_RULES_FILE,
   BRAND_RULES_SEED,
   COMPILED_RULES_FILE,
   RULES_MIGRATION_COMMAND,
   compileFirestoreRules,
-} = require('../../src/cli/utils/compile-rules.js');
+} = require('../../dist/cli/utils/compile-rules.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A pre-#255 consumer file: the brand's own rules above the managed block —
 // the exact shape operst and playlisteer still carry.
@@ -104,7 +105,7 @@ async function runCheck(TestClass, targetPath) {
   return { result: result, warning: check.getWarning() };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'compiled-rules migration deferral (no silent healing)',
   type: 'group',
 
@@ -255,4 +256,4 @@ module.exports = {
       },
     },
   ],
-};
+});

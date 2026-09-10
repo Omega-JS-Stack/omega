@@ -7,10 +7,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const PACKAGE_ROOT = path.join(__dirname, '..', '..', '..', '..');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'omega shell — vendored core mechanics + entry wiring',
@@ -48,7 +49,7 @@ module.exports = {
       // imports app-shell through it and the built bundle is asserted there).
       name: 'renderer bundles declare the vendored core assets alias',
       run: (ctx) => {
-        const task = fs.readFileSync(path.join(PACKAGE_ROOT, 'dist', 'gulp', 'tasks', 'webpack.js'), 'utf8');
+        const task = fs.readFileSync(path.join(PACKAGE_ROOT, 'dist', 'gulp', 'tasks', 'bundle.js'), 'utf8');
         ctx.expect(task.includes("'__main_assets__'")).toBe(true);
       },
     },
@@ -90,4 +91,4 @@ module.exports = {
       },
     },
   ],
-};
+});

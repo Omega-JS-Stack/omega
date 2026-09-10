@@ -5,18 +5,19 @@
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type. Mirrors stripe-parse-webhook.js for consistent coverage.
  */
-const paypalProvider = require('../../../../src/manager/routes/payments/webhook/providers/paypal.js');
+const paypalProvider = require('../../../../dist/manager/routes/payments/webhook/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
 const FIXTURE_SUBSCRIPTION_ACTIVE = require('../../../fixtures/paypal/subscription-active.json');
 const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 function parseWebhook(event) {
   return paypalProvider.parseWebhook({ body: event });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal parseWebhook() event categorization',
   type: 'group',
 
@@ -674,4 +675,4 @@ module.exports = {
       },
     },
   ],
-};
+});

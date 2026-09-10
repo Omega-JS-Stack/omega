@@ -21,7 +21,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
-const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-cb-transaction-uid';
 const ORDER_ID = '5340-5340-5340';
@@ -130,7 +131,7 @@ function runRefundWithoutCreditNote({ transaction = null, calls = [] } = {}) {
   }));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A Chargebee refund with no credit note records the transaction\'s amount, never null',
   type: 'group',
   timeout: 30000,
@@ -180,4 +181,4 @@ module.exports = {
       },
     },
   ],
-};
+});

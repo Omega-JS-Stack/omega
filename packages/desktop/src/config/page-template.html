@@ -29,7 +29,7 @@
       {{ content }}
     </main>
 
-    <!-- Per-page JS — entry bundle for this view (compiled by webpack renderer config). -->
+    <!-- Per-page JS — entry bundle for this view (compiled by the `bundle` task's renderer entry). -->
     <script src="../../assets/js/components/{{ page.name }}.bundle.js?cb={{ cacheBust }}"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ const powertools = require('node-powertools');
 const fetchFailure = require('../fetch-failure.js');
 const assertRefundLinkage = require('../refund-linkage.js');
 const env = require('../../env.js');
+const assertLicensedPayments = require('../license.js');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -27,6 +28,10 @@ const Chargebee = {
    * @returns {{ apiKey: string, site: string, baseUrl: string }}
    */
   init() {
+    // A keyless deploy runs no live payments (#320) — before the config, and
+    // before the cache below can hand one back
+    assertLicensedPayments('Chargebee');
+
     if (cachedConfig) {
       return cachedConfig;
     }
@@ -127,7 +132,7 @@ const Chargebee = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      throw fetchFailure(e, { provider: 'chargebee', resourceType, resourceId });
+      throw fetchFailure(e, { provider: 'chargebee', fn: 'fetchResource', resourceType, resourceId });
     }
   },
 
@@ -316,7 +321,7 @@ const Chargebee = {
       const result = await this.request(endpoint);
       record = result[refundType] || result;
     } catch (e) {
-      throw fetchFailure(e, { provider: 'chargebee', resourceType: refundType, resourceId: refundId });
+      throw fetchFailure(e, { provider: 'chargebee', fn: 'getRefundDetails', resourceType: refundType, resourceId: refundId });
     }
 
     assertRefundLinkage({

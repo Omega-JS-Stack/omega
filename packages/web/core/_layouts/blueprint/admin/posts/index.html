@@ -6,12 +6,6 @@ meta:
   description: "Manage blog posts"
   breadcrumb: "All posts"
 
-prerender_icons:
-  - name: "newspaper"
-  - name: "pen"
-  - name: "copy"
-  - name: "arrow-up-right-from-square"
-  - name: "ellipsis-vertical"
 config:
   theme:
     header:
@@ -34,11 +28,11 @@ config:
       </div>
       <div class="d-flex gap-2">
         <button class="btn btn-outline-adaptive" id="btn-refresh-posts">
-          {% omega_icon "rotate", "fa-md me-2" %}
+          <i class="fa-solid fa-rotate fa-md me-2"></i>
           Refresh
         </button>
         <a class="btn btn-adaptive" href="/admin/posts/editor">
-          {% omega_icon "plus", "fa-md me-2" %}
+          <i class="fa-solid fa-plus fa-md me-2"></i>
           New post
         </a>
       </div>
@@ -51,7 +45,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Published posts</span>
-      {% omega_icon "newspaper", "fa-sm" %}
+      <i class="fa-solid fa-newspaper fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-total-posts">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -61,7 +55,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Latest post</span>
-      {% omega_icon "clock", "fa-sm" %}
+      <i class="fa-solid fa-clock fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-latest-post">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -72,7 +66,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Categories in use</span>
-      {% omega_icon "tags", "fa-sm" %}
+      <i class="fa-solid fa-tags fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-categories">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -85,7 +79,7 @@ config:
   <div class="col">
     <div class="input-group">
       <span class="input-group-text">
-        {% omega_icon "magnifying-glass", "fa-sm" %}
+        <i class="fa-solid fa-magnifying-glass fa-sm"></i>
       </span>
       <input type="text" class="form-control" id="posts-filter" placeholder="Filter by title, category, or URL..." aria-label="Filter posts">
     </div>

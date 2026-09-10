@@ -5,6 +5,7 @@ const OrderId = require('../../../libraries/payment/order-id.js');
 const recaptcha = require('../../../libraries/recaptcha.js');
 const discountCodes = require('../../../libraries/payment/discount-codes.js');
 const { hasAuthUser } = require('../../../libraries/auth-user.js');
+const { COLLECTION: CART_COLLECTION } = require('../../../libraries/abandoned-cart-config.js');
 
 /**
  * POST /payments/intent
@@ -125,8 +126,10 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
     ctx.log(`Discount validated: code=${resolvedDiscount.code}, percent=${resolvedDiscount.percent}, amount=${resolvedDiscount.amount}, duration=${resolvedDiscount.duration}`);
   }
 
-  // Generate order ID
-  const orderId = OrderId.generate();
+  // Mint the order id against the intents that already exist. The id keys the
+  // intent doc written below, so an unchecked repeat overwrote another
+  // customer's checkout ([#664](https://github.com/Omega-JS-Stack/omega/issues/664)).
+  const orderId = await OrderId.mint({ admin, ctx });
 
   ctx.log(`Generated orderId=${orderId}`);
 
@@ -159,6 +162,16 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
       ctx,
     });
   } catch (e) {
+    // A REFUSAL the framework itself wrote is the one thing said out loud: a
+    // discount code that covers the whole price leaves nothing for PayPal or
+    // Coinbase to charge, and that is the buyer's own code and price to hear
+    // rather than a fault to hide (`chargeableAmount()` in
+    // libraries/payment/discount-codes.js codes it 400,
+    // [#786](https://github.com/Omega-JS-Stack/omega/issues/786)).
+    if (e.code === 400) {
+      return ctx.respond(e.message, { code: 400 });
+    }
+
     // The provider's own words stay in the logs — a client gets one neutral
     // sentence, never an SDK message naming our internals ([#212]).
     ctx.error(`Failed to create ${provider} intent: uid=${uid}, product=${productId}, error=${e.message}`);
@@ -206,6 +219,25 @@ module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   });
 
   ctx.log(`Saved payments-intents/${orderId}: uid=${uid}, product=${productId}, type=${productType}, frequency=${frequency}, trial=${trial}`);
+
+  // Tell the abandoned-cart sweep this shopper is mid-checkout. Asking for a
+  // provider session is the loudest "buying it right now" the backend ever
+  // hears, and the cart's reminder clock was otherwise set once, when the page
+  // opened, and never moved — so a shopper still working through the checkout
+  // was mailed about the cart they were paying for
+  // ([#655](https://github.com/Omega-JS-Stack/omega/issues/655)).
+  //
+  // Fire-and-forget, and an `update` on purpose: a checkout reached without the
+  // page's cart tracker (an unauthenticated page load, a direct link) has no
+  // cart, and this must never CREATE one the sweep would then chase.
+  admin.firestore().doc(`${CART_COLLECTION}/${uid}`).update({ lastActivityAt: nowUNIX })
+    .then(() => ctx.log(`Updated ${CART_COLLECTION}/${uid}: lastActivityAt=${nowUNIX}`))
+    .catch((e) => {
+      // Not-found is the ordinary case above, not a fault
+      if (e.code !== 5) {
+        ctx.error(`Failed to stamp checkout activity on ${CART_COLLECTION}/${uid}: ${e.message}`);
+      }
+    });
 
   return ctx.respond({
     id: result.id,

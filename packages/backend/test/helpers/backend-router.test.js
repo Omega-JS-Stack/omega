@@ -13,14 +13,15 @@
  * segment that merely STARTS with a prefix word (/omegatron/…), since a prefix
  * only counts as a whole segment.
  */
-const BackendRouter = require('../../src/manager/helpers/backend-router.js');
+const BackendRouter = require('../../dist/manager/helpers/backend-router.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const Manager = { libraries: {} };
 
 // The router only ever reads req.path.
 const resolve = (path) => new BackendRouter(Manager, { path }, {}).resolve().routePath;
 
-module.exports = {
+module.exports = defineCases({
   description: 'BackendRouter.resolve() route path extraction',
   type: 'group',
 
@@ -132,4 +133,4 @@ module.exports = {
       },
     },
   ],
-};
+});

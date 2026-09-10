@@ -16,6 +16,9 @@
  * `omega test` is the emulator lane, and both REFUSE in that mode. It stays a
  * framework target for everything else; a container host's publish command is
  * the brand's to name, and its `deploy` script is where it names it.
+ *
+ * A framework that does not SERVE a verb at all takes the same lane
+ * (SCRIPT_LANE_VERBS): dispatching it would only print "Unknown command".
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -27,6 +30,22 @@ const { targetScripts } = require('./custom-target.js');
 // custom-server mode (#584) — the fan-outs take the script lane for these, and
 // only these. `build`, `update` and the rest are mode-agnostic.
 const FIREBASE_ONLY_VERBS = new Set(['deploy', 'test']);
+
+// Framework → the verbs its CLI has no command for, which the fan-outs must
+// run as the target's own script instead (#603). EMPTY today: every framework
+// serves every fan-out verb, @omega.js/extension's `build` included since
+// [#81](https://github.com/Omega-JS-Stack/omega/issues/81) gave it the verb
+// its siblings already had. The mechanism stays for the next gap.
+const SCRIPT_LANE_VERBS = {};
+
+// The verbs NO framework CLI honors `--dry-run` for (checked against web,
+// backend and desktop `build`/`clean`: none reads the flag). Forwarding it
+// would really build — or really CLEAN — under a flag whose whole promise is
+// that nothing happens, so the dry run stops at the plan for the framework
+// lane too, exactly as it already does for the script lane. `deploy` is the
+// counter-case and stays off this list: every framework deploy reads the flag
+// and prints its own dispatch plan.
+const NO_FRAMEWORK_DRY_RUN_VERBS = new Set(['build', 'clean']);
 
 /**
  * @param {string} fromDir - Directory to climb from (where the dep is declared)
@@ -73,12 +92,16 @@ function resolveFrameworkPackage(fromDir, name) {
  * @param {string} verb - The verb ('deploy', 'test', …).
  * @param {string[]} [forwarded] - Brand-level flags to forward (framework lane only).
  * @param {object} [options]
- * @param {boolean} [options.dryRun] - The run is a dry run.
+ * @param {boolean} [options.dryRun] - The run is a dry run: any lane that cannot
+ *   hand the flag on returns kind:'plan' instead of a command.
  * @returns {{ kind: 'framework'|'custom'|'plan'|'skip'|'error', label?: string,
  *   command?: string, args?: string[], framework?: string, detail?: string }}
  */
 function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
-  if (entry.custom || (entry.projectType === 'custom' && FIREBASE_ONLY_VERBS.has(verb))) {
+  // The SCRIPT lane — the target's own `npm run <verb>`, which is the whole
+  // verb surface of a custom target and the fallback for a framework that
+  // cannot serve this one.
+  const scriptLane = () => {
     const scripts = targetScripts(entry.path);
     if (!scripts[verb]) {
       return { kind: 'skip', detail: `no "${verb}" script in ${entry.dir}/package.json` };
@@ -93,6 +116,10 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
     }
 
     return { kind: 'custom', command: 'npm', args: ['run', verb], label: `npm run ${verb}` };
+  };
+
+  if (entry.custom || (entry.projectType === 'custom' && FIREBASE_ONLY_VERBS.has(verb))) {
+    return scriptLane();
   }
 
   const target = findTarget(entry.path);
@@ -100,9 +127,21 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
     return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
   }
 
+  // A verb this framework's CLI has no command for is the target's script to
+  // run, not a bin dispatch that would fail on "Unknown command"
+  if (SCRIPT_LANE_VERBS[target.name]?.has(verb)) {
+    return scriptLane();
+  }
+
   const binPath = resolveFrameworkBin(target.dir, target.name);
   if (!binPath) {
     return { kind: 'error', detail: `${target.name} is not installed (node_modules climb from ${target.dir} found no bin)` };
+  }
+
+  // A verb its own CLI has no --dry-run for stops at the plan HERE, like the
+  // script lane — the flag is never forwarded to a bin that would ignore it
+  if (options.dryRun && NO_FRAMEWORK_DRY_RUN_VERBS.has(verb)) {
+    return { kind: 'plan', framework: target.name, detail: `would run omega ${verb} in ${entry.dir}` };
   }
 
   return {

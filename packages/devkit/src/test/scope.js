@@ -110,4 +110,53 @@ function parseTestScope(rawTargets, options = {}) {
   };
 }
 
-module.exports = { parseTestScope, UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS };
+/**
+ * Did the run ask for test files BY NAME? A path filter (`build/x`,
+ * `project:x`, `desktop:x`, `full:x`) names files; a bare run, or a bare
+ * source prefix, asks for a source. Only the first kind can be a typo, so
+ * only the first kind fails when it selects nothing
+ * ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+ *
+ * @param {{filters: {framework: string[], project: string[]}}} scope - A parseTestScope() result
+ * @returns {boolean} True when at least one path filter was given
+ */
+function isPathTargeted(scope) {
+  return scope.filters.framework.length > 0 || scope.filters.project.length > 0;
+}
+
+/**
+ * The ONE line every framework prints when a named target selects zero test
+ * files: the same sentence in a web app, a backend, a desktop app and an
+ * extension ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+ *
+ * @param {string} target - The target as the caller spelled it
+ * @returns {string} The message (the caller adds its own log tag)
+ */
+function noMatchMessage(target) {
+  return `No test file matches "${target}".`;
+}
+
+// A brand-root run fans ONE target out over every target, where a target that
+// does not carry that path is a legitimate no-op rather than a typo. The
+// manager sets this signal on the runs it forwards and reads the exit code
+// below to tell a miss from a failure
+// ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). Its presence is
+// the whole signal, the way OMEGA_CASE_RUNNER's is.
+const FANOUT_ENV = 'OMEGA_TEST_FANOUT';
+
+// The exit code a no-match answers with under that signal: distinct, so the
+// fan-out counts misses without confusing them with failures. A standalone run
+// stays 1, the code every human and every CI already reads as "this failed".
+const NO_MATCH_EXIT_CODE = 3;
+
+/**
+ * The exit code a no-match run ends on, given its environment.
+ *
+ * @param {object} [env] - The environment to read (defaults to process.env)
+ * @returns {number} NO_MATCH_EXIT_CODE inside a brand-root fan-out, else 1
+ */
+function noMatchExitCode(env = process.env) {
+  return env[FANOUT_ENV] ? NO_MATCH_EXIT_CODE : 1;
+}
+
+module.exports = { parseTestScope, isPathTargeted, noMatchMessage, noMatchExitCode, NO_MATCH_EXIT_CODE, FANOUT_ENV, UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS };

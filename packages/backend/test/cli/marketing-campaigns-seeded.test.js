@@ -10,8 +10,9 @@
  *
  * Run: npx omega test backend:cli/marketing-campaigns-seeded
  */
-const MarketingCampaignsSeededTest = require('../../src/cli/commands/setup-tests/marketing-campaigns-seeded.js');
-const { buildSeedCampaigns } = require('../../src/cli/commands/setup-tests/helpers/seed-campaigns.js');
+const MarketingCampaignsSeededTest = require('../../dist/cli/commands/setup-tests/marketing-campaigns-seeded.js');
+const { buildSeedCampaigns } = require('../../dist/cli/commands/setup-tests/helpers/seed-campaigns.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const SEEDS = buildSeedCampaigns();
 
@@ -82,7 +83,7 @@ async function runLikeSetup(test) {
   return result;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing campaigns seeder — reads every run, writes only on opt-in',
   type: 'group',
 
@@ -190,4 +191,4 @@ module.exports = {
       },
     },
   ],
-};
+});

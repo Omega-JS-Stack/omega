@@ -40,14 +40,15 @@ const {
   findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
+const { watchEnvChain } = require('@omega.js/devkit/env-watch');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { emitLanguageFlags } = require('../language-flags.js');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
-const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
+const { resolveStaticDirs, copyStaticAssets, hasFaviconSet, brandmarkSvgUrl } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
-const { readRedirects } = require('../redirects.js');
 const { configureOmega } = require('../engine.js');
 const reads = require('@omega.js/devkit/reads');
 const { reconcileSampleContent } = require('../sample-content.js');
@@ -55,7 +56,7 @@ const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { PATHS, resolveClientEntry } = require('../paths.js');
 
-const logger = new Logger('omega:dev');
+const logger = new Logger('dev');
 
 const WATCH_DEBOUNCE_MS = 250;
 // The rescan lane settles faster than the asset lane: a scan is a readdir, and
@@ -94,7 +95,7 @@ module.exports = async function (options) {
   // port speaks TLS through the shared mkcert proxy; eleventy sits on an
   // internal plain-http port behind it (WebSocket live-reload tunnels through).
   // `--no-https` or no mkcert → plain http on the public port, as before.
-  const { ensureLocalHttpsCerts, startLocalHttpsProxy } = require('@omega.js/devkit/local-https');
+  const { ensureLocalHttpsCerts, startLocalHttpsProxy, mkcertInstallHint } = require('@omega.js/devkit/local-https');
   let httpsCerts = null;
   let internalPort = null;
   if (options.https !== false) {
@@ -106,7 +107,7 @@ module.exports = async function (options) {
     if (httpsCerts) {
       ({ ports: { internal: internalPort } } = await resolvePorts({ wanted: { internal: 4443 } }));
     } else {
-      logger.log('HTTPS disabled — could not obtain certificates (install mkcert: brew install mkcert && mkcert -install)');
+      logger.log(`HTTPS disabled — could not obtain certificates (install mkcert: ${mkcertInstallHint()})`);
     }
   }
 
@@ -121,11 +122,6 @@ module.exports = async function (options) {
   // proxy resolve the sibling backend's map at use time (#300).
   const devPorts = devPortsOption(paths.root, port, origin);
   const authPort = () => devPorts().ports.auth;
-
-  // The path-redirect map (#442) the dev server answers with — the same
-  // compiled entries the build inlines into the 404 page, so a `/c/<id>` QR
-  // code resolves locally exactly as it does in production.
-  const redirects = readRedirects(siteData.redirects);
 
   // ---- Sample content on disk (spec §8): mirror the injected filler under
   // the gitignored .omega/sample-content/ so it can be read and copied —
@@ -173,8 +169,9 @@ module.exports = async function (options) {
 
   const manifest = await build();
   manifest.favicons = hasFaviconSet(staticDirs);
+  manifest.brandmarkSvg = brandmarkSvgUrl(staticDirs);
   jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
-  logger.log('Assets built (dev mode: stable names, no minify)');
+  logger.log('Assets built (dev mode: stable names, no minify, sourcemaps)');
 
   // ---- Service worker + build meta (/service-worker.js, /build.js,
   // /build.json) — dev serves the REAL service worker so push/caching are
@@ -206,7 +203,7 @@ module.exports = async function (options) {
     outDir: paths.out,
   });
 
-  // Runtime icon set (/assets/fa/) — the browser-side auto-renderer fetches
+  // Runtime icon set (/assets/icons/) — the browser-side auto-renderer fetches
   // these on demand (JS-set fa-* markup, e.g. the share buttons); emitted once
   // at boot like the statics (the set never changes mid-dev).
   emitIcons({
@@ -228,7 +225,28 @@ module.exports = async function (options) {
     path.join(paths.src, '_components'),
   ].filter((dir) => fs.existsSync(dir));
 
-  watchAssetSources({ dirs: watchDirs, clientDist: path.dirname(clientEntry), build });
+  // The rebuild folds back into the LIVE manifest (#765): the theme layers are
+  // watched here, so a theme's @font-face edit rebuilds the sheet — and the
+  // preload list it carries has to reach the served head, not wait for an
+  // unrelated template edit. The manifest file is the courier (see the
+  // watch target registered with Eleventy below).
+  watchAssetSources({
+    dirs: watchDirs,
+    clientDist: path.dirname(clientEntry),
+    build,
+    manifest,
+    manifestPath: paths.manifest,
+  });
+
+  // The .env chain is a dev INPUT too (#681): an edit to any layer reloads the
+  // cascade into process.env, so the next rebuild reads the new values instead
+  // of the ones this process booted with.
+  //
+  // Reach, exactly: a NEW key AND an EDITED value both land on that next
+  // rebuild, and a key dropped from the file is dropped from the process — the
+  // reload re-reads what a file layer owns (#724). A SHELL-set value still wins
+  // over every file, whatever the file now says.
+  watchEnvSources(paths.root);
 
   // The consumer's service-worker entry lives OUTSIDE the asset trees
   // (src/service-worker.js) — its own watcher; the browser picks the new
@@ -253,7 +271,13 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts, redirects));
+      eleventyConfig.setServerOptions(devServerOptions(paths.out, authPort, devPorts));
+      // The asset manifest is a template INPUT (the head reads its css/js URLs
+      // and its font preloads), and the asset watcher rewrites it when the
+      // preload list moves (#765). Watching the file is what re-renders the
+      // head then — no config reset, because the engine holds the manifest
+      // object by reference and the rebuild already updated it.
+      eleventyConfig.addWatchTarget(paths.manifest);
       // Arms the watch registration for the config build below — the engine's
       // captured reads are what fill it in (#200). The reset union goes to
       // Eleventy, the rescan union to the light content watcher; a config
@@ -298,7 +322,11 @@ module.exports = async function (options) {
   // whether this run speaks TLS (#262).
   writePortsFile(paths.root, { website: port }, { origin });
   process.on('exit', () => clearPortsFile(paths.root));
-  process.on('SIGINT', () => process.exit(0));
+  // Every way this dev server is asked to stop exits deliberately, off the ONE
+  // devkit list ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)):
+  // the `exit` hook above is what retracts the ports file, and a signal with no
+  // listener never runs it.
+  STOP_SIGNALS.forEach((signal) => process.on(signal, () => process.exit(0)));
 
   if (bumped) {
     logger.log(`Port ${CLASSIC_PORTS.website} was taken — bumped to ${port}`);
@@ -360,13 +388,10 @@ const SERVER_OPTIONS = new Map();
  *   identity would otherwise change on every config reset
  * @param {function} [devChrome] - the live dev-chrome getter (devPortsOption);
  *   given, every HTML response is rewritten to carry it (#346)
- * @param {Array<object>} [redirects] - the compiled path-redirect map
- *   (readRedirects output, #442); empty/absent mounts no redirect middleware
  * @returns {object} setServerOptions() payload
  */
-function devServerOptions(outDir, authPort, devChrome, redirects) {
-  const map = redirects && redirects.length ? redirects : [];
-  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort} ${devChrome ? 'inject' : 'plain'} ${JSON.stringify(map)}`;
+function devServerOptions(outDir, authPort, devChrome) {
+  const key = `${outDir} ${typeof authPort === 'function' ? 'live' : authPort} ${devChrome ? 'inject' : 'plain'}`;
 
   if (!SERVER_OPTIONS.has(key)) {
     SERVER_OPTIONS.set(key, {
@@ -377,10 +402,6 @@ function devServerOptions(outDir, authPort, devChrome, redirects) {
         ...(devChrome ? [devInjectDevPorts(devChrome)] : []),
         devCleanUrls(outDir),
         devImageFallback(outDir),
-        // LAST: production reaches the map only through the 404 page, i.e.
-        // when nothing real answered — so here too, everything the site
-        // actually built answers first (#442)
-        ...(map.length ? [devRedirects(outDir, map)] : []),
       ],
       watch: [
         path.join(outDir, 'assets', 'css'),
@@ -486,6 +507,10 @@ function registerTemplateWatchTargets(eleventyConfig, options) {
  * @param {string[]} options.dirs - the asset source dirs (existing ones only)
  * @param {string} [options.clientDist] - the resolved @omega.js/client dist dir
  * @param {function} options.build - (only) => Promise, the dev asset rebuild
+ * @param {object} [options.manifest] - the LIVE manifest the engine renders
+ *   from; given with manifestPath, a rebuild that moved the font preload list
+ *   folds into it and rewrites the file (#765)
+ * @param {string} [options.manifestPath] - where that manifest is written
  * @returns {{ close: function }} the live watchers (the dev loop keeps them for
  *   the life of the process; tests close them)
  */
@@ -505,7 +530,18 @@ function watchAssetSources(options) {
       pendingKinds = new Set();
       const only = kinds.size === 1 && !kinds.has('other') ? kinds.values().next().value : undefined;
       options.build(only)
-        .then(() => logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`))
+        .then((next) => {
+          // #765: the head's font preloads are manifest CONTENT, not a stable
+          // dev URL, so a rebuild that moved them has to reach the browser.
+          // The list folds into the live manifest (the engine holds it by
+          // reference) and the manifest FILE is rewritten — Eleventy watches
+          // that file, so its re-render happens AFTER this build rather than
+          // racing it, and only when the head's list actually moved.
+          if (options.manifest && options.manifestPath && refreshLiveManifest(options.manifest, next)) {
+            jetpack.write(options.manifestPath, JSON.stringify(options.manifest, null, 2));
+          }
+          logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`);
+        })
         .catch((error) => logger.error('Asset rebuild failed:', error));
     }, WATCH_DEBOUNCE_MS);
   };
@@ -526,6 +562,52 @@ function watchAssetSources(options) {
       watchers.forEach((watcher) => watcher.close());
     },
   };
+}
+
+/**
+ * Fold a rebuild's manifest back into the LIVE one the engine renders from
+ * (#765). Dev hands Eleventy the boot manifest by reference, which is right
+ * for every asset URL — dev names are stable, so a rebuilt bundle keeps its
+ * URL. The font preload list is different: it is CONTENT (the first-paint
+ * faces the compiled sheet declares), so a theme's @font-face edit has to
+ * reach the next render instead of the boot capture.
+ *
+ * A js-only rebuild returns before the css lane and carries no list, so it
+ * leaves the live one alone; a css rebuild replaces it, an emptied list
+ * included. The answer is whether the list MOVED — the caller rewrites the
+ * manifest file on a change, and that file is what makes Eleventy re-render
+ * (see watchAssetSources), so an unchanged list must not trigger one.
+ * @param {object} manifest - the live manifest the engine holds
+ * @param {object} next - what the rebuild returned
+ * @returns {boolean} whether the preload list changed
+ */
+function refreshLiveManifest(manifest, next) {
+  const preloads = next && next.fontPreloads;
+  if (!preloads || JSON.stringify(preloads) === JSON.stringify(manifest.fontPreloads)) return false;
+
+  manifest.fontPreloads = preloads;
+
+  return true;
+}
+
+/**
+ * The ENV lane's watcher (#681): every layer of the `.env` chain — company,
+ * brand, this target — and each layer's `.env.<environment>` overlay. A change
+ * reloads the cascade into process.env, and the log line names the FILE, never
+ * a value. Resolution and watching live in @omega.js/devkit/env-watch, shared
+ * with the desktop and extension dev lanes; this binds web's own target name.
+ * @param {string} root - the target root
+ * @param {object} [options]
+ * @param {string} [options.environment] - the environment whose overlay counts
+ * @returns {{ inputs: Array<{ layer: string, path: string }>, close: function }}
+ */
+function watchEnvSources(root, options) {
+  return watchEnvChain({
+    projectDir: root,
+    target: 'web',
+    environment: options && options.environment,
+    log: (line) => logger.log(line),
+  });
 }
 
 /**
@@ -829,52 +911,6 @@ function devCleanUrls(outDir) {
 }
 
 /**
- * Path redirects in dev (#442): the SAME compiled map the build inlines into
- * the 404 page, answered here with a real status code so local QA lands where
- * production lands. It runs last and only for a path nothing built — in
- * production the map is only ever reached through the 404 page, which is by
- * definition "no file answered".
- * @param {string} outDir
- * @param {Array<{ pattern: string, target: string, type: number }>} redirects - readRedirects output
- * @returns {function} connect-style middleware
- */
-function devRedirects(outDir, redirects) {
-  const root = path.resolve(outDir);
-
-  return (req, res, next) => {
-    const [pathname, query] = (req.url || '').split('?');
-
-    // A malformed percent-escape is not a redirect candidate (devCleanUrls'
-    // rule, same reason).
-    let decoded;
-    try {
-      decoded = decodeURIComponent(pathname);
-    } catch (e) {
-      return next();
-    }
-
-    // devCleanUrls already rewrote the URL to `<path>.html` when the site
-    // built that page, so a real file is exactly what this check sees.
-    const built = path.resolve(root, `.${decoded}`);
-    if (built.startsWith(root + path.sep) && jetpack.exists(built) === 'file') {
-      return next();
-    }
-
-    const entry = redirects.find(({ pattern }) => new RegExp(pattern).test(decoded));
-    if (!entry) {
-      return next();
-    }
-
-    const location = decoded.replace(new RegExp(entry.pattern), entry.target);
-    // The target carries its own querystring (`/code?id=:id`), so an incoming
-    // one is appended with the right separator.
-    res.writeHead(entry.type, { location: query ? `${location}${location.includes('?') ? '&' : '?'}${query}` : location });
-
-    return res.end();
-  };
-}
-
-/**
  * The dev website ORIGIN this run answers on — the ONE place protocol and port
  * are put together (#262). Every consumer of "where the dev website is" derives
  * from this: site.url, the published ports file, and the page chrome.
@@ -998,6 +1034,8 @@ module.exports.devServerOptions = devServerOptions;
 module.exports.resolveAssetThemeLayers = resolveAssetThemeLayers;
 module.exports.registerTemplateWatchTargets = registerTemplateWatchTargets;
 module.exports.watchAssetSources = watchAssetSources;
+module.exports.watchEnvSources = watchEnvSources;
+module.exports.refreshLiveManifest = refreshLiveManifest;
 module.exports.watchRescanTargets = watchRescanTargets;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;
 module.exports.devWebsiteOrigin = devWebsiteOrigin;
@@ -1018,10 +1056,12 @@ async function linkBrandToMonorepo() {
   // suppresses node's default kill, so it has to exit deliberately.
   const watch = local.startMonorepoWatch({ monorepoRoot, logger });
   if (watch.child) {
-    process.on('SIGINT', () => process.exit(0));
+    STOP_SIGNALS.forEach((signal) => process.on(signal, () => process.exit(0)));
   }
 
-  // The same gate the brand-root boot uses (#670): nothing reads a dist while
-  // a fresh watch's initial prepare is still rewriting it.
+  // The same gate the brand-root boot uses (#670): nothing reads a dist while a
+  // prepare is still rewriting it — a fresh watch's initial pass, and an
+  // already-running watch's, read from its log (#622). Awaited on BOTH
+  // branches, which is why this prelude never had the skip #622 fixed.
   await watch.ready;
 }

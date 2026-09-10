@@ -9,13 +9,13 @@
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
   color: var(--omega-ink-muted);
-  transition:
-    border-color var(--omega-speed) var(--omega-ease),
-    transform var(--omega-speed) var(--omega-ease);
+  transition: border-color var(--omega-speed) var(--omega-ease);
 
+  // Core's page css raises this button on hover and again when selected;
+  // classy tells both with the line alone (#686).
   &:hover {
     border-color: var(--omega-line-strong);
-    transform: translateY(-2px);
+    transform: none;
     box-shadow: none;
   }
 

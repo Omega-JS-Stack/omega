@@ -2,7 +2,9 @@
  * Test: GET /payments/discount
  * Tests discount code validation endpoint
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Discount code validation',
   type: 'group',
   timeout: 15000,
@@ -77,4 +79,4 @@ module.exports = {
       },
     },
   ],
-};
+});

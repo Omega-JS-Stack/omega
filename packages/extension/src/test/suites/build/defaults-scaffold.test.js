@@ -11,6 +11,7 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 
 const { scaffoldDefaults } = require('../../../gulp/tasks/defaults.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 
@@ -49,7 +50,7 @@ function readAppDescription(dir) {
   return readMessages(dir).appDescription.message;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'defaults scaffold (devkit engine)',
@@ -283,4 +284,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -20,6 +20,7 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const resolveSigningCert = require('../../../utils/resolve-signing-cert.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const CERT_REL = join('.omega', 'certificates', 'apple', 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12');
 const REAL_PASSWORD = 'fixture-p12-password';
@@ -73,7 +74,7 @@ function stampCompany(brandRoot, companyRoot) {
   jetpack.write(join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'resolve-signing-cert',
@@ -338,4 +339,4 @@ module.exports = {
       },
     },
   ],
-};
+});

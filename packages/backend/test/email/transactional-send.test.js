@@ -2,7 +2,9 @@
  * Test: Single transactional email send
  * Verifies the full pipeline end-to-end: prepare → render → deliver via SendGrid.
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Transactional email send',
   auth: 'admin',
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
@@ -31,4 +33,4 @@ module.exports = {
     assert.ok(response.data.options.asm, 'Should have ASM group');
     assert.ok(response.data.options.headers['List-Unsubscribe'], 'Should have unsubscribe header');
   },
-};
+});

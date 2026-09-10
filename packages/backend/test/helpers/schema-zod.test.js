@@ -18,10 +18,11 @@
  * twin (the pre-conversion schema, preserved here as the reference).
  */
 const powertools = require('node-powertools');
-const Settings = require('../../src/manager/helpers/settings.js');
-const { z, fields: f, isZodSchema } = require('../../src/manager/helpers/schema-zod.js');
-const { resolveSchema } = require('../../src/manager/helpers/schema-engine.js');
-const zodTestSchemaModule = require('../../src/manager/schemas/test/schema/post.js');
+const Settings = require('../../dist/manager/helpers/settings.js');
+const { z, fields: f, isZodSchema } = require('../../dist/manager/helpers/schema-zod.js');
+const { resolveSchema } = require('../../dist/manager/helpers/schema-engine.js');
+const zodTestSchemaModule = require('../../dist/manager/schemas/test/schema/post.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock ctx/manager — Settings.resolve only touches these surfaces when the
 // schema is passed directly (no file loading)
@@ -130,7 +131,7 @@ const normalizeTwin = (settings) => {
   return out;
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Schema-zod powertools parity',
   type: 'group',
 
@@ -326,6 +327,59 @@ module.exports = {
     },
 
     {
+      name: 'min-refuses-short-strings-and-arrays',
+      async run({ assert }) {
+        // #789: `min` bounds strings and arrays by LENGTH — a short value is
+        // REFUSED (never padded), so the documented path-id idiom
+        // (path-derived default + min: 1, NOT required) actually guards. Both
+        // engines refuse with the same 400 the enum door produces.
+        const decl = { id: { types: ['string'], default: '', min: 1, max: 128 } };
+        const zod = f.object({ id: f.string({ default: '', min: 1, max: 128 }) });
+
+        let declError, zodError;
+        try { resolve(decl, {}); } catch (e) { declError = e; }
+        try { resolve(zod, {}); } catch (e) { zodError = e; }
+
+        assert.ok(declError && zodError, 'Both engines refuse an empty path id');
+        assert.equal(zodError.code, 400, 'Refuses with 400');
+        assert.equal(zodError.message, declError.message, 'Identical message');
+        assert.equal(zodError.message, 'Invalid settings {id}: must be at least 1 character', 'Exact message');
+
+        // At or above the bound, both engines resolve normally
+        assert.equal(resolve(decl, { id: 'abc' }).id, 'abc', 'Declarative: a string at/above min passes');
+        assert.equal(resolve(zod, { id: 'abc' }).id, 'abc', 'Zod: a string at/above min passes');
+
+        // Arrays refuse by length, same shape
+        const declArray = { tags: { types: ['array'], default: [], min: 2 } };
+        const zodArray = f.object({ tags: f.array({ default: [], min: 2 }) });
+
+        let declArrayError, zodArrayError;
+        try { resolve(declArray, { tags: ['solo'] }); } catch (e) { declArrayError = e; }
+        try { resolve(zodArray, { tags: ['solo'] }); } catch (e) { zodArrayError = e; }
+
+        assert.ok(declArrayError && zodArrayError, 'Both engines refuse a short array');
+        assert.equal(zodArrayError.message, declArrayError.message, 'Identical array message');
+        assert.equal(zodArrayError.message, 'Invalid settings {tags}: must have at least 2 items', 'Exact array message');
+        assert.equal(J(resolve(zodArray, { tags: ['a', 'b'] }).tags), J(['a', 'b']), 'An array at min passes');
+
+        // Numbers keep clamping — never refused
+        assert.equal(resolve({ n: { types: ['number'], default: 5, min: 10 } }, { n: 1 }).n, 10, 'Declarative: a number below min clamps');
+        assert.equal(resolve(f.object({ n: f.number({ default: 5, min: 10 }) }), { n: 1 }).n, 10, 'Zod: a number below min clamps');
+
+        // Undeclared min → no floor: '' still resolves
+        assert.equal(resolve({ s: { types: ['string'], default: '' } }, { s: '' }).s, '', 'Declarative: undeclared min passes an empty string');
+        assert.equal(resolve(f.object({ s: f.string({ default: '' }) }), { s: '' }).s, '', 'Zod: undeclared min passes an empty string');
+
+        // Nested paths refuse by dot-path in both engines
+        let declNested, zodNested;
+        try { resolve({ o: { m: { types: ['string'], default: '', min: 2 } } }, { o: { m: 'a' } }); } catch (e) { declNested = e; }
+        try { resolve(f.object({ o: f.object({ m: f.string({ default: '', min: 2 }) }) }), { o: { m: 'a' } }); } catch (e) { zodNested = e; }
+        assert.equal(zodNested && zodNested.message, declNested && declNested.message, 'Identical nested message');
+        assert.match(zodNested.message, /\{o\.m\}/, 'Nested dot-path in message');
+      },
+    },
+
+    {
       name: 'settings-schema-exposed-for-sanitize-pass',
       async run({ assert }) {
         // cp79 fix: Settings.resolve exposes self.schema (per-field sanitize flags) so
@@ -414,7 +468,7 @@ module.exports = {
         // the pre-conversion declarative engine. Omitted consent resolves to
         // granted: false / text: '' (force-coerced), NOT absent; the route's
         // never-downgrade logic depends on reading exactly this shape.
-        const signupSchema = require('../../src/manager/schemas/user/signup/post.js');
+        const signupSchema = require('../../dist/manager/schemas/user/signup/post.js');
         const user = { auth: { uid: 'u1' } };
 
         const empty = resolve(signupSchema({ user }), {});
@@ -497,4 +551,4 @@ module.exports = {
       },
     },
   ],
-};
+});

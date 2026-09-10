@@ -14,6 +14,8 @@
  */
 
 // Record every console call the thunk makes, restoring console afterward.
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function withConsoleRecorder(fn) {
   const calls = { log: [], debug: [], warn: [], error: [] };
   const original = { log: console.log, debug: console.debug, warn: console.warn, error: console.error };
@@ -56,7 +58,7 @@ function withDebug(value, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'ctx.debug writes only when OMEGA_DEBUG is set',
   type: 'group',
 
@@ -113,4 +115,4 @@ module.exports = {
       },
     },
   ],
-};
+});

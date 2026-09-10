@@ -10,12 +10,15 @@ const { seed } = require('./seed.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
-const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { markRunnerActive } = require('@omega.js/devkit/test/define-cases');
+const { parseTestScope, isPathTargeted, noMatchMessage, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { declaredLanes } = require('../utils/test-lanes.js');
 
 // Test directories that belong to an OPT-IN lane, discovered only when that
-// lane's own gate opened it (`npx omega test --lane=<name>`). One entry per lane
-// in src/cli/commands/test-lanes/.
-const LANE_DIRECTORIES = new Set(['stripe-live']);
+// lane's own gate opened it (`npx omega test --lane=<name>`). The names come
+// from this framework's own package.json `omega.testLanes` — the one home the
+// gate modules and the brand-root fan-out read too (src/utils/test-lanes.js).
+const LANE_DIRECTORIES = new Set(declaredLanes());
 
 /**
  * @omega.js/backend Integration Test Runner
@@ -43,6 +46,7 @@ class TestRunner {
       failed: 0,
       skipped: 0,
       aborted: false, // pre-flight abort (config/health/accounts) — must exit non-zero
+      noMatch: null,  // a named target that selected nothing (#814) — must exit non-zero
       tests: [],
       startTime: null,
       endTime: null,
@@ -66,6 +70,10 @@ class TestRunner {
     // Set testing flag to skip external API calls (emails, SendGrid)
     process.env.OMEGA_TEST_MODE = 'true';
 
+    // Claim the run before any case file is required: defineCases() only lets a
+    // spec through once a real runner is loading it (#630).
+    markRunnerActive();
+
     this.results.startTime = Date.now();
 
     console.log(chalk.bold('\n  @omega.js/backend Integration Tests\n'));
@@ -75,6 +83,33 @@ class TestRunner {
       console.log(chalk.yellow.bold(`  ${EXTENDED_MODE_WARNING[0]}`));
       EXTENDED_MODE_WARNING.slice(1).forEach((line) => console.log(chalk.yellow(`  ${line}`)));
       console.log('');
+    }
+
+    // Which files this run selects
+    // @omega.js/backend tests are in the top-level test/ directory of the package
+    const frameworkTestsDir = path.resolve(__dirname, '../../test');
+    const projectTestsDir = path.join(this.options.projectDir, 'test');
+
+    // C5 scoping: bare/`project:`/`brand:` = project tests only,
+    // `framework:`/`omega:`/`mgr:`/`backend:` = the framework suite,
+    // `full:` = both. Framework self-test defaults to the framework source.
+    this.scope = parseTestScope(this.options.testPaths, {
+      frameworkAliases: FRAMEWORK_IDS['@omega.js/backend'],
+      selfTest: this.options.isFrameworkSelfTest,
+    });
+    for (const target of this.scope.invalid) {
+      console.log(chalk.yellow(`  ⚠ Unknown test scope prefix ignored: ${target}`));
+    }
+
+    // A target that names a path and selects nothing is a typo, or a suite
+    // renamed out from under it: reporting "0 passing" at exit 0 there runs
+    // silently green ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+    // Ahead of the preflight below, so a typo costs a second, not a whole stack.
+    if (isPathTargeted(this.scope) && this.countSelected(frameworkTestsDir, projectTestsDir) === 0) {
+      const target = this.options.testPaths.join(' ');
+      console.log(chalk.red(`  ${noMatchMessage(target)}`));
+      this.results.noMatch = target;
+      return this.results;
     }
 
     // Validate configuration
@@ -101,22 +136,6 @@ class TestRunner {
     if (!accountsReady) {
       this.results.aborted = true;
       return this.results;
-    }
-
-    // Discover and run tests
-    // @omega.js/backend tests are in the top-level test/ directory of the package
-    const frameworkTestsDir = path.resolve(__dirname, '../../test');
-    const projectTestsDir = path.join(this.options.projectDir, 'test');
-
-    // C5 scoping: bare/`project:`/`brand:` = project tests only,
-    // `framework:`/`omega:`/`mgr:`/`backend:` = the framework suite,
-    // `full:` = both. Framework self-test defaults to the framework source.
-    this.scope = parseTestScope(this.options.testPaths, {
-      frameworkAliases: FRAMEWORK_IDS['@omega.js/backend'],
-      selfTest: this.options.isFrameworkSelfTest,
-    });
-    for (const target of this.scope.invalid) {
-      console.log(chalk.yellow(`  ⚠ Unknown test scope prefix ignored: ${target}`));
     }
 
     // Run @omega.js/backend default tests
@@ -173,7 +192,7 @@ class TestRunner {
 
     if (!this.options.domain) {
       console.log(chalk.red('  ✗ Missing domain'));
-      console.log(chalk.gray('    Could not determine domain from brand.contact.email'));
+      console.log(chalk.gray('    Could not determine the brand host from brand.url'));
       return false;
     }
 
@@ -360,6 +379,29 @@ class TestRunner {
     }
 
     return tests;
+  }
+
+  /**
+   * How many test files this run's scope selects, across both sources: the
+   * count a named target has to beat to be a real selection rather than a typo
+   * ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+   *
+   * @param {string} frameworkTestsDir - @omega.js/backend's own test/ dir
+   * @param {string} projectTestsDir - the consumer project's test/ dir
+   * @returns {number} Files the run would load
+   */
+  countSelected(frameworkTestsDir, projectTestsDir) {
+    let count = 0;
+
+    if (this.scope.sources.includes('framework') && jetpack.exists(frameworkTestsDir)) {
+      count += this.filterTests(this.discoverTests(frameworkTestsDir), 'backend').length;
+    }
+
+    if (this.scope.sources.includes('project') && jetpack.exists(projectTestsDir)) {
+      count += this.filterTests(this.discoverTests(projectTestsDir), 'project').length;
+    }
+
+    return count;
   }
 
   /**

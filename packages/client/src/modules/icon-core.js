@@ -2,7 +2,7 @@
  * icon-core — the ONE place Font Awesome icon semantics live (C4 cp108).
  *
  * Pure functions, zero runtime assumptions: no DOM, no fs, no transport.
- * Web's build-time `omega_icon` tag (@omega.js/template-kit) and
+ * Web's build-time inlining pass (@omega.js/web src/inline-icons.js) and
  * @omega.js/desktop's main-process icon server both consume THIS module, so
  * lookup rules and rendered SVG markup can never drift between surfaces
  * again. File reading stays with each consumer (build tags read at build
@@ -24,6 +24,18 @@
 // brings its own licensed copy (npm token install, or a fontawesome.com
 // download dir via OMEGA_FONTAWESOME_ROOT).
 const PACKAGES = ['@fortawesome/fontawesome-pro', '@fortawesome/fontawesome-free'];
+
+// The ONE emitted directory name, every surface: a site serves it at
+// /assets/icons/<style>/<name>.svg, an extension packs it at
+// assets/icons/… ([#619](https://github.com/Omega-JS-Stack/omega/issues/619)).
+// `icons` and not `fa` because flags ride the same tree as a second
+// namespace, and nothing about the channel is Font Awesome specific. It lives
+// HERE with the rest of the lookup rules — the build side re-exports it
+// (@omega.js/devkit/icons) and every browser transport derives its base from
+// it, so the name can never drift between what a build emits and what a page
+// fetches. (The extension manifest's web_accessible_resources stays a literal:
+// manifest.json is static JSON, read by Chrome, not by us.)
+const ICONS_DIR = 'icons';
 
 // The free set's svgs/ directories. Pro supplies more (light, thin,
 // duotone, sharp-*, …) — validation is by shape, not this list, so new
@@ -88,7 +100,13 @@ function isValidStyle(style) {
 function injectSvgAttributes(svg) {
   if (typeof svg !== 'string' || !svg.includes('<svg')) return svg;
 
-  return svg.replace(/<svg([^>]*)>/, (match, existingAttrs) => {
+  // No comment survives into the injected markup: Font Awesome ships its
+  // license comment inside every glyph, and that comment's `-->` TERMINATES
+  // any HTML comment the icon happens to sit inside — a commented-out block
+  // carrying an icon (body.html's parked flash-sale banner) rendered on every
+  // page. Attribution stays with the set: the emitted /assets/icons/ files
+  // are copies of the originals, comments intact.
+  return svg.replace(/<!--[\s\S]*?-->/g, '').replace(/<svg([^>]*)>/, (match, existingAttrs) => {
     const toAdd = SVG_ATTRIBUTES
       .filter(([attr]) => !existingAttrs.includes(`${attr}=`))
       .map(([, pair]) => pair);
@@ -131,11 +149,18 @@ const FAMILY_CLASSES = { 'fa-sharp': 'sharp', 'fa-duotone': 'duotone', fad: 'duo
 // misses reads as an icon NAME and the renderer hunts for a glyph called '4xl'.
 const MODIFIER_REGEX = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|2xs|xs|sm|base|md|lg|xl|2xl|3xl|4xl|5xl|6xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
 
+// Country flags are the SECOND namespace on this pipeline (#619) — not Font
+// Awesome, but the same markup shape, the same lookup, the same emitted tree:
+// `<i class="omega-flag omega-flag-us">` is `flags/us.svg`.
+const FLAG_CLASS_REGEX = /^omega-flag-([a-z0-9-]+)$/;
+
 /**
  * Parse an element's class list the way Font Awesome does:
  * `fa-sharp fa-light fa-play me-2` → { name: 'play', style: 'sharp-light' }.
  * Weight defaults to solid; a family class prefixes it (duotone-solid lives
- * in the bare `duotone` dir). Null when no icon name is present.
+ * in the bare `duotone` dir). A flag class (`omega-flag-us`) is the one
+ * non-FA namespace and resolves to the `flags` style. Null when no icon name
+ * is present.
  *
  * @param {Iterable<string>} classList - Element class names.
  * @returns {{ name: string, style: string }|null} Parsed lookup, or null.
@@ -146,6 +171,10 @@ function parseIconClasses(classList) {
   let name = null;
 
   for (const cls of classList) {
+    const flag = FLAG_CLASS_REGEX.exec(cls);
+    if (flag) {
+      return { name: flag[1], style: 'flags' };
+    }
     if (BASE_STYLE_CLASSES[cls]) {
       base = BASE_STYLE_CLASSES[cls];
     } else if (FAMILY_CLASSES[cls]) {
@@ -183,6 +212,7 @@ function buildAliasMap(iconFamilies) {
 
 module.exports = {
   PACKAGES,
+  ICONS_DIR,
   STYLES,
   STYLE_REGEX,
   NAME_REGEX,

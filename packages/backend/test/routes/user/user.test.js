@@ -4,9 +4,10 @@
  * Returns user account info for authenticated users
  * Validates that User() correctly structures user data
  */
-const { getFirstPaidProduct } = require('../../../src/test/test-accounts.js');
+const { getFirstPaidProduct } = require('../../../dist/test/test-accounts.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'User resolve (account info)',
   type: 'group',
   tests: [
@@ -154,4 +155,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -23,7 +23,7 @@ Everything lives under `repo.providers.github` in the brand `config/omega.json5`
 |---|---|
 | `org` | Repo owner (org or user). No default — unset and the service skips. |
 | `shared` | `true` = the org is shared with other brands, so the org-level `org` operation is filtered out: one brand must not rewrite a shared org's profile. |
-| `repo` | Optional `owner/name` slug or bare name. Name defaults to the brand id, owner to `repo.providers.github.org`. |
+| `repo` | Optional `owner/name` slug or bare name. Name defaults to `<brand.id>-omega` (the `<brand.id>-<role>` rule, [#809](https://github.com/Omega-JS-Stack/omega/issues/809)), owner to `repo.providers.github.org`. |
 | `private` | Repo visibility (manager default `true`). |
 | `location` | Org profile location — only reconciled when set (omega-manager hardcoded a country). |
 

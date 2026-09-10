@@ -8,7 +8,10 @@
     <div class="container">
       <!-- Logo -->
       {% capture logo_href %}{% assign temp_href = data.logo.href | default: resolved.config.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-      {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+      {% comment %} The VISIBLE logo prefers the bridged vector when the mint produced one (#467) —
+        `brand.images.brandmark` stays the raster OG/social and payment sync need, and an
+        authored `data.logo.src` still outranks both. {% endcomment %}
+      {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
       {% capture logo_text %}{{ data.logo.text | default: resolved.config.brand.name | omega_liquify }}{% endcapture %}
       {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
 
@@ -31,7 +34,7 @@
       <div class="d-lg-none d-flex align-items-center ms-auto">
         <!-- Mobile toggle -->
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle navigation">
-          {% omega_icon "bars", "fa-md" %}
+          <i class="fa-solid fa-bars fa-md"></i>
         </button>
 
         <!-- Mobile account dropdown (directly to the right of toggler) -->
@@ -57,7 +60,7 @@
                 <button class="{{ link_class }}" type="button" data-bs-toggle="dropdown" {{ link_attributes }}>
                   <span class="d-inline-flex align-items-center">
                     {% if link.icon %}
-                      {% omega_icon link.icon, "fa-sm me-2" %}
+                      <i class="fa-solid fa-{{ link.icon }} fa-sm me-2"></i>
                     {% endif %}
                     <span>{{ link.label }}</span>
                   </span>
@@ -70,7 +73,7 @@
                     {% capture child_content %}
                       <span class="d-inline-flex align-items-center">
                         {% if child.icon %}
-                          {% omega_icon child.icon, "fa-sm me-2" %}
+                          <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
                         {% endif %}
                         <span>{{ child.label }}</span>
                       </span>
@@ -102,7 +105,7 @@
               {% capture link_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if link.icon %}
-                    {% omega_icon link.icon, "fa-sm me-2" %}
+                    <i class="fa-solid fa-{{ link.icon }} fa-sm me-2"></i>
                   {% endif %}
                   <span>{{ link.label }}</span>
                 </span>
@@ -137,7 +140,7 @@
                 <button class="{{ action_class }}" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
                   <span class="d-inline-flex align-items-center">
                     {% if action.icon %}
-                      {% omega_icon action.icon, "fa-sm me-2" %}
+                      <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
                     {% endif %}
                     <span>{{ action.label }}</span>
                   </span>
@@ -150,7 +153,7 @@
                     {% capture child_content %}
                       <span class="d-inline-flex align-items-center">
                         {% if child.icon %}
-                          {% omega_icon child.icon, "fa-sm me-2" %}
+                          <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
                         {% endif %}
                         <span>{{ child.label }}</span>
                       </span>
@@ -181,7 +184,7 @@
               {% capture action_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if action.icon %}
-                    {% omega_icon action.icon, "fa-sm me-2" %}
+                    <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
                   {% endif %}
                   <span>{{ action.label }}</span>
                 </span>
@@ -209,7 +212,7 @@
               {% capture action_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if action.icon %}
-                    {% omega_icon action.icon, "fa-sm me-2" %}
+                    <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
                   {% endif %}
                   <span>{{ action.label }}</span>
                 </span>
@@ -227,7 +230,7 @@
                       {% capture child_content %}
                         <span class="d-inline-flex align-items-center">
                           {% if child.icon %}
-                            {% omega_icon child.icon, "fa-sm me-2" %}
+                            <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
                           {% endif %}
                           <span>{{ child.label }}</span>
                         </span>

@@ -4,9 +4,9 @@
  * The default hosting site ({projectId}) gets api.{domain} (Cloud Functions'
  * public endpoint via Firebase Hosting rewrites; a brand whose api domain
  * fronts a dedicated non-Firebase backend routes /omega through the
- * cloudflare omega-api-proxy worker instead) plus
- * api.{sub}.{domain} for each brand.subdomains entry. The main domain is NOT
- * added — the website hosts elsewhere (GitHub Pages).
+ * cloudflare omega-api-proxy worker instead). ONE api domain, shared by every
+ * web instance the brand runs (#588). The main domain is NOT added — the
+ * website hosts elsewhere (GitHub Pages).
  *
  * Per domain, one reconciliation pass:
  *   verified  → ensure the Cloudflare CNAME has the right proxy state:
@@ -55,15 +55,6 @@ module.exports = async function ensureHosting(context) {
     fullDomain: `api.${domain}`,
     recordName: subdomainPrefix ? `api.${subdomainPrefix}` : 'api',
   }];
-
-  for (const subdomain of brandConfig.brand?.subdomains || []) {
-    if (subdomain) {
-      apiDomains.push({
-        fullDomain: `api.${subdomain}.${domain}`,
-        recordName: subdomainPrefix ? `api.${subdomain}.${subdomainPrefix}` : `api.${subdomain}`,
-      });
-    }
-  }
 
   // === Hosting site ===
   const sites = await api.listHostingSites(projectId);

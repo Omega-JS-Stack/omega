@@ -17,9 +17,10 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
-const format = require('../../src/manager/libraries/ai/providers/anthropic-format.js');
-const AI = require('../../src/manager/libraries/ai/index.js');
+const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
+const format = require('../../dist/manager/libraries/ai/providers/anthropic-format.js');
+const AI = require('../../dist/manager/libraries/ai/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { normalizePrompt, loadContent, formatHistory, VALID_PROMPT_ROLES } = OpenAI._internals;
 const { normalizeOptions, SYSTEM_PROMPT_INJECTIONS } = AI._internals;
 
@@ -45,7 +46,7 @@ function baseOptions(overrides = {}) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'AI request payload shape (system/developer/user roles)',
   type: 'group',
   tests: [
@@ -615,4 +616,4 @@ module.exports = {
   async cleanup() {
     jetpack.remove(FIXTURES_DIR);
   },
-};
+});

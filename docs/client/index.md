@@ -73,7 +73,7 @@ omega.request(WAKEUP_ROUTE, { wakeup: true });
 | @omega.js/web | `/signin` | `/omega/user/signup` behind a first-time OAuth signin |
 | @omega.js/web | `/account` | the billing portal, plan switch, cancel, refund, API key, data request, delete |
 | @omega.js/web | `/token` | `/omega/user/token` (also where a desktop app and an extension sign in) |
-| @omega.js/web | `/oauth2` | `/omega/user/oauth2` |
+| @omega.js/web | `/connections/callback` | `/omega/user/connections` |
 | @omega.js/web | `/feedback` | `/omega/user/feedback` |
 | @omega.js/web | `/portal/email-preferences` | `/omega/marketing/email-preferences` |
 | @omega.js/web | `/download`, only where the notify-me form renders | `/omega/general/email` |
@@ -84,6 +84,23 @@ omega.request(WAKEUP_ROUTE, { wakeup: true });
 The newsletter band is the one that waits for an interaction: it rides most pages, so a load-time ping would warm a function for every passive visitor scrolling past. A focus is the intent.
 
 Deliberately NOT pinging: the payment confirmation page (its check is a Firestore read, not a backend call), the contact form (it posts to Slapform, a third party), and the admin dashboard (internal tooling, whose seven load-time fetches are their own warm-up).
+
+### The session probe (`omega.auth().probeSession()`)
+
+One forced token refresh at a moment of doubt, and nothing else ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)). Firebase asks the Auth server about a persisted session at page load and at the hourly refresh and at no other moment, so a revoked, disabled or deleted account keeps an open tab signed in until a reload, and a dev stack whose auth emulator restarted leaves the page holding a session the server no longer has. The probe never asks OUR backend, so dev and production run the same code.
+
+`probeSession()` exchanges the refresh token with the Auth server (`getIdToken(user, true)`) and classifies the answer:
+
+| Result | When | What the client does |
+|---|---|---|
+| `signed-out` | no `currentUser` | nothing; a probe on a signed-out client is a no-op |
+| `alive` | the refresh succeeded | nothing |
+| `gone` | a DEFINITE `auth/*` verdict, meaning any `auth/*` code that is not one of the three transient ones below (`auth/user-token-expired`, `auth/user-disabled`, `auth/user-not-found`, `auth/invalid-refresh-token`, …) | `signOut()`, whose `onAuthStateChanged` emission drives each surface's own policy listener |
+| `unknown` | the three TRANSIENT codes (`auth/network-request-failed`, `auth/too-many-requests`, `auth/internal-error`), or an error carrying no auth code | keeps the user: a bad connection, a throttle and a failing Auth server are no verdict on the session, and neither is the "Backend starting" window |
+
+**Three moments, no timer.** The tab coming back into view (`visibilitychange` to visible) and the network coming back (`online`) are wired once per manager instance beside the auth state listener, guarded for a host with no `document` (the extension's background service worker). The third is a 401 on an authenticated `omega.request()`: the request layer calls its optional `onUnauthorized` dep WITHOUT awaiting it and throws the caller's error unchanged, so nothing waits on a token refresh and a failed probe is never the request's failure. Probes coalesce, one in flight per Auth instance, because focus, online and a 401 arrive together all the time and are all asking the same question. A periodic ping would be a request per open tab for nothing; page load and the hourly refresh stay Firebase's own.
+
+Web, desktop and extension get every bit of this from the client, with no framework code of their own. Web's page auth policy is what redirects on the resulting signed-out state ([docs/web/page-contract.md](../web/page-contract.md)).
 
 ### Click triggers (`modules/triggers.js`)
 

@@ -8,6 +8,7 @@ const { validateConfig, runSchema, formatErrors, loadConfig } = require('@omega.
 
 const path = require('path');
 const Manager = require('../../../build.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const root = Manager.getRootPath('main');
 
 // Minimal "good" config — passes every required check.
@@ -15,7 +16,7 @@ const VALID = {
   brand: { id: 'myapp', name: 'MyApp' },
 };
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'config validation — @omega.js/config integration',
@@ -86,4 +87,4 @@ module.exports = {
       },
     },
   ],
-};
+});

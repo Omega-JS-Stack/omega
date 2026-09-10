@@ -14,7 +14,7 @@ const { consumerPaths } = require('../consumer.js');
 const { translateSite } = require('../translate/index.js');
 const jetpack = require('fs-jetpack');
 
-const logger = new Logger('omega:translate');
+const logger = new Logger('translate');
 
 module.exports = async function (options) {
   const paths = consumerPaths();

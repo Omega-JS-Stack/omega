@@ -61,7 +61,7 @@ test('rules: legacy uj_ tags/filters and site.uj globals become omega_ / site.om
   ].join('\n');
   const { text } = applyRules(input, 'unit.html');
   const lines = text.split('\n');
-  assert.strictEqual(lines[0], '{% omega_icon "rocket", "fa-fw" %}{{ title | omega_title_case }}');
+  assert.strictEqual(lines[0], '<i class="fa-solid fa-rocket fa-fw"></i>{{ title | omega_title_case }}', 'the icon tag becomes native markup (#619); the filter beside it still renames');
   assert.strictEqual(lines[1], '<img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ image }}">');
   assert.strictEqual(lines[2], '<span class="omega-password-show"></span>');
   assert.strictEqual(lines[3], 'A path like /assets/uj_legacy.png stays a path', 'only known names rename');
@@ -146,12 +146,31 @@ test('rules: the loop-scope skip names the FILE and line through the codemod (#5
 });
 
 test('rules: tag-arg hoist scoped to the tag span', () => {
-  const input = '<a title="{{ t }}">{% omega_icon "{{ stat.icon }} fa-2x" %}</a>';
+  const input = '<a title="{{ t }}">{% omega_logo "{{ brand.slug }}-mark" %}</a>';
   const { text } = applyRules(input, 'unit.html');
   const lines = text.split('\n');
-  assert.strictEqual(lines[0].trim(), '{% capture omega_migrate_arg_1 %}{{ stat.icon }} fa-2x{% endcapture %}');
+  assert.strictEqual(lines[0].trim(), '{% capture omega_migrate_arg_1 %}{{ brand.slug }}-mark{% endcapture %}');
   assert.ok(lines[1].includes('title="{{ t }}"'), 'HTML attribute interpolation untouched');
-  assert.ok(lines[1].includes('{% omega_icon omega_migrate_arg_1 %}'), 'tag arg replaced with the capture var');
+  assert.ok(lines[1].includes('{% omega_logo omega_migrate_arg_1 %}'), 'tag arg replaced with the capture var');
+});
+
+// #619 — icons stopped being a tag on BOTH sides of the rename, so the lane
+// converts them to the markup the build inlines, never to a dead tag name.
+test('rules: the icon tag becomes native Font Awesome markup', () => {
+  const input = [
+    '{% uj_icon "rocket" %}',
+    '{% omega_icon "arrow-right", "fa-sm ms-2" %}',
+    '{% omega_icon item.icon, "fa-sm" %}',
+    '{% omega_icon "star", label="Featured" %}',
+  ].join('\n');
+  const { text, edits } = applyRules(input, 'unit.html');
+  const lines = text.split('\n');
+
+  assert.strictEqual(lines[0], '<i class="fa-solid fa-rocket"></i>', 'the legacy name converts too — no uj_icon survives');
+  assert.strictEqual(lines[1], '<i class="fa-solid fa-arrow-right fa-sm ms-2"></i>', 'the positional class arg rides along');
+  assert.strictEqual(lines[2], '<i class="fa-solid fa-{{ item.icon }} fa-sm"></i>', 'a variable name interpolates into the class');
+  assert.strictEqual(lines[3], '<i class="fa-solid fa-star"></i>', 'a key=value option is not a class list');
+  assert.ok(edits.every((edit) => edit.rule !== 'legacy-prefix' || !edit.after.includes('icon')), 'the rename never sees an icon tag');
 });
 
 // ---------------------------------------------------------------------------
@@ -272,11 +291,115 @@ test('rules: consumer JS — the __main_assets__ libs move to @omega.js/client (
   const lines = text.split('\n');
   assert.strictEqual(lines[0], "import omega from '@omega.js/client';");
   assert.strictEqual(lines[1], "import { FormManager } from '@omega.js/client/modules/form-manager.js';", 'the authorized-fetch import line is gone — there is no such module');
-  assert.strictEqual(lines[2], "const response = await omega.request(`${omega.getApiUrl()}/backend-manager/payments/intent`, { response: 'json' });");
+  assert.strictEqual(lines[2], "const response = await omega.request(`${omega.getApiUrl()}/backend-manager/payments/intent`, {});", "the wonderful-fetch response option goes with the function (#594)");
   assert.ok(
     findings.some((finding) => finding.check === 'client-libs' && finding.severity === 'warning' && finding.line === 4),
     'the rewritten call is flagged: the options are the client\'s, not wonderful-fetch\'s',
   );
+});
+
+test('rules: the authorizedFetch rewrite carries the ERROR SHAPE and drops the dead option (#594)', () => {
+  const input = [
+    "import omega from '@omega.js/client';",
+    "import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';",
+    'export default async function generate(payload) {',
+    '  try {',
+    '    return await authorizedFetch(`${omega.getApiUrl()}/backend-manager/copilot/generate`, {',
+    "      method: 'POST',",
+    "      response: 'json',",
+    '      body: payload,',
+    '    });',
+    '  } catch (err) {',
+    '    if (err.status === 429) return showUpgradeModal();',
+    '    throw err;',
+    '  }',
+    '}',
+  ].join('\n');
+  const { text, findings } = applyJsRules(input, 'src/assets/js/pages/copilot/generate.js');
+
+  assert.doesNotMatch(text, /response:\s*'json'/, "`response: 'json'` has no equivalent — omega.request RETURNS the parsed body");
+  assert.match(text, /method: 'POST',\n      body: payload,/, 'and the options around it survive intact');
+  assert.doesNotMatch(text, /err\.status/, '`err.status` read undefined on an omega.request error, so the 429 branch died silently');
+  assert.match(text, /if \(err\.code === 429\)/, '…the HTTP status lives on error.code (@omega.js/client request.js)');
+
+  assert.ok(
+    findings.some((finding) => finding.check === 'client-libs' && finding.line === 5 && /backend-manager/.test(finding.message)),
+    `the rewritten call still names the route segment nobody can rewrite for it: ${findings.map((f) => f.message).join(' | ')}`,
+  );
+});
+
+test('rules: what the authorizedFetch rewrite CANNOT do mechanically is named line by line (#594)', () => {
+  const input = [
+    "import omega from '@omega.js/client';",
+    "import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';",
+    "const OPTIONS = { method: 'POST', response: 'text' };",
+    "export const asText = (body) => authorizedFetch('/omega/x', { response: 'text', body });",
+    "export const viaVariable = () => authorizedFetch('/omega/y', OPTIONS);",
+    'export const ok = (res) => res.status === 204;',
+  ].join('\n');
+  const { text, findings } = applyJsRules(input, 'src/assets/js/lib/api.js');
+  const named = (pattern) => findings.filter((finding) => pattern.test(finding.message)).map((finding) => finding.line);
+
+  assert.match(text, /\{ response: 'text', body \}/, 'a non-json response is NOT quietly dropped — its output handling is a port, not a rename');
+  assert.deepStrictEqual(named(/response: 'text'/), [4], 'it is named at its own line instead');
+  assert.deepStrictEqual(named(/options come from a variable/), [5], 'options behind an identifier are unreachable for a text codemod — named too');
+  assert.match(text, /res\.status === 204/, 'a `.status` read on something that is not a caught error stays put');
+  assert.deepStrictEqual(named(/`res\.status`/), [6], '…and is named, because only a human knows whose status it is');
+});
+
+test('rules: the no-paren arrow `.catch(err =>` binds the error too (#594)', () => {
+  const input = [
+    "import omega from '@omega.js/client';",
+    "import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';",
+    "export const load = () => authorizedFetch('/omega/user/get')",
+    '  .catch(err => {',
+    '    if (err.status === 429) return retry();',
+    '    throw err;',
+    '  });',
+  ].join('\n');
+  const { text, findings } = applyJsRules(input, 'src/assets/js/lib/load.js');
+
+  assert.match(text, /if \(err\.code === 429\)/, 'the paren-less arrow is the commonest spelling of all — its binding is a catch binding like any other');
+  assert.ok(
+    !findings.some((finding) => /left `err\.status`/.test(finding.message)),
+    `…so it is rewritten, not handed back as a manual step: ${findings.map((f) => f.message).join(' | ')}`,
+  );
+});
+
+test('rules: a `.status` on something that is not IN the catch block is left alone (#594)', () => {
+  const input = [
+    "import omega from '@omega.js/client';",
+    "import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';",
+    "export const load = () => authorizedFetch('/omega/user/get').catch((err) => {",
+    '  if (err.status === 503) return null;',
+    '  throw err;',
+    '});',
+    'export function isSuccess(err) {',
+    '  return err.status === 200;',
+    '}',
+  ].join('\n');
+  const { text, findings } = applyJsRules(input, 'src/assets/js/lib/load.js');
+
+  assert.match(text, /if \(err\.code === 503\)/, 'inside the catch block the rewrite is mechanical');
+  assert.match(text, /return err\.status === 200;/, 'a same-named parameter of an unrelated function is NOT that error — its `.status` is its own');
+  assert.ok(
+    findings.some((finding) => finding.line === 8 && /`err\.status`/.test(finding.message)),
+    `…and it is named at its line instead: ${findings.map((f) => `${f.line}:${f.message}`).join(' | ')}`,
+  );
+});
+
+test('rules: an unbalanced paren inside a STRING never hands the option strip the rest of the file (#594)', () => {
+  const input = [
+    "import omega from '@omega.js/client';",
+    "import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';",
+    "export const search = (q) => authorizedFetch('/omega/search(', { method: 'POST' });",
+    "export const defaults = { response: 'json', keep: true };",
+    '',
+  ].join('\n');
+  const { text } = applyJsRules(input, 'src/assets/js/lib/search.js');
+
+  assert.match(text, /export const defaults = \{ response: 'json', keep: true \};/, 'an unrelated object BELOW the call keeps its keys — the paren in the url is text, not structure');
+  assert.match(text, /omega\.request\('\/omega\/search\(', \{ method: 'POST' \}\)/, "and the call's own options survive the walk intact");
 });
 
 test('rules: an authorizedFetch file with no client import is flagged, never silently broken (#248)', () => {
@@ -454,7 +577,7 @@ test('rules: a UJM page\'s bare config sections move under `config:`, and the ru
   assert.ok(lines.includes('  inbound:'), 'every bare section moves, not just the first');
   assert.ok(lines.includes('          enabled: false'), 'deep children keep their relative shape');
   assert.strictEqual(lines[lines.indexOf('  theme:') - 1], '  # the shell chrome this page wanted', 'the note above a moved key rides with it');
-  assert.ok(lines.includes('meta:'), '`meta` is the pageBare exception and stays put');
+  assert.ok(lines.includes('meta:'), '`meta` is page machinery, not config — it stays put');
   assert.ok(lines.includes('  title: "Pricing"'), 'and keeps its own children where they were');
   assert.strictEqual(lines[lines.length - 2], 'A theme: word in the body stays prose.', 'the body is not frontmatter');
 
@@ -493,6 +616,42 @@ test('rules: a page that already has a `config:` block gains the moved sections 
 });
 
 // ---------------------------------------------------------------------------
+// Rule unit — the retired `append` flag (#607)
+// ---------------------------------------------------------------------------
+
+test('rules: a page\'s `append:` flag is DROPPED, with a finding, idempotently (#607)', () => {
+  const input = [
+    '---',
+    'layout: blueprint/index',
+    'permalink: /',
+    'append: true',
+    'meta:',
+    '  title: "Home"',
+    '---',
+    '',
+    '## My prose',
+    '',
+    'A page that says append: true in its body is prose.',
+    '',
+  ].join('\n');
+
+  const first = applyRules(input, 'index.md');
+  const lines = first.text.split('\n');
+
+  assert.ok(!lines.includes('append: true'), 'the flag is gone from the frontmatter');
+  assert.ok(lines.includes('meta:') && lines.includes('  title: "Home"'), 'every other key stays exactly where it was');
+  assert.strictEqual(lines[lines.length - 2], 'A page that says append: true in its body is prose.', 'the body is not frontmatter');
+
+  const findings = first.findings.filter((finding) => finding.check === 'append-flag');
+  assert.strictEqual(findings.length, 1, 'one finding naming the page');
+  assert.match(findings[0].message, /composition/, 'the finding says what the flag used to do');
+
+  const second = applyRules(first.text, 'index.md');
+  assert.strictEqual(second.text, first.text, 'a migrated page is a fixed point');
+  assert.deepStrictEqual(second.findings.filter((finding) => finding.check === 'append-flag'), []);
+});
+
+// ---------------------------------------------------------------------------
 // Rule units — config READS move to resolved.config (#611)
 // ---------------------------------------------------------------------------
 
@@ -519,7 +678,7 @@ test('rules: `site.<section>` reads become `resolved.config.<section>`, body and
   // Frontmatter values are reads like any other — that is where the
   // playground's own pages hid theirs.
   assert.ok(lines.includes('  title: "{{ resolved.config.brand.name }} · Pricing"'), 'a frontmatter read moves');
-  assert.ok(lines.includes('  description: "{{ resolved.meta.description }}"'), '`site.meta` is the meta walk, not a config section');
+  assert.ok(!lines.some((line) => line.includes('description:')), 'a `site.meta` read inside the page\'s OWN meta block is DROPPED — it fed itself (#671)');
   assert.ok(lines.includes('<h1>{{ resolved.config.brand.name | upcase }}</h1>'), 'a body read moves, filters intact');
   assert.match(first.text, /\{\{ resolved\.config\.theme\.id \}\}/, 'every config section moves, not just brand');
   assert.match(first.text, /\{\{ resolved\.config\.inbound\.chat/, 'the OLD FLAT `resolved.<section>` path moves too — rule 1 manufactures it');
@@ -530,18 +689,163 @@ test('rules: `site.<section>` reads become `resolved.config.<section>`, body and
   assert.match(first.text, /\{\{ site\.omega\.date\.year \}\}/, '`site.omega` is a build fact');
   assert.match(first.text, /\{\{ site\.posts\.size \}\}/, '…and so are the indexed collections');
   assert.match(first.text, /\{\{ resolved\.pricing\.plans\.size \}\}/, 'a composed VIEW keeps its flat spelling');
-  assert.match(first.text, /\{\{ resolved\.meta\.title \}\}/, '`meta` is the pageBare section — it stays flat');
+  assert.match(first.text, /\{\{ resolved\.meta\.title \}\}/, '`meta` is the page walk, not a config section — it stays flat');
   assert.match(first.text, /href="\/site\.webmanifest"/, 'a filename is not a property read');
   assert.match(first.text, /subdomain\.site\.com/, 'nor is a hostname');
 
-  const findings = first.findings.filter((finding) => finding.check === 'config-reads');
-  assert.strictEqual(findings.length, 1, 'one finding per file, not per read');
+  const findings = first.findings.filter((finding) => finding.check === 'config-reads' && /rewrote config reads/.test(finding.message));
+  assert.strictEqual(findings.length, 1, 'one REWRITE finding per file, not per read');
   assert.match(findings[0].message, /resolved\.config/, 'the finding names the lane the reads moved to');
 
   // Idempotent: a second run over the migrated page changes nothing.
   const second = applyRules(first.text, 'pricing.md');
   assert.strictEqual(second.text, first.text, 'a migrated page is a fixed point');
   assert.deepStrictEqual(second.findings.filter((finding) => finding.check === 'config-reads'), []);
+});
+
+test('rules: a page\'s own `meta:` block may not read the walk it feeds — the read is DROPPED (#671)', () => {
+  const input = [
+    '---',
+    'layout: frontend/core/base',
+    'meta:',
+    '  title: "{{ site.meta.title }}"',
+    '  description: "A real description"',
+    '---',
+    '<h1>{{ resolved.meta.title }}</h1>',
+    '',
+  ].join('\n');
+
+  const { text, findings } = applyRules(input, 'src/pages/index.html');
+
+  assert.doesNotMatch(text, /title: "\{\{ (site|resolved)\.meta\.title \}\}"/,
+    'rewritten it read the very walk this line feeds and the page shipped the literal `{{ resolved.meta.title }}` in its <title>');
+  assert.match(text, /description: "A real description"/, 'its siblings in the block stay');
+  assert.match(text, /<h1>\{\{ resolved\.meta\.title \}\}<\/h1>/, 'a BODY read of the walk is exactly right — only the block that FEEDS it may not read it');
+  assert.ok(
+    findings.some((finding) => finding.check === 'config-reads' && /meta/.test(finding.message) && finding.line === 4),
+    `the drop is named at its line, never silent: ${findings.map((f) => f.message).join(' | ')}`,
+  );
+});
+
+test('rules: an ALREADY-rewritten self-reference is repaired, and an emptied `meta:` block goes with it (#671)', () => {
+  // What 0.46.0 shipped on itw-creative-works: rule 24 had rewritten the read
+  // to `resolved.meta.title`, which is the same self-reference wearing the new
+  // spelling. Re-running migrate has to fix it, not call the page migrated.
+  const input = [
+    '---',
+    'layout: frontend/core/base',
+    'meta:',
+    '  title: "{{ resolved.meta.title }}"',
+    'permalink: /',
+    '---',
+    'Body',
+    '',
+  ].join('\n');
+
+  const { text } = applyRules(input, 'src/pages/index.html');
+  const lines = text.split('\n');
+
+  assert.ok(!lines.some((line) => line.includes('resolved.meta.title')), 'the self-reference is gone');
+  assert.ok(!lines.some((line) => line.trim() === 'meta:'), 'and the block it emptied goes with it — a bare `meta:` is a null key');
+  assert.ok(lines.includes('permalink: /'), 'the rest of the frontmatter is untouched');
+  assert.strictEqual(applyRules(text, 'src/pages/index.html').text, text, 'and the repaired page is a fixed point');
+});
+
+test('rules: a self-reference drop is an EDIT, so the repair reaches the disk (#671)', () => {
+  // The repair page: nothing else on it moves, so the drop is the whole change.
+  // Reported as a finding alone it never reached codemod.js's write — the run
+  // printed "dropped title" over a byte-identical file.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-selfmeta-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+    const page = path.join(root, 'src', 'pages', 'index.html');
+    const input = [
+      '---',
+      'meta:',
+      '  title: "{{ resolved.meta.title }}"',
+      'permalink: /',
+      '---',
+      'Body',
+      '',
+    ].join('\n');
+    fs.writeFileSync(page, input);
+
+    const { text, edits } = applyRules(input, 'src/pages/index.html');
+    assert.ok(edits.length > 0, 'the dropped line is an edit like any other rewrite — the report counts what it changed');
+    assert.notStrictEqual(text, input, '…and the text really did change');
+
+    const result = runCodemod(root, { write: true });
+    assert.doesNotMatch(fs.readFileSync(page, 'utf8'), /resolved\.meta\.title/, 'the repair is WRITTEN, not just announced');
+    assert.ok(
+      result.files.some((file) => file.path === path.join('src', 'pages', 'index.html')),
+      `…and the file is listed among the edited ones: ${result.files.map((f) => f.path).join(', ')}`,
+    );
+    assert.ok(result.totalEdits > 0, '…and counted');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rules: an emptied NESTED key goes too — a childless `og:` is a null that REPLACES (#671)', () => {
+  const input = [
+    '---',
+    'meta:',
+    '  title: "Real title"',
+    '  og:',
+    '    image: "{{ resolved.meta.og.image }}"',
+    'permalink: /',
+    '---',
+    'Body',
+    '',
+  ].join('\n');
+
+  const { text } = applyRules(input, 'src/pages/index.html');
+  const lines = text.split('\n');
+
+  assert.ok(!lines.some((line) => line.includes('resolved.meta.og.image')), 'the self-reference is gone');
+  assert.ok(
+    !lines.some((line) => line.trim() === 'og:'),
+    'and the key it emptied with it — a childless `og:` is YAML null, and deepMerge lets null REPLACE the config og defaults',
+  );
+  assert.ok(lines.includes('  title: "Real title"'), 'its sibling under the same `meta:` stays, so the block itself survives');
+  assert.ok(lines.includes('permalink: /'), 'and the rest of the frontmatter is untouched');
+});
+
+test('rules: the MULTI-LINE flow spelling of `meta:` is read like the block form (#671)', () => {
+  const input = [
+    '---',
+    'meta: {',
+    '  title: "{{ site.meta.title }}",',
+    '  description: "A real description"',
+    '  }',
+    'permalink: /',
+    '---',
+    'Body',
+    '',
+  ].join('\n');
+
+  const { text, findings } = applyRules(input, 'src/pages/index.html');
+
+  assert.doesNotMatch(text, /site\.meta\.title/, 'a flow mapping spread over lines is the same self-reference, and legal YAML');
+  assert.match(text, /description: "A real description"/, 'its sibling pair survives');
+  assert.ok(
+    findings.some((finding) => finding.check === 'config-reads' && finding.line === 3 && /dropped/.test(finding.message)),
+    `the drop is named at its own line: ${findings.map((f) => f.message).join(' | ')}`,
+  );
+  assert.strictEqual(applyRules(text, 'src/pages/index.html').text, text, 'and the result is a fixed point');
+});
+
+test('rules: the one-line flow spelling drops the self-read and keeps the rest (#671)', () => {
+  const input = [
+    '---',
+    'meta: { title: "{{ site.meta.title }}", description: "A real description" }',
+    '---',
+    'Body',
+    '',
+  ].join('\n');
+
+  const { text } = applyRules(input, 'src/pages/index.html');
+  assert.match(text, /^meta: \{ description: "A real description" \}$/m, 'the surviving pair keeps the mapping — only the self-read leaves it');
 });
 
 test('rules: the analytics spelling normalizes BEFORE the read moves (#611)', () => {
@@ -602,6 +906,50 @@ test('rules: a section descriptor\'s reads move too — the bindings are DATA (#
   const { text, edits } = applyJsonRules('{ logo: { text: \'{{ site.brand.name }}\' } }', 'src/_includes/frontend/sections/nav.json');
   assert.strictEqual(text, '{ logo: { text: \'{{ resolved.config.brand.name }}\' } }', 'a descriptor emits the same empty string a template would');
   assert.strictEqual(edits.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Rule units — the UJM `random_id` global (#595)
+// ---------------------------------------------------------------------------
+
+test('rules: a bare `random_id` read gets the assign UJM handed it for free (#595)', () => {
+  const input = [
+    '---',
+    'layout: frontend/core/base',
+    '---',
+    '<div class="accordion" id="tool-faq-{{ random_id }}">',
+    '  <button data-bs-target="#tool-faq-{{ random_id }}-1">One</button>',
+    '</div>',
+    '',
+  ].join('\n');
+
+  const first = applyRules(input, 'src/pages/tools/index.html');
+  const lines = first.text.split('\n');
+
+  assert.strictEqual(lines[3], '{% assign random_id = 100 | omega_random %}', 'the assign opens the BODY, under the frontmatter fence');
+  assert.match(first.text, /id="tool-faq-\{\{ random_id \}\}"/, 'every read keeps its spelling — the variable exists now');
+  assert.ok(first.edits.some((edit) => edit.rule === 'random-id'), 'the insert is reported like any other edit');
+  assert.ok(
+    first.findings.some((finding) => finding.check === 'random-id' && /omega_random/.test(finding.message)),
+    `the finding names the idiom that replaced the global: ${first.findings.map((f) => f.message).join(' | ')}`,
+  );
+
+  const second = applyRules(first.text, 'src/pages/tools/index.html');
+  assert.strictEqual(second.text, first.text, 'a migrated file is a fixed point — the assign is the marker');
+});
+
+test('rules: an include has no frontmatter, and a dotted `random_id` is not the global (#595)', () => {
+  const include = applyRules('<div id="faq-{{ random_id }}"></div>\n', 'src/_includes/tool-faq.html');
+  assert.strictEqual(
+    include.text.split('\n')[0], '{% assign random_id = 100 | omega_random %}',
+    'with no fence to clear, the assign is line 1 — an include renders per call, which is what the UJM global meant',
+  );
+
+  const property = applyRules('<div id="{{ block.random_id }}"></div>\n', 'src/_includes/other.html');
+  assert.strictEqual(property.text, '<div id="{{ block.random_id }}"></div>\n', 'a property of somebody else\'s object is not the global');
+
+  const prose = applyRules('The UJM global was called random_id.\n', 'src/pages/notes.md');
+  assert.strictEqual(prose.text, 'The UJM global was called random_id.\n', 'and prose about it is not a read (#521)');
 });
 
 // ---------------------------------------------------------------------------
@@ -810,23 +1158,17 @@ test('rules: a sibling block\'s `enabled` is not the button\'s answer (#579)', (
 
 function realEngine() {
   const engine = new Liquid({ jekyllInclude: true });
-  registerLiquid(engine, {
-    icons: {
-      fontAwesomeDirs: [path.join(PKG, 'core', 'icons')],
-      flagsDir: path.join(PKG, 'core', 'icons', 'flags'),
-      style: 'solid',
-    },
-  });
+  registerLiquid(engine, { logos: { dir: path.join(PKG, 'core', 'logos') } });
   return engine;
 }
 
 test('semantic: hoisted tag arg renders identically to a literal quoted arg', async () => {
   const engine = realEngine();
-  const { text } = applyRules('{% omega_icon "{{ stat.icon }} text-primary" %}', 'semantic.html');
+  const { text } = applyRules('{% omega_logo "{{ stat.icon }}-mark" %}', 'semantic.html');
   const rewritten = await engine.parseAndRender(text, { stat: { icon: 'star' } });
-  const literal = await engine.parseAndRender('{% omega_icon "star text-primary" %}', {});
+  const literal = await engine.parseAndRender('{% omega_logo "star-mark" %}', {});
   assert.strictEqual(rewritten.trim(), literal.trim(), 'capture hoist ≡ literal arg (the upstream silent no-op is fixed forward)');
-  assert.ok(rewritten.includes('data-icon="star text-primary"'), 'interpolation actually happened');
+  assert.ok(rewritten.includes('data-omega-icon-missing="logo:star-mark"'), 'interpolation actually happened');
 });
 
 test('semantic: parentloop hoist renders the outer-loop values', async () => {
@@ -889,7 +1231,7 @@ test('lint: Jekyll-only tags error, unknown filters warn, known names pass', () 
   const findings = lintText([
     '{% post_url 2020-01-01-hello %}',
     '{% assign related = site.posts | where_exp: "p", "p.url" | limit: 3 %}',
-    '{% omega_icon "star" %} {{ title | omega_title_case | markdownify }}',
+    '{% omega_logo "star" %} {{ title | omega_title_case | markdownify }}',
     '{% iftruthy site.brand %}x{% endiftruthy %}',
   ].join('\n'), 'lint.html');
   assert.ok(findings.some((finding) => finding.check === 'jekyll-only-tag' && finding.line === 1), 'post_url flagged');
@@ -927,6 +1269,10 @@ const LEGACY_JEKYLL = {
   baseurl: '',
   theme: { id: 'classy', appearance: 'dark', nav: { enabled: true } },
   meta: { title: 'Sample - {{ site.brand.name }}', description: 'A sample' },
+  // A Liquid-bearing config value that SURVIVES the conversion (an
+  // unrecognized section rides to targets.web) — the #671 config-value
+  // rewrite's subject now that `meta` is dropped on the way in (#607).
+  tagline: 'Sample - {{ site.brand.name }}',
   brand: { id: 'sample', name: 'Sample', contact: { email: 'hi@sample.test' } },
   web_manager: {
     auth: { enabled: true, config: { redirects: { authenticated: '/account' } } },
@@ -950,7 +1296,7 @@ const LEGACY_JEKYLL = {
       },
     },
   },
-  oauth2: { discord: { enabled: true } },
+  oauth2: { discord: { enabled: true } },   // the LEGACY spelling — #788 renamed it on the way out
   analytics: { google: 'G-TEST123', meta: '', tiktok: 'TIKTOK1' },
   socials: { twitter: 'sample' },
   translation: { languages: ['es'], exclude: ['account'] },
@@ -979,7 +1325,8 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.strictEqual(omega.cloud.config.apiKey, 'AIza-TEST', 'firebase app config extracted');
   assert.strictEqual(omega.payment.providers.chargebee.site, 'sample');
   assert.strictEqual(omega.payment.providers.stripe.publishableKey, undefined, 'publishableKey: false dropped');
-  assert.strictEqual(omega.oauth2.discord.enabled, true);
+  assert.strictEqual(omega.connections.discord.enabled, true, 'the legacy `oauth2` section lands as `connections` (#788)');
+  assert.strictEqual(omega.oauth2, undefined, 'and the legacy name never survives');
 
   const web = omega.targets.web;
   assert.strictEqual(web.web_manager, undefined, 'the legacy key name does not survive the conversion (#1)');
@@ -996,7 +1343,6 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.strictEqual(web.client.cookieConsent, undefined, 'the retired block name does not survive');
   assert.deepStrictEqual(web.client.consent, { enabled: true, config: { position: 'bottom-right' } }, 'enabled + position are what carries');
   assert.ok(notes.some((note) => note.includes('cookieConsent') && note.includes('client.consent')), 'the drop is announced, not silent');
-  assert.strictEqual(web.collections.recipes.title, 'Recipes', 'custom collections carried (rule 8)');
   assert.strictEqual(web.permalink, '/blog/:title');
   assert.deepStrictEqual(web.purgecss.safelist.standard, ['keep-me'], 'UJM json build settings carried');
   assert.strictEqual(web.workflows.build.schedule, '30 1 1 * *');
@@ -1005,7 +1351,92 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.ok(notes.some((note) => note.includes('gems')), 'non-empty gems noted');
   assert.ok(notes.some((note) => note.includes('webpack.target')), 'webpack target noted');
   assert.ok(notes.some((note) => note.includes('plugins')), 'Jekyll machinery drop noted');
-  assert.ok(notes.some((note) => note.includes('collections')), 'collections carry noted');
+  assert.ok(notes.some((note) => note.includes('collections')), 'collections drop noted');
+});
+
+test('config: a legacy Jekyll collection is DROPPED with the manual step named (#589)', () => {
+  const { omega, notes } = convertConfig({ jekyll: structuredClone(LEGACY_JEKYLL), ujm: null });
+
+  assert.strictEqual(
+    omega.targets.web.collections, undefined,
+    'carried verbatim it wrote a config whose FIRST build dies in readCollections — no Jekyll collection has a `field`',
+  );
+
+  const note = notes.find((entry) => entry.includes('targets.web.collections.recipes'));
+  assert.ok(note, `the drop names the collection and its new home: ${notes.join(' | ')}`);
+  assert.match(note, /field/, '…and the manual step is the `field` the converter cannot derive');
+});
+
+test('config: the ARRAY form of Jekyll collections names the collection too (#589)', () => {
+  // `collections: [recipes, docs]` is documented Jekyll shorthand for the
+  // mapping form — the note has to name what the site called it.
+  const jekyll = { ...structuredClone(LEGACY_JEKYLL), collections: ['recipes', 'docs'] };
+  const { notes } = convertConfig({ jekyll, ujm: null });
+
+  for (const name of ['recipes', 'docs']) {
+    const note = notes.find((entry) => entry.includes(`targets.web.collections.${name}`));
+    assert.ok(note, `each collection is named by its own name, never by its index: ${notes.join(' | ')}`);
+    assert.match(note, new RegExp(`src/_${name}/`), '…and so is the directory its documents move to');
+  }
+});
+
+test('config: the retired adsense gates are DROPPED with the note (#628)', () => {
+  // #527 collapsed adsense to ONE switch, the `client` id. Carried through
+  // verbatim, a legacy `enabled: false` emitted a config the manager no longer
+  // honors — the account it was meant to leave alone starts being managed off
+  // the ca-pub- id beside it, and the gate still reads like it works.
+  const jekyll = structuredClone(LEGACY_JEKYLL);
+  jekyll.advertising = {
+    'google-adsense': {
+      client: 'ca-pub-1234567890123456',
+      enabled: false,
+      units: false,
+      'display-slot': '9023354299',
+    },
+  };
+
+  const { omega, notes } = convertConfig({ jekyll, ujm: null });
+
+  assert.deepStrictEqual(
+    omega.advertising,
+    { providers: { adsense: { client: 'ca-pub-1234567890123456', displaySlot: '9023354299' } } },
+    'the id and its slots carry; the two retired gates do not',
+  );
+
+  for (const key of ['enabled', 'units']) {
+    const note = notes.find((entry) => entry.includes(`advertising.providers.adsense.${key}`));
+    assert.ok(note, `the drop is announced, not silent: ${notes.join(' | ')}`);
+    assert.match(note, /#527/, '…and names the ruling that deleted the gate');
+  }
+});
+
+test('config: a gates-ONLY adsense block converts to no advertising section (#628)', () => {
+  // The note itself says "omit the block to serve no ads": a legacy block whose
+  // whole content was the two retired gates converts to nothing at all, not to
+  // an empty `adsense: {}` that reads as an authored opt-in to the managed
+  // account. The drop is still announced.
+  const jekyll = structuredClone(LEGACY_JEKYLL);
+  jekyll.advertising = { 'google-adsense': { enabled: false, units: false } };
+
+  const { omega, notes } = convertConfig({ jekyll, ujm: null });
+
+  assert.strictEqual(omega.advertising, undefined, 'the emptied block is pruned, section and all');
+
+  for (const key of ['enabled', 'units']) {
+    const note = notes.find((entry) => entry.includes(`advertising.providers.adsense.${key}`));
+    assert.ok(note, `the drop is still announced, not silent: ${notes.join(' | ')}`);
+  }
+});
+
+test('config: an adsense block that arrived EMPTY is kept (#628)', () => {
+  // Nothing was dropped, so nothing is pruned — an authored empty block is the
+  // brand opting the provider in and configuring the id later.
+  const jekyll = structuredClone(LEGACY_JEKYLL);
+  jekyll.advertising = { 'google-adsense': {} };
+
+  const { omega } = convertConfig({ jekyll, ujm: null });
+
+  assert.deepStrictEqual(omega.advertising, { providers: { adsense: {} } }, 'an authored opt-in carries');
 });
 
 test('config: socials lands at the ROOT, its schema home (#483)', () => {
@@ -1056,7 +1487,11 @@ test('config: converted output passes the real loader for target web', () => {
     assert.deepStrictEqual(errors, [], 'no schema findings');
     assert.strictEqual(enabled, true, 'web target enabled by key presence');
     assert.strictEqual(config.client.auth.enabled, true, 'targets.web overlays the top level');
-    assert.strictEqual(config.meta.title, 'Sample - {{ site.brand.name }}', 'Liquid-bearing values survive');
+    assert.strictEqual(config.tagline, 'Sample - {{ site.brand.name }}', 'Liquid-bearing values survive');
+    // The legacy title/description half is NOT carried (#607): the validator
+    // refuses those. What resolves here is the schema's own site-wide index
+    // default, `targets.web.meta.index` (#564), which no legacy config had.
+    assert.deepStrictEqual(config.meta, { index: true }, 'only the site-wide index default resolves under `meta`');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -1173,6 +1608,141 @@ test('e2e: real migration converts config, rewrites templates, removes legacy fi
     assert.deepStrictEqual(again.errors, [], 'a rerun is not a failure');
     assert.strictEqual(again.config.skipped, true, 'rerun reports the config step already done');
     assert.strictEqual(again.codemod.totalEdits, 0, 'rewrites are idempotent');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: a config VALUE reading `site.<section>` is rewritten with the templates (#671)', () => {
+  // The converter carries a section's strings verbatim, and a UJM `_config.yml`
+  // routinely spelled one "Sample - {{ site.brand.name }}" — which since #611
+  // renders the brand name EMPTY wherever it lands, with no error and
+  // nothing in the per-template census to catch it.
+  const root = stageLegacyConsumer();
+  try {
+    const report = runMigration(root, {});
+    const written = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
+
+    assert.match(written, /Sample - \{\{ resolved\.config\.brand\.name \}\}/, 'the config value moves to the lane the config lives on');
+    assert.doesNotMatch(written, /site\.brand\.name/, 'and the dead spelling is gone from the file');
+    assert.ok(
+      report.lint.some((finding) => finding.check === 'config-reads' && finding.file === path.join('config', 'omega.json5')),
+      `the rewrite is reported against the CONFIG file, like any other file: ${report.lint.map((f) => `${f.file}`).join(', ')}`,
+    );
+    assert.deepStrictEqual(report.config.validation, [], 'and the rewritten config still loads');
+
+    const again = runMigration(root, {});
+    assert.ok(
+      !again.lint.some((finding) => finding.check === 'config-reads' && finding.file === path.join('config', 'omega.json5')),
+      'a rerun finds nothing to move — the config rewrite is idempotent too',
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: check mode reports the config-value rewrite and writes NOTHING (#671)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-configvalue-'));
+  try {
+    fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
+    const configPath = path.join(root, 'config', 'omega.json5');
+    const original = [
+      '{',
+      "  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },",
+      '  // The default <title> every page falls through to',
+      '  targets: { web: { meta: { title: \'Creative agency - {{ site.brand.name }}\' } } },',
+      '}',
+      '',
+    ].join('\n');
+    fs.writeFileSync(configPath, original);
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'index.html'), '<h1>Home</h1>\n');
+
+    const report = runMigration(root, { check: true });
+
+    assert.strictEqual(fs.readFileSync(configPath, 'utf8'), original, 'check mode previews the config rewrite like every other edit');
+    assert.ok(
+      report.codemod.files.some((file) => file.path === path.join('config', 'omega.json5')),
+      `the preview names the config file among the edited files: ${report.codemod.files.map((f) => f.path).join(', ')}`,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: check mode on a LEGACY root previews the config-value rewrite too (#671)', () => {
+  // The pre-flight case `--check` exists for: nothing is converted yet, so the
+  // config file the scan reads is not on disk — and the preview scanned it
+  // anyway and reported a clean bill for a `meta.title` the real run rewrites.
+  const root = stageLegacyConsumer();
+  try {
+    const report = runMigration(root, { check: true });
+    const rel = path.join('config', 'omega.json5');
+
+    assert.ok(!fs.existsSync(path.join(root, rel)), 'check mode still writes nothing');
+    const file = report.codemod.files.find((entry) => entry.path === rel);
+    assert.ok(file, `the config the run WOULD write is previewed like any other file: ${report.codemod.files.map((f) => f.path).join(', ')}`);
+    assert.ok(
+      file.edits.some((edit) => edit.after.includes('resolved.config.brand.name')),
+      `…showing the value it moves: ${file.edits.map((edit) => edit.after).join(' | ')}`,
+    );
+    assert.ok(
+      report.lint.some((finding) => finding.check === 'config-reads' && finding.file === rel),
+      'and the finding names the config file, exactly as the real run reports it',
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: the report lists a bare require the consumer package.json never declared (#600)', () => {
+  const root = stageLegacyConsumer();
+  try {
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
+      name: 'legacy-site',
+      dependencies: { 'node-powertools': '^3.0.0' },
+    }, null, 2));
+    fs.mkdirSync(path.join(root, 'src', 'assets', 'js', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'assets', 'js', 'lib', 'io.js'), [
+      "const path = require('node:path');",
+      "const fs = require('fs');",
+      "const local = require('./local.js');",
+      'function buildPromptText() {',
+      "  const jetpack = require('fs-jetpack');",
+      "  const { wait } = require('node-powertools');",
+      "  const { escapeHTML } = require('@omega.js/client/modules/utilities.js');",
+      "  const theme = require('__theme__/config.js');",
+      '  return { jetpack, wait, escapeHTML, theme };',
+      '}',
+      '',
+    ].join('\n'));
+
+    const report = runMigration(root, { check: true });
+
+    assert.deepStrictEqual(
+      report.bareRequires.map((entry) => entry.module),
+      ['fs-jetpack'],
+      'only what this project does not declare: a built-in resolves everywhere, a relative path is not a package, node-powertools IS declared, '
+      + 'and the framework RESOLVES `@omega.js/client` (subpaths included) and `__theme__` through its own bundler aliases — a consumer must not install those',
+    );
+
+    const [jetpack] = report.bareRequires;
+    assert.strictEqual(jetpack.file, 'src/assets/js/lib/io.js', 'the finding names the file');
+    assert.strictEqual(jetpack.line, 5, '…and the line, because the require is lazy and the route only 500s when it runs');
+    assert.match(jetpack.fix, /npm install fs-jetpack/, '…and the fix is the dependency, never an auto-install');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('e2e: a consumer with no package.json to judge against reports no bare requires (#600)', () => {
+  const root = stageLegacyConsumer();
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'assets', 'js', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'assets', 'js', 'lib', 'io.js'), "const jetpack = require('fs-jetpack');\n");
+
+    const report = runMigration(root, { check: true });
+    assert.deepStrictEqual(report.bareRequires, [], 'with no manifest there is no "undeclared" — guessing would name every package the file uses');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -1434,7 +2004,7 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
       return configureOmega(eleventyConfig, {
         consumerDir: MINI,
         siteData,
-        assetManifest: { js: { main: '/assets/js/main-TEST.js', pages: {} }, css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} } },
+        assetManifest: { js: { main: '/assets/js/main-TEST.js', pages: {} }, css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} } },
       });
     },
   });

@@ -34,8 +34,9 @@ const SITE = { site: { brand: { name: 'ACME' } } };
 /**
  * Fresh engine over the REAL base theme layer with a captured warn sink —
  * the shipped section.json5 IS the schema under test, so no fixture stands in.
- * Icon roots stay empty: omega_icon emits its `data-icon` placeholder, which
- * is what the assertions read.
+ * Icons are native markup (#619) — the section emits `<i class="fa-solid
+ * fa-<name>">` and the build's inlining pass fills it later, so the class is
+ * what the assertions read.
  */
 function makeEngine() {
   const warnings = [];
@@ -87,7 +88,7 @@ test('#435: hero cards render (count + content) and warn-free — ported stat ca
   assert.ok(html.includes('99%') && html.includes('Undetectable'), 'number + label render');
   assert.ok(html.includes('500K+') && html.includes('Pieces created'), 'every item renders, not just the first');
   assert.ok(html.includes('30+') && html.includes('Languages'), 'an icon-less card renders too');
-  assert.ok(html.includes('data-icon="shield-check"'), 'optional icon rides the one fa-* mechanism');
+  assert.ok(html.includes('fa-shield-check'), 'optional icon rides the one fa-* mechanism');
   assert.deepEqual(warnings, [], 'cards is a declared arg — no unknown-arg warning');
 
   const without = await engine.parseAndRender('{% section "marketing/hero" %}', SITE);
@@ -98,7 +99,7 @@ test('#435: hero cards render (count + content) and warn-free — ported stat ca
 
 test('#437: demo type "form" renders the field cluster on the shipped showcase frame', async () => {
   const pages = await buildWith(miniData);
-  const page = pages.get('/test/sections/section/marketing/hero/frames/form');
+  const page = pages.get('/test/sections/marketing/hero/frames/form');
   assert.ok(page, 'the Form variant frame built');
 
   assert.ok(page.includes('Select industry'), 'select placeholder renders (the issue grep, now positive)');
@@ -188,14 +189,14 @@ test('#476: an authored class replaces the default and an authored icon renders'
   assert.ok(primary, 'the primary CTA rendered');
   assert.ok(primary.includes('class="btn btn-light btn-lg"'), `the authored class replaces btn-adaptive: ${primary}`);
   assert.ok(!primary.includes('btn-adaptive'), 'the hardcoded default is gone, not appended to');
-  assert.ok(primary.includes('data-icon="rocket"'), 'the icon rides the one omega_icon mechanism');
+  assert.ok(primary.includes('fa-rocket'), 'the icon rides the one native-markup mechanism');
   assert.ok(!primary.includes('omega-nudge'), 'an authored icon takes the arrow nudge\'s place — one glyph per button');
 
   const secondary = ctaFor(html, 'Explore solutions');
   assert.ok(secondary, 'the secondary CTA rendered');
   assert.ok(secondary.includes('class="btn btn-outline-light btn-lg"'), `same contract on the outline button: ${secondary}`);
   assert.ok(!secondary.includes('btn-outline-adaptive'), 'its default is replaced too');
-  assert.ok(secondary.includes('data-icon="book-open"'), 'its icon renders');
+  assert.ok(secondary.includes('fa-book-open'), 'its icon renders');
   assert.deepEqual(warnings, [], 'icon/class ride the declared button objects — no unknown-arg warning');
 });
 
@@ -212,7 +213,7 @@ test('#476: no icon, no class — today\'s render, arrow nudge intact', async ()
   const primary = ctaFor(html, 'Get started free');
   assert.ok(primary.includes('class="btn btn-adaptive btn-lg omega-hover-nudge"'), `the shipped default class: ${primary}`);
   assert.ok(primary.includes('<span class="omega-nudge ms-2">'), 'the nudge span survives');
-  assert.ok(primary.includes('data-icon="arrow-right"'), 'with its arrow');
+  assert.ok(primary.includes('fa-arrow-right'), 'with its arrow');
 
   const secondary = ctaFor(html, 'See pricing');
   assert.ok(secondary.includes('class="btn btn-outline-adaptive btn-lg omega-hover-nudge"'), `the outline default: ${secondary}`);
@@ -437,14 +438,14 @@ test('#496: the default placement keeps the centred frame', async () => {
 test('#486 + #496: the shipped gallery frames — the video IS the visual, centred and beside', async () => {
   const pages = await buildWith(miniData);
 
-  const centred = pages.get('/test/sections/section/marketing/hero/frames/video');
+  const centred = pages.get('/test/sections/marketing/hero/frames/video');
   assert.ok(centred, 'the Video variant frame built');
   assert.ok(centred.includes('<video'), 'the authored video type renders');
   assert.ok(centred.includes('sample-demo-1.webm'), 'with the source the variant asks for');
   assert.ok(centred.includes('<em>action</em>'), 'and its authored accent is live text, not dead words under the default rotator');
   assert.ok(!centred.includes('omega-hero__frame'), '#486: nothing stacks a product frame under a centred video');
 
-  const side = pages.get('/test/sections/section/marketing/hero/frames/side-placement');
+  const side = pages.get('/test/sections/marketing/hero/frames/side-placement');
   assert.ok(side, 'the Side placement variant frame built');
   assert.ok(side.includes('omega-hero--side'), 'the side hero renders');
   const demoAt = side.indexOf('class="omega-hero__demo"');
@@ -455,7 +456,7 @@ test('#486 + #496: the shipped gallery frames — the video IS the visual, centr
 
 test('#476: the shipped gallery frame\'s legacy button args finally render', async () => {
   const pages = await buildWith(miniData);
-  const page = pages.get('/test/sections/section/marketing/hero/frames/input-capture');
+  const page = pages.get('/test/sections/marketing/hero/frames/input-capture');
   assert.ok(page, 'the Input capture variant frame built');
 
   // Only the primary renders here: the section's secondary_button default is
@@ -463,7 +464,7 @@ test('#476: the shipped gallery frame\'s legacy button args finally render', asy
   const primary = ctaFor(page, 'Get started free');
   assert.ok(primary, 'the variant\'s primary CTA rendered');
   assert.ok(primary.includes('class="btn btn-light btn-lg"'), `its authored class lands: ${primary}`);
-  assert.ok(primary.includes('data-icon="rocket"'), 'with the rocket the variant asks for');
+  assert.ok(primary.includes('fa-rocket'), 'with the rocket the variant asks for');
   assert.ok(!primary.includes('omega-nudge'), 'and no arrow beside it');
   assert.ok(!page.includes('Explore solutions'), 'the authored secondary stays off — enabled is its own contract');
 });
@@ -558,7 +559,7 @@ test('#513: no breadcrumb arg renders nothing — zero change to existing pages'
 
 test('#513: the shipped gallery frame renders the trail', async () => {
   const pages = await buildWith(miniData);
-  const page = pages.get('/test/sections/section/marketing/hero/frames/breadcrumb');
+  const page = pages.get('/test/sections/marketing/hero/frames/breadcrumb');
   assert.ok(page, 'the Breadcrumb variant frame built');
   assert.ok(page.includes('aria-label="Breadcrumb"'), 'with its labeled nav');
   assert.ok(page.includes('aria-current="page"'), 'and the current page unlinked');

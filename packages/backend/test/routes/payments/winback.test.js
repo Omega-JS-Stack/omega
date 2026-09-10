@@ -28,12 +28,13 @@
  * Run: npx omega test framework:routes/payments/winback
  */
 const { buildUser, recordingResponse } = require('./_route-harness.js');
-const winback = require('../../../src/manager/libraries/payment/winback.js');
+const winback = require('../../../dist/manager/libraries/payment/winback.js');
 
-const handler = require('../../../src/manager/routes/payments/winback/post.js');
+const handler = require('../../../dist/manager/routes/payments/winback/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 function providerModule(name) {
-  return require(`../../../src/manager/routes/payments/winback/providers/${name}.js`);
+  return require(`../../../dist/manager/routes/payments/winback/providers/${name}.js`);
 }
 
 const YEAR = 365 * 24 * 60 * 60;
@@ -134,7 +135,7 @@ function paidProduct(config, skip) {
   return paid;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment winback endpoint: the save offer apply path',
   type: 'group',
   timeout: 30000,
@@ -593,4 +594,4 @@ module.exports = {
       },
     },
   ],
-};
+});

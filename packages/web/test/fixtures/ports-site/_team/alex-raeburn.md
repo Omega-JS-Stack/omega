@@ -3,9 +3,6 @@
 # (real doc uses layout: blueprint/team/member — the member layout is outside
 # the A1/A2 slice, so the fixture renders the doc bare at a real permalink)
 permalink: /team/alex-raeburn
-sitemap:
-  include: true
-
 ### TEAM MEMBER PAGES ###
 member:
   id: alex-raeburn

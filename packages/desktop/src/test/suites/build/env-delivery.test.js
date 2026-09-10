@@ -1,6 +1,6 @@
 // The env schema is the ONE declaration of how a key reaches the desktop app
 // ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): the build
-// workflow's env block, the webpack bake, and `omega push-secrets` all read
+// workflow's env block, the bundle task's bake, and `omega push-secrets` all read
 // `delivery: { desktop: … }` and nothing else. Each used to carry its own
 // hand-kept list — the workflow's was 21 lines a human maintained across four
 // job/step blocks, and a key added to one never reached the others.
@@ -19,8 +19,9 @@ const { publishSecretKeys, bakeKeys, renderSecretsBlock, WORKFLOW_OWNED_KEYS } =
 const SRC = path.join(__dirname, '..', '..', '..');
 const Manager = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
-const webpackTask = require(path.join(SRC, 'gulp', 'tasks', 'webpack.js'));
+const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
 const pushSecrets = require(path.join(SRC, 'commands', 'push-secrets.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
 
@@ -47,7 +48,7 @@ function tmpBrand(brandEnv) {
   return { brand, target };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'env delivery (#627) — the workflow block, the bake list, and push-secrets from ONE schema',
@@ -81,19 +82,19 @@ module.exports = {
       },
     },
     {
-      name: 'the webpack bake is exactly the schema\'s bake list, valued from the build env',
+      name: 'the bundle bake is exactly the schema\'s bake list, valued from the build env',
       run: (ctx) => {
-        ctx.expect(webpackTask.BAKED_KEYS).toEqual(bakeKeys('desktop'));
-        ctx.expect(webpackTask.BAKED_KEYS).toEqual(['GOOGLE_ANALYTICS_SECRET']);
+        ctx.expect(bundleTask.BAKED_KEYS).toEqual(bakeKeys('desktop'));
+        ctx.expect(bundleTask.BAKED_KEYS).toEqual(['GOOGLE_ANALYTICS_SECRET']);
 
         // A key with a value is replaced in the bundle; an unset one leaves the
         // `process.env` reference intact, so local dev still reads it live.
-        ctx.expect(webpackTask.bakeDefinitions({ GOOGLE_ANALYTICS_SECRET: 'fixture-mp-secret' }))
+        ctx.expect(bundleTask.bakeDefinitions({ GOOGLE_ANALYTICS_SECRET: 'fixture-mp-secret' }))
           .toEqual({ 'process.env.GOOGLE_ANALYTICS_SECRET': '"fixture-mp-secret"' });
-        ctx.expect(webpackTask.bakeDefinitions({})).toEqual({});
+        ctx.expect(bundleTask.bakeDefinitions({})).toEqual({});
 
         // A key the schema does NOT bake never reaches a shipped artifact.
-        ctx.expect(webpackTask.bakeDefinitions({ CSC_KEY_PASSWORD: 'nope' })).toEqual({});
+        ctx.expect(bundleTask.bakeDefinitions({ CSC_KEY_PASSWORD: 'nope' })).toEqual({});
       },
     },
     {
@@ -106,7 +107,7 @@ module.exports = {
         const quiet = { log() {}, warn() {}, error() {} };
         let thrown = null;
         try {
-          webpackTask.bakeDefinitions({}, { config: configured, mode: { build: true }, logger: quiet });
+          bundleTask.bakeDefinitions({}, { config: configured, mode: { build: true }, logger: quiet });
         } catch (e) {
           thrown = e;
         }
@@ -119,7 +120,7 @@ module.exports = {
         // A publish run is a build for this purpose.
         let onPublish = null;
         try {
-          webpackTask.bakeDefinitions({}, { config: configured, mode: { publish: true }, logger: quiet });
+          bundleTask.bakeDefinitions({}, { config: configured, mode: { publish: true }, logger: quiet });
         } catch (e) {
           onPublish = e;
         }
@@ -129,15 +130,15 @@ module.exports = {
         // normal step on the way to a configured one.
         const said = [];
         const loud = { log() {}, warn: (m) => said.push(m), error() {} };
-        ctx.expect(webpackTask.bakeDefinitions({}, { config: configured, mode: { build: false, publish: false }, logger: loud })).toEqual({});
+        ctx.expect(bundleTask.bakeDefinitions({}, { config: configured, mode: { build: false, publish: false }, logger: loud })).toEqual({});
         ctx.expect(said.join('\n')).toContain('GOOGLE_ANALYTICS_SECRET_DESKTOP');
 
         // The secret under its DELIVERED name settles the rule and bakes.
-        ctx.expect(webpackTask.bakeDefinitions({ GOOGLE_ANALYTICS_SECRET: 'shh' }, { config: configured, mode: { build: true }, logger: quiet }))
+        ctx.expect(bundleTask.bakeDefinitions({ GOOGLE_ANALYTICS_SECRET: 'shh' }, { config: configured, mode: { build: true }, logger: quiet }))
           .toEqual({ 'process.env.GOOGLE_ANALYTICS_SECRET': '"shh"' });
 
         // No stream configured, nothing owed.
-        ctx.expect(webpackTask.bakeDefinitions({}, { config: {}, mode: { build: true }, logger: quiet })).toEqual({});
+        ctx.expect(bundleTask.bakeDefinitions({}, { config: {}, mode: { build: true }, logger: quiet })).toEqual({});
       },
     },
     {
@@ -153,13 +154,13 @@ module.exports = {
         ].join('\n'));
 
         try {
-          const entries = pushSecrets.collectEntries({ projectRoot: target });
-          ctx.expect(entries.map((e) => e.key).sort()).toEqual(['APPLE_TEAM_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET']);
-          ctx.expect(entries.every((e) => publishSecretKeys('desktop').includes(e.key))).toBe(true);
+          const keys = Object.keys(pushSecrets.collectEnvSecrets(target));
+          ctx.expect(keys.sort()).toEqual(['APPLE_TEAM_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET']);
+          ctx.expect(keys.every((key) => publishSecretKeys('desktop').includes(key))).toBe(true);
         } finally {
           fs.rmSync(brand, { recursive: true, force: true });
         }
       },
     },
   ],
-};
+});

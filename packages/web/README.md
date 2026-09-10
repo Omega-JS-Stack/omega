@@ -67,11 +67,17 @@ npx omega translate         # translate dist/ into translation.languages (commit
                             #   `omega build` runs it automatically when enabled — see
                             #   docs/shared/translation.md in the Omega repo)
 npx omega audit            # production build → dist/ served on an ephemeral port →
-                           #   Lighthouse on the home page; report-only
+                           #   Lighthouse on the home page; report-only. Each page
+                           #   prints the four scores plus LCP, CLS and the form
+                           #   factor the run emulated (Lighthouse's default is
+                           #   mobile on Slow 4G, the shape PSI reports)
 npx omega audit /pricing --min-performance=90
                            # extra pages as args; --min-<category> arms the gate
                            #   (performance/accessibility/best-practices/seo) —
                            #   any score under its minimum exits 1
+npx omega audit --max-lcp=1300
+                           # the 1.3 s perceived-usability bar (the end of the hero fade):
+                           #   any page whose LCP is over the stated ms fails and exits 1
 
 npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme contract + translate
 ```
@@ -91,31 +97,32 @@ see the harness README for the honest before/after numbers.
 | [engine.js](src/engine.js) | `configureOmega()` — turns an Eleventy instance into the OMEGA engine: Liquid options + template-kit registration, layered layouts, frontmatter preprocessor, `resolved`/`paginator`/`pageAssets` computed data, site collections, default pages, globals |
 | [collections.js](src/collections.js) | posts / alternatives / team / updates collections + taxonomy aggregation (deterministic date-desc, slug tie-break order), and the same registration for the brand's own collections |
 | [dynamic-pages.js](src/dynamic-pages.js) | Dynamic pages, the jekyll-uj-powertools dynamic-pages successor: `targets.web.collections` declares a brand's own collection (`docs: { field: 'doc.category', size, title, description, permalink }`), its documents live in `_docs/` and publish at `/docs/<slug>`, and the engine generates the paginated listing (`/docs`, `/docs/2…`) plus one page per category of `field` (`/docs/categories/<slug>`) as virtual templates on the default-page lane — a consumer page at any of those permalinks takes that URL over. The documents are consumer FILES, so they are served at data time instead: each one gets the same `collection` block its generated siblings carry, plus its own `meta.title` (`<Document> - <Collection> - <Brand>`) and `meta.description` derived from the document's own frontmatter, and `blueprint/collection/document` is the layout that renders it (masthead h1 + prose, the listing/category siblings' shape) |
-| [redirects.js](src/redirects.js) | Path redirects (#442): `targets.web.redirects` — an ordered `[{ from, to, type }]` list where `from` may capture ONE `:name` segment (`/c/:id`) that `to` references (`/code?id=:id`). The ONE pattern engine: each entry compiles to a regex source + a replacement string, so both runtimes only apply it — the browser module on the built 404 page (`core/js/modules/redirect-map.js` over `core/js/libs/redirect-map.js`, the lane static hosting leaves for an unbuilt path, hence a CLIENT-side hop and not a true 301) and `omega dev`'s last middleware, which answers the same map with the entry's real status code once nothing built answered. Malformed entries fail the build |
 | [social-pages.js](src/social-pages.js) | Social shortlinks (#429), legacy UJM's per-social redirect pages: every entry of the `socials` config block generates a redirect page at `/<platform>` on the `modules/utilities/redirect` layout, as a virtual template on the default-page lane — so a consumer page at `/<platform>` takes that URL over, and the layout's own noindex + sitemap exclusion apply. The string form is a handle whose profile URL (template-kit's platform patterns, the same ones `omega_social` and JSON-LD `sameAs` read) IS the destination; the object form `{ handle, redirect }` sends the shortlink somewhere else while the handle keeps naming the profile. Nowhere to point (blank handle, or an unknown platform with no `redirect`) generates nothing; a malformed entry is a hard error |
 | [markdown-images.js](src/markdown-images.js) | Markdown `![alt](src)` renders through template-kit's `buildImageHtml` (the `omega_image` builder — one image-markup SSOT): responsive `<picture>` + lazy placeholder for local raster images, the plain lazy `<img>` lane for external or non-raster sources. `@post/<file>` resolves to `/assets/images/blog/post-<post.id>/<file>`; used off a post it FAILS the build naming the file. Note: feeds embed the rendered (lazy) markup, so feed readers see the placeholder — legacy parity |
 | [limit-collections.js](src/limit-collections.js) | Dev-mode collection sampling (`targets.web.dev.limitCollections`, the jekyll-uj-powertools limit-collections successor): first-N in collection order, or a random sample with `randomize: true`; the sampled-out documents are skipped before render, so they cost no pages, collection entries or taxonomy terms. Development builds only, loud on every build; the config is validated in production too, where nothing is ever sampled |
 | [layouts.js](src/layouts.js) | Layered layout delivery, zero copying: virtual templates (build) / symlink farm (dev, watchable) |
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) — over `collectProviders()`, which keeps every layer that provides a path (what the override map reports as shadowed) |
-| [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/fa/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code — the language→country map stays `@omega.js/template-kit`'s |
+| [language-flags.js](src/language-flags.js) | The language-named flag aliases in the emitted icon set (`assets/icons/flags/lang/en.svg` = the us flag; their own namespace because `ar`/`ca` name both a language and a country), so the client-side footer language switcher fetches a flag by the row's own hreflang code — the language→country map stays `@omega.js/template-kit`'s |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid — a value's variable ROOTS pick its lane (cached site-scope renders; page-scoped values, the page's pagination alias included, defer to a per-page copy-on-write pass; everything else renders uncached against the template's own cascade, so the consumer's `_data` globals resolve; a `meta:` ref with an undefined root fails the build; the context-free `omega_*` filters are registered, since LiquidJS drops an unknown filter silently) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/web/sections.md in the Omega repo) |
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
 | [overrides.js](src/overrides.js) | The layered override map (#94): `buildOverrideMap()` — every shadowable section/include/css/page with its owning layer and the consumer's shadows, read out of the SAME layer chains the build resolves through (`collectProviders`), and `materializeOverride()` — one file copied to its shadow path with a provenance header. The css lane lists ONLY what sass layers by — `main.scss` and the page sheets (`isPageEntry`, base bucket) — never the partials a bare relative `@use` resolves against the importing file, which a consumer copy could never win |
-| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass (content scan = `dist/**/*.html` + `dist/**/*.js`, so classes that live only in JS-built markup survive — #66) |
+| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass (content scan = `dist/**/*.html` + `dist/**/*.js`, so classes that live only in JS-built markup survive — #66), critical-css extraction (the first-paint subset the head inlines so the main sheet stops render-blocking, #750) |
 | [path-prefix.js](src/path-prefix.js) | Base-path support (#355): `resolvePathPrefix()` normalizes the publisher's `OMEGA_PATH_PREFIX`, and the emit lanes mount root-relative URLs under it — `prefixHtml()` (the engine's `omega-path-prefix` transform: href/src/srcset/action plus the `<html data-omega-path-prefix>` stamp the browser half reads) and `prefixCss()` (the theme sheets' `url()` targets). Unset = no pass runs |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — the build manifest at `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`, the `/status` page shows the rest: theme, package versions, repo, commit) |
 | [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
+| [inline-icons.js](src/inline-icons.js) | Build-time icon inlining ([#619](https://github.com/Omega-JS-Stack/omega/issues/619)): the engine's `omega-inline-icons` transform fills every empty `<i>` whose classes name an icon — Font Awesome or the `omega-flag-*` namespace — with that icon's SVG, in markup byte-identical to what the runtime watcher (`runtime/icons.js`) would produce, so static chrome costs zero fetches and no icon renders two ways. A name the set has no file for is left empty and marked `data-omega-icon-missing` |
 | [minify-html.js](src/minify-html.js) | Production HTML minification (UJM minifyHtml successor) — Rust minifier with the legacy extraction dance (JSON-LD minified as JSON, inline scripts esbuild-minified, IE conditionals preserved); engine mounts it as a transform for `environment: 'production'`, .html outputs only |
 | [purge.js](src/purge.js) | Cloudflare cache purge (UJM cloudflare-purge successor, de-ITW'd — direct API, brand's own `CLOUDFLARE_TOKEN`): zone from config `cloudflare.zone` or brand-url apex lookup; `omega purge` command, auto after `omega deploy --direct`, CI workflow step when the secret exists |
-| [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
-| [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
+| [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime/translations) + `resolveClientEntry()` |
+| [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root, and the environment surface mixed into the CLI class |
+| [mode-helpers.js](src/mode-helpers.js) | The build-side environment surface: `getEnvironment()` → `'development' \| 'testing' \| 'production'` (mutually exclusive, testing wins) plus `isDevelopment()` / `isProduction()` / `isTesting()` deriving from it — the same four calls `@omega.js/backend`, `@omega.js/desktop` and `@omega.js/extension` answer, and the browser-side `runtime/manager.js` already carried. `attachTo()` mixes them into the CLI class (statically and on the prototype); the build lanes read them off their own options object (`getEnvironment.call(options)`), precedence is `OMEGA_TEST_MODE` → the context's own `environment` (`omega build` → production, `omega dev` → development) → `OMEGA_BUILD_MODE` / `NODE_ENV` → development |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
 | [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registration path: registerLiquid plus the framework's own `{% section %}`/`{% component %}`/`{% composition %}` tags, so a fully converted tree lints clean), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
-| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (omega + mode helpers) |
+| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage/bootLayout handshake, `manager.js` frontend Manager (omega + mode helpers), `icons.js` the icon watcher's transport (`/assets/icons/<style>/<name>.svg`, flags one namespace over) — loud on a miss in development, silent in production |
 
 ## Packaged content (the real UJM port, B2)
 
@@ -356,28 +363,35 @@ example, and the four questions to read a page against them:
   templates UNLESS the consumer owns the same URL. The 404 lands at literal
   `/404.html` (static hosts need the file).
 - **Assets** — every layer root follows one convention (`js/main.js`,
-  `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
-  `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
-  themes dir, `__theme__/*` to the active theme (base fallback),
-  `@omega.js/client` (subpaths included) to @omega.js/client. Every package
-  the framework declares as a dependency resolves from the FRAMEWORK's
-  installation for whoever imports it, so a consumer page module writes
-  `import { Chart } from 'chart.js'` bare and shares one copy (one chunk)
-  with core's own users of the library — the framework's copy wins even if
-  the consumer declares its own; anything the framework does not declare the
-  consumer declares itself. Manifest:
-  `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
-  and the active theme's page css BOTH load. The engine's `pageAssets`
-  computed resolves each page's entries from the URL alone (the `asset_path`
-  frontmatter override is dead — spec §7): exact key, then the per-page-dir
-  `<key>/index` spelling, then `[name]` wildcard filenames (Next.js
-  convention — `js/pages/blog/[slug].js` serves every `/blog/<slug>` post; a
-  wildcard segment matches exactly one URL segment, exact beats wildcard,
-  most-literal wildcard wins). Underscore basenames under `pages/` are shared
-  partials in both languages, never entries (`js/pages/legal/_document.js`
-  backs the flat `terms`/`cookies`/`privacy` entries).
-  Dev mode (`omega dev`): stable un-hashed names + no minify, so in-place
-  asset rebuilds keep their URLs without an HTML re-render.
+  `js/pages/**`, `js/layouts/**`, `css/main.scss`, `css/pages/**`,
+  `css/layouts/**`, theme roots add `_theme.scss`/`_theme.js`).
+  `__main_assets__/*` resolves to the core layer / themes dir, `__theme__/*` to
+  the active theme (base fallback), `omega:<name>` to the same name from the
+  layers below the importing file, `@omega.js/client` (subpaths included) to
+  @omega.js/client. Every package the framework declares as a dependency
+  resolves from the FRAMEWORK's installation for whoever imports it, so a
+  consumer page module writes `import { defineChart } from '@tanstack/charts'` bare and
+  shares one copy (one chunk) with core's own users of the library — the
+  framework's copy wins even if the consumer declares its own; anything the
+  framework does not declare the consumer declares itself. Manifest:
+  `{ js: { main, firstPaint, pages, layouts }, css: { main, critical, pages, layouts } }`; each `css.pages`/`css.layouts` entry is `{ inline }` (a sheet of 8 KB or less, printed as a `<style>` block) or `{ href }`.
+  **One rule for page and layout assets, JS and CSS alike: every layer's file
+  loads, in layer order** (core → theme → consumer), so each key holds a LIST —
+  a framework page script always runs, the theme decorates, the consumer adds,
+  and nothing replaces anything. The engine's `pageAssets` computed resolves
+  each page's entries from the URL alone (the `asset_path` frontmatter override
+  is dead — spec §7): exact key, then the per-page-dir `<key>/index` spelling,
+  then `[name]` wildcard filenames (Next.js convention —
+  `js/pages/blog/[slug].js` serves every `/blog/<slug>` post; a wildcard segment
+  matches exactly one URL segment, exact beats wildcard, most-literal wildcard
+  wins). `layoutAssets` does the same keyed by layout name, across the page's
+  whole layout chain. Underscore basenames under `pages/` and `layouts/` are
+  shared partials in both languages, never entries
+  (`js/pages/legal/_document.js` backs the flat `terms`/`cookies`/`privacy`
+  entries). `main.js` / `main.scss` are the exception: first layer wins, and it
+  extends the layers below with `import coreMain from 'omega:main'` /
+  `@use 'omega:main'`. Dev mode (`omega dev`): stable un-hashed names + no
+  minify, so in-place asset rebuilds keep their URLs without an HTML re-render.
 - **Boot runtime (ESM + code splitting)** — all bundles come out of ONE
   esbuild call with `splitting: true`, so @omega.js/client and `runtime/boot.js`
   land in a shared chunk the browser evaluates ONCE per page: every
@@ -388,7 +402,10 @@ example, and the four questions to read a page against them:
   `bootMain(mod)` (omega.initialize(window.Configuration) → dev lib in
   development → global module), page stub → `bootPage(mod)` (awaits the main
   boot, then `mod({ manager, options })` — the UJM page-module contract,
-  with `manager` the frontend Manager wrapper carrying mode helpers).
+  with `manager` the frontend Manager wrapper carrying mode helpers), layout
+  stub → `bootLayout(mod)` (the layout module's NAMESPACE, whose default export
+  is optional: the redirect layout hops at import time and exports nothing, so
+  no stub may name a `default` esbuild can prove undefined, #742).
 - **Scaffolding (`ensureTarget()`, every verb)** — devkit's defaults engine over
   `scaffold/`: marker-section merges live-sync .gitignore/AGENTS.md
   (Custom sections preserved verbatim; CLAUDE.md is the one-line `@AGENTS.md`
@@ -438,8 +455,8 @@ until Ian's direction notes land; the names + plumbing are the contract.
 
 The categorical ramp (`--omega-chart-1`…`-6`) serves three surfaces from one
 palette: chart series ([core/js/libs/charts.js](core/js/libs/charts.js) — the
-framework's Chart.js, lazily split into its own chunk, so a chartless page
-pays nothing), diagram slots ([core/js/libs/graph.js](core/js/libs/graph.js) —
+framework's TanStack Charts, lazily split into its own chunks, so a chartless
+page pays nothing), diagram slots ([core/js/libs/graph.js](core/js/libs/graph.js) —
 the framework's mermaid on the same terms, mapped onto its `cScale`/`pie`
 slots) and the `.omega-tone-<n>` / `.omega-badge-tone` chips
 ([core/css/core/_tones.scss](core/css/core/_tones.scss)), so the same thing is
@@ -484,7 +501,15 @@ rail), mobile drawer below 1200px (`data-shell-open` + scrim, matching
 classy's xl cutover), and a `.omega-shell--locked` variant whose main never
 scrolls (calendar/studio-style pages). Geometry only — every painted value
 is a `var(--omega-*)` token, dimensions are `--omega-shell-*` custom
-properties, and motion respects `prefers-reduced-motion`.
+properties, and motion respects `prefers-reduced-motion`. Main pins its own
+grid row, so a page that turns the topbar off (`theme.topbar.enabled: false`)
+still scrolls inside main; `theme.sidebar.enabled: false` drops the rail and
+the two topbar toggles that drive it. A topbar-off page that KEEPS its rail
+renders `.omega-shell__drawer-toggle` instead, a floating control on the same
+`data-shell-toggle="drawer"` handler, so the drawer is still reachable on a
+narrow viewport (#719); and classy's content card reads the topbar's presence
+(`:has(> .omega-shell__topbar)`) rather than assuming it, so main draws its
+full frame when it is the whole card.
 [core/js/core/app-shell.js](core/js/core/app-shell.js) drives it
 declaratively (`[data-shell-toggle="collapse|drawer"]`,
 `[data-shell-dismiss]`, Escape closes the drawer, `aria-expanded` synced)

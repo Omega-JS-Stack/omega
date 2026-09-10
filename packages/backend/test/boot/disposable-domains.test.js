@@ -12,7 +12,8 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const dataset = require('../../src/manager/libraries/email/disposable-domains.js');
+const dataset = require('../../dist/manager/libraries/email/disposable-domains.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const PACKAGE_DIR = path.resolve(__dirname, '../..');
 
@@ -40,7 +41,7 @@ async function withCacheStashed(fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Disposable-domain dataset (seed + gitignored refresh cache)',
   type: 'group',
 
@@ -121,14 +122,14 @@ module.exports = {
           assert.deepEqual(dataset.load(), seed, 'load() falls back to the committed seed');
 
           // The real lookup path, re-required with no cache on disk.
-          delete require.cache[require.resolve('../../src/manager/libraries/email/validation.js')];
-          const { isDisposable } = require('../../src/manager/libraries/email/validation.js');
+          delete require.cache[require.resolve('../../dist/manager/libraries/email/validation.js')];
+          const { isDisposable } = require('../../dist/manager/libraries/email/validation.js');
 
           assert.equal(isDisposable(`user@${seed[0]}`), true, 'a seed domain is still blocked with no cache present');
           assert.equal(isDisposable('user@gmail.com'), false, 'a real provider is not blocked');
         });
 
-        delete require.cache[require.resolve('../../src/manager/libraries/email/validation.js')];
+        delete require.cache[require.resolve('../../dist/manager/libraries/email/validation.js')];
       },
     },
 
@@ -150,4 +151,4 @@ module.exports = {
       },
     },
   ],
-};
+});

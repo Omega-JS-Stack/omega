@@ -5,8 +5,9 @@
  * Run: npx omega test backend:mcp/utils
  */
 const path = require('path');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'MCP utility functions',
   type: 'group',
 
@@ -16,7 +17,7 @@ module.exports = {
     {
       name: 'resolveAuthInfo: admin key returns admin role',
       async run({ assert }) {
-        const { resolveAuthInfo } = require('../../src/mcp/utils.js');
+        const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const saved = process.env.OMEGA_ADMIN_KEY;
 
         try {
@@ -35,7 +36,7 @@ module.exports = {
     {
       name: 'resolveAuthInfo: non-admin token returns user role',
       async run({ assert }) {
-        const { resolveAuthInfo } = require('../../src/mcp/utils.js');
+        const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('some-user-api-key');
 
         assert.equal(result.role, 'user', 'Should be user');
@@ -46,7 +47,7 @@ module.exports = {
     {
       name: 'resolveAuthInfo: empty token returns public role',
       async run({ assert }) {
-        const { resolveAuthInfo } = require('../../src/mcp/utils.js');
+        const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('');
 
         assert.equal(result.role, 'public', 'Should be public');
@@ -58,7 +59,7 @@ module.exports = {
     {
       name: 'resolveAuthInfo: null/undefined token returns public role',
       async run({ assert }) {
-        const { resolveAuthInfo } = require('../../src/mcp/utils.js');
+        const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
 
         assert.equal(resolveAuthInfo(null).role, 'public', 'null should be public');
         assert.equal(resolveAuthInfo(undefined).role, 'public', 'undefined should be public');
@@ -68,7 +69,7 @@ module.exports = {
     {
       name: 'resolveAuthInfo: returns public when OMEGA_ADMIN_KEY is not set',
       async run({ assert }) {
-        const { resolveAuthInfo } = require('../../src/mcp/utils.js');
+        const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const saved = process.env.OMEGA_ADMIN_KEY;
 
         try {
@@ -87,7 +88,7 @@ module.exports = {
     {
       name: 'filterToolsByRole: admin sees all roles',
       async run({ assert }) {
-        const { filterToolsByRole } = require('../../src/mcp/utils.js');
+        const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
           { name: 'b', role: 'user' },
@@ -102,7 +103,7 @@ module.exports = {
     {
       name: 'filterToolsByRole: user sees user + public only',
       async run({ assert }) {
-        const { filterToolsByRole } = require('../../src/mcp/utils.js');
+        const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
           { name: 'b', role: 'user' },
@@ -120,7 +121,7 @@ module.exports = {
     {
       name: 'filterToolsByRole: public sees public only',
       async run({ assert }) {
-        const { filterToolsByRole } = require('../../src/mcp/utils.js');
+        const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
           { name: 'b', role: 'user' },
@@ -136,7 +137,7 @@ module.exports = {
     {
       name: 'filterToolsByRole: tools without role default to admin',
       async run({ assert }) {
-        const { filterToolsByRole } = require('../../src/mcp/utils.js');
+        const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [{ name: 'no-role' }];
 
         assert.equal(filterToolsByRole(tools, 'admin').length, 1, 'Admin should see role-less tool');
@@ -148,7 +149,7 @@ module.exports = {
     {
       name: 'filterToolsByRole: unknown role treated as public',
       async run({ assert }) {
-        const { filterToolsByRole } = require('../../src/mcp/utils.js');
+        const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
           { name: 'b', role: 'user' },
@@ -165,7 +166,7 @@ module.exports = {
     {
       name: 'loadConsumerTools: returns empty array when no cwd',
       async run({ assert }) {
-        const { loadConsumerTools } = require('../../src/mcp/utils.js');
+        const { loadConsumerTools } = require('../../dist/mcp/utils.js');
 
         assert.equal(loadConsumerTools(null).length, 0, 'null cwd');
         assert.equal(loadConsumerTools('').length, 0, 'empty cwd');
@@ -176,7 +177,7 @@ module.exports = {
     {
       name: 'loadConsumerTools: returns empty array for non-existent directory',
       async run({ assert }) {
-        const { loadConsumerTools } = require('../../src/mcp/utils.js');
+        const { loadConsumerTools } = require('../../dist/mcp/utils.js');
         const result = loadConsumerTools('/tmp/does-not-exist-12345');
 
         assert.equal(result.length, 0, 'Should return empty array');
@@ -188,7 +189,7 @@ module.exports = {
     {
       name: 'buildToolMap: consumer tools override built-ins with same name',
       async run({ assert }) {
-        const { buildToolMap } = require('../../src/mcp/utils.js');
+        const { buildToolMap } = require('../../dist/mcp/utils.js');
         const builtin = [{ name: 'tool_a', description: 'original' }];
         const consumer = [{ name: 'tool_a', description: 'override', _consumer: true }];
 
@@ -201,7 +202,7 @@ module.exports = {
     {
       name: 'buildToolMap: merges non-overlapping tools',
       async run({ assert }) {
-        const { buildToolMap } = require('../../src/mcp/utils.js');
+        const { buildToolMap } = require('../../dist/mcp/utils.js');
         const builtin = [{ name: 'a' }, { name: 'b' }];
         const consumer = [{ name: 'c' }];
 
@@ -218,7 +219,7 @@ module.exports = {
     {
       name: 'every built-in tool has a role assigned',
       async run({ assert }) {
-        const tools = require('../../src/mcp/tools.js');
+        const tools = require('../../dist/mcp/tools.js');
 
         const missing = tools.filter((t) => !t.role);
         assert.equal(missing.length, 0, `All tools should have roles, missing: ${missing.map((t) => t.name).join(', ')}`);
@@ -228,7 +229,7 @@ module.exports = {
     {
       name: 'role distribution matches expected counts',
       async run({ assert }) {
-        const tools = require('../../src/mcp/tools.js');
+        const tools = require('../../dist/mcp/tools.js');
 
         const admin = tools.filter((t) => t.role === 'admin');
         const user = tools.filter((t) => t.role === 'user');
@@ -241,4 +242,4 @@ module.exports = {
       },
     },
   ],
-};
+});

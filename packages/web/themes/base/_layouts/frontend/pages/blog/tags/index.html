@@ -9,14 +9,18 @@ hero:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    <div class="omega-post-card__eyebrow mb-4" data-omega-reveal>
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    <div class="omega-post-card__eyebrow mb-4">
       <a href="/blog">Blog</a>
       <span>/</span>
       <span>Tags</span>
     </div>
-    {% component "heading/masthead", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
+    {% component "heading/masthead", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, first_paint: true %}
   </div>
 </section>
 
@@ -67,7 +71,7 @@ hero:
             <h2 class="h5">No tags yet</h2>
             <p class="text-muted">Check back soon for tagged content.</p>
             <a href="/blog" class="btn btn-adaptive">
-              {% omega_icon "arrow-left", "fa-sm me-2" %}
+              <i class="fa-solid fa-arrow-left fa-sm me-2"></i>
               Back to blog
             </a>
           </div>

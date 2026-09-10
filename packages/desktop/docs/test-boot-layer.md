@@ -70,6 +70,10 @@ The `inspect` function receives:
 5. @omega.js/desktop's `main.js` boots normally; after `manager.initialize()` resolves, detects `OMEGA_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__EM_TEST__` JSON lines on stdout.
 6. Test runner parses results, calls `app.exit()`. **No sleep, no kill.**
 
+## View suites in this lane
+
+The boot lane also carries the renderer suites that name a project view (`layer: 'renderer'` + `view: '<name>'`). They need exactly what this lane already produces: the staged, freshly built app. After the `inspect` tests finish, [harness/boot-entry.js](../src/test/harness/boot-entry.js) opens each such suite's view in a real window of the booted app (through the app's own window manager, hidden), evaluates `harness/renderer-entry.js` verbatim inside the page (one suite loop, one `expect`, no fork), runs the suite there, and destroys the window. So the page carries the project's real preload, the booted main process's real IPC handlers, and the real config. The knob and its rules are documented in [test-framework.md](test-framework.md#testing-your-own-views).
+
 ## Running
 
 ```bash
@@ -130,11 +134,11 @@ The gate decides *whether* the framework boot suite runs; the env var decides *w
 
 - `config/omega.json5` — fake brand (`desktop-fixture`), `releases.enabled: false` (no repo discovery during the build), empty `cloud.config` (no Firebase hang).
 - `src/main.js` / `src/preload.js` — the one-line bootstraps a real consumer ships; `main.js` creates the `main` window (`show: false`).
-- `src/views/main/index.html` + `src/assets/js/components/main/index.js` + `src/assets/scss/main.scss` — a real view/renderer/theme so webpack + sass run exactly as for a consumer.
+- `src/views/main/index.html` + `src/assets/js/components/main/index.js` + `src/assets/scss/main.scss` — a real view/renderer/theme so the bundle + sass tasks run exactly as for a consumer.
 
-**Runtime-only, gitignored** (never committed): before the boot build, the runner symlinks `@omega.js/desktop` (→ the @omega.js/desktop repo root) and `electron` (→ @omega.js/desktop's own copy) into the fixture's `node_modules` — the only two deps resolved by *explicit path* (the gulpfile location, webpack's `require('@omega.js/desktop/main')`, and the runner's electron-binary lookup). Everything else (gulp, webpack, …) resolves via the upward `node_modules` walk because the fixture lives inside the @omega.js/desktop repo. The links are **removed again when the run finishes** — the `@omega.js/desktop` link points back at the repo root, which *contains* the fixture, so a leftover link forms an infinite directory cycle inside `dist/` that crashes the next prepare-package tree walk (`npm run prepare` / `npm publish` → `ENAMETOOLONG`). The fixture `.gitignore` is belt-and-suspenders for crashed runs. See `ensureFixtureDeps()` / `removeFixtureDeps()` in [src/test/runners/boot.js](../src/test/runners/boot.js).
+**Runtime-only, gitignored** (never committed): before the boot build, the runner symlinks `@omega.js/desktop` (→ the @omega.js/desktop repo root) and `electron` (→ @omega.js/desktop's own copy) into the fixture's `node_modules` — the only two deps resolved by *explicit path* (the gulpfile location, the bundle's `require('@omega.js/desktop/main')`, and the runner's electron-binary lookup). Everything else (gulp, esbuild, …) resolves via the upward `node_modules` walk because the fixture lives inside the @omega.js/desktop repo. The links are **removed again when the run finishes** — the `@omega.js/desktop` link points back at the repo root, which *contains* the fixture, so a leftover link forms an infinite directory cycle inside `dist/` that crashes the next prepare-package tree walk (`npm run prepare` / `npm publish` → `ENAMETOOLONG`). The fixture `.gitignore` is belt-and-suspenders for crashed runs. See `ensureFixtureDeps()` / `removeFixtureDeps()` in [src/test/runners/boot.js](../src/test/runners/boot.js).
 
-The fixture is then **webpack-built into a real `main.bundle.js`** (under its own `.omega/test-app/dist/`, like any other boot run) and booted — the same production path a consumer's boot test exercises (bundled, not the unbundled lib code the `main` layer covers). The boot smoke lives at [src/test/suites/boot/consumer-app-boots.test.js](../src/test/suites/boot/consumer-app-boots.test.js).
+The fixture is then **built into a real `main.bundle.js`** (under its own `.omega/test-app/dist/`, like any other boot run) and booted — the same production path a consumer's boot test exercises (bundled, not the unbundled lib code the `main` layer covers). The boot smoke lives at [src/test/suites/boot/consumer-app-boots.test.js](../src/test/suites/boot/consumer-app-boots.test.js).
 
 ### `OMEGA_TEST_BOOT_PROJECT`
 
@@ -144,7 +148,7 @@ The fixture is then **webpack-built into a real `main.bundle.js`** (under its ow
 
 ### Why this exists
 
-The `build`/`main`/`renderer` layers cover @omega.js/desktop's lib code fast and in isolation. None of them prove the framework still assembles a consumer's `src/main.js` into a webpacked bundle that boots end-to-end. The fixture self-test fills that gap — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the site boot?" (UJM).
+The `build`/`main`/`renderer` layers cover @omega.js/desktop's lib code fast and in isolation. None of them prove the framework still assembles a consumer's `src/main.js` into a bundle that boots end-to-end. The fixture self-test fills that gap — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the site boot?" (UJM).
 
 ## Limitations
 

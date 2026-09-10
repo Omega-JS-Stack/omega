@@ -33,8 +33,8 @@ test('#26: declared targets fill the download page — every desktop card gets i
   const download = pages.get('/download');
   assert.ok(download, 'download page built');
 
-  assert.equal(download.split(RELEASES).length - 1, 4,
-    'mac + windows + linux (.deb and snap) all point at the derived releases URL');
+  assert.equal(download.split(`${RELEASES}/download/`).length - 1, 4,
+    'mac + windows + linux (.deb and AppImage) all point at their derived direct download');
   assert.ok(download.includes('omega-dl-card__actions omega-dl-card__actions--split'),
     'Linux still splits its two derived artifacts');
   assert.ok(!download.includes('Not available yet'), 'no desktop card falls back to the empty state');

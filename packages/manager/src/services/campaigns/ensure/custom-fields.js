@@ -1,10 +1,13 @@
 /**
  * Ensure @omega.js/backend's custom fields exist in SendGrid with the right types.
  *
- * The field list comes from @omega.js/backend's marketing SSOT (honoring each
- * field's provider skip list — SendGrid has first/last name built in). A
- * type mismatch can't be patched in SendGrid, so the field is deleted and
- * recreated. Fields @omega.js/backend doesn't own are never touched.
+ * The field list comes from @omega.js/backend's marketing SSOT — its OWN
+ * per-provider view of the catalog (#695), the same derivation the backend's
+ * contact sync writes through, so what is provisioned here and what is sent
+ * there are one list (SendGrid has first/last name built in, so the catalog
+ * skips them on both sides). A type mismatch can't be patched in SendGrid, so
+ * the field is deleted and recreated. Fields @omega.js/backend doesn't own are
+ * never touched.
  */
 const chalk = require('chalk').default;
 const { fieldsFor } = require('../../../lib/backend-marketing.js');

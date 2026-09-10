@@ -50,6 +50,29 @@ test('parseThresholds: a non-score value fails loudly, before any build runs', (
   );
 });
 
+// ─── The LCP bar: --max-lcp arms the 1s interactive gate ────────────────────
+
+test('parseMaxLcp: no flag = no LCP gate (report-only default)', () => {
+  assert.strictEqual(audit.parseMaxLcp({ _: ['audit'] }), null);
+});
+
+test('parseMaxLcp: dashed and yargs-camelized flags both arm the gate', () => {
+  assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 1000 }), 1000);
+  assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], maxLcp: '1000' }), 1000);
+  assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 1000, maxLcp: 1000 }), 1000);
+});
+
+test('parseMaxLcp: a non-duration value fails loudly, before any build runs', () => {
+  assert.throws(
+    () => audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 'fast' }),
+    /--max-lcp must be a duration in milliseconds above 0 \(got "fast"\)/,
+  );
+  assert.throws(
+    () => audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 0 }),
+    /--max-lcp must be a duration in milliseconds above 0/,
+  );
+});
+
 // ─── Pages: the home page always, plus the args ─────────────────────────────
 
 test('parsePages: bare audit audits the home page', () => {
@@ -119,6 +142,64 @@ test('categoryScores: the four categories out of 100, null when Lighthouse produ
     'best-practices': null,
     seo: null,
   });
+});
+
+// ─── Metrics: LCP and CLS beside the scores, with the form factor ───────────
+
+const LHR = (lcp, cls) => ({
+  configSettings: { formFactor: 'mobile' },
+  audits: {
+    'largest-contentful-paint': { numericValue: lcp },
+    'cumulative-layout-shift': { numericValue: cls },
+  },
+});
+
+test('pageMetrics: LCP in whole ms, CLS, and the form factor the run used', () => {
+  assert.deepStrictEqual(audit.pageMetrics(LHR(784.4213, 0.0021)), {
+    lcp: 784,
+    cls: 0.0021,
+    formFactor: 'mobile',
+  });
+});
+
+test('pageMetrics: a metric Lighthouse did not produce reads null, never 0', () => {
+  assert.deepStrictEqual(audit.pageMetrics({ audits: {} }), { lcp: null, cls: null, formFactor: null });
+});
+
+test('evaluateLcp: no --max-lcp never fails, whatever the page measured', () => {
+  assert.deepStrictEqual(audit.evaluateLcp([{ page: '/', metrics: audit.pageMetrics(LHR(9000, 0)) }], null), []);
+});
+
+test('evaluateLcp: an LCP over the bar fails, at or under it passes', () => {
+  const results = [
+    { page: '/', metrics: audit.pageMetrics(LHR(784, 0)) },
+    { page: '/pricing', metrics: audit.pageMetrics(LHR(2588, 0)) },
+  ];
+  assert.deepStrictEqual(audit.evaluateLcp(results, 1000), [
+    { page: '/pricing', metric: 'lcp', value: 2588, max: 1000 },
+  ], 'the fast page is reported, the slow one is the failure');
+
+  assert.deepStrictEqual(
+    audit.evaluateLcp([{ page: '/', metrics: audit.pageMetrics(LHR(1000, 0)) }], 1000),
+    [],
+    'exactly at the bar passes',
+  );
+});
+
+test('evaluateLcp: a MISSING LCP under an armed bar fails — a run that measured nothing has not passed', () => {
+  const failures = audit.evaluateLcp([{ page: '/', metrics: { lcp: null, cls: null, formFactor: null } }], 1000);
+  assert.deepStrictEqual(failures, [{ page: '/', metric: 'lcp', value: null, max: 1000 }]);
+});
+
+test('formatSummary: the per-page printout carries the scores, the metrics and the form factor', () => {
+  assert.strictEqual(
+    audit.formatSummary(GREEN, { lcp: 784, cls: 0.021, formFactor: 'mobile' }),
+    'Performance 95/100 · Accessibility 100/100 · Best Practices 100/100 · SEO 92/100 · LCP 784 ms · CLS 0.021 (mobile emulation)',
+  );
+  assert.strictEqual(
+    audit.formatSummary({ ...GREEN, seo: null }, { lcp: null, cls: null, formFactor: null }),
+    'Performance 95/100 · Accessibility 100/100 · Best Practices 100/100 · SEO n/a · LCP n/a · CLS n/a (unknown emulation)',
+  );
 });
 
 // ─── Serving dist/: clean URLs on an ephemeral port ─────────────────────────
@@ -212,12 +293,22 @@ test('LIVE: Lighthouse scores a served page through headless Chrome', {
       return t.skip(`no headless Chrome — ${error.message}`);
     }
 
-    const scores = await audit.auditPage(`${server.origin}/`, chrome.port);
-    console.log(`    live scores: ${JSON.stringify(scores)}`);
+    const { scores, metrics } = await audit.auditPage(`${server.origin}/`, chrome.port);
+    console.log(`    live run: ${audit.formatSummary(scores, metrics)}`);
 
     for (const category of ['performance', 'accessibility', 'best-practices', 'seo']) {
       assert.strictEqual(typeof scores[category], 'number', `${category} produced a real score`);
     }
+    assert.strictEqual(typeof metrics.lcp, 'number', 'the run measured a real LCP');
+    assert.strictEqual(typeof metrics.cls, 'number', 'the run measured a real CLS');
+    assert.strictEqual(metrics.formFactor, 'mobile', "Lighthouse's default preset is the mobile emulation PSI reports");
+
+    // The LCP bar decides on the REAL number, both ways
+    assert.deepStrictEqual(audit.evaluateLcp([{ page: '/', metrics }], metrics.lcp), [],
+      'a bar AT the observed LCP passes');
+    assert.deepStrictEqual(audit.evaluateLcp([{ page: '/', metrics }], metrics.lcp - 1), [
+      { page: '/', metric: 'lcp', value: metrics.lcp, max: metrics.lcp - 1 },
+    ], 'a bar under the observed LCP fails');
     // The gate decides on the REAL numbers, both ways
     assert.deepStrictEqual(audit.evaluateScores([{ page: '/', scores }], scores), [],
       'thresholds AT the observed scores pass');

@@ -4,10 +4,12 @@
 // We test the main-side surface directly. Renderer-side wiring (preload contextBridge,
 // ipcRenderer.invoke) is exercised in pass 2.3c when the renderer harness lands.
 
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
 const TEST_CHANNEL = 'desktop:test:echo';
 const TEST_LISTEN  = 'desktop:test:event';
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'ipc (main)',
@@ -160,4 +162,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,10 +1,10 @@
-// Framework-provided dependencies (#87), webpack half: a CONSUMER module requires any
+// Framework-provided dependencies (#87), desktop half: a CONSUMER module requires any
 // library @omega.js/desktop declares by BARE specifier and it resolves from the
 // FRAMEWORK's own installation — the framework's copy wins even when the consumer
-// installed its own. The mechanism is the ORDER of the shared `resolve.modules` in
-// gulp/tasks/webpack.js (framework's node_modules before the consumer's), so these
-// tests compile a real consumer entry with that exact resolve config and read the
-// resolved module paths back out of `stats.toJson({ modules: true })`.
+// installed its own. The mechanism is the resolve hook @omega.js/devkit's bundle
+// wrapper composes from the framework's declared dependency set (#737, replacing
+// the ordered `resolve.modules` webpack used), so these tests build a real consumer
+// entry through the wrapper and read the resolved paths back out of the metafile.
 //
 // Both consumer layers live in a temp dir OUTSIDE this monorepo and carry their own
 // node_modules — the same layouts npm produces for a real brand: shared/hoisted copies
@@ -16,8 +16,8 @@ const os   = require('os');
 const path = require('path');
 
 const FRAMEWORK_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
-const webpack = require(require.resolve('webpack', { paths: [FRAMEWORK_ROOT] }));
-const { makeSharedResolve } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'webpack.js'));
+const { bundle } = require('@omega.js/devkit/bundle');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Framework-declared deps sampled by the first test: two bare CJS packages plus a
 // subpath import, all of them real `dependencies` of @omega.js/desktop.
@@ -47,37 +47,31 @@ function packageDirFor(spec, fromRoot) {
   return entry.slice(0, entry.indexOf(marker) + marker.length - 1);
 }
 
-// Compile `entry` with the shared resolve config the desktop webpack task builds for
-// this (projectRoot, frameworkRoot) pair, and return the module list.
-function compile({ projectRoot, frameworkRoot }) {
-  return new Promise((resolve, reject) => {
-    webpack({
-      mode:    'development',
-      devtool: false,
-      target:  'electron-main',
-      entry:   path.join(projectRoot, 'src', 'entry.js'),
-      output:  { path: path.join(projectRoot, 'dist'), filename: 'entry.bundle.js' },
-      resolve: makeSharedResolve(projectRoot, frameworkRoot),
-    }, (err, stats) => {
-      if (err) return reject(err);
-      const json = stats.toJson({ modules: true, errors: true });
-      if (json.errors?.length) return reject(new Error(json.errors.map((e) => e.message || e).join('\n')));
-      resolve(json.modules);
-    });
+// Build `src/entry.js` the way the desktop lane builds its main bundle, and return
+// every input path the bundle pulled in (absolute, real).
+async function compile({ projectRoot, frameworkRoot }) {
+  const result = await bundle({
+    frameworkRoot,
+    entries: [path.join(projectRoot, 'src', 'entry.js')],
+    outfile: path.join(projectRoot, 'dist', 'entry.bundle.js'),
+    platform: 'node',
+    format: 'cjs',
+    dev: true,
   });
+
+  return Object.keys(result.metafile.inputs).map((input) => path.resolve(input));
 }
 
-// The module webpack resolved for a given bare specifier.
-function resolvedFor(modules, spec) {
-  const mod = modules.find((m) => (m.reasons || []).some((r) => r.userRequest === spec));
-  return mod && mod.nameForCondition;
+// Whether the bundle pulled a file out of exactly this package directory.
+function bundledFrom(inputs, dir) {
+  return inputs.some((input) => input.startsWith(dir + path.sep));
 }
 
 // A real consumer install: the framework's deps hoisted into the consumer's own
 // node_modules (symlinked to the real installed copies), no nested copies anywhere.
 function stageHoistedConsumer(specs) {
   // realpath: macOS' /var is a symlink to /private/var, and the resolved module
-  // paths webpack reports are real paths.
+  // paths a bundler reports are real paths.
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-desktop-framework-deps-')));
   writePackage(root, 'consumer-app', '1.0.0');
 
@@ -108,6 +102,12 @@ function stageConflictInstall() {
   writePackage(path.join(consumerNm, 'shared-pkg'), 'shared-pkg', '1.0.0');
   write(path.join(consumerNm, 'shared-pkg', 'index.js'), 'module.exports = "SHARED_COPY";');
 
+  // The fixture framework must resolve esbuild the way the real one does — it
+  // has no node_modules of its own, so the monorepo's hoisted copy is what a
+  // walk up from a temp dir must find. Staging it under the CONSUMER's
+  // node_modules is that walk.
+  fs.symlinkSync(packageDirFor('esbuild', FRAMEWORK_ROOT), path.join(consumerNm, 'esbuild'), 'dir');
+
   writePackage(frameworkRoot, '@omega.js/desktop', '1.0.0', {
     dependencies: { 'dupe-pkg': '^2.0.0', 'shared-pkg': '^1.0.0' },
   });
@@ -125,7 +125,7 @@ function stageConflictInstall() {
   return { root, frameworkRoot };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'framework-deps — a consumer bundle resolves framework-declared deps from the framework',
@@ -136,10 +136,9 @@ module.exports = {
       run: async (ctx) => {
         const projectRoot = stageHoistedConsumer(SAMPLE);
         try {
-          const modules = await compile({ projectRoot, frameworkRoot: FRAMEWORK_ROOT });
+          const inputs = await compile({ projectRoot, frameworkRoot: FRAMEWORK_ROOT });
           SAMPLE.forEach((spec) => {
-            const dir = packageDirFor(spec, FRAMEWORK_ROOT);
-            ctx.expect(resolvedFor(modules, spec).startsWith(dir + path.sep)).toBe(true);
+            ctx.expect(bundledFrom(inputs, packageDirFor(spec, FRAMEWORK_ROOT))).toBe(true);
           });
         } finally {
           fs.rmSync(projectRoot, { recursive: true, force: true });
@@ -152,22 +151,23 @@ module.exports = {
       run: async (ctx) => {
         const { root, frameworkRoot } = stageConflictInstall();
         try {
-          const modules = await compile({ projectRoot: root, frameworkRoot });
+          const inputs = await compile({ projectRoot: root, frameworkRoot });
+          const built = fs.readFileSync(path.join(root, 'dist', 'entry.bundle.js'), 'utf8');
 
           // Both the bare specifier and the subpath land on the framework's nested copy…
-          ['dupe-pkg', 'dupe-pkg/sub'].forEach((spec) => {
-            ctx.expect(resolvedFor(modules, spec)).toBe(require.resolve(spec, { paths: [frameworkRoot] }));
-          });
-          ctx.expect(resolvedFor(modules, 'dupe-pkg')).toContain(path.join('desktop', 'node_modules', 'dupe-pkg'));
+          ctx.expect(built).toContain('FRAMEWORK_COPY');
+          ctx.expect(built).toContain('FRAMEWORK_SUBPATH');
+          ctx.expect(built.includes('CONSUMER_COPY')).toBe(false);
+          ctx.expect(built.includes('CONSUMER_SUBPATH')).toBe(false);
+          ctx.expect(bundledFrom(inputs, path.join(frameworkRoot, 'node_modules', 'dupe-pkg'))).toBe(true);
 
           // …while a dep with no conflict keeps resolving to the single hoisted copy,
           // shared by the framework and the consumer alike.
-          ctx.expect(resolvedFor(modules, 'shared-pkg')).toBe(require.resolve('shared-pkg', { paths: [frameworkRoot] }));
-          ctx.expect(resolvedFor(modules, 'shared-pkg')).toBe(path.join(root, 'node_modules', 'shared-pkg', 'index.js'));
+          ctx.expect(bundledFrom(inputs, path.join(root, 'node_modules', 'shared-pkg'))).toBe(true);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
         }
       },
     },
   ],
-};
+});

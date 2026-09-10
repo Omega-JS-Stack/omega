@@ -1,0 +1,11 @@
+// A SMALL page sheet: under the inline budget, so it ships as a <style> block
+// in the head instead of a request nothing paints without (#767).
+.consumer-inline-probe {
+  color: rebeccapurple;
+}
+
+// A string literal that would END the block early if printed raw (#767):
+// the inline path escapes it the way the critical block does.
+.consumer-inline-probe::after {
+  content: "</style>";
+}

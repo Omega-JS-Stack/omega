@@ -6,7 +6,9 @@
  *   targeting the test_admin segment (hello@itwcreativeworks.com only)
  */
 
-module.exports = {
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+
+module.exports = defineCases({
   description: 'Marketing campaign (POST create + send)',
   type: 'group',
   tests: [
@@ -179,4 +181,4 @@ module.exports = {
       },
     },
   ],
-};
+});

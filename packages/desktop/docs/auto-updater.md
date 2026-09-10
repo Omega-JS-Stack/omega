@@ -175,26 +175,69 @@ OMEGA_DEV_UPDATE=error npm start
 
 In dev simulation mode, `quitAndInstall()` is a no-op (no actual restart) so you can step through the dialog flow without the app exiting.
 
+The simulated download is memory-only: it never writes the `pendingUpdate` storage record, and the reconciler discards a stored one carrying the simulator's reserved `999.0.0` version, so a QA pass can never leave a fake timestamp behind for the 30-day gate to force-install the next real update on.
+
+### The menu trigger
+
+Relaunching once per scenario is a slow way to walk three outcomes, so the default menu carries the same cascade on demand. In development, **View → Developer → Simulate update** lists one item per scenario:
+
+| Item | ID | Outcome |
+|---|---|---|
+| Update available | `view/developer/simulate-update/available` | full cascade through downloading → downloaded |
+| No update available | `view/developer/simulate-update/unavailable` | lands in `not-available` |
+| Update error | `view/developer/simulate-update/error` | lands in `error` |
+
+Each item calls `manager.autoUpdater.simulate(scenario)`, which is callable from anywhere in main:
+
+```js
+await manager.autoUpdater.simulate('available');
+```
+
+Rules of the road:
+
+- It throws with `scenario required` when called with no argument, and on an unknown scenario (`available`, `unavailable`, `error` are the whole set, shared with the env var).
+- It **refuses in a packaged production build** unless that build was launched with `OMEGA_DEV_UPDATE` set. Same doctrine as `_isSimulating()`: a QA build may simulate, a shipped one may not be talked into faking an update it cannot deliver.
+- It **refuses while a cascade is still running** (one simulation at a time). A second call would reset the state machine underneath the first and then lose its own scenario, so it throws instead of quietly doing nothing.
+- It resolves with the status once the cascade is running (like `checkNow()`); the terminal state arrives over the usual `desktop:auto-updater:status` broadcast a few hundred ms later.
+- The first call swaps the real `electron-updater` instance out for the synthetic one and **leaves it swapped for the rest of the session**. Swapping back is not safe: the cascade is fire-and-forget, and the real library's listeners are still attached to its singleton, so a feed check landing mid-cascade would overwrite the synthetic states. Relaunch to get the real updater back.
+
+### The session latch
+
+Because the synthetic library stays wired, every LATER trigger drives it too: the hourly feed-check tick calls `checkForUpdates()` with no scenario, the simulator falls back to `available`, and the state machine lands on a fake `downloaded v999.0.0`. So the first `simulate()` also latches the process into simulation mode, and `_isSimulating()` reads:
+
+```js
+!!process.env.OMEGA_DEV_UPDATE || _devSimulationSession
+```
+
+That latch is what keeps a synthetic update out of the real install path. Every existing guard is written against `_isSimulating()`, so with it set:
+
+- `_evaluateIdleInstall()` bails, so no native "restart to update" prompt fires for an update that does not exist.
+- `installNow()` bails before `manager._allowQuit = true` and `quitAndInstall()`.
+
+Without the latch, a plain dev session (env var unset) that clicked the menu once would hit all of the above on the next tick. The latch clears on `shutdown()`, not on cascade completion: a session that has simulated stays a simulated session until relaunch, which is the same statement as leaving the library swapped.
+
+The submenu is dev-only (same gate as `view/developer/toggle-devtools`) and is an ordinary menu item, so `manager.menu.remove('view/developer/simulate-update')` drops it like any other.
+
 ## Production: how electron-updater finds the feed
 
-`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). @omega.js/desktop's `gulp/build-config` injects `publish` from `config.releases.{owner,repo}` into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
+`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). @omega.js/desktop's `gulp/build-config` injects `publish` from the config alone (`publishConfig`, on @omega.js/config's `releasesRepo`) into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
 
 ```
 provider: github
-owner:    <config.releases.owner ?? appOwner>
-repo:     <config.releases.repo  ?? 'update-server'>
+owner:    <releases.owner ?? the brand repo's owner>
+repo:     <releases.repo  ?? `${brand.id}-releases`>
 releaseType: release
 ```
 
-So your private app repo and your public release repo are completely decoupled — the bundled binary knows where to look for updates.
+So your private app repo and your public release repo are completely decoupled — the bundled binary knows where to look for updates. The address is never guessed from a git remote ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)): this feed URL is polled by every installed copy forever, and inside a brand monorepo the remote is the repo the brand is NESTED in.
 
 ## Failure modes
 
-- **Update repo isn't public** → `electron-updater` gets 404 or 401 against a private repo. Fix: ensure `<owner>/<update-server>` is public.
+- **Update repo isn't public** → `electron-updater` gets 404 or 401 against a private repo. Fix: ensure the releases repo (`<owner>/<brand.id>-releases` by default) is public.
 - **Token rotates / expires for `releases` repo** — `electron-updater` doesn't authenticate downloads (anonymous public reads). So tokens don't apply on the consumer side.
 - **`app-update.yml` missing in the packaged app** → look at the build log for `electron-builder`'s "creating updates yml" line. If it's skipped, your `publish` block didn't materialize correctly into `dist/electron-builder.yml`.
 - **`error` status with code `ERR_UPDATER_CHANNEL_FILE_NOT_FOUND`** → there's no `latest-mac.yml` (or `latest.yml` / `latest-linux.yml`) at the configured channel. Run a release first.
 
 ## Tests
 
-- `src/test/suites/main/auto-updater.test.js` — state machine, dev simulation, 30-day gate (first-download-wins, force install at age, fresh updates ignored), pendingUpdate clear on version match, IPC handler registration, `enabled=false` skip.
+- `src/test/suites/main/auto-updater.test.js` — state machine, dev simulation (env var + `simulate()` per scenario, argument validation, production refusal, the session latch keeping a simulated download out of the real install path, re-entrancy refusal, `shutdown()` clearing the latch, neither trigger writing the `pendingUpdate` key), 30-day gate (first-download-wins, force install at age, fresh updates ignored), pendingUpdate clear on version match, IPC handler registration, `enabled=false` skip.

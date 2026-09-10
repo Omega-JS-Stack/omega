@@ -7,7 +7,8 @@
  *
  * Run: npx omega test backend:routes/verts/selection
  */
-const { isEligible, filterEligible, scoreVert, weightedPick, selectVert, normalizeHost, normalizeBrandId, parseTags } = require('../../../src/manager/routes/verts/utils.js');
+const { isEligible, filterEligible, scoreVert, weightedPick, selectVert, normalizeHost, normalizeBrandId, parseTags } = require('../../../dist/manager/routes/verts/utils.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 function makeAd(id, overrides) {
   return {
@@ -23,7 +24,7 @@ function makeAd(id, overrides) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Verts selection scoring',
   type: 'group',
   tests: [
@@ -233,4 +234,4 @@ module.exports = {
       },
     },
   ],
-};
+});

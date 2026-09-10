@@ -5,17 +5,18 @@
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type.
  */
-const chargebeeProvider = require('../../../../src/manager/routes/payments/webhook/providers/chargebee.js');
+const chargebeeProvider = require('../../../../dist/manager/routes/payments/webhook/providers/chargebee.js');
 
 // Chargebee webhook fixtures
 const FIXTURE_SUB_CREATED = require('../../../fixtures/chargebee/webhook-subscription-created.json');
 const FIXTURE_PAYMENT_FAILED = require('../../../fixtures/chargebee/webhook-payment-failed.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 function parseWebhook(event) {
   return chargebeeProvider.parseWebhook({ body: event });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Chargebee parseWebhook() event categorization',
   type: 'group',
 
@@ -82,6 +83,17 @@ module.exports = {
       name: 'supports-payment-failed',
       async run({ assert }) {
         assert.ok(chargebeeProvider.isSupported('payment_failed'), 'Should support payment_failed');
+      },
+    },
+
+    {
+      name: 'supports-payment-succeeded',
+      async run({ assert }) {
+        // The paid signal for a one-time purchase. Without it subscribed, a
+        // Chargebee one-time sale reached the pipeline as `invoice_generated`
+        // alone — an event that says nothing about payment
+        // ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)).
+        assert.ok(chargebeeProvider.isSupported('payment_succeeded'), 'Should support payment_succeeded');
       },
     },
 
@@ -288,6 +300,47 @@ module.exports = {
       },
     },
 
+    // ─── payment_succeeded ───
+
+    {
+      name: 'payment-succeeded-one-time-category',
+      async run({ assert }) {
+        const result = parseWebhook({
+          id: 'ev_pay_ok_onetime',
+          event_type: 'payment_succeeded',
+          content: {
+            invoice: { id: 'inv_onetime_paid' },
+            customer: { id: 'cust_onetime', meta_data: '{"uid":"user-onetime-paid"}' },
+          },
+        });
+
+        assert.equal(result.category, 'one-time', 'No subscription → one-time');
+        assert.equal(result.resourceType, 'invoice', 'Should fetch invoice');
+        assert.equal(result.resourceId, 'inv_onetime_paid', 'Resource ID should be invoice ID');
+        assert.equal(result.uid, 'user-onetime-paid', 'UID from customer');
+      },
+    },
+
+    {
+      name: 'payment-succeeded-with-subscription-skipped',
+      async run({ assert }) {
+        // A renewal's charge. `subscription_renewed` already carries that revenue,
+        // so storing this one too would book the renewal twice — the same
+        // double-count the Stripe provider documents for `invoice.paid`
+        // ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)).
+        const result = parseWebhook({
+          id: 'ev_pay_ok_sub',
+          event_type: 'payment_succeeded',
+          content: {
+            subscription: { id: 'sub_paid', meta_data: '{"uid":"user-paid"}' },
+            invoice: { id: 'inv_renewal', subscription_id: 'sub_paid' },
+          },
+        });
+
+        assert.equal(result.category, null, 'With a subscription → null (subscription_renewed owns it)');
+      },
+    },
+
     // ─── payment_refunded ───
 
     {
@@ -434,4 +487,4 @@ module.exports = {
       },
     },
   ],
-};
+});

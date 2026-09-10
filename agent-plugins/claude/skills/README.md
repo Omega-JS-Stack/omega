@@ -13,6 +13,12 @@ Four more are checklists rather than routers, and the quality hook fires them on
 | `brandcheck` | Config and copy consistency: brand facts read from omega.json5, one brand hex, the merge chain, no secrets in config |
 | `analytics` | Event tracking: every flow fires through the catalog, a new event is a catalog entry first, the placement rule, consent and attribution carried not hand-rolled |
 
+One more is a checklist the GATE fires, not the quality hook — the theme surfaces it owns are the same ones the gate refuses without it (the table is in the plugin README):
+
+| Skill | The checklist |
+|---|---|
+| `theme` | The theme cascade: which layer a change belongs to, base/skin/fork and the declared forks, the tokens, whole-folder overrides and `inherit`, the two consumer tiers |
+
 ```
 skills/
 └── <name>/

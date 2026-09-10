@@ -13,8 +13,13 @@ const SIGNING_ENV_KEYS = [
   'CSC_LINK',
   'CSC_KEY_PASSWORD',
   'CSC_NAME',
+  // electron-builder's OWN Windows cert name — @omega.js/desktop's signer reads
+  // WIN_EV_TOKEN_PATH ([#337](https://github.com/Omega-JS-Stack/omega/issues/337)).
   'WIN_CSC_LINK',
   'WIN_CSC_KEY_PASSWORD',
+  'WIN_EV_TOKEN_PATH',
+  'WIN_TIMESTAMP_URL',
+  'SIGNTOOL_PATH',
   'APPLE_API_KEY',
   'APPLE_API_KEY_ID',
   'APPLE_API_ISSUER',

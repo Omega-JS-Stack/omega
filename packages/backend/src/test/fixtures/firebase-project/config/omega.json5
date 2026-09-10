@@ -15,6 +15,17 @@
     webhookKey: 'fixture-webhook-key',
     namespace: '00000000-0000-0000-0000-000000000000',
   },
+  // The feature catalog (#647): every feature is defined ONCE here, and the
+  // products below name only their value.
+  features: {
+    requests: {
+      name: 'API Requests',
+      icon: 'bolt',
+      definition: 'Calls this project may make per month.',
+      usage: {},
+    },
+  },
+
   // Corpus-parity payment config (same offline shape as the sandbox-brand
   // consumer) so the FULL framework suite — payment journeys + intent/
   // cancel/refund routes — passes against the fixture, not just boot.
@@ -35,16 +46,16 @@
         id: 'basic',
         name: 'Basic',
         type: 'subscription',
-        limits: {
-          requests: 100,
+        features: {
+          requests: 10000,
         },
       },
       {
         id: 'premium',
         name: 'Premium',
         type: 'subscription',
-        limits: {
-          requests: 1000,
+        features: {
+          requests: 100000,
         },
         trial: {
           days: 14,
@@ -68,8 +79,8 @@
         id: 'ultimate',
         name: 'Ultimate',
         type: 'subscription',
-        limits: {
-          requests: 10000,
+        features: {
+          requests: -1,
         },
         prices: {
           monthly: 19.99,

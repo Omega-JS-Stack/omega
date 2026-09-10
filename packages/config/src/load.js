@@ -57,7 +57,7 @@ const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
 const { schemaDefaults } = require('./defaults.js');
-const { resolveInstanceEntry, instanceIdFromDirName, MAIN_INSTANCE } = require('./instances.js');
+const { resolveInstanceEntry, resolveInstanceUrl, instanceIdFromDirName, MAIN_INSTANCE } = require('./instances.js');
 
 const FILE_NAME = 'omega.json5';
 const CONFIG_LOCATIONS = [
@@ -369,6 +369,33 @@ function loadConfig(projectDir, target, options) {
   // Keep the merged targets map on the resolved config (presence = enabled)
   if (target && hasTargets) {
     config.targets = targets;
+  }
+
+  // The instance's own public URL (#588): an entry's explicit `url` already
+  // merged to the top level above, and a bare `{ id: 'admin' }` derives
+  // https://admin.<brand host> through the ONE resolver, landing in that same
+  // place, so every reader of the resolved config (site-global's site.url, the
+  // web deploy's host + CNAME) sees the instance's url and not the main site's.
+  // `main` derives nothing: brand.url IS its url.
+  //
+  // A brand.url OVERRIDE that reached this instance (the instance entry's own
+  // `brand.url`, an instance target dir's local layer, a dev layer pointing at
+  // localhost) IS the instance url already, never a base to stack the id on:
+  // deriving there gave shop.shop.acme.test and https://admin.localhost:4000.
+  // The test is whether the resolved brand.url still equals the BRAND layer's.
+  if (target && instance !== MAIN_INSTANCE && !config.url) {
+    const brandLayerUrl = (brand && brand.brand && brand.brand.url)
+      || (inherited && inherited.brand && inherited.brand.url)
+      || null;
+    const resolvedUrl = (config.brand && config.brand.url) || null;
+
+    const instanceUrl = resolvedUrl && resolvedUrl !== brandLayerUrl
+      ? resolvedUrl
+      : resolveInstanceUrl(targets ? targets[target] : null, instance, config);
+
+    if (instanceUrl) {
+      config.url = instanceUrl;
+    }
   }
 
   const enabled = target

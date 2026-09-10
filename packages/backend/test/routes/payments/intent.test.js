@@ -9,7 +9,9 @@
  * If the brand has no paid product configured, each test skips — this is a
  * config-gap, not a code failure.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment intent creation',
   type: 'group',
   timeout: 30000,
@@ -408,4 +410,4 @@ module.exports = {
       },
     },
   ],
-};
+});

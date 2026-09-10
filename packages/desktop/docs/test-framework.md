@@ -90,6 +90,8 @@ The target matches against the test file path. The source prefix scopes selectio
 
 A bare prefix (`mgr:` / `desktop:` / `project:` with no path) runs every test in that source. A bare path (no prefix) binds to the PROJECT source; `full:<path>` searches both sources by path.
 
+A target that names a path and matches NO file is a hard error: the run prints `No test file matches "<target>"` and exits 1, so a typo'd path, or a suite renamed out from under a target, can never run silently green ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). A run that named no file (bare, or a bare source prefix) still exits 0 when there is nothing to run. Inside a brand-root fan-out the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and the same miss answers with exit 3 instead: a path another target carries is a no-op here, and the brand run fails only when EVERY target missed ([docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b)).
+
 > **Target vs `--filter`.** The positional target selects test FILES (by path + source). The `--filter=<substring>` flag is orthogonal: it matches test NAMES/descriptions within the selected files. Use them together, e.g. `npx omega test project: --filter="reorder"`.
 
 ### Layers
@@ -230,7 +232,7 @@ module.exports = [
 |---|---|---|
 | `build` | Plain Node | CLI, package.json, config schema, gulp tasks |
 | `main` | Spawned Electron main process | Manager init, lib modules, IPC, windows |
-| `renderer` | Hidden BrowserWindow (not yet implemented — Pass 2.3c) | `window.desktop.*`, preload bridge, UI logic |
+| `renderer` | Hidden BrowserWindow: the framework's harness page by default, one of the project's own `src/views/` when the suite declares `view: '<name>'` | `window.desktop.*`, preload bridge, UI logic, your own views |
 
 The runner partitions test files by layer at discovery time. The build layer runs inline; the main layer spawns Electron once with all main suites and parses JSON-line stdout.
 
@@ -315,3 +317,41 @@ module.exports = {
 ```
 
 `npx omega test` runs your project suites; scope `framework:` or `full:` to reach the framework's own.
+
+### Testing your own views
+
+A `renderer` suite that declares **`view: '<name>'`** runs against `src/views/<name>/` of YOUR app instead of the framework's harness page:
+
+```js
+// test/renderer/main-view.test.js
+module.exports = {
+  type: 'group',
+  layer: 'renderer',
+  view: 'main',                       // <- src/views/main/, as built
+  description: 'the main view',
+  tests: [
+    {
+      name: 'the heading renders the product name',
+      run: (ctx) => {
+        ctx.expect(document.querySelector('h1').textContent.trim()).toBe('My App');
+      },
+    },
+    {
+      name: 'the preload reached the page',
+      run: (ctx) => {
+        ctx.expect(typeof window.desktop).toBe('object');
+      },
+    },
+  ],
+};
+```
+
+Such a suite rides the **boot lane**, because only that lane stages and builds the real app (`<project>/.omega/test-app/`) before running: the page gets the project's real `dist/preload.bundle.js`, the real IPC handlers of the booted main process, and the real config. The window is created through the app's own window manager (hidden, no bounds persistence) and destroyed when the suite ends. Cost is the boot lane's: one build (~10-30s) shared with your boot tests.
+
+Consequences worth knowing:
+
+- **`--layer=renderer` does NOT run a view suite** (it needs the boot). `--layer=boot` and the default `--layer=all` do.
+- The test bodies still run as `new Function` inside the page: no closures over module scope, only `ctx` (`expect`, `state`, `layer`, `skip`) and the page globals (`window`, `document`, `window.desktop.*`).
+- Without `view`, nothing changes: the suite runs on the harness page in the main test Electron, as it always has.
+- A view that fails to load fails every test of the suite with `view "<name>" did not load`, rather than reporting an empty page.
+- Each view suite has a hard 60 s ceiling for the whole suite (the same ceiling the harness page uses); a suite's own `timeout` applies per test underneath it.

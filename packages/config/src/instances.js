@@ -149,9 +149,32 @@ function instancePortOffset(entry, instanceId) {
 }
 
 /**
+ * The host `brand.url` names, EXACTLY as it states it: a `www.` label is kept
+ * (a www brand is a www brand), any path is dropped, a port survives. A
+ * scheme-less value is read as https.
+ * @param {string} url - A brand URL.
+ * @returns {string} The host, or '' when the value is not a URL.
+ */
+function brandHost(url) {
+  try {
+    return new URL(url.includes('://') ? url : `https://${url}`).host;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * The live URL of an instance: its entry's `url` (the spec's per-instance
- * key), an instance-scoped `brand.url` override, then the brand-shared
- * brand.url — the manager's per-instance live checks read this.
+ * key), an instance-scoped `brand.url` override, then, for every id but
+ * `main`, the id AS A SUBDOMAIN of the brand host (#588), and the
+ * brand-shared brand.url for `main`. The manager's per-instance live checks,
+ * the resolved config's top-level `url` and site-global all read this.
+ *
+ * The id-is-the-subdomain default is what makes `web: [{ id: 'main' },
+ * { id: 'admin' }]` a complete declaration; an explicit `url` overrides it for
+ * a custom host (`{ id: 'store', url: 'https://shop.acme.com' }`). Nothing is
+ * half-derived: no usable brand.url means null for every id, never
+ * `https://admin.`.
  * @param {object|Array|null|undefined} entry - The raw targets.<type> value.
  * @param {string} instanceId - The instance id.
  * @param {object} config - The (resolved) config carrying brand.url.
@@ -159,7 +182,15 @@ function instancePortOffset(entry, instanceId) {
  */
 function resolveInstanceUrl(entry, instanceId, config) {
   const instance = resolveInstanceEntry(entry, instanceId);
-  return instance?.url || instance?.brand?.url || config?.brand?.url || null;
+  if (instance?.url) return instance.url;
+  if (instance?.brand?.url) return instance.brand.url;
+
+  const brandUrl = config?.brand?.url;
+  if (!brandUrl) return null;
+  if (instanceId === MAIN_INSTANCE) return brandUrl;
+
+  const host = brandHost(brandUrl);
+  return host ? `https://${instanceId}.${host}` : null;
 }
 
 module.exports = {

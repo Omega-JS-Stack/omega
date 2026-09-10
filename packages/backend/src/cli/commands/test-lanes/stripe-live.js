@@ -14,12 +14,13 @@
  *
  * The gate, in order:
  *   1. A Stripe secret resolves through the ONE env reader
- *      ([../../../manager/libraries/env.js](../../../manager/libraries/env.js)),
- *      which outside production prefers `STRIPE_SECRET_KEY_DEV` and REFUSES a
- *      live-shaped credential outright ([#586]).
- *   2. That secret is test-shaped (`sk_test_`). The reader's refusal already
- *      catches `sk_live_`, and this catches everything else a key slot might
- *      hold — a restricted key, a publishable key, a paste of the wrong line.
+ *      ([../../../manager/libraries/env.js](../../../manager/libraries/env.js)).
+ *      A test lane composes its `.env` from the base plus `.env.testing`
+ *      ([#586]), so the TEST credential belongs in that overlay.
+ *   2. That secret is test-shaped (`sk_test_`) — the whole gate, and the reason
+ *      a live key can never reach this lane. It also catches everything else a
+ *      key slot might hold: a restricted key, a publishable key, a paste of the
+ *      wrong line.
  *   3. The Stripe CLI is installed, because the forwarding and the event triggers
  *      are its job.
  *
@@ -32,13 +33,21 @@
  * NOTHING here ever prints a secret. The gate's refusals name the KEY and the
  * fix; the forwarding hands its signing secret to the child process by env.
  */
-const { execSync, spawn } = require('child_process');
+const path = require('path');
+const { commandOnPath } = require('@omega.js/devkit/command-path');
+const { spawnOnPath } = require('../../utils/spawn-shell');
 const chalk = require('chalk').default;
+
+const { assertDeclaredLane } = require('../../../utils/test-lanes.js');
 
 const env = require('../../../manager/libraries/env.js');
 
-// The lane's name, as `--lane=` spells it and as the runner reads it off the env
-const LANE = 'stripe-live';
+// The lane's name, as `--lane=` spells it and as the runner reads it off the
+// env. It is this module's own FILE NAME (the gate is resolved as
+// `test-lanes/<name>.js`), proved against the framework's declared lane list so
+// a rename that missed the manifest fails loudly here instead of leaving the
+// lane unreachable (src/utils/test-lanes.js).
+const LANE = assertDeclaredLane(path.basename(__filename, '.js'));
 
 // The env var the lane sets for the runner child. The runner's discovery skips
 // `test/stripe-live/` unless it names this lane, so the suites are unreachable by
@@ -74,16 +83,16 @@ function resolveGate({ env: reader, hasStripeCli }) {
   try {
     key = reader.get('STRIPE_SECRET_KEY');
   } catch (error) {
-    // The reader refuses a LIVE credential outside production ([#586]). That is
-    // exactly the refusal this lane wants — surfaced as a skip, because a lane
-    // that would have charged a real card must not merely fail, it must not run.
+    // A reader fault (an undeclared key, a missing one) is surfaced as a SKIP,
+    // not a failure: a lane that cannot prove which account it would touch must
+    // not merely fail, it must not run.
     return { ok: false, reason: error.message };
   }
 
   if (!key) {
     return {
       ok: false,
-      reason: 'no Stripe secret is configured — put the TEST key (sk_test_…) in STRIPE_SECRET_KEY_DEV in the brand .env and run `npx omega manage`',
+      reason: 'no Stripe secret is configured — put the TEST key (sk_test_…) in STRIPE_SECRET_KEY in the brand\'s .env.testing overlay',
     };
   }
 
@@ -107,14 +116,14 @@ function resolveGate({ env: reader, hasStripeCli }) {
 /**
  * Is the Stripe CLI on PATH?
  *
+ * The path is REPORTED (the lane hands it down as STRIPE_CLI_PATH so a run says
+ * which CLI it found), never spawned — every spawn below names `stripe` bare and
+ * lets the host resolve it.
+ *
  * @returns {string|null} Its path, or null when it is not installed
  */
 function findStripeCli() {
-  try {
-    return execSync('which stripe', { encoding: 'utf8' }).trim() || null;
-  } catch (error) {
-    return null;
-  }
+  return commandOnPath('stripe');
 }
 
 /**
@@ -283,16 +292,15 @@ async function ensureFixtures({ stripe, fixtures, log }) {
  * before the tunnel exists.
  *
  * @param {object} options
- * @param {string} options.stripePath - The Stripe CLI binary
  * @param {string} options.apiKey - The test secret key
  * @param {string} options.forwardUrl - The local webhook endpoint
  * @param {function} options.log - Where the CLI's own lines go
  * @param {number} [options.timeoutMs] - How long to wait for readiness
  * @returns {Promise<{ stop: function }>}
  */
-function startForwarding({ stripePath, apiKey, forwardUrl, log, timeoutMs = 30000 }) {
+function startForwarding({ apiKey, forwardUrl, log, timeoutMs = 30000 }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(stripePath, ['listen', '--forward-to', forwardUrl, '--api-key', apiKey], {
+    const child = spawnOnPath('stripe', ['listen', '--forward-to', forwardUrl, '--api-key', apiKey], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -373,13 +381,12 @@ function forwardUrl({ hostingPort, webhookKey }) {
  * takes the overrides that put one on.
  *
  * @param {object} options
- * @param {string} options.stripePath - The Stripe CLI binary
  * @param {string} options.apiKey - The test secret key
  * @param {string} options.event - The event type to trigger
  * @param {string[]} [options.overrides] - `--override`/`--add` arguments, e.g. `subscription:metadata.uid=…`
  * @returns {Promise<void>}
  */
-function trigger({ stripePath, apiKey, event, overrides = [] }) {
+function trigger({ apiKey, event, overrides = [] }) {
   return new Promise((resolve, reject) => {
     const args = ['trigger', event, '--api-key', apiKey];
 
@@ -387,7 +394,7 @@ function trigger({ stripePath, apiKey, event, overrides = [] }) {
       args.push('--add', override);
     }
 
-    const child = spawn(stripePath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnOnPath('stripe', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
 
     child.stderr.on('data', (data) => { stderr += data.toString(); });

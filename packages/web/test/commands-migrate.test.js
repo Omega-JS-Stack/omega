@@ -127,6 +127,44 @@ test('--check names the dead `asset_path` frontmatter key and its successor idio
   assert.match(output, /@use/, 'and at the @use scss half');
 });
 
+test('--check names each undeclared bare require with the dependency to add (#600)', (t) => {
+  const root = legacyConsumer(t);
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'legacy-site', dependencies: {} }, null, 2));
+  fs.mkdirSync(path.join(root, 'src', 'assets', 'js'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'src', 'assets', 'js', 'prompt.js'),
+    "function buildPromptText() {\n  const jetpack = require('fs-jetpack');\n  return jetpack;\n}\n",
+  );
+
+  const result = spawnSync(process.execPath, [
+    '-e',
+    `require(${JSON.stringify(COMMAND)})({ check: true })`,
+  ], { cwd: root, encoding: 'utf8' });
+  const output = result.stdout + result.stderr;
+
+  assert.strictEqual(result.status, 0, 'an undeclared dependency is a warning, not a failed check');
+  assert.match(output, /src\/assets\/js\/prompt\.js:2 — `fs-jetpack`/, 'the report line names the file, the line and the package');
+  assert.match(output, /npm install fs-jetpack/, '…and the fix, which the verb never runs itself');
+});
+
+test('--check names the sitemap delta so a brand changelog can record it (#564)', (t) => {
+  // A migrated site's `<loc>` count DROPS on the first OMEGA build — the blog
+  // taxonomy and every listing's /page/N are noindex and unlisted now. Named
+  // in the conversion output, or the brand files it as a regression.
+  const root = legacyConsumer(t);
+
+  const result = spawnSync(process.execPath, [
+    '-e',
+    `require(${JSON.stringify(COMMAND)})({ check: true })`,
+  ], { cwd: root, encoding: 'utf8' });
+  const output = result.stdout + result.stderr;
+
+  assert.strictEqual(result.status, 0, 'a posture delta is a note, not a failed check');
+  assert.match(output, /note: sitemap\.xml shrinks/, 'one line, on the conversion output\'s own note lane');
+  assert.match(output, /\/blog\/tags/, 'and it names the families that leave');
+  assert.match(output, /#564/, 'and the issue a brand changelog can point at');
+});
+
 test('a report carrying errors exits non-zero and skips the next-steps block', (t) => {
   // A tree with no legacy configs at all — runMigration reports the error.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-empty-'));

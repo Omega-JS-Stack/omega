@@ -9,9 +9,10 @@
  *                           brand⊕local flattened; the deployed runtime cannot
  *                           walk up past the upload boundary, cp100e)
  *   env cascade           → dist/.env               (COMPOSED: composeTargetEnv —
- *                           company ← brand ← target, filtered to the keys the
- *                           env schema names for `backend`; a DEPLOY stage
- *                           drops the schema's `_DEV` rows, #586)
+ *                           company ← brand ← target, each layer overlaid by its
+ *                           own .env.<environment> file, filtered to the keys the
+ *                           env schema names for `backend`; the STAGE names the
+ *                           environment, #586)
  *   .nvmrc                → dist/.nvmrc
  *   service-account.json  → dist/service-account.json (target root, else the
  *                           brand's .omega/secrets/ — the key's ONE home)
@@ -40,7 +41,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, composeTargetEnv, serializeEnv, resolveEnvChain, findBrandRoot, devEnvKeys } = require('@omega.js/config');
+const { composeTargetConfig, composeTargetEnv, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
 const { isCustomProject } = require('./project-type');
 
@@ -74,35 +75,18 @@ function resolveServiceAccountPath(projectDir) {
 }
 
 /**
- * Drop the env schema's dev-only rows from .env content (#586). The `_DEV`
- * payment secrets exist so a LOCAL run never touches a live payment account;
- * uploading them would put a test credential inside the deployed runtime's
- * env, one stale `ENVIRONMENT` away from serving real customers with it. The
- * key list is the schema's (`devEnvKeys()`), never a copy.
- *
- * Assignments only: a comment line carries no value and stays.
- *
- * @param {string} content - The authored .env content.
- * @returns {string} The same content minus every dev-only assignment.
- */
-function stripDevEnvRows(content) {
-  const dev = new Set(devEnvKeys());
-
-  return content
-    .split('\n')
-    .filter((line) => {
-      const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
-      return !match || !dev.has(match[1]);
-    })
-    .join('\n');
-}
-
-/**
  * Stage the authored target tree into dist/.
  * @param {object} options
  * @param {string} options.projectDir - The target root (firebaseProjectPath).
- * @param {boolean} [options.deploy] - Stage for an UPLOAD: the .env loses its
- *   dev-only rows (see stripDevEnvRows). Local lanes re-stage without it.
+ * @param {string} [options.environment] - The environment the artifact is FOR:
+ *   which `.env.<environment>` overlay composes into dist/.env (#586). Each lane
+ *   pins its own — a deploy 'production', a test lane 'testing', the local lanes
+ *   (emulator, serve, mcp) 'development'; omitted (a bare `omega build`)
+ *   defaults to the running environment.
+ * @param {'licensed'|'keyless'} [options.licenseStatus] - The deploy-time license
+ *   verdict ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)), written
+ *   into dist/.env as OMEGA_LICENSE_STATUS. DEPLOY ONLY: every local lane omits
+ *   it, and an artifact with no status behaves exactly as it does today.
  * @param {function} [options.log] - Line logger (silent by default).
  * @returns {{ distDir: string, staged: string[] }} staged = relative paths written.
  */
@@ -198,14 +182,17 @@ function stageFunctions(options) {
   //     the target's own .env is an optional per-key override. Every verb
   //     that stages composes this file, so a brand-root key reaches the
   //     upload without anyone remembering to run a manage first.
-  const composed = composeTargetEnv({ targetDir: projectDir, target: 'backend' });
-  const envContent = serializeEnv(composed.values);
-  jetpack.write(path.join(distDir, '.env'), options.deploy ? stripDevEnvRows(envContent) : envContent);
+  const composed = composeTargetEnv({ targetDir: projectDir, target: 'backend', environment: options.environment });
+  //     The one COMPUTED key in the file (#320): the deploy's license verdict,
+  //     which no cascade layer can supply and no human writes. Deploy-only, so
+  //     a local stage composes byte-identically to before.
+  if (options.licenseStatus) composed.values.OMEGA_LICENSE_STATUS = options.licenseStatus;
+  jetpack.write(path.join(distDir, '.env'), serializeEnv(composed.values));
 
   // Key NAMES and the layer each came from — never a value (the .env is all
   // secrets)
   const delivered = Object.keys(composed.values).map((key) => `${key} (${composed.sources[key]})`);
-  staged.push(`.env (composed from the cascade${options.deploy ? ', dev-only keys stripped for the upload' : ''})`);
+  staged.push(`.env (composed from the cascade${options.environment ? ` for ${options.environment}` : ''})`);
   log(`Composed dist/.env — ${delivered.length} keys: ${delivered.join(', ') || 'none'}`);
 
   // ─── Target-root files that ride the artifact ────────────────────────────────
@@ -272,6 +259,9 @@ function envWatchInputs(projectDir) {
  * own output) can never feed back into a re-stage loop.
  * @param {object} options
  * @param {string} options.projectDir
+ * @param {string} [options.environment] - The environment every re-stage
+ *   composes dist/.env for (#586) — the boot's own, so a hot reload never
+ *   swaps the artifact's overlay under a running lane.
  * @param {function} [options.log]
  * @param {number} [options.debounceMs]
  * @returns {{ close: function }}
@@ -288,7 +278,7 @@ function watchAndStage(options) {
     clearTimeout(timer);
     timer = setTimeout(() => {
       try {
-        stageFunctions({ projectDir });
+        stageFunctions({ projectDir, environment: options.environment });
         log(`Re-staged dist/ (${reason} changed)`);
       } catch (error) {
         log(`Re-stage failed: ${error.message}`);
@@ -303,17 +293,29 @@ function watchAndStage(options) {
 
   watch(path.join(projectDir, 'src'), restage('src'), { recursive: true });
 
-  // Target-root stage inputs by NAME (never react to dist/ or log churn)
-  const TARGET_ROOT_INPUTS = new Set(['package.json', '.env', '.nvmrc', 'service-account.json', BRAND_RULES_FILE]);
+  // Target-root stage inputs by NAME (never react to dist/ or log churn). The
+  // `.env.<environment>` overlays are inputs too (#586), all three, because the
+  // target root is watched once for every lane and a re-stage is idempotent.
+  // The layer NAMES come from @omega.js/config's envLayerFiles, the one home of
+  // the `.env` + overlay spelling ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
+  const TARGET_ROOT_INPUTS = new Set([
+    'package.json', '.nvmrc', 'service-account.json', BRAND_RULES_FILE,
+    ...ENV_ENVIRONMENTS.flatMap((environment) => envLayerFiles('.env', environment)),
+  ]);
   watch(projectDir, (event, filename) => {
     if (TARGET_ROOT_INPUTS.has(filename)) restage(filename)();
   });
 
-  // The composed .env's upper layers — a brand-root edit restages exactly like
-  // a target .env edit, so a running dev server picks the new key up (#678)
+  // The composed .env's upper layers: a brand-root edit restages exactly like a
+  // target .env edit, so a running dev server picks the new key up (#678). The
+  // lane's OWN overlay counts as that layer's .env (#586); another
+  // environment's file is not in this artifact and must not re-stage it. That
+  // pair IS what envLayerFiles answers, so it is asked rather than spelled out
+  // ([#681](https://github.com/Omega-JS-Stack/omega/issues/681)).
+  const laneNames = new Set(envLayerFiles('.env', options.environment));
   for (const input of envWatchInputs(projectDir)) {
     watch(path.dirname(input.path), (event, filename) => {
-      if (filename === '.env') restage(`${input.layer} .env`)();
+      if (laneNames.has(filename)) restage(`${input.layer} ${filename}`)();
     });
   }
 

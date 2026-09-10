@@ -2,12 +2,12 @@
  * `omega install [type]` — `i local` links every declared @omega.js/* dep
  * from the local Omega monorepo (idempotent); `i live`/`prod` restores
  * registry specs TREE-WIDE (the publish-day inverse: every file: spec flips
- * to ^<linked version> and one install re-resolves from the registry).
+ * to the exact <linked version> and one install re-resolves from the registry).
  */
 const Logger = require('@omega.js/devkit/logger');
 const local = require('@omega.js/devkit/local');
 
-const logger = new Logger('omega:install');
+const logger = new Logger('install');
 
 module.exports = async function (options) {
   const type = options._[1] || 'prod';

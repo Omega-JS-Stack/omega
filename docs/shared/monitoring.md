@@ -146,7 +146,7 @@ maps it from `monitoring.providers.sentry`:
 | Framework | Where |
 |---|---|
 | `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring.providers.sentry` → `sentry`. A real DSN is emitted AFTER the `resolved.client` loop, so the canonical home outranks a stale `client.sentry` ([#485](https://github.com/Omega-JS-Stack/omega/issues/485)); with no DSN there, the off state rides before the loop, so a brand not yet migrated off `client.sentry` keeps reporting |
-| `@omega.js/extension` | `src/gulp/tasks/webpack.js` and `src/gulp/tasks/package.js` (the generated `build.js`) |
+| `@omega.js/extension` | `src/gulp/tasks/bundle.js` (`composeBuildConfig`, baked into every bundle) |
 
 The client's `sentry.config` is the PROVIDER block, flat — nothing role-level ever rides into
 `Sentry.init`. Node/Electron hosts pass the whole `monitoring` section instead and core's

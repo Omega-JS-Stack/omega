@@ -12,17 +12,18 @@
  *     match:       RegExp,                // only checked when value present + string
  *     enum:        [...],                 // only checked when value present
  *     default:     <value>,               // the framework answer — see below
- *     pageBare:    true,                  // section root only — see below
  *     description: 'What the field drives.',
  *   }
  *
- * `pageBare:` is the page-override allow-list
- * ([#607](https://github.com/Omega-JS-Stack/omega/issues/607)): a page's
- * frontmatter overrides config keys under a `config:` parent, and a SECTION
- * ROOT rule carrying `pageBare: true` is the exception a page may restate
- * BARE. `meta` is the only one, and a page restating any other section bare
- * is a build error. configSections() below derives the per-target list of
- * top-level sections this schema declares — the namespace `config:` holds.
+ * configSections() below derives the per-target list of top-level sections
+ * this schema declares ([#607](https://github.com/Omega-JS-Stack/omega/issues/607)):
+ * a page's frontmatter overrides config keys under a `config:` parent, and
+ * that list is BOTH halves of the rule — a section restated bare is a build
+ * error, and a key under `config:` that is not a section is one too. Page
+ * machinery (`meta`, `schema`, `layout`, `permalink`) is not config and has
+ * no home here: `meta` in particular lives in page frontmatter alone, its
+ * site-wide default being brand.name / brand.description (the head's
+ * fallback), so the config section it briefly had is registered RETIRED.
  *
  * `default:` is the ONE home of every config default
  * ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)): defaults.js
@@ -31,6 +32,13 @@
  * description as its guiding comment. A key with no sane framework answer —
  * owner decisions, tri-states that mean "ask", ids the services provision,
  * anything secret-shaped — carries NO `default:` and is never materialized.
+ *
+ * `materialize: false` is the one exception to that second sentence
+ * ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): the rule's
+ * `default:` still resolves (every reader sees it) but is never WRITTEN into a
+ * brand file. It is for framework facts a brand may override and rarely does —
+ * presentation the framework owns, like the packaged connection cards — where a
+ * copy in every brand config would drift from the framework it came from.
  *
  * The other standing exclusion is the PRESENCE GATE (#425), which means the
  * sections a service reads presence from: `monitoring.providers.sentry` is the
@@ -121,7 +129,7 @@ function backendProjectType(entry) {
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
-const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
+const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'features', 'payment', 'monitoring', 'connections', 'theme', 'translation'];
 
 // brand.id's slug rule — the ONE home for the pattern. Anything that gates a
 // caller-supplied brand id (the backend verts routes' normalizeBrandId) imports
@@ -129,6 +137,15 @@ const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 
 const BRAND_ID_PATTERN = /^[a-z][a-z0-9+\-.]*$/;
 
 const SHARED_SCHEMA = [
+  // ── the instance's own url ───────────────────────────────────────────────
+  {
+    path:        'url',
+    type:        'string',
+    required:    false,
+    match:       /^https?:\/\//,
+    description: "This instance's own public URL, and the one key a target entry may set at the top level. A multi-instance target derives it from the instance id (`{ id: 'admin' }` → https://admin.<host of brand.url>, #588; docs/shared/config.md → Multi-instance targets); an entry's own `url` overrides it for a custom host. `brand.url` stays the BRAND's url, which is what brand-level facts (authDomain, the persona domain) read.",
+  },
+
   // ── brand ────────────────────────────────────────────────────────────────
   {
     path:        'brand.id',
@@ -254,80 +271,6 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: 'Parent/legal-entity wordmark (brand.company) rendered in the transactional email footer. Omitted from the footer when unset.',
-  },
-
-  // ── meta (the site's default page meta — the ONE page-bare section) ──────
-  // #607: a page's `meta:` block is the SITE default's page-level override,
-  // and `meta` is the only config section a page may restate BARE
-  // (`pageBare: true`); every other section a page overrides goes under
-  // `config:`. Merge order @omega.js/web renders: page `meta:` → layout `meta`
-  // defaults → this block → brand.name/brand.description.
-  {
-    path:        'meta',
-    type:        'object',
-    required:    false,
-    pageBare:    true,
-    description: "Default page meta for every page the site builds (@omega.js/web's head): title, description, image, keywords plus the head knobs below. A page (or layout) restates `meta:` BARE in frontmatter to override it — the one config section that may. No value here = the head falls back to brand.name / brand.description.",
-  },
-  {
-    path:        'meta.title',
-    type:        'string',
-    required:    false,
-    description: 'Default <title>/og:title. Unset falls back to brand.name.',
-  },
-  {
-    path:        'meta.description',
-    type:        'string',
-    required:    false,
-    description: 'Default meta description/og:description. Unset falls back to brand.description.',
-  },
-  {
-    path:        'meta.image',
-    type:        'string',
-    required:    false,
-    description: 'Default og:image/twitter:image. Unset falls back to brand.images.social, then brand.images.brandmark.',
-  },
-  {
-    path:        'meta.keywords',
-    type:        'string',
-    required:    false,
-    description: 'Default meta keywords (comma-separated). Unset emits no keywords tag.',
-  },
-  {
-    path:        'meta.index',
-    type:        'boolean',
-    required:    false,
-    description: 'false marks every page noindex AND drops it from sitemap.xml (#564) — the site-wide switch a staging brand flips. Per-page/per-layout `meta.index` overrides it.',
-  },
-  {
-    path:        'meta.viewport',
-    type:        'string',
-    required:    false,
-    description: 'Overrides the framework viewport meta ("width=device-width, initial-scale=1.0, user-scalable=yes, shrink-to-fit=no").',
-  },
-  {
-    path:        'meta.referrer',
-    type:        'string',
-    required:    false,
-    description: 'Overrides the framework referrer policy meta ("strict-origin-when-cross-origin").',
-  },
-  {
-    path:        'meta.twitter_card',
-    type:        'string',
-    required:    false,
-    description: "Twitter card type ('summary_large_image' by default).",
-  },
-  {
-    path:        'meta.og_image_width',
-    type:        'integer',
-    required:    false,
-    description: 'og:image:width for the default image (1200 by default).',
-  },
-  {
-    path:        'meta.og_image_height',
-    type:        'integer',
-    required:    false,
-    description: 'og:image:height for the default image (630 by default).',
   },
 
   // ── socials ──────────────────────────────────────────────────────────────
@@ -520,6 +463,14 @@ const SHARED_SCHEMA = [
     description: "The parent company's canonical URL. Sub-brand surfaces derive the company api from it (e.g. advertising inhouse source 'company' → api.<company host>).",
   },
 
+  // ── features (the catalog every product prices) ──────────────────────────
+  {
+    path:        'features',
+    type:        'object',
+    required:    false,
+    description: "The feature catalog (#647): every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon, definition — and, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
+  },
+
   // ── payment (role: billing; provider-discriminated) ──────────────────────
   {
     path:        'payment.providers.stripe.publishableKey',
@@ -541,10 +492,17 @@ const SHARED_SCHEMA = [
     description: 'Chargebee site slug.',
   },
   {
+    path:        'payment.providers.coinbase.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     false,
+    description: "Coinbase Commerce (crypto) checkout, one-time purchases only. Its ONLY credential is a secret (COINBASE_COMMERCE_API_KEY), so there is no public datum to gate on — this is the switch, default OFF, because an accidental ON shows a Crypto button no key can complete.",
+  },
+  {
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-provider IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every provider and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features [{ id, name, icon, definition, value }].',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, prices, per-provider IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every provider and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features { <catalog id>: value } — a number on a counted feature (the MONTHLY limit, -1 unlimited), true/false/a string on a perk (#647).',
   },
   {
     path:        'payment.winback.enabled',
@@ -656,12 +614,58 @@ const SHARED_SCHEMA = [
     description: "Browser only: the URL fragments that identify OUR bundles — a browser event reports only when a stack frame matches one. Defaults to ['/assets/js/'], where both @omega.js/web and @omega.js/extension serve every framework bundle.",
   },
 
-  // ── oauth2 ───────────────────────────────────────────────────────────────
+  // ── connections ──────────────────────────────────────────────────────────
   {
-    path:        'oauth2',
+    path:        'connections',
     type:        'object',
     required:    false,
-    description: 'Public OAuth client IDs only — never client secrets.',
+    // RESOLUTION-ONLY ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)):
+    // this default is framework PRESENTATION, never an owner decision, so it
+    // resolves into every read and is never written into a brand's omega.json5 —
+    // five copied provider blocks in every brand config would drift from the
+    // framework they came from. A brand overrides any key it wants; the rest
+    // keeps tracking the framework.
+    materialize: false,
+    // The five providers @omega.js/backend ships a module for, each with what
+    // the account page's card DRAWS ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)):
+    // the framework owns the presentation so a brand's entry is one line, and
+    // the ordinary merge chain lets a brand overwrite any of it. `enabled` is
+    // false here because a packaged provider still needs its
+    // CONNECTIONS_<PROVIDER>_CLIENT_ID pair before a card could connect
+    // anything — turning one on is the brand's act.
+    default: {
+      google: {
+        enabled: false,
+        name: 'Google',
+        logo: 'google',
+        description: 'Enable single sign-on with your Google account',
+      },
+      discord: {
+        enabled: false,
+        name: 'Discord',
+        logo: 'discord',
+        description: 'Connect to access Discord community features',
+      },
+      spotify: {
+        enabled: false,
+        name: 'Spotify',
+        logo: 'spotify',
+        description: 'Connect your Spotify listening account',
+      },
+      twitch: {
+        enabled: false,
+        name: 'Twitch',
+        logo: 'twitch',
+        description: 'Connect your Twitch channel',
+      },
+      kick: {
+        enabled: false,
+        name: 'Kick',
+        logo: 'kick',
+        description: 'Connect your Kick channel',
+      },
+    },
+    description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`) — public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false — set it true to offer one; a brand's own provider is on unless this is false), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws — the CONFIG is the only card list, #793: `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. packages/backend/docs/connections.md",
   },
 
   // ── repo (role: source hosting; provider-discriminated) ─────────────────
@@ -682,7 +686,7 @@ const SHARED_SCHEMA = [
     path:        'repo.providers.github.repo',
     type:        'string',
     required:    false,
-    description: 'Brand repo name, or an "owner/name" slug when the repo lives under a different org than repo.providers.github.org. Defaults to brand.id.',
+    description: 'Brand repo name, or an "owner/name" slug when the repo lives under a different org than repo.providers.github.org. Defaults to <brand.id>-omega (the <brand.id>-<role> repo rule).',
   },
   {
     path:        'repo.providers.github.shared',
@@ -744,6 +748,12 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: "Cloudflare zone id. The web build's cache purge (`omega purge`) targets it; unset = purge skips.",
+  },
+  {
+    path:        'edge.providers.cloudflare.rules.redirect',
+    type:        'array',
+    required:    false,
+    description: "The zone's dynamic redirect rules, ORDERED — the ONE home for a TEMPLATED redirect, i.e. one whose destination is computed from the request path (#466): [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }]. `expression` and `targetUrl` ({ value } for a fixed URL, { expression } for a computed one) are Cloudflare's own filter language, because only the edge can answer a URL the build cannot enumerate — DashQR's printed `/c/<id>` codes redirect to `/code?id=<id>` with `targetUrl.expression: concat(\"https://\", http.host, \"/code?id=\", substring(http.request.uri.path, 3))`. The @omega.js/manager edge service reconciles them by `name`. A redirect whose URLs CAN be enumerated is a redirect PAGE instead (docs/web/index.md), never config.",
   },
 
   // ── captcha (role: bot defense; provider-discriminated) ──────────────────
@@ -973,7 +983,7 @@ const SHARED_SCHEMA = [
     path:        'seo',
     type:        'object',
     required:    false,
-    description: 'Parasite-SEO content (@omega.js/manager seo service): seo.github.content repos. Big content blocks may live in the config/seo.json5 sidecar.',
+    description: 'Parasite-SEO content: seo.github.content is the @omega.js/manager seo service\'s repos, and big content blocks may live in the config/seo.json5 sidecar. The indexing switch is NOT here: it is `targets.web.meta.index`, the same name a page writes (#564).',
   },
 
   // ── account ──────────────────────────────────────────────────────────────
@@ -1244,6 +1254,11 @@ const SHARED_SCHEMA = [
   // exception (#383): it decides whether a visitor is tracked at all, which is
   // a legal surface, not a preference — a typo that silently disabled the
   // banner would ship a site with no consent gate and no error.
+  //
+  // The three below are the second exception (#650 — found adopting omega in a
+  // consumer): keys a BRAND authors. They work (they reach the client payload
+  // and change what the site does), so every validate run told the brand that
+  // turned one off it might be a typo. The rest of the blob stays the client's.
   {
     path:        'client.consent.enabled',
     type:        'boolean',
@@ -1264,6 +1279,27 @@ const SHARED_SCHEMA = [
     required:    false,
     description: "Banner copy: message, panelIntro, accept, customize, acceptAll, acceptNone (a literal `{terms}`/`{cookies}` links the terms/cookie-policy page). Category labels are framework copy — a brand renames the buttons, not the categories.",
   },
+  {
+    path:        'client.auth.config.policy',
+    type:        'string',
+    required:    false,
+    enum:        ['authenticated', 'unauthenticated', 'disabled'],
+    description: "Who a page is FOR: 'authenticated' redirects a signed-out visitor to the signin route, 'unauthenticated' redirects a signed-in one away, 'disabled' skips the auth module entirely (a vert iframe). Absent = no policy, which is the site-wide answer — the auth/admin layouts set theirs in page frontmatter, so a brand only sets this to blanket a whole site.",
+  },
+  {
+    path:        'client.exitPopup.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: 'The exit-intent offer popup (default true). false ships no popup at all; its copy, timeout and avatars live under client.exitPopup.config.',
+  },
+  {
+    path:        'client.serviceWorker.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: 'Registers the site service worker (default true) — the offline/refresh lane and the push-notification registration ride it. false unregisters any worker the visitor already has.',
+  },
 
   // ── targets ──────────────────────────────────────────────────────────────
   {
@@ -1281,6 +1317,19 @@ const TARGET_SCHEMAS = {
   // workflows land as their features do.
   web: [
     {
+      path:        'meta',
+      type:        'object',
+      required:    false,
+      description: "Site-wide defaults for page-meta values: the SAME names a page's `meta:` frontmatter carries, and the page (or its layout) wins (docs/web/frontmatter.md). `index` is the only key defined today, because everything else already falls back to the brand block.",
+    },
+    {
+      path:        'meta.index',
+      type:        'boolean',
+      required:    false,
+      default:     true,
+      description: "false takes the WHOLE site out of search: every page emits noindex and sitemap.xml, llms.txt and pages.json list nothing. It is the site-wide DEFAULT of the one flag every signal reads (#564), so a page's own `meta.index: true` still exempts it. Case 2 (docs/shared/config.md): default ON, and the literal false is the only OFF.",
+    },
+    {
       path:        'imagemin',
       type:        'object',
       required:    false,
@@ -1297,12 +1346,6 @@ const TARGET_SCHEMAS = {
       type:        'object',
       required:    false,
       description: "The brand's own content collections (#207): collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
-    },
-    {
-      path:        'redirects',
-      type:        'array',
-      required:    false,
-      description: "Path redirects (#442), ORDERED — first match wins: [{ from, to, type }] where `from` may carry ONE captured `:name` segment ('/c/:id') that `to` references ('/code?id=:id'), and `type` is 301 (default), 302, 307 or 308. Static hosting has no server to answer with, so @omega.js/web materializes the map through the built 404 page and the redirect is CLIENT-side (`omega dev` serves the same map as a real status-code redirect). Entry shapes are validated hard by the web build (unknown key, malformed pattern, a `to` naming a segment `from` never captured).",
     },
     {
       path:        'purgecss',
@@ -1400,10 +1443,16 @@ const TARGET_SCHEMAS = {
       description: 'One switch for the release surface: false suppresses the site\'s derived download links AND desktop publishing (electron-builder publish). Site derivation defaults true only when the releases block exists; desktop publishing defaults true regardless.',
     },
     {
+      path:        'releases.owner',
+      type:        'string',
+      required:    false,
+      description: 'GitHub owner of the releases repo; defaults to the brand repo owner.',
+    },
+    {
       path:        'releases.repo',
       type:        'string',
       required:    false,
-      description: 'GitHub repo where built artifacts + the auto-update feed live.',
+      description: 'GitHub repo where built artifacts + the auto-update feed live. Defaults to `<brand.id>-releases`.',
     },
     {
       path:        'restartManager.enabled',
@@ -1534,15 +1583,23 @@ const TARGET_SCHEMAS = {
   mobile: [],
 };
 
-/** The top-level sections a rule array declares — `targets` is scoping machinery. */
-const sectionsOf = (rules) => [...new Set(rules.map((rule) => rule.path.split('.')[0]))].filter((section) => section !== 'targets');
+// Declared top-level keys that are NOT config sections: `targets` is scoping
+// machinery, and `url` is this instance's RESOLVED public url (#588): a value
+// the loader derives, carried to templates as the `site.url` build fact, never
+// a namespace a page's `config:` block overrides.
+const NON_SECTION_KEYS = ['targets', 'url'];
+
+/** The top-level sections a rule array declares (machinery keys excluded). */
+const sectionsOf = (rules) => [...new Set(rules.map((rule) => rule.path.split('.')[0]))].filter((section) => !NON_SECTION_KEYS.includes(section));
 
 /**
  * The config sections a target's RESOLVED config can hold (#607) — the
- * namespace a page's `config:` block overrides, and the namespace a page may
- * not restate bare. Per-target, because a target's refinements land at the
- * top level: `app` is a desktop section, and a web layout's own `app:` block
- * (the deep-link interstitial) is page data, not config.
+ * namespace a page's `config:` block overrides, in BOTH directions: a section
+ * restated bare in frontmatter is a build error, and a key under `config:`
+ * that is not one of these is a build error too. Per-target, because a
+ * target's refinements land at the top level: `app` is a desktop section, and
+ * a web layout's own `app:` block (the deep-link interstitial) is page data,
+ * not config.
  * @param {string} [target] - target name; omitted = the shared sections only
  * @returns {string[]} section names, sorted
  */
@@ -1550,10 +1607,4 @@ function configSections(target) {
   return [...new Set([...sectionsOf(SHARED_SCHEMA), ...sectionsOf(TARGET_SCHEMAS[target] || [])])].sort();
 }
 
-// The sections a page MAY restate bare (`pageBare: true` on the section root).
-const PAGE_BARE_SECTIONS = [...SHARED_SCHEMA, ...Object.values(TARGET_SCHEMAS).flat()]
-  .filter((rule) => rule.pageBare)
-  .map((rule) => rule.path)
-  .sort();
-
-module.exports = { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN, WINBACK_DURATIONS, configSections, PAGE_BARE_SECTIONS };
+module.exports = { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN, WINBACK_DURATIONS, configSections };

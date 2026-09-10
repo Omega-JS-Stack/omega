@@ -21,7 +21,8 @@
  * Run: npx omega test framework:analytics/signup-conversion
  */
 const crypto = require('crypto');
-const signup = require('../../src/manager/libraries/analytics/signup.js');
+const signup = require('../../dist/manager/libraries/analytics/signup.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-signup-conversion-uid';
 const IP = '203.0.113.9';
@@ -61,7 +62,7 @@ function userRecord() {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'sign_up: the server half fires from the post-auth request, with the request\'s match data',
   type: 'group',
 
@@ -131,4 +132,4 @@ module.exports = {
       },
     },
   ],
-};
+});

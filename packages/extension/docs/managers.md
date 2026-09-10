@@ -64,7 +64,7 @@ Cross-context helpers (`isTesting/isDevelopment/isProduction/getVersion`) are av
 
 Each Manager's `initialize()`:
 
-1. **Read configuration** — from `window.OMEGA_BUILD_JSON?.config` (injected by webpack at build time)
+1. **Read configuration** — from `window.OMEGA_BUILD_JSON?.config` (assigned by the banner the bundle task bakes into every bundle, [#743](https://github.com/Omega-JS-Stack/omega/issues/743))
 2. **Wire `extension`** — singleton from [src/lib/extension.js](../src/lib/extension.js), normalized chrome.*/browser.* API
 3. **Construct `logger`** — `new LoggerLite('<context>')` from [src/lib/logger-lite.js](../src/lib/logger-lite.js)
 4. **Initialize `omega`** (popup/options/sidepanel/page only) — `omega.initialize(config)`

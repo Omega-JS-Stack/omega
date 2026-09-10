@@ -52,16 +52,16 @@ test('#441: a named animation renders into the hero\'s custom demo slot', async 
   const pages = await buildWith(miniData);
   // The hero's own showcase roster carries the named-folder variant, so the
   // gallery frame IS the rendered proof.
-  const frame = pages.get('/test/sections/section/marketing/hero/frames/custom-animation');
+  const frame = pages.get('/test/sections/marketing/hero/frames/custom-animation');
 
   assert.ok(frame, 'the variant renders as a frame page');
   assert.match(frame, /<div id="hero-demo-custom"/, 'it lands in the custom demo slot');
   assert.match(frame, /data-omega-hero="orbit"/, 'wrapped in the hook that boots its script.js');
   assert.match(frame, /class="omega-orbit"/, 'and the folder\'s own markup is what rendered');
-  assert.match(frame, /<i class="fa" data-icon="globe"/, 'the markup renders as Liquid — omega_* tags work inside it');
+  assert.match(frame, /<i class="fa-solid fa-globe" data-omega-fa="solid\/globe"><svg/, 'the folder\'s icons go through the build\'s inlining pass');
 
   // The other custom lane is untouched: call-site markup still fills the slot.
-  const authored = pages.get('/test/sections/section/marketing/hero/frames/custom-slot');
+  const authored = pages.get('/test/sections/marketing/hero/frames/custom-slot');
   assert.match(authored, /id="demo-brand-color"/, 'an authored `options.content` still renders');
   assert.ok(!authored.includes('data-omega-hero'), 'and never claims a folder it did not name');
 });

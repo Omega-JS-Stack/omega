@@ -1,7 +1,9 @@
 // Renderer-layer round-trip tests for window.desktop.{analytics,context,usage,remoteConfig}.
 // Verifies the contextBridge surfaces actually round-trip through IPC into main.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'renderer',
   description: 'analytics + context + usage + remote-config bridges (renderer)',
@@ -123,4 +125,4 @@ module.exports = {
       },
     },
   ],
-};
+});

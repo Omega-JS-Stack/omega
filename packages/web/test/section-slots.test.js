@@ -155,7 +155,7 @@ test('hero demo_html slot replaces the typed demo lane on a real build', async (
       'permalink: /slots-demo/',
       'layout: frontend/core/minimal',
       '---',
-      '{% section "marketing/hero", headline: "Slots" %}{% slot demo_html %}<div id="my-wild-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>{% endslot %}{% endsection %}',
+      '{% section "marketing/hero", headline: "Slots" %}{% slot demo_html %}<div id="my-wild-demo"><i class="fa-solid fa-rocket"></i> {{ resolved.config.brand.name }}</div>{% endslot %}{% endsection %}',
       '{% capture trailing_cta %}<a class="btn" href="/pricing">See pricing</a>{% endcapture %}',
       '{% section "marketing/stats" %}',
       'items:',

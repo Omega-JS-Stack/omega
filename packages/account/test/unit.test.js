@@ -27,6 +27,18 @@ test('empty input resolves full defaults; generated fields are null without gene
   assert.strictEqual(account.affiliate.code, null);
 });
 
+test('#663: personal.location carries postalCode and street, null until filled', () => {
+  const empty = resolveAccount({});
+
+  assert.strictEqual(empty.personal.location.postalCode, null);
+  assert.strictEqual(empty.personal.location.street, null);
+
+  const filled = resolveAccount({ personal: { location: { postalCode: '90210', street: '123 Main Street' } } });
+
+  assert.strictEqual(filled.personal.location.postalCode, '90210');
+  assert.strictEqual(filled.personal.location.street, '123 Main Street');
+});
+
 test('injected generators feed $uuid/$randomId/$apiKey', () => {
   const account = resolveAccount({}, {
     generators: { uuid: () => 'u-1', randomId: () => 'r-1', apiKey: () => 'k-1' },
@@ -95,25 +107,35 @@ test('array type: non-array input falls back to default', () => {
 test('$passthrough keeps unknown keys; plain branches strip them', () => {
   const account = resolveAccount({
     roles: { admin: true, customRole: true },
-    oauth2: { google: { token: 'tok' } },
+    connections: { google: { token: 'tok' } },
     unknownTopLevel: { stripped: true },
   });
 
   assert.strictEqual(account.roles.customRole, true);
-  assert.deepStrictEqual(account.oauth2, { google: { token: 'tok' } });
+  assert.deepStrictEqual(account.connections, { google: { token: 'tok' } });
   assert.strictEqual('unknownTopLevel' in account, false);
 });
 
 test('$template resolves dynamic usage keys against the template shape', () => {
   const account = resolveAccount({
-    usage: { requests: { monthly: '5', last: { id: 'req-9' } } },
+    usage: { requests: { monthly: '5', last: { timestampUNIX: 1788397430 } } },
   });
 
   assert.strictEqual(account.usage.requests.monthly, 5);
   assert.strictEqual(account.usage.requests.daily, 0);
   assert.strictEqual(account.usage.requests.total, 0);
-  assert.strictEqual(account.usage.requests.last.id, 'req-9');
+  assert.strictEqual(account.usage.requests.last.timestampUNIX, 1788397430);
   assert.strictEqual(account.usage.requests.last.timestamp, '1970-01-01T00:00:00.000Z');
+});
+
+test('#647: usage.last carries only WHEN the counter moved — the retired `id` is gone', () => {
+  const account = resolveAccount({ usage: { requests: { monthly: 1 } } });
+
+  assert.deepStrictEqual(
+    Object.keys(account.usage.requests.last),
+    ['timestamp', 'timestampUNIX'],
+    'a schema field nothing writes reads as a fact that is always null',
+  );
 });
 
 // ─── Auth-user overlay (frontend semantic) ───
@@ -285,7 +307,7 @@ test('suspended paid plan falls back to basic', () => {
 // ─── Schema export sanity ───
 
 test('USER_SCHEMA is exported and carries the canonical branches', () => {
-  for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'oauth2', 'attribution', 'trackingConsent', 'consent']) {
+  for (const branch of ['auth', 'subscription', 'roles', 'flags', 'affiliate', 'metadata', 'activity', 'api', 'usage', 'personal', 'connections', 'attribution', 'trackingConsent', 'consent']) {
     assert.ok(USER_SCHEMA[branch], `missing branch: ${branch}`);
   }
 });

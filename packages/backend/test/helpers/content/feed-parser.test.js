@@ -7,7 +7,8 @@
  * Pure function tests (parseFeed, stripHtml, extractElement) — required
  * directly and called with plain inputs. NOT a mock.
  */
-const { parseFeed, stripHtml, extractTextFromHtml } = require('../../../src/manager/libraries/content/feed-parser.js');
+const { parseFeed, stripHtml, extractTextFromHtml } = require('../../../dist/manager/libraries/content/feed-parser.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // --- Sample feeds for testing ---
 
@@ -112,7 +113,7 @@ const RSSAPP_FORMAT = JSON.stringify({
   ],
 });
 
-module.exports = {
+module.exports = defineCases({
   description: 'content/feed-parser',
   type: 'group',
 
@@ -525,4 +526,4 @@ module.exports = {
       },
     },
   ],
-};
+});

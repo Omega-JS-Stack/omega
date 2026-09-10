@@ -204,7 +204,7 @@ async function startWatch(t, fixture) {
         defaultsDir: fixture.defaultsDir,
         environment: 'development',
         sampleAnchor: '2026-07-18',
-        assetManifest: { js: { pages: {} }, css: { pages: {}, themePages: {} } },
+        assetManifest: { js: { pages: {} }, css: { pages: {}, layouts: {} } },
       });
     },
   });
@@ -226,16 +226,8 @@ async function startWatch(t, fixture) {
   return {
     page,
     configRuns,
-    async pageBecomes(pattern, message, file) {
-      const deadline = Date.now() + rebuildDeadlineMs();
-      let rendered = page(file);
-
-      while (!pattern.test(rendered) && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-        rendered = page(file);
-      }
-
-      assert.match(rendered, pattern, message);
+    pageBecomes(pattern, message, file, nudge) {
+      return waitForRebuild({ read: () => page(file), pattern, message, builds, nudge });
     },
   };
 }
@@ -247,8 +239,13 @@ test('the first real post ends the samples on the next rebuild — no config res
   assert.match(watch.page(), /data-post="Sample Post"/, 'a content-less brand blogs the sample corpus');
   const runsAfterFirstBuild = watch.configRuns.count;
 
-  fixture.write('_posts/2026-07-20-first.md', '---\ntitle: My First Post\ntags: posts\n---\nreal words');
-  await watch.pageBecomes(/data-post="My First Post"/, 'the real post lands');
+  // The first edit after the watch starts gets the re-save nudge (#688): the
+  // fresh root's FSEvents stream can still be initializing when this save
+  // lands, and a save that predates the stream is never replayed. The nudge
+  // stops on the first build event, so a woken-but-stale rebuild still fails.
+  const writePost = () => fixture.write('_posts/2026-07-20-first.md', '---\ntitle: My First Post\ntags: posts\n---\nreal words');
+  writePost();
+  await watch.pageBecomes(/data-post="My First Post"/, 'the real post lands', undefined, writePost);
 
   assert.doesNotMatch(watch.page(), /data-post="Sample Post"/,
     'the sample corpus steps aside the moment the brand owns the collection — the gate is asked at render time');

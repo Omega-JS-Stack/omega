@@ -2,8 +2,8 @@
 //
 // Replaces the old "do it from my laptop" release flow with "let CI do it, but make it
 // feel local." User runs `npm run release` (or `npx omega release`) and gets:
-//   1. A workflow_dispatch POST to GH Actions on the consumer's repo (owner/repo derived
-//      from package.json#repository.url, falling back to git remote origin).
+//   1. A workflow_dispatch POST to GH Actions on the brand's repo (owner/repo from the
+//      config, and the workflow file the scaffold actually wrote: see dispatchTarget).
 //   2. A few seconds of waiting while GH spins up the run.
 //   3. Live polling of every job's logs at 5s intervals, printing NEW lines as they
 //      arrive (job-prefixed) so it looks like streaming.
@@ -19,13 +19,13 @@ const path     = require('path');
 const fs       = require('fs');
 const jetpack  = require('fs-jetpack');
 
-const { discoverRepo, getOctokit } = require('../utils/github.js');
+const { getOctokit } = require('../utils/github.js');
+const { dispatchRepo } = require('@omega.js/devkit/deploy');
 const Manager = new (require('../build.js'));
 
 const logger = Manager.logger('release');
 
 const POLL_INTERVAL_MS = 5000;
-const WORKFLOW_FILE    = 'build.yml';
 
 module.exports = async function release(options = {}) {
   const projectRoot = process.cwd();
@@ -41,13 +41,7 @@ module.exports = async function release(options = {}) {
     throw new Error('Failed to create octokit (missing GH_TOKEN?).');
   }
 
-  // Discover repo from package.json#repository.url (falls back to git remote).
-  let owner, repo;
-  try {
-    ({ owner, repo } = await discoverRepo(projectRoot));
-  } catch (e) {
-    throw new Error(`Could not determine GitHub repo: ${e.message}`);
-  }
+  const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: Manager.getConfig() });
 
   // Discover ref (current branch or override via --ref).
   const ref = options.ref || (await currentBranch(projectRoot)) || 'main';
@@ -209,6 +203,31 @@ module.exports = async function release(options = {}) {
   }
 };
 
+// The CI dispatch address, from the config and the scaffold: the brand's APP
+// repo (`@omega.js/devkit/deploy`'s dispatchRepo, the one call web and the
+// extension deploy verbs make too) and the workflow file the target's
+// ensure-target pass actually wrote (composed as `desktop-build.yml` at the
+// brand root inside a monorepo, plain `build.yml` standalone:
+// `@omega.js/devkit/ci-workflows` owns that name for all four frameworks).
+// Never the git remote: a brand nested in another repo would dispatch on the
+// enclosing one, which for the playground is the framework monorepo itself.
+// Exported for tests.
+function dispatchTarget({ projectRoot, config }) {
+  const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+  const { resolveSeedMode } = require('@omega.js/config');
+  const { owner, repo } = dispatchRepo(config);
+
+  return {
+    owner,
+    repo,
+    workflow: composedWorkflowName({
+      targetDir: projectRoot,
+      brandRoot: resolveSeedMode(projectRoot).brandRoot,
+      workflow: 'build.yml',
+    }),
+  };
+}
+
 function formatElapsed(ms) {
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);
@@ -261,3 +280,7 @@ function stripAnsi(s) {
   // Minimal ANSI stripper — handles CSI sequences (colors, cursor moves).
   return String(s).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 }
+
+// Exported for tests + `omega deploy`, which prints the exact dispatch this
+// sends before delegating here.
+module.exports.dispatchTarget = dispatchTarget;

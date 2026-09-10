@@ -11,12 +11,13 @@
  *     idempotency handle events dedupe on.
  *   - timestamp and timestampUNIX describe the SAME instant.
  */
-const Metadata = require('../../src/manager/helpers/metadata.js');
+const Metadata = require('../../dist/manager/helpers/metadata.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The helper only reaches Manager.ctx.log().
 const Manager = { ctx: { log: () => {} } };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Metadata.set() document stamping',
   type: 'group',
 
@@ -118,4 +119,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -75,6 +75,8 @@ npx omega test --extended routes/marketing/push-send
 
 The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, only the project's tests are searched; `full:` searches both.
 
+A target that names a path and matches NO file is a hard error: the run prints `No test file matches "<target>"` and exits 1 (before the config/health preflight, so a typo costs a second rather than a whole stack), so a typo'd path, or a suite renamed out from under a target, can never run silently green ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)). A run that named no file (bare, or a bare source prefix) still exits 0 when there is nothing to run. Inside a brand-root fan-out the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and the same miss answers with exit 3 instead: a path another target carries is a no-op here, and the brand run fails only when EVERY target missed ([docs/shared/testing.md](../../../docs/shared/testing.md#brand-root-cp94b)).
+
 ## Project mismatch detection
 
 The runner adopts an already-running emulator only when that emulator **proves** it belongs to this project. "Something is listening on the functions port" is not proof — reading it as one adopted another brand's stack on the classic ports and died on a health fetch against the wrong project ([#258](https://github.com/Omega-JS-Stack/omega/issues/258)).
@@ -126,7 +128,7 @@ After the flush, `test/_init.js`'s `setup()` reseeds fixtures into the empty DB.
 
 ### Personas (N6)
 
-Every seeded account is a **persona** usable two ways: backend tests authenticate with its `api.privateKey` (`http.as('<id>')`), and a HUMAN or browser flow signs in with its email + the deterministic **`TEST_ACCOUNT_PASSWORD`** (`'omega-test-password'`, exported from [src/test/test-accounts.js](../src/test/test-accounts.js)) — boot the emulators, open an emulator-connected dev site, sign in as any persona. **`npx omega emulator` seeds personas automatically on boot** (`--no-seed` to skip; non-fatal on failure), via the same shared seed module the test runner uses ([src/test/seed.js](../src/test/seed.js) — wipe → meta/stats → create accounts → order fixtures → fetch keys → `test/_init.js` hooks). The test runner re-seeds at the start of every run regardless, so a long-running emulator always starts each test run from the same clean slate. Lifecycle states are first-class personas: `basic` (free), `premium-active` (paid), `premium-trialing` (mid-trial — active on the paid plan, nothing charged, its term ending exactly when the catalog's trial does), `premium-cancelling`, `premium-expired`/`refunded` (cancelled; `refunded` is the post-refund-webhook end state on the `test` provider), `premium-suspended`, `delete`/`delete-by-admin`. "Unauthed" needs no persona — that's `http.as('none')` or a signed-out browser. Payment flows get their own dedicated personas so the shared lifecycle ones stay clean (see [Test Account Isolation](#test-account-isolation-critical)): alongside the existing `journey-payments-*` set, `journey-payments-decline` (a first checkout that declines, seeded basic + active), `journey-payments-one-time-refund` (a one-time purchase bought then refunded), `journey-payments-abandoned` (opens a checkout and never finishes it — the persona exists to prove nothing is written), `journey-payments-dispute` (buys, then gets charged back), and `refund-no-order` (a paid subscriber pending cancellation whose subscription carries no `payment.orderId`, so the refund provider has to resolve the product from the subscription itself). For automated browser signin, mint a custom token for the persona's uid (admin SDK or `POST /user/token` as admin) and use the site's `?authCustomToken=` param / the client's `signInWithCustomToken`.
+Every seeded account is a **persona** usable two ways: backend tests authenticate with its `api.privateKey` (`http.as('<id>')`), and a HUMAN or browser flow signs in with its email + the deterministic **`TEST_ACCOUNT_PASSWORD`** (`'omega-test-password'`, exported from [src/test/test-accounts.js](../src/test/test-accounts.js)) — boot the emulators, open an emulator-connected dev site, sign in as any persona. **`npx omega emulator` seeds personas automatically on boot** (`--no-seed` to skip; non-fatal on failure), via the same shared seed module the test runner uses ([src/test/seed.js](../src/test/seed.js) — wipe → meta/stats → create accounts → order fixtures → fetch keys → `test/_init.js` hooks). The test runner re-seeds at the start of every run regardless, so a long-running emulator always starts each test run from the same clean slate. Lifecycle states are first-class personas: `basic` (free), `premium-active` (paid), `premium-trialing` (mid-trial — active on the paid plan, nothing charged, its term ending exactly when the catalog's trial does), `premium-cancelling`, `premium-expired`/`refunded` (cancelled; `refunded` is the post-refund-webhook end state on the `test` provider), `premium-suspended`, `delete`/`delete-by-admin`. `usage-spread` is the one persona that deliberately carries a SPREAD rather than a single state ([#647](https://github.com/Omega-JS-Stack/omega/issues/647), Ian's call): a usage bar is only worth previewing beside its neighbours, so it holds one state per COUNTED feature the brand's own catalog defines — untouched, half spent, day cap hit, month cap hit, override credits — and each feature still tells exactly one story. The spread is resolved against the brand catalog like every other seed, never hand-typed (`resolveSeededUsage`), so a brand with fewer counted features simply seeds fewer bars. "Unauthed" needs no persona — that's `http.as('none')` or a signed-out browser. Payment flows get their own dedicated personas so the shared lifecycle ones stay clean (see [Test Account Isolation](#test-account-isolation-critical)): alongside the existing `journey-payments-*` set, `journey-payments-decline` (a first checkout that declines, seeded basic + active), `journey-payments-one-time-refund` (a one-time purchase bought then refunded), `journey-payments-abandoned` (opens a checkout and never finishes it — the persona exists to prove nothing is written), `journey-payments-dispute` (buys, then gets charged back), and `refund-no-order` (a paid subscriber pending cancellation whose subscription carries no `payment.orderId`, so the refund provider has to resolve the product from the subscription itself). For automated browser signin, mint a custom token for the persona's uid (admin SDK or `POST /user/token` as admin) and use the site's `?authCustomToken=` param / the client's `signInWithCustomToken`.
 
 **A persona that holds a paid plan is one that BOUGHT it** ([#263](https://github.com/Omega-JS-Stack/omega/issues/263)). Its seed is resolved against the brand catalog, never hand-typed: `subscription.payment` carries the price and cadence `config.payment.products[].prices` lists for that plan (the same read the unified transforms make), a live term expires at the end of the billing cycle it is on rather than a decade out, and a seed naming `payment.orderId` gets the matching `payments-orders` document stood up at seed time — the fixture the test cancel provider reads the plan off, the test webhook library rebuilds a provider subscription from, and the per-owner trial-eligibility query counts. One definition builds it everywhere (`buildOrderFixture`/`seedOrderFixture` in [src/test/test-accounts.js](../src/test/test-accounts.js)): the boot seed, the flows lane, and the per-persona dev reset (`POST /test/reset-account`) all write the same record — and a project's own `test/_init.js` personas are seeded on the same terms, so a consumer persona naming an `orderId` gets its order too. A persona that bought nothing (`basic`, `journey-flows-trial`, the signup/consent set) stays deliberately hollow — any subscription order in its name would disqualify it from the trial its journey exists to prove.
 
@@ -154,7 +156,7 @@ The runner loads an optional `test/_init.js` from **both** test roots — @omega
 
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ config, Manager }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
 
-- `accounts` — array of extra test accounts to create alongside the built-in ones (admin/basic/premium-*/journey-*), so this project has a user for each lifecycle it exercises. Each entry is `{ id, uid, email, properties }` (email may use the `{domain}` placeholder, `properties` is merged into the user doc after `auth:on-create`). These accounts are created, fetched (privateKeys), and deleted on the same path as the built-ins, and show up in the `accounts` map that tests and `setup()` receive. A project account may override a built-in one by reusing its `id`.
+- `accounts` — array of extra test accounts to create alongside the built-in ones (admin/basic/premium-*/journey-*), so this project has a user for each lifecycle it exercises. Each entry is `{ id, uid, email, palette, properties }` (email may use the `{domain}` placeholder, which resolves to the brand's HOST — `brand.url`'s hostname, the one derivation the dev palette signs in on; `properties` is merged into the user doc after `auth:on-create`). These accounts are created, fetched (privateKeys), and deleted on the same path as the built-ins, and show up in the `accounts` map that tests and `setup()` receive. A project account may override a built-in one by reusing its `id`. A `palette: '<Label>'` label offers the persona in the dev palette's account switcher, exactly like a built-in one — `GET /test/roster` reads both halves of the seed ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)); an account without a label is machinery and stays invisible. The functions process reads the file once and remembers what it got — a CHANGED persona has to be re-seeded to exist at all, which is an emulator restart — but a read that FAILED is never remembered ([#733](https://github.com/Omega-JS-Stack/omega/issues/733)): a broken `_init.js` logs its error, serves an empty project half, and is re-read (module cache and all) on the next roster request, so fixing the file is enough.
 - `async setup({ admin, config, accounts, Manager, ctx })` — seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed — the whole DB is wiped each run).
 
 There is **no `cleanup` hook**: the entire emulator Firestore is flushed before every run and each test cleans up after itself, so there is nothing project-level to tear down.
@@ -183,7 +185,7 @@ module.exports = ({ config }) => ({
 
 `TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across @omega.js/backend/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx omega test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx omega test`. Either form works; the flag is just sugar over the env var.
 
-Several routes/handlers skip external API calls (SendGrid, Beehiiv, Stripe webhooks, dispute handlers, marketing libraries) when `process.env.TEST_EXTENDED_MODE` is unset, so unit tests don't fire real emails or webhook side effects. Set the flag (or pass `--extended`) to opt **in** to those side effects for a full end-to-end run.
+Several routes/handlers skip external API calls (Beehiiv, Stripe webhooks, dispute handlers, marketing libraries) when `process.env.TEST_EXTENDED_MODE` is unset, so unit tests don't fire real webhook side effects. Transactional email is the one that no longer SKIPS: it is built, rendered and [captured](#testing-mode-email-capture--how-a-test-reads-what-was-sent) instead of delivered, which is what makes an email assertable offline ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). Set the flag (or pass `--extended`) to opt **in** to real delivery and the rest of those side effects for a full end-to-end run.
 
 **@omega.js/backend propagates the mode to BOTH spawned environments — the distinctive @omega.js/backend detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
 
@@ -231,6 +233,36 @@ TEST_EXTENDED_MODE=true npx omega emulator        # boots in extended mode
 npx omega test ...                                 # ← this still flips it back to normal
 ```
 
+## Testing-mode email capture — how a test reads what was sent
+
+Extended mode's counterpart: **outside** extended mode, `Transactional.send()` does not call SendGrid at all — it RECORDS the email it built and returns `{ status: 'captured' }` ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). The seam sits past `build()`, so the brand, the recipients, the template data and the MJML render are the real ones: a template that throws fails a test instead of reaching production. No caller gates itself on `ctx.isTesting()` around a send any more; the seam decides for all of them.
+
+The store is `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `Manager.cwd`, which is `<projectDir>/dist` in both processes — the test runner boots there, and so do the emulator's function workers, since `dist` is the source directory `firebase.json` names) — so the workers and the runner write and read the ONE store. Full rationale: the module header on [src/test/utils/email-capture.js](../src/test/utils/email-capture.js), and [email-system.md](email-system.md#testing) § Testing.
+
+```javascript
+const capture = require('../../dist/test/utils/email-capture.js');
+
+// Clear BEFORE the act, so what you read back is your own
+capture.clearCaptured(Manager);
+
+await http.as('signup-emails').post('backend-manager/user/signup', {});
+
+const sent = capture.readCaptured(Manager);
+// [{ to: ['a@b.dev'], template: 'card', subject: 'Welcome to …!', summary: '…', sendAt: null }]
+```
+
+| Field | What it is |
+|---|---|
+| `to` | Every recipient address the built email carried, in order |
+| `template` | The template that rendered it, after the legacy-name shim |
+| `subject` | The subject line |
+| `summary` | The rendered body reduced to visible text (tags stripped, entities decoded, whitespace collapsed, capped) — where a test finds the product name, the totals, the greeting |
+| `sendAt` | The scheduled UNIX second, or `null` for an immediate send |
+
+Two things the capture is NOT. A send scheduled past `SEND_AT_LIMIT` (71 hours) never reaches the seam — it goes to the `emails-queue` collection, and a test asserts it there. And extended mode is untouched: `--extended` still delivers real mail, so nothing about the capture lane changes what the extended suites do.
+
+A handler that dispatches its send fire-and-forget (the payment transitions) needs a poll rather than a look — see [test/events/payments/transition-order-emails.test.js](../test/events/payments/transition-order-emails.test.js).
+
 ## Log Files
 
 Test runs tee output to `functions/test.log` (own-emulator runs go to `functions/emulator.log` instead, since the test command delegates to the emulator command). Full reference — file table, the `functions/` location exception, `production.log`: [logging.md](logging.md).
@@ -259,12 +291,12 @@ Runs the payment pipeline against REAL Stripe test-mode events: real objects in 
 
 The gate, in order — any failure is one skip line:
 
-1. A Stripe secret resolves through the ONE env reader (`src/manager/libraries/env.js`), which outside production prefers `STRIPE_SECRET_KEY_DEV` and refuses a live-shaped credential outright ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)).
-2. That secret is **test-shaped** (`sk_test_`). The reader's refusal already catches `sk_live_`; this catches everything else a key slot picks up — a restricted key, a publishable key, a paste of the wrong line.
+1. A Stripe secret resolves through the ONE env reader (`src/manager/libraries/env.js`). A test lane composes its `.env` from the base plus `.env.testing` ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)), so the TEST credential goes in that overlay under the plain `STRIPE_SECRET_KEY` name.
+2. That secret is **test-shaped** (`sk_test_`). Nothing upstream vets the value — the env reader hands back whatever the resolved cascade holds — so this gate is the ONLY thing standing between the lane and a live account, and it refuses everything that is not an `sk_test_`: a live key, a restricted key, a publishable key, a paste of the wrong line.
 3. The **Stripe CLI** is installed, because the forwarding and the event triggers are its job.
 
 ```bash
-# In a brand's backend target, with STRIPE_SECRET_KEY_DEV="sk_test_…" in the .env cascade:
+# In a brand's backend target, with STRIPE_SECRET_KEY="sk_test_…" in .env.testing:
 npx omega test --lane=stripe-live
 ```
 
@@ -396,6 +428,7 @@ All email tests live under `test/email/`, mirroring `src/manager/libraries/email
 | Test file | What it tests | Extended? |
 |---|---|---|
 | `templates.js` | MJML rendering for card/plain/order/feedback (11 tests) | No |
+| `testing-capture.js` | The [testing-mode capture](#testing-mode-email-capture--how-a-test-reads-what-was-sent): the gate, the store, the summary, and the mailer's seam (6 tests) | No |
 | `transactional.js` | Transactional email building (output shape assertions) | No |
 | `validation.js` | Email format/disposable/corporate/local-part checks (80+ tests) | No |
 | `transactional-send.js` | Single transactional send via SendGrid | Yes |
@@ -543,6 +576,7 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 | `src/test/utils/assertions.js` | Assert helpers |
 | `src/test/utils/http-client.js` | HTTP client |
 | `src/test/utils/firestore-rules-client.js` | Rules testing client (`asAccount` / `expectSuccess` / `expectFailure`) |
+| `src/test/utils/email-capture.js` | Testing-mode email capture (`readCaptured` / `clearCaptured`) |
 | `src/test/test-accounts.js` | Test account definitions |
 | `test/routes/test/schema.test.js` | Schema-validation reference test |
 | `test/routes/user/signup.test.js` | Full-lifecycle route suite reference |

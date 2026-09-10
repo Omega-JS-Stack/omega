@@ -11,9 +11,10 @@
  *
  * Run: npx omega test backend:routes/admin/post-deploy-flag
  */
-const Settings = require('../../../src/manager/helpers/settings.js');
-const createSchema = require('../../../src/manager/schemas/admin/post/post.js');
-const editSchema = require('../../../src/manager/schemas/admin/post/put.js');
+const Settings = require('../../../dist/manager/helpers/settings.js');
+const createSchema = require('../../../dist/manager/schemas/admin/post/post.js');
+const editSchema = require('../../../dist/manager/schemas/admin/post/put.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Settings.resolve only touches these surfaces when the schema is passed
 // directly (no file loading) — the seam test/helpers/schema-zod.js documents
@@ -40,7 +41,7 @@ const EDIT_INPUT = {
   body: 'Body',
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'admin/post schemas: D13 deploy flag survives validation',
   type: 'group',
 
@@ -77,4 +78,4 @@ module.exports = {
       },
     },
   ],
-};
+});

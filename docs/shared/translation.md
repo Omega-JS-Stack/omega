@@ -118,6 +118,9 @@ string. Committed to git — that's the whole point:
   translation; the key only changes when the SOURCE changes).
 - Maps are pruned to the current source set on save — no stale entries.
 
+`@omega.js/web` ships a second cache in exactly this shape for its OWN default
+pages, inside the package ([below](#framework-shipped-default-page-translations-621)).
+
 ## Web (`@omega.js/web`)
 
 `omega build` translates everything by default (Ian's #24 final call): warm
@@ -157,11 +160,13 @@ Exclusions are matched on that same underneath-the-prefix route. ABSOLUTE URLs
 `brand.url`, which for a mounted site already carries the path — nothing
 prefixes them twice.
 
-Never translated, and the framework owns the list
+Never sent to the PROVIDER, and the framework owns the list
 ([#605](https://github.com/Omega-JS-Stack/omega/issues/605)): every one of its
 OWN default pages whose layout says it is plumbing rather than marketing copy —
 the auth flows, the `/app` shell, the account/payment/portal screens, the legal
 boilerplate, `404`, and the redirect stubs (`/login`, `/account`, `/cancel`, …).
+Those pages still get their `/{lang}/` copies — from the translations PACKAGED
+with `@omega.js/web`, at no cost to the brand (next section).
 The list is DERIVED from the packaged defaults tree
 (`packages/web/defaults/pages/**`, read by `src/translate/default-routes.js`),
 never typed out, so a default page that moves or arrives cannot drift out of it,
@@ -173,6 +178,60 @@ for the BRAND's own pages, and only those. A brand that lists `signin` or
 Element opt-out: `data-omega-no-translate`. Collector fixes vs UJM:
 `aria-describedby`/`aria-labelledby` are NOT collected (ID refs), `value`
 only on button-type inputs (hidden-input tokens stay intact).
+
+### Framework-shipped default-page translations ([#621](https://github.com/Omega-JS-Stack/omega/issues/621))
+
+The default pages above render the SAME chrome on every brand, so the framework
+translates them ONCE and ships the result: `packages/web/translations/{lang}/pages/{route}.json`,
+the identical `{lang}/{namespace}.json` shape as a consumer's own cache (same
+loader, same `sha256(source)[:12]` keys, same prune-on-save, hand-fixable the
+same way), committed to the package and published under `files`.
+
+The keys are brand-NEUTRAL. The generator renders with a fixture brand and
+replaces every occurrence of it with the sentinel `__OMEGA_BRAND__` before
+hashing; the read-through replaces the CONSUMER's `brand.name` with the same
+token before the lookup and puts it back on the way out, so "Sign in to MiniCo"
+and "Sign in to Acme" are one packaged entry (`src/translate/packaged-defaults.js`).
+
+Consumer side, on every pass — `omega build`, `--cached-only`, `omega translate`
+alike, since it never touches a provider:
+
+- Each default route gets its `dist/{lang}/…` copy with the same localized
+  chrome, hreflang and sitemap entry as any other page. Link rewriting is the
+  same pass too, which means links OUT to brand pages gain the language segment
+  while links between two default routes (signin → signup) do not — those routes
+  are excluded from rewriting, and that is unchanged from #605.
+- A string the package does not carry (copy the brand overrode, a page the
+  framework has not regenerated for) stays in the source language and is
+  COUNTED — one log line per route names the miss count. Never guessed at.
+- A brand whose NAME is a word the chrome itself uses ("Sign") still gets every
+  string that does not interpolate the brand — the lookup falls back to the raw
+  key when the sentinel-normalized one misses. The strings that DO interpolate
+  it (`Sign in to Sign`) miss, and stay in the source language.
+- A route the package carries nothing for gets NO copy, so hreflang keeps
+  telling the truth. That is how the legal boilerplate stays one language:
+  `terms`/`privacy`/`cookies` are deliberately not generated.
+- A configured language the package does not ship is one log line for the whole
+  run, not an error — those routes stay in the source language.
+- A route the brand named in `translation.exclude` is left alone entirely.
+
+**Shipped set: `es`, `fa`.** Regenerating, or extending the set, is one command
+in `packages/web` (the ONLY place the framework's own pages ever reach a
+provider):
+
+```bash
+npm run translate:defaults                      # the shipped set
+npm run translate:defaults -- --languages es,fa,de   # …plus a new one
+```
+
+It renders the defaults tree through the real production build against a
+throwaway consumer (no brand repo involved), harvests with the same collector
+the pass uses, translates ONLY the strings the packaged cache is missing —
+across all routes at once, so the header/footer chrome every default page
+repeats is paid for exactly once — and writes the files back. Idempotent: a
+re-run costs nothing, adding a language costs only that language. A provider
+failure, or a translation that dropped the sentinel, STOPS the run and writes
+nothing.
 
 `dist/sitemap.xml` (emitted by the build in the source language only) is
 rewritten afterwards so it tells the same story: every PRODUCED copy joins it

@@ -1,0 +1,55 @@
+---
+layout: frontend/core/cover
+---
+
+<section class="col-12">
+  <div class="omega-auth" data-omega-reveal>
+    <div class="omega-auth__card text-center">
+      <!-- Logo -->
+      <div class="omega-auth__brand">
+        {% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one — `brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+        <img src="{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | omega_cachebreak }}" class="filter-adaptive" alt="{{ resolved.config.brand.name }} Logo"/>
+      </div>
+
+      <!-- Loading State -->
+      <div id="connections-loading">
+        <h1 class="omega-auth__title">Authorizing <span id="connections-provider">Provider</span></h1>
+        <p class="omega-auth__sub">Hold tight. Completing the connection.</p>
+        <div class="spinner-border spinner-border-sm mb-0" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Result State -->
+      <div id="connections-result" class="d-none">
+        <!-- Success -->
+        <div id="result-success" class="d-none">
+          <h1 class="omega-auth__title">Connected</h1>
+          <p class="omega-auth__sub mb-0">Your account is linked. Redirecting you now.</p>
+        </div>
+
+        <!-- Error -->
+        <div id="result-error" class="d-none mb-3">
+          <h1 class="omega-auth__title mb-3">Connection failed</h1>
+          <div class="alert alert-danger mb-3 text-start" role="alert">
+            <p id="error-message" class="mb-0">An error occurred while connecting your account.</p>
+          </div>
+          <div class="text-center mb-0">
+            <a id="return-button" href="/dashboard/account#connections" class="btn btn-adaptive">
+              <i class="fa-solid fa-arrow-left fa-sm me-2"></i><span class="button-text">Return to account</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help -->
+      <div class="mt-4 pt-3 hairline-top text-center">
+        <span class="small omega-quiet">
+          Need help? <a href="/contact" class="text-decoration-none">Contact support</a>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | omega_content_format }}

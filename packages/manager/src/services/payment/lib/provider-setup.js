@@ -4,7 +4,9 @@
  * every service opens with (lib/config-flow.js confirmSetup, the ONE home of
  * that wording), then the provider dashboard and its keys. Public halves
  * (publishable key, client id, site) land in omega.json5 via the
- * comment-preserving writeback; the SECRET half rides the shared helper
+ * comment-preserving writeback — a provider with no public half declares none
+ * (coinbase, whose API key is the whole credential) — and the SECRET half rides
+ * the shared helper
  * (lib/service-input.js), which persists it to the brand .env and exports it
  * so the current run proceeds immediately. Disable writes
  * `payment.providers.<name>: false` so the run stops asking — permanently.
@@ -63,6 +65,20 @@ const PROVIDERS = {
       },
     ],
   },
+  // The one provider with NO public half ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)):
+  // the Coinbase Commerce API key is the entire credential, so `fields` is empty
+  // and nothing is written to omega.json5 — the gate and the secret ask are the
+  // whole flow. Its Disable therefore lands on `enabled`, the switch the schema
+  // declares and the checkout reads, rather than on the provider block the
+  // siblings turn off.
+  coinbase: {
+    label: 'Coinbase Commerce',
+    url: 'https://commerce.coinbase.com/settings/security',
+    instructions: 'Open the brand\'s Coinbase Commerce account, then go to Settings → Security → API keys.',
+    secret: 'COINBASE_COMMERCE_API_KEY',
+    disablePath: 'payment.providers.coinbase.enabled',
+    fields: [],
+  },
 };
 
 /**
@@ -70,7 +86,7 @@ const PROVIDERS = {
  * credentials were landed (config + .env + process.env), false otherwise.
  *
  * @param {Object} context - Service context (brandConfig, brandRoot, options)
- * @param {string} name - 'stripe' | 'paypal' | 'chargebee'
+ * @param {string} name - 'stripe' | 'paypal' | 'chargebee' | 'coinbase'
  */
 async function providerSetupFlow(context, name) {
   if (!canPrompt(context.options)) {
@@ -78,7 +94,11 @@ async function providerSetupFlow(context, name) {
   }
 
   const provider = PROVIDERS[name];
-  const disablePath = `payment.providers.${name}`;
+  // Where Disable lands `false`. The provider BLOCK is the switch for the ones
+  // whose public data enables them; a provider carrying its own switch names it
+  // (coinbase's `enabled`, #642), so the off state is the one shape the schema
+  // declares and every reader already gates on.
+  const disablePath = provider.disablePath || `payment.providers.${name}`;
 
   // The uniform gate — Disable lands `payment.providers.<name>: false`
   const action = await confirmSetup(context, {

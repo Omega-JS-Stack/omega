@@ -41,6 +41,38 @@ function tmpBrand({ target, brandEnv, repo }) {
   return { brand, targetDir };
 }
 
+// #586 — the `.env.<environment>` overlay reaches this lane too. What a runner
+// builds is a RELEASE, so the publish composes PRODUCTION: a developer machine's
+// `.env.development` values must never become the repo's Actions secrets, and
+// the composed set must not depend on which shell ran the publish.
+test('collect: the publish composes PRODUCTION, never this shell\'s environment', () => {
+  const { brand, targetDir } = tmpBrand({
+    target: 'extension',
+    brandEnv: 'CHROME_CLIENT_ID=live-id\n',
+  });
+  const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
+
+  fs.writeFileSync(path.join(brand, '.env.development'), 'CHROME_CLIENT_ID=dev-id\n');
+  fs.writeFileSync(path.join(brand, '.env.production'), 'CHROME_CLIENT_ID=prod-id\n');
+
+  try {
+    for (const environment of ['development', 'testing', 'production']) {
+      delete process.env.OMEGA_TEST_MODE;
+      process.env.ENVIRONMENT = environment;
+
+      assert.deepStrictEqual(collectTargetSecrets({ targetDir, target: 'extension' }), {
+        CHROME_CLIENT_ID: 'prod-id',
+      }, `a publish run under ${environment} still publishes the production value`);
+    }
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    fs.rmSync(brand, { recursive: true, force: true });
+  }
+});
+
 test('collect: the SCHEMA names the keys, the composed env supplies the values', () => {
   const { brand, targetDir } = tmpBrand({
     target: 'extension',
@@ -107,6 +139,46 @@ test('publish: the collected keys go to the declared repo, values on stdin', () 
     // Values travel on stdin, never in argv.
     assert.deepStrictEqual(gh.slice(1).map((call) => call.input), ['mp-secret', 'sk-fixture']);
     assert.ok(gh.every((call) => !call.args.join(' ').includes('sk-fixture')));
+  } finally {
+    fs.rmSync(brand, { recursive: true, force: true });
+  }
+});
+
+// #682 — desktop's signing secrets are named by PATH in the cascade
+// (CSC_LINK=config/certs/dev-id.p12) and CI needs the FILE, so the one shape
+// difference between the three binds is a resolver applied before the send.
+test('publish: a resolveValue seam transforms each value, and a falsy return drops the key', () => {
+  const { brand, targetDir } = tmpBrand({
+    target: 'web',
+    brandEnv: 'OPENAI_API_KEY=sk-fixture\nGOOGLE_ANALYTICS_SECRET_WEB=mp-secret\n',
+    repo: 'acme/site',
+  });
+  const gh = [];
+
+  try {
+    // The seam sees the composed value and its DELIVERED key.
+    assert.deepStrictEqual(
+      collectTargetSecrets({ targetDir, target: 'web', resolveValue: (value, key) => `${key}:${value}` }),
+      { GOOGLE_ANALYTICS_SECRET: 'GOOGLE_ANALYTICS_SECRET:mp-secret', OPENAI_API_KEY: 'OPENAI_API_KEY:sk-fixture' },
+    );
+
+    const result = publishTargetSecrets({
+      targetDir,
+      target: 'web',
+      logger: quiet,
+      env: {},
+      resolveValue: (value, key) => (key === 'OPENAI_API_KEY' ? Buffer.from(value).toString('base64') : null),
+      gitExecFn: () => 'git@github.com:acme/site.git\n',
+      execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
+    });
+
+    // The dropped key never reaches gh; the kept one travels transformed.
+    assert.deepStrictEqual(result.published, ['OPENAI_API_KEY']);
+    assert.deepStrictEqual(gh.map((call) => call.args.join(' ')), [
+      'auth status',
+      'secret set OPENAI_API_KEY --repo acme/site',
+    ]);
+    assert.deepStrictEqual(gh.slice(1).map((call) => call.input), [Buffer.from('sk-fixture').toString('base64')]);
   } finally {
     fs.rmSync(brand, { recursive: true, force: true });
   }

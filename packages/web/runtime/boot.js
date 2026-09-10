@@ -16,14 +16,12 @@
  *   2. page bundle  → bootPage(pageModule): awaits the main boot, then
  *      pageModule({ manager, options }). Both scripts are `type="module"`
  *      (deferred, document order), so bootMain always registers first.
+ *   3. layout bundle → bootLayout(namespace): the same handshake for a layout
+ *      module, whose default export is optional (#742).
  */
 import omega from '@omega.js/client';
-import { createIconRenderer } from '@omega.js/client/modules/icon-renderer.js';
 import { Manager } from './manager.js';
-// Relative, not the __main_assets__ alias: this runtime is bundled by every
-// esbuild pass, and a package-root-relative path resolves the same in the
-// monorepo and in a published install (both ship runtime/ and core/).
-import { siteUrl } from '../core/js/libs/path-prefix.js';
+import { createIconWatcher } from './icons.js';
 
 let context = null;
 let ready = null;
@@ -50,14 +48,10 @@ async function initialize() {
   // Initialize the @omega.js/client singleton with the page-baked config
   await omega.initialize(window.Configuration);
 
-  // Font Awesome auto-render (C4 cp112) — the same shared watcher desktop
-  // runs; web's transport is the site's OWN emitted icon set (assets/fa/,
-  // the brand's Pro chain + free floor). Static fa-* markup and classes
-  // set or changed via JS both render; only used icons ever transfer.
-  createIconRenderer({
-    resolve: (name, style) => fetch(siteUrl(`/assets/fa/${style}/${name}.svg`))
-      .then((response) => (response.ok ? response.text() : null)),
-  }).start(document);
+  // Icon upgrading (#619) — the build already inlined every icon the rendered
+  // page named, so this is what covers markup JS creates afterwards and
+  // classes it changes mid-flight. Every page, main bundle or not.
+  createIconWatcher({ development: manager.isDevelopment() }).start(document);
 
   // Development helpers — code-split, only ever fetched in development
   if (manager.isDevelopment()) {
@@ -107,6 +101,20 @@ export function bootPage(mod) {
       if (typeof mod === 'function') return mod({ manager, options });
     })
     .catch((e) => console.error('Page module error:', e));
+}
+
+/**
+ * Boot a layout bundle (#624): the layout module's NAMESPACE arrives here, not
+ * its default export, because a layout module's default is OPTIONAL. Layout
+ * chrome that must act before the client is ready runs at import time and
+ * exports nothing (the redirect layout's hop). Reading `.default` off the
+ * namespace here rather than in the generated stub is what keeps esbuild from
+ * proving the access undefined and warning on every build (#742).
+ * @param {object} mod - the layout module's namespace
+ * @returns {Promise<void>}
+ */
+export function bootLayout(mod) {
+  return bootPage(mod.default);
 }
 
 /**

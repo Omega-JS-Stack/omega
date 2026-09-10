@@ -18,7 +18,8 @@
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/plan/post.js');
+const handler = require('../../../dist/manager/routes/payments/plan/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
 // exclusive to this suite and declared in the seed roster, so the account it
@@ -27,7 +28,7 @@ const PERSONA = 'journey-payments-plan-switch';
 const RESOURCE_ID = 'sub_test_journey_plan_switch';
 const ORDER_ID = 'TEST-PLAN-SWTCH';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment journey: plan endpoint → plan-changed → paid product B',
   type: 'suite',
   timeout: 30000,
@@ -178,4 +179,4 @@ module.exports = {
       },
     },
   ],
-};
+});

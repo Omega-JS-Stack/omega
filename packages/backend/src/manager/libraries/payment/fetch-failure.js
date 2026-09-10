@@ -29,19 +29,20 @@ const isAlreadyGone = require('./provider-errors.js');
  * @param {Error} error - The error the provider call threw
  * @param {object} options
  * @param {string} options.provider - Provider name (e.g. 'stripe')
+ * @param {string} options.fn - The library method that made the call, so the message names its own call site (e.g. 'getRefundDetails')
  * @param {string} options.resourceType - Resource type that was being fetched
  * @param {string} options.resourceId - Resource ID that was being fetched
  * @param {string} [options.consequence] - What the failed call did NOT do (e.g. an uncaptured capture)
  * @returns {Error} The error to throw, carrying `notFound` plus what it was about
  */
-function fetchFailure(error, { provider, resourceType, resourceId, consequence }) {
+function fetchFailure(error, { provider, fn, resourceType, resourceId, consequence }) {
   const notFound = isAlreadyGone(error);
   const verdict = notFound
     ? `${provider} does not have ${resourceType} ${resourceId}`
     : `${provider} could not be reached for ${resourceType} ${resourceId}`;
   const suffix = consequence ? ` — ${consequence}` : '';
 
-  const failure = new Error(`${provider} fetchResource(${resourceType}/${resourceId}) failed — ${verdict}: ${error?.message || error}${suffix}`);
+  const failure = new Error(`${provider} ${fn}(${resourceType}/${resourceId}) failed — ${verdict}: ${error?.message || error}${suffix}`);
 
   failure.notFound = notFound;
   failure.provider = provider;

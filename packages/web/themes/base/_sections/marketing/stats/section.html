@@ -11,7 +11,7 @@
           {% capture stat_class %}omega-stat{% if tone_slots contains stat.color %} omega-{{ stat.color }}{% endif %}{% endcapture %}
           <div class="{{ stat_class }}" data-omega-reveal>
             {% iftruthy stat.icon %}
-              <span class="omega-icon-chip omega-stat__icon">{% omega_icon stat.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip omega-stat__icon"><i class="fa-solid fa-{{ stat.icon }} fa-sm"></i></span>
             {% endiftruthy %}
             {%- comment %} A value is TEXT, never markup (#580): a stat like
             `<200ms` opened a tag the minifier then ate, printing a visible

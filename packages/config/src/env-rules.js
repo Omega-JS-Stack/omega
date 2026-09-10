@@ -14,7 +14,7 @@
  *     `assertRules`) — production refuses, everything else warns;
  *   - the two BAKE lanes, where a missing key would be frozen into a shipped
  *     artifact: the extension's build.json bake (gulp/tasks/package.js) and the
- *     desktop's webpack DefinePlugin bake (gulp/tasks/webpack.js), both
+ *     desktop's bundle `define` bake (gulp/tasks/bundle.js), both
  *     refusing in build/publish mode and warning in development. Web has NO
  *     bake seam — a site reads its values at request time, so there is nothing
  *     to freeze and nothing to check;

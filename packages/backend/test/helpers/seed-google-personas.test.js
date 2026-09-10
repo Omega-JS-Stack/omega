@@ -16,7 +16,8 @@
  * personas already exist when this runs (the suite's own seed just made them),
  * so the first call here is already the second seed the bug fired on.
  */
-const { GOOGLE_ACCOUNTS, importGoogleAccount } = require('../../src/test/test-accounts.js');
+const { GOOGLE_ACCOUNTS, importGoogleAccount } = require('../../dist/test/test-accounts.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The domain the seeder resolves persona emails against — same derivation the
 // emulator's boot seed and the runner both use.
@@ -26,7 +27,7 @@ function seedDomain(config) {
   return email.includes('@') ? email.split('@')[1] : '';
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Google picker personas import idempotently onto a warm emulator',
   type: 'group',
   auth: 'none',
@@ -110,4 +111,4 @@ module.exports = {
       },
     },
   ],
-};
+});

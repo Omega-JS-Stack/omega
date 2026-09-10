@@ -16,7 +16,7 @@ everything that depends on a backend.
 | `project-settings` | The GCP display name matches `brand.name`, and a web app named "Web App" exists. Diffed before writing. |
 | `oauth-consent` | The OAuth consent screen (IAP brand): application title, support email, and the AUDIENCE (below). |
 | `service-account` | The Admin SDK service account with `firebase.admin`, `firebaseauth.admin`, `datastore.owner`, `serviceusage.serviceUsageConsumer`, and its key downloaded. The IAM grant diffs the policy first. |
-| `hosting` | The default hosting site gets `api.{domain}` plus `api.{sub}.{domain}` per `brand.subdomains` entry; DNS is written through Cloudflare. The main domain is NOT added — the website hosts on GitHub Pages. |
+| `hosting` | The default hosting site gets `api.{domain}`: ONE api domain, shared by every web instance the brand runs ([#588](https://github.com/Omega-JS-Stack/omega/issues/588)); DNS is written through Cloudflare. The main domain is NOT added — the website hosts on GitHub Pages. |
 | `firestore` | The Firestore database (nam5 US multi-region) with Point-in-Time Recovery. |
 | `database` | The default Realtime Database instance (`{projectId}-default-rtdb`, us-central1). |
 | `authentication` | Identity Platform, email/password sign-in, email-enumeration privacy, anonymous auto-delete, the password policy, authorized domains — all diffed via Identity Toolkit — plus Google sign-in. |
@@ -72,6 +72,17 @@ attempting a write that cannot exist:
 Creating the screen is org-only too: on a project that belongs to no organization the create answers
 400 "Project must belong to an organization", and the ensure names that cause with the console consent URL
 instead of the generic could-not-create line.
+
+## The branding page — a NAMED manual step
+
+The consent screen's **branding** extras (logo, home/privacy/terms links, authorized domains) have no API
+at all, so nothing here can reconcile them. Per the automation ruling
+([#693](https://github.com/Omega-JS-Stack/omega/issues/693)) what cannot be automated gets NAMED, so
+`oauth-consent` prints
+[the branding page](https://console.cloud.google.com/auth/branding) with its one-line checklist
+([#696](https://github.com/Omega-JS-Stack/omega/issues/696)): links and authorized domains are safe to
+change anytime, while uploading a LOGO starts Google's verification review for External apps. It is a
+named step, not a warning — the run's status never changes for it.
 
 ## Gotchas
 

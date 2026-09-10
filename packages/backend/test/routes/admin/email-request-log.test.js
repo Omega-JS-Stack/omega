@@ -11,7 +11,8 @@
  *
  * Run: npx omega test backend:routes/admin/email-request-log
  */
-const handler = require('../../../src/manager/routes/admin/email/post.js');
+const handler = require('../../../dist/manager/routes/admin/email/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ADMIN = { authenticated: true, roles: { admin: true } };
 
@@ -49,7 +50,7 @@ const SETTINGS = {
   data: { content: { message: 'Account number 4111 1111 1111 1111 is now active.' } },
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin send email — the request log carries no addresses and no body (#127)',
   type: 'group',
 
@@ -82,4 +83,4 @@ module.exports = {
       },
     },
   ],
-};
+});

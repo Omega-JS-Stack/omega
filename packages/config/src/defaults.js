@@ -18,6 +18,13 @@
  * A key with no sane framework answer carries no `default:` and is never
  * materialized: owner decisions, tri-states that mean "ask", ids the services
  * provision, anything secret-shaped (secrets live in .env regardless).
+ *
+ * A rule may also carry `materialize: false`
+ * ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): its `default:`
+ * still RESOLVES (schemaDefaults, so every reader sees the value) but is never
+ * WRITTEN into a brand's file. That is for framework facts a brand may override
+ * and rarely does — presentation the framework owns — where a copy in every
+ * brand config is a copy that drifts from the thing it came from.
  */
 
 const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
@@ -25,6 +32,17 @@ const { isPlainObject } = require('./merge.js');
 
 function hasDefault(rule) {
   return Object.prototype.hasOwnProperty.call(rule, 'default');
+}
+
+/**
+ * Whether a rule's default is WRITTEN into a brand's file, not merely resolved
+ * ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)). `materialize:
+ * false` means resolution-only: the fact stays at the layer that owns it.
+ * @param {object} rule
+ * @returns {boolean}
+ */
+function isMaterialized(rule) {
+  return rule.materialize !== false;
 }
 
 /**
@@ -62,9 +80,19 @@ function setAtPath(target, dotted, value) {
  * @returns {object}
  */
 function schemaDefaults(target) {
+  return defaultsFrom(defaultRules(target));
+}
+
+/**
+ * The default config a given rule set describes — every `default:` at its own
+ * dot-path, deep-copied per call.
+ * @param {object[]} rules - Rules that carry a default.
+ * @returns {object}
+ */
+function defaultsFrom(rules) {
   const defaults = {};
 
-  for (const rule of defaultRules(target)) {
+  for (const rule of rules) {
     setAtPath(defaults, rule.path, structuredClone(rule.default));
   }
 
@@ -86,7 +114,7 @@ function defaultComments(target) {
     ? [...SHARED_SCHEMA, ...TARGET_SCHEMAS[target]]
     : SHARED_SCHEMA;
 
-  const defaulted = rules.filter(hasDefault).map((rule) => rule.path);
+  const defaulted = rules.filter(hasDefault).filter(isMaterialized).map((rule) => rule.path);
   const comments = {};
 
   for (const rule of rules) {
@@ -134,7 +162,12 @@ function collectMissing(defaults, present, prefix, target, found) {
  * @returns {Array<{ path: string, value: * }>}
  */
 function missingDefaults(config, target) {
-  return collectMissing(schemaDefaults(target), config || {}, '', target, []);
+  // Resolution-only defaults are skipped whole: a `materialize: false` rule's
+  // value belongs to the framework, and writing it here would hand a brand a
+  // copy to drift ([#793](https://github.com/Omega-JS-Stack/omega/issues/793))
+  const writable = defaultsFrom(defaultRules(target).filter(isMaterialized));
+
+  return collectMissing(writable, config || {}, '', target, []);
 }
 
 module.exports = { schemaDefaults, missingDefaults, defaultComments, defaultRules };

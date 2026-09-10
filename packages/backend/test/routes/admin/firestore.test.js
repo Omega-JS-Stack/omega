@@ -3,9 +3,11 @@
  * Tests the admin Firestore read/write endpoints
  * Requires admin authentication
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const TEST_PATH = '_test/firestore-test-doc';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin Firestore read/write operations',
   type: 'group',
   tests: [
@@ -124,4 +126,4 @@ module.exports = {
     },
 
   ],
-};
+});

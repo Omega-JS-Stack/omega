@@ -23,11 +23,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { requiredEnvKeys } = require('@omega.js/config');
+const { requiredEnvKeys, envEnvironment } = require('../../dist/vendor/config/index.js');
 
-const env = require('../../src/manager/libraries/env.js');
+const env = require('../../dist/manager/libraries/env.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MANAGER_PATH = require.resolve('../../src/manager/index.js');
+const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
 const REQUIRED = requiredEnvKeys('backend');
 
 /** A FRESH Manager module, so the boot latches start unset. */
@@ -174,7 +175,7 @@ const HALF_KEYED_CAPTCHA = {
   targets: { backend: {} },
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'The one env reader (#581): declared keys only, and a boot that refuses without the required ones',
   type: 'group',
 
@@ -254,88 +255,46 @@ module.exports = {
     },
 
     {
-      name: 'the _DEV twin wins outside production and reads as absent in production (#586)',
+      name: 'one key, every environment — the _DEV twin mechanism is gone (#586)',
 
       run() {
-        const both = { STRIPE_SECRET_KEY: 'sk_test_plain', STRIPE_SECRET_KEY_DEV: 'sk_test_devtwin' };
+        // Ruled 2026-08-26: the `<KEY>_DEV` twins are replaced, before they
+        // shipped, by `.env.<environment>` files overlaying the base `.env`.
+        // The reader no longer decides WHICH name to read — the cascade has
+        // already resolved the one name by the time anything reaches here, so
+        // a read returns the same value in every environment.
+        for (const vars of [DEVELOPMENT, PRODUCTION, { ...DEVELOPMENT, OMEGA_TEST_MODE: 'true' }]) {
+          withEnv({ ...vars, STRIPE_SECRET_KEY: 'sk_from_the_cascade' }, () => {
+            assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_from_the_cascade');
+          });
+        }
 
-        // Outside production the twin is the value — the emulator can never
-        // reach the account the plain key names
-        withEnv({ ...DEVELOPMENT, ...both }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_test_devtwin');
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY_DEV'), 'sk_test_devtwin');
-        });
+        // The twin names are not declared anywhere, so reading one is the
+        // undeclared-key programmer error, not a silent undefined
+        for (const name of ['STRIPE_SECRET_KEY_DEV', 'PAYPAL_CLIENT_SECRET_DEV', 'CHARGEBEE_API_KEY_DEV']) {
+          assert.throws(() => env.get(name), (error) => {
+            assert.strictEqual(error.name, 'UnknownEnvKeyError');
+            return true;
+          }, `${name} must not be a declared key`);
+        }
 
-        // …and the plain key still serves when no twin is set
-        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_test_plain', STRIPE_SECRET_KEY_DEV: null }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_test_plain');
-          assert.strictEqual(env.has('STRIPE_SECRET_KEY_DEV'), false);
-        });
-
-        // In production the twin does not exist — a stale row that survived
-        // into the artifact can never redirect a real customer's payment
-        withEnv({ ...PRODUCTION, ...both }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_test_plain');
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY_DEV'), undefined);
-          assert.strictEqual(env.has('STRIPE_SECRET_KEY_DEV'), false);
-        });
-
-        // The other two twins answer the same way
-        withEnv({ ...DEVELOPMENT, PAYPAL_CLIENT_SECRET: 'pp-plain', PAYPAL_CLIENT_SECRET_DEV: 'pp-sandbox' }, () => {
-          assert.strictEqual(env.get('PAYPAL_CLIENT_SECRET'), 'pp-sandbox');
-        });
-        withEnv({ ...DEVELOPMENT, CHARGEBEE_API_KEY: 'test_plain', CHARGEBEE_API_KEY_DEV: 'test_dev' }, () => {
-          assert.strictEqual(env.get('CHARGEBEE_API_KEY'), 'test_dev');
+        // …and a live-shaped value is TRUSTED now: the overlay is where a
+        // local run puts its test credential, and no key gets a shape guard
+        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_live_trusted' }, () => {
+          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_live_trusted');
         });
       },
     },
 
     {
-      name: 'a LIVE-shaped payment secret is refused outside production, by name and never by value (#586)',
+      name: 'env.environment() IS the one vocabulary the overlay files are named with (#586)',
 
       run() {
-        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_live_SECRETVALUE', STRIPE_SECRET_KEY_DEV: null }, () => {
-          assert.throws(() => env.get('STRIPE_SECRET_KEY'), (error) => {
-            assert.strictEqual(error.name, 'LiveSecretOutsideProductionError');
-            assert.ok(error.message.includes('STRIPE_SECRET_KEY'), 'the refusal names the key');
-            assert.ok(error.message.includes('STRIPE_SECRET_KEY_DEV'), 'the refusal names the fix');
-            assert.ok(error.message.includes('development'), 'the refusal names the environment');
-            assert.ok(!error.message.includes('sk_live_SECRETVALUE'), 'no secret value ever appears in the message');
-            return true;
-          });
-        });
+        assert.strictEqual(env.environment, envEnvironment, "the reader re-exports @omega.js/config's resolver, never a second copy");
 
-        // A restricted live key charges real cards too
-        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'rk_live_SECRETVALUE', STRIPE_SECRET_KEY_DEV: null }, () => {
-          assert.throws(() => env.get('STRIPE_SECRET_KEY'), /LIVE/);
-        });
-
-        // …and a live key pasted into the TWIN is refused under the twin's name
-        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_test_plain', STRIPE_SECRET_KEY_DEV: 'sk_live_OOPS' }, () => {
-          assert.throws(() => env.get('STRIPE_SECRET_KEY'), (error) => {
-            assert.strictEqual(error.name, 'LiveSecretOutsideProductionError');
-            assert.ok(error.message.includes('STRIPE_SECRET_KEY_DEV'), 'the refusal names the key that carried the value');
-            return true;
-          });
-        });
-
-        // Chargebee's live sites announce themselves the same way
-        withEnv({ ...DEVELOPMENT, CHARGEBEE_API_KEY: 'live_SECRETVALUE', CHARGEBEE_API_KEY_DEV: null }, () => {
-          assert.throws(() => env.get('CHARGEBEE_API_KEY'), (error) => {
-            assert.strictEqual(error.name, 'LiveSecretOutsideProductionError');
-            return true;
-          });
-        });
-
-        // In production a live key IS the point
-        withEnv({ ...PRODUCTION, STRIPE_SECRET_KEY: 'sk_live_SECRETVALUE', STRIPE_SECRET_KEY_DEV: null }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_live_SECRETVALUE');
-        });
-
-        // A test-shaped key is never refused anywhere
-        withEnv({ ...DEVELOPMENT, STRIPE_SECRET_KEY: 'sk_test_fine', STRIPE_SECRET_KEY_DEV: null }, () => {
-          assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_test_fine');
-        });
+        withEnv(DEVELOPMENT, () => assert.strictEqual(env.environment(), 'development'));
+        withEnv(PRODUCTION, () => assert.strictEqual(env.environment(), 'production'));
+        withEnv({ ...DEVELOPMENT, OMEGA_TEST_MODE: 'true' }, () => assert.strictEqual(env.environment(), 'testing'));
       },
     },
 
@@ -400,4 +359,4 @@ module.exports = {
       },
     },
   ],
-};
+});

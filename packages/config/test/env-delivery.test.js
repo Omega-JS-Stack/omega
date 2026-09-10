@@ -66,7 +66,7 @@ test('renderSecretsBlock(): sorted `KEY: ${{ secrets.KEY }}` lines at the token 
   // The template's own env: block already declares these — a repeated YAML
   // mapping key is invalid, so the generated block never restates them
   assert.ok(!block.includes('GH_TOKEN'), 'a workflow-owned key never renders');
-  assert.deepEqual(WORKFLOW_OWNED_KEYS, ['GH_TOKEN', 'NODE_VERSION', 'NODE_ENV']);
+  assert.deepEqual(WORKFLOW_OWNED_KEYS, ['GH_TOKEN', 'CLOUDFLARE_TOKEN', 'NODE_VERSION', 'NODE_ENV']);
 });
 
 test('renderSecretsBlock(): the indent is the caller\'s, and an empty block is still valid YAML', () => {
@@ -110,8 +110,10 @@ test('publishSecretKeys(): what push-secrets sends — the workflow set, workflo
 
 test('web: the build-step keys, and nothing the backend alone reads', () => {
   assert.deepEqual(workflowSecretKeys('web'), [
+    'CLOUDFLARE_TOKEN',
     'GH_TOKEN',
     'GOOGLE_ANALYTICS_SECRET',
+    'OMEGA_LICENSE_KEY',
     'OMEGA_TEST_FIREBASE_ADMIN_KEY',
     'OMEGA_TEST_USER_UID',
     'OPENAI_API_KEY',
@@ -130,6 +132,19 @@ test('web: the build-step keys, and nothing the backend alone reads', () => {
   assert.ok(!block.includes('OMEGA_FONTAWESOME_ROOT'), 'the machine-local Pro path never publishes (#454)');
 
   assert.deepEqual(bakeKeys('web'), [], 'the web build bakes nothing — the client blob reads the runner env');
+});
+
+test('a workflow-owned key is PUBLISHED and never re-rendered — the #715 duplicate mapping (#728)', () => {
+  // CLOUDFLARE_TOKEN is both halves at once: the publish lane pushes the repo
+  // secret so the purge step's `if: env.CLOUDFLARE_TOKEN != ''` can be true,
+  // and the template's own env: block already declares it. A generated line
+  // for it would repeat a YAML mapping key and GitHub would refuse the file.
+  assert.ok(publishSecretKeys('web').includes('CLOUDFLARE_TOKEN'), 'the purge gate needs the repo secret to exist');
+
+  const block = renderSecretsBlock('web');
+  for (const key of WORKFLOW_OWNED_KEYS) {
+    assert.ok(!block.includes(`${key}:`), `${key} is the template's own — a second mapping key invalidates the workflow`);
+  }
 });
 
 test('backend: every key is an env delivery — nothing rides a runner', () => {
@@ -157,6 +172,7 @@ test('desktop: the signing + publishing set the build workflow injects today', (
     'DIGICERT_KEYPAIR_ALIAS',
     'GH_TOKEN',
     'GOOGLE_ANALYTICS_SECRET',
+    'OMEGA_LICENSE_KEY',
     'SIGNTOOL_PATH',
     'SNAPCRAFT_STORE_CREDENTIALS',
     'SSLCOM_CREDENTIAL_ID',
@@ -182,7 +198,26 @@ test('extension: the three stores plus the baked Measurement Protocol secret', (
     'FIREFOX_API_SECRET',
     'FIREFOX_EXTENSION_ID',
     'GOOGLE_ANALYTICS_SECRET',
+    'OMEGA_LICENSE_KEY',
   ]);
 
   assert.deepEqual(bakeKeys('extension'), ['GOOGLE_ANALYTICS_SECRET'], 'build.json carries it into the packaged zip');
+});
+
+test('the license key rides the runner env and NEVER an artifact (#320)', () => {
+  // The check runs where the build runs, so the three CI-built targets get it
+  // injected — but a baked license key is a license key anyone who unpacks the
+  // app can copy, so it appears in no bake list anywhere.
+  for (const target of ['web', 'backend', 'desktop', 'extension']) {
+    assert.ok(!bakeKeys(target).includes('OMEGA_LICENSE_KEY'), `${target} must never bake the license key`);
+  }
+
+  for (const target of ['web', 'desktop', 'extension']) {
+    assert.ok(workflowSecretKeys(target).includes('OMEGA_LICENSE_KEY'), `${target} builds on a runner, so the check needs it there`);
+    assert.ok(publishSecretKeys(target).includes('OMEGA_LICENSE_KEY'), `${target}'s repo secret must exist for the workflow to read`);
+  }
+
+  // The backend deploys straight from the CLI: no runner, and no delivery that
+  // would write the key into the .env its artifact ships with.
+  assert.ok(!workflowSecretKeys('backend').includes('OMEGA_LICENSE_KEY'));
 });

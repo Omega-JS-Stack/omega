@@ -11,7 +11,6 @@ let formManager = null;
 // Initialize profile section
 export function init() {
   setupProfileForm();
-  setupButtons();
 }
 
 // Load profile data
@@ -51,6 +50,8 @@ export function loadData(account, user) {
         country: account.personal?.location?.country || '',
         region: account.personal?.location?.region || '',
         city: account.personal?.location?.city || '',
+        street: account.personal?.location?.street || '',
+        postalCode: account.personal?.location?.postalCode || '',
       },
       telephone: {
         countryCode: phoneCountryCode,
@@ -85,15 +86,6 @@ function setupProfileForm() {
     // Show success message
     formManager.showSuccess('Profile updated successfully!');
   });
-}
-
-// Setup button handlers
-function setupButtons() {
-  // Setup copy UID button
-  const $copyUidBtn = document.getElementById('copy-uid-btn');
-  if ($copyUidBtn) {
-    $copyUidBtn.addEventListener('click', handleCopyUid);
-  }
 }
 
 // Update user profile
@@ -140,38 +132,6 @@ async function updateUserProfile(data) {
   await userDocRef.set(data, { merge: true });
 
   console.log('Profile successfully updated in Firestore');
-}
-
-// Handle copy UID
-async function handleCopyUid() {
-  const $uidInput = document.getElementById('uid-input');
-  const $copyBtn = document.getElementById('copy-uid-btn');
-
-  if (!$uidInput || !$uidInput.value) {
-    return;
-  }
-
-  try {
-    // Use omega's clipboard utility
-    await omega.utilities().clipboardCopy($uidInput);
-
-    // Update button text temporarily
-    const $text = $copyBtn.querySelector('.button-text');
-    const originalText = $text.textContent;
-
-    $text.textContent = 'Copied!';
-    $copyBtn.classList.remove('btn-outline-adaptive');
-    $copyBtn.classList.add('btn-success');
-
-    // Reset after 2 seconds
-    setTimeout(() => {
-      $text.textContent = originalText;
-      $copyBtn.classList.remove('btn-success');
-      $copyBtn.classList.add('btn-outline-adaptive');
-    }, 2000);
-  } catch (err) {
-    console.error('Failed to copy UID:', err);
-  }
 }
 
 // Update join date from Firebase user

@@ -164,7 +164,7 @@ function configure(config, fixture, siteData = SITE_DATA) {
     coreDir: fixture.coreDir,
     defaultsDir: fixture.defaultsDir,
     environment: 'development',
-    assetManifest: { js: { pages: {} }, css: { pages: {}, themePages: {} } },
+    assetManifest: { js: { pages: {} }, css: { pages: {}, layouts: {} } },
   });
 }
 

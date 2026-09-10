@@ -12,11 +12,14 @@
       <!-- Brand block: lockup, one-liner, socials -->
       <div class="omega-footer__brand">
         {% capture logo_href %}{% assign temp_href = data.logo.href | default: resolved.config.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+        {% comment %} The VISIBLE logo prefers the bridged vector when the mint produced one (#467) —
+          `brand.images.brandmark` stays the raster OG/social and payment sync need, and an
+          authored `data.logo.src` still outranks both. {% endcomment %}
+        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
         {% capture logo_text %}{{ data.logo.text | default: resolved.config.brand.name | omega_liquify }}{% endcapture %}
         {% capture logo_description %}{{ data.logo.description | default: resolved.config.brand.description | omega_liquify }}{% endcapture %}
         {% assign logo_description = logo_description | strip %}
-        {% comment %} A data value that LIQUIFIES to empty (e.g. '{{ resolved.config.meta.description }}' with no meta.description set) still needs the brand fallback — `default:` only sees the raw string {% endcomment %}
+        {% comment %} A data value that LIQUIFIES to empty (e.g. a descriptor binding whose key the brand never set) still needs the brand fallback — `default:` only sees the raw string {% endcomment %}
         {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = resolved.config.brand.description %}{% endif %}
         {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
 
@@ -43,7 +46,7 @@
               {% capture social_href %}{% omega_social platform %}{% endcapture %}
               {% iftruthy social_href %}
                 <a href="{{ social_href }}" class="omega-footer__social-link" aria-label="{{ platform | capitalize }}">
-                  {% omega_icon platform, "fa-sm" %}
+                  <i class="fa-solid fa-{{ platform }} fa-sm"></i>
                 </a>
               {% endiftruthy %}
             {% endfor %}
@@ -109,11 +112,13 @@
         </span>
       {% endif %}
 
-      {% comment %} Framework attribution — a constant, never brand config {% endcomment %}
-      <span class="omega-footer__powered">
-        {% omega_icon "bolt", "fa-sm" %}
-        <span>Powered by <a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a></span>
-      </span>
+      {% comment %} Framework attribution — never brand config: the build's own license verdict (#320) is the only switch {% endcomment %}
+      {% if site.license.attribution == 'shown' %}
+        <span class="omega-footer__powered">
+          <i class="fa-solid fa-bolt fa-sm"></i>
+          <span>Powered by <a href="https://omegajs.dev" target="_blank" rel="noopener">omegajs.dev</a></span>
+        </span>
+      {% endif %}
 
       <div class="omega-footer__tools">
         {% if data.legal.enabled %}
@@ -131,7 +136,7 @@
              never written. Fewer than two languages → this block stays hidden. -->
         <div class="dropup omega-language-dropdown" data-omega-language-switcher hidden>
           <button class="omega-footer__pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            {% omega_icon "language", "fa-sm" %}
+            <i class="fa-solid fa-language fa-sm"></i>
             <span>Language</span>
           </button>
           <ul class="dropdown-menu" data-omega-language-list></ul>
@@ -139,9 +144,9 @@
 
         <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->
         <div class="omega-footer__seg" role="group" aria-label="Appearance" data-omega-segmented>
-          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% omega_icon "sun", "fa-sm" %}</button>
-          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% omega_icon "moon", "fa-sm" %}</button>
-          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% omega_icon "circle-half-stroke", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false"><i class="fa-solid fa-sun fa-sm"></i></button>
+          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false"><i class="fa-solid fa-moon fa-sm"></i></button>
+          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false"><i class="fa-solid fa-circle-half-stroke fa-sm"></i></button>
         </div>
       </div>
     </div>

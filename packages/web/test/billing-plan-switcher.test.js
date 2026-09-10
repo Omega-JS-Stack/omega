@@ -79,11 +79,22 @@ function bundleOnce() {
   return building;
 }
 
-// A catalog shaped exactly like `payment.products`: features carry their own
-// value or fall back to the product's matching limit, -1 is unlimited, and a
-// definition authored on ONE product's copy of a feature explains every other
-// copy (the pricing composer's backfill). Premium lists FIVE features on
-// purpose — the switcher shows four.
+// The FEATURES CATALOG (#647): every feature DEFINED once — name, icon,
+// definition, and a `usage` block on the counted ones — in the order every
+// surface renders it.
+const FEATURE_CATALOG = {
+  requests: { name: 'API requests', definition: 'Calls you can make to the API each month.', usage: {} },
+  seats: { name: 'Team seats', usage: { pace: false } },
+  support: { name: 'Priority support' },
+  history: { name: 'History', usage: { pace: false } },
+  exports: { name: 'Scheduled exports' },
+  sso: { name: 'Single sign-on' },
+  domain: { name: 'Custom domain' },
+};
+
+// A catalog shaped exactly like `payment.products`: each product names ONLY its
+// value — a number on a counted feature (-1 unlimited), true/a string on a perk.
+// Premium names FIVE features on purpose — the switcher shows four.
 const PAYMENT_CONFIG = {
   currency: 'USD',
   products: [
@@ -93,24 +104,14 @@ const PAYMENT_CONFIG = {
       name: 'Premium',
       type: 'subscription',
       prices: { monthly: 10, annually: 100 },
-      limits: { requests: 1000 },
-      features: [
-        { id: 'requests', name: 'API requests', definition: 'Calls you can make to the API each month.' },
-        { id: 'seats', name: 'Team seats', value: 3 },
-        { id: 'support', name: 'Priority support', value: true },
-        { id: 'history', name: 'History', value: -1 },
-        { id: 'exports', name: 'Scheduled exports', value: true },
-      ],
+      features: { requests: 1000, seats: 3, support: true, history: -1, exports: true },
     },
     {
       id: 'pro',
       name: 'Pro',
       type: 'subscription',
       prices: { monthly: 25, annually: 250 },
-      limits: { requests: -1 },
-      features: [
-        { id: 'requests', name: 'API requests' },
-      ],
+      features: { requests: -1 },
     },
     { id: 'credits', name: 'Credits', type: 'one-time', prices: { once: 5 } },
   ],
@@ -274,6 +275,8 @@ function makeClient() {
 
   return {
     motionScans,
+    // The features catalog rides the client config, beside payment (#647)
+    config: { features: FEATURE_CATALOG },
     // The web layer's programmatic hook into the shared motion engine
     // (`core/js/core/motion.js` registers it) — the modal hands it the freshly
     // rendered toggle so the gliding thumb is adopted.
@@ -696,8 +699,9 @@ test('plan switcher: the whole card picks it — minus the parts that own their 
 });
 
 test('plan switcher: a feature value only prints when it says something', async () => {
-  // `true` means "included" — which the check already says — and `false` / ''
-  // mean the same; they used to print themselves ("false Priority support").
+  // `true` means "included" — which the check already says — and `''` says
+  // nothing either; both used to print themselves ("false Priority support").
+  // `false` is not a promise at all now (#647): the tier omits the row.
   const view = await openSwitcher(paidAccount({}), {
     currency: 'USD',
     products: [
@@ -707,20 +711,15 @@ test('plan switcher: a feature value only prints when it says something', async 
         name: 'Premium',
         type: 'subscription',
         prices: { monthly: 10, annually: 100 },
-        features: [
-          { id: 'support', name: 'Priority support', value: true },
-          { id: 'sso', name: 'Single sign-on', value: false },
-          { id: 'domain', name: 'Custom domain', value: '' },
-          { id: 'seats', name: 'Seats', value: 0 },
-        ],
+        features: { seats: 0, support: true, sso: false, domain: '' },
       },
     ],
   });
 
   assert.deepStrictEqual(
     find(view.cards, 'premium').features,
-    ['Priority support', 'Single sign-on', 'Custom domain', '0 Seats'],
-    'true/false/empty print nothing of themselves; a number prints, zero included',
+    ['0 Team seats', 'Priority support', 'Custom domain'],
+    'a number prints (zero included), true/empty print nothing of themselves, false omits the row entirely',
   );
 });
 

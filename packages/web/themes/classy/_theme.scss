@@ -2,7 +2,7 @@
 // Order matters: config (loads Bootstrap with our tokens) → root bridge
 // (Bootstrap CSS vars ← --omega-* tokens, both modes) → base → components →
 // layout → marketing → pages → universal Bootstrap overrides (shared across
-// all themes; last so @extend works).
+// all themes; after the theme so @extend works) → the no-raise opt-out.
 
 // Forward theme configuration (allows consuming project to override)
 @forward 'config';
@@ -50,3 +50,8 @@
 // Universal Bootstrap overrides (shared across all omega themes)
 // Must come AFTER Bootstrap is loaded via config to use @extend
 @import '../bootstrap/overrides';
+
+// The no-raise opt-out (#686). LAST on purpose: it cancels the hover lifts
+// declared above it — core's motion idiom and the floor partials other themes
+// import — so it has to outlive every one of them.
+@import 'css/base/no-raise';

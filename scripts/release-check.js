@@ -16,7 +16,7 @@
  *      local tarballs so nothing resolves against the (empty) registry
  *   3. `require.resolve('<name>')` from the scratch project
  *   4. scan the installed tree for raw PRIVATE @omega.js references
- *      (devkit/config/account/template-kit) — vendoring must have rewritten
+ *      (devkit's VENDORABLE_PACKAGES) — vendoring must have rewritten
  *      or eliminated every one; published runtime deps (@omega.js/client,
  *      @omega.js/backend, @omega.js/mcp-router) are legitimate package
  *      requires and are skipped
@@ -36,7 +36,7 @@ const path = require('node:path');
 // Constants
 const ROOT = path.join(__dirname, '..');
 const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web'];
-const PRIVATE_PACKAGES = ['devkit', 'config', 'account', 'template-kit', 'analytics', 'monitoring'];
+const { VENDORABLE_PACKAGES: PRIVATE_PACKAGES } = require('../packages/devkit/tools/vendor');
 // Always packed even under --only: overrides point at these tarballs
 const OVERRIDE_PACKAGES = ['client', 'backend', 'mcp-router'];
 
@@ -118,6 +118,27 @@ function scanInstalledTree(dir) {
 
   walk(dir);
   return { hits, files, bytes };
+}
+
+/**
+ * Lockstep check (#794) — every publishable's package.json version is the
+ * SAME number. Reads the manifests, never the packed tarballs: the whole
+ * family releases together, so a differing version is a broken release
+ * before anything is packed.
+ * @returns {{ ok: boolean, detail: string }}
+ */
+function checkLockstepVersions() {
+  const versions = PUBLISHABLES.map((name) => ({
+    name,
+    version: JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name, 'package.json'), 'utf8')).version,
+  }));
+  const distinct = [...new Set(versions.map((entry) => entry.version))];
+
+  if (distinct.length === 1) {
+    return { ok: true, detail: distinct[0] };
+  }
+
+  return { ok: false, detail: versions.map((entry) => `${entry.name} ${entry.version}`).join(', ') };
 }
 
 function main() {
@@ -215,6 +236,14 @@ function main() {
   // Summary
   console.log('\n━━━ release-check summary ━━━');
   let failed = false;
+
+  // Lockstep (#794): the family ships ONE version number, so a mixed set of
+  // manifest versions is a red check here — before a publish can put two
+  // numbers on the registry for one release.
+  const lockstep = checkLockstepVersions();
+  if (!lockstep.ok) failed = true;
+  console.log(`  ${lockstep.ok ? '✓' : '✗'} one version across the family (${lockstep.detail})`);
+
   for (const r of results) {
     const ok = r.pack && r.install && r.resolve && r.hits.length === 0;
     if (!ok) failed = true;
@@ -235,4 +264,10 @@ function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+// PUBLISHABLES is the one home of what publishes — the changeset lockstep
+// group is asserted against it (#794), never a second copy of the list.
+module.exports = { PUBLISHABLES, checkLockstepVersions };

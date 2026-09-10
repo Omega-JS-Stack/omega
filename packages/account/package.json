@@ -8,7 +8,8 @@
     ".": "./src/index.js",
     "./schema": "./src/schema.js",
     "./engine": "./src/engine.js",
-    "./subscription": "./src/subscription.js"
+    "./subscription": "./src/subscription.js",
+    "./features": "./src/features.js"
   },
   "scripts": {
     "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"

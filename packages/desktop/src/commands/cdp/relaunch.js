@@ -27,7 +27,7 @@ async function portUp() {
 }
 
 async function waitForBoot(matcher) {
-  // Build + boot: webpack takes the bulk of it. Generous ceiling.
+  // Build + boot: electron's own startup takes the bulk of it. Generous ceiling.
   for (let i = 0; i < 120; i++) {
     await sleep(2000);
     if (!await portUp()) {

@@ -14,19 +14,22 @@
  * lookup ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
  */
 const assert = require('node:assert');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../src/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
-const Test = require('../../../src/manager/libraries/payment/providers/test.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
+const Test = require('../../../dist/manager/libraries/payment/providers/test.js');
 
 const chargebeeSubscriptionCreated = require('../../fixtures/chargebee/webhook-subscription-created.json');
 const chargebeeInvoiceOneTime = require('../../fixtures/chargebee/invoice-one-time.json');
 const stripeCheckoutSession = require('../../fixtures/stripe/checkout-session-completed.json');
+const coinbaseChargeConfirmed = require('../../fixtures/coinbase/charge-confirmed.json');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Stripe's fixtures are bare resources — a webhook wraps one in the event envelope
 const stripeEvent = { id: 'evt_test_session', type: 'checkout.session.completed', data: { object: stripeCheckoutSession } };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Provider extractResource() envelope shapes',
   type: 'group',
 
@@ -64,6 +67,19 @@ module.exports = {
     },
 
     {
+      name: 'coinbase-reads-the-data-inside-its-event-key',
+      async run() {
+        // Coinbase Commerce nests its charge two deep — the delivery envelope
+        // wraps an EVENT, and the charge is that event's data
+        // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642))
+        const charge = Coinbase.extractResource(coinbaseChargeConfirmed);
+
+        assert.equal(charge.id, coinbaseChargeConfirmed.event.data.id, 'Coinbase carries its charge at event.data');
+        assert.equal(Coinbase.extractResource({ id: 'delivery_only' }), null, 'And answers nothing the same way its siblings do');
+      },
+    },
+
+    {
       name: 'chargebee-reads-the-content-key-of-the-event',
       async run() {
         const subscription = Chargebee.extractResource(chargebeeSubscriptionCreated);
@@ -94,4 +110,4 @@ module.exports = {
       },
     },
   ],
-};
+});

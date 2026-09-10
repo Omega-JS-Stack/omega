@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const devkitUpdate = require('@omega.js/devkit/update');
 const updateCommand = require('../src/commands/update.js');
 
 // ─── Fixture staging (deploy-command.test.js pattern) ────────────────────────
@@ -87,6 +88,9 @@ async function runUpdateCommand(cwd, options = {}) {
     await updateCommand({ _: ['update'], ...options });
     return process.exitCode;
   } finally {
+    // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers
+    // so the next case starts from an unpatched stdout.
+    require('@omega.js/devkit/attach-log-file').detach();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }
@@ -110,7 +114,7 @@ test('bare run fans out to every target, each spawned `update` in its own cwd', 
   assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
-test('flags forward verbatim (--apply, --major, --min-age); --only is consumed here', async () => {
+test('flags forward verbatim (--apply, --major, --min-age); --target= is consumed here', async () => {
   const { brand } = stageBrand();
   await runUpdateCommand(brand, { apply: true, major: true, 'min-age': 14, minAge: 14 });
 
@@ -121,16 +125,43 @@ test('flags forward verbatim (--apply, --major, --min-age); --only is consumed h
   }
 
   fs.rmSync(path.join(brand, 'calls.log'));
-  await runUpdateCommand(brand, { only: 'web' });
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], '--only filters and never forwards');
+  await runUpdateCommand(brand, { target: 'web' });
+  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], '--target= picks and never forwards');
 });
 
-test('a filter matching nothing errors with zero spawns', async () => {
+// The retired pickers (#780) — never ignored, never aliased
+test('--only and --except are REFUSED, naming --target=; zero spawns', async () => {
   const { brand } = stageBrand();
-  const code = await runUpdateCommand(brand, { only: 'hosting' });
+
+  await assert.rejects(
+    () => runUpdateCommand(brand, { only: 'web' }),
+    (error) => {
+      assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
+      assert.match(error.message, /--only is retired: pick targets with --target=/);
+      return true;
+    },
+  );
+  await assert.rejects(() => runUpdateCommand(brand, { except: 'backend' }), /--except is retired/);
 
   assert.deepEqual(readCalls(brand), []);
-  assert.equal(code, 1);
+});
+
+test('a --target= token matching nothing STOPS the run, never a matched subset', async () => {
+  const { brand } = stageBrand();
+
+  await assert.rejects(
+    () => runUpdateCommand(brand, { target: 'hosting' }),
+    (error) => {
+      assert.equal(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "hosting"/);
+      return true;
+    },
+  );
+
+  // A typo beside a real target never checks the matched half
+  await assert.rejects(() => runUpdateCommand(brand, { target: 'web,hosting' }), /Unknown --target token "hosting"/);
+
+  assert.deepEqual(readCalls(brand), []);
 });
 
 test('targets are INDEPENDENT: a failing target never blocks the rest, still exit 1', async () => {
@@ -155,4 +186,63 @@ test('cli routes `update` (+ outdated/out aliases) through ALIASES to the comman
   assert.ok(Main.config.aliases.update.includes('outdated'));
   assert.ok(Main.config.aliases.update.includes('out'));
   assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'update.js')));
+});
+
+// ─── The brand root rides the fan-out for its own pin (#794) ────────────────
+
+/**
+ * The real devkit runUpdate, with only its documented seams replaced: a fixture
+ * packument (no registry) and a recording exec (no install). What comes back is
+ * the exact command npm would have run.
+ */
+function withOfflineUpdate(fn) {
+  const original = devkitUpdate.runUpdate;
+  const commands = [];
+
+  devkitUpdate.runUpdate = (options) => original({
+    ...options,
+    hasNpu: false,
+    now: Date.parse('2026-09-03T00:00:00Z'),
+    lookup: async (name) => ({
+      latest: '0.5.0',
+      versions: ['0.4.0', '0.5.0'],
+      times: { '0.5.0': '2026-01-01T00:00:00Z', '0.4.0': '2025-12-01T00:00:00Z' },
+      name,
+    }),
+    execFn: (command) => commands.push(command),
+  });
+
+  return Promise.resolve(fn()).then(
+    (value) => { devkitUpdate.runUpdate = original; return { value, commands }; },
+    (error) => { devkitUpdate.runUpdate = original; throw error; },
+  );
+}
+
+test('the brand ROOT rides the fan-out for @omega.js/manager, applied with --save-exact (#794)', async () => {
+  const { brand } = stageBrand();
+  write(path.join(brand, 'package.json'), JSON.stringify({
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+    devDependencies: { '@omega.js/manager': '0.4.0', 'some-brand-tool': '^1.0.0' },
+  }));
+
+  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { apply: true }));
+
+  assert.deepEqual(commands, ['npm install @omega.js/manager@0.5.0 --save-dev --save-exact'],
+    'the root pin moves with the family, exactly — and nothing else at the root is touched');
+
+  // The targets still fan out exactly as before
+  assert.deepEqual(readCalls(brand).map((c) => c.name).sort(), ['backend', 'web']);
+});
+
+test('a picked run leaves the brand root alone — --target= names targets', async () => {
+  const { brand } = stageBrand();
+  write(path.join(brand, 'package.json'), JSON.stringify({
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+    devDependencies: { '@omega.js/manager': '0.4.0' },
+  }));
+
+  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { apply: true, target: 'web' }));
+
+  assert.deepEqual(commands, [], 'nothing ran for the root');
+  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
 });

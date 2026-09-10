@@ -9,14 +9,18 @@ collection_empty: "Nothing here yet. The first entry will land right on this pag
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="omega-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", headline: resolved.collection.title, sub: resolved.collection.description %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-4" data-omega-first-paint data-omega-dotfield>
+  <div class="container">
+    {% component "heading/masthead", headline: resolved.collection.title, sub: resolved.collection.description, first_paint: true %}
 
     {% comment %} Category rail — the collection's own taxonomy, one link per term {% endcomment %}
     {% assign terms = collections[resolved.collection.taxonomy] %}
     {% if terms and terms.size > 0 %}
-      <nav class="omega-tabs mt-5" aria-label="{{ resolved.collection.title }} categories" data-omega-reveal>
+      <nav class="omega-tabs mt-5" aria-label="{{ resolved.collection.title }} categories">
         <a href="{{ resolved.collection.base }}" class="active">All</a>
         {% for term in terms %}
           <a href="{{ resolved.collection.base }}/categories/{{ term.slug }}">{{ term.name | omega_title_case }}</a>
@@ -42,7 +46,7 @@ collection_empty: "Nothing here yet. The first entry will land right on this pag
                 <span>{{ entry.title | default: item.title | default: item.url }}</span>
                 <span class="omega-rowlist__meta">
                   {{ entry.description | default: item.description }}
-                  {% omega_icon "arrow-right", "fa-xs ms-2" %}
+                  <i class="fa-solid fa-arrow-right fa-xs ms-2"></i>
                 </span>
               </a>
             {% endfor %}
@@ -61,7 +65,7 @@ collection_empty: "Nothing here yet. The first entry will land right on this pag
       <nav aria-label="{{ resolved.collection.title }} pagination" class="d-flex justify-content-center align-items-center gap-3 mt-5" data-omega-reveal>
         {% if paginator.previous_page_path %}
           <a class="btn btn-outline-adaptive btn-sm omega-hover-nudge" href="{{ paginator.previous_page_path }}">
-            {% omega_icon "chevron-left", "fa-xs me-2" %}
+            <i class="fa-solid fa-chevron-left fa-xs me-2"></i>
             Previous
           </a>
         {% endif %}
@@ -69,7 +73,7 @@ collection_empty: "Nothing here yet. The first entry will land right on this pag
         {% if paginator.next_page_path %}
           <a class="btn btn-outline-adaptive btn-sm omega-hover-nudge" href="{{ paginator.next_page_path }}">
             Next
-            {% omega_icon "chevron-right", "fa-xs ms-2" %}
+            <i class="fa-solid fa-chevron-right fa-xs ms-2"></i>
           </a>
         {% endif %}
       </nav>

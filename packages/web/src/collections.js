@@ -50,12 +50,27 @@ function registerCollections(eleventyConfig, collectionsHolder, dynamicCollectio
   // Jekyll-style doc id ('/team/ian', '/blog/slug') — the shape the omega_member
   // and omega_post tags match on and derive asset paths from. inputPath only as
   // a fallback for url-less docs.
-  const toDoc = (item) => ({
-    id: String(item.url || '').replace(/\/+$/, '') || item.inputPath,
-    url: item.url,
-    date: item.date,
-    data: item.data,
-  });
+  //
+  // `templateContent` rides along LAZY and non-enumerable (#711), which is what
+  // lets the engine flatten these holder docs with the same `jekyllDoc` the
+  // paginator uses: a `site.<name>` doc's `content` reads through to the
+  // Eleventy item's rendered body at RENDER time. Eager or enumerable would
+  // throw Eleventy's premature-use error — the holder fills while collections
+  // compute, and every data walk that copies a doc would touch it.
+  const toDoc = (item) => {
+    const doc = {
+      id: String(item.url || '').replace(/\/+$/, '') || item.inputPath,
+      url: item.url,
+      date: item.date,
+      data: item.data,
+    };
+    Object.defineProperty(doc, 'templateContent', {
+      get: () => item.templateContent,
+      enumerable: false,
+      configurable: true,
+    });
+    return doc;
+  };
 
   // One registration shape for every collection: the documents the directory
   // tagging marked, in the collection's own order, mirrored into the holder.

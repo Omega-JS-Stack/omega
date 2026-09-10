@@ -71,6 +71,23 @@ test('defaults: a config missing a schema-defaulted block gains it, comments int
   assert.ok(result.output.defaults.materialized.includes('repo'), 'the run output names what was healed');
 });
 
+test('#793: a resolution-only default (connections) is never written into the brand file', async () => {
+  // `materialize: false` on the schema rule: the connection cards' presentation
+  // resolves from the framework and is never copied into a brand's config,
+  // where it would drift from the framework it came from.
+  const root = makeBrand();
+
+  const result = await defaultsOp({ brandRoot: root, options: {} });
+
+  const source = read(root);
+  const parsed = JSON5.parse(source);
+
+  assert.equal(parsed.connections, undefined, `the brand file gained no connections block: ${source}`);
+  assert.ok(!source.includes('Per-provider user-connection settings'), 'nor its schema description as a comment');
+  assert.ok(!result.output.defaults.materialized.includes('connections'), 'and the run never claims to have healed one');
+  assert.ok(result.output.defaults.materialized.includes('repo'), 'while the ordinary blocks still materialize');
+});
+
 test('defaults: a value the brand authored is never overwritten', async () => {
   const root = makeBrand();
 

@@ -200,6 +200,46 @@ function detectOneTimeTransition(eventType, options) {
     return 'purchase-completed';
   }
 
+  // Chargebee. Its provider routes a subscription-less payment_failed to
+  // category one-time (routes/payments/webhook/providers/chargebee.js), and
+  // reading only Stripe's string left that whole half detecting nothing — no
+  // transition, so the failed-payment email never sent
+  // ([#714](https://github.com/Omega-JS-Stack/omega/issues/714)). The
+  // subscription side never reaches here: it names payment-failed off the
+  // active → suspended state diff, not off this string.
+  if (eventType === 'payment_failed') {
+    return 'purchase-failed';
+  }
+
+  // The success half of that same pair, and it has to be THIS string rather than
+  // `invoice_generated`: an invoice is born unpaid (libraries/payment/providers/
+  // chargebee.js maps `payment_due`/`not_paid` → failed), so mapping the generated
+  // invoice would send a receipt for a purchase nobody paid for. Reading neither
+  // left a paid Chargebee one-time with no receipt and no purchase analytics at all
+  // ([#729](https://github.com/Omega-JS-Stack/omega/issues/729)). The subscription
+  // side never reaches here either: its provider gives a payment_succeeded carrying
+  // a subscription no category at all, because `subscription_renewed` owns that
+  // revenue.
+  if (eventType === 'payment_succeeded') {
+    return 'purchase-completed';
+  }
+
+  // Coinbase Commerce. A crypto charge is a single payment, so `charge:confirmed`
+  // is this provider's whole success half — the coins have settled on-chain and
+  // the purchase is real ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
+  //
+  // Its two siblings deliberately map to NOTHING, though both are supported by
+  // the parser and both write their order: `charge:pending` is money detected but
+  // not yet confirmed, so there is nothing to mail about or book yet, and
+  // `charge:failed` is a hosted charge that expired unpaid — the abandoned-
+  // checkout population, watched by the person who walked away from it, which is
+  // exactly the population `checkout-declined` refuses to mail. (An abandoned
+  // Stripe session sends nothing either; `purchase-failed` is for a MANUAL
+  // invoice nobody is standing in front of.)
+  if (eventType === 'charge:confirmed') {
+    return 'purchase-completed';
+  }
+
   return null;
 }
 

@@ -136,7 +136,12 @@ Marketing.prototype.add = async function (options) {
     return {};
   }
 
-  ctx.log('Marketing.add():', { email });
+  // Same trim remove() got: the address is this line's PAYLOAD, not its subject,
+  // and it sits in Cloud Logging for the whole retention window
+  // ([#710](https://github.com/Omega-JS-Stack/omega/issues/710)). The line names
+  // which providers are about to be asked; the address is at debug.
+  ctx.log(`Marketing.add(): ${enabledProviders(self).join(', ') || 'no providers enabled'}`);
+  ctx.debug('Marketing.add():', { email });
 
   const results = {};
   const promises = [];
@@ -165,7 +170,11 @@ Marketing.prototype.add = async function (options) {
 
   await Promise.all(promises);
 
-  ctx.log('Marketing.add() result:', results);
+  // Each provider answers with its own payload — a SendGrid contact record, a
+  // Beehiiv subscriber — and every one carries the address back. The verdict per
+  // provider is what the line is for (#710); the payloads are at debug.
+  ctx.log('Marketing.add() result:', summarizeResults(results));
+  ctx.debug('Marketing.add() result:', results);
 
   return results;
 };
@@ -218,7 +227,9 @@ Marketing.prototype.sync = async function (userDocOrUid) {
     return {};
   }
 
-  ctx.log('Marketing.sync():', { email });
+  // The address is the payload here too (#710) — the line names the providers.
+  ctx.log(`Marketing.sync(): ${enabledProviders(self).join(', ') || 'no providers enabled'}`);
+  ctx.debug('Marketing.sync():', { email });
 
   const firstName = _.get(userDoc, 'personal.name.first');
   const lastName = _.get(userDoc, 'personal.name.last');
@@ -253,7 +264,11 @@ Marketing.prototype.sync = async function (userDocOrUid) {
 
   await Promise.all(promises);
 
-  ctx.log('Marketing.sync() result:', results);
+  // The provider payloads carry the address back — verdict at log, payloads at
+  // debug (#710). A sync's payloads also echo the custom fields built from the
+  // user doc (name, plan, attribution), which is more of the same class.
+  ctx.log('Marketing.sync() result:', summarizeResults(results));
+  ctx.debug('Marketing.sync() result:', results);
 
   return results;
 };
@@ -272,7 +287,14 @@ Marketing.prototype.remove = async function (email) {
     return {};
   }
 
-  ctx.log('Marketing.remove():', { email });
+  // The address is this line's PAYLOAD, not its subject: a removal is one step
+  // of the caller's own invocation, which already names whose account it is, and
+  // an address in Cloud Logging sits there for the whole retention window — the
+  // same PII the #657 sweep took off the auth trigger headlines
+  // ([#710](https://github.com/Omega-JS-Stack/omega/issues/710)). What the line
+  // needs is which providers are about to be asked; the address is at debug.
+  ctx.log(`Marketing.remove(): ${enabledProviders(self).join(', ') || 'no providers enabled'}`);
+  ctx.debug('Marketing.remove():', { email });
 
   const results = {};
   const promises = [];
@@ -301,10 +323,41 @@ Marketing.prototype.remove = async function (email) {
 
   await Promise.all(promises);
 
-  ctx.log('Marketing.remove() result:', results);
+  // Each provider answers with its own payload — a SendGrid contact record, a
+  // Beehiiv subscriber — and every one of them carries the address back. The
+  // verdict per provider is what the line is for (#710); the payloads are at
+  // debug.
+  ctx.log('Marketing.remove() result:', summarizeResults(results));
+  ctx.debug('Marketing.remove() result:', results);
 
   return results;
 };
+
+/**
+ * The providers a contact call will be asked of, by name.
+ *
+ * @param {object} self - The Marketing instance.
+ * @returns {Array<string>} The enabled provider keys.
+ */
+function enabledProviders(self) {
+  return Object.keys(self.providers).filter((provider) => self.providers[provider]);
+}
+
+/**
+ * A results object as one line: which provider answered, and how.
+ *
+ * @param {object} results - Provider key → that provider's own result payload.
+ * @returns {string} e.g. `campaigns=ok newsletter=failed`.
+ */
+function summarizeResults(results) {
+  const entries = Object.entries(results);
+
+  if (!entries.length) {
+    return 'no providers enabled';
+  }
+
+  return entries.map(([provider, result]) => `${provider}=${result?.success ? 'ok' : 'failed'}`).join(' ');
+}
 
 // ============================================================
 // Campaign management
@@ -440,7 +493,10 @@ Marketing.prototype.sendCampaign = async function (settings) {
 
   await Promise.all(promises);
 
-  ctx.log('Marketing.sendCampaign() results:', results);
+  // The SendGrid result carries the Single Send id and, on a failure, whatever
+  // the provider said — verdict at log, the payloads at debug (#710).
+  ctx.log('Marketing.sendCampaign() results:', summarizeResults(results));
+  ctx.debug('Marketing.sendCampaign() results:', results);
 
   return results;
 };

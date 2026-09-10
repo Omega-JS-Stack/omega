@@ -13,7 +13,7 @@ module.exports = async function (options) {
   try {
     if (['live', 'prod', 'p', 'production'].includes(type)) {
       // The publish-day inverse of `i local`: flip every file: spec in the
-      // brand tree to ^<linked version>, then one registry install
+      // brand tree to the exact <linked version>, then one registry install
       logger.log('Installing production (restoring registry specs tree-wide)...');
       const actions = await local.restoreRegistrySpecs({ dir: process.cwd(), logger });
       const flipped = actions.filter((action) => action.action === 'flip').length;

@@ -48,7 +48,7 @@ test('an authored superheadline.icon is ignored — the eyebrow renders its labe
   );
 
   assert.ok(html.includes('<span class="omega-micro">FAQ</span>'), 'the label alone, icon key or not');
-  assert.ok(!html.includes('data-icon='), 'no omega_icon output anywhere in the head');
+  assert.ok(!/<i class="fa-/.test(html), 'no icon markup anywhere in the head');
   assert.ok(!html.includes('<i class="fa'), 'no orphan icon shell');
   assert.ok(!html.includes('[object Object]'), 'never the raw object');
   assert.deepEqual(warnings, [], 'the icon key is ignored, not an error');

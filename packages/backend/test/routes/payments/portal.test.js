@@ -2,7 +2,9 @@
  * Test: POST /payments/portal - Validation errors
  * Tests rejection cases before any provider call is made.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment portal endpoint: validation errors',
   type: 'group',
   timeout: 15000,
@@ -89,4 +91,4 @@ module.exports = {
       },
     },
   ],
-};
+});

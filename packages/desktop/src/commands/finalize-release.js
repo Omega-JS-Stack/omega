@@ -1,30 +1,35 @@
 // finalize-release — wraps up a release after the matrix builds finish.
 //
 // Two modes (one command, --flag selects):
-//   --signed-dir <path>   Upload signed Windows artifacts to the update-server release
-//                         (created earlier by mac/linux's electron-builder --publish), then
-//                         mirror the same files to the download-server installer tag with
-//                         stable filenames. Used by the windows-sign CI job.
-//   --publish             Flip the update-server release from draft → published so
-//                         electron-updater can read its feed. Used by the finalize CI job.
+//   --signed-dir <path>   Upload signed Windows artifacts to the releases-repo release
+//                         (created earlier by mac/linux's electron-builder --publish).
+//                         Used by the windows-sign CI job.
+//   --publish             Flip that release from draft → published so electron-updater
+//                         can read its feed. Used by the finalize CI job.
 //
-// Reads config/omega.json5 to discover update-server (releases.repo) and
-// download-server (downloads.repo / downloads.tag). Owner falls back to the consumer's
-// own GitHub owner if not set in config.
+// The repo is the brand's ONE public releases repo, addressed by @omega.js/config's
+// `releasesRepo` from config/omega.json5 alone (#799): the same address the build
+// baked into the app's update feed, never the git remote of whatever repo the
+// target sits in.
 //
-// Idempotent: each mode is safe to re-run. Uploads use clobber, publish uses GH's
+// Both modes find the release by LISTING the repo's releases, drafts included
+// (#810): `repos.getReleaseByTag` returns published releases only, because a draft
+// carries no tag ref, so it 404'd on the very draft electron-builder had just
+// created and every run piled up another draft for the same version.
+//
+// Idempotent: each mode is safe to re-run. An upload whose asset name is already
+// on the release replaces it (delete, then upload), publish uses GH's
 // "set draft=false" which is a no-op if already published.
 
 const path    = require('path');
 const fs      = require('fs');
 const jetpack = require('fs-jetpack');
 
-const { discoverRepo, getOctokit } = require('../utils/github.js');
+const { getOctokit } = require('../utils/github.js');
+const { releasesRepo } = require('@omega.js/config');
 const Manager = new (require('../build.js'));
 
 const logger = Manager.logger('finalize-release');
-
-const STABLE = require('../gulp/tasks/mirror-downloads.js');
 
 module.exports = async function finalizeRelease(options = {}) {
   const argv = options._ || [];
@@ -48,40 +53,62 @@ module.exports = async function finalizeRelease(options = {}) {
     throw new Error('finalize-release: GH_TOKEN not set in env');
   }
 
-  const octokit = getOctokit();
+  const octokit = options.octokit || getOctokit();
   if (!octokit) {
     throw new Error('finalize-release: failed to create octokit (missing GH_TOKEN?)');
   }
 
-  let appOwner;
-  try {
-    const discovered = await discoverRepo(projectRoot);
-    appOwner = discovered.owner;
-  } catch (e) {
-    throw new Error(`finalize-release: could not discover GitHub owner: ${e.message}`);
+  // The releases repo (the auto-updater feed source), from config alone.
+  const { owner, name, repo } = releasesRepo(config);
+  if (!repo) {
+    throw new Error('finalize-release: could not address the releases repo. Set repo.providers.github.org (or targets.desktop.releases.owner) and brand.id in config/omega.json5.');
   }
 
-  // Update-server (the auto-updater feed source).
-  const releasesOwner = config.releases?.owner || appOwner;
-  const releasesRepo  = config.releases?.repo  || 'update-server';
-  const releaseTag    = `v${pkgVersion}`;
+  const releaseTag = `v${pkgVersion}`;
 
   if (signedDir) {
     await uploadSignedWindows({
-      octokit, owner: releasesOwner, repo: releasesRepo, tag: releaseTag,
+      octokit, owner, repo: name, tag: releaseTag,
       signedDir: path.resolve(projectRoot, signedDir),
-      config, projectRoot,
     });
   }
 
   if (doPublish) {
-    await publishUpdateServerRelease({
-      octokit, owner: releasesOwner, repo: releasesRepo, tag: releaseTag,
+    await publishReleasesRepoRelease({
+      octokit, owner, repo: name, tag: releaseTag,
     });
   }
 };
 
-async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, config, projectRoot }) {
+/**
+ * Find the repo's release for a tag, DRAFTS INCLUDED (#810).
+ *
+ * The newest draft wins: that is the one the current run's electron-builder
+ * publish step created, and an older duplicate draft for the same version (what
+ * the tag lookup's blindness left behind) never steals the assets. A published
+ * release for the tag answers when no draft does.
+ *
+ * @param {object} args - Lookup args.
+ * @param {object} args.octokit - Authenticated octokit client.
+ * @param {string} args.owner - Releases repo owner.
+ * @param {string} args.repo - Releases repo name.
+ * @param {string} args.tag - Release tag, e.g. `v1.2.3`.
+ * @returns {Promise<object|null>} The release, or null when the tag has none.
+ */
+async function findRelease({ octokit, owner, repo, tag }) {
+  const releases = await octokit.paginate(octokit.rest.repos.listReleases, {
+    owner, repo, per_page: 100,
+  });
+
+  const matches = releases.filter((release) => release.tag_name === tag);
+  const drafts  = matches
+    .filter((release) => release.draft)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  return drafts[0] || matches.find((release) => !release.draft) || null;
+}
+
+async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir }) {
   if (!jetpack.exists(signedDir)) {
     logger.warn(`No signed dir at ${signedDir} — nothing to upload.`);
     return;
@@ -99,19 +126,16 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
     return;
   }
 
-  // Find the update-server release by tag. Normally mac/linux's electron-builder
-  // publish step has already created it (as a draft). For partial-platform runs
-  // (`--platforms windows` on a brand-new version) it doesn't exist yet — in that
-  // case we create it ourselves as a draft so we have a place to attach signed
-  // assets. The `finalize` job is the one gated on all-platforms before flipping
-  // draft → published, so a draft created here just sits until a full run completes.
-  let release;
-  try {
-    const { data } = await octokit.rest.repos.getReleaseByTag({ owner, repo, tag });
-    release = data;
-  } catch (err) {
-    if (err.status !== 404) throw err;
-    logger.log(`No release at ${owner}/${repo}@${tag} yet — creating draft so we have somewhere to upload signed assets...`);
+  // Find the release for the tag, drafts included. Normally mac/linux's
+  // electron-builder publish step has already created it (as a draft). For
+  // partial-platform runs (`--platforms windows` on a brand-new version) it
+  // doesn't exist yet, and in that case we create it ourselves as a draft so we
+  // have a place to attach signed assets. The `finalize` job is the one gated on
+  // all-platforms before flipping draft → published, so a draft created here just
+  // sits until a full run completes.
+  let release = await findRelease({ octokit, owner, repo, tag });
+  if (!release) {
+    logger.log(`No release at ${owner}/${repo}@${tag} yet: creating draft so we have somewhere to upload signed assets...`);
     const { data } = await octokit.rest.repos.createRelease({
       owner, repo,
       tag_name: tag,
@@ -137,6 +161,7 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
 
     const old = existingByName.get(filename);
     if (old) {
+      logger.log(`  ↻ ${filename} is already on the release (asset ${old.id}): replacing it.`);
       await octokit.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: old.id });
     }
 
@@ -160,6 +185,7 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
     const data = fs.readFileSync(src);
     const old  = existingByName.get(filename);
     if (old) {
+      logger.log(`  ↻ ${filename} is already on the release (asset ${old.id}): replacing it.`);
       await octokit.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: old.id });
     }
     await octokit.rest.repos.uploadReleaseAsset({
@@ -170,77 +196,13 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
     });
     logger.log(`  ✓ ${filename} (auto-updater feed) → ${owner}/${repo}@${tag}`);
   }
-
-  // Now mirror the same signed files to download-server with stable names.
-  if (config.downloads?.enabled === false) {
-    logger.log('downloads.enabled=false — skipping download-server mirror.');
-    return;
-  }
-
-  const downloadsOwner = config.downloads?.owner || owner;
-  const downloadsRepo  = config.downloads?.repo  || 'download-server';
-  const downloadsTag   = config.downloads?.tag   || 'installer';
-  const productName    = config.app?.productName || (Manager.getPackage('project') || {}).name || 'app';
-
-  // Get-or-create the installer release.
-  let installerId;
-  try {
-    const { data } = await octokit.rest.repos.getReleaseByTag({ owner: downloadsOwner, repo: downloadsRepo, tag: downloadsTag });
-    installerId = data.id;
-  } catch (err) {
-    if (err.status !== 404) throw err;
-    const { data } = await octokit.rest.repos.createRelease({
-      owner: downloadsOwner, repo: downloadsRepo,
-      tag_name: downloadsTag, name: downloadsTag,
-      body: `Latest installers (auto-mirrored by @omega.js/desktop).`,
-      draft: false, prerelease: false,
-    });
-    installerId = data.id;
-    logger.log(`Created ${downloadsOwner}/${downloadsRepo}@${downloadsTag}.`);
-  }
-
-  const { data: installerAssets } = await octokit.rest.repos.listReleaseAssets({
-    owner: downloadsOwner, repo: downloadsRepo, release_id: installerId, per_page: 100,
-  });
-  const installerByName = new Map(installerAssets.map((a) => [a.name, a]));
-
-  let mirrored = 0;
-  for (const filename of files) {
-    const stable = STABLE.stableName(filename, productName);
-    if (!stable) continue;
-
-    const src  = path.join(signedDir, filename);
-    const data = fs.readFileSync(src);
-
-    const old = installerByName.get(stable);
-    if (old) {
-      await octokit.rest.repos.deleteReleaseAsset({ owner: downloadsOwner, repo: downloadsRepo, asset_id: old.id });
-    }
-
-    await octokit.rest.repos.uploadReleaseAsset({
-      owner: downloadsOwner, repo: downloadsRepo, release_id: installerId,
-      name: stable,
-      data,
-      headers: { 'content-type': 'application/octet-stream', 'content-length': data.length },
-    });
-
-    logger.log(`  ✓ ${stable} (${(data.length / 1024 / 1024).toFixed(1)}MB) ← ${filename} → ${downloadsOwner}/${downloadsRepo}@${downloadsTag}`);
-    mirrored += 1;
-  }
-
-  logger.log(`Mirrored ${mirrored} signed Windows artifact(s) to ${downloadsOwner}/${downloadsRepo}@${downloadsTag}`);
 }
 
-async function publishUpdateServerRelease({ octokit, owner, repo, tag }) {
-  let release;
-  try {
-    const { data } = await octokit.rest.repos.getReleaseByTag({ owner, repo, tag });
-    release = data;
-  } catch (err) {
-    if (err.status === 404) {
-      throw new Error(`Release ${tag} not found at ${owner}/${repo}. Did the build/publish job succeed?`);
-    }
-    throw err;
+async function publishReleasesRepoRelease({ octokit, owner, repo, tag }) {
+  const release = await findRelease({ octokit, owner, repo, tag });
+
+  if (!release) {
+    throw new Error(`Release ${tag} not found at ${owner}/${repo}. Did the build/publish job succeed?`);
   }
 
   if (!release.draft && !release.prerelease) {
@@ -272,3 +234,5 @@ async function publishUpdateServerRelease({ octokit, owner, repo, tag }) {
 
   logger.log(`Release URL: https://github.com/${owner}/${repo}/releases/tag/${tag}`);
 }
+
+module.exports.findRelease = findRelease;

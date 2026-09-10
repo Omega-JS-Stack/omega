@@ -13,7 +13,8 @@
  * Run: npx omega test framework:helpers/analytics-no-id-notice
  */
 
-const Analytics = require('../../src/manager/helpers/analytics.js');
+const Analytics = require('../../dist/manager/helpers/analytics.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Record every console call the thunk makes, restoring console afterward.
 function withConsoleRecorder(fn) {
@@ -76,7 +77,7 @@ function withoutAnalyticsId(Manager, fn) {
 
 const NOTICE = 'analytics(): Not initializing because missing analyticsId';
 
-module.exports = {
+module.exports = defineCases({
   description: 'analytics(): the missing-analyticsId notice is debug-level',
   type: 'group',
 
@@ -142,4 +143,4 @@ module.exports = {
       },
     },
   ],
-};
+});

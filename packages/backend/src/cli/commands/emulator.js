@@ -1,7 +1,7 @@
 const BaseCommand = require('./base-command');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
@@ -14,6 +14,8 @@ const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-
 const { seed } = require('../../test/seed.js');
 const { createChildLog } = require('../utils/attach-log-file');
 const { refuseWhenCustom } = require('../utils/project-type');
+const emulatorOrphans = require('./emulator-orphans');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
@@ -258,6 +260,79 @@ async function assertPlannedPortsFree(planned, isFree = isPortFree) {
 }
 
 /**
+ * The allocated port firebase-tools just failed to bind, or null.
+ *
+ * The probe and the bind are two moments, and on a machine running a second
+ * brand's stack a foreign listener can take a port between them, and the boot
+ * then dies on a port the allocator read as free seconds earlier
+ * ([#778](https://github.com/Omega-JS-Stack/omega/issues/778)). The child says
+ * so in one line, and the port is read out of it by matching against THIS
+ * run's allocation rather than by parsing an address shape: node writes the
+ * same failure as `127.0.0.1:9099`, `:::9099` and `port 9099` depending on
+ * which layer reports it, and only a number this run actually asked for can be
+ * the one it could not bind.
+ * @param {string} text - A chunk of the child's output.
+ * @param {number[]} ports - This attempt's allocated ports.
+ * @returns {number|null}
+ */
+function addressInUsePort(text, ports) {
+  const allocated = new Set(ports);
+
+  for (const line of String(text || '').split('\n')) {
+    if (!/EADDRINUSE/i.test(line)) {
+      continue;
+    }
+
+    for (const [number] of line.matchAll(/\d+/g)) {
+      if (allocated.has(Number(number))) {
+        return Number(number);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The report for a boot whose retry hit the same wall (#778).
+ *
+ * The holder is NAMED, never signalled: it is another session's live stack,
+ * and this run has no proof of ownership over it, which is the same bar every
+ * sweep in this file clears before it sends a signal.
+ * @param {{port: number, name: string|null}} failed - The port the retry could not bind.
+ * @param {Array<{pid: number, command: string}>} holders - Who holds it now.
+ * @returns {string}
+ */
+function formatAddressInUseFailure(failed, holders) {
+  const named = `port ${failed.port}${failed.name ? ` (${failed.name})` : ''}`;
+  const report = [`Emulator boot failed: ${named} was taken while the stack was coming up, and the bumped retry hit the same wall.`];
+
+  for (const { pid, command } of holders) {
+    report.push(`Port ${failed.port} is held by pid ${pid}${command ? `: ${command}` : ''}.`);
+  }
+
+  if (holders.length === 0) {
+    report.push(`Nothing answers for port ${failed.port} now: whatever took it came and went inside this boot.`);
+  }
+
+  report.push(`Stop whatever keeps taking ${failed.port} and run this again. This run's stack was shut down; nothing of it is left running.`);
+
+  return report.join('\n  ');
+}
+
+/**
+ * The allocation's name for a port ('auth' for 9099), or null.
+ * @param {object} ports - The resolved name to port map.
+ * @param {number} port - The port to name.
+ * @returns {string|null}
+ */
+function portName(ports, port) {
+  const found = Object.entries(ports || {}).find(([, value]) => value === port);
+
+  return found ? found[0] : null;
+}
+
+/**
  * Can this process be PROVEN to be an emulator process of THIS project?
  *
  * The sweep used to signal whatever was listening on its ports, which
@@ -336,25 +411,37 @@ function isStoppableEmulatorProcess(candidate, ownership) {
 }
 
 /**
- * Should the PRE-BOOT reaper SIGKILL this process?
+ * Should the STALE-RECORD reap signal this recorded process?
  *
- * Two proofs, both required. ORPHANED: reparented to PID 1, so the firebase
- * parent that would tear it down is gone — a live sibling stack never matches
- * and the allocator bumps around it as before. OURS: the same ownership matcher
- * the post-shutdown sweep runs on. The reaper used to take a command line
- * matching /emulator|firebase/i as sufficient, which is a NAME, not ownership —
- * that killed another session's reload watcher and another brand's orphans
- * ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)).
+ * The stop path's bar first (isStoppableEmulatorProcess): emulator machinery
+ * that does not name a different project. That bar decides a jar naming NO
+ * project — the pubsub emulator — on record membership alone, and a record is a
+ * list of NUMBERS: a recycled number now running the NEIGHBOUR brand's pubsub
+ * jar reads exactly like our own leftover
+ * ([#730](https://github.com/Omega-JS-Stack/omega/issues/730)).
+ *
+ * So the live PARENT is the second proof, and it is only ever asked of a record
+ * whose root is already proven dead. A dead run's survivors are reparented (PID
+ * 1, where every orphan lands) or still hang off another member of that same
+ * dead run — the firebase parent that outlived the `sh` root, say. A number
+ * handed to somebody else's LIVE stack has a live parent that this record has
+ * never heard of, and it is left running.
  * @param {{pid: number|string, ppid: number|string, command: string}} candidate - One ps row.
- * @param {{pids: number[], projectId: string|null}} ownership - This project's evidence.
+ * @param {{pids: number[], projectId: string|null, rootPid: number|null}} ownership - The PREVIOUS record.
  * @returns {boolean}
  */
-function isReapableOrphan(candidate, ownership) {
-  if (Number(candidate?.ppid) !== 1) {
+function isReapableRecordedProcess(candidate, ownership) {
+  if (!isStoppableEmulatorProcess(candidate, ownership)) {
     return false;
   }
 
-  return isOwnedEmulatorProcess(candidate, ownership);
+  const parent = Number(candidate?.ppid);
+
+  if (parent === 1 || parent === Number(ownership?.rootPid)) {
+    return true;
+  }
+
+  return (ownership?.pids || []).some((recorded) => Number(recorded) === parent);
 }
 
 /**
@@ -365,9 +452,12 @@ function isReapableOrphan(candidate, ownership) {
  * last one, and by then the OS may have handed those numbers to anything. The
  * project id is not pid-based — a command line naming this project proves
  * itself at any age — so it survives an expiry.
+ *
+ * The ports ride with the pids: they are the map the recorded run bound, and
+ * they are only ever read to settle ports those very pids just released.
  * @param {object|null} record - The parsed pid-record file.
  * @param {number} [now] - Epoch ms to age against (defaults to Date.now()).
- * @returns {{pids: number[], projectId: string|null, rootPid: number|null}}
+ * @returns {{pids: number[], projectId: string|null, rootPid: number|null, ports: object}}
  */
 function ownershipFromRecord(record, now) {
   const startedAt = Date.parse(record?.startedAt);
@@ -377,6 +467,7 @@ function ownershipFromRecord(record, now) {
     pids: fresh && Array.isArray(record?.pids) ? record.pids : [],
     projectId: record?.projectId || null,
     rootPid: record?.rootPid || null,
+    ports: fresh && record?.ports ? record.ports : {},
   };
 }
 
@@ -392,6 +483,40 @@ function readProcessCommand(pid) {
     return execSync(`ps -o command= -p ${Number(pid)} 2>/dev/null`, { encoding: 'utf8' }).trim();
   } catch (error) {
     return '';
+  }
+}
+
+/**
+ * The command line a pid is running right now AND who forked it, or null when
+ * it is gone.
+ *
+ * The parent is half of the stale reap's identity proof, and it is only
+ * readable in the same breath as the command line: two `ps` calls describe two
+ * moments, and a number that changed hands between them reads as one process
+ * that never existed ([#730](https://github.com/Omega-JS-Stack/omega/issues/730)).
+ * @param {number|string} pid - The pid to read.
+ * @returns {{ppid: number, command: string}|null}
+ */
+function readProcessInfo(pid) {
+  const { execSync } = require('child_process');
+
+  try {
+    const row = execSync(`ps -o ppid=,command= -p ${Number(pid)} 2>/dev/null`, { encoding: 'utf8' }).trim();
+    const match = row.match(/^\s*(\d+)\s+(.*)$/s);
+
+    return match ? { ppid: Number(match[1]), command: match[2] } : null;
+  } catch (error) {
+    // `ps` exiting 1 is the one provable answer: the pid does not exist. Any
+    // other failure (fork pressure, a spawn error) proves NOTHING — and it
+    // must read as alive-but-unprovable, never as gone, because the reap's
+    // root gate turns "gone" into a kill order. The sentinel is truthy (the
+    // root gate leaves the record alone) and matches no identity proof (a
+    // member read spares the pid) ([#730](https://github.com/Omega-JS-Stack/omega/issues/730)).
+    if (error.status === 1) {
+      return null;
+    }
+
+    return { ppid: -1, command: '' };
   }
 }
 
@@ -482,6 +607,13 @@ class EmulatorCommand extends BaseCommand {
     const watcher = new WatchCommand(this.main);
     const watcherChild = watcher.startBackground();
 
+    // The watcher hangs off THIS process, not off the emulator child, so the pid
+    // record's descendant walk from the emulator's root pid cannot see it — name
+    // it for the record explicitly, or a run that dies without teardown leaves a
+    // nodemon no later stop path can even name
+    // ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+    this.backgroundWatcherPid = watcherChild ? watcherChild.pid : null;
+
     // Keep-alive: boot emulators and wait for Ctrl+C. No "command" subprocess —
     // the emulator child IS the foreground process from the user's perspective.
     // HTTPS default-on for the interactive command (--no-https disables); the
@@ -513,22 +645,23 @@ class EmulatorCommand extends BaseCommand {
       // @omega.js/devkit/test/e2e-harness.js.
       this.log(chalk.gray('\n  Emulator ready. Press Ctrl+C to shut down...\n'));
 
-      // Synchronous SIGINT handler — must NOT be async. In Node, registering any
-      // SIGINT listener suppresses the default "exit on signal" behavior, but only
-      // if the listener is present when the signal fires. An async handler loses
-      // the race: Node starts it, doesn't await it, and the process dies mid-shutdown.
-      // So: set a flag synchronously, kick off shutdown (no await), and let the
-      // main `await exitPromise` below resolve naturally once shutdown kills the child.
-      let sigintCount = 0;
+      // Synchronous stop handler — must NOT be async. In Node, registering a
+      // listener for one of these signals suppresses the default "exit on signal"
+      // behavior, but only if the listener is present when the signal fires. An
+      // async handler loses the race: Node starts it, doesn't await it, and the
+      // process dies mid-shutdown. So: set a flag synchronously, kick off shutdown
+      // (no await), and let the main `await exitPromise` below resolve naturally
+      // once shutdown kills the child.
+      let stopCount = 0;
       // The handler cannot await, but the run must not exit ahead of the
       // shutdown it started: the jar reap runs AFTER the child is gone, and
       // process.exit() below would cut it off mid-signal
       // ([#304](https://github.com/Omega-JS-Stack/omega/issues/304)). Keep the
       // promise and join it once the child has exited.
       let shutdownRun = null;
-      const onSigint = () => {
-        sigintCount++;
-        if (sigintCount === 1) {
+      const onStopSignal = () => {
+        stopCount++;
+        if (stopCount === 1) {
           this.log(chalk.gray('\n  Shutting down emulator... (Ctrl+C again to force kill)'));
           shutdownRun = shutdown();
         } else {
@@ -536,31 +669,27 @@ class EmulatorCommand extends BaseCommand {
           shutdownRun = shutdown();
         }
       };
-      process.on('SIGINT', onSigint);
-      // A programmatic stop arrives as SIGTERM (`omega dev`'s shutdown, a
-      // supervisor, the journey lane) — without a listener the default kills
-      // THIS process only, and the firebase group (detached above, so a
-      // parent's group signal can never reach it) orphans with its ports
-      // (#690). Same teardown either way.
-      process.on('SIGTERM', onSigint);
+      // ONE handler, three signals: the stop path is the same whether the ask is
+      // Ctrl+C, `omega dev`'s SIGTERM, or the SIGHUP of a closed terminal
+      // ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+      STOP_SIGNALS.forEach((signal) => process.on(signal, onStopSignal));
 
       // Resolve when the emulator exits (via shutdown or crash)
       await exitPromise;
       // A child that exited on its own (a crash, firebase-tools stopping
       // itself) started no shutdown — run one anyway, so the same reap covers
       // both ways this line is reached. shutdown() owns the whole teardown now:
-      // the recorded jars, the orphan sweep, and the port verdict. The SIGINT
-      // listener stays active across it so Ctrl+C spam can't cut it short.
+      // the recorded jars, the orphan sweep, and the port verdict. The stop
+      // listeners stay active across it so Ctrl+C spam can't cut it short.
       await (shutdownRun || shutdown());
       // Reap the background watcher — it is NOT in the firebase child's
       // process group, so nothing else kills it on a programmatic shutdown.
       if (watcherChild) {
         try { watcherChild.kill('SIGTERM'); } catch (e) { /* already gone */ }
       }
-      process.removeListener('SIGINT', onSigint);
-      process.removeListener('SIGTERM', onSigint);
+      STOP_SIGNALS.forEach((signal) => process.removeListener(signal, onStopSignal));
       this.log(chalk.gray('  Emulator stopped.\n'));
-      if (sigintCount > 0) {
+      if (stopCount > 0) {
         process.exit(0);
       }
     } catch (error) {
@@ -595,21 +724,25 @@ class EmulatorCommand extends BaseCommand {
       const functionsDir = path.join(projectDir, 'dist');
 
       // Load project config (same pattern as test.js loadProjectConfig)
-      const { hasOmegaConfig, loadConfig, loadEnv } = require('@omega.js/config');
+      const { hasOmegaConfig, loadConfig, loadEnv, resolvedBrandHost } = require('@omega.js/config');
       loadEnv(functionsDir);
 
       let config = {};
       let domain = '';
       if (hasOmegaConfig(functionsDir)) {
         config = loadConfig(functionsDir, 'backend').config;
-        const contactEmail = config.brand?.contact?.email || '';
-        domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
+        // A persona lives on the brand's HOST — the one derivation, shared with
+        // the dev palette that signs in as one
+        // ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)). The
+        // brand's contact address is a support inbox — often on the apex while
+        // the site is a subdomain of it — so it shapes no persona identity.
+        domain = resolvedBrandHost(config);
       }
 
       // Persona emails are `_test.<id>@{domain}` — without a domain every
       // createUser call fails with an invalid email. Skip cleanly instead.
       if (!domain) {
-        this.logWarning('Skipping persona seeding: no brand.contact.email in config/omega.json5 (personas need a domain for their emails)');
+        this.logWarning('Skipping persona seeding: no brand.url in config/omega.json5 (personas are seeded on the brand host)');
         return;
       }
 
@@ -656,6 +789,17 @@ class EmulatorCommand extends BaseCommand {
    * @param {object} [options]
    * @param {boolean} [options.https] - Front the public hosting port with the
    *   shared mkcert TLS proxy (interactive `omega emulator` default)
+   * @param {string} [options.environment] - The environment the stage composes
+   *   dist/.env for (#586). Omitted = `development`, the local lane's pin —
+   *   never the shell's answer, so an exported ENVIRONMENT can't stage
+   *   production credentials into a local boot. `omega test`'s auto-start
+   *   names `testing`.
+   *
+   *   The STAGED overlay and the emulator RUNTIME's own environment answer
+   *   differ on purpose: functions running under the emulator report `testing`
+   *   (OMEGA_TEST_MODE), while the artifact they read was composed from
+   *   `.env.development` — the file lane is the developer's local credentials,
+   *   the runtime lane is "don't do real side effects".
    * @returns {Promise<{ child: ChildProcess, shutdown: () => Promise<void>, emulatorPorts: object }>}
    */
   async startEmulators(options) {
@@ -663,10 +807,12 @@ class EmulatorCommand extends BaseCommand {
 
     // dist/ is staged output (src/dist pillar): stage fresh (including
     // dist/public/ for hosting), then keep it fresh — the emulator watches
-    // dist/ natively, so a re-stage IS the hot reload. The watcher dies with
-    // the emulator child (exitPromise below).
-    this.ensureStaged();
-    const stageWatch = this.startStageWatch();
+    // dist/ natively, so a re-stage IS the hot reload. The watcher belongs to
+    // the boot ATTEMPT below, which dies with the emulator child it feeds.
+    // The local lane's pin (#586): a boot nobody named an environment for is
+    // `development`, so the composed dist/.env can never follow the shell.
+    const environment = options?.environment || 'development';
+    this.ensureStaged({ environment });
 
     // N7 port allocation: firebase.json values (classic defaults) when free,
     // bump-if-taken — a second brand's stack relocates instead of the old
@@ -681,7 +827,7 @@ class EmulatorCommand extends BaseCommand {
     // port, same fallback as serve.
     let httpsCerts = null;
     if (options?.https) {
-      const { ensureLocalHttpsCerts } = require('@omega.js/devkit/local-https');
+      const { ensureLocalHttpsCerts, mkcertInstallHint } = require('@omega.js/devkit/local-https');
       httpsCerts = await ensureLocalHttpsCerts({
         certsDir: path.join(this.getTempPath(), 'certs'),
         log: (line) => this.log(chalk.gray(`  ${line}`)),
@@ -692,29 +838,103 @@ class EmulatorCommand extends BaseCommand {
         wanted.hosting = 5443;
       } else {
         this.log(chalk.yellow('  HTTPS disabled — could not obtain certificates.'));
-        this.log(chalk.yellow('  Install mkcert for trusted local HTTPS: brew install mkcert && mkcert -install\n'));
+        this.log(chalk.yellow(`  Install mkcert for trusted local HTTPS: ${mkcertInstallHint()}\n`));
       }
     }
 
-    // Crash leftovers first: a run that died without teardown leaves java
-    // emulator grandchildren squatting the classic ports FOREVER — the
-    // shutdown sweep only covers that run's RESOLVED map, and allocation
-    // just bumps around squatters (95a: two stale generations cross-talking
-    // with a live run's functions emulator). Reaped by two proofs together:
-    // orphaned (parent gone, so it can't be a sibling's live stack) AND
-    // provably this project's — the crashed run's own pid record, or a
-    // command line naming this project
-    // ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)). Live
-    // listeners and other projects' leftovers stay untouched and bump as before.
+    // Crash leftovers first, MACHINE-WIDE: a run that died without teardown
+    // leaves java emulator grandchildren and functions workers squatting
+    // FOREVER, and the port-driven reaper that used to stand here could only
+    // ever see the ports THIS run wants and only what it could prove was this
+    // project's. A hub on a bumped port, a legacy install's workers, another
+    // brand's leftovers: all invisible, all still holding memory and ports. An
+    // ORPHAN of the emulator family is nobody's, so it goes whatever project it
+    // names ([#781](https://github.com/Omega-JS-Stack/omega/issues/781)). The
+    // strict command-shape match is what survives of
+    // [#293](https://github.com/Omega-JS-Stack/omega/issues/293): live stacks,
+    // reload watchers and other users' processes are never candidates.
+    await this.reapMachineOrphans();
+
+    // Then the leftovers no ORPHAN test can reach: a dead run's members that
+    // still hang off another member of that same dead run. The record naming
+    // them is about to be overwritten by this boot — read it while it still
+    // exists ([#721](https://github.com/Omega-JS-Stack/omega/issues/721)).
     const recorded = this.readEmulatorOwnership();
-    await this.reapOrphanedEmulators(Object.values(wanted), {
+    const ownership = {
       pids: recorded.pids,
       projectId: this.loadProjectId(projectDir) || recorded.projectId,
-    });
+      rootPid: recorded.rootPid,
+      ports: recorded.ports,
+    };
+    await this.reapStaleRecordedProcesses(ownership);
+
+    // ONE bump-and-retry (#778): the allocator probed these ports seconds ago,
+    // and on a machine that shares them with another brand's session a foreign
+    // listener can take one between that probe and firebase-tools' bind. The
+    // port the child could not bind is marked claimed, so the next allocation
+    // moves that name off it, republishes the map, and boots again. A second
+    // failure is no longer a race: something is sitting on that port, and the
+    // report names it (and never signals it).
+    const taken = new Set();
+
+    try {
+      return await this.bootEmulatorStack({ projectDir, environment, wanted, httpsCerts, taken });
+    } catch (error) {
+      if (!error?.addressInUsePort) {
+        throw error;
+      }
+
+      taken.add(error.addressInUsePort);
+      this.log(chalk.yellow(`  Port ${error.addressInUsePort}${error.addressInUseName ? ` (${error.addressInUseName})` : ''} was taken while the stack came up; reallocating around it and booting once more.`));
+
+      try {
+        return await this.bootEmulatorStack({ projectDir, environment, wanted, httpsCerts, taken });
+      } catch (retryError) {
+        if (!retryError?.addressInUsePort) {
+          throw retryError;
+        }
+
+        throw new Error(formatAddressInUseFailure(
+          { port: retryError.addressInUsePort, name: retryError.addressInUseName },
+          this.describePortHolders(retryError.addressInUsePort),
+        ));
+      }
+    }
+  }
+
+  /**
+   * ONE boot attempt: allocate the ports, publish them, spawn firebase-tools,
+   * and wait for the ready marker.
+   *
+   * Each attempt owns its stage watcher, because the watcher is torn down with
+   * the emulator child (exitPromise below), so a failed attempt takes its
+   * watcher with it and the retry starts a fresh one, instead of hot-reloading
+   * into a stack that no longer exists (#778).
+   * @param {object} attempt
+   * @param {string} attempt.projectDir - The firebase project directory.
+   * @param {string} attempt.environment - The environment each re-stage composes for.
+   * @param {object} attempt.wanted - The wanted name to port map (firebase.json + https).
+   * @param {object|null} attempt.httpsCerts - The mkcert pair, when HTTPS is on.
+   * @param {Set<number>} attempt.taken - Ports this attempt may not allocate:
+   *   the ones a previous attempt proved something else is holding.
+   * @returns {Promise<{ child: ChildProcess, shutdown: () => Promise<void>, emulatorPorts: object, bumped: string[], exitPromise: Promise<object> }>}
+   */
+  async bootEmulatorStack({ projectDir, environment, wanted, httpsCerts, taken }) {
+    // The stamp for THIS attempt, and the newest one owns the shared artifacts.
+    // A first attempt's child can close LATE: after shutdown's SIGTERM/SIGKILL
+    // races gave up on it, and after the retry published its own map. Both
+    // attempts stamp the same process.pid, so the pid cannot tell them apart
+    // ([#778](https://github.com/Omega-JS-Stack/omega/issues/778)).
+    const attempt = this.activeAttempt = (this.activeAttempt || 0) + 1;
+    const stageWatch = this.startStageWatch({ environment });
 
     const { ports: emulatorPorts, bumped } = await resolvePorts({
       wanted,
       pins: this.loadPortPins(projectDir),
+      // A FRESH claimed set per attempt: the allocator claims every port it
+      // hands out into it, so carrying one over would bump the whole map. The
+      // only thing an attempt inherits is what the last one proved is taken.
+      claimed: new Set(taken),
     });
 
     // Preflight: the allocator has relocated around every busy port it owns,
@@ -804,20 +1024,33 @@ class EmulatorCommand extends BaseCommand {
       OMEGA_TEST_MODE: 'true',
     };
 
-    // Internal calls (Manager.getApiUrl) loop through the HTTPS proxy with a
-    // mkcert cert Node doesn't trust — same handoff as `omega serve`.
+    // Internal calls (Manager.getApiUrl) loop through the HTTPS proxy under the
+    // local mkcert certificate. The child TRUSTS that root (#795) instead of
+    // switching verification off wholesale — same handoff as `omega serve` and
+    // `omega dev`'s legs, and Node prints no warning for it. A shell-set value
+    // wins verbatim; only a host whose mkcert root vanished under existing
+    // certs still takes the old bypass.
     if (httpsCerts) {
-      env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      const { mkcertCaRootPem } = require('@omega.js/devkit/local-https');
+      const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
+
+      if (caPem) {
+        env.NODE_EXTRA_CA_CERTS = caPem;
+      } else {
+        env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        this.log(chalk.yellow('  mkcert root CA not found — internal calls fall back to NODE_TLS_REJECT_UNAUTHORIZED=0 (Node will warn)'));
+      }
     }
 
-    // Spawn `firebase emulators:start` as a background child. Use `sh -c` so the
-    // user's shell PATH resolves `firebase` consistently with the interactive shell.
+    // Spawn `firebase emulators:start` as a background child through the host's
+    // own shell (spawnShell owns which shell that is), so its PATH resolves
+    // `firebase` the way the interactive shell does.
     //
     // `detached: true` puts the child into its own process group. We need this so that
     // shutdown() can kill the entire group (sh → firebase → java emulators) by
     // signalling the negative pgid. Without it, SIGTERM to the shell doesn't propagate
     // to firebase or its java grandchildren, leaving orphan firestore/pubsub processes.
-    const child = spawn('sh', ['-c', `firebase emulators:start ${EMULATOR_FLAGS}${configFlag}`], {
+    const child = spawnShell(`firebase emulators:start ${EMULATOR_FLAGS}${configFlag}`, {
       cwd: projectDir,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -840,23 +1073,53 @@ class EmulatorCommand extends BaseCommand {
     let ready = false;
     const READY_MARKER = /All emulators ready/i;
 
+    // The other end a boot can come to: firebase-tools failing to bind a port
+    // the allocator handed it, because something took it in between (#778).
+    // Read here rather than left to the ready deadline, so the retry starts in
+    // the second the child gave up instead of three minutes later, and TAGGED,
+    // so the caller retries this failure and no other.
+    let inUsePort = null;
+    const noteAddressInUse = (text) => {
+      if (ready || inUsePort) {
+        return;
+      }
+
+      const port = addressInUsePort(text, Object.values(emulatorPorts));
+
+      if (!port) {
+        return;
+      }
+
+      inUsePort = port;
+      const name = portName(emulatorPorts, port);
+
+      readyReject(Object.assign(
+        new Error(`Emulator could not bind port ${port}${name ? ` (${name})` : ''}: something took it between the port probe and the bind`),
+        { addressInUsePort: port, addressInUseName: name },
+      ));
+    };
+
     child.stdout.on('data', (data) => {
+      const text = data.toString();
       process.stdout.write(data);
       childLog.write(data);
-      if (!ready && READY_MARKER.test(data.toString())) {
+      if (!ready && READY_MARKER.test(text)) {
         ready = true;
         readyResolve();
       }
+      noteAddressInUse(text);
     });
 
     child.stderr.on('data', (data) => {
+      const text = data.toString();
       process.stderr.write(data);
       childLog.write(data);
       // firebase-tools prints the ready line to stderr sometimes — watch both.
-      if (!ready && READY_MARKER.test(data.toString())) {
+      if (!ready && READY_MARKER.test(text)) {
         ready = true;
         readyResolve();
       }
+      noteAddressInUse(text);
     });
 
     // Track exit state so shutdown() can resolve when the process is gone
@@ -868,15 +1131,27 @@ class EmulatorCommand extends BaseCommand {
     child.on('close', (code, signal) => {
       childLog.close();
       // The TLS proxy lives in THIS process — release the public port with
-      // the stack (and drop any keep-alive sockets holding it open)
+      // the stack (and drop any keep-alive sockets holding it open). Never
+      // gated on the attempt: this handle is the attempt's OWN server, it can
+      // reach no other attempt's proxy, and a retry that found this port still
+      // held simply allocated around it. Skipping the close would strand the
+      // port for the life of the CLI process (#778).
       if (httpsProxy) {
         httpsProxy.close();
         httpsProxy.closeAllConnections?.();
       }
       // Retract the published port map (clean shutdown). The resolved
       // firebase config is per-run scratch — remove it too.
-      clearPortsFile(projectDir);
-      try { fs.unlinkSync(path.join(projectDir, 'firebase.resolved.json')); } catch (e) { /* not a bumped run */ }
+      //
+      // Both are shared BY NAME (one of each per project), and a retried boot
+      // has already replaced both by the time a late first attempt closes:
+      // retracting them here would unpublish the stack that is actually up and
+      // delete the config it is running on. Only the attempt still in charge
+      // cleans up (#778).
+      if (this.activeAttempt === attempt) {
+        clearPortsFile(projectDir);
+        try { fs.unlinkSync(path.join(projectDir, 'firebase.resolved.json')); } catch (e) { /* not a bumped run */ }
+      }
       exitPromiseResolve({ code, signal });
       // If we exited before becoming ready, fail the readiness wait too
       if (!ready) {
@@ -926,7 +1201,7 @@ class EmulatorCommand extends BaseCommand {
       // — this is the last moment ownership is readable
       // ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
       try {
-        this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir));
+        this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir), emulatorPorts);
       } catch (error) { /* the boot record still stands */ }
 
       // 1. Signal the process group (sh + firebase + direct children)
@@ -986,7 +1261,7 @@ class EmulatorCommand extends BaseCommand {
     // without a record the sweep falls back to command-line proof and spares
     // anything it cannot place.
     try {
-      this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir));
+      this.writeEmulatorPidRecord(child.pid, this.loadProjectId(projectDir), emulatorPorts);
     } catch (error) {
       this.logWarning(`Could not record emulator pids (${error.message}) — the orphan sweep will only spare, never over-reach`);
     }
@@ -1010,19 +1285,18 @@ class EmulatorCommand extends BaseCommand {
     // verdict), so both paths below just join it.
     const { shutdown, exitPromise } = await this.startEmulators();
 
-    // Same synchronous SIGINT pattern as execute() — see comment there.
-    let sigintCount = 0;
-    const onSigint = () => {
-      sigintCount++;
+    // Same synchronous handler and same three signals as execute() — see the
+    // comment there.
+    let stopCount = 0;
+    const onStopSignal = () => {
+      stopCount++;
       shutdown();
     };
-    process.on('SIGINT', onSigint);
-    // SIGTERM is the programmatic stop — same teardown (#690, see execute()).
-    process.on('SIGTERM', onSigint);
+    STOP_SIGNALS.forEach((signal) => process.on(signal, onStopSignal));
 
     try {
       // Run the user command; when it exits we tear down the emulator.
-      const cmdChild = spawn('sh', ['-c', command], {
+      const cmdChild = spawnShell(command, {
         cwd: this.main.firebaseProjectPath,
         env: { ...process.env, FORCE_COLOR: '1' },
         stdio: 'inherit',
@@ -1032,8 +1306,7 @@ class EmulatorCommand extends BaseCommand {
         cmdChild.on('close', (code, signal) => resolve({ code, signal }));
       });
 
-      process.removeListener('SIGINT', onSigint);
-      process.removeListener('SIGTERM', onSigint);
+      STOP_SIGNALS.forEach((signal) => process.removeListener(signal, onStopSignal));
       await shutdown();
       await exitPromise;
 
@@ -1041,8 +1314,7 @@ class EmulatorCommand extends BaseCommand {
         throw Object.assign(new Error(`Command exited with code ${cmdExit.code}`), { code: cmdExit.code });
       }
     } catch (e) {
-      process.removeListener('SIGINT', onSigint);
-      process.removeListener('SIGTERM', onSigint);
+      STOP_SIGNALS.forEach((signal) => process.removeListener(signal, onStopSignal));
       await shutdown();
       throw e;
     }
@@ -1073,6 +1345,23 @@ class EmulatorCommand extends BaseCommand {
     await assertPlannedPortsFree(planned, isFree);
 
     return planned;
+  }
+
+  /**
+   * Who is listening on a port right now: pid and command line, for a report.
+   *
+   * READ ONLY, deliberately: a port this run could not bind is held by someone
+   * else's live process, and nothing in this file signals a process it cannot
+   * prove is its own ([#274](https://github.com/Omega-JS-Stack/omega/issues/274),
+   * [#778](https://github.com/Omega-JS-Stack/omega/issues/778)).
+   * @param {number} port - The port to name a holder for.
+   * @param {object} [seams]
+   * @param {Function} [seams.listPids] - Port to pid lookup (injectable).
+   * @param {Function} [seams.readCommand] - The `ps` read (injectable).
+   * @returns {Array<{pid: number, command: string}>}
+   */
+  describePortHolders(port, { listPids = listListeningPids, readCommand = readProcessCommand } = {}) {
+    return listPids(port).map((pid) => ({ pid: Number(pid), command: readCommand(pid) }));
   }
 
   /**
@@ -1125,10 +1414,19 @@ class EmulatorCommand extends BaseCommand {
    * Record the stack's pids while it is UP, so the post-shutdown sweep can
    * prove which orphans are its own
    * ([#274](https://github.com/Omega-JS-Stack/omega/issues/274)).
+   *
+   * The emulator child's descendants cover firebase-tools' own tree — the java
+   * emulators and every functions runtime worker it forks. The background
+   * watcher is the one member that hangs off the CLI process instead, so it is
+   * named separately ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+   * The resolved port map rides along: it is what the NEXT boot's stale reap
+   * waits on after it takes these pids down, since a pid it killed names no
+   * port of its own ([#730](https://github.com/Omega-JS-Stack/omega/issues/730)).
    * @param {number} rootPid - The spawned child's pid.
    * @param {string|null} projectId - The project this stack serves.
+   * @param {object} [ports] - This run's resolved port map.
    */
-  writeEmulatorPidRecord(rootPid, projectId) {
+  writeEmulatorPidRecord(rootPid, projectId, ports) {
     const existing = this.readEmulatorOwnership();
 
     // UNION with what this run already recorded: a later snapshot can only see
@@ -1136,12 +1434,18 @@ class EmulatorCommand extends BaseCommand {
     // the one the sweep exists for. Pids of processes that have since exited
     // cost nothing — signaling one is a caught ESRCH.
     const previous = existing.pids.length > 0 && existing.rootPid === rootPid ? existing.pids : [];
-    const pids = [...new Set([...previous, ...collectDescendantPids(rootPid)])];
+    // NAME DEPENDENCY: if this record misses the watcher, the command-line fallback
+    // (EMULATOR_COMMAND, /emulator|firebase/i) only catches it because watch.js bakes
+    // the `emulator.log.reset` sentinel PATH into nodemon's --exec argv. Rename that
+    // sentinel and the watcher stops matching — spared by every stop path, immortal.
+    const watcher = this.backgroundWatcherPid ? collectDescendantPids(this.backgroundWatcherPid) : [];
+    const pids = [...new Set([...previous, ...collectDescendantPids(rootPid), ...watcher])];
 
     jetpack.write(this.getTempPath(PID_RECORD_FILE), {
       pids: pids,
       projectId: projectId || null,
       rootPid: rootPid,
+      ports: ports || {},
       startedAt: new Date().toISOString(),
     });
 
@@ -1226,15 +1530,17 @@ class EmulatorCommand extends BaseCommand {
    * Poll a pid set until every one is gone or the window closes.
    * @param {number[]} pids - The pids to watch.
    * @param {number} timeoutMs - How long to wait in total.
+   * @param {object} [seams]
+   * @param {Function} [seams.readCommand] - The `ps` read (injectable).
    * @returns {Promise<number[]>} The pids still alive when the window closed.
    */
-  async waitForProcessesToExit(pids, timeoutMs) {
+  async waitForProcessesToExit(pids, timeoutMs, { readCommand = readProcessCommand } = {}) {
     const deadline = Date.now() + timeoutMs;
     let alive = pids;
 
     while (alive.length > 0 && Date.now() < deadline) {
       await powertools.wait(POLL_INTERVAL_MS);
-      alive = alive.filter((pid) => !!readProcessCommand(pid));
+      alive = alive.filter((pid) => !!readCommand(pid));
     }
 
     return alive;
@@ -1332,63 +1638,175 @@ class EmulatorCommand extends BaseCommand {
   }
 
   /**
-   * Pre-boot reaper for CRASHED-run leftovers: kill processes squatting the
-   * wanted ports (plus the shared hub/storage ports) that are reparented to
-   * PID 1 — the firebase parent that spawned them is gone, so nothing will
-   * ever tear them down — AND can be PROVEN to be this project's.
+   * Pre-boot reap of every ORPHANED emulator-family process on the MACHINE
+   * ([#781](https://github.com/Omega-JS-Stack/omega/issues/781)).
    *
-   * Ownership is the same bar the post-shutdown sweep clears: a name matching
-   * /emulator|firebase/i is not evidence, so the reaper no longer kills
-   * another brand's orphans or another session's reload watcher on ports it
-   * merely wants ([#293](https://github.com/Omega-JS-Stack/omega/issues/293)).
-   * A sibling brand's LIVE emulator keeps its parent and never matches either;
-   * the allocator bumps around both exactly as before.
-   * @param {number[]} ports - The wanted port map's values.
-   * @param {{pids: number[], projectId: string|null}} ownership - This project's evidence.
-   * @param {object} [probes]
-   * @param {Function} [probes.isFree] - Port probe (injectable).
-   * @param {Function} [probes.listPids] - Port to pid lookup (injectable).
+   * The verdict, the escalation and the settle wait all live in
+   * cli/commands/emulator-orphans.js, which reads the world through seams; this
+   * is the wiring: the boot's own settle windows and the boot's voice.
+   * @param {object} [seams] - The sweep's seams (tests state a process table here).
    */
-  async reapOrphanedEmulators(ports, ownership, { isFree = isPortFree, listPids = listListeningPids } = {}) {
-    const { execSync } = require('child_process');
-    const killedPorts = new Set();
-    let reaped = 0;
-    let spared = 0;
+  async reapMachineOrphans(seams) {
+    await emulatorOrphans.reapMachineOrphans({
+      graceMs: STOP_GRACE_MS,
+      portReleaseTimeoutMs: PORT_RELEASE_TIMEOUT_MS,
+      pollIntervalMs: POLL_INTERVAL_MS,
+      log: (message) => this.log(chalk.gray(`  ${message}`)),
+      ...seams,
+    });
+  }
 
-    for (const port of await heldPorts([...(ports || []), 4400, 9199], isFree)) {
-      for (const pid of listPids(port)) {
-        try {
-          const info = execSync(`ps -o ppid=,command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
-          const match = info.match(/^\s*(\d+)\s+(.*)$/s);
-          if (!match) continue;
+  /**
+   * Pre-boot reap of a STALE pid record: the leftovers of a previous run that
+   * died without teardown, taken BY PID, before this boot overwrites the file
+   * that names them ([#721](https://github.com/Omega-JS-Stack/omega/issues/721)).
+   *
+   * The sibling sweep above only ever considers an ORPHAN, so it cannot reach a
+   * dead run's member that still hangs off another member of that same dead run
+   * — the reload watcher's usual shape while its root is unwinding — and
+   * writeEmulatorPidRecord drops the previous record the moment a new root pid
+   * appears. Between the two, a dead boot's nodemon survived every stop path
+   * this framework has, forever.
+   *
+   * STALE is the first proof: the record's ROOT pid is gone, so the run that
+   * wrote it is not around to own its own processes. A live root means a LIVE
+   * record — this boot is a second stack beside a running one — and nothing in
+   * it is anyone's to reap. A record that names no usable root at all proves
+   * neither, and an unprovable root is not a kill order.
+   *
+   * IDENTITY is the second, and it is the whole safety story. A record is a
+   * list of NUMBERS, the OS recycles numbers, and the run that could vouch for
+   * them is by definition gone. So nothing is signalled on the number: the LIVE
+   * row must still read as emulator machinery of this project AND hang off the
+   * dead run itself (isReapableRecordedProcess). A pid whose row cannot be read
+   * has no identity to prove and is never signalled. The escalation re-proves
+   * it, because the grace window is long enough for a number to be freed and
+   * handed out again — and there is no apologising to a SIGKILL.
+   *
+   * @param {{pids: number[], projectId: string|null, rootPid: number|null, ports: object}} ownership - The PREVIOUS record.
+   * @param {object} [seams]
+   * @param {Function} [seams.readProcess] - The `ps -o ppid=,command=` read (injectable).
+   * @param {Function} [seams.kill] - The signal (injectable).
+   * @param {Function} [seams.isFree] - Port probe for the settle wait (injectable).
+   */
+  async reapStaleRecordedProcesses(ownership, { readProcess = readProcessInfo, kill = process.kill, isFree = isPortFree } = {}) {
+    const rootPid = Number(ownership?.rootPid);
 
-          if (!isReapableOrphan({ pid: pid, ppid: match[1], command: match[2] }, ownership)) {
-            spared++;
-            continue;
-          }
-
-          process.kill(Number(pid), 'SIGKILL');
-          reaped++;
-          killedPorts.add(port);
-        } catch (e) { /* vanished mid-check */ }
-      }
+    // Staleness is proved BY the root, so a record that names no usable one
+    // proves nothing — and an unprovable root is not a kill order. Read the
+    // other way ("no root answering"), a record written without a rootPid over
+    // a LIVE stack of this same project reads as pure leftovers and the reap
+    // takes the running firebase parent with it.
+    if (!Number.isInteger(rootPid) || rootPid <= 1) {
+      return;
     }
 
-    if (reaped > 0) {
-      this.log(chalk.gray(`  Reaped ${reaped} orphaned emulator process${reaped > 1 ? 'es' : ''} left by a previous crashed run.`));
+    // A root still answering is a run still up. A root whose number was
+    // recycled onto a stranger reads the same and is also left alone: erring
+    // toward "somebody is using this" is the only safe direction here.
+    if (readProcess(rootPid)) {
+      return;
+    }
 
-      // A SIGKILLed JVM does not release its socket the instant kill() returns,
-      // and the allocator probes these same ports right after this method. The
-      // sweep used to be slow enough to hide that race; now it is milliseconds,
-      // so wait like shutdown does or the run bumps around a corpse.
-      const held = await this.waitForPortsReleased([...killedPorts], { isFree });
+    const targets = [];
+    let spared = 0;
+
+    for (const recorded of ownership?.pids || []) {
+      const pid = Number(recorded);
+
+      // Never this run or its parent. `omega emulator` matches the machinery
+      // signature by NAME, so a recorded number recycled onto this very process
+      // would otherwise make the boot signal itself.
+      if (pid === process.pid || pid === process.ppid) {
+        continue;
+      }
+
+      const live = readProcess(pid);
+
+      // Gone (nothing to do) or unreadable (no proof, so no kill order).
+      if (!live) {
+        continue;
+      }
+
+      if (!isReapableRecordedProcess({ pid: pid, ppid: live.ppid, command: live.command }, ownership)) {
+        spared++;
+        continue;
+      }
+
+      targets.push(pid);
+    }
+
+    for (const pid of targets) {
+      try { kill(pid, 'SIGTERM'); } catch (e) { /* exited between the read and the signal */ }
+    }
+
+    // The exit watch reads through the same `ps` seam the identity proof does.
+    const readCommand = (pid) => {
+      const live = readProcess(pid);
+      return live ? live.command : '';
+    };
+
+    const survivors = await this.waitForProcessesToExit(targets, STOP_GRACE_MS, { readCommand: readCommand });
+    const killed = [];
+
+    for (const pid of survivors) {
+      const live = readProcess(pid);
+
+      if (!live || !isReapableRecordedProcess({ pid: pid, ppid: live.ppid, command: live.command }, ownership)) {
+        spared++;
+        continue;
+      }
+
+      try {
+        kill(pid, 'SIGKILL');
+        killed.push(pid);
+      } catch (e) { /* gone in the meantime */ }
+    }
+
+    // Only what actually went down: a target that outlived the grace window and
+    // came back as somebody else's number is spared, so counting the kill
+    // ORDERS would report it reaped and left alone in the same breath.
+    const downed = targets.length - survivors.length + killed.length;
+
+    if (downed > 0) {
+      this.log(chalk.gray(`  Reaped ${downed} recorded process${downed > 1 ? 'es' : ''} left by a previous run${killed.length > 0 ? ` (${killed.length} needed SIGKILL)` : ''}.`));
+
+      // A signal is not an exit: kill() returns while the kernel is still
+      // unwinding the process, so a probe in the same tick asks about a
+      // shutdown that has not happened yet, and a jar mid-unwind can answer
+      // FREE on a port it is about to keep holding, which is exactly the
+      // "probed free, then failed to bind" the retry above exists to catch.
+      // The numbers go first, THEN the ports are asked
+      // ([#778](https://github.com/Omega-JS-Stack/omega/issues/778)).
+      const lingering = await this.waitForProcessesToExit(killed, STOP_GRACE_MS, { readCommand: readCommand });
+
+      if (lingering.length > 0) {
+        this.logWarning(`Pid${lingering.length > 1 ? 's' : ''} ${lingering.join(', ')} outlived SIGKILL; the port check below is the last word on ${lingering.length > 1 ? 'them' : 'it'}`);
+      }
+
+      // Same race the port-driven reaper answers above: a SIGKILLed JVM holds
+      // its listener for a moment after the process is gone, and the allocator
+      // probes these very ports a few lines later. A reap here is BY PID, so
+      // nothing says which port each one held — the record's own map is the
+      // set, and the worst case is the release window spent on a port a live
+      // neighbour took over, which the log names before the allocator bumps
+      // around it. `https` is not in it: that port belonged to the dead run's
+      // in-process TLS proxy, never to a jar this reap could take.
+      const { https: _httpsPort, ...settleable } = ownership?.ports || {};
+
+      if (Object.keys(settleable).length === 0) {
+        this.log(chalk.gray('  The record named no ports, so nothing was waited on; the allocation probe is the only check on what this reap just freed.'));
+      }
+
+      const held = await this.waitForPortsReleased(Object.values(settleable), { isFree });
+
       if (held.length > 0) {
         this.log(chalk.gray(`  Port${held.length > 1 ? 's' : ''} ${held.join(', ')} still closing after the reap; the allocator will bump around ${held.length > 1 ? 'them' : 'it'}.`));
       }
     }
 
     if (spared > 0) {
-      this.log(chalk.gray(`  Left ${spared} process${spared > 1 ? 'es' : ''} on these ports alone — not this project's crash leftovers.`));
+      this.log(chalk.gray(`  Left ${spared} recorded pid${spared > 1 ? 's' : ''} alone — the number is no longer this project's emulator.`));
     }
   }
 }
@@ -1403,7 +1821,8 @@ EmulatorCommand.plannedEmulatorPorts = plannedEmulatorPorts;
 EmulatorCommand.assertPlannedPortsFree = assertPlannedPortsFree;
 EmulatorCommand.isOwnedEmulatorProcess = isOwnedEmulatorProcess;
 EmulatorCommand.isStoppableEmulatorProcess = isStoppableEmulatorProcess;
-EmulatorCommand.isReapableOrphan = isReapableOrphan;
+EmulatorCommand.isReapableRecordedProcess = isReapableRecordedProcess;
+EmulatorCommand.readProcessInfo = readProcessInfo;
 EmulatorCommand.ownershipFromRecord = ownershipFromRecord;
 EmulatorCommand.collectDescendantPids = collectDescendantPids;
 

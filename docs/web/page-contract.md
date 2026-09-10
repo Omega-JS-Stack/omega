@@ -19,6 +19,12 @@ Redirects are not the page's job. The global auth policy owns them
 elsewhere before the page code runs. A page that hides itself "in case" is
 hiding from a visitor who is allowed to be there.
 
+That listener also owns the MID-SESSION case: it redirects the moment
+@omega.js/client's session probe signs a dead session out, so a revoked,
+disabled or deleted account leaves an `authenticated` page for sign-in with no
+reload ([the session probe](../client/index.md#the-session-probe-omegaauthprobesession),
+[#798](https://github.com/Omega-JS-Stack/omega/issues/798)).
+
 ## 2. User data arrives through bindings
 
 Anything that depends on the signed-in user renders through

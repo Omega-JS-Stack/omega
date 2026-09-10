@@ -165,8 +165,21 @@ service cloud.firestore {
     // (the client SENDS them in the payload; the server is what writes them),
     // so a direct client write could only ever be a forged consent answer or a
     // rewritten campaign credit — the two records nobody may edit after the fact.
+    // `usage` covers `usage.overrides` too — the admin-granted extra credits a
+    // counted feature's limit resolves against — and `owns` names the documents
+    // a feature's counters mirror onto, so a client that could write either
+    // would be granting itself quota or aiming another account's counters
+    // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+    // `connections` is a CREDENTIAL STORE, not a record: the account page renders
+    // whatever sits there as a live connection, and the status route hands
+    // `connections.<provider>.token.refresh_token` straight to the provider — so a
+    // client write forges a connection AND plants a token the server then
+    // spends ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)).
+    // `activity` is the sign-in/security trail (IP, user agent, locale) the
+    // before-signin auth event writes; a client that could write it would be
+    // editing its own audit record.
     function isWritingFrameworkField() {
-      return isWritingAny(['auth', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'usage', 'consent', 'trackingConsent', 'attribution', 'verifications']);
+      return isWritingAny(['auth', 'connections', 'roles', 'flags', 'subscription', 'affiliate', 'api', 'metadata', 'activity', 'usage', 'owns', 'consent', 'trackingConsent', 'attribution', 'verifications']);
     }
 
     // ========== Resources ==========

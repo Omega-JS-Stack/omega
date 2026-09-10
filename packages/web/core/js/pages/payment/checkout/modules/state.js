@@ -73,15 +73,16 @@ export function resolveProvider(paymentMethod) {
     return 'stripe';
   }
 
-  const map = { paypal: 'paypal' };
+  const map = { paypal: 'paypal', crypto: 'coinbase' };
   return map[paymentMethod] || paymentMethod;
 }
 
-// Resolve price for a frequency (handles both `{ amount: N }` and plain `N` formats)
+// Resolve price for a frequency. A catalog price is a bare number and nothing
+// else — the config validator refuses the object shape, so this page and the
+// backend can never read one entry differently
+// ([#674](https://github.com/Omega-JS-Stack/omega/issues/674)).
 function resolvePrice(product, frequency) {
-  const entry = product?.prices?.[frequency];
-  if (entry == null) return 0;
-  return typeof entry === 'object' ? (entry.amount || 0) : Number(entry) || 0;
+  return Number(product?.prices?.[frequency]) || 0;
 }
 
 // Determine which frequencies a product supports based on its prices object
@@ -136,7 +137,8 @@ export function buildBindingsState() {
   // Determine which frequencies are available for this product
   const availableFrequencies = getAvailableFrequencies(product);
 
-  // Resolve prices using helper (handles both `N` and `{ amount: N }` formats)
+  // A price is a bare number on the product, and a frequency it has no price for
+  // reads 0 — which is exactly what getAvailableFrequencies() filters on
   const monthlyPrice = resolvePrice(product, 'monthly');
   const annualPrice = resolvePrice(product, 'annually');
   const weeklyPrice = resolvePrice(product, 'weekly');
@@ -156,6 +158,49 @@ export function buildBindingsState() {
   // no discount for a flat code, so the receipt showed full price while the
   // backend went on to charge the discounted one.
   const hasDiscount = state.discountPercent > 0 || state.discountAmount > 0;
+
+  // A code that covers the WHOLE price leaves nothing to charge, and the two
+  // providers this framework computes the amount for cannot take a $0.00
+  // payment — the backend refuses that checkout before it reaches them
+  // ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)), so the buttons
+  // that could only end there are not offered.
+  //
+  // A free TRIAL is never this case, and the backend agrees: nothing is charged
+  // today (the provider's own trial cycle does that, and PayPal's setup-fee
+  // discount is skipped outright on a trial), and the code comes off the first
+  // PAID period later — so both buttons stay. It is read off the trial and the
+  // DISCOUNT, never off `prices.total`, which a trial zeroes on its own.
+  const fullyDiscounted = hasDiscount && !hasFreeTrial && prices.subtotal > 0 && prices.subtotal - prices.discountAmount <= 0;
+
+  // What this checkout can still be paid with — built before the bindings
+  // because the page has to know when the set is EMPTY.
+  const paymentMethods = {
+    card: !!(state.providers?.stripe?.publishableKey || state.providers?.chargebee?.site),
+    paypal: !!state.providers?.paypal?.clientId && !fullyDiscounted,
+    applePay: false,
+    googlePay: false,
+    // Crypto is the one method with a PRODUCT condition as well as a
+    // provider one: Coinbase Commerce sells a single hosted charge and has
+    // no recurring anything, so the backend's intent provider refuses a
+    // subscription outright. A button offered there could only ever end in
+    // the checkout's generic failure sentence
+    // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
+    // One-time ONLY, spelled positively: a product with no `type` is a
+    // subscription to the backend intent route, so the button must not show.
+    crypto: product?.type === 'one-time' && state.providers?.coinbase?.enabled === true && !fullyDiscounted,
+  };
+
+  // A brand selling through PayPal (and crypto) alone has NO method left once a
+  // code covers the price, and the page's only "no payment methods" sentence is
+  // an init-time read of the provider CONFIG — so the grid just emptied and the
+  // page said nothing (#786). The sentence goes where the remedy is: the
+  // discount field's own error line, which keeps the code removable. The
+  // page-level error surface is not reusable here — it HIDES the whole checkout
+  // (`@hide checkout.error.show`), taking the discount field with it.
+  const noMethodsLeft = fullyDiscounted && !Object.values(paymentMethods).some(Boolean);
+  const blockedMessage = noMethodsLeft
+    ? `Discount code ${state.discountCode} covers the full price, and no payment method here can take a $0.00 charge. Remove the code to continue.`
+    : '';
 
   return {
     checkout: {
@@ -197,17 +242,15 @@ export function buildBindingsState() {
         label: state.discountPercent > 0 ? `${state.discountPercent}%` : (state.discountCode || ''),
         amount: prices.discountAmount.toFixed(2),
         loading: state.discountUI.loading,
-        success: state.discountUI.success,
-        error: state.discountUI.error,
+        // A code the server accepted, that this brand can then charge nobody
+        // with, is not a success the buyer can act on — it reads as the
+        // refusal it is, on the one line beside the field it was typed in
+        success: state.discountUI.success && !noMethodsLeft,
+        error: state.discountUI.error || noMethodsLeft,
         successMessage: state.discountUI.message || 'Discount applied',
-        errorMessage: state.discountUI.message || 'Invalid discount code',
+        errorMessage: noMethodsLeft ? blockedMessage : (state.discountUI.message || 'Invalid discount code'),
       },
-      paymentMethods: {
-        card: !!(state.providers?.stripe?.publishableKey || state.providers?.chargebee?.site),
-        paypal: !!state.providers?.paypal?.clientId,
-        applePay: false,
-        googlePay: false,
-      },
+      paymentMethods: paymentMethods,
       error: {
         show: state.error.show,
         message: state.error.message,
@@ -272,7 +315,10 @@ function buildTermsText(product, cycle, hasFreeTrial, prices, hasDiscount) {
     year: 'numeric',
   });
 
-  const discountNote = hasDiscount ? ' Discount code applies to first payment only and is not available with PayPal.' : '';
+  // PayPal takes a code too since [#759](https://github.com/Omega-JS-Stack/omega/issues/759)
+  // (a discounted first period, charged as the plan's setup fee), so the note
+  // says the one thing that is still true of every code: it comes off once.
+  const discountNote = hasDiscount ? ' Discount code applies to first payment only.' : '';
 
   if (hasFreeTrial) {
     // The charge that lands when the trial ends is the FIRST invoice, and a

@@ -14,9 +14,10 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-const BaseTest = require('../../src/cli/commands/setup-tests/base-test.js');
-const NpmProjectScriptsTest = require('../../src/cli/commands/setup-tests/npm-project-scripts.js');
+const BaseTest = require('../../dist/cli/commands/setup-tests/base-test.js');
+const NpmProjectScriptsTest = require('../../dist/cli/commands/setup-tests/npm-project-scripts.js');
 const frameworkPackage = require('../../package.json');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A minimal instance around a temp target dir: `stale` is the boot-time
 // in-memory manifest; the DISK manifest then diverges (npm added a dep)
@@ -26,7 +27,7 @@ function makeInstance(TestClass, dir, stale) {
   return instance;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Setup manifest sync (fresh-read writes, --ignore-scripts installs)',
   type: 'group',
 
@@ -52,6 +53,26 @@ module.exports = {
           'the fix still lands every projectScript');
         assert.equal(instance.self.package.dependencies['firebase-admin'], '^13.0.0',
           'the shared in-memory manifest resyncs to disk truth');
+
+        fs.rmSync(dir, { recursive: true, force: true });
+      },
+    },
+
+    {
+      name: 'manifest-writing-fix-keeps-the-trailing-newline',
+      async run({ assert }) {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manifest-sync-'));
+        const manifest = { name: 'newline-app', scripts: {} };
+        // ensure-target's byte contract: npm's shape, trailing newline included
+        fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+
+        const instance = makeInstance(NpmProjectScriptsTest, dir, manifest);
+        await instance.fix();
+
+        const bytes = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+        assert.equal(bytes.endsWith('\n'), true,
+          'a setup-test fix keeps the trailing newline every sibling writer writes');
+        assert.equal(bytes.endsWith('\n\n'), false, 'exactly one, never a growing tail');
 
         fs.rmSync(dir, { recursive: true, force: true });
       },
@@ -92,4 +113,4 @@ module.exports = {
       },
     },
   ],
-};
+});

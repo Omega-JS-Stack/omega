@@ -19,10 +19,13 @@
  * Run: npx omega test framework:routes/payments/intent-discount-amounts
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
-const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
-const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
+const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
 
-const handler = require('../../../src/manager/routes/payments/intent/post.js');
+const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+
+const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // What each code is worth, pinned against the discount-codes SSOT below so a
 // repriced code fails here instead of silently changing what the test asserts.
@@ -95,7 +98,7 @@ function eventIdFor(sessionId) {
   return sessionId.replace('_test-cs-', '_test-evt-');
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Test intent provider: discounts move the first-charge amounts',
   type: 'group',
   timeout: 90000,
@@ -114,6 +117,11 @@ module.exports = {
         state.frequency = Object.keys(paidProduct.prices)[0];
         state.price = paidProduct.prices[state.frequency];
         state.oneTimeProduct = (config.payment?.products || []).find((p) => p.type === 'one-time' && p.prices?.once);
+
+        // The other end of the same code: a frequency it covers WHOLE, which is
+        // the checkout PayPal and Coinbase cannot be handed at all (#786)
+        state.fullCoverFrequency = Object.keys(paidProduct.prices).find((f) => paidProduct.prices[f] > 0 && paidProduct.prices[f] <= AMOUNT_OFF) || null;
+        state.fullCoverPrice = state.fullCoverFrequency ? paidProduct.prices[state.fullCoverFrequency] : null;
 
         // A flat-dollar code only MOVES a number on a charge bigger than it is —
         // on anything smaller it floors at $0, which is also what a trial quotes.
@@ -481,6 +489,51 @@ module.exports = {
     },
 
     {
+      name: 'a-code-that-covers-the-whole-price-answers-400-and-never-calls-paypal',
+      async run({ accounts, assert, firestore, Manager, state, skip }) {
+        if (!state.fullCoverFrequency) {
+          skip(`No configured price is small enough for the $${AMOUNT_OFF} code to cover whole`);
+        }
+
+        // The WIRE half of #786: the refusal is thrown by `chargeableAmount()`
+        // in libraries/payment/discount-codes.js and coded 400, and this route
+        // is what turns that into the buyer's answer — the one provider-path
+        // error it repeats instead of hiding behind its neutral 500 sentence.
+        // Everything else about this checkout is real; only PayPal's HTTP door
+        // is watched, and it must never open.
+        const { user } = await purchaser(accounts, firestore, Manager, 'zero-total');
+        const calls = [];
+        const realRequest = PayPal.request;
+
+        PayPal.request = async (endpoint) => {
+          calls.push(endpoint);
+          throw new Error(`PayPal was called at ${endpoint} for a $0.00 checkout`);
+        };
+
+        let sent;
+
+        try {
+          sent = await callHandler({
+            Manager,
+            handler,
+            functionName: 'payments-intent',
+            user,
+            settings: checkoutSettings({ provider: 'paypal', productId: state.product.id, frequency: state.fullCoverFrequency, discount: AMOUNT_CODE }),
+          });
+        } finally {
+          PayPal.request = realRequest;
+        }
+
+        assert.equal(sent.code, 400, `A fully covered price is the buyer's own 400, got ${sent.code}: ${JSON.stringify(sent.body)}`);
+        assert.match(String(sent.body), new RegExp(AMOUNT_CODE), 'The answer names the code they entered');
+        assert.match(String(sent.body), new RegExp(`\\$${state.fullCoverPrice.toFixed(2)}`), `And the $${state.fullCoverPrice} price it covered`);
+        assert.match(String(sent.body), /PayPal/, 'And the payment method that cannot take it');
+        assert.ok(!/could not start your checkout/i.test(String(sent.body)), 'Never the neutral sentence a real provider fault gets');
+        assert.equal(calls.length, 0, `PayPal was never called, got ${JSON.stringify(calls)}`);
+      },
+    },
+
+    {
       name: 'an-amount-discount-comes-off-the-first-charge',
       async run({ assert }) {
         // Stripe coupons come in both shapes (percent_off, amount_off), so the math
@@ -494,4 +547,4 @@ module.exports = {
       },
     },
   ],
-};
+});

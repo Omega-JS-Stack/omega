@@ -41,8 +41,9 @@ module.exports = async function ensureCacheRules(context) {
       action: 'set_cache_settings',
       action_parameters: {
         cache: true,
-        edge_ttl: { mode: 'override_origin', default: configRule.edgeTtl || 31536000 },
-        browser_ttl: { mode: 'override_origin', default: configRule.browserTtl || 14400 },
+        // Nullish, never falsy: 0 is a legal TTL a brand can mean (#754)
+        edge_ttl: { mode: 'override_origin', default: configRule.edgeTtl ?? 31536000 },
+        browser_ttl: { mode: 'override_origin', default: configRule.browserTtl ?? 14400 },
       },
       expression: configRule.expression || currentRule?.expression,
       description: ruleName,

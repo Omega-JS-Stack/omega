@@ -6,7 +6,8 @@
  * The rate-limit half of ApiManager is pure arithmetic over an in-memory user
  * record, and it decides whether a paying customer's request is served or
  * refused — so it is unit-testable and worth pinning exactly:
- *   - init() derives the plan table from config.payment.products.
+ *   - init() derives the plan table from the NUMBERS in each config.payment.products
+ *     entry's `features` value map (#647); a perk value is not a limit.
  *   - getUserStat()/incrementUserStat() read and write `_APIManager.stats`
  *     against `subscription.limits`.
  *   - isUserOverStat()'s `daily` frame is the MONTHLY limit divided by 31
@@ -17,7 +18,8 @@
  * verification need a real ctx/hcaptcha boundary and are proven at the route
  * level, not here.
  */
-const ApiManager = require('../../src/manager/helpers/api-manager.js');
+const ApiManager = require('../../dist/manager/helpers/api-manager.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The only Manager surface init() reads.
 const makeManager = (products) => ({ config: { payment: { products: products || [] } } });
@@ -36,7 +38,7 @@ function throwsWith(fn) {
   return null;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'ApiManager plan limits + stat accounting',
   type: 'group',
 
@@ -47,11 +49,13 @@ module.exports = {
       name: 'init-derives-the-plan-table-from-config-products',
       async run({ assert }) {
         const api = await makeApi({}, [
-          { id: 'basic', limits: { requests: 3100 } },
-          { id: 'premium', limits: { requests: 62000, storage: 10 } },
+          { id: 'basic', features: { requests: 3100, support: false } },
+          { id: 'premium', features: { requests: 62000, storage: 10, support: 'priority', templates: true } },
           { id: 'free' },
         ]);
 
+        // Only the NUMBERS in a product's `features` map are limits (#647) —
+        // a perk value (a string, a boolean) is not a quota.
         assert.deepEqual(api.options.plans, {
           basic: { limits: { requests: 3100 } },
           premium: { limits: { requests: 62000, storage: 10 } },
@@ -243,7 +247,7 @@ module.exports = {
     {
       name: 'a-new-user-inherits-the-plan-limits-and-starts-at-zero',
       async run({ assert }) {
-        const api = await makeApi({}, [{ id: 'premium', limits: { requests: 62000, storage: 10 } }]);
+        const api = await makeApi({}, [{ id: 'premium', features: { requests: 62000, storage: 10 } }]);
 
         const user = api._createNewUser(
           { auth: { uid: 'uid_1' }, authenticated: true, ip: '1.2.3.4', country: 'US' },
@@ -266,7 +270,7 @@ module.exports = {
     {
       name: 'a-per-user-limit-override-beats-the-plan-limit',
       async run({ assert }) {
-        const api = await makeApi({}, [{ id: 'basic', limits: { requests: 3100 } }]);
+        const api = await makeApi({}, [{ id: 'basic', features: { requests: 3100 } }]);
 
         const user = api._createNewUser(
           { auth: { uid: 'uid_1' }, authenticated: true, subscription: { limits: { requests: 999999 } } },
@@ -283,7 +287,7 @@ module.exports = {
     {
       name: 'stats-carry-over-inside-the-reset-window-and-drop-outside-it',
       async run({ assert }) {
-        const api = await makeApi({ resetInterval: 60 }, [{ id: 'basic', limits: { requests: 3100 } }]);
+        const api = await makeApi({ resetInterval: 60 }, [{ id: 'basic', features: { requests: 3100 } }]);
         const authed = { auth: { uid: 'uid_1' }, authenticated: true };
 
         const recent = api._createNewUser(authed, 'basic', {
@@ -304,4 +308,4 @@ module.exports = {
       },
     },
   ],
-};
+});

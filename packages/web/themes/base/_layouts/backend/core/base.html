@@ -36,6 +36,17 @@ config:
     {% endif %}
   {% endunless %}
 
+  <!-- Floating drawer toggle: the topbar carries the rail controls (#740), so a
+       page with a rail and no topbar would have no way to open the drawer on a
+       narrow viewport. Same declarative control, same handler (#719). -->
+  {% if resolved.config.theme.topbar.enabled == false %}
+    {% unless resolved.config.theme.sidebar.enabled == false %}
+      <button class="btn-icon omega-shell__drawer-toggle d-xl-none" type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar" aria-label="Toggle navigation">
+        <i class="fa-solid fa-bars fa-md"></i>
+      </button>
+    {% endunless %}
+  {% endif %}
+
   <!-- Main Content -->
   <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.config.theme.main.class | omega_liquify }}" aria-label="Main content">
     {{ content | omega_content_format }}

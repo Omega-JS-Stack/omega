@@ -4,10 +4,17 @@
  *
  * Every cell births a brand through the REAL onboard (in-process, flags
  * mode) in a temp dir, proves the config validates and git initializes,
- * and — for web cells — runs the REAL Eleventy build via the monorepo's own
- * @omega.js/web (the same no-install engine lane the zero-page pin uses)
- * with per-cell invariants: branded homepage, active theme id, /blog,
- * sitemap + robots meta-files, and post listing for the content cell.
+ * and — for web cells — runs the REAL build the way `omega build` does
+ * (ensureTarget, then buildSite with the whole asset lane, writing a real
+ * dist/), then reads the BUILT FILES back for its invariants: branded
+ * homepage, active theme id, /blog, sitemap + robots meta-files, font
+ * preloads, and post listing for the content cell.
+ *
+ * The build is the point: rendering Eleventy against a hand-built asset
+ * manifest proved the fixture, not the product — the font-preload list comes
+ * off the compiled sheet (#765), so a stub could only fake it and every web
+ * cell failed the invariant
+ * ([#776](https://github.com/Omega-JS-Stack/omega/issues/776)).
  *
  * Fully OFFLINE by construction: no npm installs, no emulators, no live
  * calls (Ian's corpus stance — real code against real local infra only;
@@ -30,6 +37,8 @@ const { configureOmega, loadSiteData } = require('@omega.js/web');
 // _posts entry before the build. instances flips targets.web to the
 // 2-instance array form and proves the multi-instance sweep (structure,
 // per-instance compose, port offsets, deploy-record keys, both builds).
+// themeOverride drops a consumer-local tier-2 theme over the seeded one and
+// proves the cascade through a REAL production build (proveThemeOverride).
 const CELLS = [
   { id: 'shape-web-only', targets: 'web' },
   { id: 'shape-default-derivation', targets: null },
@@ -39,9 +48,31 @@ const CELLS = [
   { id: 'shape-desktop-extension', targets: 'desktop,extension' },
   { id: 'shape-with-post', targets: 'web', post: true },
   { id: 'shape-web-two-instance', targets: 'web', instances: true },
+  { id: 'shape-theme-override', targets: 'web', themeOverride: true },
 ];
 
 const POST_MARKER = 'Corpus Post Alpha';
+
+// The tier-2 override fixture the themeOverride cell installs into
+// `<src>/themes/<active id>/` — one marker per FILE KIND the cascade resolves,
+// each invisible to a reader, and each read back out of the BUILT output by
+// proveThemeOverride:
+//   _layouts/frontend/core/base.html      data-corpus-override="layout"
+//   _includes/core/body.html              data-corpus-override="include"
+//   _theme.scss                           --corpus-override: css
+//   _sections/marketing/stats/            data-corpus-override="section-html"
+//                                         + its own section.js (window.__corpusOverride)
+//   _sections/marketing/newsletter-cta/   inherit: ['js'] — the base section's
+//                                         js keeps riding the bundle
+//
+// What it deliberately does NOT ship is half the point. No `_theme.js`: base's
+// is the floor every chain ends at. No `fonts/`: the hatch in `_theme.scss`
+// inherits the packaged skin's faces, and the fonts lane follows a shadowing
+// theme with the dir it shadows, so the files arrive with the rules. Both were
+// build-breaking gaps this cell found, fixed upstream under
+// [#773](https://github.com/Omega-JS-Stack/omega/issues/773) — the fixture
+// omitting them is what keeps those fixes pinned here.
+const THEME_OVERRIDE_FIXTURE = path.join(__dirname, 'corpus-fixtures', 'theme-override');
 
 function deriveName(id) {
   return id.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -63,7 +94,9 @@ function flipTheme(brandRoot, themeId) {
 }
 
 function writePost(webTargetDir) {
-  const postPath = path.join(webTargetDir, '_posts', '2026', '2026-07-01-corpus-post.md');
+  // `src/` is the Eleventy input dir (#776 — the corpus builds the way the verb
+  // does now), so the collection lives there like a real brand's does.
+  const postPath = path.join(webTargetDir, 'src', '_posts', '2026', '2026-07-01-corpus-post.md');
   fs.mkdirSync(path.dirname(postPath), { recursive: true });
   fs.writeFileSync(postPath, [
     '---',
@@ -81,33 +114,80 @@ function writePost(webTargetDir) {
   ].join('\n'));
 }
 
-/** Real Eleventy build of a cell's web target (any instance dir); returns results by URL. */
+/**
+ * The REAL build of a cell's web target — what `omega build` runs, in this
+ * process: the local `ensureTarget` scaffold, then `buildSite` from the target
+ * root, writing a real `dist/`.
+ *
+ * It used to render Eleventy in memory against a hand-built asset-manifest
+ * stub, which is why every web cell failed `font preload links present`
+ * ([#776](https://github.com/Omega-JS-Stack/omega/issues/776)): the preload
+ * list is produced by the asset lane from the COMPILED sheet (#765), so a
+ * stub can only ever fake it. A corpus cell that renders against a fixture is
+ * proving the fixture — the invariant is truthful again because the build is.
+ *
+ * Offline like the rest of the corpus: ensureTarget is copy-if-missing and
+ * marker-merge with nothing on the network, and every dependency resolves from
+ * the monorepo (no installs).
+ * @param {string} brandRoot - the born brand
+ * @param {string} [targetDirName] - the target dir (multi-instance cells pass their own)
+ * @returns {Promise<Map<string, string>>} url → built file content
+ */
 async function buildWebTarget(brandRoot, targetDirName = 'website') {
-  const Eleventy = require('@11ty/eleventy').default;
-  const webTargetDir = path.join(brandRoot, 'targets', targetDirName);
-  const siteData = loadSiteData(webTargetDir); // the REAL config chain (throws on invalid)
+  const { buildSite, resolveClientEntry, consumerPaths } = require('@omega.js/web');
+  const { ensureTarget } = require(path.join(MONOREPO_ROOT, 'packages', 'web', 'src', 'commands', 'lib', 'ensure-target.js'));
 
-  const elev = new Eleventy(webTargetDir, path.join(brandRoot, `.corpus-out-${targetDirName}`), {
-    quietMode: true,
-    configPath: false,
-    config: (eleventyConfig) => {
-      // Cells share one process — never let Eleventy's template cache
-      // bleed one brand's layouts into the next (slice-test precedent)
-      eleventyConfig.setUseTemplateCache(false);
-      return configureOmega(eleventyConfig, {
-        consumerDir: webTargetDir,
-        siteData,
-        farmDir: path.join(brandRoot, `.corpus-farm-${targetDirName}`),
-        assetManifest: {
-          js: { main: '/assets/js/main-CORPUS.js', pages: {} },
-          css: { main: '/assets/css/main-CORPUS.css', pages: {}, themePages: {} },
-        },
-      });
-    },
-  });
+  const paths = consumerPaths(path.join(brandRoot, 'targets', targetDirName));
+  // Step one of every verb (#675). Inside a brand it is layer-aware: no
+  // target-level config seed, so the brand root's config stays the only one.
+  ensureTarget({ projectDir: paths.root });
 
-  const results = await elev.toJSON();
-  return new Map(results.map((entry) => [entry.url, entry.content]));
+  // A real verb runs from the target root, and the engine's machinery ignores
+  // are cwd-relative globs — so the corpus stands where the verb stands.
+  const cwd = process.cwd();
+  process.chdir(paths.root);
+  try {
+    await buildSite({
+      consumerDir: paths.src,
+      siteAssetsDir: paths.assets,
+      siteData: loadSiteData(paths.root), // the REAL config chain (throws on invalid)
+      outDir: paths.out,
+      clientEntry: resolveClientEntry(),
+      // No `environment: 'production'` on purpose: production MINIFIES the html
+      // (attribute quotes and all) and the invariants read quoted attributes.
+      // Every lane that matters here — layers, sass, esbuild — runs either way.
+    });
+  } finally {
+    process.chdir(cwd);
+  }
+
+  return readDist(paths.out);
+}
+
+/**
+ * A built `dist/` as the url → content map the invariants read.
+ * `index.html` files answer to their directory url, everything else to its own
+ * path, so `/`, `/blog`, `/sitemap.xml` and `/robots.txt` all address the way
+ * they did when this was an in-memory render.
+ * @param {string} outDir - the build output dir
+ * @returns {Map<string, string>} url → file content
+ */
+function readDist(outDir) {
+  const pages = new Map();
+
+  const walk = (dir) => {
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, item.name);
+      if (item.isDirectory()) { walk(file); continue; }
+      if (!/\.(html|xml|txt)$/.test(item.name)) continue;
+      const rel = path.relative(outDir, file).split(path.sep).join('/');
+      const url = rel.endsWith('index.html') ? `/${rel.slice(0, -'index.html'.length)}`.replace(/\/$/, '') || '/' : `/${rel}`;
+      pages.set(url, fs.readFileSync(file, 'utf8'));
+    }
+  };
+  walk(outDir);
+
+  return pages;
 }
 
 function assertWebInvariants(cell, pages) {
@@ -230,11 +310,93 @@ async function proveInstances(brandRoot, cell) {
   return failures;
 }
 
+/**
+ * The tier-2 cascade proof ([#773](https://github.com/Omega-JS-Stack/omega/issues/773)):
+ * a consumer-local theme at `<src>/themes/<active id>` shadows the PACKAGED
+ * theme of the same id, and every file kind the cascade resolves is proven in
+ * the built output rather than in the layer list.
+ *
+ * The build is the shared one every web cell runs now (#776); what is singular
+ * here is the FIXTURE it installs first and the marker set it reads back —
+ * the shared invariants still apply on top, so a cascade that renders the
+ * markers but breaks the page fails this cell like any other.
+ * @param {string} brandRoot - the born brand
+ * @param {object} cell - the CELLS row
+ * @returns {Promise<string[]>} failures
+ */
+async function proveThemeOverride(brandRoot, cell) {
+  const { consumerPaths } = require('@omega.js/web');
+
+  const failures = [];
+  const need = (condition, label) => { if (!condition) failures.push(label); };
+  const paths = consumerPaths(path.join(brandRoot, 'targets', 'website'));
+  const themeId = cell.theme || 'classy';
+
+  // The override lands where the LAYERS code probes — resolveThemeLayers reads
+  // `<consumerDir>/themes/<id>`, and consumerDir is the Eleventy input dir
+  // (`paths.src`), exactly as `omega build` passes it.
+  fs.cpSync(path.join(THEME_OVERRIDE_FIXTURE, 'theme'), path.join(paths.src, 'themes', themeId), { recursive: true });
+
+  // The same real build every other web cell runs, so this cell keeps every
+  // shared invariant (branded home, theme id, /blog, sitemap, robots, font
+  // preloads) on TOP of its own.
+  const pages = await buildWebTarget(brandRoot);
+  failures.push(...assertWebInvariants(cell, pages));
+
+  // Every built asset of a kind, concatenated — the bundles are content-hashed,
+  // so the marker is what is named here, never a filename.
+  const readAssets = (kind, extension) => {
+    const dir = path.join(paths.out, 'assets', kind);
+    if (!fs.existsSync(dir)) return '';
+    // Recursive: the theme entry is a dynamic import, so it rides its own
+    // code-split chunk under chunks/ rather than the main bundle.
+    const read = (from, out = []) => {
+      for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+        const file = path.join(from, entry.name);
+        if (entry.isDirectory()) read(file, out);
+        else if (entry.name.endsWith(extension)) out.push(fs.readFileSync(file, 'utf8'));
+      }
+      return out;
+    };
+    return read(dir).join('\n');
+  };
+  const home = pages.get('/') || '';
+  const css = readAssets('css', '.css');
+  const js = readAssets('js', '.js');
+
+  // HTML — the layout lane (shadowing BASE's layout), the include lane
+  // (shadowing CORE's include) and the section markup lane (shadowing BASE's
+  // section), all three from the one consumer-local theme layer.
+  need(home.includes('data-corpus-override="layout"'), 'layout override reached the built home page');
+  need(home.includes('data-corpus-override="include"'), 'include override reached the built home page');
+  need(home.includes('data-corpus-override="section-html"'), 'section html override reached the built home page');
+
+  // CSS — the theme scss entry, through the real sass + purge lanes. The
+  // minifier closes the space up, so both spellings count.
+  need(/--corpus-override:\s*css/.test(css), 'theme scss entry reached the compiled stylesheet');
+
+  // JS — the §7 section-js lane, both halves: the override folder's own js,
+  // and the base js an `inherit: ['js']` folder deliberately left to the chain
+  // (its POST target is the string only the base module carries).
+  need(js.includes('__corpusOverride'), 'override section js reached the built bundle');
+  need(js.includes('/omega/marketing/contact'), "inherit: ['js'] kept the base section's js in the bundle");
+
+  // The theme ENTRY lane, the js twin of the scss hatch: the fixture ships no
+  // `_theme.js`, so the packaged classy module it shadows is what must ride the
+  // bundle — `#hero-demo-form` is a literal in themes/classy/js/hero-demo-form.js,
+  // which only classy's `_theme.js` imports (a literal survives minification;
+  // an identifier does not).
+  need(js.includes('#hero-demo-form'), 'the shadowed packaged theme js reached the built bundle');
+
+  return failures;
+}
+
 async function runCell(cell) {
   const tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'omega-corpus-'));
   const brandRoot = path.join(tempRoot, cell.id);
   fs.mkdirSync(brandRoot);
   const failures = [];
+  let buildSeconds = 0;
 
   try {
     const report = await runOnboard(brandRoot, {
@@ -259,31 +421,50 @@ async function runCell(cell) {
       failures.push(`expected ${targets.length} target dirs, found ${scaffoldedDirs.length} (${scaffoldedDirs.join(', ')})`);
     }
 
+    // The build half is timed on its own: a web cell now runs a REAL build
+    // (#776), so the line says what that costs.
+    const buildStarted = process.hrtime.bigint();
     if (cell.instances) {
       failures.push(...await proveInstances(brandRoot, cell));
+    } else if (cell.themeOverride) {
+      failures.push(...await proveThemeOverride(brandRoot, cell));
     } else if (targets.includes('web')) {
       if (cell.theme) flipTheme(brandRoot, cell.theme);
       if (cell.post) writePost(path.join(brandRoot, 'targets', 'website'));
       failures.push(...assertWebInvariants(cell, await buildWebTarget(brandRoot)));
     }
+    if (targets.includes('web')) {
+      buildSeconds = Number(process.hrtime.bigint() - buildStarted) / 1e9;
+    }
   } catch (error) {
     failures.push(`crashed: ${error.message}`);
   }
 
-  if (failures.length === 0) {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-  return { cell, failures, brandRoot };
+  // The temp root is NOT removed here even on a pass — main() sweeps it after
+  // the last cell. esbuild's node API snapshots process.cwd() ONCE, at module
+  // load, and sends it as `absWorkingDir` on every build; a web cell builds
+  // from its target root, so deleting the first passing cell's tree left every
+  // later build dying with "Could not resolve" on paths that plainly exist
+  // ([#776](https://github.com/Omega-JS-Stack/omega/issues/776)). The devkit
+  // bundle composer now pins `absWorkingDir` per call
+  // ([#777](https://github.com/Omega-JS-Stack/omega/issues/777)), so the
+  // deferral is hygiene, not a requirement.
+  return { cell, failures, brandRoot, buildSeconds, tempRoot };
 }
 
 async function main() {
   console.log(`\nBrand-shape corpus — ${CELLS.length} cells (offline: real onboard + real web builds, no installs)\n`);
   const outcomes = [];
 
+  const started = process.hrtime.bigint();
+
   for (const [index, cell] of CELLS.entries()) {
     const outcome = await runCell(cell);
     outcomes.push(outcome);
-    const label = `[${index + 1}/${CELLS.length}] ${cell.id}`;
+    // Sequential by design — never parallelize: the cells share one process and
+    // one Eleventy template cache, and a real build is where the time goes.
+    const timing = outcome.buildSeconds > 0 ? ` (build ${outcome.buildSeconds.toFixed(1)}s)` : '';
+    const label = `[${index + 1}/${CELLS.length}] ${cell.id}${timing}`;
     if (outcome.failures.length === 0) {
       console.log(`  ✓ ${label}`);
     } else {
@@ -291,10 +472,17 @@ async function main() {
     }
   }
 
+  const total = (Number(process.hrtime.bigint() - started) / 1e9).toFixed(1);
   const failed = outcomes.filter((outcome) => outcome.failures.length > 0);
+
+  // Sweep the passing cells now that no build will run again (see runCell).
+  // A failing cell keeps its tree for autopsy, as it always has.
+  for (const outcome of outcomes) {
+    if (outcome.failures.length === 0) fs.rmSync(outcome.tempRoot, { recursive: true, force: true });
+  }
   console.log(failed.length === 0
-    ? `\n  Shape corpus PASSED (${CELLS.length}/${CELLS.length})\n`
-    : `\n  Shape corpus FAILED — ${failed.length}/${CELLS.length} cells\n`);
+    ? `\n  Shape corpus PASSED (${CELLS.length}/${CELLS.length}) in ${total}s\n`
+    : `\n  Shape corpus FAILED — ${failed.length}/${CELLS.length} cells (${total}s)\n`);
   if (failed.length > 0) process.exitCode = 1;
 }
 

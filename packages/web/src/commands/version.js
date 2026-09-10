@@ -3,7 +3,7 @@
  */
 const Logger = require('@omega.js/devkit/logger');
 
-const logger = new Logger('omega:version');
+const logger = new Logger('version');
 const pkg = require('../../package.json');
 
 module.exports = async function (options) {

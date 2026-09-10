@@ -1,8 +1,9 @@
 // Build-layer tests for lib/templating.js — render, buildPageVars, renderPage.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'templating — render + buildPageVars',
@@ -91,4 +92,4 @@ module.exports = {
       },
     },
   ],
-};
+});

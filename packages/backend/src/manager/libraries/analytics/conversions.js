@@ -216,6 +216,11 @@ function sendGA4({ descriptor, identity, ctx, Manager }) {
  * Meta's DEDUPLICATION key — a browser event with the same name and id is
  * counted once.
  *
+ * `action_source` is `website` unless the catalog's mapping named another one:
+ * a renewal, a recovered payment and a trial converting are billed by the
+ * provider with nobody on the site, and Meta's own enum has `system_generated`
+ * for exactly that ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
+ *
  * `event_source_url` is the page the conversion is credited to — the attribution
  * touch's url, which the descriptor carries when the touch had one
  * ([#497](https://github.com/Omega-JS-Stack/omega/issues/497)). A webhook has no
@@ -264,7 +269,12 @@ function buildMetaBody({ descriptor, identity, eventId }) {
     event_name: descriptor.name,
     event_time: Math.floor(Date.now() / 1000),
     event_id: eventId,
-    action_source: 'website',
+    // WHERE the conversion happened, a field Meta requires and asks be accurate.
+    // `website` is the default because that is where a person converts; the
+    // catalog overrides it per event for the charges a card takes with nobody
+    // present, which Meta's enum calls `system_generated`
+    // ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
+    action_source: descriptor.actionSource || 'website',
     user_data: userData,
     custom_data: descriptor.payload,
   };

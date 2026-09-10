@@ -22,7 +22,8 @@
  */
 const assert = require('node:assert');
 
-const lane = require('../../src/cli/commands/test-lanes/stripe-live.js');
+const lane = require('../../dist/cli/commands/test-lanes/stripe-live.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /** An env reader stand-in: the ONE reader's surface, answering what a suite says */
 function reader(answer) {
@@ -37,10 +38,10 @@ function reader(answer) {
   };
 }
 
-/** The live-credential refusal the real reader throws outside production (#586) */
-function liveRefusal() {
-  const error = new Error('STRIPE_SECRET_KEY holds a LIVE credential and this process is running in testing — refusing to use it. Put the provider\'s TEST credential in STRIPE_SECRET_KEY_DEV');
-  error.name = 'LiveSecretOutsideProductionError';
+/** A reader fault the lane must surface as a skip rather than a crash */
+function readerFault() {
+  const error = new Error('STRIPE_SECRET_KEY is not declared in the env schema');
+  error.name = 'UnknownEnvKeyError';
   return error;
 }
 
@@ -51,7 +52,7 @@ const CATALOGUE = [
   { id: 'legacy', name: 'Legacy', type: 'subscription', prices: { monthly: 1 }, archived: true },
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'The stripe-live lane: the gate that keeps it shut, and the fixtures it plans',
   type: 'group',
   timeout: 30000,
@@ -78,22 +79,32 @@ module.exports = {
           const decision = lane.resolveGate({ env: reader(answer), hasStripeCli: true });
 
           assert.equal(decision.ok, false, `a ${JSON.stringify(answer)} secret must not open the lane`);
-          assert.ok(decision.reason.includes('STRIPE_SECRET_KEY_DEV'), `the skip line names the slot to put the key in, got: ${decision.reason}`);
+          assert.ok(decision.reason.includes('.env.testing'), `the skip line names the overlay to put the key in, got: ${decision.reason}`);
         }
       },
     },
 
     {
-      name: 'a-live-key-keeps-the-lane-shut-through-the-one-reader',
+      name: 'a-live-key-keeps-the-lane-shut',
 
       async run() {
-        // The reader refuses a live credential outside production before this
-        // lane ever sees it (#586). The lane's job is to surface that as a SKIP,
-        // not to crash — and certainly not to catch it and carry on.
-        const decision = lane.resolveGate({ env: reader(liveRefusal()), hasStripeCli: true });
+        // #586 retired the reader's live-shape refusal: the `.env.testing`
+        // overlay is where a test credential goes, and every value is trusted.
+        // The `sk_test_` gate below is what keeps a live key out of a lane that
+        // creates subscriptions — it is the ONLY latch now, so it is pinned
+        // against every live shape a Stripe key can carry.
+        for (const live of ['sk_live_abc123', 'rk_live_abc123']) {
+          const decision = lane.resolveGate({ env: reader(live), hasStripeCli: true });
 
-        assert.equal(decision.ok, false, 'a live credential must never open a lane that creates subscriptions');
-        assert.ok(decision.reason.includes('LIVE'), `the skip line carries the reader's own words, got: ${decision.reason}`);
+          assert.equal(decision.ok, false, `${live} must never open a lane that creates subscriptions`);
+          assert.ok(decision.reason.includes('sk_test_'), `the skip line names what it wanted, got: ${decision.reason}`);
+        }
+
+        // A reader FAULT is surfaced as a skip too, not a crash
+        const faulted = lane.resolveGate({ env: reader(readerFault()), hasStripeCli: true });
+
+        assert.equal(faulted.ok, false, 'a lane that cannot resolve its key must not run');
+        assert.ok(faulted.reason.includes('STRIPE_SECRET_KEY'), `the skip line carries the reader's own words, got: ${faulted.reason}`);
       },
     },
 
@@ -267,7 +278,7 @@ module.exports = {
         // lane's suites either vanish from every run or, worse, join the default
         // one — which is a suite hitting a real payment API because a folder was
         // renamed.
-        const TestRunner = require('../../src/test/runner.js');
+        const TestRunner = require('../../dist/test/runner.js');
 
         assert.ok(
           TestRunner.LANE_DIRECTORIES.has(lane.LANE),
@@ -289,4 +300,4 @@ module.exports = {
       },
     },
   ],
-};
+});

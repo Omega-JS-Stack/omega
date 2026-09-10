@@ -44,6 +44,29 @@ const RETIRED_KEYS = {
     replacement: 'client.consent',
     why: 'the banner became a real consent gate (#383) — the block names the DECISION, not the cookie, and its palette/theme/type keys are gone (tokens paint it, the visitor\'s region picks opt-in vs opt-out)',
   },
+
+  // The web instance IS the subdomain (#588). `brand.subdomains` was read by
+  // ONE thing (the cloud hosting op, which ensured an api.{sub}.{domain} per
+  // entry) and declared by nothing: no schema rule, no default, never
+  // materialized. Ian's 2026-09-01 call gave the fact a real home. A NAME test
+  // by the rule above: `subdomains` exists nowhere else in the schema (the
+  // legacy searchConsole.subdomains was dropped outright), so the walk catches
+  // it at every depth, instance arrays included.
+  subdomains: {
+    replacement: 'targets.web',
+    why: "each subdomain is a web INSTANCE (#588): [\"admin\", \"cdn\"] becomes web: [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }], where the id IS the subdomain (https://admin.<brand host>), an entry's own `url` overrides it for a custom host, and the subdomains share ONE api.<domain>",
+  },
+
+  // The feature is `connections` now (#788, Ian 2026-09-03): a user connection
+  // will not always be an OAuth grant — an API key or a bot token is a
+  // connection too — so the section, the route, the user-record field, the env
+  // prefix and the brand provider folder all carry the product word, and each
+  // record names its own kind with `type: 'oauth2'`. A NAME test by the rule
+  // above: `oauth2` exists nowhere else in the schema.
+  oauth2: {
+    replacement: 'connections',
+    why: "the product concept is a CONNECTION (#788) — the per-provider block is unchanged, the credentials are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair now, and a brand's own provider lives at targets/backend/src/connections/<name>.js",
+  },
 };
 
 // exact dotted path → { replacement, why } (docs/shared/config.md carries the rows)
@@ -83,6 +106,23 @@ const RETIRED_PATHS = {
   'advertising.providers.google-adsense': {
     replacement: 'advertising.providers.adsense',
     why: 'provider ids drop the vendor prefix and every key is camelCase (#23) — the slots are displaySlot/inArticleSlot/inFeedSlot/multiplexSlot',
+  },
+
+  // ─── adsense has ONE switch (#527/#628) ───────────────────────────────
+  // The second gate is what let one config say "stop managing" while the site
+  // kept serving ads off the same id, so #527 deleted the service's
+  // `enabled === false` skip and never shipped the `units` half of the same
+  // proposal. Neither was registered here, so a brand still carrying
+  // `enabled: false` validated CLEAN — and the account it was meant to leave
+  // alone started being managed on the next walk, the gate reading exactly
+  // like it still worked.
+  'advertising.providers.adsense.enabled': {
+    replacement: 'advertising.providers.adsense',
+    why: 'adsense has ONE switch (#527): `client` presence manages the account, renders the units and writes the ads.txt record together — set `advertising.providers.adsense: false` to opt the provider out, and there is no second gate to disable it with',
+  },
+  'advertising.providers.adsense.units': {
+    replacement: 'advertising.providers.adsense',
+    why: 'adsense has ONE switch (#527): the render gate the key proposed was refused — `client` presence is the whole answer, so a managed-but-ad-free brand omits the block and manages the account by hand',
   },
 
   // ─── one provider shape everywhere (#425) ──────────────────────────────
@@ -208,6 +248,51 @@ const RETIRED_PATHS = {
     why: "one provider shape everywhere (#425) — the blog writer is a KEY under `blog.providers`; `blog.enabled` and `blog.content` stay role-level (content is pipeline config)",
   },
 
+  // ─── a page's TITLE and DESCRIPTION live in page frontmatter (#607/#564) ──
+  // The config `meta` section shipped for one wave as the site's default page
+  // meta, beside the bare `meta:` a page and a layout already wrote — two homes
+  // for one fact, free to disagree. Ian's 2026-08-26 ruling deleted the copy
+  // that could not win: the head walk is page `meta:` → layout `meta:` →
+  // brand.name / brand.description, so a title or description left in
+  // omega.json5 reaches NOTHING and every page silently falls back to the brand.
+  //
+  // `index` is the exception, and #564 (Ian 2026-09-09, the same-name ruling in
+  // docs/shared/rulings.md) is why the rows are per KEY now rather than on the
+  // whole block: a site-wide default and the page override of it share ONE name
+  // at every level, so the site default is `targets.web.meta.index` and the page
+  // writes `meta.index`. That key is LIVE, and it overlays to the resolved root
+  // on a web load like every target key, and a row on the whole `meta` object would
+  // fire on a brand that is simply using it.
+  //
+  // Matched at AUTHORED paths, never by key NAME: `analytics.providers.meta` is
+  // a legitimate key one level down.
+  'meta.title': {
+    replacement: 'brand.name (and the page\'s own frontmatter `meta.title`)',
+    why: 'a title never exists in two places (#607): page frontmatter `meta:` is the only per-page meta, and the site-wide default is the brand block the head falls back to',
+  },
+  'meta.description': {
+    replacement: 'brand.description (and the page\'s own frontmatter `meta.description`)',
+    why: 'a description never exists in two places (#607): page frontmatter `meta:` is the only per-page meta, and the site-wide default is the brand block the head falls back to',
+  },
+  'targets.web.meta.title': {
+    replacement: 'brand.name (and the page\'s own frontmatter `meta.title`)',
+    why: 'a title never exists in two places (#607): @omega.js/web reads no site-wide title; a per-page title belongs in that page\'s own frontmatter',
+  },
+  'targets.web.meta.description': {
+    replacement: 'brand.description (and the page\'s own frontmatter `meta.description`)',
+    why: 'a description never exists in two places (#607): @omega.js/web reads no site-wide description; a per-page description belongs in that page\'s own frontmatter',
+  },
+
+  // ─── one index flag, one name at both levels (#564) ────────────────────
+  // #725 gave the site-wide noindex its own name, `seo.index`, while a page
+  // said `meta.index`, one decision spelled two ways, which is the defect
+  // Ian's 2026-09-09 same-name ruling names. The site default is now the same
+  // key the page writes, under the target that reads it.
+  'seo.index': {
+    replacement: 'targets.web.meta.index',
+    why: 'a global value and its specific override share ONE name (#564, Ian 2026-09-09): the site-wide default is `targets.web.meta.index` and a page overrides it with `meta.index` in its own frontmatter; `seo` keeps `enabled` and `github.content`',
+  },
+
   // ─── one home for the download/extension links (#610) ──────────────────
   // The legacy UJM page maps survived beside the derivation #85/#124 added,
   // so explicit config could silently override the release the desktop target
@@ -224,7 +309,85 @@ const RETIRED_PATHS = {
     replacement: 'targets.extension.listings',
     why: 'two homes for one fact (#610) — the /extension page and its shortlinks read the extension target\'s store listings, curated onto site.targets.extension.listings',
   },
+
+  // ─── redirects are not web config (#466) ──────────────────────────────
+  // The block shipped for one wave (0.45.0) and was withdrawn: static hosting
+  // has no server, so the map could only be answered CLIENT-side off the built
+  // 404 page — a search engine saw a 404 that redirects, never a move. A
+  // TEMPLATED redirect genuinely needs edge computing and is a Cloudflare
+  // redirect rule; an enumerable one is a redirect PAGE. Matched at its
+  // AUTHORED path, the one place a carrying brand has it.
+  'targets.web.redirects': {
+    replacement: 'edge.providers.cloudflare.rules.redirect',
+    why: 'redirects are not web config (#466) — a TEMPLATED redirect (/c/:id → /code?id=:id) is a Cloudflare redirect rule the edge service reconciles, and a redirect whose URLs can be enumerated is a PAGE on the `modules/utilities/redirect` layout with `redirect.url` in its frontmatter',
+  },
+
+  // ─── the bundler has no consumer override (#737) ──────────────────────
+  // Desktop moved off webpack and the externals knob went with it: esbuild's
+  // externals set is the framework's own native-module list plus whatever the
+  // consumer's package.json declares from it, resolved at build time. Nothing
+  // reads the key any more — and it sits inside the `targets` namespace the
+  // undeclared-key warning EXEMPTS, so without a row here a brand still
+  // carrying it validates completely clean and silently loses the setting.
+  // Matched at its AUTHORED path, the one place a carrying brand has it.
+  'targets.desktop.em.webpack.externals': {
+    replacement: 'nothing — the externals set is framework-owned',
+    why: "the desktop bundler is esbuild (#737) and there is no consumer-facing override key: the externals set is the framework's native-module list (`nativeExternals` in @omega.js/desktop's src/gulp/tasks/bundle.js) plus what the consumer's own package.json declares from it, so a genuinely native module the list misses is raised upstream and every brand gets the fix",
+  },
+
+  // ─── one features catalog, one values map (#647) ───────────────────────
+  // A metered feature used to be spelled twice on every product — a number in
+  // `limits` and a display row in the `features` ARRAY — and its PACING was a
+  // product-wide `rateLimit` that no single feature could opt out of. The
+  // catalog defines each feature once (name, icon, definition, and the `usage`
+  // block that meters it) and a product names only its value, so a limit and
+  // the row that renders it can no longer disagree. Matched at their AUTHORED
+  // paths: `limits` is a legitimate word elsewhere, so this is not a name test.
+  'payment.products.limits': {
+    replacement: 'payment.products[].features',
+    why: 'a product names one VALUE per feature (#647) — `limits: { saves: 100 }` becomes `features: { saves: 100 }`, and the feature itself (name, icon, definition, pacing, mirrors) is defined once in the top-level `features` catalog',
+  },
+  'payment.products.rateLimit': {
+    replacement: 'features.<id>.usage.pace',
+    why: 'pacing is per FEATURE now (#647) — day pacing is the default on every counted feature, and `usage: { pace: false }` on the catalog entry is the opt-out the product-wide `rateLimit: "monthly"` used to be',
+  },
+
+  // ─── one releases repo, no mirror (#620/#799) ──────────────────────────
+  // The `download-server` mirror existed to give marketing a fixed filename,
+  // which the versionless artifact names (#620) made free: the site links the
+  // releases repo directly and reads nothing from the mirror. #799 deleted the
+  // lane (gulp/mirror-downloads, the finalize-release mirror step, the repo
+  // provisioning), so a brand still carrying the block gets a second repo
+  // provisioned and nothing published to it. Matched at their AUTHORED paths,
+  // one row per key: `downloads` is a legitimate word elsewhere (the curated
+  // site.targets.desktop.downloads map is the derived direct-download links),
+  // so this is not a name test.
+  'targets.desktop.downloads.enabled': {
+    replacement: 'targets.desktop.releases',
+    why: 'one public releases repo per brand (#620/#799): the fixed-name mirror is gone, and the versionless assets on the releases repo ARE the permanent download links',
+  },
+  'targets.desktop.downloads.owner': {
+    replacement: 'targets.desktop.releases.owner',
+    why: 'one public releases repo per brand (#620/#799): there is no second repo to own, and the releases owner defaults to the brand repo owner',
+  },
+  'targets.desktop.downloads.repo': {
+    replacement: 'targets.desktop.releases.repo',
+    why: 'one public releases repo per brand (#620/#799): the release artifacts and the marketing downloads are the same assets in `<brand.id>-releases`',
+  },
+  'targets.desktop.downloads.tag': {
+    replacement: 'nothing: the versionless assets live on the `v<x.y.z>` release',
+    why: 'one public releases repo per brand (#620/#799): a stable mirror tag is what `/releases/latest/download/<asset>` replaced, so no tag is configured anywhere',
+  },
 };
+
+// A multi-instance target is an ARRAY, so the walked path carries the position
+// (`targets.web.0.meta`) while every RETIRED_PATHS row names the shape
+// (`targets.web.meta`) — without this, each `targets.<type>.*` row missed the
+// array form outright (#732). Matching only: the REPORTED path keeps the index,
+// which is where the author finds the key.
+function withoutIndices(keyPath) {
+  return keyPath.split('.').filter((segment) => !/^\d+$/.test(segment)).join('.');
+}
 
 function walk(node, path, found) {
   if (Array.isArray(node)) {
@@ -243,8 +406,10 @@ function walk(node, path, found) {
       found.push({ path: keyPath, key, ...RETIRED_KEYS[key] });
     }
 
-    if (RETIRED_PATHS[keyPath]) {
-      found.push({ path: keyPath, key, ...RETIRED_PATHS[keyPath] });
+    const shapePath = withoutIndices(keyPath);
+
+    if (RETIRED_PATHS[shapePath]) {
+      found.push({ path: keyPath, key, ...RETIRED_PATHS[shapePath] });
     }
 
     walk(node[key], keyPath, found);

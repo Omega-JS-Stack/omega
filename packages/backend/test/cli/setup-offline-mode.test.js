@@ -23,10 +23,11 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
-const { BOOLEAN_FLAGS } = require('../../src/cli/flags.js');
-const FirestoreIndexesSyncedTest = require('../../src/cli/commands/setup-tests/firestore-indexes-synced.js');
-const StorageLifecyclePolicyTest = require('../../src/cli/commands/setup-tests/storage-lifecycle-policy.js');
-const MarketingCampaignsSeededTest = require('../../src/cli/commands/setup-tests/marketing-campaigns-seeded.js');
+const { BOOLEAN_FLAGS } = require('../../dist/cli/flags.js');
+const FirestoreIndexesSyncedTest = require('../../dist/cli/commands/setup-tests/firestore-indexes-synced.js');
+const StorageLifecyclePolicyTest = require('../../dist/cli/commands/setup-tests/storage-lifecycle-policy.js');
+const MarketingCampaignsSeededTest = require('../../dist/cli/commands/setup-tests/marketing-campaigns-seeded.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // What the target has committed vs what the live project actually carries — one
 // differing index is all the drift the check needs to fail.
@@ -101,7 +102,7 @@ function buildStorageTest(argv) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'setup --offline — live-mutating checks downgrade to reported failures',
   type: 'group',
   timeout: 20000,
@@ -272,4 +273,4 @@ module.exports = {
       },
     },
   ],
-};
+});

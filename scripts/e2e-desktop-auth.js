@@ -15,7 +15,7 @@
  *      sign-in custom token at POST /omega/user/token (the node-side setup —
  *      the same seed the sibling lanes use).
  *   3. A consumer app is staged from @omega.js/desktop's bundled fixture, given
- *      a cloud config pointed at the emulator project, and webpack-built by the
+ *      a cloud config pointed at the emulator project, and built by the
  *      REAL gulp pipeline into a real dist/main.bundle.js (the boot runner does
  *      the build + the spawn — the production boot path, not lib code in node).
  *   4. A SECOND Electron instance launches carrying
@@ -64,7 +64,7 @@ const DESKTOP = path.join(ROOT, 'packages', 'desktop');
 const DESKTOP_DIST = path.join(DESKTOP, 'dist');
 const FIXTURE = path.join(DESKTOP, 'src', 'test', 'fixtures', 'consumer-app');
 // The staged app lives INSIDE packages/desktop on purpose: the fixture resolves
-// gulp/webpack/firebase through the upward node_modules walk, which only reaches
+// gulp/esbuild/firebase through the upward node_modules walk, which only reaches
 // the desktop package (and the workspace root) from in here.
 const STAGE_DIR = path.join(DESKTOP, '.temp', 'desktop-auth-e2e');
 const APP_DIR = path.join(STAGE_DIR, 'app');

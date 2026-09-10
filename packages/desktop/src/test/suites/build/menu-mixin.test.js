@@ -6,8 +6,9 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..', '..', '..');
 const mixin = require(path.join(root, 'dist', 'lib', '_menu-mixin.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'menu-mixin (id-path utilities)',
@@ -126,4 +127,4 @@ module.exports = {
       },
     },
   ],
-};
+});

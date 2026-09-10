@@ -11,11 +11,12 @@ const JSON5 = require('json5');
 const { loadConfig } = require('@omega.js/config');
 
 const Manager = require('../../../build.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const root = Manager.getRootPath('main');
 const defaultsDir = path.join(root, 'dist', 'defaults');
 const defaultConfigPath = path.join(defaultsDir, 'config', 'omega.json5');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'Default config schema (omega.json5)',
@@ -129,4 +130,4 @@ module.exports = {
       },
     },
   ],
-};
+});

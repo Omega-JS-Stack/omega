@@ -5,7 +5,7 @@
  */
 const fetch = require('wonderful-fetch');
 const Manager = require('../../../index.js');
-const { FIELDS, resolveFieldValues } = require('../constants.js');
+const { FIELDS, resolveFieldValues, fieldsForProvider } = require('../constants.js');
 const env = require('../../env.js');
 
 const BASE_URL = 'https://api.beehiiv.com/v2';
@@ -405,14 +405,23 @@ async function listSubscriptions({ status, expand } = {}, request = fetch) {
  * Resolves all field values, then maps to display names for Beehiiv.
  * Beehiiv matches custom fields by their display name.
  *
+ * The catalog decides which fields Beehiiv owns (#695): a field the catalog
+ * skips for Beehiiv is never provisioned there, so writing it would push a
+ * value at a custom field that does not exist on every sync.
+ *
  * @param {object} userDoc - User document from Firestore
  * @returns {Array<{name: string, value: string}>} Custom fields in Beehiiv format
  */
 function buildFields(userDoc) {
   const values = resolveFieldValues(userDoc, Manager.config);
+  const owned = new Set(fieldsForProvider('beehiiv'));
   const fields = [];
 
   for (const [name, value] of Object.entries(values)) {
+    if (!owned.has(name)) {
+      continue;
+    }
+
     const fieldConfig = FIELDS[name];
     const displayName = fieldConfig?.display || name;
     fields.push({ name: displayName, value: String(value) });

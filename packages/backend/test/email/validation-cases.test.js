@@ -5,9 +5,10 @@
  * The behavior-by-behavior suite lives next door in validation.test.js; this file is
  * the broad address corpus — one test per address, one per parse code.
  */
-const { validate } = require('../../src/manager/libraries/email/validation.js');
-const { parseResult } = require('../../src/manager/libraries/email/validation-provider-neverbounce.js');
+const { validate } = require('../../dist/manager/libraries/email/validation.js');
+const { parseResult } = require('../../dist/manager/libraries/email/validation-provider-neverbounce.js');
 const assert = require('node:assert');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const FREE_CHECKS = ['format', 'disposable', 'corporate', 'localPart', 'typo', 'dns'];
 
@@ -106,7 +107,7 @@ const NB_PARSE_CASES = [
   { result: 4, expectValid: true, expectStatus: 'unknown' },
 ];
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email validation case corpus (free checks + NeverBounce parsing)',
   type: 'group',
   tests: [
@@ -148,4 +149,4 @@ module.exports = {
       },
     })),
   ],
-};
+});

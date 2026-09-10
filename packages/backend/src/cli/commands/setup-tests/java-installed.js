@@ -1,5 +1,6 @@
 const BaseTest = require('./base-test');
 const powertools = require('node-powertools');
+const { javaInstallHint } = require('./helpers');
 
 class JavaInstalledTest extends BaseTest {
   getName() {
@@ -9,7 +10,7 @@ class JavaInstalledTest extends BaseTest {
   getWarning() {
     return [
       'Java is required by the Firebase Firestore emulator (used for testing).',
-      'Install with: brew install openjdk',
+      `Install with: ${javaInstallHint()}`,
     ];
   }
 

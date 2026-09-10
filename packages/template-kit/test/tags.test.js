@@ -10,7 +10,6 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const { TAGS } = require('../src/tags/index.js');
-const { DEFAULT_ICON } = require('../src/tags/media.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures');
 
@@ -173,95 +172,6 @@ test('omega_translation_url prefixes languages, honors default + excludes + blog
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"es", "/blog/page/2.html"'), '/es/blog/page/2');
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, 'lang, pageUrl'), '/es/pricing');
   assert.strictEqual(TAGS.omega_translation_url.render(makeCtx({}), ''), '/');
-});
-
-test('omega_icon loads from injected dirs with brands fallback, flag mapping, and default icon', () => {
-  const options = { icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')], flagsDir: path.join(FIXTURES, 'flags') } };
-  const ctx = makeCtx({}, { options });
-
-  const rocket = TAGS.omega_icon.render(ctx, 'rocket');
-  assert.ok(rocket.startsWith('<i class="fa" data-icon="rocket" aria-hidden="true">'));
-  assert.ok(rocket.includes('M1 1'));
-  assert.ok(rocket.includes('width="1em"') && rocket.includes('height="1em"') && rocket.includes('fill="currentColor"'));
-
-  // brands fallback when not in the configured style
-  const github = TAGS.omega_icon.render(ctx, 'github, "me-2"');
-  assert.ok(github.startsWith('<i class="fa me-2" data-icon="github" aria-hidden="true">'));
-  assert.ok(github.includes('M2 2'));
-  assert.ok(!github.includes('width="1em" width')); // existing width= not duplicated
-
-  // flag via direct country code and via language mapping (en -> us)
-  assert.ok(TAGS.omega_icon.render(ctx, 'us').includes('M3 3'));
-  const enFlag = TAGS.omega_icon.render(ctx, 'en');
-  assert.ok(enFlag.includes('M3 3'));
-  // the flag set's hardcoded width/height="512" is stripped so the standard
-  // 1em inline-icon sizing applies (a 512px flag blew up the dropdown)
-  assert.ok(!enFlag.includes('"512"'), 'hardcoded flag dimensions stripped');
-  assert.ok(enFlag.includes('width="1em"') && enFlag.includes('height="1em"'), '1em sizing injected');
-
-  // unknown -> default warning triangle
-  const missing = TAGS.omega_icon.render(ctx, 'definitely-not-real');
-  assert.ok(missing.includes('M320 64'));
-  // The fallback carries the failed slug so the dev-only browser audit can
-  // console.error it ([data-omega-icon-missing] scan)
-  assert.ok(missing.includes('data-omega-icon-missing="definitely-not-real"'));
-
-  // no dirs configured -> default icon, no crash
-  const bare = makeCtx({});
-  assert.ok(TAGS.omega_icon.render(bare, 'rocket').includes('M320 64'));
-});
-
-test('omega_icon walks the dir chain and resolves aliases (icon-core semantics)', () => {
-  const options = {
-    icons: {
-      fontAwesomeDirs: [path.join(FIXTURES, 'icons'), path.join(FIXTURES, 'icons-fallback')],
-      aliasFile: path.join(FIXTURES, 'icon-families.json'),
-    },
-  };
-  const ctx = makeCtx({}, { options });
-
-  // first dir wins for names it has
-  assert.ok(TAGS.omega_icon.render(ctx, 'rocket').includes('M1 1'));
-
-  // a name only the second dir has resolves through the chain
-  const bolt = TAGS.omega_icon.render(ctx, 'bolt');
-  assert.ok(bolt.includes('M9 9'));
-
-  // the shared root attributes ride every icon (icon-core's full set)
-  assert.ok(bolt.includes('aria-hidden="true"') && bolt.includes('overflow="visible"'));
-
-  // alias resolves to the canonical file ('search' → 'magnifying-glass')
-  const search = TAGS.omega_icon.render(ctx, 'search');
-  assert.ok(search.includes('M8 8'));
-  assert.ok(search.startsWith('<i class="fa" data-icon="search" aria-hidden="true">')); // data-icon keeps the requested name
-});
-
-// #538 — the WRAPPER is the accessibility surface. Every icon sits beside
-// visible text (buttons, tiles, facts), so the default emit is hidden from the
-// a11y tree instead of relying on screen readers skipping text-free SVGs; the
-// rare meaningful icon says so with `label=` and gets a real name.
-test('omega_icon: the wrapper is aria-hidden by default, a labeled icon is role=img instead (#538)', () => {
-  const options = { icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')] } };
-  const ctx = makeCtx({ heading: 'Rocket status', risky: 'The "Pro" plan' }, { options });
-
-  const decorative = TAGS.omega_icon.render(ctx, 'rocket');
-  assert.ok(decorative.startsWith('<i class="fa" data-icon="rocket" aria-hidden="true">'), decorative);
-  assert.ok(!decorative.includes('role="img"'), 'a decorative icon claims no role');
-
-  const classed = TAGS.omega_icon.render(ctx, 'rocket, "me-2"');
-  assert.ok(classed.startsWith('<i class="fa me-2" data-icon="rocket" aria-hidden="true">'), classed);
-
-  const labeled = TAGS.omega_icon.render(ctx, 'rocket, "me-2", label="Launch status"');
-  assert.ok(labeled.startsWith('<i class="fa me-2" data-icon="rocket" role="img" aria-label="Launch status">'), labeled);
-  assert.ok(!labeled.includes('aria-hidden="true"><svg'), 'a labeled icon is never hidden from the a11y tree');
-
-  // The label rides the option lane like every other tag option: variables
-  // resolve, and the value is attribute-escaped at the emit.
-  const fromVariable = TAGS.omega_icon.render(ctx, 'rocket, label=heading');
-  assert.ok(fromVariable.startsWith('<i class="fa" data-icon="rocket" role="img" aria-label="Rocket status">'), fromVariable);
-
-  const quoted = TAGS.omega_icon.render(ctx, 'rocket, label=risky');
-  assert.ok(quoted.includes('aria-label="The &quot;Pro&quot; plan"'), quoted);
 });
 
 test('omega_logo prefixes SVG ids uniquely per instance', () => {

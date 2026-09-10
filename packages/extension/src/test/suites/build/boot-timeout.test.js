@@ -10,6 +10,7 @@
 // and the wiring that carries it) rather than re-running the boot layer.
 
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const RUNNER = path.join(__dirname, '..', '..', 'runner.js');
 const BOOT_SUITES = path.join(__dirname, '..', 'boot');
@@ -17,7 +18,7 @@ const BOOT_SUITES = path.join(__dirname, '..', 'boot');
 // The observed worst case the default has to clear (#262).
 const OBSERVED_FIRST_RUN_SW_INIT_MS = 30000;
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'boot-layer timeout default',
@@ -88,4 +89,4 @@ module.exports = {
       },
     },
   ],
-};
+});

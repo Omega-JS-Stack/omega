@@ -10,6 +10,12 @@
  * the section gallery — an index, one page per entry, frames beside it — in
  * its OWN url space, and `/test/sections/component/…` is gone.
  *
+ * Ian's spec addendum (2026-08-26) finished the mirror by HARMONIZING the two
+ * spellings: a section entry is `/test/sections/<id>` exactly as a component
+ * entry is `/test/components/<id>`, so neither library carries a kind segment
+ * the other lacks. The `/test/sections/section/…` spelling goes with it — a
+ * dev-only surface, so no redirects.
+ *
  * ONE generator serves both kinds: `defaults/showcase/entry.html` and
  * `defaults/showcase/frame.html` paginate the whole library and take their
  * permalink from the entry's own kind-aware url.
@@ -41,7 +47,7 @@ test('#602: /test/components is the component INDEX — one row per entry, linki
   assert.ok(index.includes('href="/test/components/pricing/features"'), 'including the ones a section composes, not a page');
 
   // Components only, both here and in the section gallery
-  assert.ok(!index.includes('/test/sections/section/marketing/hero'), 'no section entries on the component index');
+  assert.ok(!index.includes('/test/sections/marketing/hero'), 'no section entries on the component index');
   assert.ok(index.includes('/test/sections'), 'the section library is one click away');
 
   // Dev-only surface, like the rest of the gallery
@@ -57,7 +63,7 @@ test('#602: /test/components/<id> is the entry page, with its frames beside it',
   assert.match(entry, /<main[^>]*>\s*<section[^>]*data-omega-showcase-shell/, 'the same shell a section entry wears');
   assert.ok(entry.includes('aria-label="Component library"'), 'the rail is the COMPONENT library on a component page');
   assert.ok(entry.includes('href="/test/components/pricing/features"'), 'the rail links its siblings — no trip back to the index');
-  assert.ok(!entry.includes('href="/test/sections/section/marketing/hero"'), 'and never a section: the rail is its own kind');
+  assert.ok(!entry.includes('href="/test/sections/marketing/hero"'), 'and never a section: the rail is its own kind');
 
   // The frames are this entry's own, under its own url space
   assert.ok(entry.includes('src="/test/components/heading/masthead/frames/eyebrow-accent-sub"'), 'each iframe points at its own frame page');
@@ -74,20 +80,46 @@ test('#602: /test/components/<id> is the entry page, with its frames beside it',
   assert.ok(features.includes('&quot;definition&quot;: &quot;API requests per month.&quot;'), 'and its variant options show as a copyable block');
 });
 
-test('#602: the /test/sections/component/… url space is gone; the section gallery lists sections only', async () => {
+test('#602: the two galleries are the SAME url shape — <index>/<id>, frames beside it, no kind segment anywhere', async () => {
   const pages = await buildWith(miniData);
 
-  const strays = [...pages.keys()].filter((url) => url.startsWith('/test/sections/component'));
-  assert.deepEqual(strays, [], 'no page is generated under the retired component url space');
+  // THE route table. Every showcase url a build writes, by which library owns
+  // it — the one place both spaces are pinned side by side, so a change to
+  // either shape has to be spelled out here first.
+  const routes = [...pages.keys()].filter((url) => url.startsWith('/test/sections') || url.startsWith('/test/components'));
+  const shapeOf = (base) => ({
+    index: routes.filter((url) => url === base),
+    entries: routes.filter((url) => url.startsWith(`${base}/`) && !url.includes('/frames/')),
+    frames: routes.filter((url) => url.startsWith(`${base}/`) && url.includes('/frames/')),
+  });
+  const sections = shapeOf('/test/sections');
+  const components = shapeOf('/test/components');
+
+  for (const [label, shape] of [['section', sections], ['component', components]]) {
+    assert.equal(shape.index.length, 1, `${label}: exactly one index page`);
+    assert.ok(shape.entries.length > 0 && shape.frames.length > 0, `${label}: entry pages, and frames beside them`);
+    // <base>/<category>/<name> and <base>/<category>/<name>/frames/<slug> —
+    // the SAME segment count on both sides, which is what "mirrored" means.
+    const depth = (url) => url.split('/').length;
+    assert.deepEqual([...new Set(shape.entries.map(depth))], [depth(shape.index[0]) + 2], `${label}: an entry is <index>/<category>/<name>, nothing deeper`);
+    assert.deepEqual([...new Set(shape.frames.map(depth))], [depth(shape.index[0]) + 4], `${label}: a frame is <entry>/frames/<slug>`);
+  }
+  assert.equal(sections.entries.length + components.entries.length, routes.length - sections.frames.length - components.frames.length - 2, 'every showcase url belongs to one of the two libraries');
+
+  // The retired spellings — the kind segment is gone from BOTH sides now
+  // (Ian's 2026-08-26 addendum harmonized sections onto the component shape).
+  for (const retired of ['/test/sections/component/', '/test/sections/section/']) {
+    assert.deepEqual(routes.filter((url) => url.startsWith(retired)), [], `no page is generated under the retired ${retired} url space`);
+  }
 
   const index = pages.get('/test/sections');
-  assert.ok(index.includes('/test/sections/section/marketing/hero'), 'sections still link their own pages');
+  assert.ok(index.includes('href="/test/sections/marketing/hero"'), 'sections link their own pages, at the harmonized url');
   assert.ok(!index.includes('/test/components/heading/masthead'), 'a component entry is not listed on the section index');
   assert.ok(index.includes('/test/components'), 'the component library is one click away');
 
-  const hero = pages.get('/test/sections/section/marketing/hero');
-  assert.ok(hero, 'section entry pages are where they always were');
-  assert.ok(hero.includes('src="/test/sections/section/marketing/hero/frames/email-capture"'), 'and so are their frames');
+  const hero = pages.get('/test/sections/marketing/hero');
+  assert.ok(hero, 'a section entry page sits directly under its index, like a component one');
+  assert.ok(hero.includes('src="/test/sections/marketing/hero/frames/email-capture"'), 'and its frames hang off it');
   assert.ok(!hero.includes('/test/components/heading/masthead'), 'a section rail carries no components either');
 });
 

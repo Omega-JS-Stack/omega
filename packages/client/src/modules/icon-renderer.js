@@ -4,6 +4,7 @@
  * pages when one appears. Authoring is plain Font Awesome markup:
  *
  *   <i class="fa-solid fa-rocket"></i>          — static HTML
+ *   <i class="omega-flag omega-flag-us"></i>    — the flags namespace (#619)
  *   el.className = 'fa-sharp fa-light fa-play'  — set or CHANGED via JS,
  *                                                  any time; both render.
  *
@@ -14,7 +15,7 @@
  * text comes from:
  *
  *   desktop  →  (name, style) => ipc.invoke('desktop:fontawesome:get', …)
- *   web      →  (name, style) => fetch(`/assets/fa/${style}/${name}.svg`)
+ *   web      →  (name, style) => fetch(`/assets/icons/${style}/${name}.svg`)
  *   extension→  (name, style) => fetch(chrome.runtime.getURL(…))
  *
  * Rendered elements carry data-omega-fa="<style>/<name>". Unknown icons
@@ -23,6 +24,11 @@
  */
 
 const { parseIconClasses, isValidIconName, isValidStyle, injectSvgAttributes } = require('./icon-core.js');
+
+// Both namespaces the class parser understands (#619): Font Awesome's fa-*
+// and the country flags' omega-flag-*.
+const ICON_SELECTOR = 'i[class*="fa-"], i[class*="omega-flag-"]';
+const RENDERED_SELECTOR = `${ICON_SELECTOR}, i[data-omega-fa]`;
 
 /**
  * Create an icon renderer bound to a transport.
@@ -75,10 +81,10 @@ function createIconRenderer(options) {
   };
 
   const scan = (root) => {
-    if (root.matches?.('i[class*="fa-"]')) {
+    if (root.matches?.(ICON_SELECTOR)) {
       render(root);
     }
-    root.querySelectorAll?.('i[class*="fa-"]').forEach(render);
+    root.querySelectorAll?.(ICON_SELECTOR).forEach(render);
   };
 
   /**
@@ -97,7 +103,7 @@ function createIconRenderer(options) {
       observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           if (mutation.type === 'attributes') {
-            if (mutation.target.matches?.('i[class*="fa-"], i[data-omega-fa]')) {
+            if (mutation.target.matches?.(RENDERED_SELECTOR)) {
               render(mutation.target);
             }
             continue;

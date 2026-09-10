@@ -48,7 +48,14 @@
 // Alert Close Button
 // ============================================
 
+// A real <button>: the dismiss is an operable control, so it has to be
+// keyboard-reachable and named. These four reset the UA button chrome so it
+// still renders as the bare × it always did.
 .main-alert-close {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
   margin-left: 15px;
   color: white;
   font-weight: bold;

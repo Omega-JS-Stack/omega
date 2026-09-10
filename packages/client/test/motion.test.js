@@ -248,4 +248,449 @@ describe('motion', () => {
       assert.strictEqual(video.paused, false);
     });
   });
+
+  // #752: the dotfield hero canvas repainted its whole grid on every animation
+  // frame from the moment the engine scanned, inside the LCP window, on the
+  // page's own thread, and the marquee read geometry in the same tick it
+  // replaced the track's children (a forced reflow). The unit env has no DOM,
+  // so each case builds the exact surface these two lanes touch (the
+  // icon-renderer/#499 idiom) plus a hand-driven rAF and idle queue.
+  describe('first-paint budget (#752)', () => {
+    /** A 2d context stub that counts grid repaints (one clearRect each). */
+    function makeContext() {
+      const ctx = {
+        clears: 0,
+        dots: 0,
+        fills: [],
+        setTransform() {},
+        clearRect() { this.clears += 1; },
+        beginPath() {},
+        arc() { this.dots += 1; },
+        fill() {},
+        /** The color of the last dot drawn. */
+        lastDot: () => ctx.fills.filter((value) => String(value).startsWith('rgba')).pop(),
+      };
+
+      // fillStyle is an accessor because the engine writes it twice: once per
+      // dot, and once per color parse (it round-trips a CSS value through the
+      // canvas to normalize it).
+      let current = '#000000';
+      Object.defineProperty(ctx, 'fillStyle', {
+        get: () => current,
+        set: (value) => {
+          current = value;
+          ctx.fills.push(value);
+        },
+      });
+
+      return ctx;
+    }
+
+    /**
+     * Install the browser surface the motion engine reaches for, with the
+     * animation frames, idle callbacks and the load event under test control.
+     * Everything is restored afterwards: the suite shares one global window.
+     */
+    function withMotionEnv({ reduced = false, readyState = 'complete', idleCallback = true } = {}, body) {
+      const frames = [];
+      const idles = [];
+      const listeners = { load: [] };
+      const observers = { resize: [], mutation: [] };
+      let lineColor = '#808080';
+      const originals = {
+        raf: global.requestAnimationFrame,
+        caf: global.cancelAnimationFrame,
+        matchMedia: global.window.matchMedia,
+        computed: global.window.getComputedStyle,
+        idle: global.window.requestIdleCallback,
+        add: global.window.addEventListener,
+        resizeObserver: global.ResizeObserver,
+        mutationObserver: global.MutationObserver,
+      };
+
+      global.requestAnimationFrame = (fn) => frames.push(fn);
+      global.cancelAnimationFrame = () => {};
+      global.window.matchMedia = (query) => ({ matches: reduced && query.includes('prefers-reduced-motion') });
+      global.window.getComputedStyle = () => ({ getPropertyValue: () => lineColor });
+      global.window.addEventListener = (type, fn) => {
+        (listeners[type] = listeners[type] || []).push(fn);
+      };
+      global.ResizeObserver = class {
+        constructor(fn) { this.fn = fn; }
+        observe() { observers.resize.push(this.fn); }
+        disconnect() {}
+      };
+      global.MutationObserver = class {
+        constructor(fn) { this.fn = fn; }
+        observe() { observers.mutation.push(this.fn); }
+        disconnect() {}
+      };
+      if (idleCallback) {
+        global.window.requestIdleCallback = (fn) => idles.push(fn);
+      } else {
+        delete global.window.requestIdleCallback;
+      }
+
+      const env = {
+        readyState,
+        /** Render one animation frame at `now` (ms). */
+        frame: (now) => frames.splice(0, frames.length).forEach((fn) => fn(now)),
+        /** How many callbacks are waiting on the next frame. */
+        pending: () => frames.length,
+        /** Run the queued idle callbacks. */
+        idle: () => idles.splice(0, idles.length).forEach((fn) => fn({ didTimeout: false, timeRemaining: () => 50 })),
+        /** Fire the window load event. */
+        load: () => (listeners.load || []).splice(0).forEach((fn) => fn()),
+        /** Fire every ResizeObserver the engine armed (it fires on observe too). */
+        resize: () => observers.resize.forEach((fn) => fn([])),
+        /** Flip data-bs-theme to a page whose line color is `color`. */
+        themeFlip: (color) => {
+          lineColor = color;
+          observers.mutation.forEach((fn) => fn([]));
+        },
+      };
+
+      try {
+        body(env);
+      } finally {
+        global.requestAnimationFrame = originals.raf;
+        global.cancelAnimationFrame = originals.caf;
+        global.window.matchMedia = originals.matchMedia;
+        global.window.getComputedStyle = originals.computed;
+        global.window.addEventListener = originals.add;
+        if (originals.idle === undefined) {
+          delete global.window.requestIdleCallback;
+        } else {
+          global.window.requestIdleCallback = originals.idle;
+        }
+        if (originals.resizeObserver === undefined) {
+          delete global.ResizeObserver;
+        } else {
+          global.ResizeObserver = originals.resizeObserver;
+        }
+        if (originals.mutationObserver === undefined) {
+          delete global.MutationObserver;
+        } else {
+          global.MutationObserver = originals.mutationObserver;
+        }
+      }
+    }
+
+    /** A root whose only motion target is `el`, found by `selector`. */
+    const rootOf = (selector, el) => ({
+      matches: () => false,
+      querySelectorAll: (query) => (query === selector ? [el] : []),
+    });
+
+    /** A `[data-omega-dotfield]` element and the canvas the engine prepends. */
+    function makeField(readyState) {
+      const ctx = makeContext();
+      const canvas = {
+        className: '',
+        width: 0,
+        height: 0,
+        setAttribute() {},
+        getContext: () => ctx,
+      };
+      const doc = {
+        readyState,
+        hidden: false,
+        createElement: () => canvas,
+        addEventListener() {},
+        documentElement: { addEventListener() {} },
+      };
+      const el = {
+        dataset: {},
+        clientHeight: 100,
+        measures: 0,
+        get clientWidth() {
+          this.measures += 1;
+          return 200;
+        },
+        ownerDocument: doc,
+        prepended: [],
+        getAttribute: (name) => (name === 'data-omega-dotfield' ? '20' : null),
+        prepend(node) { this.prepended.push(node); },
+        getBoundingClientRect: () => ({ left: 0, top: 0, width: 200, height: 100 }),
+      };
+      return { el, ctx, canvas };
+    }
+
+    describe('dotfield', () => {
+      it('paints nothing until first paint has settled', () => {
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          assert.strictEqual(field.ctx.clears, 0, 'the scan itself paints nothing');
+          assert.strictEqual(env.pending(), 0, 'and arms no animation frame at all');
+
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 0, 'a frame before the settle signal still paints nothing');
+
+          env.idle();
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 1, 'the first grid lands on the settle signal');
+          assert.ok(field.ctx.dots > 0, 'and it is a real grid');
+        });
+      });
+
+      it('waits for the load event before asking for idle time', () => {
+        withMotionEnv({ readyState: 'loading' }, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          env.idle();
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 0, 'a document still loading paints nothing');
+
+          env.load();
+          env.idle();
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 1, 'the field starts once the page is loaded and idle');
+        });
+      });
+
+      it('falls back to the load event where idle callbacks do not exist', () => {
+        withMotionEnv({ readyState: 'loading', idleCallback: false }, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          assert.strictEqual(field.ctx.clears, 0, 'nothing before load');
+          assert.strictEqual(env.pending(), 0, 'and no frame is even armed before it');
+
+          env.load();
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 1, 'load alone is the signal on browsers without requestIdleCallback');
+        });
+      });
+
+      it('hands the CSS fallback dots off on the first painted grid, not at scan', () => {
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          // `.omega-dotgrid[data-omega-dotfield-ready]::before` fades the CSS
+          // dots out on this stamp, so an early one leaves the hero blank.
+          assert.strictEqual(field.el.dataset.omegaDotfieldReady, undefined, 'not at scan');
+
+          env.idle();
+          assert.strictEqual(field.el.dataset.omegaDotfieldReady, undefined, 'not on the settle signal either');
+
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 1, 'the first grid is painted');
+          assert.strictEqual(field.el.dataset.omegaDotfieldReady, 'true', 'and the CSS dots hand off to it');
+        });
+      });
+
+      it('installs once, even rescanned before the stamp lands', () => {
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          const engine = motion.createMotion();
+          const root = rootOf('[data-omega-dotfield]', field.el);
+
+          engine.scan(root);
+          engine.scan(root); // a MutationObserver rescan, before the stamp exists
+
+          assert.strictEqual(field.el.prepended.length, 1, 'one canvas, not two');
+
+          env.idle();
+          env.frame(0);
+          assert.strictEqual(field.ctx.clears, 1, 'and one field painting it');
+        });
+      });
+
+      it('sizes the canvas at the settle signal, never through an early resize observer', () => {
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          assert.strictEqual(field.el.measures, 0, 'the scan measures nothing');
+
+          env.resize(); // the observer's own first callback, a frame after scan
+          assert.strictEqual(field.el.measures, 0, 'and neither does the observer, before settle');
+          assert.strictEqual(field.canvas.width, 0, 'so nothing allocates a backing store either');
+
+          env.idle();
+          assert.ok(field.el.measures > 0, 'the settle callback is what measures');
+          assert.strictEqual(field.canvas.width, 200, 'and sizes the canvas to the field');
+
+          const settledMeasures = field.el.measures;
+          env.resize();
+          assert.ok(field.el.measures > settledMeasures, 'a resize after settle is honored as before');
+        });
+      });
+
+      it('caps the repaint cadence at 30fps, whatever the display runs at', () => {
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+          env.idle();
+
+          // One second of a 60Hz display
+          for (let i = 0; i <= 60; i += 1) {
+            env.frame((i * 1000) / 60);
+          }
+          assert.ok(field.ctx.clears <= 31, `capped at ~30 repaints/s, got ${field.ctx.clears}`);
+          assert.ok(field.ctx.clears >= 29, `still animating, got ${field.ctx.clears}`);
+        });
+
+        withMotionEnv({}, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+          env.idle();
+
+          // One second of a 120Hz display; the cap is the same number
+          for (let i = 0; i <= 120; i += 1) {
+            env.frame((i * 1000) / 120);
+          }
+          assert.ok(field.ctx.clears <= 31, `120Hz stays capped, got ${field.ctx.clears}`);
+          assert.ok(field.ctx.clears >= 29, `and still animates, got ${field.ctx.clears}`);
+        });
+      });
+
+      it('gives a reduced-motion visitor one static grid and no loop', () => {
+        withMotionEnv({ reduced: true }, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+
+          assert.strictEqual(field.ctx.clears, 0, 'not even the static grid competes with first paint');
+          assert.strictEqual(field.el.dataset.omegaDotfieldReady, undefined, 'and the CSS dots stay until there is a grid');
+
+          env.idle();
+          assert.strictEqual(field.ctx.clears, 1, 'one grid, drawn once');
+          assert.strictEqual(env.pending(), 0, 'no animation frame was ever armed');
+
+          env.frame(16);
+          env.frame(32);
+          assert.strictEqual(field.ctx.clears, 1, 'and nothing repaints it');
+          assert.strictEqual(field.el.dataset.omegaDotfieldReady, 'true', 'the CSS handoff stamp lands with that grid');
+        });
+      });
+
+      it('re-reads the theme color for a still grid, which has no loop to poll it', () => {
+        withMotionEnv({ reduced: true }, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+          env.idle();
+
+          const before = field.ctx.lastDot();
+          env.themeFlip('#ffffff'); // dark → light: --omega-line-strong changes
+
+          assert.strictEqual(field.ctx.clears, 2, 'the still grid is redrawn, once');
+          assert.notStrictEqual(field.ctx.lastDot(), before, 'in the color the new theme reads');
+          assert.strictEqual(env.pending(), 0, 'and it still never armed a frame');
+        });
+      });
+
+      it('repaints a still grid on resize, in the current theme color', () => {
+        withMotionEnv({ reduced: true }, (env) => {
+          const field = makeField(env.readyState);
+          motion.createMotion().scan(rootOf('[data-omega-dotfield]', field.el));
+          env.idle();
+
+          const before = field.ctx.lastDot();
+          env.themeFlip('#ffffff');
+          env.resize();
+
+          assert.strictEqual(field.ctx.clears, 3, 'the resize redraws it');
+          assert.notStrictEqual(field.ctx.lastDot(), before, 'never in the color of the theme it left');
+        });
+      });
+    });
+
+    describe('marquee', () => {
+      /** An image inside a marquee item, still loading. */
+      const makeImage = () => ({
+        complete: false,
+        listeners: [],
+        addEventListener(type, fn) { this.listeners.push(fn); },
+        /** Finish the load, the way a decoded image does. */
+        fire() {
+          this.complete = true;
+          this.listeners.splice(0).forEach((fn) => fn());
+        },
+      });
+
+      /** A marquee item that can clone itself, optionally carrying images. */
+      const makeItem = (images = []) => ({
+        matches: () => false,
+        querySelectorAll: (selector) => (selector === 'img' ? images : []),
+        setAttribute() {},
+        cloneNode() { return makeItem(); },
+      });
+
+      /**
+       * A `.omega-marquee__track` that logs the order of mutation and read,
+       * and measures what it actually holds (150px an item), so a read of an
+       * already-cloned track is visible in the duration it produces.
+       */
+      function makeTrack(items) {
+        return {
+          children: items.slice(),
+          calls: [],
+          speed: '',
+          replaceChildren(...next) {
+            this.calls.push('replaceChildren');
+            this.children = next;
+          },
+          appendChild(child) { this.children.push(child); },
+          getBoundingClientRect() {
+            this.calls.push('read');
+            return { width: this.children.length * 150 };
+          },
+          style: {
+            setProperty: (name, value) => {
+              if (name === '--omega-marquee-speed') {
+                track.speed = value;
+              }
+            },
+          },
+        };
+      }
+
+      /** A `[data-omega-marquee]` element over `track`, 900px wide. */
+      const marqueeOf = (track) => ({
+        dataset: {},
+        clientWidth: 900,
+        getAttribute: () => null,
+        querySelector: (selector) => (selector === '.omega-marquee__track' ? track : null),
+      });
+
+      let track;
+
+      it('reads the track geometry in a later frame, never in the mutation tick', () => {
+        withMotionEnv({}, (env) => {
+          track = makeTrack([makeItem(), makeItem()]);
+          motion.createMotion().scan(rootOf('[data-omega-marquee]', marqueeOf(track)));
+
+          assert.deepStrictEqual(track.calls, ['replaceChildren'], 'the write lands alone, with no read behind it');
+          assert.strictEqual(env.pending(), 1, 'the read is queued for the next frame');
+
+          env.frame(0);
+          assert.deepStrictEqual(track.calls, ['replaceChildren', 'read'], 'and lands after the frame');
+          // 300px set, 900px container → 3 copies per half, doubled
+          assert.strictEqual(track.children.length, 12, 'the clones still land, in that frame');
+          assert.strictEqual(track.speed, '11s', 'and the duration comes from the SET width');
+        });
+      });
+
+      it('a burst of rebuilds still measures the bare set, never a cloned track', () => {
+        withMotionEnv({}, (env) => {
+          const images = [makeImage(), makeImage()];
+          track = makeTrack([makeItem([images[0]]), makeItem([images[1]])]);
+          motion.createMotion().scan(rootOf('[data-omega-marquee]', marqueeOf(track)));
+          env.frame(0);
+
+          // Both images decode in the same tick, so two rebuilds queue for one
+          // frame: the second must not measure what the first just cloned.
+          images.forEach((image) => image.fire());
+          env.frame(16);
+
+          assert.strictEqual(track.children.length, 12, 'one set of clones, not a doubling');
+          assert.strictEqual(track.speed, '11s', 'the duration is still the set width, not the whole track');
+        });
+      });
+    });
+  });
 });

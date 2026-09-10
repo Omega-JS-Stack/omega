@@ -15,7 +15,8 @@
  * the assertions run against the real Transactional.build().
  */
 const assert = require('node:assert');
-const { GROUP_KEYS, DEFAULT_GROUP_KEY } = require('../../src/manager/libraries/email/constants.js');
+const { GROUP_KEYS, DEFAULT_GROUP_KEY } = require('../../dist/manager/libraries/email/constants.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // This brand's own account ids — deliberately nothing like the ITW ids that
 // used to be compiled in.
@@ -44,7 +45,7 @@ function makeManager(groups) {
 function build(settings, { groups = GROUP_IDS } = {}) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
+  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
   const Manager = makeManager(groups);
   const ctx = { Manager, log: () => {}, error: () => {} };
 
@@ -57,7 +58,7 @@ function build(settings, { groups = GROUP_IDS } = {}) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Unsubscribe group ids resolve from config (#649)',
   type: 'group',
   tests: [
@@ -65,7 +66,7 @@ module.exports = {
       name: 'constants carry KEYS only — no compiled-in ASM ids',
 
       run() {
-        const constants = require('../../src/manager/libraries/email/constants.js');
+        const constants = require('../../dist/manager/libraries/email/constants.js');
 
         assert.ok(!('GROUPS' in constants), 'the hardcoded id map is gone');
         assert.deepEqual(GROUP_KEYS, ['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal']);
@@ -89,7 +90,7 @@ module.exports = {
       name: 'every sender category resolves its own configured id',
 
       async run() {
-        const { SENDERS } = require('../../src/manager/libraries/email/constants.js');
+        const { SENDERS } = require('../../dist/manager/libraries/email/constants.js');
 
         for (const [sender, config] of Object.entries(SENDERS)) {
           const email = await build({ sender });
@@ -151,4 +152,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,6 +1,5 @@
 {
   "url": "https://collections.example.com",
   "brand": { "id": "collections", "name": "CollectionsCo", "description": "A brand with its own collection" },
-  "meta": { "title": "CollectionsCo", "description": "Collections meta description" },
   "theme": { "id": "classy" }
 }

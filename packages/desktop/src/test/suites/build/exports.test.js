@@ -4,10 +4,11 @@ const path = require('path');
 const fs = require('fs');
 
 const Manager = require('../../../build.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 const pkg = Manager.getPackage('main');
 const root = Manager.getRootPath('main');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'Package exports',
@@ -59,4 +60,4 @@ module.exports = {
       },
     },
   ],
-};
+});

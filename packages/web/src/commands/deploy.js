@@ -21,28 +21,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
-const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, dispatchRepo, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { deployPrecheck } = require('./lib/deploy-precheck.js');
 const { resolvePathPrefix } = require('../path-prefix.js');
 
-const logger = new Logger('omega:deploy');
+const logger = new Logger('deploy');
 
 // GitHub's own Pages host — the address a PROJECT site already serves at, so a
 // brand.url naming one is never a custom domain ([#366](https://github.com/Omega-JS-Stack/omega/issues/366)).
 const DEFAULT_PAGES_HOST = /(^|\.)github\.io$/i;
 
 /**
- * brand.url split where the host ends: the two facts every derivation below
- * reasons from. Parsed by hand, not through `new URL()`, because brand.url is
- * allowed to arrive without a scheme.
+ * The URL this deploy PUBLISHES to, split where the host ends: the two facts
+ * every derivation below reasons from. Parsed by hand, not through
+ * `new URL()`, because the value is allowed to arrive without a scheme.
+ *
+ * The resolved config's top-level `url` answers first: it is THIS instance's
+ * own public url ([#588](https://github.com/Omega-JS-Stack/omega/issues/588),
+ * derived from the instance id or declared on its entry), so a
+ * `targets/website-admin` deploy writes admin.acme.test into the CNAME and
+ * mounts the build there instead of publishing over the main site. `brand.url`
+ * is the fallback, which IS the answer for the single-instance world.
  *
  * @param {object} config - Composed omega config (brand + local layers).
- * @returns {{ host: string, path: string }} '' each when brand.url is unset.
+ * @returns {{ host: string, path: string }} '' each when no URL is known.
  */
 function brandUrlParts(config) {
-  const value = String(config.brand?.url || '').replace(/^https?:\/\//, '');
+  const value = String(config.url || config.brand?.url || '').replace(/^https?:\/\//, '');
   const slash = value.indexOf('/');
 
   return slash === -1
@@ -180,6 +187,22 @@ function loadDeployConfig(dir) {
   }
 
   return config;
+}
+
+/**
+ * The repo this target's CI dispatch addresses: the brand's own, from the
+ * config it just loaded ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)).
+ * A git remote answers the repo the working tree SITS IN, which inside a brand
+ * nested in another repo is the enclosing one, so the dispatch went to a
+ * workflow that was never there. The rule is `@omega.js/devkit/deploy`'s
+ * `dispatchRepo`, the same call desktop's release verbs and the extension's
+ * deploy make. Exported for tests.
+ *
+ * @returns {{ owner: string, repo: string }} owner and bare repo name
+ * @throws {Error} when the config names no repo
+ */
+function dispatchAddress() {
+  return dispatchRepo(loadDeployConfig(process.cwd()));
 }
 
 /**
@@ -395,7 +418,8 @@ module.exports = async function (options) {
     syncWorkingTree({ message: 'Deploy', logger });
   }
 
-  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
+  const { owner, repo } = dispatchAddress();
+  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, owner, repo, dryRun });
 
   if (dispatched) {
     const { targetInstance } = require('@omega.js/config');
@@ -411,6 +435,7 @@ module.exports = async function (options) {
 };
 
 module.exports.buildDirectPlan = buildDirectPlan;
+module.exports.dispatchAddress = dispatchAddress;
 module.exports.pagesHost = pagesHost;
 module.exports.deployPathPrefix = deployPathPrefix;
 module.exports.targetPathPrefix = targetPathPrefix;

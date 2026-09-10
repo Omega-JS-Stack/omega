@@ -7,12 +7,11 @@
  * Target selection (Ian 2026-07-16): the default set is web + backend — the
  * local web loop. GUI/watcher targets (desktop opens an Electron window,
  * extension runs a build watcher) never boot unless asked.
- *   omega dev                       web + backend
- *   omega dev --only web            one leg
- *   omega dev --only web,backend    explicit set
- *   omega dev --except backend      default minus
- *   omega dev --all                 every target with a dev leg
- *   omega dev --full                boot on the WHOLE manage walk, not the lane
+ *   omega dev                        web + backend
+ *   omega dev --target=web           one leg (target key or dir name)
+ *   omega dev --target=web,backend   explicit set
+ *   omega dev --all                  every target with a dev leg
+ *   omega dev --full                 boot on the WHOLE manage walk, not the lane
  *
  * Boot order: the freshness sweep first (one dist check for every lane), then
  * a manage cycle — the boot lane (workspace, assets, disperse: the local
@@ -31,12 +30,16 @@ const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { freshnessSweep, resolveLinkedMonorepo, startMonorepoWatch } = require('@omega.js/devkit/local');
+const { mkcertCaRootPem } = require('@omega.js/devkit/local-https');
+const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
 // Local
 const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
+const { assertFamilyVersions } = require('../lib/preflight.js');
 const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
+const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens, targetMatches } = require('../lib/target-selection.js');
 
 // Target → the npm leg that IS local dev for that target
 const DEV_LEGS = {
@@ -97,32 +100,35 @@ const DEFAULT_TARGETS = ['web', 'backend'];
  * @param {object} input
  * @param {string[]} input.available - targets that have a dir in this brand
  * @param {string[]} [input.custom] - custom target names with a `start` script
- * @param {string} [input.only] - comma list: exact set to boot
- * @param {string} [input.except] - comma list: subtract from the set
+ * @param {string} [input.target] - the --target= comma list: exact set to boot
  * @param {boolean} [input.all] - start every target with a dev leg
- * @returns {{ selected: string[], unknown: string[], missing: string[] }}
+ * @returns {{ selected: string[], missing: string[] }}
+ * @throws {Error} when a --target= token names no dev leg
  */
-function selectDevTargets({ available, custom = [], only, except, all }) {
+function selectDevTargets({ available, custom = [], target, all }) {
   // A custom target is a first-class leg once it has a start script — the
   // default set boots it beside web + backend (it is part of the local stack,
   // never an opt-in GUI surface)
-  const hasLeg = (target) => Boolean(DEV_LEGS[target]) || custom.includes(target);
-  const defaults = [...DEFAULT_TARGETS, ...custom].filter((target) => available.includes(target));
+  const hasLeg = (name) => Boolean(DEV_LEGS[name]) || custom.includes(name);
+  const defaults = [...DEFAULT_TARGETS, ...custom].filter((name) => available.includes(name));
 
-  const requested = only
-    ? String(only).split(',').map((part) => part.trim()).filter(Boolean)
+  const tokens = parseTargetTokens(target);
+  const requested = tokens.length > 0
+    ? tokens
     : (all ? [...Object.keys(DEV_LEGS), ...custom] : defaults);
-  const excluded = new Set(String(except || '').split(',').map((part) => part.trim()).filter(Boolean));
 
-  const unknown = requested.filter((target) => !hasLeg(target));
-  const kept = requested.filter((target) => hasLeg(target) && !excluded.has(target));
-  const selected = kept.filter((target) => available.includes(target));
-  const missing = kept.filter((target) => !available.includes(target));
+  // A token naming no leg STOPS the boot (#780) — booting the rest of the set
+  // would serve a stack the human did not ask for. A named leg with no dir in
+  // this brand is a different thing: reported below, never invented.
+  assertKnownTargets(requested.filter((name) => !hasLeg(name)), [...Object.keys(DEV_LEGS), ...custom]);
+
+  const selected = requested.filter((name) => available.includes(name));
+  const missing = requested.filter((name) => !available.includes(name));
 
   // Backend first: it publishes the emulator port map the web leg reads
   selected.sort((a, b) => (a === 'backend' ? -1 : 0) - (b === 'backend' ? -1 : 0));
 
-  return { selected, unknown, missing };
+  return { selected, missing };
 }
 
 /**
@@ -171,6 +177,8 @@ function createLineDeduper() {
 }
 
 module.exports = async (options = {}) => {
+  assertPickerFlags(options);
+
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
     console.error(chalk.red('✖ omega dev: no brand root found (looked for config/omega.json5 walking up from here)'));
@@ -187,6 +195,14 @@ module.exports = async (options = {}) => {
   // when its package.json declares a `start` script — the manager never
   // invents a leg for it.
   const discovered = discoverTargets(brandRoot);
+
+  // Lockstep (#794): the same gate the manage walk opens with, run here too —
+  // before the freshness sweep and before any leg spawns. A boot on a brand
+  // whose targets carry different @omega.js versions would serve two copies of
+  // the client and validate one omega.json5 with two validators; nothing
+  // downstream can see it, so the refusal belongs at the door.
+  assertFamilyVersions({ brandRoot, targets: discovered });
+
   const customLegs = discovered.filter((entry) => entry.custom && targetScripts(entry.path).start);
   const targets = [
     ...discovered.filter((entry) => entry.target && DEV_LEGS[entry.target]),
@@ -194,17 +210,23 @@ module.exports = async (options = {}) => {
   ];
 
   const custom = customLegs.map((entry) => entry.name);
-  const { selected, unknown, missing } = selectDevTargets({
+
+  // A --target= token names a target by KEY ('web') or by its dir name
+  // ('website') — the same two spellings every other brand-root verb takes
+  // (#780). The pairing lives in the discovered entries, so the dir spelling
+  // resolves to its key HERE, through the one shared matcher; a token that
+  // names nothing passes through untouched and the selector refuses it.
+  const picker = parseTargetTokens(options[PICKER_FLAG])
+    .map((token) => (targets.find((entry) => targetMatches(entry, token)) || {}).target || token)
+    .join(',');
+
+  const { selected, missing } = selectDevTargets({
     available: targets.map((entry) => entry.target),
     custom,
-    only: options.only,
-    except: options.except,
+    target: picker,
     all: options.all,
   });
 
-  unknown.forEach((target) => {
-    console.log(chalk.yellow(`⊘ unknown dev target "${target}" (know: ${[...Object.keys(DEV_LEGS), ...custom].join(', ')})`));
-  });
   missing.forEach((target) => {
     console.log(chalk.yellow(`⊘ ${target}: no dir in this brand — skipped`));
   });
@@ -215,8 +237,8 @@ module.exports = async (options = {}) => {
   }
 
   console.log(chalk.bold(`🚀 omega dev — booting ${selected.join(' + ')} ${chalk.dim(`(${brandRoot})`)}`));
-  if (!options.only && !options.all) {
-    console.log(chalk.dim('   default set is web + backend — `--only`, `--except`, `--all` filter it'));
+  if (!options[PICKER_FLAG] && !options.all) {
+    console.log(chalk.dim('   default set is web + backend — `--target=`, `--all` pick it'));
   }
 
   // Dist freshness is checked ONCE, here, for every lane at once (#340). Each
@@ -296,18 +318,23 @@ module.exports = async (options = {}) => {
   if (linkedMonorepo) {
     const watch = startMonorepoWatch({ monorepoRoot: linkedMonorepo, logger: { log: (line) => console.log(chalk.dim(`   ${line}`)) } });
 
-    // A fresh watch's initial prepare rewrites every package's dist, and a
-    // target booting into that rewrite loads a half-written CLI (#670). The
-    // legs wait for the pass to land; an already-running watch has none.
-    if (!watch.alreadyRunning) {
-      const outcome = await watch.ready;
-      if (outcome === 'ready') {
-        console.log(chalk.dim('   monorepo watch: initial prepare done'));
-      }
+    // A watch's prepare rewrites every package's dist, and a target booting
+    // into that rewrite loads a half-written CLI (#670). The legs wait for the
+    // pass to land — a FRESH watch's initial one, and an ALREADY-RUNNING
+    // watch's, which is the branch a brand normally takes (Ian keeps the root
+    // `npm start` up) and the one that skipped the wait entirely (#622).
+    const outcome = await watch.ready;
+    if (outcome === 'ready') {
+      console.log(chalk.dim(`   monorepo watch: ${watch.alreadyRunning ? 'nothing in flight' : 'initial prepare done'}`));
     }
   } else {
     console.log(chalk.dim('   ⚑ frameworks come from the registry — no monorepo watch to run (a linked brand starts one here)'));
   }
+
+  // The local certificate's root, resolved ONCE for every leg (#795): a leg
+  // that never speaks TLS ignores it, and this is verification rather than a
+  // bypass, so Node prints no warning. A shell-set value wins verbatim.
+  const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
 
   const pad = Math.max(...selected.map((target) => target.length));
   const children = [];
@@ -344,7 +371,12 @@ module.exports = async (options = {}) => {
       stdio: ['ignore', 'pipe', 'pipe'],
       // Legs pipe their output — keep chalk colors when the parent's terminal
       // has them (the log tee strips ANSI either way)
-      env: { ...process.env, ...nodeEnvFor(node), FORCE_COLOR: process.stdout.isTTY ? '1' : process.env.FORCE_COLOR || '0' },
+      env: {
+        ...process.env,
+        ...nodeEnvFor(node),
+        FORCE_COLOR: process.stdout.isTTY ? '1' : process.env.FORCE_COLOR || '0',
+        ...(caPem ? { NODE_EXTRA_CA_CERTS: caPem } : {}),
+      },
       // Own process group per leg (#690): a leg is a chain (npm run <leg> →
       // the real server), and shutdown signals the GROUP — a same-group leg
       // would get only npm killed, orphaning the emulator on its ports.
@@ -386,8 +418,12 @@ module.exports = async (options = {}) => {
       process.exit(0);
     });
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  // Every way this run is asked to stop takes the SAME teardown, off the ONE
+  // devkit list ([#629](https://github.com/Omega-JS-Stack/omega/issues/629)).
+  // SIGHUP was missing: a closed terminal killed the orchestrator outright and
+  // the legs, spawned DETACHED so a group signal cannot reach them, orphaned
+  // with the emulator tree behind them.
+  STOP_SIGNALS.forEach((signal) => process.on(signal, shutdown));
 
   // Keep the orchestrator alive while any child runs
   await new Promise(() => {});

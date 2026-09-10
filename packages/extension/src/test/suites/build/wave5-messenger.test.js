@@ -2,15 +2,16 @@
 // "wired automatically" but every context assigned null and lib/messaging.js
 // was never instantiated. Behavioral test for the Messaging class + source
 // pins proving each DOM context constructs it (the context Managers are
-// ES modules webpack owns — not requireable from Node, hence the pins).
+// ES modules the bundler owns — not requireable from Node, hence the pins).
 
 const path = require('path');
 const fs = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 const CONTEXTS = ['popup', 'options', 'sidepanel', 'page', 'content'];
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'lib/messaging + per-context messenger wiring (wave-5 F7)',
@@ -76,4 +77,4 @@ module.exports = {
       },
     },
   ],
-};
+});

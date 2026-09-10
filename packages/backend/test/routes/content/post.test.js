@@ -4,7 +4,9 @@
  * Fetches blog post content from GitHub
  * Requires GitHub API key and a resolvable github repo (targets.backend.github.repo slug or repo.providers.github.org + brand.id)
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'General fetch post from GitHub',
   type: 'group',
   tests: [
@@ -55,4 +57,4 @@ module.exports = {
       },
     },
   ],
-};
+});

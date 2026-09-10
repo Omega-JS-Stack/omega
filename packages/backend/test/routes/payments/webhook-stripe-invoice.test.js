@@ -22,10 +22,11 @@
  */
 const { callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/webhook/post.js');
-const stripeProvider = require('../../../src/manager/routes/payments/webhook/providers/stripe.js');
+const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
+const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
 
 const FIXTURE_INVOICE_RENEWAL = require('../../fixtures/stripe/invoice-subscription-payment-succeeded.json');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
@@ -49,7 +50,7 @@ function deliver(Manager, event) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment webhook: Stripe invoice events',
   type: 'group',
   timeout: 30000,
@@ -125,4 +126,4 @@ module.exports = {
       },
     },
   ],
-};
+});

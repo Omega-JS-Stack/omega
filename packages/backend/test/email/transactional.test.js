@@ -5,7 +5,9 @@
  * These tests exercise the email library through the admin/email route to get a real
  * SendGrid integration. Route-level tests (auth, permissions) are in test/routes/admin/email.js.
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Email library',
   type: 'group',
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE env var not set (skipping email tests)' : false,
@@ -557,4 +559,4 @@ module.exports = {
       },
     },
   ],
-};
+});

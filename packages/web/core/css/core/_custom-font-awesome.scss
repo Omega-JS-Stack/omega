@@ -30,11 +30,12 @@ $fa-sizes: (
 // Base Icon Styles
 // ============================================
 
-// A rendered icon is a SQUARE, glyph-centered box (#180). Both renderers
-// stamp their own hook on the <i> they fill: the runtime one sets
-// data-omega-fa (@omega.js/client icon-renderer), the build-time one emits
-// class="fa" (@omega.js/template-kit omega_icon) — never a class an author
-// has to remember. Without the box the 1em svg sits on the text baseline
+// A rendered icon is a SQUARE, glyph-centered box (#180). The hook is the
+// stamp the renderers leave on the <i> they fill — data-omega-fa, written by
+// the build-time inlining pass and by @omega.js/client's runtime watcher
+// alike (#619) — never a class an author has to remember; `.fa` stays for
+// hand-authored wrappers around a glyph (the account page's provider logos
+// are `div.fa fa-3xl`). Without the box the 1em svg sits on the text baseline
 // and any transform orbits a point below the glyph (the spin wobble).
 // Both branches qualify with `i` so the box outranks the vertical-align in
 // the size classes below.

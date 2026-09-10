@@ -17,6 +17,7 @@ const Manager = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
 const { deployPrecheck } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const cli = require(path.join(SRC, 'cli.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
 
@@ -31,7 +32,7 @@ function stageConsumer() {
   return tmp;
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'ensure-target — the local half every verb runs (#675)',
@@ -127,4 +128,4 @@ module.exports = {
       },
     },
   ],
-};
+});

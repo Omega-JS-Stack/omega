@@ -24,7 +24,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
-const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The subscriber the hosted page says bought this subscription
 const OWNER_UID = '_test-hosted-page-owner';
@@ -131,7 +132,7 @@ function runHostedPageEvent({ payloadUid, payloadOrderId, inWindow = true, calls
   }));
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A payload uid is checked against the hosted page before it is allowed to steer',
   type: 'group',
   timeout: 30000,
@@ -208,4 +209,4 @@ module.exports = {
       },
     },
   ],
-};
+});

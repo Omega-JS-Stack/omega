@@ -165,7 +165,7 @@ test('loadBrand: declared target beats naming; unconventional dirs map via their
 
 test('loadBrand: config load failure lands in configError, never throws', () => {
   const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, oauth2: { clientSecret: 'oops' }, targets: { web: {} } }`,
+    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: {} } }`,
   });
 
   const brand = loadBrand(root);
@@ -233,6 +233,41 @@ test('runManage: --migration=targets-rename runs the rename ALONE — the one br
 // Testing's live checks read fetch/retryDelayMs from runManage options — a
 // canned 200 keeps the full loop network-free (the fixture URL never resolves)
 const FAKE_FETCH_200 = { fetch: async () => ({ status: 200, json: async () => ({}) }), retryDelayMs: 0 };
+
+// #586 — the manage walk judges every key on the RESOLVED cascade (it mints a
+// missing one into the brand .env), so a value that lives only in an
+// environment overlay has to be visible to it. Without the overlay in the
+// chain, `.env.production` would read as absent and the mint lane would write
+// a second value over the top of it.
+//
+// The overlay it reads is PINNED to production: manage reconciles real
+// infrastructure with production credentials, so the shell's incidental
+// environment never decides which key the walk judges.
+test('runManage: the env chain reads the brand .env.production overlay, whatever the shell says', async () => {
+  const root = stageBrand();
+  const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
+
+  fs.writeFileSync(path.join(root, '.env'), 'FIXTURE_OVERLAY_KEY="from-the-base"\n');
+  fs.writeFileSync(path.join(root, '.env.development'), 'FIXTURE_OVERLAY_KEY="from-the-development-overlay"\n');
+  fs.writeFileSync(path.join(root, '.env.production'), 'FIXTURE_OVERLAY_KEY="from-the-production-overlay"\n');
+
+  try {
+    delete process.env.FIXTURE_OVERLAY_KEY;
+    delete process.env.OMEGA_TEST_MODE;
+    process.env.ENVIRONMENT = 'development';
+
+    await runManage(root, { ...FAKE_FETCH_200 });
+
+    assert.equal(process.env.FIXTURE_OVERLAY_KEY, 'from-the-production-overlay', 'the manage lane pins production — a development shell never swaps the overlay');
+  } finally {
+    delete process.env.FIXTURE_OVERLAY_KEY;
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('runManage: full loop — workspace, update (build), testing all pass; run output + gitignore written', async () => {
   const root = stageBrand();
@@ -467,7 +502,7 @@ test('runManage: on a boot lane, preflight still names what MANAGE owes — with
 
 test('runManage: unloadable brand config fails the workspace service and stops the run', async () => {
   const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, oauth2: { clientSecret: 'oops' }, targets: { web: {} } }`,
+    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: {} } }`,
   });
 
   const report = await runManage(root, {});

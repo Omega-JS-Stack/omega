@@ -18,12 +18,13 @@
 const fs = require('fs');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const targetChecks = require('../../src/cli/utils/target-checks.js');
+const targetChecks = require('../../dist/cli/utils/target-checks.js');
 const { RULES_VERSION } = targetChecks;
-const { BRAND_RULES_SEED, compileRules } = require('../../src/cli/utils/compile-rules.js');
+const { BRAND_RULES_SEED, compileRules } = require('../../dist/cli/utils/compile-rules.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const SETUP_SOURCE = path.join(__dirname, '..', '..', 'src', 'cli', 'utils', 'target-checks.js');
-const COMPILER_SOURCE = path.join(__dirname, '..', '..', 'src', 'cli', 'utils', 'compile-rules.js');
+const SETUP_SOURCE = path.join(__dirname, '..', '..', 'dist', 'cli', 'utils', 'target-checks.js');
+const COMPILER_SOURCE = path.join(__dirname, '..', '..', 'dist', 'cli', 'utils', 'compile-rules.js');
 
 // The generator (target-checks' getRulesFile) only touches `main.default`, so
 // a bare main is enough to run it: no project, no config, no emulator.
@@ -44,7 +45,7 @@ function generateRules() {
   return main.default;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Generated rules stamp: the rules schema version, not the package version',
   type: 'group',
 
@@ -100,4 +101,4 @@ module.exports = {
       },
     },
   ],
-};
+});

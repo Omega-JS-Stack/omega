@@ -17,6 +17,9 @@ const { discoverBrands } = require('../src/lib/company.js');
 const { runManage } = require('../src/manage.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
+// Every scaffolded @omega.js/* spec is this exact number (#794)
+const MANAGER_VERSION = require('../package.json').version;
+
 // Fixture brands must never reach a real external account via shell-exported
 // credentials — every service must skip in the manage pins and the handoff
 // child process (which inherits this env)
@@ -57,14 +60,16 @@ function readConfig(root) {
   return JSON5.parse(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'));
 }
 
-// Scaffolded target package.jsons declare their framework (`*`); stub the
-// packages at the brand root so the update service's resolution climb passes
-// without the registry (pre-publish, and tests must never install).
+// Scaffolded target package.jsons pin their framework at the family version
+// (#794); stub the packages at the brand root so the update service's
+// resolution climb passes without the registry (pre-publish, and tests must
+// never install). The stub carries the family version too — a real install
+// does, and the lockstep gate refuses a walk on anything else.
 function stubFrameworks(root, names) {
   for (const name of names) {
     const dir = path.join(root, 'node_modules', name);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: '0.0.0-stub' }));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: MANAGER_VERSION }));
   }
 }
 
@@ -123,6 +128,9 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     url: 'https://acme.io',
     description: 'Rockets and anvils',
     tagline: 'Beep beep',
+    contactName: 'Wile E. Coyote, CEO',
+    contactImage: 'https://acme.io/wile.jpg',
+    contactUrl: 'https://acme.io/wile',
     targets: 'web,backend,desktop',
     manage: false,
   });
@@ -132,6 +140,9 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.equal(report.valid, true);
   assert.deepEqual(report.created.sort(), [
     '.env',
+    '.env.development',
+    '.env.production',
+    '.env.testing',
     '.gitignore',
     'README.md',
     'config/omega.json5',
@@ -149,7 +160,12 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     description: 'Rockets and anvils',
     tagline: 'Beep beep',
     url: 'https://acme.io',
-    contact: { email: 'support@acme.io' },
+    contact: {
+      email: 'support@acme.io',
+      // The human who signs the personal sends — flags answer it
+      // non-interactively; the optionals ride along (#770)
+      person: { name: 'Wile E. Coyote, CEO', image: 'https://acme.io/wile.jpg', url: 'https://acme.io/wile' },
+    },
   });
   assert.deepEqual(config.theme, { id: 'classy', appearance: 'system' });
   // Socials seed EMPTY (#462): every surface that reads the block (the footer
@@ -169,7 +185,8 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
   // the scaffold must declare it or nothing installs it outside the monorepo
   // (cp195 journey catch)
-  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': '*' });
+  // Exact pin, the manager's own version — the family ships lockstep (#794)
+  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': MANAGER_VERSION });
   // Scripts say `omega` — the ONE user-facing verb (the retired omega-manager
   // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251).
   // `npm start` boots the dev stack; the manage cycle is the NAMED verb (#229)
@@ -189,9 +206,9 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // dependency on its ONE target manifest (src/dist pillar: the stage derives
   // dist/package.json from it), every other target's is a devDependency —
   // plus a bootable demo-* cloud project and the starter catalog as a comment
-  assert.deepEqual(targetPkg.devDependencies, { '@omega.js/web': '*' });
+  assert.deepEqual(targetPkg.devDependencies, { '@omega.js/web': MANAGER_VERSION });
   const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'));
-  assert.deepEqual(backendPkg.dependencies, { '@omega.js/backend': '*' });
+  assert.deepEqual(backendPkg.dependencies, { '@omega.js/backend': MANAGER_VERSION });
   assert.equal(backendPkg.devDependencies, undefined, 'backend framework is a runtime dep, not dev');
   assert.deepEqual(config.cloud, { provider: 'firebase', config: { projectId: 'demo-acme' } });
   const rawConfig = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
@@ -234,6 +251,9 @@ test('non-interactive: everything derives from the directory name', async () => 
   assert.equal(config.brand.name, 'Sweet Saucy');
   assert.equal(config.brand.url, 'https://sweetsaucy.com');
   assert.equal(config.brand.contact.email, 'support@sweetsaucy.com');
+  // A contact PERSON is never invented (#770): no --contactName, no key —
+  // the manage walk's own gate (#694) is what catches the gap later
+  assert.ok(!('person' in config.brand.contact));
   // Optional fields stay OUT of the config instead of landing as empty strings
   assert.ok(!('description' in config.brand));
   assert.ok(!('tagline' in config.brand));
@@ -250,6 +270,10 @@ test('non-interactive: underivable id is a clear error, bad flag values throw', 
   await assert.rejects(() => runOnboard(root, { id: 'Bad_Id', manage: false }), /Invalid brand id/);
   await assert.rejects(() => runOnboard(root, { id: 'ok', url: 'ftp://x', manage: false }), /Invalid brand url/);
   await assert.rejects(() => runOnboard(root, { id: 'ok', targets: 'web,gopher', manage: false }), /Unknown target\(s\): gopher/);
+  // A contact flag with nobody to belong to fails loudly instead of vanishing (#770)
+  await assert.rejects(() => runOnboard(root, { id: 'ok', contactImage: 'https://x/y.jpg', manage: false }), /need a --contactName/);
+  // A bare --contactName parses to boolean true; that is not a name
+  await assert.rejects(() => runOnboard(root, { id: 'ok', contactName: true, manage: false }), /Invalid --contactName/);
 
   // Nothing was written by any failed attempt
   assert.deepEqual(fs.readdirSync(root), []);
@@ -269,6 +293,9 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     await tty.answer('Brand URL:', '\r');                     // accept derived: https://wizardbrand.com
     await tty.answer('Brand description', 'A wizard-made brand\r');
     await tty.answer('Brand tagline', '\r');                  // empty → omitted
+    await tty.answer('Contact person (', 'Jane Doe, CEO\r');
+    await tty.answer('Contact person headshot URL', '\r');    // empty → omitted
+    await tty.answer('Contact person link URL', '\r');        // empty → omitted
     await tty.answer('Targets (', '\r');                      // accept checked defaults: web + backend
     await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
     await tty.answer('Run manage now?', 'n\r');
@@ -285,6 +312,9 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     assert.equal(config.brand.url, 'https://wizardbrand.com');
     assert.equal(config.brand.description, 'A wizard-made brand');
     assert.ok(!('tagline' in config.brand));
+    // The person signs the personal sends (#770); the skipped optionals stay
+    // out of the config rather than landing as empty strings
+    assert.deepEqual(config.brand.contact, { email: 'support@wizardbrand.com', person: { name: 'Jane Doe, CEO' } });
     assert.deepEqual(Object.keys(config.targets), ['web', 'backend']);
     // Inherited account list stays unwritten — the source layer keeps owning it
     assert.ok(!('account' in config));
@@ -302,6 +332,9 @@ test('interactive: customizing the account list writes account.admins into the b
 
     await tty.answer('Brand description', '\r');
     await tty.answer('Brand tagline', '\r');
+    await tty.answer('Contact person (', 'Boss Person\r');
+    await tty.answer('Contact person headshot URL', '\r');
+    await tty.answer('Contact person link URL', '\r');
     await tty.answer('Keep this account list?', 'n\r');
     await tty.answer('Account email', 'boss@{domain}\r');
     await tty.answer('Manage the Firebase Auth account', '\r');   // yes (default)
@@ -371,13 +404,35 @@ test('resume from inside an existing brand: answers come from its config, only g
 
   assert.equal(report.mode, 'resume');
   assert.equal(report.brandRoot, root);
-  assert.deepEqual(report.created.sort(), ['.env', '.gitignore', 'README.md', 'package.json']);
+  assert.deepEqual(report.created.sort(), ['.env', '.env.development', '.env.production', '.env.testing', '.gitignore', 'README.md', 'package.json']);
 
   // Scaffolded files carry the EXISTING brand's identity, not derived guesses
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   assert.ok(readme.startsWith('# Existing Brand'));
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.ok(env.startsWith('# Existing Brand'));
+});
+
+test('resume: an existing contact person survives a rerun untouched (#770)', async () => {
+  const root = tempDir();
+  fs.mkdirSync(path.join(root, 'config'));
+  const authored = `{
+    brand: {
+      id: 'personful',
+      name: 'Personful',
+      url: 'https://personful.test',
+      contact: { email: 'support@personful.test', person: { name: 'Jane Doe, CEO' } },
+    },
+    targets: { web: {} },
+  }`;
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), authored);
+
+  const report = await runOnboard(root, { manage: false });
+
+  assert.equal(report.mode, 'resume');
+  // The person is the brand's own answer — a rerun never rewrites it
+  assert.deepEqual(readConfig(root).brand.contact.person, { name: 'Jane Doe, CEO' });
+  assert.equal(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'), authored);
 });
 
 // ─── Legacy port ─────────────────────────────────────────────────────────────

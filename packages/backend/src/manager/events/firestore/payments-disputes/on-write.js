@@ -71,14 +71,11 @@ module.exports = async ({ ctx, change, context }) => {
 
       ctx.log(`Dispute ${alertId}: no matching charge found`);
 
-      // Still send email to alert brand about unmatched dispute
-      if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
-        const emailStatus = await sendDisputeEmail({ alert, match: null, result: null, alertId, ctx });
-        await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
-      } else {
-        ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
-        await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
-      }
+      // Still send email to alert brand about unmatched dispute. No testing-mode
+      // gate — the mailer's own seam captures a testing send instead of delivering
+      // it ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)).
+      const emailStatus = await sendDisputeEmail({ alert, match: null, result: null, alertId, ctx });
+      await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
 
       return;
     }
@@ -114,14 +111,11 @@ module.exports = async ({ ctx, change, context }) => {
       },
     }, { merge: true });
 
-    // Send email alert — awaited, because the dispute doc records its outcome
-    if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
-      const emailStatus = await sendDisputeEmail({ alert, match, result, alertId, ctx });
-      await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
-    } else {
-      ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
-      await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
-    }
+    // Send email alert — awaited, because the dispute doc records its outcome. No
+    // testing-mode gate — the mailer's own seam captures a testing send instead of
+    // delivering it ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)).
+    const emailStatus = await sendDisputeEmail({ alert, match, result, alertId, ctx });
+    await disputeRef.set({ actions: { email: emailStatus } }, { merge: true });
 
     ctx.log(`Dispute ${alertId} resolved: refund=${result.refundStatus}, cancel=${result.cancelStatus}`);
   } catch (e) {

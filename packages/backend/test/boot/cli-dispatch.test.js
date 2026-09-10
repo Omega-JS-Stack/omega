@@ -12,6 +12,7 @@
 
 const Main = require('../../dist/cli/index.js');
 const table = require('../../dist/cli/command-table.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Capture console + exit code around a process() call, restoring after.
 async function captured(fn) {
@@ -32,7 +33,7 @@ async function captured(fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'CLI dispatch — help, unknown-command, and default-verb behavior',
   type: 'group',
 
@@ -138,4 +139,4 @@ module.exports = {
       },
     },
   ],
-};
+});

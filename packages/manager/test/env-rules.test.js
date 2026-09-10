@@ -144,6 +144,25 @@ test('env-rules op: a target-less entry is judged against the brand config', asy
   assert.deepEqual(keys, ['SENTRY_AUTH_TOKEN']);
 });
 
+test('env-rules op: a target-less entry sees the PER-TARGET value too (#683)', async () => {
+  // The canonical Sentry shape: the monitoring service provisions one project
+  // per surface and writes the DSN to targets.<t>.monitoring.providers.sentry.dsn,
+  // leaving the shared slot null (brands/omega-playground is exactly this). A
+  // brand-ROOT read of monitoring.providers.sentry.dsn therefore saw nothing,
+  // so SENTRY_AUTH_TOKEN — the key the service needs to have provisioned any
+  // of it — was never owed on the shape brands actually carry.
+  const { keys } = await runOp({
+    brand: { id: 'fixture' },
+    monitoring: { providers: { sentry: { dsn: null } } },
+    targets: {
+      web: { monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } } },
+      backend: {},
+    },
+  }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
+
+  assert.deepEqual(keys, ['SENTRY_AUTH_TOKEN']);
+});
+
 test('env-rules op: a key the cascade already serves is not a violation', async () => {
   const { result } = await runOp(
     { brand: { id: 'fixture' }, captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } }, targets: { backend: {} } },

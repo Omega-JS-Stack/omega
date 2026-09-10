@@ -1,6 +1,8 @@
 // Verifies every lib was initialized during the main-process boot sequence.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'main',
   description: 'boot sequence (main)',
@@ -72,4 +74,4 @@ module.exports = {
       },
     },
   ],
-};
+});

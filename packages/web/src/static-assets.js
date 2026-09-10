@@ -27,12 +27,16 @@ const { PATHS } = require('./paths.js');
 // copy would drop unbundled sources beside the bundles and undo the font prune.
 const PIPELINE_LANES = new Set(['js', 'css', 'fonts']);
 
+// The bridged VECTOR brandmark's site path — named because two lanes address
+// it: the mint bridge below writes it, and brandmarkSvgUrl reports it.
+const BRANDMARK_SVG_DEST = 'assets/images/brand/brandmark.svg';
+
 // <brandRoot>/.omega/assets → site paths. This is the mint contract:
 // head.html's favicon links + brand.images.{brandmark,social} config URLs
 // resolve against these destinations.
 const MINT_BRIDGE = [
   { src: ['favicon'], dest: 'assets/images/favicon' },
-  { src: ['logo', 'brandmark', 'color-x.svg'], dest: 'assets/images/brand/brandmark.svg' },
+  { src: ['logo', 'brandmark', 'color-x.svg'], dest: BRANDMARK_SVG_DEST },
   { src: ['logo', 'brandmark', 'color-512.png'], dest: 'assets/images/brand/brandmark.png' },
   { src: ['social', 'brandmark', 'color-1024.png'], dest: 'assets/images/brand/social.png' },
 ];
@@ -91,6 +95,25 @@ function hasFaviconSet(staticDirs) {
 }
 
 /**
+ * The site url of the VECTOR brandmark when these static copies will ship one
+ * — same shape as hasFaviconSet, and the same reason: whether the mint
+ * produced an svg is a build-time fact, so the templates that render the
+ * VISIBLE logo (nav, footer, app sidebar) read it off the asset manifest
+ * instead of guessing a filename ([#467](https://github.com/Omega-JS-Stack/omega/issues/467)).
+ * `brand.images.brandmark` stays the RASTER it has always been — payment sync
+ * (the Stripe/PayPal product image) and OG/social cards need one.
+ * @param {Array<{ src: string, dest: string }>} staticDirs - From resolveStaticDirs().
+ * @returns {string|null}
+ */
+function brandmarkSvgUrl(staticDirs) {
+  const shipped = (staticDirs || []).some(({ src, dest }) =>
+    (dest === BRANDMARK_SVG_DEST && jetpack.exists(src) === 'file')
+    || (dest === 'assets/images' && jetpack.exists(path.join(src, 'brand', 'brandmark.svg')) === 'file'));
+
+  return shipped ? `/${BRANDMARK_SVG_DEST}` : null;
+}
+
+/**
  * Copy the resolved entries into the build output, in order (later entries
  * overwrite earlier ones — that's the consumer-wins contract), then mirror
  * the shipped favicon.ico to the site root.
@@ -128,4 +151,4 @@ function mirrorRootFavicon(outDir) {
   return true;
 }
 
-module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet };
+module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet, brandmarkSvgUrl };

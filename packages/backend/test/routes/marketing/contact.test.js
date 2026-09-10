@@ -23,13 +23,16 @@
 // NOT start with "test"/"example" which are in BLOCKED_LOCAL_PATTERNS, NOT be on
 // a corporate/disposable domain). Real-looking name on a real domain with no actual
 // mailbox there is the safest pick.
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const { MARKETING_RATE_LIMIT } = require('../../../dist/manager/libraries/rate-limits.js');
 const TEST_DOMAIN = 'itwcreativeworks.com';
 const TEST_EMAILS = {
   valid: () => `sarah.martinez+bem@${TEST_DOMAIN}`,         // Should infer: Sarah Martinez
   invalid: () => `nonexistent.user+bem@${TEST_DOMAIN}`,     // No such mailbox — mailbox verification should flag as invalid
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing contact (POST add + DELETE remove)',
   type: 'group',
   tests: [
@@ -353,29 +356,39 @@ module.exports = {
       },
     },
 
-    // --- Auth rejection tests ---
+    // --- Anonymous anti-abuse gate ---
     {
-      name: 'add-unauthenticated-rejected',
+      name: 'add-unauthenticated-rate-limited-after-the-gate',
       auth: 'none',
-      timeout: 15000,
+      timeout: 30000,
 
       async run({ http, assert }) {
-        // Public request without auth must be rejected. The exact rejection mechanism
-        // depends on environment:
-        //   - Production: missing reCAPTCHA token → 403
-        //   - Local emulator (OMEGA_TEST_MODE=true): reCAPTCHA is bypassed, but unauthenticated
-        //     users hit the marketing-subscribe rate limit (quota 0/0) → 429
-        // Both are correct: the route protects itself from anonymous abuse. Accept either.
-        const response = await http.post('backend-manager/marketing/contact', {
+        // The public lane's gate is an EXPLICIT per-IP counter, not a plan
+        // feature ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)):
+        // `MARKETING_RATE_LIMIT` subscribes from one caller go through, the
+        // next one is refused with a 429. The counter is keyed by the caller's
+        // IP and the run starts from a flushed store, so this whole case is one
+        // caller spending its own quota.
+        //
+        // In PRODUCTION the same request meets reCAPTCHA first — a missing or
+        // bad token is a 403 before the gate is ever reached. The emulator
+        // bypasses reCAPTCHA (OMEGA_TEST_MODE=true), which is what leaves the
+        // rate limit as the visible protection here.
+        const send = () => http.post('backend-manager/marketing/contact', {
           email: TEST_EMAILS.valid(),
           source: 'backend-test',
         });
 
-        assert.ok(!response.success, 'Public request should be rejected');
-        assert.ok(
-          response.status === 403 || response.status === 429,
-          `Expected 403 or 429 but got ${response.status}`
-        );
+        for (let i = 1; i <= MARKETING_RATE_LIMIT; i++) {
+          const response = await send();
+
+          assert.isSuccess(response, `Anonymous subscribe ${i} of ${MARKETING_RATE_LIMIT} should be inside the gate`);
+        }
+
+        const refused = await send();
+
+        assert.ok(!refused.success, `Anonymous subscribe ${MARKETING_RATE_LIMIT + 1} should be refused`);
+        assert.equal(refused.status, 429, `Expected 429 past the gate but got ${refused.status}`);
       },
     },
 
@@ -400,4 +413,4 @@ module.exports = {
       },
     },
   ],
-};
+});

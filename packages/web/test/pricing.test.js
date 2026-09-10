@@ -2,8 +2,12 @@
  * C2 pricing — payment.products is the ONLY pricing source.
  *
  * Unit half: composePricing's view-model contract (plan/one-time split,
- * free detection, limits fallback, -1 → Unlimited, common/extra features,
- * comparison inheritance, billing-toggle availability, honest savings %).
+ * free detection, the FEATURES CATALOG supplying row order/name/icon/definition
+ * while each product names only its value, -1 → Unlimited, common/extra
+ * features, comparison inheritance, billing-toggle availability, honest
+ * savings %). A feature is defined ONCE
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)), so there is
+ * nothing left to backfill.
  *
  * Integration half: the packaged themes render /pricing from config alone —
  * plans from the catalog, one-time section per type (friction #7), the honest
@@ -24,6 +28,16 @@ const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), '
 // Namespace this file's Eleventy output dirs (test files run concurrently)
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'pricing-test');
 
+// The top-level `features` catalog: every feature DEFINED once, in the order
+// every surface renders it. `requests` is counted (it carries a `usage` block);
+// `support` is a perk.
+const FEATURES = {
+  requests: { name: 'Requests', icon: 'sparkles', definition: 'API requests per month.', usage: {} },
+  proofs: { name: 'Proof pulls', icon: 'flask', usage: {} },
+  support: { name: 'Priority support', icon: 'headset' },
+  sso: { name: 'SSO & provisioning', icon: 'key' },
+};
+
 const CATALOG = {
   products: [
     {
@@ -31,10 +45,7 @@ const CATALOG = {
       name: 'Basic',
       type: 'subscription',
       tagline: 'best for getting started',
-      limits: { requests: 100 },
-      features: [
-        { id: 'requests', name: 'Requests', icon: 'sparkles', definition: 'API requests per month.' },
-      ],
+      features: { requests: 100 },
     },
     {
       id: 'premium',
@@ -42,13 +53,9 @@ const CATALOG = {
       type: 'subscription',
       tagline: 'best for teams',
       popular: true,
-      limits: { requests: -1 },
       trial: { days: 14 },
       prices: { monthly: 9.99, annually: 99.99 },
-      features: [
-        { id: 'requests', name: 'Requests', icon: 'sparkles' },
-        { id: 'support', name: 'Priority support', icon: 'headset', value: true },
-      ],
+      features: { requests: -1, support: true },
     },
     {
       id: 'launch-kit',
@@ -60,8 +67,8 @@ const CATALOG = {
   ],
 };
 
-test('composePricing: subscription/one-time split, free detection, limits fallback', () => {
-  const pricing = composePricing(CATALOG);
+test('composePricing: subscription/one-time split, free detection, values from the catalog', () => {
+  const pricing = composePricing(CATALOG, FEATURES);
 
   assert.strictEqual(pricing.plans.length, 2, 'one-time products stay out of the plan grid');
   assert.strictEqual(pricing.oneTime.length, 1);
@@ -69,7 +76,9 @@ test('composePricing: subscription/one-time split, free detection, limits fallba
   const [basic, premium] = pricing.plans;
   assert.strictEqual(basic.free, true, 'no prices → free');
   assert.strictEqual(basic.url, '/signup', 'free plans default to the signup CTA');
-  assert.strictEqual(basic.features[0].value, 100, 'feature value falls back to limits[id]');
+  assert.strictEqual(basic.features[0].value, 100, "the product names the counted feature's number");
+  assert.strictEqual(basic.features[0].name, 'Requests', 'the name comes from the catalog');
+  assert.strictEqual(basic.features[0].icon, 'sparkles', 'so does the icon');
   assert.strictEqual(basic.features[0].definition, 'API requests per month.');
 
   assert.strictEqual(premium.free, false);
@@ -77,30 +86,66 @@ test('composePricing: subscription/one-time split, free detection, limits fallba
   assert.strictEqual(premium.popular, true);
   assert.strictEqual(premium.trialDays, 14);
   assert.strictEqual(premium.prices.annuallyPerMonth, 8, '99.99/12 floors for the card display');
-  assert.strictEqual(premium.features[0].value, 'Unlimited', '-1 limit renders as Unlimited');
-  assert.strictEqual(premium.features[1].value, true, 'explicit feature value wins');
+  assert.strictEqual(premium.features[0].value, 'Unlimited', '-1 renders as Unlimited');
+  assert.strictEqual(premium.features[1].value, true, 'a perk value renders as a check');
 
   const kit = pricing.oneTime[0];
   assert.strictEqual(kit.price, 49.99);
   assert.strictEqual(kit.tagline, 'everything to ship day one');
 });
 
-test('composePricing: definitions backfill by id — author once, tooltip everywhere', () => {
-  const pricing = composePricing(CATALOG);
+test('composePricing: one definition, every card — the catalog is the only home', () => {
+  const pricing = composePricing(CATALOG, FEATURES);
   const [, premium] = pricing.plans;
 
-  // premium's `requests` copy declares NO definition — it inherits basic's,
-  // so every plan card (not just the first) renders the dotted tooltip
+  // No product carries copy any more, so every plan card (not just the first)
+  // renders the dotted tooltip from the ONE definition the catalog holds
   assert.strictEqual(premium.features[0].definition, 'API requests per month.');
   assert.strictEqual(
     premium.commonFeatures.find((f) => f.id === 'requests').definition,
     'API requests per month.',
-    'the split keeps the backfilled objects',
+    'the common/extra split keeps the catalog copy',
+  );
+});
+
+test('composePricing: a value of false is not a promise — the tier omits the row', () => {
+  const pricing = composePricing({
+    products: [
+      { id: 'basic', name: 'Basic', features: { requests: 10, support: false } },
+      { id: 'premium', name: 'Premium', prices: { monthly: 5 }, features: { requests: 20, support: true } },
+    ],
+  }, FEATURES);
+
+  assert.deepStrictEqual(pricing.plans[0].features.map((f) => f.id), ['requests'], 'false renders nowhere');
+  assert.deepStrictEqual(pricing.plans[1].features.map((f) => f.id), ['requests', 'support']);
+});
+
+test('composePricing: row order is CATALOG order, not the order a product listed them', () => {
+  const pricing = composePricing({
+    products: [{ id: 'p', name: 'P', features: { support: true, requests: 5 } }],
+  }, FEATURES);
+
+  assert.deepStrictEqual(pricing.plans[0].features.map((f) => f.id), ['requests', 'support']);
+});
+
+test('composePricing: products with no catalog behind them render no bullets, never invented copy', () => {
+  const pricing = composePricing({ products: [{ id: 'p', name: 'P', features: { requests: 5 } }] });
+
+  assert.deepStrictEqual(pricing.plans[0].features, []);
+});
+
+test('composePricing: the pre-#647 features LIST fails loudly, never a silently empty matrix', () => {
+  assert.throws(
+    () => composePricing({
+      products: [{ id: 'basic', name: 'Basic', features: [{ id: 'requests', name: 'Requests', value: 100 }] }],
+    }, FEATURES),
+    /"basic" carries the pre-#647 features LIST.*define each feature ONCE in the top-level `features` catalog/s,
+    'the message names the product and the migration',
   );
 });
 
 test('composePricing: common/extra split + comparison inheritance', () => {
-  const pricing = composePricing(CATALOG);
+  const pricing = composePricing(CATALOG, FEATURES);
   const [basic, premium] = pricing.plans;
 
   assert.deepStrictEqual(basic.commonFeatures.map((f) => f.id), ['requests'], 'requests is in every plan');
@@ -118,16 +163,16 @@ test('composePricing: common/extra split + comparison inheritance', () => {
 test('composePricing: comparison values inherit from earlier tiers', () => {
   const pricing = composePricing({
     products: [
-      { id: 'a', name: 'A', features: [{ id: 'x', name: 'X', value: 10 }] },
-      { id: 'b', name: 'B', prices: { monthly: 5 }, features: [{ id: 'y', name: 'Y', value: true }] },
+      { id: 'a', name: 'A', features: { x: 10 } },
+      { id: 'b', name: 'B', prices: { monthly: 5 }, features: { y: true } },
     ],
-  });
+  }, { x: { name: 'X', usage: {} }, y: { name: 'Y' } });
   const x = pricing.comparison.features.find((f) => f.id === 'x');
   assert.strictEqual(x.values.b, 10, 'b inherits x from a (tiers accumulate)');
 });
 
 test('composePricing: billing availability + honest savings badge', () => {
-  const both = composePricing(CATALOG);
+  const both = composePricing(CATALOG, FEATURES);
   assert.deepStrictEqual(both.billing, { monthly: true, annually: true });
   assert.strictEqual(both.savingsPercent, 17, '99.99 vs 9.99*12 → 17%');
 
@@ -193,6 +238,13 @@ for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
     assert.ok(html.includes('17%'), `${theme}: computed savings badge`);
     assert.ok(html.includes('WELCOME15'), `${theme}: promo banner on by default`);
     assert.ok(html.includes('id="pricing-promo-banner"'), `${theme}: banner markup present`);
+
+    // The banner is NAV chrome (#764): closing it hands the nav its margin
+    // back and touches nothing else — the page never moved for it, so there is
+    // no page padding to put back.
+    const closeHandler = /onclick="([^"]*pricing-promo-banner[^"]*)"/.exec(html)[1];
+    assert.ok(closeHandler.includes('.omega-nav'), `${theme}: close resets the nav push`);
+    assert.ok(!closeHandler.includes('paddingTop'), `${theme}: close touches no section padding`);
   });
 
   test(`${theme}: bare catalog → honest empty state (friction #6)`, async () => {
@@ -289,18 +341,18 @@ test('composePricing: the enterprise product leaves the grid (issue #44 item 8)'
   const pricing = composePricing({
     products: [
       ...CATALOG.products,
-      { id: 'enterprise', name: 'Bindery', enterprise: true, tagline: 'for organizations', features: [{ id: 'sso', name: 'SSO' }] },
+      { id: 'enterprise', name: 'Bindery', enterprise: true, tagline: 'for organizations', features: { sso: true } },
     ],
-  });
+  }, FEATURES);
 
   assert.strictEqual(pricing.plans.length, 2, 'the enterprise tier is not a plan card');
   assert.ok(!pricing.comparison.features.some((f) => f.id === 'sso'), 'nor a comparison column');
   assert.strictEqual(pricing.enterprise.name, 'Bindery');
   assert.strictEqual(pricing.enterprise.tagline, 'for organizations');
   assert.strictEqual(pricing.enterprise.url, '/contact', 'contact CTA by default');
-  assert.deepStrictEqual(pricing.enterprise.features.map((f) => f.name), ['SSO']);
+  assert.deepStrictEqual(pricing.enterprise.features.map((f) => f.name), ['SSO & provisioning']);
 
-  assert.strictEqual(composePricing(CATALOG).enterprise, null, 'no enterprise product → nothing to render');
+  assert.strictEqual(composePricing(CATALOG, FEATURES).enterprise, null, 'no enterprise product → nothing to render');
 });
 
 test('composePricing: the enterprise flag wins over the type — one product, one lane', () => {
@@ -318,6 +370,7 @@ test('composePricing: the enterprise flag wins over the type — one product, on
 test('classy: the enterprise row renders only when the catalog declares it (issue #44 item 8)', async () => {
   const withEnterprise = await buildWith({
     ...miniData,
+    features: FEATURES,
     payment: {
       products: [
         ...CATALOG.products,
@@ -327,7 +380,7 @@ test('classy: the enterprise row renders only when the catalog declares it (issu
           enterprise: true,
           tagline: 'for organizations that need their own terms',
           url: '/contact',
-          features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+          features: { sso: true },
         },
       ],
     },
@@ -341,7 +394,7 @@ test('classy: the enterprise row renders only when the catalog declares it (issu
   assert.ok(html.includes('data-plan-enterprise="enterprise"'), 'contact CTA (a link, not a checkout button)');
   assert.ok(!html.includes('data-plan-id="enterprise"'), 'never a card in the grid');
 
-  const without = await buildWith({ ...miniData, payment: CATALOG });
+  const without = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG });
   assert.ok(!without.get('/pricing').includes('omega-band--enterprise'), 'no enterprise in the data → no row');
 });
 
@@ -352,6 +405,7 @@ for (const theme of ['neobrutalism', 'newsflash']) {
   test(`${theme}: /pricing falls through to the base page; enterprise rides the omega-band idiom (#177)`, async () => {
     const withEnterprise = await buildWith({
       ...miniData,
+      features: FEATURES,
       payment: {
         products: [
           ...CATALOG.products,
@@ -361,7 +415,7 @@ for (const theme of ['neobrutalism', 'newsflash']) {
             enterprise: true,
             tagline: 'for organizations that need their own terms',
             url: '/contact',
-            features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+            features: { sso: true },
           },
         ],
       },
@@ -381,7 +435,7 @@ for (const theme of ['neobrutalism', 'newsflash']) {
     assert.ok(!html.includes('Custom solutions for large organizations'), `${theme}: no fictional enterprise blurb`);
     assert.ok(!html.includes('Bulk memberships for companies'), `${theme}: no fictional group-access blurb`);
 
-    const without = await buildWith({ ...miniData, payment: CATALOG }, { activeTheme: theme });
+    const without = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG }, { activeTheme: theme });
     assert.ok(!without.get('/pricing').includes('data-plan-enterprise'), `${theme}: no enterprise in the data → no strip`);
     assert.ok(!without.get('/pricing').includes('>Enterprise<'), `${theme}: nor its heading`);
   });
@@ -503,7 +557,7 @@ test('composePricing: the universal trial number needs unanimity among paid plan
   assert.strictEqual(composePricing(MIXED_TRIALS).trialDays, 0, 'paid plans disagreeing → no number the page can speak');
   assert.strictEqual(composePricing(UNIFORM_TRIALS).trialDays, 14, 'every paid plan on 14 days → 14');
   assert.strictEqual(
-    composePricing(CATALOG).trialDays,
+    composePricing(CATALOG, FEATURES).trialDays,
     14,
     'a free plan carries no trial to disagree with — the paid plans decide',
   );
@@ -536,7 +590,7 @@ const ENTERPRISE_ONLY = {
       enterprise: true,
       tagline: 'for organizations that need their own terms',
       url: '/contact',
-      features: [{ id: 'sso', name: 'SSO & provisioning', value: true }],
+      features: { sso: true },
     },
   ],
 };
@@ -569,7 +623,7 @@ const HIDDEN_QA = {
       tagline: 'test prints, pulled immediately',
       hidden: true,
       prices: { monthly: 5 },
-      features: [{ id: 'proofs', name: 'Proof pulls', icon: 'flask' }],
+      features: { proofs: 5 },
     },
   ],
 };

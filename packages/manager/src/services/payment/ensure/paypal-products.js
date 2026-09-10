@@ -6,9 +6,11 @@
  * exact-name match against the catalog (self-heal when state is lost) →
  * create. Created/matched IDs are written back into omega.json5
  * (payment.products[id=…].paypal.productId — comment-preserving) and
- * mirrored in state. Plans are managed by interval + amount + trial —
- * matching active plans are kept, duplicates and stale plans deactivated,
- * missing ones created. Legacy products (product.paypal.legacyProductIds)
+ * mirrored in state. Plans are managed by interval + amount + trial-cycle
+ * presence — matching active plans are kept, duplicates and stale plans
+ * deactivated, missing ones created; a product with trial days carries a TWIN
+ * pair per interval (with the trial cycle, and without it) so a buyer who is
+ * not owed a trial has a plan to land on. Legacy products (product.paypal.legacyProductIds)
  * get their active plans deactivated so no new subscriptions land on them.
  *
  * In sandbox mode the ensured products are the payments-QA fixtures, so the
@@ -69,8 +71,13 @@ function getProductUpdates(paypalProduct, desired) {
 /**
  * Check if a plan's billing cycles match the expected config.
  * Matches on: interval unit, amount, and trial days.
+ *
+ * `expectedTrialDays` carries the twin dimension: a positive value matches the
+ * trial twin (a TRIAL cycle of exactly that many days ahead of the REGULAR
+ * one), 0 matches the skip-trial twin (a REGULAR cycle and nothing else), so
+ * neither twin ever matches the other's row ([#761]).
  */
-function isPlanMatch(plan, intervalUnit, expectedAmount, trialDays) {
+function isPlanMatch(plan, intervalUnit, expectedAmount, expectedTrialDays) {
   if (plan.status !== 'ACTIVE') {
     return false;
   }
@@ -90,8 +97,8 @@ function isPlanMatch(plan, intervalUnit, expectedAmount, trialDays) {
   }
 
   const trialCycle = plan.billing_cycles?.find((c) => c.tenure_type === 'TRIAL');
-  if (trialDays > 0) {
-    if (!trialCycle || trialCycle.total_cycles !== trialDays) {
+  if (expectedTrialDays > 0) {
+    if (!trialCycle || trialCycle.total_cycles !== expectedTrialDays) {
       return false;
     }
   } else if (trialCycle) {
@@ -104,10 +111,33 @@ function isPlanMatch(plan, intervalUnit, expectedAmount, trialDays) {
 /**
  * Ensure billing plans on a PayPal product match config.
  * Creates new plans if missing, deactivates duplicates and stale plans.
+ *
+ * A product that configures trial days carries TWIN plans per paid interval:
+ * the trial twin (TRIAL cycle + REGULAR) and the skip-trial twin (REGULAR
+ * only). PayPal puts trials on the PLAN, never on the subscribe call, so a
+ * returning buyer who is not owed a trial has to subscribe to a plan that has
+ * no free cycle on it at all — the backend picks the twin by the same
+ * interval + amount + trial-presence rule this walk matches on
+ * ([#761](https://github.com/Omega-JS-Stack/omega/issues/761)). A product
+ * without trial days carries one plan, as before. Neither twin is a duplicate
+ * or a stale copy of the other, so a rerun creates and deactivates nothing.
  */
 async function ensurePlans(api, paypalProductId, product, brandConfig, dryRun) {
   const plans = await api.listPlansForProduct(paypalProductId);
   const trialDays = product.trial?.days || 0;
+
+  // The twins to ensure, in dashboard order: with a trial cycle, then without
+  const twins = trialDays > 0 ? [trialDays, 0] : [0];
+
+  // Only a twinned product has plans to tell apart — a single-plan product's
+  // names and log lines stay exactly as they were
+  const isSkipTrialTwin = (twinTrialDays) => trialDays > 0 && twinTrialDays === 0;
+  const twinLabel = (twinTrialDays) => {
+    if (trialDays === 0) {
+      return '';
+    }
+    return isSkipTrialTwin(twinTrialDays) ? ' (no trial)' : ' (trial)';
+  };
 
   for (const interval of Object.keys(product.prices)) {
     const expectedAmount = product.prices[interval];
@@ -123,33 +153,39 @@ async function ensurePlans(api, paypalProductId, product, brandConfig, dryRun) {
       continue;
     }
 
-    // Split this interval's active plans into matches and stale
-    const matches = [];
-    const stale = [];
-
-    for (const plan of plans) {
+    // Every active plan on this interval, split ONCE across the twins: a keeper
+    // per twin, its extra matches are duplicates, and what no twin claims is
+    // stale (splitting per twin instead would read one twin as the other's
+    // stale plan and deactivate it every run)
+    const intervalPlans = plans.filter((plan) => {
       if (plan.status !== 'ACTIVE') {
-        continue;
+        return false;
       }
       const regularCycle = plan.billing_cycles?.find((c) => c.tenure_type === 'REGULAR');
-      if (regularCycle?.frequency?.interval_unit !== intervalUnit) {
+      return regularCycle?.frequency?.interval_unit === intervalUnit;
+    });
+
+    const claimed = new Set();
+    const duplicates = [];
+    const missing = [];
+
+    for (const twinTrialDays of twins) {
+      const matches = intervalPlans.filter((plan) => isPlanMatch(plan, intervalUnit, expectedAmount, twinTrialDays));
+
+      for (const plan of matches) {
+        claimed.add(plan);
+      }
+
+      if (matches.length === 0) {
+        missing.push(twinTrialDays);
         continue;
       }
 
-      if (isPlanMatch(plan, intervalUnit, expectedAmount, trialDays)) {
-        matches.push(plan);
-      } else {
-        stale.push(plan);
-      }
+      console.log(`        ${chalk.green('✓')} ${interval}${twinLabel(twinTrialDays)}: $${expectedAmount} ${chalk.dim(matches[0].id)}`);
+      duplicates.push(...matches.slice(1));
     }
 
-    // Keep the first match, deactivate duplicates + stale
-    const match = matches[0] || null;
-    const duplicates = matches.slice(1);
-
-    if (match) {
-      console.log(`        ${chalk.green('✓')} ${interval}: $${expectedAmount} ${chalk.dim(match.id)}`);
-    }
+    const stale = intervalPlans.filter((plan) => !claimed.has(plan));
 
     for (const dup of duplicates) {
       if (dryRun) {
@@ -169,24 +205,23 @@ async function ensurePlans(api, paypalProductId, product, brandConfig, dryRun) {
       }
     }
 
-    if (match) {
-      continue;
-    }
+    // Create the twins nothing matched
+    for (const twinTrialDays of missing) {
+      const intervalName = interval.charAt(0).toUpperCase() + interval.slice(1);
+      const planName = `${productDisplayName(brandConfig, product)} (${intervalName}${isSkipTrialTwin(twinTrialDays) ? ', no trial' : ''})`;
 
-    // Create new plan
-    const planName = `${productDisplayName(brandConfig, product)} (${interval.charAt(0).toUpperCase() + interval.slice(1)})`;
-
-    if (dryRun) {
-      console.log(`        ${chalk.cyan('+')} ${interval}: would create $${expectedAmount} plan "${planName}" ${chalk.yellow('[DRY RUN]')}`);
-    } else {
-      const newPlan = await api.createPlan({
-        productId: paypalProductId,
-        name: planName,
-        interval,
-        amount: expectedAmount,
-        trialDays,
-      });
-      console.log(`        ${chalk.green('✓')} ${interval}: created $${expectedAmount} ${chalk.cyan(newPlan.id)}`);
+      if (dryRun) {
+        console.log(`        ${chalk.cyan('+')} ${interval}: would create $${expectedAmount} plan "${planName}" ${chalk.yellow('[DRY RUN]')}`);
+      } else {
+        const newPlan = await api.createPlan({
+          productId: paypalProductId,
+          name: planName,
+          interval,
+          amount: expectedAmount,
+          trialDays: twinTrialDays,
+        });
+        console.log(`        ${chalk.green('✓')} ${interval}${twinLabel(twinTrialDays)}: created $${expectedAmount} ${chalk.cyan(newPlan.id)}`);
+      }
     }
   }
 }

@@ -3,7 +3,9 @@
  * Tests the user create custom token endpoint
  * Requires user authentication (uses Api.resolveUser with adminRequired: true which means user must be authenticated)
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User create custom token',
   type: 'group',
   tests: [
@@ -106,4 +108,4 @@ module.exports = {
       },
     },
   ],
-};
+});

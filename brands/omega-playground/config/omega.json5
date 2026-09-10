@@ -93,6 +93,10 @@
     providers: {
       github: {
         org: "Omega-JS-Stack",
+        // Explicit until #808 renames this brand to `playground` (the rule is
+        // `<brand.id>-<role>`, so the derived default would be
+        // `omega-playground-omega`).
+        repo: "omega-playground",
         shared: true,
         private: false,
         // false = the repo service skips entirely — no org profile, no repo
@@ -197,6 +201,76 @@
     },
   },
 
+  // The FEATURE CATALOG (#647) — every feature defined ONCE, in the order every
+  // surface renders it (pricing rows, comparison matrix, account usage bars).
+  // A `usage` block makes a feature COUNTED (metered per user; day pacing is
+  // the default, `pace: false` opts out, `mirror` names the document kinds its
+  // counters also land on). No `usage` block = a perk. The products below name
+  // only their VALUE: a number on a counted feature (the monthly limit, -1
+  // unlimited), true/false/a string on a perk.
+  features: {
+    requests: {
+      name: "Saves",
+      icon: "feather",
+      definition: "Notes, clips, and pages you can save per month.",
+      usage: {},
+    },
+    exports: {
+      name: "Exports",
+      icon: "file-export",
+      definition: "Finished pieces you can export to PDF, Markdown, or HTML each month.",
+      usage: {},
+    },
+    uploads: {
+      name: "Image uploads",
+      icon: "image",
+      definition: "Images you can attach to your notes and pages each month.",
+      usage: {},
+    },
+    templates: {
+      name: "Page templates",
+      icon: "palette",
+      definition: "Ready-made page and journal templates included with your license.",
+      usage: { pace: false },
+    },
+    seats: {
+      name: "Writers on your team",
+      icon: "users",
+      definition: "People who can write in your shared library at the same time.",
+      usage: { pace: false },
+    },
+    targets: {
+      name: "Everywhere you write",
+      icon: "layer-group",
+      definition: "Web app, writing desk, and browser clipper: one library across all of them.",
+    },
+    support: {
+      name: "Priority support",
+      icon: "headset",
+      definition: "Your tickets jump the queue and reach a real person first.",
+    },
+    review: {
+      name: "Draft review & approvals",
+      icon: "pen-nib",
+      definition: "Send a draft for review, collect comments, publish once it's approved.",
+    },
+    sso: {
+      name: "SSO & provisioning",
+      icon: "key",
+      definition: "Sign in through your identity provider, with accounts provisioned for you.",
+    },
+    residency: {
+      name: "Data residency & retention terms",
+      icon: "shield-halved",
+      definition: "Choose where your library lives and how long it is kept.",
+    },
+    manager: {
+      name: "Named account manager",
+      icon: "headset",
+      definition: "One person who knows your account and answers directly.",
+    },
+  },
+
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
   // Shapes mirror @omega.js/backend's product schema.
   payment: {
@@ -204,9 +278,16 @@
       stripe: { publishableKey: "pk_test_51T32RbReHWMUiO2TIWCU72ATxikGDMo1a3Byl7ZiEOdDHSKsiW9v6JwRyC7BCBK8AvhTJxWpsn3dpppwdZv73lIp00oBCyjnfg" },
       paypal: { clientId: "BAAjk48TKd_AqC0VqD4dzqif8PfxWULRx6VqwoGd8PV4mJMK_OxBUXYiPhMl1kIPqzVpDgk80nAoaW73Z0" },
       chargebee: { site: null },
+      coinbase: {
+        // Coinbase Commerce (crypto) checkout, one-time purchases only. Its
+        // ONLY credential is a secret (COINBASE_COMMERCE_API_KEY), so there is
+        // no public datum to gate on — this is the switch, default OFF, because
+        // an accidental ON shows a Crypto button no key can complete.
+        enabled: false,
+      },
     },
     products: [
-      // Demo catalog — ids, limits, prices, and provider ids are the
+      // Demo catalog — ids, feature values, prices, and provider ids are the
       // plumbing the payment lanes exercise (the Stripe/PayPal test products
       // keep their ids); the display names are placeholder copy, and no tier
       // here is a real product anyone is meant to buy.
@@ -215,13 +296,7 @@
         name: "Jotter",
         type: "subscription",
         tagline: "best for kicking the tires",
-        limits: { requests: 100 },
-        features: [
-          // definition = the dotted-underline tooltip; author it ONCE per
-          // feature id — the pricing composer backfills every other copy
-          { id: "requests", name: "Saves", icon: "feather", definition: "Notes, clips, and pages you can save per month." },
-          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true, definition: "Web app, writing desk, and browser clipper: one library across all of them." },
-        ],
+        features: { requests: 100, exports: 10, uploads: 50, targets: true },
       },
       {
         id: "premium",
@@ -229,14 +304,9 @@
         type: "subscription",
         tagline: "best for daily writers",
         popular: true,
-        limits: { requests: 10000 },
         trial: { days: 1 }, // one-day trial so the playground converts fast (Ian 2026-08-28)
         prices: { monthly: 9.99, annually: 99.99 },
-        features: [
-          { id: "requests", name: "Saves", icon: "feather" },
-          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
-          { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real person first." },
-        ],
+        features: { requests: 10000, exports: 500, uploads: 2000, templates: 40, seats: 3, targets: true, support: true },
         stripe: { productId: "prod_UscSf6XFplJRS1" },
         paypal: { productId: "PROD-3SG37836K78792621" },
         chargebee: { itemId: null, legacyPlanIds: [] },
@@ -248,16 +318,9 @@
         name: "Press",
         type: "subscription",
         tagline: "best for teams publishing together",
-        limits: { requests: -1 },
         trial: { days: 14 },
         prices: { monthly: 24.99, annually: 249.99 },
-        features: [
-          { id: "requests", name: "Saves", icon: "feather" },
-          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
-          { id: "support", name: "Priority support", icon: "headset", value: true },
-          { id: "seats", name: "Writers on your team", icon: "users", value: 10, definition: "People who can write in your shared library at the same time." },
-          { id: "review", name: "Draft review & approvals", icon: "pen-nib", value: true, definition: "Send a draft for review, collect comments, publish once it's approved." },
-        ],
+        features: { requests: -1, exports: -1, uploads: -1, templates: 120, seats: 10, targets: true, support: true, review: true },
         stripe: { productId: "prod_UzOGM0st0zRSbc" },
         paypal: { productId: "PROD-1VY66504XX977983J" },
         chargebee: { itemId: null, legacyPlanIds: [] },
@@ -268,9 +331,7 @@
         type: "one-time",
         tagline: "templates to begin beautifully",
         prices: { once: 49.99 },
-        features: [
-          { id: "templates", name: "Page templates", icon: "palette", value: 12, definition: "Ready-made page and journal templates included with your license." },
-        ],
+        features: { templates: 12 },
         stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },
         paypal: {
@@ -292,11 +353,8 @@
         name: "Proof Press",
         type: "subscription",
         tagline: "test prints, pulled immediately",
-        limits: { requests: 1 },
         prices: { monthly: 5.00 },
-        features: [
-          { id: "requests", name: "Saves", icon: "feather" },
-        ],
+        features: { requests: 31 },
         chargebee: { itemId: null, legacyPlanIds: [] },
         paypal: {
           productId: "PROD-1VE952820H061592K",
@@ -314,12 +372,7 @@
         enterprise: true,
         tagline: "best for publishing houses and organizations that need their own terms",
         url: "/contact",
-        features: [
-          { id: "seats", name: "Unlimited writers", icon: "users", value: true },
-          { id: "sso", name: "SSO & provisioning", icon: "key", value: true },
-          { id: "residency", name: "Data residency & retention terms", icon: "shield-halved", value: true },
-          { id: "manager", name: "Named account manager", icon: "headset", value: true },
-        ],
+        features: { seats: -1, sso: true, residency: true, manager: true },
       },
     ],
     winback: {
@@ -336,7 +389,7 @@
     },
   },
 
-  oauth2: {
+  connections: {
     google: { enabled: true },
   },
   marketing: {
@@ -505,6 +558,17 @@
       // The consent banner + the provider-script gate (default true). false
       // ships NO banner — legal only for a site that loads no
       // analytics/marketing provider at all.
+      enabled: true,
+    },
+    exitPopup: {
+      // The exit-intent offer popup (default true). false ships no popup at
+      // all; its copy, timeout and avatars live under client.exitPopup.config.
+      enabled: true,
+    },
+    serviceWorker: {
+      // Registers the site service worker (default true) — the offline/refresh
+      // lane and the push-notification registration ride it. false unregisters
+      // any worker the visitor already has.
       enabled: true,
     },
   },

@@ -8,7 +8,9 @@
 // run, the env var is unset and boot tests target the consumer's own
 // `<cwd>/dist/`.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'fixture consumer — extension loads + boots',
@@ -53,4 +55,4 @@ module.exports = {
       },
     },
   ],
-};
+});

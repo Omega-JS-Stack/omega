@@ -4,12 +4,16 @@
  * belongs to. Repos not in the map are treated as standalone and linked to
  * GitHub instead.
  *
- * In the brand-monorepo world every brand is ONE repo (`repo.providers.github.org` +
- * `repo.providers.github.repo || brand id` — the github service's exact derivation);
+ * In the brand-monorepo world every brand is ONE repo, addressed by
+ * `@omega.js/config`'s `brandRepo` — the typed `repo.providers.github.repo` slug
+ * (whose owner half wins when it carries one), else `<brand.id>-omega` under
+ * `repo.providers.github.org`, the ONE derivation the github service reads too;
  * omega-manager's per-target + subdomain repo fan-out collapsed at the
  * redesign. Brands without a repo.providers.github.org are skipped (the github service
  * skips them too).
  */
+
+const { brandRepo: deriveBrandRepo, brandRepoName } = require('@omega.js/config');
 
 /**
  * Resolve a loaded brand's repo identity, or null when it has none.
@@ -24,7 +28,12 @@ function brandRepo(brand) {
     return null;
   }
 
-  return { owner: github.org, repo: github.repo || brand.id };
+  // BOTH halves from the one derivation: an `owner/name` slug houses the repo
+  // under its own owner. The loaded brand's own id stands in for a config that
+  // names none.
+  const { owner, name } = deriveBrandRepo(brand.config);
+
+  return { owner, repo: name || brandRepoName({ brand: { id: brand.id } }) };
 }
 
 /**

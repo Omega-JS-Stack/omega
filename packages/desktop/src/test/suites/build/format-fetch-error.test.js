@@ -3,8 +3,9 @@
 // log-spam case (remote-config / remote-scripts brand-site fetches).
 
 const formatFetchError = require('../../../utils/format-fetch-error.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'format-fetch-error',
@@ -81,4 +82,4 @@ module.exports = {
       },
     },
   ],
-};
+});

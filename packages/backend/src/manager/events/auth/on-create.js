@@ -32,9 +32,13 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  // The headline is one line — uid + email. The full UserRecord (passwordHash,
-  // providerData, metadata) and the event context stay reachable at debug level.
-  ctx.log(`onCreate: ${user.uid} (${user.email})`);
+  // The uid and nothing else — the one spelling the other three auth triggers
+  // carry since the #657 sweep, so the family reads the same way
+  // ([#710](https://github.com/Omega-JS-Stack/omega/issues/710)). The email is
+  // legal on a log line, but it is not what NAMES this invocation, and the
+  // account it belongs to is one debug line away. The full UserRecord
+  // (passwordHash, providerData, metadata) and the event context go with it.
+  ctx.log(`onCreate: ${user.uid}`);
   ctx.debug(`onCreate: ${user.uid} record`, user, context);
 
   // Skip anonymous users
@@ -56,8 +60,16 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
     return;
   }
 
-  // Extract name from provider data (e.g., Google, Facebook, GitHub)
-  ctx.log(`onCreate: Inferred name from provider:`, extractProviderName(user));
+  // Extract name from provider data (e.g., Google, Facebook, GitHub). WHETHER a
+  // name came back, never the name itself: a person's first/last is their PII,
+  // and this line lands in Cloud Logging for the whole retention window
+  // (docs/shared/logging.md § PII — identifier not payload,
+  // [#710](https://github.com/Omega-JS-Stack/omega/issues/710)). The parsed
+  // name stays one debug line down.
+  const providerName = extractProviderName(user);
+
+  ctx.log(`onCreate: Inferred name from provider for ${user.uid}: ${providerName ? 'yes' : 'no'}`);
+  ctx.debug(`onCreate: Inferred name from provider for ${user.uid}:`, providerName);
 
   // Build the user doc — the same shape the sign-in heal recreates when this doc
   // goes missing later ([#405](https://github.com/Omega-JS-Stack/omega/issues/405))

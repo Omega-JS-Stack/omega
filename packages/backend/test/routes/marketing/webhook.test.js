@@ -26,6 +26,8 @@
  */
 
 // Helper — generate a unique sg_event_id per test
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 function sgEventId(name) {
   return `_test-sg-${name}-${Date.now()}`;
 }
@@ -42,7 +44,7 @@ function sgEvent({ id, type, email, timestamp, asmGroupId, bounceClassification 
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing webhook endpoint (SendGrid)',
   type: 'group',
   timeout: 30000,
@@ -636,4 +638,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -12,6 +12,7 @@
  * about the same subscription twice.
  */
 const powertools = require('node-powertools');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
 // exclusive to this suite, declared in the seed roster, and the half the seed
@@ -26,7 +27,7 @@ const REPROCESS_SENTINEL = '_awaiting-reprocess';
 // The ceiling the sweep stops re-flipping at (retry-failed-webhooks.js MAX_RETRIES)
 const MAX_RETRIES = 5;
 
-module.exports = {
+module.exports = defineCases({
   description: 'Failed webhooks retry on the frequent cron, then dead-letter',
   type: 'suite',
   timeout: 180000,
@@ -225,7 +226,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 
 /**
  * A Stripe-shaped active subscription — the shape the test provider speaks

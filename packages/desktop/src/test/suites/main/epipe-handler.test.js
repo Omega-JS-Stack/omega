@@ -1,4 +1,5 @@
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'EPIPE handler (main)',
@@ -36,4 +37,4 @@ module.exports = {
       },
     },
   ],
-};
+});

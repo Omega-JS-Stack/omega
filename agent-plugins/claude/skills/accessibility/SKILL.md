@@ -12,7 +12,7 @@ Most of this is already built into the layers — tokens carry contrast, the mot
 
 - `docs/shared/theming.md` — the `--omega-*` token contract (light + dark values ship together), the one-status-hue rule, the motion library and its resilience rules.
 - `docs/web/sections.md` — the section/component contract: what a section owns and how its markup composes.
-- `docs/shared/icons.md` — the one icon mechanism (`fa-*` markup, `omega_icon` inlining).
+- `docs/shared/icons.md` — the one icon mechanism (`fa-*` markup, inlined at build, upgraded at runtime).
 - `packages/web/core/css/motion/_index.scss` and `packages/web/core/css/tokens/_index.scss` — the two sheets the checks below refer to.
 
 ## The checklist

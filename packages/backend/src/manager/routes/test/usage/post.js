@@ -1,54 +1,44 @@
 /**
  * POST /test/usage - Test usage tracking
- * Increments the 'requests' usage metric and returns the updated usage data
- * Supports both authenticated (user doc) and unauthenticated (usage collection by IP) modes
+ * Consumes the 'requests' counted feature and returns what the call left behind
+ * Signed-in callers count on their own account; anonymous callers count against
+ * their IP, which is an EXPLICIT keyed counter
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
  */
 module.exports = async ({ ctx, user, settings }) => {
-  const usage = ctx.usage;
   const amount = settings.amount;
 
-  // Get usage before increment
-  const beforeMonthly = usage.getUsage('requests');
-  const beforeTotal = user.usage?.requests?.total || 0;
-  const beforeDaily = user.usage?.requests?.daily || 0;
+  // Anonymous callers are keyed EXPLICITLY — a key can never silently move a
+  // signed-in user's own counters into the anonymous store
+  const usage = user.authenticated
+    ? ctx.usage
+    : ctx.usage.forKey(ctx.request.geolocation.ip);
 
-  // Increment usage
-  usage.increment('requests', amount);
+  const before = await usage.read('requests');
 
-  // Update usage in storage
-  await usage.update();
-
-  // Get usage after increment
-  const afterMonthly = usage.getUsage('requests');
-  const afterTotal = user.usage?.requests?.total || 0;
-  const afterDaily = user.usage?.requests?.daily || 0;
+  // Check, count and write, in one call — a 429 is thrown, never returned
+  const after = await usage.consume('requests', amount);
 
   // Log
-  ctx.log(`test/usage: Incremented requests by ${amount}`, {
+  ctx.log(`test/usage: Consumed ${amount} requests`, {
     authenticated: user.authenticated,
     key: usage.key,
-    before: { monthly: beforeMonthly, daily: beforeDaily, total: beforeTotal },
-    after: { monthly: afterMonthly, daily: afterDaily, total: afterTotal },
+    before: { used: before.used, left: before.left, day: before.day },
+    after: after,
   });
 
   return ctx.respond({
-    metric: 'requests',
+    feature: 'requests',
     amount,
     authenticated: user.authenticated,
     key: usage.key,
+    limit: before.limit,
+    dayLimit: before.day.limit,
     before: {
-      monthly: beforeMonthly,
-      daily: beforeDaily,
-      total: beforeTotal,
+      used: before.used,
+      left: before.left,
+      day: { used: before.day.used, left: before.day.left },
     },
-    after: {
-      monthly: afterMonthly,
-      daily: afterDaily,
-      total: afterTotal,
-    },
-    user: {
-      uid: user.auth?.uid || null,
-      usage: user.usage,
-    },
+    after: after,
   });
 };

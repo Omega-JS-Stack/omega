@@ -50,7 +50,9 @@
 //   view/reload, view/force-reload, view/reset-zoom, view/zoom-in, view/zoom-out,
 //   view/toggle-fullscreen
 //   view/developer (submenu, dev-mode only): view/developer/toggle-devtools,
-//     view/developer/inspect-elements, view/developer/force-reload
+//     view/developer/inspect-elements, view/developer/force-reload,
+//     view/developer/simulate-update (submenu): view/developer/simulate-update/available,
+//     view/developer/simulate-update/unavailable, view/developer/simulate-update/error
 //   window/minimize, window/zoom, window/close, window/front
 //   help/check-for-updates (win/linux only — mac places it under main/), help/website (when brand.url)
 //   development (top-level, dev-mode only): development/open-exe-folder,
@@ -187,6 +189,20 @@ const menu = {
       },
     });
 
+    // Dev-only update-simulator triggers. Each one runs the auto-updater's synthetic
+    // cascade for a single scenario, so update UX can be walked without cutting a
+    // release. simulate() rejects on an unknown scenario and refuses outright in a
+    // production build, so the result is logged either way.
+    const simulateUpdateItem = (scenario, label) => ({
+      id: `view/developer/simulate-update/${scenario}`,
+      label,
+      click: () => {
+        m.autoUpdater.simulate(scenario)
+          .then((status) => logger.log(`simulate(${scenario}) → ${status.code}`))
+          .catch((e) => logger.warn(`simulate(${scenario}) failed: ${e.message}`));
+      },
+    });
+
     // Preferences — visible:false by default so consumers can flip it on with one
     // line if they have a settings window. (Matches legacy.)
     const preferencesItem = {
@@ -293,6 +309,16 @@ const menu = {
             },
           },
           { id: 'view/developer/force-reload',     role: 'forceReload' },
+          { type: 'separator' },
+          {
+            id: 'view/developer/simulate-update',
+            label: 'Simulate update',
+            submenu: [
+              simulateUpdateItem('available',   'Update available'),
+              simulateUpdateItem('unavailable', 'No update available'),
+              simulateUpdateItem('error',       'Update error'),
+            ],
+          },
         ],
       });
     }

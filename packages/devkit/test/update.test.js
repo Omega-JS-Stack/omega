@@ -230,6 +230,20 @@ test('buildInstallCommands: npu when present, npm otherwise; dev group gets --sa
   assert.deepEqual(update.buildInstallCommands(updates, { hasNpu: false })[0].command, 'npm install a@1.1.0');
 });
 
+test('buildInstallCommands: an @omega.js dep installs --save-exact — the family pin survives its own mover (#794)', () => {
+  const updates = [
+    { name: 'a', group: 'prod', from: '1.0.0', to: '1.1.0' },
+    { name: '@omega.js/web', group: 'prod', from: '0.4.0', to: '0.5.0' },
+    { name: '@omega.js/manager', group: 'dev', from: '0.4.0', to: '0.5.0' },
+  ];
+
+  assert.deepEqual(update.buildInstallCommands(updates, { hasNpu: false }), [
+    { command: 'npm install a@1.1.0', group: 'prod' },
+    { command: 'npm install @omega.js/web@0.5.0 --save-exact', group: 'prod' },
+    { command: 'npm install @omega.js/manager@0.5.0 --save-dev --save-exact', group: 'dev' },
+  ]);
+});
+
 // ─── The verb body ───────────────────────────────────────────────────────────
 
 function collectLogger() {

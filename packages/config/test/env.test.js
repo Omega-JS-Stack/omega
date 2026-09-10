@@ -8,12 +8,12 @@
  * devkit test convention. Tests mutate process.env through dotenv, so every
  * test uses its own key prefix and clears its keys when done.
  */
-const { test } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, composeTargetEnv, serializeEnv } = require('../src/index.js');
+const { loadEnv, reloadEnv, resolveEnvChain, loadEnvChain, loadEnvRoots, readCompanyRoot, composeTargetEnv, serializeEnv, ENV_ENVIRONMENTS, envEnvironment } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -215,6 +215,34 @@ test('loadEnvChain: explicit paths load strongest-first, nulls and missing files
   assert.strictEqual(process.env.ENVT6_S, 'shell'); // shell beats all files
 });
 
+// ─── loadEnvRoots: the known-layers loader (the manager's walks) ───
+
+test('loadEnvRoots: each root contributes .env + its named overlay, strongest root first', (t) => {
+  const root = makeFixture('env-roots', {
+    'brand/.env': 'ENVT16_X=brand\nENVT16_Y=brand\n',
+    'brand/.env.production': 'ENVT16_X=brand-production\n',
+    'brand/.env.development': 'ENVT16_X=brand-development\n',
+    'company/.env': 'ENVT16_X=company\nENVT16_Y=company\nENVT16_Z=company\n',
+    'company/.env.production': 'ENVT16_Z=company-production\n',
+  });
+  cleanup(t, root, ['ENVT16_X', 'ENVT16_Y', 'ENVT16_Z']);
+
+  const loaded = loadEnvRoots(
+    [path.join(root, 'brand'), null, path.join(root, 'company')],
+    { environment: 'production' },
+  );
+
+  assert.deepStrictEqual(loaded, [
+    path.join(root, 'brand', '.env.production'),
+    path.join(root, 'brand', '.env'),
+    path.join(root, 'company', '.env.production'),
+    path.join(root, 'company', '.env'),
+  ]);
+  assert.strictEqual(process.env.ENVT16_X, 'brand-production'); // the strongest root's overlay
+  assert.strictEqual(process.env.ENVT16_Y, 'brand');            // its base still beats the company layer
+  assert.strictEqual(process.env.ENVT16_Z, 'company-production'); // a gap the company overlay fills
+});
+
 // ─── resolveEnvChain is read-only ───
 
 test('resolveEnvChain resolves paths without touching process.env', (t) => {
@@ -336,10 +364,10 @@ test('composeTargetEnv: the target layer passes through unfiltered — placement
   assert.strictEqual(values.RECAPTCHA_SITE_KEY, 'target-site-key', 'a web-named key placed in the backend .env by hand is delivered');
 });
 
-test('composeTargetEnv: a pattern entry composes (OAUTH2_<PROVIDER>_CLIENT_*)', (t) => {
+test('composeTargetEnv: a pattern entry composes (CONNECTIONS_<PROVIDER>_CLIENT_*)', (t) => {
   const root = makeFixture('env-compose-pattern', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
-    'brand/.env': 'OAUTH2_GOOGLE_CLIENT_ID=brand-client-id\nOAUTH2_GOOGLE_CLIENT_SECRET=brand-client-secret\n',
+    'brand/.env': 'CONNECTIONS_GOOGLE_CLIENT_ID=brand-client-id\nCONNECTIONS_GOOGLE_CLIENT_SECRET=brand-client-secret\n',
   });
   cleanup(t, root);
 
@@ -348,9 +376,9 @@ test('composeTargetEnv: a pattern entry composes (OAUTH2_<PROVIDER>_CLIENT_*)', 
     target: 'backend',
   });
 
-  assert.strictEqual(values.OAUTH2_GOOGLE_CLIENT_ID, 'brand-client-id');
-  assert.strictEqual(values.OAUTH2_GOOGLE_CLIENT_SECRET, 'brand-client-secret');
-  assert.strictEqual(sources.OAUTH2_GOOGLE_CLIENT_ID, 'brand');
+  assert.strictEqual(values.CONNECTIONS_GOOGLE_CLIENT_ID, 'brand-client-id');
+  assert.strictEqual(values.CONNECTIONS_GOOGLE_CLIENT_SECRET, 'brand-client-secret');
+  assert.strictEqual(sources.CONNECTIONS_GOOGLE_CLIENT_ID, 'brand');
 });
 
 test('composeTargetEnv: deliverAs renames the per-target GA4 secret on delivery', (t) => {
@@ -473,6 +501,228 @@ test('composeTargetEnv: the target layer renames too, and overrides the brand', 
   assert.strictEqual(values.GOOGLE_ANALYTICS_SECRET, 'target-stream', "the target's own answer wins");
   assert.strictEqual(sources.GOOGLE_ANALYTICS_SECRET, 'target');
   assert.strictEqual(values.GOOGLE_ANALYTICS_SECRET_BACKEND, undefined, 'one key ships, under the delivered name');
+});
+
+// ─── reloadEnv: a delivered name inherits its SOURCE key's ownership (#724) ───
+
+// A rename CONSUMES its source key, so after the boot load nothing can see that
+// the value came from the shell — the delivered name has to carry that ownership
+// itself, or the reload drops a shell value (gone entirely when no file declares
+// the source name, replaced by the file's when one does).
+//
+// THE SHELL: exported before this file reads its first `.env`, so the cascade's
+// ownership snapshot counts the source name as shell-owned forever, exactly as a
+// real `export GOOGLE_ANALYTICS_SECRET_WEB=…` would be. Each case re-sets it
+// because delivery consumed it, the way the shell still holds it.
+const WEB_SOURCE_KEY = 'GOOGLE_ANALYTICS_SECRET_WEB';
+process.env[WEB_SOURCE_KEY] = 'shell-web-stream';
+after(() => { delete process.env[WEB_SOURCE_KEY]; });
+
+test('reloadEnv: a shell-set source key keeps the delivered name, with no file declaring it', (t) => {
+  const root = makeFixture('env-deliver-reload-shell', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVT17_X=brand\n',
+  });
+  cleanup(t, root, [...GA_KEYS, WEB_SOURCE_KEY, 'ENVT17_X']);
+  clearGaKeys();
+
+  process.env[WEB_SOURCE_KEY] = 'shell-web-stream';
+  const websiteDir = path.join(root, 'brand', 'targets', 'website');
+
+  loadEnv(websiteDir, { target: 'web' });
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'shell-web-stream', 'the boot load delivers the shell value, or the case proves nothing');
+
+  reloadEnv(websiteDir, { target: 'web' });
+
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'shell-web-stream', "a delivered name inherits its source key's SHELL ownership — a reload never drops it");
+});
+
+test('reloadEnv: a shell-set source key still beats the file that declares the same name', (t) => {
+  const root = makeFixture('env-deliver-reload-shell-vs-file', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': `${WEB_SOURCE_KEY}=file-web-stream\n`,
+  });
+  cleanup(t, root, [...GA_KEYS, WEB_SOURCE_KEY]);
+  clearGaKeys();
+
+  process.env[WEB_SOURCE_KEY] = 'shell-web-stream';
+  const websiteDir = path.join(root, 'brand', 'targets', 'website');
+
+  loadEnv(websiteDir, { target: 'web' });
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'shell-web-stream', 'the shell beats the file at boot, or the case proves nothing');
+
+  reloadEnv(websiteDir, { target: 'web' });
+
+  assert.strictEqual(process.env.GOOGLE_ANALYTICS_SECRET, 'shell-web-stream', 'the reload re-reads the file, and the shell keeps winning');
+});
+
+// ─── Environment overlays (#586) ───
+
+// `.env.<environment>` overlays the `.env` beside it, the widespread standard.
+// The environment names are exactly what envEnvironment() returns — one
+// vocabulary with the runtime's own (`development` | `testing` | `production`).
+
+test('envEnvironment(): one vocabulary — testing wins, then production, else development, and no signal is production', (t) => {
+  const saved = { OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT, FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR, TERM_PROGRAM: process.env.TERM_PROGRAM };
+  t.after(() => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  const only = (vars) => {
+    for (const key of Object.keys(saved)) delete process.env[key];
+    Object.assign(process.env, vars);
+    return envEnvironment();
+  };
+
+  assert.strictEqual(only({ OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }), 'testing', 'testing wins over everything');
+  assert.strictEqual(only({ ENVIRONMENT: 'production' }), 'production');
+  assert.strictEqual(only({ ENVIRONMENT: 'development' }), 'development');
+  assert.strictEqual(only({ FUNCTIONS_EMULATOR: 'true' }), 'development');
+  assert.strictEqual(only({}), 'production', 'no signal is production — a deployed function carries none');
+
+  // The list every overlay suffix and every scaffolded file is spelled from
+  assert.deepStrictEqual(ENV_ENVIRONMENTS, ['development', 'testing', 'production']);
+  for (const vars of [{ ENVIRONMENT: 'development' }, { ENVIRONMENT: 'production' }, { OMEGA_TEST_MODE: 'true' }]) {
+    assert.ok(ENV_ENVIRONMENTS.includes(only(vars)), 'the resolver can only ever answer a name from the list');
+  }
+});
+
+test('loadEnv: .env.<environment> overlays the .env beside it, at every layer', (t) => {
+  const root = makeFixture('env-overlay-load', {
+    'company/.env': 'ENVO1_C=company\nENVO1_B=company\nENVO1_L=company\n',
+    'company/.env.development': 'ENVO1_C=company-dev\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVO1_B=brand\nENVO1_L=brand\n',
+    'brand/.env.development': 'ENVO1_B=brand-dev\n',
+    'brand/targets/site/.env': 'ENVO1_L=local\n',
+    'brand/targets/site/.env.development': 'ENVO1_L=local-dev\n',
+  });
+  cleanup(t, root, ['ENVO1_C', 'ENVO1_B', 'ENVO1_L']);
+
+  const brandRoot = path.join(root, 'brand');
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+
+  const { loaded } = loadEnv(path.join(brandRoot, 'targets', 'site'), { environment: 'development' });
+
+  assert.strictEqual(process.env.ENVO1_L, 'local-dev', "the local layer's overlay beats its own base");
+  assert.strictEqual(process.env.ENVO1_B, 'brand-dev', 'a brand overlay beats the brand base — and still loses to a stronger layer');
+  assert.strictEqual(process.env.ENVO1_C, 'company-dev');
+  assert.deepStrictEqual(loaded, [
+    path.join(brandRoot, 'targets', 'site', '.env.development'),
+    path.join(brandRoot, 'targets', 'site', '.env'),
+    path.join(brandRoot, '.env.development'),
+    path.join(brandRoot, '.env'),
+    path.join(root, 'company', '.env.development'),
+    path.join(root, 'company', '.env'),
+  ], 'each layer contributes its overlay first, then its base');
+});
+
+test('loadEnv: only the RUNNING environment overlays — another environment file is never read', (t) => {
+  const root = makeFixture('env-overlay-other', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVO2_K=base\n',
+    'brand/.env.production': 'ENVO2_K=production\n',
+    'brand/.env.testing': 'ENVO2_K=testing\n',
+  });
+  cleanup(t, root, ['ENVO2_K']);
+
+  const { loaded } = loadEnv(path.join(root, 'brand', 'targets', 'site'), { environment: 'development' });
+
+  assert.strictEqual(process.env.ENVO2_K, 'base', "a development run never reads another environment's file");
+  assert.deepStrictEqual(loaded, [path.join(root, 'brand', '.env')]);
+});
+
+test('loadEnv: no overlay file leaves the chain exactly as it was', (t) => {
+  const root = makeFixture('env-overlay-absent', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVO3_K=base\n',
+  });
+  cleanup(t, root, ['ENVO3_K']);
+
+  const { chain, loaded } = loadEnv(path.join(root, 'brand', 'targets', 'site'), { environment: 'development' });
+
+  assert.deepStrictEqual(loaded, [path.join(root, 'brand', '.env')], 'a missing overlay skips silently');
+  assert.deepStrictEqual(chain, {
+    local: path.join(root, 'brand', 'targets', 'site', '.env'),
+    brand: path.join(root, 'brand', '.env'),
+    company: null,
+  }, 'the chain shape is the three base layers, unchanged');
+  assert.strictEqual(process.env.ENVO3_K, 'base');
+});
+
+test('composeTargetEnv: the environment overlay overrides the base within each layer', (t) => {
+  const root = makeFixture('env-overlay-compose', {
+    'company/.env': 'GH_TOKEN=company\nOMEGA_ADMIN_KEY=company\n',
+    'company/.env.testing': 'GH_TOKEN=company-testing\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'OMEGA_ADMIN_KEY=brand\nOMEGA_WEBHOOK_KEY=brand\n',
+    'brand/.env.testing': 'OMEGA_ADMIN_KEY=brand-testing\n',
+    'brand/targets/backend/.env': 'OMEGA_WEBHOOK_KEY=target\n',
+    'brand/targets/backend/.env.testing': 'OMEGA_WEBHOOK_KEY=target-testing\n',
+  });
+  cleanup(t, root);
+
+  const brandRoot = path.join(root, 'brand');
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+
+  const { values, sources } = composeTargetEnv({
+    targetDir: path.join(brandRoot, 'targets', 'backend'),
+    target: 'backend',
+    environment: 'testing',
+  });
+
+  assert.strictEqual(values.GH_TOKEN, 'company-testing');
+  assert.strictEqual(sources.GH_TOKEN, 'company', 'an overlay is its layer, not a layer of its own');
+  assert.strictEqual(values.OMEGA_ADMIN_KEY, 'brand-testing', "the brand's overlay beats the brand base and the company layer");
+  assert.strictEqual(values.OMEGA_WEBHOOK_KEY, 'target-testing');
+  assert.strictEqual(sources.OMEGA_WEBHOOK_KEY, 'target');
+});
+
+test("composeTargetEnv: another environment's overlay never rides the artifact", (t) => {
+  const root = makeFixture('env-overlay-compose-other', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'OMEGA_ADMIN_KEY=base\n',
+    'brand/.env.development': 'OMEGA_ADMIN_KEY=development\n',
+    'brand/.env.production': 'OMEGA_ADMIN_KEY=production\n',
+  });
+  cleanup(t, root);
+
+  const deployed = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+    environment: 'production',
+  });
+  assert.strictEqual(deployed.values.OMEGA_ADMIN_KEY, 'production', 'a deploy composes base + production');
+
+  const local = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+    environment: 'development',
+  });
+  assert.strictEqual(local.values.OMEGA_ADMIN_KEY, 'development', 'the emulator composes base + development');
+});
+
+test('composeTargetEnv: the schema still filters an overlay — an unclaimed key never rides down', (t) => {
+  const root = makeFixture('env-overlay-compose-filter', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'OMEGA_ADMIN_KEY=base\n',
+    'brand/.env.development': 'OMEGA_ADMIN_KEY=dev\nCSC_KEY_PASSWORD=desktop-only\n',
+  });
+  cleanup(t, root);
+
+  const { values } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+    environment: 'development',
+  });
+
+  assert.strictEqual(values.OMEGA_ADMIN_KEY, 'dev');
+  assert.strictEqual(values.CSC_KEY_PASSWORD, undefined, 'an overlay is filtered by the schema exactly like the base');
 });
 
 // ─── serializeEnv ───

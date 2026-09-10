@@ -3,7 +3,9 @@
  * Tests the user regenerate API keys endpoint
  * This is a suite because we need to track state and restore original keys
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'User regenerate API keys',
   type: 'suite',
   timeout: 30000,
@@ -153,4 +155,4 @@ module.exports = {
       },
     },
   ],
-};
+});

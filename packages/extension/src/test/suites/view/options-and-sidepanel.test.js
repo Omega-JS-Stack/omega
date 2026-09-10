@@ -3,7 +3,9 @@
 // just by setting the `context` field — same `ctx.expect / state / skip` API
 // applies. (Sidepanel is exercised separately in sidepanel.test.js.)
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   layer: 'view',
   context: 'options',
   description: 'view/options — DOM + context attribute',
@@ -11,4 +13,4 @@ module.exports = {
     ctx.expect(document.body.dataset.omegaContext).toBe('options');
     ctx.expect(document.title).toContain('Options');
   },
-};
+});

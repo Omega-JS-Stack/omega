@@ -39,7 +39,7 @@ ever reach the house/company inventory here. Pinned by the build-layer
 ## Config
 
 The `advertising` and `company` sections of `config/omega.json5` ride the
-build snapshot (`build.js` / `OMEGA_BUILD_JSON`) into every surface:
+build snapshot (`OMEGA_BUILD_JSON`, baked into every bundle) into every surface:
 
 ```json5
 advertising: {

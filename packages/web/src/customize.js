@@ -287,9 +287,9 @@ function materialize({ url, consumerDir, siteData }) {
 
   if (plan.lane === 'composition') {
     const body = plan.inner.replace(/^\n+/, '').replace(/\n+$/, '');
-    // Body content REPLACES the {% composition %} wrap by default (Ian
-    // 2026-07-19) — no flag needed; `append: true` is the legacy
-    // add-below escape hatch.
+    // Body content REPLACES the {% composition %} wrap (Ian 2026-07-19) — no
+    // flag, and none to add: the materialized body IS the default bands, so
+    // editing it is the whole customization lane (#607 retired `append`).
     content = `---\n${header}\n${page.frontmatterRaw}\n---\n\n${body}\n`;
   } else {
     content = `---\n${header}\n${page.frontmatterRaw}\n---\n${page.body}`;

@@ -39,8 +39,18 @@ async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build'
         siteData,
         farmDir: path.join(PKG, '.omega', `${name}-farm`),
         assetManifest: {
-          js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          js: {
+            main: '/assets/js/main-TEST.js',
+            firstPaint: '/assets/js/first-paint-TEST.js',
+            pages: {},
+            // The one layout asset the framework ships (#624) — every redirect
+            // page's hop rides it, so the fixture manifest carries it.
+            layouts: { 'modules/utilities/redirect': ['/assets/js/layouts/modules/utilities/redirect-TEST.js'] },
+          },
+          css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
+          // The head's font-preload loop reads the manifest (#765) — one
+          // fixture face, so every render carries the link the real lane emits.
+          fontPreloads: ['/assets/fonts/preload-TEST.woff2'],
         },
         ...overrides,
       });

@@ -3,9 +3,11 @@
  * Tests the admin Firestore query endpoint
  * Requires admin authentication
  */
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 const TEST_COLLECTION = '_test_query';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin Firestore query operation',
   type: 'suite',
   timeout: 30000,
@@ -201,4 +203,4 @@ module.exports = {
     },
 
   ],
-};
+});

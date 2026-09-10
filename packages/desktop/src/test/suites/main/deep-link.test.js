@@ -1,6 +1,8 @@
 // Main-process tests for lib/deep-link.js — pattern matching, dispatch pipeline, built-ins, override semantics.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'deep-link (main)',
@@ -283,4 +285,4 @@ module.exports = {
       },
     },
   ],
-};
+});

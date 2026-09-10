@@ -16,11 +16,12 @@
  *
  * Run: npx omega test framework:routes/payments/intent-discount-coupons
  */
-const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const ChargebeeLib = require('../../../src/manager/libraries/payment/providers/chargebee.js');
-const stripeIntent = require('../../../src/manager/routes/payments/intent/providers/stripe.js');
-const chargebeeIntent = require('../../../src/manager/routes/payments/intent/providers/chargebee.js');
-const discountCodes = require('../../../src/manager/libraries/payment/discount-codes.js');
+const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const stripeIntent = require('../../../dist/manager/routes/payments/intent/providers/stripe.js');
+const chargebeeIntent = require('../../../dist/manager/routes/payments/intent/providers/chargebee.js');
+const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-intent-coupon-uid';
 const ORDER_ID = '2424-6868-1212';
@@ -190,7 +191,7 @@ async function chargebeeCheckout(Manager, code, { couponExists = false } = {}) {
   return captured;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment intent: real-provider coupons for both discount shapes',
   type: 'group',
   timeout: 15000,
@@ -289,4 +290,4 @@ module.exports = {
       },
     },
   ],
-};
+});

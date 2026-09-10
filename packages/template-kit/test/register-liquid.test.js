@@ -30,7 +30,6 @@ function makeEngine(overrides = {}) {
     getCollectionNames: overrides.getCollectionNames,
     fileExists: overrides.fileExists,
     markdown: overrides.markdown,
-    icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')], flagsDir: path.join(FIXTURES, 'flags') },
     logos: { dir: path.join(FIXTURES, 'logos') },
   });
   return engine;
@@ -96,12 +95,8 @@ test('urlmatches reads page.url from the render scope', async () => {
   assert.strictEqual(await engine.parseAndRender(tpl, { page: { url: '/pricing' } }), '');
 });
 
-test('omega_icon + omega_logo render inline SVGs through the engine', async () => {
+test('omega_logo renders an inline SVG through the engine', async () => {
   const engine = makeEngine();
-
-  const icon = await engine.parseAndRender('{% omega_icon rocket, "me-2" %}');
-  assert.ok(icon.startsWith('<i class="fa me-2" data-icon="rocket" aria-hidden="true">'));
-  assert.ok(icon.includes('M1 1'));
 
   const logo = await engine.parseAndRender('{% omega_logo acme %}');
   assert.match(logo, /id="acme-\d+-grad"/);

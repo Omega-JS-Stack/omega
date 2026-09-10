@@ -2,7 +2,9 @@
  * Test: GET /payments/trial-eligibility
  * Tests trial eligibility check based on subscription order history
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Trial eligibility check',
   type: 'group',
   timeout: 15000,
@@ -68,4 +70,4 @@ module.exports = {
       },
     },
   ],
-};
+});

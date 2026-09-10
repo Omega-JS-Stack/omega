@@ -23,7 +23,7 @@ config:
 <!-- Back Link -->
 <div class="mb-3">
   <a href="/admin/users" class="text-decoration-none">
-    {% omega_icon "arrow-left", "fa-sm me-2" %}
+    <i class="fa-solid fa-arrow-left fa-sm me-2"></i>
     Back to users
   </a>
 </div>
@@ -33,7 +33,7 @@ config:
   <div class="col-lg-7">
     <div class="card">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "user-plus", "fa-md me-2" %} Create new user</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-user-plus fa-md me-2"></i> Create new user</h6>
       </div>
       <div class="card-body">
         <form id="create-user-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -57,7 +57,7 @@ config:
           <div class="d-flex justify-content-end gap-2 mt-3">
             <a href="/admin/users" class="btn btn-outline-adaptive">Cancel</a>
             <button type="submit" class="btn btn-adaptive">
-              {% omega_icon "check", "fa-md me-2" %}
+              <i class="fa-solid fa-check fa-md me-2"></i>
               <span class="button-text">Create user</span>
             </button>
           </div>
@@ -70,7 +70,7 @@ config:
   <div class="col-lg-5">
     <div class="card">
       <div class="card-body">
-        <h6 class="mb-3 d-inline-flex align-items-center">{% omega_icon "circle-info", "fa-sm me-2" %} How it works</h6>
+        <h6 class="mb-3 d-inline-flex align-items-center"><i class="fa-solid fa-circle-info fa-sm me-2"></i> How it works</h6>
         <ul class="small text-muted mb-0">
           <li class="mb-2">A Firebase Auth account is created with the provided email and password</li>
           <li class="mb-2">The backend automatically creates the Firestore user document</li>

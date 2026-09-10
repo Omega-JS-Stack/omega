@@ -13,7 +13,8 @@
  *   integration surface for the real Firestore paths.
  */
 const assert = require('node:assert');
-const Marketing = require('../../../src/manager/libraries/email/marketing/index.js');
+const Marketing = require('../../../dist/manager/libraries/email/marketing/index.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { isMarketingRevoked } = Marketing;
 
@@ -115,7 +116,7 @@ const LEGACY_DOC = {
   // No consent field at all — pre-consent-system user, must keep syncing
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Marketing consent gate (revoked-only skip on add/sync)',
   type: 'group',
   tests: [
@@ -261,4 +262,4 @@ module.exports = {
       },
     },
   ],
-};
+});

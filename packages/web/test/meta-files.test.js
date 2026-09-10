@@ -15,7 +15,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test, before } = require('node:test');
-const { buildSite, buildWith, miniData } = require('./lib/build.js');
+const { buildSite, buildWith, miniData, BARE, MINI, PKG } = require('./lib/build.js');
+
+const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
 let pages;
 before(async () => {
@@ -38,7 +40,8 @@ test('sitemap.xml: real pages in, machine/redirect/test pages out', () => {
   assert.ok(/<changefreq>weekly<\/changefreq>/.test(xml), 'default changefreq');
   assert.ok(/<lastmod>\d{4}-\d{2}-\d{2}T/.test(xml), 'build-stamp lastmod');
 
-  // Exclusions: redirects (sitemap.include false), test pages, admin, the meta files themselves
+  // Exclusions, ALL of them the one resolved meta.index flag (#564): redirect
+  // stubs, test pages, admin, the meta files themselves
   assert.ok(!xml.includes('/login'), 'auth redirects excluded');
   assert.ok(!xml.includes('/test/'), 'test pages excluded');
   assert.ok(!xml.includes('/admin/'), 'admin pages excluded');
@@ -113,6 +116,53 @@ test('pages.json + llms.txt: no unrendered Liquid survives the meta-file lane (#
   assert.ok(update.desc.includes('The first public release'), 'the page description renders');
 });
 
+// #564's posture is ONE decision for THREE machine files: sitemap.xml read
+// `resolved.meta.index`, llms.txt and pages.json did not — so a page the site
+// tells crawlers not to index was still handed to an LLM and to site search.
+test('llms.txt + pages.json: a noindexed page is out of EVERY machine file, not just the sitemap', () => {
+  const hub = 'https://mini.example.com/blog/tags';
+  assert.ok(pages.get('/blog/tags').includes('<meta name="robots" content="noindex'), 'the tag hub is noindex (thin taxonomy)');
+
+  assert.ok(!pages.get('/llms.txt').includes(`(${hub})`), 'the noindexed hub is absent from llms.txt');
+  assert.ok(!JSON.parse(pages.get('/pages.json')).some((entry) => entry.url === hub), 'and from pages.json');
+});
+
+// The dev-surface exclusion is a path SEGMENT, not a bare prefix — the same
+// rule engine.js applies (DEV_ONLY_URL_RE). A bare `/test` prefix silently ate
+// every brand page whose URL merely starts with those five characters.
+test('sitemap + llms.txt + pages.json: /testimonials ships, /test does not (segment, not prefix)', async () => {
+  const consumerDir = path.join(PKG, '.omega', 'meta-files-segment-src');
+  fs.rmSync(consumerDir, { recursive: true, force: true });
+  fs.cpSync(BARE, consumerDir, { recursive: true });
+  fs.writeFileSync(path.join(consumerDir, 'pages', 'testimonials.html'), [
+    '---',
+    'layout: frontend/core/base',
+    'permalink: /testimonials',
+    'meta:',
+    '  title: "Testimonials"',
+    '---',
+    '<section><h2>What they say</h2></section>',
+    '',
+  ].join('\n'));
+
+  try {
+    const built = await buildSite(consumerDir, bareData, {}, 'meta-files-segment');
+    assert.ok(built.get('/testimonials'), 'the brand page builds');
+
+    assert.ok(built.get('/sitemap.xml').includes(`<loc>${bareData.url}/testimonials</loc>`), 'sitemap lists it');
+    assert.ok(built.get('/llms.txt').includes(`(${bareData.url}/testimonials)`), 'llms.txt lists it');
+    assert.ok(JSON.parse(built.get('/pages.json')).some((entry) => entry.url === `${bareData.url}/testimonials`), 'pages.json indexes it');
+
+    // …and the dev surface it was mistaken for is still out of all three.
+    assert.ok(built.get('/test'), 'the framework dev index builds in a dev build');
+    assert.ok(!built.get('/sitemap.xml').includes(`<loc>${bareData.url}/test</loc>`), '/test itself stays out of the sitemap');
+    assert.ok(!built.get('/llms.txt').includes(`(${bareData.url}/test)`), 'and out of llms.txt');
+    assert.ok(!JSON.parse(built.get('/pages.json')).some((entry) => entry.url === `${bareData.url}/test`), 'and out of pages.json');
+  } finally {
+    fs.rmSync(consumerDir, { recursive: true, force: true });
+  }
+});
+
 test('ads.txt: renders the configured AdSense client with the ca- prefix stripped', () => {
   assert.match(pages.get('/ads.txt'), /^google\.com, pub-1234567890, DIRECT, f08c47fec0942fa0$/m);
   // #556 — the record is the FIRST byte: the gate tag was left-stripped only,
@@ -159,6 +209,50 @@ test('llms.txt: llmstxt.org shape — brand heading, summary, pages and posts as
   assert.ok(!llms.includes('llms.txt'), 'llms.txt does not list itself');
 });
 
+// #731: the Posts walk filtered on its own rule list, so a post the brand took
+// OUT of the machine files could be dropped from the sitemap and pages.json and
+// still handed to an LLM. One flag, every file: #564 retired `sitemap.include`
+// outright, so the opt-out a post writes is `meta.index: false`, the same key
+// every other page writes. Inside the package, not os.tmpdir; see the
+// index-posture consumer test.
+test('llms.txt: a post with `meta.index: false` is out of llms.txt, the sitemap and pages.json (#731/#564)', async () => {
+  const consumerDir = path.join(PKG, '.omega', 'meta-files-post-excluded-src');
+  fs.rmSync(consumerDir, { recursive: true, force: true });
+  fs.cpSync(MINI, consumerDir, { recursive: true });
+  fs.writeFileSync(path.join(consumerDir, '_posts', '2024', '2024-03-01-excluded-post.md'), [
+    '---',
+    'layout: blueprint/blog/post',
+    'meta:',
+    '  index: false',
+    'post:',
+    '  title: "Excluded post"',
+    '  description: "Written, published, and not for the machines"',
+    '  author: jane doe',
+    '  id: 1000099',
+    '---',
+    '',
+    'Kilo lima mike november oscar papa.',
+    '',
+  ].join('\n'));
+
+  try {
+    const built = await buildSite(consumerDir, miniData, {}, 'meta-files-post-excluded');
+    const excluded = `${miniData.url}/blog/excluded-post`;
+    const kept = `${miniData.url}/blog/first-post`;
+    assert.ok(built.get('/blog/excluded-post'), `the post itself still builds: ${[...built.keys()].filter((url) => url.startsWith('/blog/')).join(', ')}`);
+
+    const llms = built.get('/llms.txt');
+    assert.ok(llms.includes(`(${kept})`), 'a normal post is still listed under Posts');
+    assert.ok(!llms.includes(`(${excluded})`), 'the excluded post is not handed to an LLM');
+
+    // The two files that already honored the flag, as the parity proof.
+    assert.ok(!built.get('/sitemap.xml').includes(`<loc>${excluded}</loc>`), 'and it stays out of the sitemap');
+    assert.ok(!JSON.parse(built.get('/pages.json')).some((entry) => entry.url === excluded), 'and out of pages.json');
+  } finally {
+    fs.rmSync(consumerDir, { recursive: true, force: true });
+  }
+});
+
 test('llms.txt: a consumer file at the same URL wins (default-page shadowing)', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-llms-'));
   const consumerDir = path.join(tmp, 'src');
@@ -166,8 +260,8 @@ test('llms.txt: a consumer file at the same URL wins (default-page shadowing)', 
   fs.writeFileSync(path.join(consumerDir, 'pages', 'llms.md'), [
     '---',
     'permalink: /llms.txt',
-    'sitemap:',
-    '  include: false',
+    'meta:',
+    '  index: false',
     '---',
     'CONSUMER LLMS BRIEF',
     '',

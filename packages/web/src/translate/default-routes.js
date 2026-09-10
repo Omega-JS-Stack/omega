@@ -13,6 +13,11 @@ const jetpack = require('fs-jetpack');
 const yaml = require('js-yaml');
 const { PATHS } = require('../paths.js');
 
+// The legal boilerplate's family, named because TWO derivations read it: the
+// never-translated set below, and legalRoutes() — the generator harvests those
+// routes from nowhere, so the framework packages no copy for them.
+const LEGAL_LAYOUT = 'blueprint/legal';
+
 // Layouts whose pages carry no marketing copy — matched exactly or as a family
 // prefix (`blueprint/auth` covers `blueprint/auth/signin`).
 const NEVER_TRANSLATED_LAYOUTS = [
@@ -21,7 +26,8 @@ const NEVER_TRANSLATED_LAYOUTS = [
   'blueprint/app', // the user app shell
   'blueprint/account',
   'blueprint/auth',
-  'blueprint/legal', // terms/privacy/cookies — legally binding in ONE language
+  'blueprint/connections', // the provider redirect lands here — a spinner, not copy
+  LEGAL_LAYOUT, // terms/privacy/cookies — legally binding in ONE language
   'blueprint/payment',
   'blueprint/portal',
 ];
@@ -71,25 +77,37 @@ function routeFromPermalink(permalink) {
 }
 
 /**
+ * Whether a layout belongs to a family — exactly, or as its prefix.
+ * @param {*} layout - the frontmatter value
+ * @param {string} family - a layout family
+ * @returns {boolean}
+ */
+function inFamily(layout, family) {
+  return typeof layout === 'string' && (layout === family || layout.startsWith(`${family}/`));
+}
+
+/**
  * Whether a layout renders framework plumbing rather than brand copy.
  * @param {*} layout - the frontmatter value
  * @returns {boolean}
  */
 function isPlumbing(layout) {
-  return typeof layout === 'string'
-    && NEVER_TRANSLATED_LAYOUTS.some((family) => layout === family || layout.startsWith(`${family}/`));
+  return NEVER_TRANSLATED_LAYOUTS.some((family) => inFamily(layout, family));
 }
 
 /**
- * The framework's never-translated routes, read off the defaults tree.
+ * Scan a defaults tree once — every never-translated route, and the legal
+ * subset of them.
  * @param {string} [defaultsDir] - the packaged defaults dir (tests override it)
- * @returns {Set<string>} routes, in routeOf() shape (no leading slash)
+ * @returns {{ excluded: Set<string>, legal: Set<string> }} routes, in routeOf()
+ *   shape (no leading slash)
  */
-function defaultExcludedRoutes(defaultsDir) {
+function scanDefaults(defaultsDir) {
   const dir = path.resolve(defaultsDir || PATHS.defaults);
 
   if (!derived.has(dir)) {
-    const routes = new Set();
+    const excluded = new Set();
+    const legal = new Set();
 
     for (const file of jetpack.find(path.join(dir, 'pages'), { matching: ['*.md', '*.html'] })) {
       const { layout, permalink } = readFrontmatter(file);
@@ -98,14 +116,37 @@ function defaultExcludedRoutes(defaultsDir) {
       // The home route ('') would swallow the whole site as a folder prefix —
       // it is also never a plumbing page, so reaching it means a broken tree.
       if (route) {
-        routes.add(route);
+        excluded.add(route);
+
+        if (inFamily(layout, LEGAL_LAYOUT)) {
+          legal.add(route);
+        }
       }
     }
 
-    derived.set(dir, routes);
+    derived.set(dir, { excluded, legal });
   }
 
   return derived.get(dir);
 }
 
-module.exports = { defaultExcludedRoutes };
+/**
+ * The framework's never-translated routes, read off the defaults tree.
+ * @param {string} [defaultsDir] - the packaged defaults dir (tests override it)
+ * @returns {Set<string>} routes, in routeOf() shape (no leading slash)
+ */
+function defaultExcludedRoutes(defaultsDir) {
+  return scanDefaults(defaultsDir).excluded;
+}
+
+/**
+ * The framework's legal routes — the never-translated pages the generator also
+ * harvests nothing for, so no packaged copy of them exists (#621).
+ * @param {string} [defaultsDir] - the packaged defaults dir (tests override it)
+ * @returns {Set<string>} routes, in routeOf() shape (no leading slash)
+ */
+function legalRoutes(defaultsDir) {
+  return scanDefaults(defaultsDir).legal;
+}
+
+module.exports = { defaultExcludedRoutes, legalRoutes };

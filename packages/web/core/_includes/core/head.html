@@ -19,21 +19,46 @@
   {% assign favicon-path = resolved.config.favicon.path %}
 {%- endiftruthy -%}
 
-<!-- The index posture (#564): `meta.index: false` is the ONE decision — a
-     layout, a page, or the config `meta` section sets it, and sitemap.xml
-     filters on the very same value, so the two signals can never disagree.
-     Two families answer by URL instead, because one template generates both
-     the indexable page and the ones that must not be: a listing's `/page/N`
-     (page 1 is the canonical listing) and the framework's `/test` dev
-     surfaces (#554 keeps them out of a production build entirely). -->
+<!-- The index posture (#564): `meta.index` is the ONE decision, resolved once
+     per page by the engine (engine.js `resolved`): the site default
+     `targets.web.meta.index`, then the layout's, then the page's own, then the
+     framework's automatic exclusions (drafts, the /test dev surfaces, /admin/,
+     redirect stubs, a listing's pages 2..N). sitemap.xml, pages.json and
+     llms.txt filter on that very same value, so no signal keeps a rule list of
+     its own and none of them can disagree. -->
 {% assign page-robots = "index" %}
-{%- if resolved.meta.index == false or page.url contains "/page/" or page.url contains "/test/" -%}
+{%- if resolved.meta.index == false -%}
   {% assign page-robots = "noindex" %}
 {%- endif -%}
 
+<!-- Redirect pages (#466): a page carrying `redirect.url` is not a page, it is
+     a forwarding URL, so the head says so three ways — the destination is the
+     canonical (this URL never competes with it in an index), the layout's own
+     `meta.index: false` already made it noindex, and a meta-refresh performs
+     the hop with JavaScript off. The refresh is emitted inside <noscript>
+     BELOW: with JS on, the redirect layout's own script does the hop and forwards the
+     querystring and the fragment, which a refresh cannot, so the two must
+     never race. A SITE-RELATIVE destination is absolutized here, since the
+     base-path pass only rewrites href/src attributes — and only that one: a
+     single leading slash. `//cdn.example.com/x` is already absolute and a
+     `mailto:` is not a path at all, so both ship verbatim. -->
+{% assign page-redirect = "" %}
+{%- iftruthy resolved.redirect.url -%}
+  {% capture page-redirect %}{{ resolved.redirect.url | omega_liquify | strip }}{% endcapture %}
+  {%- assign page-redirect-head1 = page-redirect | slice: 0, 1 -%}
+  {%- assign page-redirect-head2 = page-redirect | slice: 0, 2 -%}
+  {%- if page-redirect-head1 == "/" and page-redirect-head2 != "//" -%}
+    {% capture page-redirect %}{{ resolved.config.url }}{{ page-redirect }}{% endcapture %}
+  {%- endif -%}
+{%- endiftruthy -%}
+
 <!-- Assign Default Dynamic Variables -->
-<!-- (Page asset lookups are computed by the engine: pageAssets.css / pageAssets.themeCss / pageAssets.js
-     resolve this page's content-hashed bundles from the asset manifest.) -->
+<!-- (Asset lookups are computed by the engine: pageAssets.css / pageAssets.js
+     resolve this URL's content-hashed bundles from the asset manifest, and
+     layoutAssets.css / layoutAssets.js this page's layout chain. Each is a LIST
+     — every layer that ships one, in load order. A css entry carries `href`
+     for a hashed file, or `inline` for a sheet small enough to print in the
+     document instead of fetching, #767.) -->
 {% assign page-title = resolved.meta.title | omega_liquify %}
 {% assign page-description = resolved.meta.description | omega_liquify %}
 {% assign page-image = resolved.meta.image | omega_liquify %}
@@ -103,6 +128,39 @@
   <link rel="dns-prefetch" href="https://chatsy.ai"/>
 {% endiftruthy %}
 
+<!-- Analytics providers (#467): the three origins core/js/core/analytics-loader.js
+     injects a script from, each on the SAME gate the loader reads — a provider
+     with no id is never injected, so warming its origin would be a handshake
+     nobody spends. Consent gates the injection, not the warmup: a preconnect
+     sends no request and sets no cookie, and by the time a visitor accepts the
+     banner the connection is already open.
+     No crossorigin here: these are plain <script src> fetches, and an anonymous
+     preconnect opens a connection the tag cannot reuse. -->
+{% iftruthy resolved.config.analytics.providers.google.id %}
+  <link rel="preconnect" href="https://www.googletagmanager.com"/>
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com"/>
+{% endiftruthy %}
+{% iftruthy resolved.config.analytics.providers.meta.id %}
+  <link rel="preconnect" href="https://connect.facebook.net"/>
+  <link rel="dns-prefetch" href="https://connect.facebook.net"/>
+{% endiftruthy %}
+{% iftruthy resolved.config.analytics.providers.tiktok.id %}
+  <link rel="preconnect" href="https://analytics.tiktok.com"/>
+  <link rel="dns-prefetch" href="https://analytics.tiktok.com"/>
+{% endiftruthy %}
+
+<!-- Firebase (#467): @omega.js/client boots the SDK the moment cloud.config
+     carries an apiKey (index.js `_resolveFirebaseConfig()?.apiKey`) — auth
+     refreshes the persisted token against securetoken, then the auth module
+     reads the account doc from firestore. Both are CORS fetches, so the warmup
+     IS anonymous or it is not the connection the SDK reuses. -->
+{% iftruthy resolved.config.cloud.config.apiKey %}
+  <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin/>
+  <link rel="dns-prefetch" href="https://securetoken.googleapis.com"/>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin/>
+  <link rel="dns-prefetch" href="https://firestore.googleapis.com"/>
+{% endiftruthy %}
+
 <!-- Cloudflare Insights (if used) -->
 <!-- <link rel="preconnect" href="https://static.cloudflareinsights.com"/>
 <link rel="dns-prefetch" href="https://static.cloudflareinsights.com"/> -->
@@ -114,6 +172,81 @@
      stamp, so no-JS pages render fully visible. Inline + first so the stamp
      beats first paint. -->
 <script>document.documentElement.setAttribute('data-omega-motion', 'true');</script>
+
+<!-- First-paint reveal starter (#763): the band that IS the first viewport
+     animates from the moment it is PARSED, not when the engine's observer
+     fires. Inline on purpose — a fetch here is the wait it exists to remove
+     (#749 measured ~2.0s of a 2,588ms mobile LCP on that wait).
+     The guard is PER ELEMENT, never per band: the parser hands the band over at
+     its OPEN tag, when it holds no copy yet, so a band-level "already handled"
+     flag stamped nothing and left the real work to DOMContentLoaded — which
+     waits for the deferred module bundles, exactly the wait this removes. Each
+     mutation batch collects the reveals it just saw (data-omega-inview IS the
+     guard) and coalesces TWO frames, so the browser paints the opacity-0 state
+     and the CSS transition really runs. The stagger is re-applied to the whole
+     container each time (motion.js applyStagger, same 60ms default): parse
+     order is document order, so an index never changes and re-setting the same
+     value restarts nothing. The engine's observeReveal skips a stamped element,
+     so its later boot does nothing in here, and reduced motion needs no guard:
+     the reveal lane only hides under no-preference. -->
+<script>
+(() => {
+  const HOOK = '[data-omega-first-paint] [data-omega-reveal]:not([data-omega-inview])'
+    + ', [data-omega-first-paint][data-omega-reveal]:not([data-omega-inview])';
+  const queue = new Set();
+  const collect = (node) => {
+    if (node.nodeType !== 1) { return; }
+    if (node.matches(HOOK)) { queue.add(node); }
+    node.querySelectorAll(HOOK).forEach((el) => queue.add(el));
+  };
+  let frame = 0;
+  const schedule = () => {
+    if (frame || !queue.size) { return; }
+    // TWO frames on purpose: the first one paints what has been collected at
+    // opacity 0 (a transition needs that starting state to have been rendered),
+    // the second stamps it. Anything the parser adds in between rides the next
+    // batch, so every element gets its own painted frame first.
+    frame = requestAnimationFrame(() => {
+      const batch = [...queue];
+      queue.clear();
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        new Set(batch.map((el) => el.closest('[data-omega-first-paint]'))).forEach((band) => {
+          if (!band) { return; }
+          band.querySelectorAll('[data-omega-reveal-stagger]').forEach((parent) => {
+            const step = Number(parent.getAttribute('data-omega-reveal-stagger')) || 60;
+            parent.querySelectorAll('[data-omega-reveal]').forEach((el, index) => {
+              el.style.setProperty('--omega-reveal-delay', `${index * step}ms`);
+            });
+          });
+        });
+        batch.forEach((el) => el.setAttribute('data-omega-inview', 'true'));
+        schedule();
+      });
+    });
+  };
+  const observer = new MutationObserver((records) => {
+    records.forEach((record) => record.addedNodes.forEach(collect));
+    schedule();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  // The backstop, for anything the parser was still emitting at the last frame.
+  document.addEventListener('DOMContentLoaded', () => {
+    observer.disconnect();
+    collect(document.documentElement);
+    schedule();
+  });
+})();
+</script>
+
+<!-- First-paint script (#585): the reveal starter, in its own tiny bundle.
+     A deferred module, so it downloads in parallel with the stylesheet and runs
+     the moment the DOM is parsed — ahead of the main bundle's module in the
+     foot, and independent of images, fonts and firebase. Booting reveals from
+     the main bundle meant the hero stayed blank for the whole JS download.
+     core/js/first-paint.js is the seam; keep it small. -->
+<script type="module" src="{{ assetManifest.js.firstPaint }}"></script>
+
 <meta name="viewport" content="{{ page-viewport }}"/>
 <meta name="HandheldFriendly" content="True"/>
 <meta name="MobileOptimized" content="320"/>
@@ -124,8 +257,15 @@
 <!-- Referrer -->
 <meta name="referrer" content="{{ page-referrer }}"/>
 
-<!-- Canonical -->
-<link rel="canonical" href="{{ resolved.config.url }}{{ page.url }}"/>
+<!-- Canonical (a redirect page's is its DESTINATION, #466) -->
+<link rel="canonical" href="{% if page-redirect != '' %}{{ page-redirect }}{% else %}{{ resolved.config.url }}{{ page.url }}{% endif %}"/>
+
+<!-- Meta refresh: the no-JS half of a redirect page. In <noscript> on purpose
+     — the redirect layout's script forwards the querystring and the fragment,
+     so it must win whenever it can run at all. -->
+{%- if page-redirect != '' -%}
+  <noscript><meta http-equiv="refresh" content="0; url={{ page-redirect }}"/></noscript>
+{%- endif -%}
 
 <!-- Robots -->
 <meta name="robots" content="{{ page-robots }}"/>
@@ -201,29 +341,57 @@
   {{ page-ie-script }}
 <![endif]-->
 
-<!-- Font preloads: first-paint faces discovered from the active theme's
-     fonts/ dir — fetched in parallel with the stylesheet so glyphs are ready
-     by the time the layout paints (eliminates the system-font flash on cold
-     cache). crossorigin is required for font preloads per spec. -->
-{% for font in site.fontPreloads %}
+<!-- Font preloads: the first-paint faces the asset lane picked off the
+     compiled sheet's @font-face rules (#765) — fetched in parallel with the
+     stylesheet so glyphs are ready by the time the layout paints (eliminates
+     the system-font flash on cold cache). crossorigin is required for font
+     preloads per spec. -->
+{% for font in assetManifest.fontPreloads %}
 <link rel="preload" href="{{ font }}" as="font" type="font/woff2" crossorigin/>
 {% endfor %}
 
-<!-- CSS Bundles: content-hashed by the asset pipeline, mapped via the manifest -->
-<!-- Note: media="print" onload="this.media='all'" does NOT improve performance -->
+<!-- CSS Bundles: content-hashed by the asset pipeline, mapped via the manifest.
+     The main sheet does NOT render-block (#750): the asset lane extracts its
+     first-paint subset (tokens, shell chrome, nav, hero) and it is inlined
+     here, then the full sheet loads through rel=preload and swaps itself into
+     the cascade on load. The <link> keeps its document position, so cascade
+     order never moves — the layout and page sheets below still win over it.
+     <noscript> carries the plain sheet for a visitor with JS off.
+     Note: media="print" onload="this.media='all'" does NOT improve performance.
+     A dev build extracts nothing (that lane never purges either), so there the
+     head keeps the plain blocking link — no flash while you work. The dev
+     manifest carries '' and Liquid's `if` reads '' as true, hence iftruthy. -->
+{% iftruthy assetManifest.css.critical %}
+<style>{{ assetManifest.css.critical }}</style>
+<link rel="preload" as="style" href="{{ assetManifest.css.main }}" onload="this.onload=null;this.rel='stylesheet'"/>
+<noscript><link rel="stylesheet" type="text/css" href="{{ assetManifest.css.main }}"/></noscript>
+{% endiftruthy %}
+{% iffalsy assetManifest.css.critical %}
 <link rel="stylesheet" type="text/css" href="{{ assetManifest.css.main }}"/>
+{% endiffalsy %}
 
-<!-- Then, fetch any page specific bundle -->
-{% iftruthy pageAssets.css %}
-  <link rel="stylesheet" type="text/css" href="{{ pageAssets.css }}"/>
-{% endiftruthy %}
+<!-- Then this page's LAYOUT sheets: one per layout in the chain, outermost
+     first (css/layouts/<layout>.scss). A sheet under the lane's byte budget
+     arrives as css TEXT and prints here as a <style> block instead of a link
+     (#767): the request queues behind the HTML and the font preloads, which
+     cost about a second of first paint however small the sheet is. The block
+     stands exactly where the link stood, so the cascade never moves. -->
+{% for layoutCss in layoutAssets.css %}
+  {% if layoutCss.inline %}<style>{{ layoutCss.inline }}</style>
+  {% else %}<link rel="stylesheet" type="text/css" href="{{ layoutCss.href }}"/>
+  {% endif %}
+{% endfor %}
 
-<!-- Then, the active theme's page-specific bundle (loaded AFTER base so it can override).
-     Only present when the theme ships page CSS for this path — otherwise nothing loads
-     and the theme's component/general styles handle the page. No fallback needed. -->
-{% iftruthy pageAssets.themeCss %}
-  <link rel="stylesheet" type="text/css" href="{{ pageAssets.themeCss }}"/>
-{% endiftruthy %}
+<!-- Then the page-specific bundles: EVERY layer that ships a sheet for this
+     URL, in layer order — core, then the theme, then the consumer (#624). One
+     rule, the same one the page JS follows: nothing replaces anything, the
+     later sheet decorates the earlier one by winning the cascade. A layer with
+     no sheet for this path simply contributes nothing. -->
+{% for pageCss in pageAssets.css %}
+  {% if pageCss.inline %}<style>{{ pageCss.inline }}</style>
+  {% else %}<link rel="stylesheet" type="text/css" href="{{ pageCss.href }}"/>
+  {% endif %}
+{% endfor %}
 
 <!-- Brand accent tokens: derived from brand.color at build (src/brand-tokens.js);
      emitted AFTER the bundles so the ramps win the cascade over the token sheet's

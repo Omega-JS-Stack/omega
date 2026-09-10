@@ -21,6 +21,10 @@ const path = require('node:path');
 // writeEnvValue writeback, so a company .env and a brand .env look alike.
 const { renderCanonicalEnv } = require('./env-order.js');
 
+// The ONE environment vocabulary — the same three overlays the brand scaffold
+// plans beside its own .env (#586)
+const { ENV_ENVIRONMENTS } = require('@omega.js/config');
+
 // Directories init guarantees. The signing tree is the certificates service's
 // layout under {signingRoot}/.omega/certificates/apple/ — created empty so
 // the operator has an obvious home for the App Store Connect `AuthKey_*.p8`
@@ -106,6 +110,25 @@ function renderCompanyEnvStub(name) {
 }
 
 /**
+ * A company environment-overlay stub — a header comment and NOTHING else, the
+ * same shape the BRAND scaffold plans
+ * ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)). The company
+ * layer is a layer like any other: its `.env` is the one file that documents
+ * the keys, and an overlay holds only the handful that differ for one
+ * environment (a sandbox Apple account, a staging token).
+ *
+ * @param {string} environment - `development` | `testing` | `production`.
+ * @returns {string} The file contents.
+ */
+function renderCompanyEnvOverlayStub(environment) {
+  return [
+    `# .env.${environment} — overlays .env when a managed brand runs in ${environment} (gitignored).`,
+    '# Only the keys that differ — anything not set here falls through to .env.',
+    '',
+  ].join('\n');
+}
+
+/**
  * The company repo's .gitignore. The `.omega/` and `logs/` entries match the
  * shared healer's (lib/gitignore.js) exactly, so a company root scaffolded
  * here is already 'present' when a company run checks.
@@ -123,8 +146,9 @@ function renderCompanyGitignore() {
     '# Run logs (truncated on every launch — never committed)',
     'logs/',
     '',
-    '# Secrets',
+    '# Secrets — the shared .env and its per-environment overlays',
     '.env',
+    '.env.*',
     '',
     '# Managed brands — each one is its OWN git repo, never embedded in this one',
     'brands/',
@@ -148,6 +172,8 @@ shared Apple signing tree live here, and each brand stays its own repo.
   brands are; every other key is a default a brand can override).
 - \`.env\` — company secrets, loaded UNDER each brand's own \`.env\`
   (shell > brand \`.env\` > this file). Gitignored.
+- \`.env.<environment>\` — the per-environment overlay (\`development\`, \`testing\`,
+  \`production\`): only the keys that differ there.
 - \`.omega/certificates/apple/\` — the shared Apple signing tree: one Apple
   account signs everything the company ships. Gitignored; drop the App Store
   Connect \`AuthKey_*.p8\` here.
@@ -176,6 +202,7 @@ function buildCompanyScaffoldPlan(name) {
     { path: path.join('config', 'omega.json5'), contents: renderCompanyConfig(name) },
     { path: '.gitignore', contents: renderCompanyGitignore() },
     { path: '.env', contents: renderCompanyEnvStub(name) },
+    ...ENV_ENVIRONMENTS.map((environment) => ({ path: `.env.${environment}`, contents: renderCompanyEnvOverlayStub(environment) })),
     { path: 'README.md', contents: renderCompanyReadme(name) },
     // Self-protecting: signing material can never be committed even if the
     // root .gitignore is edited or the tree is copied into another repo.

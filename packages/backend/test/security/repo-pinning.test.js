@@ -8,15 +8,16 @@
  *
  * Schemas are pure functions with no I/O, so they are asserted directly.
  */
-const { buildSchemaMap } = require('../../src/manager/helpers/schema-zod.js');
+const { buildSchemaMap } = require('../../dist/manager/helpers/schema-zod.js');
 
 const SCHEMAS = {
-  'admin/post (create)': require('../../src/manager/schemas/admin/post/post.js'),
-  'admin/post (edit)': require('../../src/manager/schemas/admin/post/put.js'),
-  'admin/repo/content': require('../../src/manager/schemas/admin/repo/content/post.js'),
+  'admin/post (create)': require('../../dist/manager/schemas/admin/post/post.js'),
+  'admin/post (edit)': require('../../dist/manager/schemas/admin/post/put.js'),
+  'admin/repo/content': require('../../dist/manager/schemas/admin/repo/content/post.js'),
 };
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin repo targets come from brand config, never the caller',
   type: 'group',
   timeout: 10000,
@@ -73,4 +74,4 @@ module.exports = {
       },
     },
   ],
-};
+});

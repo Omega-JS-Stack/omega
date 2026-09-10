@@ -15,6 +15,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
 
@@ -28,7 +29,7 @@ function readTitle(html) {
   return match ? match[1] : null;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Shipped templates: storage denies by default, the welcome page owns its title',
   type: 'group',
   timeout: 10000,
@@ -62,4 +63,4 @@ module.exports = {
       },
     },
   ],
-};
+});

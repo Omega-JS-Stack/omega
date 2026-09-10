@@ -5,9 +5,10 @@
  * The Stripe round trips ride the real HTTP surface, so a delivery is gated by
  * the shared `?key=` param alone — the one check every provider rides.
  */
-const { TEST_ACCOUNTS } = require('../../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS } = require('../../../dist/test/test-accounts.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment webhook endpoint',
   type: 'group',
   timeout: 30000,
@@ -111,4 +112,4 @@ module.exports = {
       },
     },
   ],
-};
+});

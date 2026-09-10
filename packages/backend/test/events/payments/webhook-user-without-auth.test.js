@@ -20,6 +20,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-journey-flows-upgrade';
 const ORDER_ID = '2403-2403-2403';
@@ -49,7 +50,7 @@ function existingUser() {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A payment webhook never creates a user doc for a uid with no auth user',
   type: 'group',
   timeout: 30000,
@@ -157,4 +158,4 @@ module.exports = {
       },
     },
   ],
-};
+});

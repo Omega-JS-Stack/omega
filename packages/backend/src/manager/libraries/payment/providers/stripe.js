@@ -2,6 +2,7 @@ const powertools = require('node-powertools');
 const fetchFailure = require('../fetch-failure.js');
 const assertRefundLinkage = require('../refund-linkage.js');
 const env = require('../../env.js');
+const assertLicensedPayments = require('../license.js');
 
 // Lazy singleton Stripe SDK instance
 let stripeInstance = null;
@@ -25,6 +26,10 @@ const Stripe = {
    * @returns {object} Stripe SDK instance
    */
   init() {
+    // A keyless deploy runs no live payments (#320) — before the SDK, and
+    // before the cached instance below can hand one back
+    assertLicensedPayments('Stripe');
+
     if (!stripeInstance) {
       const secretKey = env.get('STRIPE_SECRET_KEY');
 
@@ -83,7 +88,7 @@ const Stripe = {
 
       throw new Error(`Unknown resource type: ${resourceType}`);
     } catch (e) {
-      throw fetchFailure(e, { provider: 'stripe', resourceType, resourceId });
+      throw fetchFailure(e, { provider: 'stripe', fn: 'fetchResource', resourceType, resourceId });
     }
   },
 

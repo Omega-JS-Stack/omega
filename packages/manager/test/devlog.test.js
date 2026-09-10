@@ -137,7 +137,7 @@ test('devlog: DEFAULTS carry the devlog block, disabled with website destination
 
 // ─── Project map ─────────────────────────────────────────────────────────────
 
-test('devlog: project map derives repo identity like the github service (repo || brand id)', () => {
+test('devlog: project map derives repo identity like the github service (a typed slug, else `<brand.id>-omega`)', () => {
   const brands = [
     fakeBrand('alpha'),
     fakeBrand('beta', { repo: 'beta-monorepo' }),
@@ -146,25 +146,39 @@ test('devlog: project map derives repo identity like the github service (repo ||
 
   const map = buildProjectMap(brands);
   assert.deepEqual(map, {
-    alpha: { project: 'alpha brand', url: 'https://alpha.test' },
+    'alpha-omega': { project: 'alpha brand', url: 'https://alpha.test' },
     'beta-monorepo': { project: 'beta brand', url: 'https://beta.test' },
   });
 
   const repos = buildBrandRepos(brands);
   assert.deepEqual(repos, [
-    { owner: 'fixture-org', repo: 'alpha' },
+    { owner: 'fixture-org', repo: 'alpha-omega' },
     { owner: 'fixture-org', repo: 'beta-monorepo' },
   ]);
 });
 
+test('devlog: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
+  // ../omega-brand's real shape: org Omega-JS-Stack, repo
+  // "itw-creative-works/omega-brand". An owner read off `org` scans a repo that
+  // does not exist.
+  const brands = [fakeBrand('acme', { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' })];
+
+  assert.deepEqual(buildProjectMap(brands), {
+    'acme-app': { project: 'acme brand', url: 'https://acme.test' },
+  });
+  assert.deepEqual(buildBrandRepos(brands), [{ owner: 'itw-creative-works', repo: 'acme-app' }]);
+});
+
 test('devlog: excludeRepos drops repos from both map and scan list; duplicates collapse', () => {
-  const brands = [fakeBrand('alpha'), fakeBrand('alpha-copy', { repo: 'alpha' }), fakeBrand('beta')];
+  // The copy TYPES the slug the first brand derives, which is what makes the two
+  // one repo, and the duplicate the collapse is about.
+  const brands = [fakeBrand('alpha'), fakeBrand('alpha-copy', { repo: 'alpha-omega' }), fakeBrand('beta')];
 
-  const map = buildProjectMap(brands, { excludeRepos: ['beta'] });
-  assert.deepEqual(Object.keys(map), ['alpha']);
+  const map = buildProjectMap(brands, { excludeRepos: ['beta-omega'] });
+  assert.deepEqual(Object.keys(map), ['alpha-omega']);
 
-  const repos = buildBrandRepos(brands, { excludeRepos: ['beta'] });
-  assert.deepEqual(repos, [{ owner: 'fixture-org', repo: 'alpha' }]);
+  const repos = buildBrandRepos(brands, { excludeRepos: ['beta-omega'] });
+  assert.deepEqual(repos, [{ owner: 'fixture-org', repo: 'alpha-omega' }]);
 });
 
 // ─── Collect ─────────────────────────────────────────────────────────────────
@@ -424,6 +438,39 @@ test('devlog: an empty window reports published: false without generating', asyn
   assert.deepEqual(report, { published: false, commits: 0 });
 });
 
+// #586 — devlog talks to REAL GitHub and a real writer account, so its secrets
+// chain is pinned to the `production` overlay: the shell's incidental
+// environment never decides which token the run publishes with.
+test('devlog: the secrets chain reads the brand .env.production overlay, whatever the shell says', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-env-'));
+  const brandRoot = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha') });
+  const saved = { ENVIRONMENT: process.env.ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE };
+
+  fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_FIXTURE_KEY="from-the-base"\n');
+  fs.writeFileSync(path.join(brandRoot, '.env.development'), 'DEVLOG_FIXTURE_KEY="from-the-development-overlay"\n');
+  fs.writeFileSync(path.join(brandRoot, '.env.production'), 'DEVLOG_FIXTURE_KEY="from-the-production-overlay"\n');
+
+  try {
+    delete process.env.DEVLOG_FIXTURE_KEY;
+    delete process.env.OMEGA_TEST_MODE;
+    process.env.ENVIRONMENT = 'development';
+
+    await runDevlog(brandRoot, {}, {
+      githubApi: fakeApi([]),
+      generatePost: async () => { throw new Error('must not generate'); },
+    });
+
+    assert.equal(process.env.DEVLOG_FIXTURE_KEY, 'from-the-production-overlay', 'the devlog lane pins production — a development shell never swaps the overlay');
+  } finally {
+    delete process.env.DEVLOG_FIXTURE_KEY;
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('devlog: --dry-run previews to .omega/devlog/ and picks the single enabled company brand', async () => {
   const { root, brands } = stageCompany({
     'brand-a': devlogConfig('brand-a', { enabled: false }),
@@ -440,7 +487,7 @@ test('devlog: --dry-run previews to .omega/devlog/ and picks the single enabled 
     githubApi: api,
     generatePost: async ({ commits, projectMap }) => {
       // The sibling map covers BOTH brands even though only one publishes
-      assert.deepEqual(Object.keys(projectMap).sort(), ['brand-a', 'brand-b']);
+      assert.deepEqual(Object.keys(projectMap).sort(), ['brand-a-omega', 'brand-b-omega']);
       assert.equal(commits.length, 1);
       return { ...POST, slug: 'sharpen-the-tool' };
     },

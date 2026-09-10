@@ -410,6 +410,28 @@ test('composedWorkflowName: the root name in a monorepo, the plain name standalo
     brandRoot: null,
     workflow: 'publish.yml',
   }), 'publish.yml');
+
+  // The TARGET DIR prefixes the name, not the framework: web's `website` and
+  // desktop's `desktop` both ship a `build.yml`, and the two composed files sit
+  // side by side at the brand root. Desktop's release/deploy verbs read this
+  // name too (#799).
+  assert.equal(composedWorkflowName({
+    targetDir: '/brand/targets/desktop',
+    brandRoot: '/brand',
+    workflow: 'build.yml',
+  }), 'desktop-build.yml');
+
+  assert.equal(composedWorkflowName({
+    targetDir: '/brand/targets/website',
+    brandRoot: '/brand',
+    workflow: 'build.yml',
+  }), 'website-build.yml');
+
+  assert.equal(composedWorkflowName({
+    targetDir: '/standalone-desktop-app',
+    brandRoot: null,
+    workflow: 'build.yml',
+  }), 'build.yml');
 });
 
 test('a transform hook renders the template before composing (site tokens)', () => {

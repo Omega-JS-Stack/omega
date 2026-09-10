@@ -2,8 +2,9 @@
 // shared by lib/remote-scripts.js and lib/remote-config.js.
 
 const { isSecureRemoteUrl } = require('../../../utils/secure-remote-url.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'secure-remote-url (build)',
@@ -38,4 +39,4 @@ module.exports = {
       },
     },
   ],
-};
+});

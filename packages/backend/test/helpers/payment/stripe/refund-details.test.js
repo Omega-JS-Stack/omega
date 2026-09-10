@@ -16,7 +16,8 @@
  *
  * Run: npx omega test backend:helpers/payment/stripe/refund-details
  */
-const Stripe = require('../../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const CHARGE_ID = 'ch_test_refund_details';
 const SUBSCRIPTION_ID = 'sub_test_refund_details';
@@ -62,7 +63,7 @@ function envelope(amountCents, reason) {
   return { id: 'evt_test', type: 'charge.refunded', data: { object: charge(amountCents, reason) } };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Stripe getRefundDetails() reads the charge Stripe answered for',
   type: 'group',
 
@@ -143,4 +144,4 @@ module.exports = {
       },
     },
   ],
-};
+});

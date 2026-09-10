@@ -31,10 +31,10 @@ const FORWARD_CHANNEL = 'desktop:log:forward';
 // Detect context. In renderer bundles (target: 'web'), Node modules like 'electron'
 // don't exist — all detection returns false, and the logger becomes console-only +
 // IPC forwarding to main. No top-level `require('electron')` — that would get bundled
-// by webpack and crash in the browser-like renderer context.
+// by esbuild and crash in the browser-like renderer context.
 //
 // We lazy-load Node modules (path, fs, electron, electron-log) inside the functions
-// that actually need them (ensureMainFileTransport, tryForwardToMain) so webpack's
+// that actually need them (ensureMainFileTransport, tryForwardToMain) so esbuild's
 // renderer bundle never sees them.
 const _isBrowser = typeof window !== 'undefined' && typeof require === 'undefined';
 let _electron = null;

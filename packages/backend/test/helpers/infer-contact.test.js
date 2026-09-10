@@ -4,9 +4,10 @@
  *
  * AI tests only run when TEST_EXTENDED_MODE is set.
  */
-const { inferContact, capitalize } = require('../../src/manager/libraries/infer-contact.js');
+const { inferContact, capitalize } = require('../../dist/manager/libraries/infer-contact.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Infer contact from email',
   type: 'group',
 
@@ -153,4 +154,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -26,10 +26,11 @@
  * Run: npx omega test backend:routes/payments/dedup-race
  */
 const { callHandler } = require('./_route-harness.js');
-const { TEST_ACCOUNTS } = require('../../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS } = require('../../../dist/test/test-accounts.js');
 
-const webhookHandler = require('../../../src/manager/routes/payments/webhook/post.js');
-const disputeHandler = require('../../../src/manager/routes/payments/dispute-alert/post.js');
+const webhookHandler = require('../../../dist/manager/routes/payments/webhook/post.js');
+const disputeHandler = require('../../../dist/manager/routes/payments/dispute-alert/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
@@ -87,7 +88,7 @@ function assertExactlyOneProcessed(assert, sent, label) {
   assert.equal(duplicates.length, 1, `${label}: the other delivery must be told it is a duplicate, got ${duplicates.length}`);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment webhook + dispute alert: same-instant deliveries deduplicate',
   type: 'group',
   timeout: 30000,
@@ -182,4 +183,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -10,10 +10,11 @@
  * processing and Firestore tracking tests run against the real emulator.
  */
 const path = require('path');
-const resolverPath = path.resolve(__dirname, '../../../src/manager/libraries/content/source-resolver.js');
+const resolverPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/source-resolver.js');
 const { contentSourceHash, isURL } = require(resolverPath);
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'content/blog-auto-publisher',
   type: 'group',
 
@@ -478,4 +479,4 @@ module.exports = {
       },
     },
   ],
-};
+});

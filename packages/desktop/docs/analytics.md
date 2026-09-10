@@ -46,7 +46,7 @@ Mint the secret in GA4 Admin → Data Streams → your stream → **Measurement 
 
 ### Production builds
 
-Webpack's DefinePlugin bakes `process.env.GOOGLE_ANALYTICS_SECRET` into the bundled main process at build time, so packaged apps don't need `.env` at runtime. The build runs with the secret set (CI does this via the GitHub Actions secret pushed by `mgr push-secrets`).
+The `bundle` task's esbuild `define` bakes `process.env.GOOGLE_ANALYTICS_SECRET` into the bundled main process at build time, so packaged apps don't need `.env` at runtime. The build runs with the secret set (CI does this via the GitHub Actions secret pushed by `mgr push-secrets`).
 
 ## API
 

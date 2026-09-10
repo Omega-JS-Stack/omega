@@ -18,7 +18,7 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
    series-1 rides the accent, the rest are CVD-validated muted hues, cool half
    before warm), shadows
    (`shadow-1`/`shadow-2`), shape (`radius-xs/s/m/l/xl`), motion (`speed`,
-   `speed-slow`, `ease`), and the type slots (`font-ui`, `font-serif`,
+   `speed-slow`, `speed-first-paint`, `ease`), and the type slots (`font-ui`, `font-serif`,
    `font-mono`, plus the pairing slots `font-marketing` and `font-display`).
    Light + dark values ship together: OS preference carries via
    `@media (prefers-color-scheme: dark)`, and the `data-bs-theme` stamp
@@ -27,7 +27,10 @@ its quality hook fires on every stylesheet edit (contrast, focus, and reduced-mo
 2. **Mechanics** — `core/css/shell/_index.scss` (the `.omega-shell` app
    chrome: 264px sidebar / 68px rail / 60px topbar, drawer under 1200px; the
    rail clips nothing — its nav scrolls inside the `__sidebar-scroll` region
-   so rail popovers can escape, [#319](https://github.com/Omega-JS-Stack/omega/issues/319)),
+   so rail popovers can escape, [#319](https://github.com/Omega-JS-Stack/omega/issues/319);
+   main claims the `1fr` row explicitly, so a page that turns the topbar off
+   still scrolls inside main instead of handing the scroll back to the
+   document, [#741](https://github.com/Omega-JS-Stack/omega/issues/741)),
    `core/css/motion/_index.scss` (below), and `core/css/components/_index.scss`
    (the shared component vocabulary: `omega-chip` and its `--accent`/`--ink`
    modifiers, plus the app-chrome pair the base topbar/sidebar renders —
@@ -110,18 +113,51 @@ the tokens).
   and **Fraunces** the same way (cp187 — its Google Fonts CDN link is dead) —
   variable woff2, latin + latin-ext, OFL —
   in `themes/<theme>/fonts/`; the asset pipeline copies every layer's `fonts/`
-  dir to `/assets/fonts` (first layer wins), `css/base/_fonts.scss` carries
+  dir to `/assets/fonts` (first layer wins, and a consumer-local theme is
+  followed by the packaged theme it SHADOWS — inheriting that skin's sheet
+  through the hatch inherits the files its `@font-face` rules point at,
+  [#773](https://github.com/Omega-JS-Stack/omega/issues/773)), `css/base/_fonts.scss` carries
   the `@font-face` blocks (`font-display: swap`), and `css/base/_root.scss`
   re-points `--omega-font-ui` / `--omega-font-serif` at them. The core token
   sheet keeps system stacks as the framework default AND the fallback tail —
   swapping faces stays a values-only change (two custom properties + the
   files). Ordering note: core main.scss MUST load the token sheet before the
   theme `@forward` (Sass emits a module's CSS at its first load), or theme
-  token overrides lose the cascade.
+  token overrides lose the cascade. The head PRELOADS the first-paint faces,
+  and the list is read off those `@font-face` rules in the compiled sheet
+  ([#765](https://github.com/Omega-JS-Stack/omega/issues/765)) — a face with no
+  `unicode-range`, or one whose range reaches basic latin (U+0000-00FF), is a
+  first-paint face; the `-latin-ext` subsets stay out. So a theme naming its
+  files its own way, or vendoring ONE variable face, preloads correctly with
+  nothing to declare: the declaration IS the `@font-face`
+  ([docs/web/index.md](../web/index.md)).
+  And the face that paints BEFORE it lands is metric-matched
+  ([#768](https://github.com/Omega-JS-Stack/omega/issues/768)): the css lane
+  measures each vendored family's own font file, measures the system family the
+  theme's stack already names next, and generates
+  `@font-face { font-family: '<Family> Fallback'; src: local('<system family>'), ...;
+  size-adjust; ascent-override; descent-override; line-gap-override }` (one
+  `local()` per measured family the stack names, so the face resolves on macOS
+  and Windows alike; the overrides follow the first), then
+  names that face right after the web family in the `--omega-font-*` stack. The
+  system font occupies the same lines the webfont will, so `font-display: swap`
+  moves nothing (classy: Inter over `Helvetica Neue` at size-adjust 105.508%,
+  Newsreader over `georgia` at 91.224%). A theme gets this for FREE: the
+  transform reads the compiled sheet, so a theme's own faces and its own stacks
+  are all it has to declare, and no scss file names a fallback family. What a
+  theme owes is the tail: a stack that reaches none of the measured system
+  families (Arial, Helvetica, Helvetica Neue, Georgia, Times New Roman,
+  Verdana) gets no fallback face and one build warning naming the family.
 
 Tier 2 stays: fork `themes/_template` for a full theme; `themes/base` remains
 the fall-through layer for anything the theme doesn't cover, and base's
-`_theme.scss` forwards classy's theme as the default skin css.
+`_theme.scss` forwards classy's theme as the default skin css. The tier is
+PROVEN in a real build by the brand-shape corpus's `shape-theme-override` cell
+([#773](https://github.com/Omega-JS-Stack/omega/issues/773)): a consumer-local
+theme shadows the packaged one of the same id, and every file kind the cascade
+resolves — layout, include, the scss entry, a section's html, its own section
+js, and a lane left to the chain with `inherit: ['js']` — is read back out of
+`dist/` ([testing.md](testing.md)).
 
 ### CSS fall-through — the two lanes (cp190, closes the audit's asymmetry)
 
@@ -212,9 +248,9 @@ buttons — core appearance.js stamps `.active`/`aria-pressed`. The brand
 lockup class (`.omega-nav__brand`) is root-scoped and shared by nav +
 footer.
 
-**Per-page theme css override slot**: `themes/<theme>/css/pages/<page>/index.scss`
-compiles into the manifest's `themePages` bucket and loads LAST on its page —
-after main css AND core page css. That's where a theme outranks core page
+**Per-page theme css slot**: `themes/<theme>/css/pages/<page>/index.scss`
+compiles to its own bundle and loads after main css AND core's page sheet — one
+rule, every layer's sheet in layer order ([#624](https://github.com/Omega-JS-Stack/omega/issues/624)). That's where a theme outranks core page
 rules; classy's `status` and `feedback` entries repaint the JS-toggled `bg-*`
 state classes (a class contract — never rename them) into the hairline
 language there.
@@ -248,11 +284,13 @@ inherits them:
   click affordance — the surface warms on hover AND `:focus-visible`, an
   accent ring on focus, an accent-subtle tint on press. `--lift` adds the
   card lift (2px up, shadow-2) that presses back down; a row takes the base
-  class alone. `prefers-reduced-motion` drops the transition and the lift.
+  class alone. `prefers-reduced-motion` drops the transition and the lift, and
+  classy drops the lift outright (see "classy never raises on hover" below).
 
 Charts read the same ramp: `core/js/libs/charts.js` (`chartColors()`) resolves
-`--omega-chart-1…6` off `:root`, so a chart follows the brand ramp and dark
-mode without knowing either exists. A surface that means a STATUS passes the
+`--omega-chart-1…6` off `:root` and hands them to the chart definition as its
+theme palette, so a chart follows the brand ramp and dark mode without knowing
+either exists. A surface that means a STATUS passes the
 status tokens explicitly instead (`colors: ['var(--omega-ok)', …]` — the
 helper's `resolveColor` reads them off the live sheet); the admin dashboard's
 plan doughnut is the reference case ([#74](https://github.com/Omega-JS-Stack/omega/issues/74)).
@@ -297,20 +335,21 @@ both halves: the twins exist in every stamp, and the bridge is the LAST
 ## Motion library
 
 CSS: `core/css/motion/_index.scss`. Engine: `@omega.js/client/modules/motion.js`
-(`createMotion()`), booted by `core/js/core/motion.js` — shared with
-desktop/extension at C4 exactly like icon-renderer.
+(`createMotion()`), started by `core/js/first-paint.js` and registered on the
+omega library by `core/js/core/motion.js` — shared with desktop/extension at C4
+exactly like icon-renderer.
 
 | Surface | Use |
 |---|---|
 | `data-omega-reveal="up\|fade\|left\|right\|scale"` | reveal once on scroll-in |
 | `data-omega-reveal-stagger="60"` (parent) | staggers child reveals (ms step) |
-| `data-omega-reveal-lead` (the `<main>` shell) | names the wrapper whose FIRST section is the page's lead band: its reveals play from paint, in pure CSS, after a `--omega-reveal-lead-delay` (120ms) beat on a staged compositor layer. Layout plumbing (`themes/base/_layouts/frontend/core/base.html`), never authored per band |
+| `data-omega-first-paint` (band) | the band IS the first viewport: its reveals are started at PARSE time by head.html's inline starter (no fetch), and a rotator inside it opens on its first word (css) |
 | `data-omega-countup` | counts to the number already in the markup |
 | `data-omega-rotate="2600"` | children cycle (hero word rotator, quotes) |
 | `data-omega-marquee` + `.omega-marquee__track/__item` | seamless loop — the set is cloned until half the track covers the container (never runs dry), constant px/s (attr value overrides); clones are `aria-hidden` with focusables detabbed (`tabindex=-1`, still mouse-clickable) so interactive sets (newsflash ticker headlines) stay accessible |
 | `data-omega-scroll-watch="24"` | stamps `data-omega-scrolled` (glassy nav) |
 | `data-omega-segmented` | gliding-thumb segmented control: engine injects `.omega-segmented__thumb` and tracks the checked/`.active` segment (billing toggle, platform rails, footer appearance) |
-| `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, dots tint along ONE drifting rainbow gradient, pointer glow (tracked window-level so the fixed nav can't blind it); static CSS dots remain for no-JS/reduced-motion |
+| `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, dots tint along ONE drifting rainbow gradient, pointer glow (tracked window-level so the fixed nav can't blind it); the loop starts only once first paint has settled and repaints at 30fps (below), reduced motion gets ONE still grid, and static CSS dots remain for no-JS |
 | `.omega-hover-lift/-raise/-dim`, `.omega-pressable`, `.omega-hover-nudge .omega-nudge` | pure-CSS hover/press effects |
 | `.omega-interactive` (+ `--lift`) | whole-surface click affordance: warm on hover/focus-visible, ring on focus, tint on press |
 | `.omega-float`, `.omega-caret` | ambient float, terminal caret |
@@ -319,44 +358,144 @@ Resilience rules (load-bearing):
 
 - Reveal styles only hide content under the inline `html[data-omega-motion]`
   stamp (head.html) — **no JS means a fully visible page**.
-- **A reveal never waits for the client bundle**
+- **A reveal never waits for the big bundle**
   ([#585](https://github.com/Omega-JS-Stack/omega/issues/585)). The stamp lands
   before first paint, so a hidden reveal that waited on the engine's
-  IntersectionObserver was blank text for the whole JS download on a cold
-  cache. Two pure-CSS lanes close that: the LEAD band (the first `<section>`
-  under the `data-omega-reveal-lead` shell) animates in from paint, staggered
-  by CSS `:nth-child` delays; every other reveal auto-resolves itself after
-  `--omega-reveal-wait` (1s) unless the engine stamps
-  `html[data-omega-motion-ready]` first and takes the lane back for scroll
-  reveals. Booting LATE, the engine adopts what the net already resolved, so
-  the stamp can never re-hide text the visitor is reading. **Slow JS can only
-  shorten an animation, never blank a page.** One `omega-reveal-in` keyframe
-  serves both lanes (no `from`, so every direction starts from its own hidden
-  state), and both skip `.omega-float` — the library's ambient loop owns
-  `animation` on the elements it rides, so a floating decorative frame is
-  painted rather than revealed.
-- **The lead band waits a beat, on a staged layer** (#585 follow-up, Ian
-  2026-08-25). An entrance that starts at the very first frame plays while the
-  browser is still fetching fonts and scripts, and it looks it. So the lead
-  lane's delay is `--omega-reveal-lead-delay` (120ms) PLUS its stagger step —
-  after the worst of the load burst, still far ahead of any bundle — and it
-  declares `will-change: opacity, transform` so the compositor layer exists
-  during that beat instead of being built mid-animation. `core/js/core/motion.js`
-  drops the hint when the entrance's own `finished` promise resolves: a hint
-  that outlives its animation is memory reserved for nothing, and waiting on the
-  animation means a bundle arriving mid-entrance cannot cut it short. The safety
-  net stages nothing — it is the lane that usually never plays. **With JS
-  disabled entirely the hint persists** — the CSS-only lane's one accepted cost,
-  and cheaper than the blank hero it replaces.
-- **A band's stagger is ONE number, honoured by both lanes** (#585 F5). The
-  author writes it once, on the cluster: `data-omega-reveal-stagger="70"`. The
-  motion engine reads that attribute and writes `--omega-reveal-delay` per
-  child; the paint-time lane multiplies its `:nth-child` index by
-  `--omega-reveal-step`, and the BUILD mirrors the attribute into that property
-  on the same element ([reveal-stagger.js](../../packages/web/src/reveal-stagger.js),
-  the `omega-reveal-stagger` transform). Before the mirror every lead band
-  staggered at the 90ms fallback while its author had written 40–120ms. A
-  hand-authored `--omega-reveal-step` wins; the mirror never overwrites one.
+  IntersectionObserver was blank text for the whole JS download on a cold cache
+  — LCP measured on an empty band. The cause was never the animation but WHERE
+  the starter lived: `core/js/main.js`, behind firebase/auth/analytics init. The
+  fix is `core/js/first-paint.js` — its own asset entry, loaded from `head.html`
+  as a deferred `type="module"` script, so it runs the moment the DOM is parsed:
+  ahead of the main bundle's module in the foot, and independent of images,
+  fonts and firebase. Same engine, same CSS transition, same feel; it just
+  starts when the DOM is ready instead of when the app is.
+- **The band in the FIRST viewport starts its reveals at PARSE time**
+  ([#763](https://github.com/Omega-JS-Stack/omega/issues/763), Ian's ruling
+  2026-09-02). Booting the engine early made the gate cheap, not free: the
+  reveal lane is a SCROLL lane, and the opening band is never scrolled to.
+  Holding it at opacity 0 until the observer fires cost the playground homepage
+  ~2.0s of a 2,588ms mobile LCP, measured on `p.omega-hero__sub`
+  ([#749](https://github.com/Omega-JS-Stack/omega/issues/749)). #749 answered
+  that by taking the hero copy out of the lane entirely; the above-the-fold fade
+  is part of the design, so the attributes came back and the ATTRIBUTE changed
+  meaning instead. A band that declares `data-omega-first-paint` is run by an
+  inline starter in `head.html`, right after the motion stamp: a plain script,
+  no module and no fetch. A MutationObserver on `document.documentElement`
+  collects the reveals in each batch of added nodes, and **the guard is per
+  ELEMENT, never per band** — the parser hands a band over at its OPEN tag, when
+  it holds no copy yet, so a band-level "handled" flag stamps nothing and leaves
+  the work to `DOMContentLoaded`, which waits for the deferred bundles: the very
+  wait this removes. Each batch coalesces TWO animation frames — the first
+  paints what was collected at opacity 0, which is the transition's starting
+  state, the second stamps it — then re-applies the stagger across the whole
+  container (`--omega-reveal-delay` per child, same 60ms default; parse order is
+  document order, so an index never changes and re-setting a value restarts
+  nothing) and sets `data-omega-inview`. `DOMContentLoaded` disconnects the
+  observer after one last pass, as a backstop. The engine's `observeReveal`
+  returns early on a stamped element, so its later boot changes nothing inside
+  the band, and the starter needs no reduced-motion guard of its own: the reveal
+  lane hides only under `(prefers-reduced-motion: no-preference)`, so a visitor
+  who asked for less motion gets the final state either way, JS or no JS.
+  **The inline critical block has to carry the reveal lane** for any of that to
+  be visible: every reveal rule is scoped `html[data-omega-motion] …`, a token
+  no markup scan can see, so PurgeCSS purged the lane out of the block and a
+  built page painted its copy VISIBLE, stamped it, and met the deferred sheet
+  with the element already resolved — no fade at all. The critical extractor
+  safelists that one lane (`src/assets.js`, ~1.1 KB), pinned by
+  `test/critical-css.test.js`. So the marketing
+  hero's copy stack (badge, headline, sub, CTAs, meta, frame) is back on the
+  lane behind its `data-omega-reveal-stagger="40"` container, and so is any
+  markup the template never sees (an authored `demo_html` slot, a custom hero
+  animation folder). The headline's word rotator is the one above-the-fold gate
+  the starter does NOT resolve — the engine owns the cycle — so its css rule
+  stays: inside a first-paint band the FIRST word paints with the document and
+  yields the moment the engine stamps `data-omega-active`, which it does on that
+  same child. Below-the-fold bands keep the one lane, untouched.
+
+  **A first-paint band fades on its own, shorter token.** Chrome reports the
+  largest element painted only when its fade ENDS, so the first viewport's
+  transition and the stagger ahead of it land on LCP in full; the proof on the
+  playground home (mobile, slow 4G) put the 550ms reveal behind a 90ms stagger
+  750ms past first paint. `motion/_index.scss` therefore times
+  `[data-omega-first-paint] [data-omega-reveal]` with `--omega-speed-first-paint`
+  (300ms in core) and the hero's stagger is 40ms a step: the same fade, the same
+  lane, 400ms past first paint. Below the fold nothing changed, because no
+  metric watches a scroll-in reveal. A theme re-times the first viewport by
+  setting the token, exactly as it sets `--omega-speed-slow` for the rest.
+
+  **Every first-viewport band declares the attribute, not just the hero**
+  ([#467](https://github.com/Omega-JS-Stack/omega/issues/467) Phase 2). The
+  five the #749 worker found still gated took the identical treatment:
+  `about/hero` (both its layouts, photo-lead and split), the document masthead
+  in `_layouts/frontend/core/minimal.html`, and the opening bands of
+  `download.html`, `contact.html` and `pricing.html`. Four of them compose
+  their copy through the shared `heading/masthead` component, which emits the
+  reveal attributes itself, so the component takes a `first_paint: true`
+  switch rather than losing them. The follow-up pass then walked the REST of
+  that component's callers, and every one of them proved to be its page's
+  opening band too: `status.html`, `feedback.html`, `blog/index.html` and the
+  four blog taxonomy layouts, `team/index.html`, `legal/document.html` (whose
+  band wears `omega-legal__head`, not a dotgrid), `alternatives/index.html`
+  and `alternatives/alternative.html`, the three `collection/` layouts,
+  `extension/index.html` and `updates/index.html`. The switch stays on the
+  component because a MID-page caller (a consumer's own composition, the
+  component gallery) still belongs on the reveal lane. Those masthead clusters
+  therefore carry no reveal attributes at all, which #763 left exactly as it
+  found them: the starter animates whatever a first-paint band carries, and
+  these bands carry nothing. Below the fold on every one of these pages,
+  nothing changed. Pinned by
+  `packages/web/test/first-paint-bands.test.js`.
+- **The first-paint script is the one early seam, and it stays small.** Anything
+  that must beat the big bundle belongs there (brand custom hero animations,
+  [#441](https://github.com/Omega-JS-Stack/omega/issues/441), ride the same
+  engine and get the same early start) — weighed against that budget. It must
+  never import `@omega.js/client`: the singleton drags the whole runtime into
+  the bundle and rebuilds the very problem it exists to solve. The motion
+  module's subpath is standalone by design, and `core/js/core/motion.js` adopts
+  the running instance rather than starting a second one.
+- **One lane, not two** (Ian's ruling 2026-08-26). An earlier round answered
+  #585 with a second, pure-CSS entrance lane (paint-time keyframes, a 120ms
+  lead-in, an `:nth-child` stagger cap, a 1s auto-resolve net, `will-change`
+  staging). It put the text on screen but at a different rhythm and a different
+  start moment than the reveal everywhere else — a visibly worse animation. It
+  is deleted: no `omega-reveal-in` keyframe, no `--omega-reveal-wait`, no
+  `html[data-omega-motion-ready]` gate, no `data-omega-reveal-lead` hook. A
+  band's stagger is again the engine's job alone, from the one number its author
+  writes on the cluster (`data-omega-reveal-stagger="70"` → `--omega-reveal-delay`
+  per child).
+- **Ambient motion waits for first paint; a mutation never reads geometry
+  behind itself** ([#752](https://github.com/Omega-JS-Stack/omega/issues/752)).
+  The homepage hero carries `data-omega-dotfield`, and the engine used to start
+  its loop the moment it scanned: a full canvas grid repainted on every one of
+  the display's frames, on the page's own thread, through the whole LCP window.
+  The rules below answer it, and they are the pattern for anything ambient
+  this engine grows next:
+  - **The settle signal.** No measure, no style read and no paint until the
+    first `requestIdleCallback` AFTER the load event (a 2s timeout, so a
+    permanently busy page still gets its field), or the load event itself where
+    idle callbacks do not exist. The `whenSettled(doc, fn)` helper in
+    `motion.js` is the one implementation.
+  - **The handoff stamp rides the first painted grid.** classy fades its CSS
+    fallback dots out on `.omega-dotgrid[data-omega-dotfield-ready]::before`,
+    so `data-omega-dotfield-ready` lands with the grid that replaces them and
+    never at scan: stamped early it left the hero backdrop blank for the whole
+    wait. The engine keeps its own re-entry set, so a rescan before the stamp
+    exists still installs exactly one field.
+  - **A capped cadence.** The field then repaints at 30fps, not at whatever the
+    display offers: the wave crawls (~900px crest, a 20s rainbow cycle), so 30
+    reads exactly like 60 and costs half the main thread, and a 120Hz display
+    pays the same 30, not double. The pointer trail still eases on every frame
+    (cheap), so its feel is unchanged. Under `prefers-reduced-motion` the field
+    paints ONE grid, held at the start of the wave, with no loop and no pointer
+    tracking; it repaints only on a resize or a `data-bs-theme` flip, and
+    re-reads `--omega-line-strong` there, because the once-a-second color poll
+    lives inside the loop that path does not have.
+  - **The marquee measures in a later frame.** `build()` replaces the track's
+    children and reads the set width one `requestAnimationFrame` later, never
+    in the tick that just mutated it: that read was a forced synchronous
+    reflow on every build, and a build runs on resize, on `fonts.ready` and on
+    every image load in the set. A burst of those collapses to ONE measure, so
+    the second never sizes the loop from a track the first just cloned.
 - `prefers-reduced-motion` renders final states: reveals resolve instantly,
   count-ups show their target, rotators hold the first word, marquees park.
   EVERY continuous loop in `core/css` and in the theme sheets this package
@@ -384,6 +523,21 @@ Resilience rules (load-bearing):
   runtime-stamped and never visible to the content scan. **New
   runtime-stamped classes must live in the `omega-` namespace** (or join the
   safelist explicitly).
+
+**Classy never raises on hover** (Ian 2026-08-29,
+[#686](https://github.com/Omega-JS-Stack/omega/issues/686)). Nothing travels
+upward under the pointer in classy — not a button, not a card, not a tile.
+Everything else a hover does stays: the warm, the ring, the shadow, the line,
+the press, and the hero frame's tilt. The raise itself is SHARED css (core's
+motion library serves every skin, and newsflash/neobrutalism import classy's
+floor partials), so classy OPTS OUT in `themes/classy/css/base/_no-raise.scss`
+— loaded last by its `_theme.scss` — and every other theme keeps its lifts.
+Raises classy owns alone are gone from their own files instead. The legacy
+`.hover-up` utility needs one specificity step (`html .hover-up:hover`) because
+`core/css/core/_animations.scss` lands AFTER every theme, and a re-declared
+hover transform carries its `prefers-reduced-motion` park with it, since a
+media query adds no specificity. `test/hover-raise.test.js` compiles both the
+classy and a sibling bundle, so a new raise reaching classy fails the suite.
 
 **Every loading state carries a visible animation** (Ian 2026-08-15). Any
 surface that WAITS — a poll, a fetch, a build, a webhook that has not landed —
@@ -433,7 +587,12 @@ consumer-overridable per file). The sidebar supports an optional project
 selector module (`selector:`), nested collapsible groups, badges, an ad slot
 (`bottom.ad.enabled`), and the auth-bound user row; the topbar carries the
 drawer/rail toggles, the breadcrumb trail (from `theme.header.breadcrumbs`),
-the ⌘K search pill (`search:`), custom actions, and the account dropdown.
+the ⌘K search pill (`search:`), custom actions, and the account dropdown. Each
+region rides its own page switch: `theme.sidebar.enabled: false` drops the rail
+AND the two topbar toggles that drive it (dead buttons otherwise, naming an id
+the page no longer carries,
+[#740](https://github.com/Omega-JS-Stack/omega/issues/740)), and
+`theme.topbar.enabled: false` drops the topbar.
 
 ## Stable-API line (don't churn once consumers exist)
 

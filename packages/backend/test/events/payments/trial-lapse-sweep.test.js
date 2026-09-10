@@ -15,8 +15,9 @@
  * says X" is seeded as an order doc — or, for "the subscription is gone", as no order
  * doc at all.
  */
-const sweep = require('../../../src/manager/events/cron/daily/trial-lapse-sweep.js');
-const analytics = require('../../../src/manager/events/firestore/payments-webhooks/analytics.js');
+const sweep = require('../../../dist/manager/events/cron/daily/trial-lapse-sweep.js');
+const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const DAY = 24 * 60 * 60;
 
@@ -29,7 +30,7 @@ const AGED_UID = '_test-trial-lapse-aged';
 const CANCELLED_ORDER = '_test-order-trial-lapse-cancelled';
 const CONVERTED_ORDER = '_test-order-trial-lapse-converted';
 
-module.exports = {
+module.exports = defineCases({
   description: 'Trial-lapse sweep: confirms with the provider, then corrects state',
   type: 'suite',
   timeout: 180000,
@@ -319,7 +320,7 @@ module.exports = {
     },
 
   ],
-};
+});
 
 /**
  * A `$timestamp` pair from a UNIX second

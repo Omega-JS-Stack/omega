@@ -18,21 +18,20 @@ Liquid form.
 #
 #   layout                          which layout renders the page chrome
 #   permalink                       the URL, when it isn't the file path
-#   meta                            title / description / image for the <head>
+#   meta                            title / description / image / index for the <head>
 #   schema                          structured data (JSON-LD) for this page
 #   config                          per-page omega.json5 overrides (theme, client…)
-#   sitemap                         false keeps the page out of sitemap.xml
-#   append                          extra markup appended for this page
 #   redirect                        url / querystring for the redirect layout
-#   prerender_icons                 icons rendered into the page up front
 #   templateEngineOverride          the engine, when it isn't inferred
 #   eleventyExcludeFromCollections  keep the page out of collections
 #
 # Any OTHER key is content-in-frontmatter, a lane that does not exist. The
 # build strips it before rendering and warns; sections never see it. Content
-# lives in the page BODY, below, as {% section %} calls. A config section
-# (theme, client, analytics…) restated BARE is a build ERROR — those go under
-# `config:`, and `meta` is the one section that keeps its bare spelling.
+# lives in the page BODY, below, as {% section %} calls. The `config:` rule
+# runs both ways: a config section (theme, client, analytics…) restated BARE
+# is a build ERROR, and a key under `config:` that omega.json5 has no section
+# for is one too. Everything above except `config` is page machinery — `meta`
+# included, which is why omega.json5 carries no meta section at all.
 layout: frontend/core/base
 permalink: /example
 meta:
@@ -76,7 +75,7 @@ items:
 {% comment %} Slots pass finished MARKUP where a string won't do. {% endcomment %}
 {% section "marketing/hero" %}
   {% slot demo_html %}
-    <div class="my-demo">{% omega_icon "rocket" %} {{ resolved.config.brand.name }}</div>
+    <div class="my-demo"><i class="fa-solid fa-rocket"></i> {{ resolved.config.brand.name }}</div>
   {% endslot %}
 {% endsection %}
 ────────────────────────────────────────────────────────────────────────────

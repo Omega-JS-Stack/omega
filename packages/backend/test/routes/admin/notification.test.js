@@ -3,9 +3,10 @@
  * Tests the admin send notification (FCM) endpoint
  * Requires admin authentication
  */
-const { TEST_DATA } = require('../../../src/test/test-accounts.js');
+const { TEST_DATA } = require('../../../dist/test/test-accounts.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Admin send notification (FCM)',
   type: 'group',
   tests: [
@@ -195,4 +196,4 @@ module.exports = {
       },
     },
   ],
-};
+});

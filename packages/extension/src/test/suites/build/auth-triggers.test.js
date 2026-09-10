@@ -12,12 +12,13 @@
 
 const path = require('path');
 const fs = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 const AUTH_HELPERS = fs.readFileSync(path.join(SRC, 'lib', 'auth-helpers.js'), 'utf8');
 const LEGACY_CLASSES = ['auth-signin-btn', 'auth-signout-btn', 'uj-password-toggle'];
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'click triggers: omega-signin / omega-account ride the shared registry (#16, #122)',
@@ -67,4 +68,4 @@ module.exports = {
       },
     },
   ],
-};
+});

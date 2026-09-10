@@ -19,9 +19,10 @@ share the account.
 | `sender-identity` | The verified sender Single Sends require: `offers@{contact domain}` with the brand's name. It auto-verifies because `domain-auth` ran first. |
 | `list` | The brand's marketing list, resolved config id → exact-name lookup → create, with the id written back to `marketing.campaigns.providers.sendgrid.listId`. |
 | `unsubscribe-groups` | The account's ASM groups (below). |
-| `custom-fields` | `@omega.js/backend`'s custom fields, from its marketing SSOT, honoring each field's provider skip list (SendGrid has first/last name built in). A type mismatch cannot be patched in SendGrid, so the field is deleted and recreated. |
+| `custom-fields` | `@omega.js/backend`'s custom fields, from its marketing SSOT, honoring each field's provider skip list (SendGrid has first/last name built in) — ONE derivation (`fieldsForProvider()`), the same one the backend's contact sync writes through, so a skipped field is neither provisioned here nor sent there ([#695](https://github.com/Omega-JS-Stack/omega/issues/695)). A type mismatch cannot be patched in SendGrid, so the field is deleted and recreated. |
 | `segments` | `@omega.js/backend`'s segments, each one's `query_dsl` rebuilt from its conditions and compared against the live segment; stale ones are PATCHed, falling back to delete + recreate. Orphaned `__temp_` segments (leaked by a brand-scoped campaign send that crashed) are swept. |
 | `event-webhook` | The account-global Event Webhook pointed at the PARENT backend's forwarder, with the consent toggles (`bounce`, `dropped`, `spam_report`, `unsubscribe`, `group_unsubscribe`) enabled and drift patched by minimum diff. |
+| `contact-person` | `brand.contact.person.name` exists — the human `@omega.js/backend`'s welcome, discount-nudge and checkup emails sign off as. Missing → the operation FAILS the walk naming the key ([#694](https://github.com/Omega-JS-Stack/omega/issues/694)). Last in the order: it gates the backend's sends, not anything provisioned here, so every SendGrid operation still converges first. |
 
 Fields and segments `@omega.js/backend` does not own are never touched.
 
@@ -61,6 +62,8 @@ send time. A dry run names the groups it would create and writes nothing.
   stamped the company's address on every brand; this ASKS for the brand's own
   ([#635](https://github.com/Omega-JS-Stack/omega/issues/635)), five fields behind ONE gate,
   and warns only when nobody can be asked.
+- `brand.contact.person.name` — the human the backend's personal sends sign off as. REQUIRED
+  here: without it the walk fails ([#694](https://github.com/Omega-JS-Stack/omega/issues/694)).
 - `parent` — whose backend the Event Webhook points at (`'self'` when this brand IS the
   parent; `false` is a deliberate opt-out).
 

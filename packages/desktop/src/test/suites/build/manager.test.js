@@ -1,8 +1,9 @@
 // Build-time tests for the Manager class (build.js).
 
 const Manager = require('../../../build.js');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group', // independent tests; run all even on failure
   layer: 'build',
   description: 'Manager (build.js)',
@@ -189,4 +190,4 @@ module.exports = {
       },
     },
   ],
-};
+});

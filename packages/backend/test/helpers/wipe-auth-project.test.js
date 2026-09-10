@@ -17,7 +17,8 @@
  * booted. Non-destructive on purpose — the suite's personas (and the api keys
  * the runner cached from them) must survive this file.
  */
-const { TEST_ACCOUNTS, resolveWipeProjectId } = require('../../src/test/test-accounts.js');
+const { TEST_ACCOUNTS, resolveWipeProjectId } = require('../../dist/test/test-accounts.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The project id the wipe fell back to before the fix — the store it cleared
 // every run.
@@ -64,7 +65,7 @@ function messageOf(fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'the auth bulk-clear targets THIS project, and fails loudly when it cannot tell',
   type: 'group',
   auth: 'none',
@@ -139,4 +140,4 @@ module.exports = {
       },
     },
   ],
-};
+});

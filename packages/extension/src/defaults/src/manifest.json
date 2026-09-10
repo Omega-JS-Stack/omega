@@ -74,13 +74,13 @@
   // Web accessible resources
   web_accessible_resources: [
     // Icon set (C4 cp112): lets content-script-injected UI fetch icons via
-    // chrome.runtime.getURL('assets/fa/…'). Extension pages don't need this.
+    // chrome.runtime.getURL('assets/icons/…'). Extension pages don't need this.
     {
       matches: [
         '<all_urls>',
       ],
       resources: [
-        'assets/fa/*',
+        'assets/icons/*',
       ],
     },
     // {

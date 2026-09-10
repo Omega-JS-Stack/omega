@@ -21,6 +21,17 @@ test('slugify downcases and collapses non-alphanumeric runs', () => {
   assert.strictEqual(compat.slugify(''), '');
 });
 
+test('slugify DELETES an apostrophe instead of separating on it (#597)', () => {
+  // UJM deleted apostrophes, so a migrating brand's "Beginner's Guides"
+  // category lives at /beginners-guides. Separating on it moved every such
+  // URL (soundgrail lost two live category pages to `beginner-s-guides`).
+  assert.strictEqual(compat.slugify("Beginner's Guides"), 'beginners-guides');
+  assert.strictEqual(compat.slugify('Beginner’s Music Guide'), 'beginners-music-guide');
+  assert.strictEqual(compat.slugify("Don't & Won't"), 'dont-wont');
+  // A leading/trailing apostrophe leaves nothing behind either.
+  assert.strictEqual(compat.slugify("'Tis the season'"), 'tis-the-season');
+});
+
 test('dates render in UTC regardless of the builder timezone', () => {
   const date = new Date('2008-11-07T13:07:54Z');
 

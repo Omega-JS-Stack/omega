@@ -53,7 +53,7 @@ function walkJs(dir) {
 // The entry bundle plus every chunk it transitively imports — static AND
 // dynamic. Chunk-to-chunk hops are same-directory (`./chunk-X.js`), so the
 // walk cannot key on the `chunks/` segment an entry's references carry.
-function readGraph(outDir, manifestUrl) {
+function readGraph(outDir, manifestUrls) {
   const seen = new Map();
   const visit = (file) => {
     if (seen.has(file)) return;
@@ -64,17 +64,21 @@ function readGraph(outDir, manifestUrl) {
       if (fs.existsSync(next)) visit(next);
     }
   };
-  visit(path.join(outDir, manifestUrl.slice(1)));
+  // A manifest key holds every layer's bundle for that page (#624) — the graph
+  // is the union of theirs.
+  for (const url of manifestUrls) visit(path.join(outDir, url.slice(1)));
   return [...seen.values()].join('\n');
 }
 
 const CHART_PAGE = `
-import { Chart, DoughnutController, ArcElement } from 'chart.js';
+import { defineChart, barY } from '@tanstack/charts';
 export default function () {
-  Chart.register(DoughnutController, ArcElement);
-  return 'consumer chart page';
+  return defineChart({ marks: [barY([], { x: 'label', y: 'value' })] });
 }
 `;
+
+// The library's own default palette — present in its bundle, nowhere else.
+const CHART_MARKER = 'var(--ts-chart-1, #2563eb)';
 
 test('a consumer page imports a framework dependency bare, and SHARES its chunk with core', async () => {
   const { build, outDir, cleanup } = await buildConsumer({ 'js/pages/charts/index.js': CHART_PAGE });
@@ -82,15 +86,15 @@ test('a consumer page imports a framework dependency bare, and SHARES its chunk 
     const manifest = await build;
     assert.ok(manifest.js.pages['charts/index'], 'the consumer page bundled');
 
-    // chart.js exists in exactly ONE output file — the shared chunk — and both
-    // the consumer page and core's admin page reach it.
+    // @tanstack/charts exists in exactly ONE output file — the shared chunk —
+    // and both the consumer page and core's admin page reach it.
     const files = walkJs(path.join(outDir, 'assets', 'js'));
-    const withChart = files.filter((f) => fs.readFileSync(f, 'utf8').includes('Chart.js v'));
-    assert.strictEqual(withChart.length, 1, `chart.js in exactly one file (found ${withChart.length})`);
-    assert.ok(withChart[0].includes(`${path.sep}chunks${path.sep}`), 'chart.js lives in a shared chunk');
+    const withChart = files.filter((f) => fs.readFileSync(f, 'utf8').includes(CHART_MARKER));
+    assert.strictEqual(withChart.length, 1, `@tanstack/charts in exactly one file (found ${withChart.length})`);
+    assert.ok(withChart[0].includes(`${path.sep}chunks${path.sep}`), '@tanstack/charts lives in a shared chunk');
 
-    assert.ok(readGraph(outDir, manifest.js.pages['charts/index']).includes('Chart.js v'), 'consumer page graph reaches chart.js');
-    assert.ok(readGraph(outDir, manifest.js.pages['admin/index']).includes('Chart.js v'), 'core admin page graph reaches the SAME chart.js');
+    assert.ok(readGraph(outDir, manifest.js.pages['charts/index']).includes(CHART_MARKER), 'consumer page graph reaches @tanstack/charts');
+    assert.ok(readGraph(outDir, manifest.js.pages['admin/index']).includes(CHART_MARKER), 'core admin page graph reaches the SAME @tanstack/charts');
   } finally {
     cleanup();
   }
@@ -99,13 +103,13 @@ test('a consumer page imports a framework dependency bare, and SHARES its chunk 
 test("the framework's copy wins over a consumer-declared duplicate", async () => {
   const { build, outDir, cleanup } = await buildConsumer({
     'js/pages/charts/index.js': CHART_PAGE,
-    'node_modules/chart.js/package.json': JSON.stringify({ name: 'chart.js', version: '0.0.0', main: 'index.js' }),
-    'node_modules/chart.js/index.js': 'export const Chart = { register() {} }; export const DoughnutController = 1; export const ArcElement = 2; export const CONSUMER_COPY = true;',
+    'node_modules/@tanstack/charts/package.json': JSON.stringify({ name: '@tanstack/charts', version: '0.0.0', type: 'module', main: 'index.js' }),
+    'node_modules/@tanstack/charts/index.js': 'export const defineChart = (d) => d; export const barY = () => 1; export const CONSUMER_COPY = true;',
   });
   try {
     const manifest = await build;
     const graph = readGraph(outDir, manifest.js.pages['charts/index']);
-    assert.ok(graph.includes('Chart.js v'), "the framework's chart.js bundled");
+    assert.ok(graph.includes(CHART_MARKER), "the framework's @tanstack/charts bundled");
     assert.ok(!graph.includes('CONSUMER_COPY'), "the consumer's own copy was NOT used");
   } finally {
     cleanup();

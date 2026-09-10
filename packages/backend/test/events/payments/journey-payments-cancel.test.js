@@ -5,7 +5,9 @@
  * Uses test intent for initial subscription, then manual webhooks for cancel flow
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: paid → pending cancel → cancelled',
   type: 'suite',
   timeout: 30000,
@@ -179,4 +181,4 @@ module.exports = {
       },
     },
   ],
-};
+});

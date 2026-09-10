@@ -28,7 +28,13 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  ctx.log(`onDelete: ${user.uid} (${user.email})`, user, context);
+  // The UID and nothing else. The UserRecord carries the email, the display name,
+  // the provider data and the password hash, and a backend line lands in Cloud
+  // Logging for the whole retention window — so none of it rides this line
+  // ([#657](https://github.com/Omega-JS-Stack/omega/issues/657)). The record and
+  // the event context stay reachable one level down, at debug.
+  ctx.log(`onDelete: ${user.uid}`);
+  ctx.debug(`onDelete: ${user.uid} record`, user, context);
 
   // Check if user doc exists before attempting delete
   const existingDoc = await admin.firestore().doc(`users/${user.uid}`)
@@ -67,7 +73,15 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   if (user.email) {
     const email = Manager.Email(ctx);
     email.remove(user.email)
-      .then((r) => ctx.log('onDelete: Marketing remove:', r))
+      .then((r) => {
+        // The uid and how many providers answered. The results object carries
+        // each provider's own payload — a contact record, a subscriber — and
+        // every one of them carries the deleted user's address back, into the
+        // Cloud Logging retention window the headline above stopped writing to
+        // ([#710](https://github.com/Omega-JS-Stack/omega/issues/710)).
+        ctx.log(`onDelete: Marketing remove for ${user.uid}: ${Object.keys(r).length} provider(s)`);
+        ctx.debug('onDelete: Marketing remove:', r);
+      })
       .catch((e) => ctx.error('onDelete: Marketing remove failed:', e));
   }
 

@@ -21,6 +21,7 @@ const Logger = require('@omega.js/devkit/logger');
 const reads = require('@omega.js/devkit/reads');
 const { scanConsumerPages, findPermalinkCollisions } = require('./consumer-scan.js');
 const { hasOwnContent } = require('./sample-content.js');
+const { isProduction } = require('./mode-helpers.js');
 
 const logger = new Logger('decisions');
 
@@ -31,7 +32,7 @@ const logger = new Logger('decisions');
  * @param {object} options
  * @param {string} options.consumerDir - the Eleventy input dir
  * @param {string[]} options.collectionDirs - the sample-content collections ('_posts', …)
- * @param {string} [options.environment] - 'production' makes a collision fatal
+ * @param {string} [options.environment] - the build's environment (#717, read through the one surface) — production makes a collision fatal
  * @param {function} [options.log] - diagnostic sink (default: the web logger)
  * @returns {object} the live decisions
  */
@@ -77,7 +78,7 @@ function createDecisions(options) {
     // A shipped site cannot have two files at one URL — one of them silently
     // wins and the other is simply gone. Dev says it loudly and keeps serving;
     // a production build stops.
-    if (options.environment === 'production') throw new Error(messages.join('\n'));
+    if (isProduction.call(options)) throw new Error(messages.join('\n'));
     messages.forEach((message) => log(message));
   }
 

@@ -5,11 +5,12 @@
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  * Mirrors stripe/to-unified-one-time.js for consistent coverage
  */
-const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
 const FIXTURE_ORDER_COMPLETED = require('../../../fixtures/paypal/order-completed.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock config matching the @omega.js/backend template (new flat price structure)
 const MOCK_CONFIG = {
@@ -34,7 +35,7 @@ function toUnifiedOneTime(rawResource, options) {
   return PayPal.toUnifiedOneTime(rawResource, { config: MOCK_CONFIG, ...options });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal toUnifiedOneTime() transformation',
   type: 'group',
 
@@ -379,4 +380,4 @@ module.exports = {
       },
     },
   ],
-};
+});

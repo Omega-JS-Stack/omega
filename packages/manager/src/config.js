@@ -532,7 +532,14 @@ const MANAGER_DEFAULTS = {
           frequency: 'WEEKLY',
           region: 'us-central1',
         },
-        // Cache rules — complex ruleset, kept as separate operation
+        // Cache rules — complex ruleset, kept as separate operation.
+        // The web build content-hashes the bundles it emits under /assets
+        // (`main-<hash>.js`, `theme-<hash>.css`), so those bytes are immutable
+        // and cacheable forever. HTML is the opposite: its URL never changes,
+        // so whatever a browser holds is what a returning visitor sees until it
+        // expires — a minute here, and the edge copy a deploy purges (#751).
+        // One path, one lifetime: the HTML rule excludes /assets so the two
+        // never both match a request.
         cacheRules: [
           {
             name: 'Assets: Cache for 1 Year',
@@ -541,6 +548,31 @@ const MANAGER_DEFAULTS = {
             browserTtl: 31536000,
             enabled: true,
             priority: 100,
+          },
+          {
+            name: 'HTML: Short Browser Cache',
+            // A cache rule is ZONE-scoped, and the zone also serves the api
+            // host — whose Firebase rewrites answer EXTENSIONLESS user-scoped
+            // GETs (/authorize, /token, /omega/**, /mcp/**). Caching one of
+            // those at the edge would hand one user's answer to the next, so
+            // the rule is guarded by host: every SITE host on the zone (apex,
+            // www, a subdomain project under the parent zone) matches, and the
+            // two non-site hosts the stack creates never do: api.<domain>,
+            // `api.` + the target's own domain at every shape
+            // (cloud/ensure/hosting.js), and emailurl.<domain>, the proxied
+            // SendGrid link-tracking CNAME (edge/lib/dns-records-helpers.js)
+            // whose extensionless click and open URLs must reach SendGrid
+            // every time or campaign counts undercount.
+            // Pages are extensionless (the trailing-slash redirect below) or
+            // end in .html; `not … contains "."` is the free-plan way to say
+            // "no file extension" (`matches` needs Business).
+            expression: '(not starts_with(http.host, "api.") and not starts_with(http.host, "emailurl.") and not starts_with(http.request.uri.path, "/assets/") and (not (http.request.uri.path contains ".") or ends_with(http.request.uri.path, ".html")))',
+            // The edge copy is what a deploy purges; only the browser copy,
+            // which no purge can reach, has to expire on its own.
+            edgeTtl: 7200,
+            browserTtl: 60,
+            enabled: true,
+            priority: 200,
           },
         ],
         rules: {
@@ -749,6 +781,7 @@ const OPERATIONS = {
     { name: 'custom-fields', ensure: true },   // @omega.js/backend custom fields (@omega.js/backend's marketing SSOT)
     { name: 'segments', ensure: true },        // @omega.js/backend segments (query_dsl diffed; __temp_ orphans swept)
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent @omega.js/backend forwarder (min-diff PATCH)
+    { name: 'contact-person', ensure: true },  // brand.contact.person.name — @omega.js/backend's personal sends fail at runtime without it (#694)
   ],
 
   newsletter: [
@@ -1127,6 +1160,25 @@ const REQUIRES = {
         gates: false,
         disablePath: 'payment.providers.chargebee',
         when: (config) => config.payment?.providers?.chargebee !== false,
+      },
+      {
+        // The crypto provider ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
+        // Two things make it the odd one out, both for the same reason — the API
+        // key is its ENTIRE credential, with no public half to live in
+        // omega.json5:
+        //   - `when` demands an explicit ON, where the siblings ask unless
+        //     switched off. `payment.providers.coinbase.enabled` is the whole
+        //     switch, so an absent one means the brand has no use for the key.
+        //   - `disablePath` is that same `enabled`, not the provider block: the
+        //     schema declares `enabled`, and the checkout reads it.
+        name: 'COINBASE_COMMERCE_API_KEY',
+        label: 'Coinbase Commerce API key',
+        url: 'https://commerce.coinbase.com/settings/security',
+        hint: 'Settings → Security → API keys, on the brand\'s Coinbase Commerce account (this key is the whole credential — there is no public half)',
+        prompted: true,
+        gates: false,
+        disablePath: 'payment.providers.coinbase.enabled',
+        when: (config) => config.payment?.providers?.coinbase?.enabled === true,
       },
       WEBHOOK_KEY_ENV,
     ],

@@ -8,7 +8,9 @@
 //   - off-screen bounds are clamped (position dropped, size kept)
 //   - persistBounds: false opts out of save AND restore
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'window-manager bounds persistence (main)',
@@ -164,4 +166,4 @@ module.exports = {
       },
     },
   ],
-};
+});

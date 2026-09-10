@@ -2,7 +2,7 @@
   "name": "@omega.js/extension",
   "version": "0.1.0",
   "description": "OMEGA extension framework — build, test, and package Chrome/Firefox extensions (MV3)",
-  "private": true,
+  "private": false,
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -93,12 +93,12 @@
     ]
   },
   "projectScripts": {
-    "start": "npx omega clean && npm run gulp --",
+    "start": "omega clean && npm run gulp --",
     "gulp": "gulp",
-    "build": "npx omega clean && OMEGA_BUILD_MODE=true npm run gulp -- build",
+    "build": "omega build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
-    "test": "npx omega test"
+    "test": "omega test"
   },
   "engines": {
     "node": ">=22"
@@ -113,19 +113,17 @@
     "manifest-v3",
     "gulp",
     "sass",
-    "webpack"
+    "esbuild"
   ],
   "author": "ITW Creative Works",
   "license": "Elastic-2.0",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
-    "@babel/core": "^7.29.7",
-    "@babel/preset-env": "^7.29.7",
     "@fortawesome/fontawesome-free": "^7.3.0",
     "@popperjs/core": "^2.11.8",
-    "babel-loader": "^10.1.1",
     "chalk": "^5.6.2",
     "dotenv": "^17.4.2",
+    "esbuild": "^0.28.1",
     "fs-jetpack": "^5.1.0",
     "glob": "^13.0.6",
     "gulp-clean-css": "^4.3.0",
@@ -139,8 +137,7 @@
     "minimatch": "^10.2.5",
     "node-powertools": "^3.0.0",
     "sass": "^1.100.0",
-    "@omega.js/client": "^0.1.0",
-    "webpack": "^5.107.2",
+    "@omega.js/client": "0.1.0",
     "wonderful-fetch": "^2.0.5",
     "wonderful-version": "^1.3.2",
     "ws": "^8.21.0",

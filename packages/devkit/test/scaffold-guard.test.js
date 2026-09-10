@@ -40,6 +40,31 @@ test('assertScaffoldable: a workspace root is refused by name and reason', () =>
   });
 });
 
+test('assertScaffoldable: the refusal is FLAGGED, so every CLI prints it as a refusal (#706)', () => {
+  const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
+
+  assert.throws(() => assertScaffoldable(root), (error) => {
+    assert.equal(error.refusal, true, 'the flag the router and the bins print by, instead of a stack');
+    return true;
+  });
+});
+
+test('assertScaffoldable: an UNPARSEABLE manifest up the walk refuses too, crafted (#706)', () => {
+  // A corrupt package.json used to throw a raw SyntaxError out of the guard —
+  // loud, but naming neither the file nor the refusal. And it must never READ as
+  // "not a workspace root": scaffolding on a guess is the accident this stops.
+  const root = stageRepo({});
+  fs.writeFileSync(path.join(root, 'package.json'), '{ "name": "broken", ');
+
+  assert.throws(() => assertScaffoldable(root), (error) => {
+    assert.equal(error.refusal, true);
+    assert.match(error.message, /refusing to scaffold into/);
+    assert.ok(error.message.includes(path.join(root, 'package.json')), `names the unreadable file: ${error.message}`);
+    assert.match(error.message, /Nothing was scaffolded/);
+    return true;
+  });
+});
+
 test('assertScaffoldable: a directory INSIDE a workspace root is refused too (nearest manifest)', () => {
   const root = stageRepo({ '.': { name: 'omega', workspaces: ['packages/*'] } });
   const scratchDir = path.join(root, 'scratch', 'deep');

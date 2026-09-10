@@ -14,6 +14,9 @@
  * Legacy parity that matters: `/download/<platform>` with no arch points at the
  * platform's FIRST artifact (UJM sent /download/mac → mac.universal and
  * /download/linux → linux.debian).
+ *
+ * Since #620 a shortlink hands over the FILE (`/releases/latest/download/
+ * <versionless asset>`), never the releases page.
  */
 const assert = require('node:assert');
 const { test, before } = require('node:test');
@@ -22,6 +25,13 @@ const { buildWith, miniData } = require('./lib/build.js');
 const { readTargetShortlinks, targetShortlinkPages } = require('../src/target-shortlinks.js');
 
 const RELEASES = 'https://github.com/mini-org/mini-desktop/releases/latest';
+// The mini fixture's brand is "MiniCo" — @omega.js/config's one naming rule.
+const DL = (asset) => `${RELEASES}/download/MiniCo-${asset}`;
+const DOWNLOADS = {
+  mac: { universal: DL('mac-universal.dmg') },
+  windows: { universal: DL('windows-universal.exe') },
+  linux: { debian: DL('linux-debian.deb'), appimage: DL('linux-appimage.AppImage') },
+};
 
 // A brand that opted into desktop releases and listed three stores — the whole
 // declaration, in the one place it lives.
@@ -40,9 +50,11 @@ const TARGETS = {
   },
 };
 
-// The curated view the engine hands the generator (toSiteGlobal's output).
+// The curated view the engine hands the generator (toSiteGlobal's output), off
+// the SAME config the build below runs on — the brand name in it is what the
+// artifact filenames derive from.
 const siteOf = (config) => require('@omega.js/config/site-global').toSiteGlobal(config);
-const SITE = siteOf(TARGETS);
+const SITE = siteOf({ ...miniData, ...TARGETS });
 
 test('an unset block declares nothing', () => {
   assert.deepStrictEqual(readTargetShortlinks({}), []);
@@ -52,23 +64,28 @@ test('an unset block declares nothing', () => {
   assert.deepStrictEqual(targetShortlinkPages(readTargetShortlinks({})), [], 'no targets, no pages');
 });
 
-test('the desktop releases URL declares every platform and artifact shortlink', () => {
-  assert.deepStrictEqual(readTargetShortlinks({ targets: { desktop: { releasesUrl: RELEASES } } }), [
-    { label: 'download.mac', url: '/download/mac', redirect: RELEASES },
-    { label: 'download.mac.universal', url: '/download/mac/universal', redirect: RELEASES },
-    { label: 'download.windows', url: '/download/windows', redirect: RELEASES },
-    { label: 'download.windows.universal', url: '/download/windows/universal', redirect: RELEASES },
-    { label: 'download.linux', url: '/download/linux', redirect: RELEASES },
-    { label: 'download.linux.debian', url: '/download/linux/debian', redirect: RELEASES },
-    { label: 'download.linux.snap', url: '/download/linux/snap', redirect: RELEASES },
+test('the derived downloads declare every platform and artifact shortlink, each pointing at the FILE', () => {
+  assert.deepStrictEqual(readTargetShortlinks({ targets: { desktop: { releasesUrl: RELEASES, downloads: DOWNLOADS } } }), [
+    { label: 'download.mac', url: '/download/mac', redirect: DOWNLOADS.mac.universal },
+    { label: 'download.mac.universal', url: '/download/mac/universal', redirect: DOWNLOADS.mac.universal },
+    { label: 'download.windows', url: '/download/windows', redirect: DOWNLOADS.windows.universal },
+    { label: 'download.windows.universal', url: '/download/windows/universal', redirect: DOWNLOADS.windows.universal },
+    { label: 'download.linux', url: '/download/linux', redirect: DOWNLOADS.linux.debian },
+    { label: 'download.linux.debian', url: '/download/linux/debian', redirect: DOWNLOADS.linux.debian },
+    { label: 'download.linux.appimage', url: '/download/linux/appimage', redirect: DOWNLOADS.linux.appimage },
   ]);
 });
 
-test('the bare platform URL comes FIRST — legacy parity', () => {
-  const urls = readTargetShortlinks({ targets: { desktop: { releasesUrl: RELEASES } } }).map((entry) => entry.url);
+test('the bare platform URL comes FIRST and leads with that platform\'s first artifact — legacy parity', () => {
+  const entries = readTargetShortlinks({ targets: { desktop: { releasesUrl: RELEASES, downloads: DOWNLOADS } } });
 
-  assert.deepStrictEqual(urls.slice(4), ['/download/linux', '/download/linux/debian', '/download/linux/snap'],
+  assert.deepStrictEqual(entries.slice(4).map((entry) => entry.url), ['/download/linux', '/download/linux/debian', '/download/linux/appimage'],
     'UJM sent /download/linux to the .deb, and the bare URL leads its artifacts');
+  assert.strictEqual(entries[4].redirect, DOWNLOADS.linux.debian, 'and it hands over the .deb itself');
+});
+
+test('a hub with no derived filenames declares nothing — the releases PAGE is never a shortlink target', () => {
+  assert.deepStrictEqual(readTargetShortlinks({ targets: { desktop: { releasesUrl: RELEASES } } }), []);
 });
 
 test('a store listing declares its shortlink at /extension/<store>', () => {
@@ -100,13 +117,13 @@ before(async () => {
 
 test('every platform and store ships its shortlink, on the redirect module', () => {
   const expected = {
-    '/download/mac': RELEASES,
-    '/download/mac/universal': RELEASES,
-    '/download/windows': RELEASES,
-    '/download/windows/universal': RELEASES,
-    '/download/linux': RELEASES,
-    '/download/linux/debian': RELEASES,
-    '/download/linux/snap': RELEASES,
+    '/download/mac': DOWNLOADS.mac.universal,
+    '/download/mac/universal': DOWNLOADS.mac.universal,
+    '/download/windows': DOWNLOADS.windows.universal,
+    '/download/windows/universal': DOWNLOADS.windows.universal,
+    '/download/linux': DOWNLOADS.linux.debian,
+    '/download/linux/debian': DOWNLOADS.linux.debian,
+    '/download/linux/appimage': DOWNLOADS.linux.appimage,
     '/extension/chrome': 'https://chromewebstore.google.com/detail/abc',
     '/extension/firefox': 'https://addons.mozilla.org/addon/minico',
     '/extension/edge': 'https://microsoftedge.microsoft.com/addons/detail/xyz',
@@ -117,8 +134,8 @@ test('every platform and store ships its shortlink, on the redirect module', () 
     assert.ok(pages.get(url).includes(`data-url="${redirect}"`), `${url} points at ${redirect}`);
   }
 
-  assert.ok(pages.get('/download/mac').includes('/assets/js/modules/redirect.bundle.js'),
-    'the shortlink rides the redirect module like a hand-written one');
+  assert.ok(pages.get('/download/mac').includes('/assets/js/layouts/modules/utilities/redirect-TEST.js'),
+    'the shortlink rides the redirect layout\'s script like a hand-written one');
 });
 
 test('a shortlink is noindex and out of every machine file', () => {
@@ -126,14 +143,14 @@ test('a shortlink is noindex and out of every machine file', () => {
 
   const sitemap = pages.get('/sitemap.xml');
   const pagesJson = pages.get('/pages.json');
-  for (const url of ['/download/mac', '/download/linux/snap', '/extension/chrome']) {
+  for (const url of ['/download/mac', '/download/linux/appimage', '/extension/chrome']) {
     assert.ok(!sitemap.includes(`<loc>${miniData.url}${url}</loc>`), `${url} stays out of the sitemap`);
     assert.ok(!pagesJson.includes(`"${url}"`), `${url} stays out of the search index`);
   }
 });
 
 test('the hub pages read the SAME facts — one home, two consumers', () => {
-  assert.ok(pages.get('/download').includes(RELEASES), '/download renders the releases hub');
+  assert.ok(pages.get('/download').includes(DOWNLOADS.mac.universal), '/download renders the same direct URLs');
   assert.ok(pages.get('/extension').includes('https://chromewebstore.google.com/detail/abc'), 'and /extension its listings');
 });
 

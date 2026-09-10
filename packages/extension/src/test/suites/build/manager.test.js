@@ -5,6 +5,7 @@
 const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function stageProject(opts = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-getconfig-'));
@@ -38,7 +39,7 @@ function inDir(dir, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'Manager — config / manifest / package / environment getters',
@@ -245,4 +246,4 @@ module.exports = {
       },
     },
   ],
-};
+});

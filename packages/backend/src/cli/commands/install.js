@@ -34,7 +34,7 @@ class InstallCommand extends BaseCommand {
     await this.updatePeerDependencies();
 
     // The publish-day inverse of `i local`: flip every file: spec in the
-    // brand tree to ^<linked version>, then one registry install
+    // brand tree to the exact <linked version>, then one registry install
     const actions = await local.restoreRegistrySpecs({
       dir: this.firebaseProjectPath,
       logger: { log: (m) => this.log(m), warn: (m) => this.logWarning(m) },

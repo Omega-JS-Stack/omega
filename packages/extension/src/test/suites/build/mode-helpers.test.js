@@ -7,6 +7,7 @@ const fs   = require('fs');
 const os   = require('os');
 
 const helpers = require(path.join(__dirname, '..', '..', '..', 'utils', 'mode-helpers.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function withEnv(overrides, fn) {
   const originals = {};
@@ -23,7 +24,7 @@ function withEnv(overrides, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'utils/mode-helpers — cross-context isDevelopment/isTesting/getVersion',
@@ -132,4 +133,4 @@ module.exports = {
       },
     },
   ],
-};
+});

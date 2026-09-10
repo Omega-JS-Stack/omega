@@ -4,9 +4,13 @@ layout: frontend/core/base
 # ═══ /download — reimagined 2026-07-16 (manus-grade: the page knows your
 # platform and leads with YOUR button; everything else is one scroll away).
 # Data contract preserved: resolved.downloads.platforms drives cards + the
-# detection JS; site.targets.desktop.releasesUrl supplies the desktop URLs
-# (#610 — the curated targets view is the ONE home). Mobile derives nothing
-# while MAM is parked, so every mobile store stays on the notify form.
+# detection JS; site.targets.desktop.downloads[platform][artifact] supplies the
+# desktop URLs (#610 — the curated targets view is the ONE home). Each is a
+# DIRECT download of a versionless asset (#620), so a button hands over the
+# file and a desktop release never touches this page. The platform/artifact
+# keys below are the catalog's: a `type` with no derived URL renders no button.
+# Mobile derives nothing while MAM is parked, so every mobile store stays on
+# the notify form.
 
 # Hero Section
 hero:
@@ -57,8 +61,8 @@ downloads:
         - type: "debian"
           name: "Debian package"
           icon: "linux"
-        - type: "snap"
-          name: "Snap package"
+        - type: "appimage"
+          name: "AppImage"
           icon: "linux"
     - id: "ios"
       name: "iOS"
@@ -79,8 +83,10 @@ downloads:
           name: "Google Play"
           icon: "android"
 
-# What travels with you — hairline rows
-features:
+# What travels with you — hairline rows. Named `highlights`, not `features`:
+# `features` is a CONFIG section now (the feature catalog, #647) and a page key
+# may not shadow one
+highlights:
   superheadline:
     text: "Included"
   headline: "The install is the"
@@ -159,12 +165,19 @@ cta:
     nudge: true
 ---
 
+{% comment %} #467: the VISIBLE lockup prefers the bridged vector when the mint produced one —
+`brand.images.brandmark` stays the raster OG/social and payment sync need. {% endcomment %}
+{% assign brandmark_src = assetManifest.brandmarkSvg | default: resolved.config.brand.images.brandmark %}
 <!-- ═══ Hero: the page already picked your button ═══ -->
-<section class="omega-dotgrid pb-0" data-omega-dotfield>
-  <div class="container text-center" data-omega-reveal-stagger="90">
-    {% component "heading/masthead", eyebrow: "Download", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, sub_class: "omega-hero__sub mx-auto" %}
+{% comment %} #467 (after #749): this masthead IS the page's first viewport, so
+the band paints with the document — data-omega-first-paint on the section, no
+stagger container, and the masthead cluster on its first_paint switch. The
+bands below keep the reveal lane. {% endcomment %}
+<section class="omega-dotgrid pb-0" data-omega-first-paint data-omega-dotfield>
+  <div class="container text-center">
+    {% component "heading/masthead", eyebrow: "Download", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, sub_class: "omega-hero__sub mx-auto", first_paint: true %}
 
-    <div class="omega-dl-hero" data-omega-reveal>
+    <div class="omega-dl-hero">
       <!-- Filled by the detection JS: your platform's primary download -->
       <a id="download-hero" class="btn btn-adaptive btn-lg omega-dl-hero__btn" href="#platforms" hidden>
         <span class="omega-dl-hero__icon" data-hero-icon></span>
@@ -172,16 +185,16 @@ cta:
       </a>
       <!-- Shown until detection resolves (and forever without JS) -->
       <a id="download-hero-fallback" class="btn btn-adaptive btn-lg omega-dl-hero__btn" href="#platforms">
-        {% omega_icon "download", "fa-sm me-2" %}
+        <i class="fa-solid fa-download fa-sm me-2"></i>
         See every download
       </a>
       <a class="btn btn-outline-adaptive btn-lg omega-hover-nudge" href="#platforms">
         All platforms
-        <span class="omega-nudge ms-2">{% omega_icon "arrow-down", "fa-sm" %}</span>
+        <span class="omega-nudge ms-2"><i class="fa-solid fa-arrow-down fa-sm"></i></span>
       </a>
     </div>
 
-    <p class="omega-dl-hero__platforms omega-quiet small" data-omega-reveal>
+    <p class="omega-dl-hero__platforms omega-quiet small">
       {% for name in resolved.downloads.supported_platforms %}{{ name }}{% unless forloop.last %} · {% endunless %}{% endfor %}
     </p>
   </div>
@@ -199,28 +212,28 @@ cta:
 
         {% assign download_count = 0 %}
         {% for type in platform.types %}
-          {% assign config_url = site.targets.desktop.releasesUrl %}
+          {% assign config_url = site.targets.desktop.downloads[platform.id][type.type] %}
           {% iftruthy config_url %}{% assign download_count = download_count | plus: 1 %}{% endiftruthy %}
         {% endfor %}
 
         <div class="col-md-6 col-lg-4 d-flex" data-omega-reveal>
           <div class="omega-dl-card omega-hover-lift" data-download-card data-platform="{{ platform.id }}">
             <span class="omega-dl-card__mark">
-              {% omega_icon platform.icon, "fa-2xl" %}
+              <i class="fa-solid fa-{{ platform.icon }} fa-2xl"></i>
             </span>
             <h3 class="omega-dl-card__name">{{ platform.name }}</h3>
             <p class="omega-dl-card__req omega-quiet small">{{ platform.description }}</p>
 
-            <!-- Two artifacts (Linux ships .deb + snap) ride SIDE BY SIDE — a
-                 second full-width button under the first read as the primary
+            <!-- Two artifacts (Linux ships .deb + AppImage) ride SIDE BY SIDE —
+                 a second full-width button under the first read as the primary
                  download twice (Ian #14). -->
             <div class="omega-dl-card__actions{% if download_count > 1 %} omega-dl-card__actions--split{% endif %}">
               {% if download_count > 0 %}
                 {% for type in platform.types %}
-                  {% assign config_url = site.targets.desktop.releasesUrl %}
+                  {% assign config_url = site.targets.desktop.downloads[platform.id][type.type] %}
                   {% iftruthy config_url %}
                     <a href="{{ config_url }}" class="btn {% if forloop.first %}btn-adaptive{% else %}btn-outline-adaptive{% endif %}" data-download="true" data-download-name="{{ type.name }}">
-                      {% omega_icon "download", "fa-sm me-2" %}
+                      <i class="fa-solid fa-download fa-sm me-2"></i>
                       {{ type.name }}
                     </a>
                   {% endiftruthy %}
@@ -294,7 +307,7 @@ cta:
                 {% endfor %}
                 {% unless has_download %}
                   <span class="d-inline-flex align-items-center gap-2">
-                    {% omega_icon platform.icon, "fa-sm" %}
+                    <i class="fa-solid fa-{{ platform.icon }} fa-sm"></i>
                     <strong>{{ platform.name }}</strong>
                   </span>
                 {% endunless %}
@@ -315,7 +328,7 @@ cta:
                   required
                 >
                 <button class="btn btn-adaptive" type="submit">
-                  {% omega_icon "paper-plane", "fa-sm me-1" %}
+                  <i class="fa-solid fa-paper-plane fa-sm me-1"></i>
                   Notify me
                 </button>
               </div>
@@ -333,14 +346,14 @@ cta:
   <div class="container">
     <div class="omega-duo">
       <div class="omega-duo__aside omega-section-head" data-omega-reveal>
-        {% component "heading/section-head", superheadline: resolved.features.superheadline.text, headline: resolved.features.headline, headline_accent: resolved.features.headline_accent %}
+        {% component "heading/section-head", superheadline: resolved.highlights.superheadline.text, headline: resolved.highlights.headline, headline_accent: resolved.highlights.headline_accent %}
       </div>
 
       <div class="omega-rowlist" data-omega-reveal-stagger="60">
-        {% for feature in resolved.features.items %}
+        {% for feature in resolved.highlights.items %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon feature.icon, "fa-sm" %}</span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ feature.icon }} fa-sm"></i></span>
               <strong>{{ feature.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ feature.description }}</span>
@@ -406,7 +419,7 @@ cta:
     <div class="modal-content omega-dl-modal">
       <div class="modal-header border-0 pb-0">
         <h5 class="modal-title omega-dl-modal__title" id="onboardingModalLabel">
-          <span class="omega-icon-chip">{% omega_icon "rocket", "fa-sm" %}</span>
+          <span class="omega-icon-chip"><i class="fa-solid fa-rocket fa-sm"></i></span>
           Getting started
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -423,7 +436,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="folder-icon animation-flex position-relative d-flex align-items-center justify-content-center">
-                    {% omega_icon "download", "display-4" %}
+                    <i class="fa-solid fa-download display-4"></i>
                   </div>
                   <span class="fw-bold">Downloads</span>
                   <div class="click-indicator folder-click-target position-absolute top-50 start-50">
@@ -443,7 +456,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="file-to-click d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
                   <span class="fw-bold">{{ resolved.config.brand.name }}-Setup.exe</span>
                   <div class="click-indicator position-absolute top-50 start-50">
@@ -482,7 +495,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
                   <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
@@ -492,11 +505,11 @@ cta:
             </div>
             <div class="steps-slideshow-nav">
               <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-                {% omega_icon "chevron-left", "me-1" %} Back
+                <i class="fa-solid fa-chevron-left me-1"></i> Back
               </button>
               <div class="steps-dots"></div>
               <button type="button" class="btn btn-adaptive btn-sm step-next">
-                <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+                <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
               </button>
             </div>
           </div>
@@ -513,7 +526,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="folder-icon animation-flex position-relative d-flex align-items-center justify-content-center">
-                    {% omega_icon "download", "display-4" %}
+                    <i class="fa-solid fa-download display-4"></i>
                   </div>
                   <span class="fw-bold">Downloads</span>
                   <div class="click-indicator folder-click-target position-absolute top-50 start-50">
@@ -533,7 +546,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="file-to-click d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
                   <span class="fw-bold">{{ resolved.config.brand.name }}.dmg</span>
                   <div class="click-indicator position-absolute top-50 start-50">
@@ -554,7 +567,7 @@ cta:
                 <div class="d-flex gap-5 align-items-center position-relative">
                   <div class="d-flex flex-column align-items-center gap-2 position-relative">
                     <div class="file-to-click d-flex align-items-center justify-content-center">
-                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                      <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                     </div>
                     <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                     <div class="drag-indicator position-absolute top-50 start-50">
@@ -565,7 +578,7 @@ cta:
                     </div>
                   </div>
                   <div class="text-primary animation-pulse-right">
-                    {% omega_icon "arrow-right", "fs-1" %}
+                    <i class="fa-solid fa-arrow-right fs-1"></i>
                   </div>
                   <div class="d-flex flex-column align-items-center gap-2">
                     <div class="folder-icon position-relative d-flex align-items-center justify-content-center">
@@ -589,7 +602,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
                   <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
@@ -599,11 +612,11 @@ cta:
             </div>
             <div class="steps-slideshow-nav">
               <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-                {% omega_icon "chevron-left", "me-1" %} Back
+                <i class="fa-solid fa-chevron-left me-1"></i> Back
               </button>
               <div class="steps-dots"></div>
               <button type="button" class="btn btn-adaptive btn-sm step-next">
-                <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+                <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
               </button>
             </div>
           </div>
@@ -620,7 +633,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2 position-relative">
                   <div class="app-icon animation-flex app-icon--terminal d-flex align-items-center justify-content-center">
-                    {% omega_icon "terminal", "display-4" %}
+                    <i class="fa-solid fa-terminal display-4"></i>
                   </div>
                   <span class="fw-bold">Terminal</span>
                   <div class="click-indicator folder-click-target position-absolute top-50 start-50">
@@ -641,7 +654,7 @@ cta:
                 <div class="input-group">
                   <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-1" value="cd ~/Downloads" readonly aria-labelledby="linux-step-2-label">
                   <button type="button" class="btn btn-outline-adaptive copy-command-btn">
-                    {% omega_icon "copy", "me-2" %}
+                    <i class="fa-solid fa-copy me-2"></i>
                     <span class="button-text d-none d-sm-inline">Copy</span>
                   </button>
                 </div>
@@ -652,23 +665,19 @@ cta:
               <div class="step-number-badge">3</div>
                 <h5 class="step-title" id="linux-step-3-label">Install the package</h5>
               <!-- <p class="text-muted mb-3">Run the appropriate command for your distribution</p> -->
+              <!-- The command installs the file the button just handed over:
+                   the basename of the SAME derived URL (#620), never a second
+                   hand-spelled rule. Debian is the only install step there is —
+                   the pipeline builds a .deb and an AppImage (which needs no
+                   install), and never an .rpm. -->
+              {% assign deb_file = site.targets.desktop.downloads.linux.debian | split: "/" | last %}
               <div class="omega-dl-modal__pane p-4 overflow-hidden position-relative">
-                <div class="mb-3">
+                <div>
                   <small class="text-muted d-block mb-2 fw-bold" id="linux-debian-label">For Debian/Ubuntu:</small>
                   <div class="input-group">
-                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-2" value="sudo dpkg -i {{ resolved.config.brand.name | downcase }}_amd64.deb" readonly aria-labelledby="linux-debian-label">
+                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-2" value="sudo dpkg -i {{ deb_file }}" readonly aria-labelledby="linux-debian-label">
                     <button type="button" class="btn btn-outline-adaptive copy-command-btn">
-                      {% omega_icon "copy", "me-2" %}
-                      <span class="button-text d-none d-sm-inline">Copy</span>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <small class="text-muted d-block mb-2 fw-bold" id="linux-fedora-label">For Fedora/RHEL:</small>
-                  <div class="input-group">
-                    <input type="text" class="form-control font-monospace omega-dl-modal__cmd" name="linux-command-3" value="sudo rpm -i {{ resolved.config.brand.name | downcase }}_amd64.rpm" readonly aria-labelledby="linux-fedora-label">
-                    <button type="button" class="btn btn-outline-adaptive copy-command-btn">
-                      {% omega_icon "copy", "me-2" %}
+                      <i class="fa-solid fa-copy me-2"></i>
                       <span class="button-text d-none d-sm-inline">Copy</span>
                     </button>
                   </div>
@@ -683,7 +692,7 @@ cta:
               <div class="instruction-step-container p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
                 <div class="d-flex flex-column align-items-center gap-2">
                   <div class="app-icon animation-flex d-flex align-items-center justify-content-center">
-                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ resolved.config.brand.images.brandmark }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
+                    <img src="{{ site.omega.placeholder.src }}" data-lazy="@src {{ brandmark_src }}" class="brandmark" alt="{{ resolved.config.brand.name }} Logo"/>
                   </div>
                   <span class="fw-bold">{{ resolved.config.brand.name }}</span>
                 </div>
@@ -693,11 +702,11 @@ cta:
             </div>
             <div class="steps-slideshow-nav">
               <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-                {% omega_icon "chevron-left", "me-1" %} Back
+                <i class="fa-solid fa-chevron-left me-1"></i> Back
               </button>
               <div class="steps-dots"></div>
               <button type="button" class="btn btn-adaptive btn-sm step-next">
-                <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+                <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
               </button>
             </div>
           </div>
@@ -728,11 +737,11 @@ cta:
             </div>
             <div class="steps-slideshow-nav">
               <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-                {% omega_icon "chevron-left", "me-1" %} Back
+                <i class="fa-solid fa-chevron-left me-1"></i> Back
               </button>
               <div class="steps-dots"></div>
               <button type="button" class="btn btn-adaptive btn-sm step-next">
-                <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+                <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
               </button>
             </div>
           </div>
@@ -763,18 +772,18 @@ cta:
             </div>
             <div class="steps-slideshow-nav">
               <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
-                {% omega_icon "chevron-left", "me-1" %} Back
+                <i class="fa-solid fa-chevron-left me-1"></i> Back
               </button>
               <div class="steps-dots"></div>
               <button type="button" class="btn btn-adaptive btn-sm step-next">
-                <span class="button-text">Next</span> {% omega_icon "chevron-right", "ms-1" %}
+                <span class="button-text">Next</span> <i class="fa-solid fa-chevron-right ms-1"></i>
               </button>
             </div>
           </div>
         </div>
 
         <div class="omega-dl-modal__help mt-4" role="note">
-          {% omega_icon "lightbulb", "fa-sm me-2" %}<strong>Need help?</strong> Please <a href="/contact">contact support</a>.
+          <i class="fa-solid fa-lightbulb fa-sm me-2"></i><strong>Need help?</strong> Please <a href="/contact">contact support</a>.
         </div>
       </div>
     </div>

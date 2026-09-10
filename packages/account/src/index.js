@@ -21,6 +21,7 @@
 const USER_SCHEMA = require('./schema.js');
 const { resolve } = require('./engine.js');
 const resolveSubscription = require('./subscription.js');
+const features = require('./features.js');
 
 function resolveAccount(data, options) {
   options = options || {};
@@ -49,4 +50,4 @@ function resolveAccount(data, options) {
   return account;
 }
 
-module.exports = { USER_SCHEMA, resolveAccount, resolveSubscription };
+module.exports = { USER_SCHEMA, resolveAccount, resolveSubscription, ...features };

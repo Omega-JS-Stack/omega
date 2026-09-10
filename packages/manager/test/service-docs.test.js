@@ -16,8 +16,9 @@ const SERVICES_DIR = path.resolve(__dirname, '..', 'src', 'services');
 const DOCS_DIR = path.resolve(__dirname, '..', '..', '..', 'docs', 'manager');
 
 // Docs in docs/manager/ that are not a service's: the map itself, and the two
-// guides for the rungs around a brand. Everything else must name a service.
-const NON_SERVICE_DOCS = new Set(['index', 'brand', 'company']);
+// guides for the rungs around a brand, and the migration playbook (#149).
+// Everything else must name a service.
+const NON_SERVICE_DOCS = new Set(['index', 'brand', 'company', 'migration']);
 
 function serviceNames() {
   return fs.readdirSync(SERVICES_DIR, { withFileTypes: true })

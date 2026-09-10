@@ -15,7 +15,8 @@
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../src/manager/routes/payments/portal/post.js');
+const handler = require('../../../dist/manager/routes/payments/portal/post.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Where the route sends a caller whose returnUrl it refused.
 const DEFAULT_RETURN = (Manager) => new URL('/dashboard/account#billing', Manager.project.websiteUrl).toString();
@@ -42,7 +43,7 @@ function openPortal(Manager, returnUrl) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment portal endpoint: returnUrl is same-origin only',
   type: 'group',
   timeout: 15000,
@@ -103,4 +104,4 @@ module.exports = {
       },
     },
   ],
-};
+});

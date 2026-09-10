@@ -5,7 +5,8 @@ const { runPipeline } = require('../utils/build-pipeline.js');
 
 // `npx omega package` (the consumer's `package` script) builds the full installer
 // set; `--quick` (the `package:quick` script) builds only the host platform/arch.
-// Quick mode also propagates to clean/setup via Manager.isQuickMode().
+// That is ALL `--quick` does (#737): the build ahead of it is full and cold, and
+// the flag is read here and nowhere else.
 function plan(options) {
   options = options || {};
 

@@ -8,13 +8,21 @@
  * semantics: existing files are NEVER touched, so onboarding is idempotent
  * and re-running it into a partial brand only fills the gaps.
  *
- * Target package.jsons carry their framework dep (`*` — satisfied by workspace
- * links in a monorepo, `mgr i local` pre-publish, npm post-publish; dogfood
- * friction #2), so install → setup works without hand-editing; each
- * framework's own setup still owns the consumer INTERIOR (scripts, config,
- * scaffolded files). The backend's framework is a RUNTIME dependency (it
- * rides the staged dist/package.json — src/dist pillar); every other target
- * declares its framework as a devDependency (build-time only).
+ * Target package.jsons carry their framework dep, so install → setup works
+ * without hand-editing; each framework's own setup still owns the consumer
+ * INTERIOR (scripts, config, scaffolded files). The backend's framework is a
+ * RUNTIME dependency (it rides the staged dist/package.json — src/dist
+ * pillar); every other target declares its framework as a devDependency
+ * (build-time only).
+ *
+ * Every `@omega.js/*` spec is an EXACT PIN at the manager's own version
+ * (#794): the family ships lockstep, one number for the whole set, so a
+ * brand can never install a backend from one release beside a client from
+ * another. A caret (or the old `*`) let one target float ahead alone on an
+ * `npm update`; pinned, only `omega update --apply` at the brand root moves it,
+ * and it moves every target together. The local era is untouched — an
+ * existing `file:` spec is never rewritten, because applyScaffoldPlan()
+ * leaves every file that already exists exactly as it is.
  */
 
 const path = require('node:path');
@@ -22,6 +30,9 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const { TARGET_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
+// The environment vocabulary is @omega.js/config's — the same three names the
+// overlay files are suffixed with and every runtime's environment() answers
+const { ENV_ENVIRONMENTS } = require('@omega.js/config');
 // The canonical group list + renderer live in env-order.js (the ordering
 // SSOT, cp137) — the stub is just a canonical render with generated Omega
 // keys, so a scaffolded .env and a reordered one have the same shape.
@@ -37,6 +48,11 @@ const { MANAGE_SCRIPT } = require('./package-scripts.js');
 // step derives dist/package.json from the target manifest's `dependencies`
 // (src/dist pillar). Every other target's framework is build-time only.
 const RUNTIME_DEP_TARGETS = ['backend'];
+
+// The pin every scaffolded @omega.js/* spec carries — the manager's OWN
+// version, read at run time (#794). The family releases lockstep, so the
+// manager's number IS the family's number; nothing here keeps a copy of it.
+const FAMILY_VERSION = require('../../package.json').version;
 
 /**
  * Render the brand-level config/omega.json5 (fresh brands only — an existing
@@ -66,6 +82,20 @@ function renderOmegaConfig(answers) {
     `    url: ${JSON.stringify(answers.url)},`,
     '    contact: {',
     `      email: ${JSON.stringify(answers.email)},`,
+  );
+
+  // The human who signs the personal sends (welcome, nudge, checkup) — asked
+  // for at onboarding, never derived, so an unanswered person writes no key
+  // at all instead of a placeholder identity (#770).
+  if (answers.person) {
+    lines.push('      person: {');
+    for (const [key, value] of Object.entries(answers.person)) {
+      lines.push(`        ${key}: ${JSON.stringify(value)},`);
+    }
+    lines.push('      },');
+  }
+
+  lines.push(
     '    },',
     '  },',
     '',
@@ -199,9 +229,10 @@ function renderRootPackageJson(answers) {
     // Brand-level verbs (`omega dev`, manage, the `start` script above) resolve
     // @omega.js/manager FROM THE BRAND ROOT (omega-bin dispatch) — without this
     // declaration nothing installs it outside the monorepo and every brand-root
-    // command dies (cp195 journey catch).
+    // command dies (cp195 journey catch). Pinned exactly: the root and every
+    // target ride ONE family version (#794).
     devDependencies: {
-      '@omega.js/manager': '*',
+      '@omega.js/manager': FAMILY_VERSION,
     },
   }, null, 2)}\n`;
 }
@@ -222,6 +253,7 @@ function renderGitignore() {
     '',
     '# Secrets',
     '.env',
+    '.env.*',
     '',
     '# OS',
     '.DS_Store',
@@ -241,6 +273,25 @@ function renderEnvStub(answers) {
     // healed by the env-keys op carry byte-identical shapes.
     entries: new Map(Object.entries(generatedEnvKeys()).map(([key, generate]) => [key, { raw: envLine(key, generate()) }])),
   });
+}
+
+/**
+ * An environment overlay stub — a header comment and NOTHING else
+ * ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)). The base `.env`
+ * stays the one file that documents every key (it carries the canonical
+ * placeholder list); an overlay only ever holds the handful a brand wants
+ * different for one environment, so pre-listing anything here would be a second
+ * inventory to drift.
+ *
+ * @param {string} environment - `development` | `testing` | `production`.
+ * @returns {string} The file contents.
+ */
+function renderEnvOverlayStub(environment) {
+  return [
+    `# .env.${environment} — overlays .env when this brand runs in ${environment} (gitignored).`,
+    '# Only the keys that differ — anything not set here falls through to .env.',
+    '',
+  ].join('\n');
 }
 
 function renderReadme(answers) {
@@ -265,6 +316,7 @@ to it, idempotently.
 - \`config/omega.json5\` — brand-level shared config (targets inherit + override)
 ${targetList}
 - \`.env\` — credentials (gitignored; see the stub for every service's keys)
+- \`.env.<environment>\` — the per-environment overlay (\`development\`, \`testing\`, \`production\`): only the keys that differ there
 - \`.omega/\` — manager state + run output (gitignored, machine-owned)
 
 ## Next steps
@@ -280,8 +332,10 @@ ${targetList}
 
 function renderTargetPackageJson(answers, target, dir) {
   const framework = TARGET_FRAMEWORKS[target];
-  // `*`: satisfied by a workspace link in-monorepo, `mgr i local` pre-publish,
-  // and the npm registry once @omega.js/* publish.
+  // The exact family pin (#794): satisfied by a workspace link in-monorepo,
+  // `mgr i local` pre-publish (which flips the spec to `file:`), and the npm
+  // registry once @omega.js/* publish — where the pin is what keeps every
+  // target on ONE framework version.
   const depKey = RUNTIME_DEP_TARGETS.includes(target) ? 'dependencies' : 'devDependencies';
 
   // version + author: electron-builder hard-requires version and warns on
@@ -292,14 +346,14 @@ function renderTargetPackageJson(answers, target, dir) {
     author: answers.name,
     private: true,
     description: `${answers.name} ${target} target`,
-    ...(framework ? { [depKey]: { [framework]: '*' } } : {}),
+    ...(framework ? { [depKey]: { [framework]: FAMILY_VERSION } } : {}),
   }, null, 2)}\n`;
 }
 
 /**
  * Build the scaffold plan for a brand.
  *
- * @param {Object} answers - { id, name, description, tagline, url, email, targets }
+ * @param {Object} answers - { id, name, description, tagline, url, email, person, targets }
  * @returns {Array<{ path: string, contents: string }>} - Brand-root-relative file plan
  */
 function buildScaffoldPlan(answers) {
@@ -308,6 +362,7 @@ function buildScaffoldPlan(answers) {
     { path: 'package.json', contents: renderRootPackageJson(answers) },
     { path: '.gitignore', contents: renderGitignore() },
     { path: '.env', contents: renderEnvStub(answers) },
+    ...ENV_ENVIRONMENTS.map((environment) => ({ path: `.env.${environment}`, contents: renderEnvOverlayStub(environment) })),
     { path: 'README.md', contents: renderReadme(answers) },
   ];
 

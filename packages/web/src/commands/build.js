@@ -12,7 +12,8 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
-const { findBrandRoot } = require('@omega.js/config');
+const { resolveLicenseStamp } = require('@omega.js/devkit/license');
+const { findBrandRoot, readPortsFile } = require('@omega.js/config');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -22,7 +23,7 @@ const { translateSite } = require('../translate/index.js');
 const { fetchFirebaseAuthHelpers } = require('../firebase-auth-helpers.js');
 const { visibleProducts } = require('../pricing.js');
 
-const logger = new Logger('omega:build');
+const logger = new Logger('build');
 
 /**
  * C2: payment.products is the only pricing source — surface the honest empty
@@ -43,9 +44,34 @@ function catalogWarning(payment) {
   return `${state} — /pricing renders the "no published pricing" empty state`;
 }
 
+/**
+ * The port a LIVE `omega dev` is serving this target on, or null (#617).
+ *
+ * The dev server publishes its resolved port in the target's ports file for
+ * sibling tools and retracts it on shutdown, so that file already IS the dev
+ * run's lock — no second one to invent or keep in sync. Only the dev server
+ * writes one in a website target, and the reader ignores a file whose pid is
+ * gone, so a crash leftover can never wedge a build.
+ * @param {string} root - the target root
+ * @returns {number|null} The live dev server's port, or null when none runs.
+ */
+function liveDevPort(root) {
+  const ports = readPortsFile(root);
+  return (ports && ports.website) || null;
+}
+
 module.exports = async function (options) {
   options = options || {};
   const paths = consumerPaths();
+
+  // Dev and build write the SAME dist/, so a build under a running dev server
+  // replaces the pages it is serving with production-stamped ones — and nothing
+  // re-renders them until that server restarts (#617). Refuse, before anything
+  // touches the target: stop dev first, or deploy, which runs its own build.
+  const devPort = liveDevPort(paths.root);
+  if (devPort) {
+    throw new Error(`omega dev is serving this target on :${devPort} and both write dist/ — stop that dev leg first, then build (a deploy builds too, so it refuses the same way)`);
+  }
 
   // Tee the whole run to <targetRoot>/logs/build.log (#197). `omega test` runs this
   // build INSIDE its own logs/test.log tee and passes logFile: false — a second
@@ -66,6 +92,15 @@ module.exports = async function (options) {
     logger.warn(emptyCatalog);
   }
 
+  // The license check ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)),
+  // once per build: `omega build` IS the production build — on a runner for a
+  // deploy, or here for a local one — so this is where the verdict is asked
+  // for and where the artifact records it. A keyless brand and a demo-*
+  // project short-circuit offline; a key that cannot be answered for THROWS,
+  // which is what gates a deploy on a bad key.
+  const license = await resolveLicenseStamp({ config: siteData, production: true });
+  logger.log(`License: ${license.status} (attribution ${license.attribution}, payments ${license.payments})`);
+
   const result = await buildSite({
     consumerDir: paths.src,
     siteAssetsDir: paths.assets,
@@ -73,6 +108,7 @@ module.exports = async function (options) {
     outDir: paths.out,
     clientEntry: resolveClientEntry(),
     environment: 'production',
+    license,
     version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
     manifestPath: paths.manifest,
     staticDirs: resolveStaticDirs({

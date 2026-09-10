@@ -41,11 +41,13 @@ const storage = {
 
     let ElectronStore;
     try {
-      // electron-store is ESM-only. The static specifier + eager mode makes webpack
-      // bundle it INTO main.bundle.js (no split chunk, no runtime resolution) — packaged
-      // consumers need nothing installed. Outside webpack (@omega.js/desktop's own unbundled harness),
-      // Node ignores the magic comment and resolves it from @omega.js/desktop's node_modules.
-      const mod = await import(/* webpackMode: "eager" */ 'electron-store');
+      // electron-store is ESM-only. The STATIC specifier is what matters: the
+      // bundler inlines it INTO main.bundle.js (no lazy chunk, no runtime
+      // resolution) — packaged consumers need nothing installed. Unbundled
+      // (@omega.js/desktop's own harness), Node resolves it from
+      // @omega.js/desktop's node_modules. Pinned by
+      // src/test/suites/boot/storage-bundled.test.js.
+      const mod = await import('electron-store');
       ElectronStore = mod.default || mod;
     } catch (e) {
       logger.warn(`electron-store not available — storage running as no-op. (${e.message})`);

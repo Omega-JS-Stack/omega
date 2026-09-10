@@ -235,6 +235,64 @@ test('CI: attach is a no-op that returns a no-op detach', () => {
   assert.equal(fs.existsSync(logPath), false, 'CI must not create a log file');
 });
 
+test('attachInCI: a sink that OWNS its file still attaches on a runner', () => {
+  // The signing box's `<runner home>/logs/runner.log` is the box's own record,
+  // not a workspace artifact: the job it runs inside is exactly when it matters.
+  const logPath = scratchFile('attach-in-ci.log');
+  fs.rmSync(logPath, { force: true });
+
+  const spy = spyWriters();
+  let detach;
+  try {
+    const tee = attachLogFile.createTee();
+    detach = tee.attach(logPath, { env: { GITHUB_ACTIONS: 'true' }, attachInCI: true });
+    assert.notEqual(process.stdout.write, spy.stdoutSpy, 'the writers are patched despite CI');
+    process.stdout.write('signed on the box\n');
+  } finally {
+    if (detach) { detach(); }
+    spy.restore();
+  }
+
+  assert.match(fs.readFileSync(logPath, 'utf8'), /signed on the box/);
+});
+
+test('append: two sequential attaches to one file keep both runs', () => {
+  // The box's runner.log is written by more than one process — a `runner start`
+  // parent, then every `sign-windows` the listener spawns — so the second one
+  // must not truncate the first's trail. Default is still truncate-on-open.
+  const logPath = scratchFile('append.log');
+  fs.rmSync(logPath, { force: true });
+
+  const spy = spyWriters();
+  try {
+    for (const line of ['first run\n', 'second run\n']) {
+      const detach = attachLogFile.createTee().attach(logPath, { env: {}, append: true });
+      process.stdout.write(line);
+      detach();
+    }
+  } finally {
+    spy.restore();
+  }
+
+  const written = fs.readFileSync(logPath, 'utf8');
+  assert.match(written, /first run/);
+  assert.match(written, /second run/);
+  assert.equal(written.split('# omega log').length - 1, 2, 'each run stamps its own header');
+
+  // Unchanged by default: the next attach without the option truncates.
+  const spy2 = spyWriters();
+  try {
+    const detach = attachLogFile.createTee().attach(logPath, NO_CI);
+    process.stdout.write('third run\n');
+    detach();
+  } finally {
+    spy2.restore();
+  }
+  const fresh = fs.readFileSync(logPath, 'utf8');
+  assert.equal(fresh.includes('first run'), false, 'the default still opens truncated');
+  assert.match(fresh, /third run/);
+});
+
 test('a falsy path is a no-op that returns a no-op detach', () => {
   const spy = spyWriters();
   try {

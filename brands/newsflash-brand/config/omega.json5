@@ -105,6 +105,33 @@
   // so the newsflash pricing/checkout surfaces get honest test content.
   // Shapes mirror @omega.js/backend's product schema; all provider ids null
   // (offline — checkout renders, never charges).
+  // The FEATURE CATALOG (#647) — every feature defined ONCE, in the order every
+  // surface renders it. A `usage` block makes a feature COUNTED; without one it
+  // is a perk. The products below name only their VALUE.
+  features: {
+    articles: {
+      name: "Articles",
+      icon: "newspaper",
+      definition: "Full articles you can read per month.",
+      usage: {},
+    },
+    ticker: {
+      name: "Live ticker",
+      icon: "bolt",
+      definition: "The real-time wire of releases, incidents, and ship logs.",
+    },
+    briefing: {
+      name: "Morning briefing",
+      icon: "mug-hot",
+      definition: "The editor's daily digest in your inbox before standup.",
+    },
+    archive: {
+      name: "Full archive",
+      icon: "box-archive",
+      definition: "Lifetime access to every past issue and column.",
+    },
+  },
+
   payment: {
     providers: {
       stripe: { publishableKey: null },
@@ -117,13 +144,7 @@
         name: "Reader",
         type: "subscription",
         tagline: "best for the morning skim",
-        limits: { articles: 30 },
-        features: [
-          // definition = the dotted-underline tooltip; author it ONCE per
-          // feature id — the pricing composer backfills every other copy
-          { id: "articles", name: "Articles", icon: "newspaper", definition: "Full articles you can read per month." },
-          { id: "ticker", name: "Live ticker", icon: "bolt", value: true, definition: "The real-time wire of releases, incidents, and ship logs." },
-        ],
+        features: { articles: 30, ticker: true },
       },
       {
         id: "insider",
@@ -131,14 +152,9 @@
         type: "subscription",
         tagline: "best for the daily deep read",
         popular: true,
-        limits: { articles: 1000 },
         trial: { days: 14 },
         prices: { monthly: 7.99, annually: 79.99 },
-        features: [
-          { id: "articles", name: "Articles", icon: "newspaper" },
-          { id: "ticker", name: "Live ticker", icon: "bolt", value: true },
-          { id: "briefing", name: "Morning briefing", icon: "mug-hot", value: true, definition: "The editor's daily digest in your inbox before standup." },
-        ],
+        features: { articles: 1000, ticker: true, briefing: true },
         stripe: { productId: null },
         paypal: { productId: null },
         chargebee: { itemId: null, legacyPlanIds: [] },
@@ -149,9 +165,7 @@
         type: "one-time",
         tagline: "every back issue, forever",
         prices: { once: 29.99 },
-        features: [
-          { id: "archive", name: "Full archive", icon: "box-archive", value: true, definition: "Lifetime access to every past issue and column." },
-        ],
+        features: { archive: true },
         stripe: { productId: null },
         chargebee: { itemId: null },
       },

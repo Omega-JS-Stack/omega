@@ -11,7 +11,7 @@
  */
 const jetpack = require('fs-jetpack');
 const { initializeTestEnvironment } = require('@firebase/rules-unit-testing');
-const { BRAND_RULES_SEED, compileRules } = require('../../src/cli/utils/compile-rules.js');
+const { BRAND_RULES_SEED, compileRules } = require('../../dist/cli/utils/compile-rules.js');
 
 // The line the seed reserves for a brand's own rules.
 const YOUR_RULES_MARKER = '// ─── Your rules ─';

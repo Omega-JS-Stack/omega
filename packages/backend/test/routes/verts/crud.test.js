@@ -3,7 +3,9 @@
  *
  * Run: npx omega test backend:routes/verts/crud
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Verts admin CRUD',
   type: 'suite',
   tests: [
@@ -189,4 +191,4 @@ module.exports = {
       },
     },
   ],
-};
+});

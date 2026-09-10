@@ -4,7 +4,9 @@
 // drive real browser automation (playwright-core connectOverCDP) against the
 // harness Electron itself.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'harness CDP endpoint (main)',
@@ -44,4 +46,4 @@ module.exports = {
       },
     },
   ],
-};
+});

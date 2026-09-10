@@ -1,6 +1,7 @@
 /**
  * Packaged framework content locations — the theme layers, core assets
- * (icons/logos/css/js), and default pages that ship WITH @omega.js/web.
+ * (icons/logos/css/js), default pages, and the default-page translations that
+ * ship WITH @omega.js/web.
  * Engine and build entry points default to these; tests and harnesses may
  * override per call.
  */
@@ -14,6 +15,9 @@ const PATHS = {
   defaults: path.join(PKG, 'defaults'),
   scaffold: path.join(PKG, 'scaffold'),
   runtime: path.join(PKG, 'runtime'),
+  // The default-page translations the framework ships (#621) — the cache
+  // src/translate/packaged-defaults.js reads and generate-defaults.js writes.
+  translations: path.join(PKG, 'translations'),
 };
 
 /**

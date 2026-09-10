@@ -6,7 +6,9 @@
  * to payments-webhooks/{eventId}, triggering the full on-write pipeline automatically.
  * Product-agnostic: resolves the first paid product from config.payment.products
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: cancel endpoint → cancellation pending',
   type: 'suite',
   timeout: 30000,
@@ -97,4 +99,4 @@ module.exports = {
       },
     },
   ],
-};
+});

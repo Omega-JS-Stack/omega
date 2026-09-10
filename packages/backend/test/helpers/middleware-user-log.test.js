@@ -15,8 +15,9 @@
  * beyond the document itself. The wiring half is proven by the emulator: every
  * authenticated route suite still round-trips green through this same line.
  */
-const Middleware = require('../../src/manager/helpers/middleware.js');
-const { USER_SCHEMA } = require('@omega.js/account');
+const Middleware = require('../../dist/manager/helpers/middleware.js');
+const { USER_SCHEMA } = require('../../dist/vendor/account/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { projectUserForLog } = Middleware;
 
@@ -48,7 +49,7 @@ function serialize(value) {
   return JSON.stringify(value);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Middleware user log projection — no credential reaches a log line',
   type: 'group',
 
@@ -120,4 +121,4 @@ module.exports = {
       },
     },
   ],
-};
+});

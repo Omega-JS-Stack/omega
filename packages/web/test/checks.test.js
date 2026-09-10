@@ -77,32 +77,34 @@ test('#10: the plan-feature check is a one-line box, not a magic margin — and 
   assert.ok(!css.includes('.omega-band__check'), 'the enterprise band keeps no private copy');
 });
 
-// A catalog with plan features + a comparison table (the check-heaviest page)
+// A catalog with plan features + a comparison table (the check-heaviest page).
+// Each feature is defined ONCE in the top-level catalog and each product names
+// only its value (#647).
+const FEATURES = {
+  requests: { name: 'Requests', icon: 'sparkles', usage: {} },
+  support: { name: 'Priority support', icon: 'headset' },
+};
+
 const CATALOG = {
   products: [
     {
       id: 'basic',
       name: 'Basic',
       type: 'subscription',
-      limits: { requests: 100 },
-      features: [{ id: 'requests', name: 'Requests', icon: 'sparkles' }],
+      features: { requests: 100 },
     },
     {
       id: 'premium',
       name: 'Premium',
       type: 'subscription',
       prices: { monthly: 9.99 },
-      limits: { requests: -1 },
-      features: [
-        { id: 'requests', name: 'Requests', icon: 'sparkles' },
-        { id: 'support', name: 'Priority support', icon: 'headset', value: true },
-      ],
+      features: { requests: -1, support: true },
     },
   ],
 };
 
 test('#44: the check surfaces stamp text-success on plan features, comparison, signup', async () => {
-  const pages = await buildWith({ ...miniData, payment: CATALOG });
+  const pages = await buildWith({ ...miniData, features: FEATURES, payment: CATALOG });
 
   const pricing = pages.get('/pricing');
   assert.ok(pricing, '/pricing built');
@@ -112,7 +114,7 @@ test('#44: the check surfaces stamp text-success on plan features, comparison, s
 
   const signup = pages.get('/signup');
   assert.ok(signup, '/signup built');
-  assert.match(signup, /class="fa text-success fa-sm"/, 'signup benefit checks carry the success class');
+  assert.match(signup, /class="fa-solid fa-check text-success fa-sm"/, 'signup benefit checks carry the success class');
 });
 
 test('#44: every affirmation-check site wears text-success and nothing else', () => {
@@ -130,7 +132,7 @@ test('#44: every affirmation-check site wears text-success and nothing else', ()
     const source = fs.readFileSync(path.join(PKG, rel), 'utf8');
     assert.ok(!source.includes('omega-check'), `${rel} dropped the retired seam class`);
 
-    const calls = source.split('\n').filter((line) => line.includes(`omega_icon "${icon}"`));
+    const calls = source.split('\n').filter((line) => line.includes(`fa-${icon}`));
     assert.ok(calls.length > 0, `${rel} still renders its ${icon}`);
     for (const call of calls) {
       assert.ok(call.includes('text-success'), `${rel} check takes its ink from the bridge: ${call.trim()}`);

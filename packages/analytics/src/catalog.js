@@ -9,17 +9,19 @@
  *
  * MANDATORY BEFORE ANY EDIT BELOW (Ian 2026-08-27): every provider `name`,
  * `kind` and param shape in this file is checked LIVE against the platform's
- * own specification, never from memory. Open all four, read the event you are
+ * own specification, never from memory. Open all six, read the event you are
  * touching, and confirm the name is spelled as the platform spells it, that
  * `kind: 'standard'` only claims an event the platform lists, and that the
  * shaper sends the parameters the platform documents for that event:
  *   GA4        https://support.google.com/analytics/answer/9267735
  *   Meta       https://www.facebook.com/business/help/402791146561655
+ *   Meta pixel https://developers.facebook.com/docs/meta-pixel/reference
  *   TikTok     https://ads.tiktok.com/help/article/standard-events-parameters
+ *   TikTok 2.0 https://business-api.tiktok.com/portal/docs?id=1771100865818625
  *   GA4 dedupe https://support.google.com/analytics/answer/12313109
  * A platform renames and retires events (TikTok retired CompletePayment for
  * Purchase); a mapping that was right when written can be wrong today. The
- * fourth link is the one that binds a PARAM rather than a name: GA4
+ * last link is the one that binds a PARAM rather than a name: GA4
  * deduplicates `purchase` on `transaction_id`, so a money event's id is one
  * CHARGE's ([#656](https://github.com/Omega-JS-Stack/omega/issues/656)).
  *
@@ -46,13 +48,22 @@
  *                         `ttq.page()`). The name and kind stay declared for the
  *                         catalog and the fire log; the transport calls the
  *                         method, with no name and no payload.
+ *                  actionSource — OPTIONAL, Meta only: the `action_source` this
+ *                         event's SERVER fire carries instead of the sender's
+ *                         default `website`. Meta requires the field and makes
+ *                         its accuracy a term of use, and its enum names the
+ *                         case itself: `system_generated`, "for example, a
+ *                         subscription renewal that's set to auto-pay each
+ *                         month". A charge a card takes on its own had nobody
+ *                         on a website to claim
+ *                         ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
  *
  * The canonical param vocabulary is GA4-flavoured (flat params plus an `items`
  * array), because that is what the live call sites and the backend's payment
  * webhook already build — so GA4 is pass-through and the maps live where the
- * other two platforms genuinely disagree: their commerce vocabulary (Meta's
- * `content_ids` + `num_items`, TikTok's `contents` array) and Search's
- * `search_string`.
+ * other two platforms genuinely disagree: their commerce vocabulary (both spell
+ * a cart as `content_ids` + `contents`, but the contents OBJECT is each
+ * platform's own) and Search's `search_string`.
  */
 
 // Drop keys a caller did not supply — a provider payload carrying
@@ -69,18 +80,41 @@ function compact(payload) {
 
 // ─── Shared provider shapers ────────────────────────────────────────────────
 
-// Meta's commerce vocabulary: content_ids + num_items instead of GA4's items[].
+// Meta's commerce vocabulary: content_ids + contents + num_items instead of
+// GA4's items[]. BOTH id carriers ride, because Meta accepts either and its
+// pixel reference asks for "contents or content_ids" on Purchase and Search
+// (plain `contents` on AddToCart) for Advantage+ catalog ads: the priced
+// objects are what a catalog campaign can match on
+// ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)). The object's
+// field names are Meta's own (`id`, `quantity`, `item_price`), never GA4's;
+// `delivery_category` is the fourth and belongs to physical fulfilment, which a
+// subscription has none of.
 function metaCommerce(params) {
   const items = Array.isArray(params.items) ? params.items : [];
-  const first = items[0];
 
   return compact({
     content_ids: items.length ? items.map((item) => item.item_id) : undefined,
-    content_name: first ? first.item_name : undefined,
+    contents: items.length ? items.map((item) => compact({
+      id: item.item_id,
+      // Meta's object requires id + quantity; a line naming none is one of it,
+      // the same answer num_items gives below
+      quantity: item.quantity ?? 1,
+      item_price: item.price,
+    })) : undefined,
+    // "Name of the page/product", SINGULAR. This named items[0] for a whole
+    // cart, which labels a two-product order with one of them; `content_ids` and
+    // `contents` are the members that carry every product [#498].
+    content_name: items.length === 1 ? items[0].item_name : undefined,
     content_type: items.length ? 'product' : undefined,
     currency: params.currency,
     value: params.value,
-    num_items: items.length || undefined,
+    // "The number of items that a user tries to buy", so two seats on one line
+    // are two items, and a line naming no quantity is one of that thing [#498].
+    num_items: items.length ? items.reduce((total, item) => total + (item.quantity ?? 1), 0) : undefined,
+    // The transaction's own id, in Meta's vocabulary. The dedupe `event_id` is
+    // not this: Meta reads that as the pair-key for one browser/server fire and
+    // never as the order [#498].
+    order_id: params.transaction_id,
   });
 }
 
@@ -92,10 +126,19 @@ function metaCommerce(params) {
 // web event with product information" — and the flat single-item
 // `content_id`/`price`/`quantity` this sent before appears nowhere in it
 // ([#652](https://github.com/Omega-JS-Stack/omega/issues/652)).
+//
+// Events API 2.0 documents `content_ids` BESIDE `contents` in the same
+// `properties` object, and TikTok's standard-events page recommends `content_ids`
+// on every commerce event it lists, so both ride, as they do on Meta's half
+// ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)). `content_type`
+// stays where 2.0 documents it, at the properties level: the per-item
+// `content_type` of the older Pixel SDK model is not in 2.0's contents object,
+// whose fields are price, content_id, content_name, content_category and brand.
 function tiktokCommerce(params) {
   const items = Array.isArray(params.items) ? params.items : [];
 
   return compact({
+    content_ids: items.length ? items.map((item) => item.item_id) : undefined,
     contents: items.length ? items.map((item) => compact({
       content_id: item.item_id,
       content_name: item.item_name,
@@ -105,6 +148,8 @@ function tiktokCommerce(params) {
     content_type: items.length ? 'product' : undefined,
     currency: params.currency,
     value: params.value,
+    // 2.0's `properties.order_id`, Meta's `order_id` twin [#498].
+    order_id: params.transaction_id,
   });
 }
 
@@ -115,14 +160,23 @@ function tiktokCommerce(params) {
 // `value: 0` is the honest number on that side; GA4 keeps the real one, where a
 // refund is a standard event the revenue report knows how to net.
 function metaAudienceSignal(params) {
-  return { ...metaCommerce(params), value: 0 };
+  // `contents` comes off whole: its `item_price` IS the amount, and Meta's
+  // object requires `id` + `quantity`, so a stripped one would be a malformed
+  // object rather than a quieter signal. `content_ids` already names the plan,
+  // which is the entire content of an exclusion audience
+  // ([#498](https://github.com/Omega-JS-Stack/omega/issues/498)).
+  const { contents, ...signal } = metaCommerce(params);
+
+  return { ...signal, value: 0 };
 }
 
 function tiktokAudienceSignal(params) {
   // TikTok's per-item `price` and `quantity` come off with the value: zeroing
   // one field while the amount rides inside `contents` is not a zero-value
-  // signal. Meta's shaper carries neither by construction, and this matches it —
-  // what is left is who and which plan, which is the whole point of the audience.
+  // signal. Meta's signal drops its own `contents` outright for the same reason,
+  // and TikTok's array stays because it is that platform's only id carrier
+  // besides `content_ids`. What is left is who and which plan, which is the
+  // whole point of the audience.
   const signal = tiktokCommerce(params);
 
   return compact({
@@ -370,7 +424,7 @@ const CATALOG = {
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard' },
-      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce, actionSource: 'system_generated' },
       tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
@@ -450,7 +504,7 @@ const CATALOG = {
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard', map: ga4Recurring },
-      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce, actionSource: 'system_generated' },
       tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },
@@ -460,7 +514,7 @@ const CATALOG = {
     placement: 'server',
     providers: {
       ga4: { name: 'purchase', kind: 'standard', map: ga4Recurring },
-      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce },
+      meta: { name: 'Purchase', kind: 'standard', map: metaCommerce, actionSource: 'system_generated' },
       tiktok: { name: 'Purchase', kind: 'standard', map: tiktokCommerce },
     },
   },

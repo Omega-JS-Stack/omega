@@ -29,6 +29,12 @@ const runner = createRunner({
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 15000,
 
+  // A renderer suite that names a project view rides the BOOT lane instead of the harness
+  // page: only the boot runner stages and builds the real app, and the view needs that
+  // build (its own preload, its own IPC handlers, its own config). The runner core hands
+  // such a file to boot.run whole, as `suites`, never flattened into the inspect list.
+  bootBound: (mod) => mod.layer === 'renderer' && typeof mod.view === 'string',
+
   middleLayers: [
     {
       // Main + renderer share one spawned Electron process — main suites first, then a
@@ -63,14 +69,15 @@ const runner = createRunner({
 
   boot: {
     // Spawn the consumer's actual built bundle and inspect the live manager (the core
-    // aggregates boot tests into the flat `tests` list).
-    run: async ({ tests, results, projectRoot }) => {
+    // aggregates boot tests into the flat `tests` list). `suites` are the boot-bound
+    // renderer suites (`view: '<name>'`), which run in a real window of that same app.
+    run: async ({ tests, suites, results, projectRoot }) => {
       let runBootTests;
       try {
         ({ runBootTests } = require('./runners/boot.js'));
       } catch (e) {
         console.log(chalk.yellow(`    ○ boot tests skipped (boot runner not available: ${e.message})`));
-        results.skipped += tests.length;
+        results.skipped += tests.length + suites.reduce((n, s) => n + (s.mod.tests || []).length, 0);
         return;
       }
 
@@ -78,6 +85,7 @@ const runner = createRunner({
 
       const counts = await runBootTests({
         tests,
+        suites,
         projectRoot,
         frameworkDistRoot: path.resolve(__dirname, '..'),
       });

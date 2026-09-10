@@ -4,7 +4,7 @@
  * keys in a consumer page's frontmatter are STRIPPED from the cascade with a
  * warning — the build succeeds, but sections/components can never see the
  * values. The override lane doesn't silently work; it doesn't exist. Meta
- * keys (meta, sitemap, append), the `config:` override block (#607) and
+ * keys (meta, schema), the `config:` override block (#607) and
  * plumbing (layout, permalink) stay legal, and collection docs (_posts/…) are
  * content entries the guard never touches. A config section restated BARE is
  * the one frontmatter mistake that FAILS the build — test/page-config-overrides.test.js.
@@ -97,17 +97,16 @@ test('a page may set `client` under `config:` — it reaches resolved.config.cli
   }
 });
 
-// #247 — two SHIPPED layout contracts read page frontmatter: the redirect
-// layout's `redirect.url` (documented in docs/web/index.md) and body.html's
-// `prerender_icons`. Both worked only from defaults/ and _layouts/ (exempt
-// from the /pages/ guard), so a consumer's own page lost them silently — a
-// redirect page bounced to site.url instead of its target.
-test('#247: a consumer page keeps redirect and prerender_icons through the guard', async () => {
+// #247 — a SHIPPED layout contract reads page frontmatter: the redirect
+// layout's `redirect.url` (documented in docs/web/index.md). It worked only
+// from defaults/ and _layouts/ (exempt from the /pages/ guard), so a
+// consumer's own page lost it silently — a redirect page bounced to site.url
+// instead of its target. (`prerender_icons` rode the same lane until #619
+// retired it: icons are native markup now, inlined at build.)
+test('#247: a consumer page keeps redirect through the guard', async () => {
   const { tmp, consumerDir } = makeConsumer([
     'redirect:',
     '  url: "https://example.com/target"',
-    'prerender_icons:',
-    '  - rocket',
   ], 'modules/utilities/redirect');
   const warnings = [];
   const originalWarn = console.warn;
@@ -119,8 +118,6 @@ test('#247: a consumer page keeps redirect and prerender_icons through the guard
 
     assert.ok(html.includes('data-url="https://example.com/target"'), 'the page redirect.url reaches the redirect config');
     assert.ok(!html.includes(`data-url="${bareData.url}"`), 'the layout never falls back to site.url when the page names a target');
-    assert.ok(html.includes('data-icon="rocket"'), 'the page prerender_icons list reaches the prerendered-icons block');
-
     assert.ok(
       !warnings.some((line) => line.includes('ignoring frontmatter content keys')),
       `neither key is treated as smuggled content: ${warnings.join(' | ')}`,
@@ -131,18 +128,41 @@ test('#247: a consumer page keeps redirect and prerender_icons through the guard
   }
 });
 
-test('meta-only frontmatter (meta, sitemap, append) builds clean', async () => {
+test('meta-only frontmatter (meta, schema) builds clean', async () => {
   const { tmp, consumerDir } = makeConsumer([
     'meta:',
     '  title: "Legal meta"',
-    'sitemap: false',
-    'append: true',
+    'schema:',
+    '  faq_page:',
+    '    enabled: false',
   ]);
   try {
     const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-allow');
     assert.ok(pages.get('/'), 'page built');
     assert.ok(pages.get('/').includes('<title>Legal meta</title>'), 'meta.title consumed — meta is the sanctioned lane');
   } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// #564 retired the page-level `sitemap` block: the sitemap follows meta.index,
+// so a page still carrying it is stripped with the meta-only warning.
+test('a retired sitemap block in page frontmatter is stripped and the warning names it', async () => {
+  const { tmp, consumerDir } = makeConsumer([
+    'sitemap:',
+    '  include: false',
+  ]);
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...parts) => warnings.push(parts.join(' '));
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-sitemap');
+    assert.ok(pages.get('/'), 'build succeeds');
+    const warning = warnings.find((line) => line.includes('ignoring frontmatter content keys'));
+    assert.ok(warning, `build warns about the stripped block: ${warnings.join(' | ')}`);
+    assert.ok(/sitemap/.test(warning), 'warning names sitemap');
+  } finally {
+    console.warn = originalWarn;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

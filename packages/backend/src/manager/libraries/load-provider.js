@@ -11,6 +11,26 @@ const NAME_PATTERN = /^[a-z0-9-]+$/;
 const ID_PATTERN = /^[a-z0-9_-]+(?::[a-z0-9_-]+)*$/;
 
 /**
+ * The file `${dir}/${name}.js` resolves to, rejecting any name that could
+ * escape the directory. Split out of loadProvider so a caller that searches
+ * SEVERAL directories (the connections lane: the brand's dir, then the package's)
+ * can ask whether a file is there without owning a second copy of the name
+ * rule ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)).
+ *
+ * @param {string} dir - Absolute path of the providers directory
+ * @param {string} name - Provider name (strictly [a-z0-9-])
+ * @returns {string} Absolute path of the provider file
+ * @throws {Error} When the name is not a valid provider name
+ */
+function providerPath(dir, name) {
+  if (typeof name !== 'string' || !NAME_PATTERN.test(name)) {
+    throw new Error(`Invalid provider name: ${name}`);
+  }
+
+  return path.join(dir, `${name}.js`);
+}
+
+/**
  * Load `${dir}/${name}.js`, rejecting any name that could escape the directory.
  *
  * @param {string} dir - Absolute path of the providers directory
@@ -19,11 +39,7 @@ const ID_PATTERN = /^[a-z0-9_-]+(?::[a-z0-9_-]+)*$/;
  * @throws {Error} When the name is not a valid provider name
  */
 function loadProvider(dir, name) {
-  if (typeof name !== 'string' || !NAME_PATTERN.test(name)) {
-    throw new Error(`Invalid provider name: ${name}`);
-  }
-
-  return require(path.join(dir, `${name}.js`));
+  return require(providerPath(dir, name));
 }
 
 /**
@@ -45,4 +61,5 @@ function loadTemplate(dir, id) {
 }
 
 module.exports = loadProvider;
+module.exports.providerPath = providerPath;
 module.exports.loadTemplate = loadTemplate;

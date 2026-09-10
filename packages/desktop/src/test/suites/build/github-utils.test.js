@@ -1,74 +1,24 @@
-// Build-layer tests for src/utils/github.js — discoverRepo logic.
+// Build-layer tests for src/utils/github.js — the octokit factory + repo ensure.
+// Repo DISCOVERY is not this module's job any more (#799): the app repo and the
+// releases repo come from @omega.js/config, never a package.json or a git remote.
 
 const path    = require('path');
-const fs      = require('fs');
-const os      = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'utils/github — repo discovery + octokit factory',
+  description: 'utils/github — octokit factory + repo ensure',
   tests: [
     {
-      name: 'github utils module exports the expected surface',
+      name: 'github utils exports the octokit surface and NO repo discovery (#799)',
       run: (ctx) => {
         const mod = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        ctx.expect(typeof mod.discoverRepo).toBe('function');
         ctx.expect(typeof mod.getOctokit).toBe('function');
         ctx.expect(typeof mod.ensureRepo).toBe('function');
-      },
-    },
-    {
-      name: 'discoverRepo parses package.json repository.url (object form)',
-      run: async (ctx) => {
-        const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
-          name: 'foo',
-          repository: { type: 'git', url: 'https://github.com/myorg/myrepo.git' },
-        }));
-        try {
-          const result = await discoverRepo(tmp);
-          ctx.expect(result.owner).toBe('myorg');
-          ctx.expect(result.repo).toBe('myrepo');
-        } finally {
-          fs.rmSync(tmp, { recursive: true, force: true });
-        }
-      },
-    },
-    {
-      name: 'discoverRepo parses package.json repository.url (string form)',
-      run: async (ctx) => {
-        const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
-          name: 'foo',
-          repository: 'github.com/another/proj',
-        }));
-        try {
-          const result = await discoverRepo(tmp);
-          ctx.expect(result.owner).toBe('another');
-          ctx.expect(result.repo).toBe('proj');
-        } finally {
-          fs.rmSync(tmp, { recursive: true, force: true });
-        }
-      },
-    },
-    {
-      name: 'discoverRepo strips trailing .git from repo name',
-      run: async (ctx) => {
-        const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
-        fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
-          repository: { url: 'git+https://github.com/owner/repo.git' },
-        }));
-        try {
-          const result = await discoverRepo(tmp);
-          ctx.expect(result.owner).toBe('owner');
-          ctx.expect(result.repo).toBe('repo');
-        } finally {
-          fs.rmSync(tmp, { recursive: true, force: true });
-        }
+        // The git-remote fallback is gone: in a brand monorepo it answered the
+        // ENCLOSING repo, so every release verb targeted the wrong owner.
+        ctx.expect(mod.discoverRepo).toBeUndefined();
       },
     },
     {
@@ -101,4 +51,4 @@ module.exports = {
       },
     },
   ],
-};
+});

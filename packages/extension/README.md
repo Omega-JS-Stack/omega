@@ -14,7 +14,7 @@
   <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/@omega.js/extension">NPM Module</a> | <a href="https://github.com/Omega-JS-Stack/omega">Omega Monorepo</a>
   <br>
   <br>
-  <strong>OMEGA Extension</strong> is a framework for building modern cross-browser extensions. One-line bootstrap per context, component-based architecture, multi-browser build pipeline, cross-context auth, auto-translation across 16 languages, and a four-layer test framework.
+  <strong>OMEGA Extension</strong> is a framework for building modern cross-browser extensions. One-line bootstrap per context, component-based architecture, multi-browser build pipeline, cross-context auth, config-driven auto-translation, and a four-layer test framework.
 </p>
 
 ## 🦄 Features
@@ -25,7 +25,7 @@
 - **Cross-context auth sync**: sign-in in one tab is reflected in all open contexts (no `chrome.storage` needed)
 - **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/verts.md](docs/verts.md)
 - **Affiliate redirects**: a visit to a partner site (Amazon, Rakuten, NordVPN, …) redirects once per 24h to an affiliate URL — default-on, `?affiliatizerStatus=block` to stop it. The partner map is a fixed framework constant carrying the framework author's referral codes, not per-brand config. See [docs/affiliatizer.md](docs/affiliatizer.md)
-- **Auto-translation** to 16 languages via Claude CLI on every build
+- **Auto-translation** to the languages in `translation.languages` (omega.json5) on every build — only missing keys hit the provider
 - **Four-layer test framework**: build / background / view / boot — real Chromium, real MV3 service worker, real consumer extensions
 - **Multi-browser packaging + auto-publish** to Chrome / Firefox / Edge stores from one command
 - **Theme system**: Bootstrap 5 + Classy (custom design system), or roll your own
@@ -86,11 +86,9 @@ Full guide: [docs/test-framework.md](docs/test-framework.md). End-to-end "did my
 
 ## 🌐 Auto-translation
 
-When you run `npm run build`, @omega.js/extension auto-translates `src/_locales/en/messages.json` to 16 languages via Claude CLI:
+When you run `npm run build`, @omega.js/extension auto-translates `config/messages.json` to the languages set in `translation.languages` (omega.json5), via the shared devkit translation engine (Claude CLI by default). Translation is off until `translation.languages` is set.
 
-`zh`, `es`, `hi`, `ar`, `pt`, `ru`, `ja`, `de`, `fr`, `ko`, `ur`, `id`, `bn`, `tl`, `vi`, `it`
-
-Only missing translations are generated — existing translations are preserved. Full guide: [docs/translations.md](docs/translations.md).
+Only missing translations are generated — existing translations live in the committed `translations/` cache and are preserved. Full guide: [docs/translations.md](docs/translations.md).
 
 ## 🎨 Design tokens (C4)
 
@@ -108,7 +106,7 @@ with the C3/D10 skin.
 ### Manual upload
 
 ```bash
-npm run build
+npx omega build      # `npm run build` is the same pipeline — the script is a thin alias of the verb
 ```
 
 Upload the `.zip` files under `packaged/<browser>/` to each browser's extension store.

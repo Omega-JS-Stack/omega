@@ -12,6 +12,6 @@
   {% endiftruthy %}
   <span class="newsflash-rule-head__rule"></span>
   {% iftruthy args.link_text %}
-    <a href="{{ args.link_href }}">{{ args.link_text }} {% omega_icon "arrow-right", "ms-1" %}</a>
+    <a href="{{ args.link_href }}">{{ args.link_text }} <i class="fa-solid fa-arrow-right ms-1"></i></a>
   {% endiftruthy %}
 </div>

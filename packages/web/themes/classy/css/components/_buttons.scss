@@ -1,6 +1,6 @@
 // Classy v2 buttons — ink primaries (Manus/ElevenLabs), hairline ghosts,
 // accent reserved for the brand-aware .btn-primary. Zero gradients, zero
-// glow; feedback is motion (lift/press) and line emphasis.
+// glow; feedback is the press and line emphasis, never a lift (#686).
 //
 // .btn-adaptive IS the ink button: the shared bootstrap-overrides layer
 // builds it from $dark/$light, which classy's config points at the ink/paper
@@ -18,29 +18,18 @@
     transform var(--omega-speed) var(--omega-ease),
     box-shadow var(--omega-speed) var(--omega-ease);
 
-  // The unified niceties (Ian 2026-07-16): EVERY button lifts on hover and
-  // presses on click — no per-variant opt-in
-  &:hover {
-    transform: translateY(-1px);
-  }
-
+  // The unified nicety (Ian 2026-07-16, narrowed 2026-08-29 for #686): EVERY
+  // button presses on click — no per-variant opt-in. Hover paints, it never
+  // lifts.
   &:active {
     transform: scale(0.985);
   }
-}
-
-// Attached/segmented contexts: a lift would detach the button from its
-// group geometry (password eye in the input group, gliding-thumb segments)
-.input-group .btn:hover,
-[data-omega-segmented] .btn:hover {
-  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .btn {
     transition: none;
 
-    &:hover,
     &:active {
       transform: none;
     }
@@ -177,12 +166,10 @@
   opacity: 0.85;
   transition:
     filter var(--omega-speed) var(--omega-ease),
-    opacity var(--omega-speed) var(--omega-ease),
-    transform var(--omega-speed) var(--omega-ease);
+    opacity var(--omega-speed) var(--omega-ease);
 
   &:hover {
     filter: none;
     opacity: 1;
-    transform: translateY(-1px);
   }
 }

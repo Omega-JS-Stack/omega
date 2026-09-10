@@ -12,6 +12,7 @@
 //   5. `npx omega test`
 
 const fs = require('fs');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const ADMIN_KEY = process.env.OMEGA_TEST_FIREBASE_ADMIN_KEY
                 || process.env.GOOGLE_APPLICATION_CREDENTIALS
@@ -37,7 +38,7 @@ function checkSkipReason() {
 
 const skipReason = checkSkipReason();
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'client-bridge (main, integration)',
@@ -130,4 +131,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -3,6 +3,8 @@
 //
 // Each test resets the updater + clears storage so we get clean state.
 
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
 const STORAGE_KEY = 'autoUpdater';
 
 async function reinit(ctx, env) {
@@ -42,7 +44,7 @@ function waitFor(predicate, { timeout = 3000, step = 50 } = {}) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'auto-updater (main)',
@@ -108,16 +110,223 @@ module.exports = {
       },
     },
     {
-      name: 'first download persists pendingUpdate to storage',
+      name: 'simulate(): available scenario walks state through downloaded with no env var set',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        try {
+          await ctx.manager.autoUpdater.simulate('available');
+          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+
+          const s = ctx.manager.autoUpdater.getStatus();
+          ctx.expect(s.code).toBe('downloaded');
+          ctx.expect(s.version).toBe('999.0.0');
+          ctx.expect(s.percent).toBe(100);
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): unavailable scenario lands in not-available',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        try {
+          await ctx.manager.autoUpdater.simulate('unavailable');
+          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
+
+          ctx.expect(ctx.manager.autoUpdater.getStatus().error).toBe(null);
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): error scenario lands in error',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        try {
+          await ctx.manager.autoUpdater.simulate('error');
+          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'error');
+
+          ctx.expect(ctx.manager.autoUpdater.getStatus().error.message).toMatch(/Simulated/);
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): unknown scenario throws',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        try {
+          await ctx.expect(() => ctx.manager.autoUpdater.simulate('sideways')).toThrow(/unknown scenario/i);
+          await ctx.expect(() => ctx.manager.autoUpdater.simulate()).toThrow(/scenario required/i);
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): refuses in a production build unless OMEGA_DEV_UPDATE is set',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const origIsProduction = ctx.manager.isProduction;
+        ctx.manager.isProduction = () => true;
+        try {
+          await ctx.expect(() => ctx.manager.autoUpdater.simulate('available')).toThrow(/production/i);
+          ctx.expect(ctx.manager.autoUpdater.getStatus().code).toBe('idle');
+
+          // ...but a packaged QA build launched with the env var set may still simulate.
+          process.env.OMEGA_DEV_UPDATE = 'available';
+          await ctx.manager.autoUpdater.simulate('unavailable');
+          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
+        } finally {
+          delete process.env.OMEGA_DEV_UPDATE;
+          ctx.manager.isProduction = origIsProduction;
+          await restore();
+        }
+      },
+    },
+    {
+      // The whole point of the session flag: simulate() leaves the synthetic library
+      // wired, so every LATER trigger (the hourly feed tick) drives the simulator too.
+      // Without _isSimulating() latching, that fake 'downloaded' walks into the real
+      // install path and flips the manager's quit latch.
+      name: 'simulate(): latches the session so a later feed tick cannot reach the real install path',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const u = ctx.manager.autoUpdater;
+        const origPrompt = u._promptToInstall;
+        let promptCalls = 0;
+        u._promptToInstall = async () => { promptCalls++; };
+        try {
+          await u.simulate('unavailable');
+          await waitFor(() => u.getStatus().code === 'not-available');
+          ctx.expect(u._isSimulating()).toBe(true);
+
+          // The feed tick calls checkForUpdates() with no scenario: the simulator falls
+          // back to 'available' and lands on a fake downloaded v999.0.0.
+          await u._feedCheckTick();
+          await waitFor(() => u.getStatus().code === 'downloaded', { timeout: 5000 });
+
+          // User idle well past the threshold, background check: only the simulation
+          // guard stands between this and a real install.
+          u._userInitiated = false;
+          u._lastActivityAt = Date.now() - (10 * 60 * 1000);
+          u._evaluateIdleInstall();
+
+          ctx.expect(ctx.manager._allowQuit).toBe(false);
+          ctx.expect(promptCalls).toBe(0);
+        } finally {
+          u._promptToInstall = origPrompt;
+          ctx.manager._allowQuit = false;
+          await restore();
+        }
+      },
+    },
+    {
+      name: 'simulate(): shutdown clears the session flag',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const u = ctx.manager.autoUpdater;
+        try {
+          await u.simulate('unavailable');
+          ctx.expect(u._isSimulating()).toBe(true);
+
+          u.shutdown();
+          ctx.expect(u._isSimulating()).toBe(false);
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): refuses while a cascade is already running',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const u = ctx.manager.autoUpdater;
+        try {
+          await u.simulate('available');
+          ctx.expect(u._devSimulating).toBe(true);
+
+          await ctx.expect(() => u.simulate('error')).toThrow(/already running/i);
+          // The refused call must not have reset the running cascade's state.
+          ctx.expect(u.getStatus().code).not.toBe('idle');
+          await waitFor(() => u.getStatus().code === 'downloaded', { timeout: 5000 });
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'dev simulation: the env-var cascade never writes the pendingUpdate storage key',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
           await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
           await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
 
+          // The fake download stamps memory (the in-session UI flow reads the
+          // same as a real one) but must leave the production record alone.
+          ctx.expect(typeof ctx.manager.autoUpdater.getStatus().downloadedAt).toBe('number');
+          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
+        } finally { await restore(); }
+      },
+    },
+    {
+      name: 'simulate(): the cascade never writes the pendingUpdate storage key',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        try {
+          await ctx.manager.autoUpdater.simulate('available');
+          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+
+          ctx.expect(typeof ctx.manager.autoUpdater.getStatus().downloadedAt).toBe('number');
+          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
+        } finally { await restore(); }
+      },
+    },
+    {
+      // Heals profiles an older build already polluted: a simulated record
+      // whose version can never be applied would otherwise seed the 30-day
+      // gate and force-install the first REAL download on the spot.
+      name: 'a stale simulated pendingUpdate cannot seed a real download (30-day gate does not force install)',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const updater = ctx.manager.autoUpdater;
+        let quitCalled = false;
+        let origQuit;
+        try {
+          // A 40-day-old simulator record, then a boot so the reconciler sees it.
+          const staleTs = Date.now() - (40 * 24 * 60 * 60 * 1000);
+          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '999.0.0', downloadedAt: staleTs });
+          updater.shutdown();
+          await updater.initialize(ctx.manager);
+
+          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBe(null);
+          ctx.expect(updater._state.downloadedAt).toBe(null);
+
+          // A real update downloads: it starts its OWN 30-day clock.
+          const before = Date.now();
+          origQuit = updater._library.quitAndInstall;
+          updater._library.quitAndInstall = () => { quitCalled = true; };
+          updater._library.emit('update-downloaded', { version: '2.0.0' });
+
+          const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+          ctx.expect(stored.version).toBe('2.0.0');
+          ctx.expect(stored.downloadedAt).not.toBeLessThan(before);
+          ctx.expect(updater._state.downloadedAt).toBe(stored.downloadedAt);
+          ctx.expect(quitCalled).toBe(false);
+        } finally {
+          // The spy sat on the shared electron-updater singleton.
+          if (origQuit) updater._library.quitAndInstall = origQuit;
+          ctx.manager._allowQuit = false;
+          await restore();
+        }
+      },
+    },
+    {
+      // A REAL download, not the simulator: the simulator deliberately never
+      // writes this key (see the two cases above).
+      name: 'first download persists pendingUpdate to storage',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const updater = ctx.manager.autoUpdater;
+        try {
+          updater._library.emit('update-downloaded', { version: '2.0.0' });
+          ctx.expect(updater.getStatus().code).toBe('downloaded');
+
           const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           ctx.expect(stored).toBeDefined();
-          ctx.expect(stored.version).toBe('999.0.0');
+          ctx.expect(stored.version).toBe('2.0.0');
           ctx.expect(typeof stored.downloadedAt).toBe('number');
         } finally { await restore(); }
       },
@@ -125,22 +334,22 @@ module.exports = {
     {
       name: 'subsequent download keeps downloadedAt but tracks the NEW version (first timer wins, clear-on-apply matches)',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
           // Plant an older pending-update record manually.
           const oldTs = Date.now() - (10 * 24 * 60 * 60 * 1000);  // 10 days ago
           ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '888.0.0', downloadedAt: oldTs });
 
           // Call _recordDownloadedAt for a "new" download.
-          ctx.manager.autoUpdater._recordDownloadedAt('999.0.0');
+          ctx.manager.autoUpdater._recordDownloadedAt('2.0.0');
 
           const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           // Timer unchanged (first-download-wins) — but the version must track
-          // the newest download: after installing 999.0.0, the clear-on-apply
+          // the newest download: after installing 2.0.0, the clear-on-apply
           // check (pending.version === getVersion()) has to match, or the stale
           // flag would force-install every future download instantly forever.
           ctx.expect(stored.downloadedAt).toBe(oldTs);
-          ctx.expect(stored.version).toBe('999.0.0');
+          ctx.expect(stored.version).toBe('2.0.0');
         } finally { await restore(); }
       },
     },
@@ -926,4 +1135,4 @@ module.exports = {
       },
     },
   ],
-};
+});

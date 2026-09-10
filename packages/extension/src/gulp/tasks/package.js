@@ -8,16 +8,12 @@ const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
 const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
-const { readSiblingPorts, envPorts, CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
-const { bakeKeys } = require('@omega.js/config/env-delivery');
-const { checkEnvRules } = require('@omega.js/config/env-rules');
+const { CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 
 // Load package
-const package = Manager.getPackage('main');
 const project = Manager.getPackage('project');
 const config = Manager.getConfig('project');
 const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
 
 // Glob
 const input = [
@@ -29,258 +25,6 @@ const input = [
 ];
 const output = 'dist';
 const delay = 250;
-
-// JSONP Template for build.js
-const JSONP_TEMPLATE = `
-(function() {
-  // Create a global variable for the config
-  const config = { config };
-
-  // Assign to various global scopes for compatibility
-  if (typeof self !== 'undefined') self.OMEGA_BUILD_JSON = config;
-  if (typeof window !== 'undefined') window.OMEGA_BUILD_JSON = config;
-  if (typeof globalThis !== 'undefined') globalThis.OMEGA_BUILD_JSON = config;
-})();
-`.trim();
-
-// Generate build.js file
-async function generateBuildJs(outputDir) {
-  try {
-    // Get git info
-    const gitInfo = getGitInfo();
-
-    // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
-    // (#425). The provider block feeds Sentry.init directly; the role level
-    // (`enabled`) never rides along.
-    const sentryConfig = { ...(config.monitoring?.providers?.sentry || {}) };
-
-    // The live sibling website's published origin, or null when none is up (#262)
-    const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
-
-    // The Measurement Protocol secret (.env — secrets never live in omega.json5).
-    const googleAnalyticsId = config.analytics?.providers?.google?.id || '';
-    const googleAnalyticsSecret = readBakedEnv(process.env, { config }).GOOGLE_ANALYTICS_SECRET;
-
-    // Build config object matching @omega.js/client's expected structure
-    const buildConfig = {
-      timestamp: new Date().toISOString(),
-      repo: gitInfo,
-      environment: Manager.getEnvironment(),
-      packages: {
-        [package.name]: package.version,
-        '@omega.js/client': getPackageVersion('@omega.js/client'),
-      },
-      config: {
-        // Core metadata
-        runtime: 'browser-extension',
-        version: project.version,
-        environment: Manager.getEnvironment(),
-        buildTime: Date.now(),
-
-        // Brand configuration (from config/omega.json5 or manifest)
-        brand: config.brand || {},
-
-        // The local stack's resolved facts (N7). An extension context has no
-        // env and no filesystem, so this bake is its ONLY channel: the sibling
-        // backend's published map plus anything a parent injected on the env
-        // channel, and the sibling WEBSITE's published origin
-        // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)) —
-        // resolved per build so a rebuild follows a restarted emulator
-        // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
-        // Production packages carry none — there is no local stack to reach.
-        // A key present is a resolved fact; absent, @omega.js/client assumes the
-        // classic and warns — so an unpublished origin ships no origin at all.
-        ...(Manager.getEnvironment() === 'production'
-          ? {}
-          : { dev: {
-            ports: { ...readSiblingPorts(rootPathProject), ...envPorts() },
-            ...(devWebsiteOrigin ? { origin: devWebsiteOrigin } : {}),
-          } }),
-
-        // Cloud (firebase) config in the CANONICAL `cloud.config` shape —
-        // what @omega.js/client prefers and the only shape background.js
-        // reads. Without it the SW's Firebase auth never initializes (#46).
-        cloud: config.cloud || {},
-
-        // OMEGA build metadata
-        omega: {
-          environment: Manager.getEnvironment(),
-          cache_breaker: Math.round(new Date().getTime() / 1000),
-          // Resolved at serve time (N7) — the getter reads the allocator's
-          // OMEGA_LIVERELOAD_PORT, so a bumped server and the baked client
-          // agree. Packaged (non-serve) builds bake the classic default.
-          liveReloadPort: config.liveReloadPort || Manager.getLiveReloadPort(),
-        },
-
-        // Web-manager features (matching expected structure)
-        auth: { enabled: true, config: {} },
-
-        firebase: {
-          app: {
-            enabled: !!(config.cloud?.config?.apiKey),
-            config: config.cloud?.config || {},
-          },
-          appCheck: { enabled: false, config: {} },
-        },
-
-        consent: { enabled: true, config: {} },
-        inbound: (() => {
-          // Curated to the leaves the client runtime reads (#23) — the provisioning-only
-          // siblings (template ids, plan, update flags) never ship in the bundle
-          const chatsy = config.inbound?.chat?.providers?.chatsy;
-          return { chat: { providers: { chatsy: chatsy
-            ? { enabled: chatsy.enabled, agentId: chatsy.agentId, settings: chatsy.settings }
-            : { enabled: false } } } };
-        })(),
-        sentry: {
-          enabled: !!(sentryConfig.dsn),
-          config: sentryConfig,
-        },
-        exitPopup: { enabled: false, config: {} },
-        lazyLoading: { enabled: true, config: {} },
-        socialSharing: { enabled: false, config: {} },
-        pushNotifications: { enabled: false, config: {} },
-        validRedirectHosts: [],
-        refreshNewVersion: { enabled: true, config: {} },
-        serviceWorker: { enabled: false, config: {} },
-
-        // Analytics (canonical providers shape — C4 cp106a). The Measurement
-        // Protocol API secret comes from .env (GOOGLE_ANALYTICS_SECRET —
-        // matches @omega.js/backend/EM convention; secrets never live in
-        // omega.json5) and is baked into the snapshot here at build time.
-        analytics: {
-          providers: {
-            google: {
-              id: googleAnalyticsId,
-              secret: googleAnalyticsSecret,
-            },
-          },
-        },
-
-        // Theme config
-        theme: config.theme || {},
-
-        // Advertising (ads-system phase 4) — feeds the client verts module's
-        // house/company lane (extension surfaces never run AdSense; lib/verts.js
-        // pins the house type). company carries the parent's url so the
-        // inhouse source 'company' can resolve.
-        advertising: config.advertising || {},
-        company: config.company || {},
-      }
-    };
-
-    // Write JSON version
-    const jsonPath = path.join(outputDir, 'build.json');
-    jetpack.write(jsonPath, JSON.stringify(buildConfig, null, 2));
-
-    // Write JSONP version for service worker
-    const jsonpContent = JSONP_TEMPLATE.replace('{ config }', JSON.stringify(buildConfig, null, 2));
-    const jsonpPath = path.join(outputDir, 'build.js');
-    jetpack.write(jsonpPath, jsonpContent);
-
-    logger.log(`Generated build.js and build.json`);
-  } catch (e) {
-    // Report, then re-throw — a package with no build.js has no service-worker
-    // config, and its own catch would eat the error before packageRaw's (#46).
-    logger.error(`Error generating build.js`, e);
-    throw e;
-  }
-}
-
-// The keys the env schema says this build writes INTO the shipped artifact
-// ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): a packaged
-// extension runs with no `.env`, so a `delivery: { extension: 'bake' }` key is
-// read from the build env here and baked into build.json / build.js. The list
-// is the schema's — the hardcoded GOOGLE_ANALYTICS_SECRET read this replaced
-// was one of three hand-kept lists for one concern.
-const BAKED_KEYS = bakeKeys('extension');
-
-/**
- * The schema's presence rules at the BAKE seam
- * ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)) — the last
- * moment a missing key is still fixable.
- *
- * A packaged extension runs with no `.env`, so what the bake holds is what the
- * artifact holds forever: a brand with a GA4 stream id and no Measurement
- * Protocol secret used to bake an empty string and ship an extension that sends
- * no events, silently — #582's failure mode, and the CI publish that has no
- * `.env` at all is exactly where it happens. A BUILD refuses; development
- * warns and keeps going, because a half-configured brand is a normal step on
- * the way to a configured one.
- *
- * @param {object} config - The target's resolved omega.json5 config.
- * @param {object} env - The build env.
- * @param {object} [options]
- * @param {boolean} [options.build] - Build/publish mode (default: the Manager's).
- * @param {object} [options.logger] - Logger with `warn` (default: this task's).
- * @throws {Error} in build mode, naming every brand-level key and the config path that requires it.
- */
-function assertBakeRules(config, env, options) {
-  options = options || {};
-  const build = options.build === undefined ? Manager.isBuildMode() : options.build;
-  const warn = (options.logger || logger).warn.bind(options.logger || logger);
-
-  const violations = checkEnvRules(config, env, { target: 'extension' })
-    .filter((violation) => violation.rule === 'requiredWhen');
-  if (violations.length === 0) return;
-
-  // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_EXTENSION, not the
-  // GOOGLE_ANALYTICS_SECRET it is delivered as): that is the name a human puts
-  // in the brand .env and in the repo's Actions secrets.
-  const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
-  const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
-    + 'Set it in the brand .env (and as a repo Actions secret for a CI publish — `omega deploy` pushes them), then build again.';
-
-  if (build) {
-    throw new Error(message);
-  }
-
-  warn(message);
-}
-
-// The baked keys' values from the build env. Absent reads as the empty string,
-// never undefined: the snapshot is JSON, and a missing key would read to the
-// client as "no analytics configured" rather than "configured, no secret".
-//
-// The presence guard runs FIRST: a build that would bake an empty secret over a
-// configured stream refuses here rather than shipping the hole.
-function readBakedEnv(env, options) {
-  env = env || process.env;
-
-  if (options && options.config) {
-    assertBakeRules(options.config, env, options);
-  }
-
-  return Object.fromEntries(BAKED_KEYS.map((key) => [key, env[key] || '']));
-}
-
-// Get git info
-function getGitInfo() {
-  try {
-    const { execSync } = require('child_process');
-    const user = execSync('git config user.name', { encoding: 'utf8' }).trim();
-    const repo = execSync('git config --get remote.origin.url', { encoding: 'utf8' })
-      .trim()
-      .replace(/.*[\/:]([\w-]+)\/([\w-]+)(\.git)?$/, '$2');
-
-    return { user, name: repo };
-  } catch (e) {
-    return { user: 'unknown', name: 'unknown' };
-  }
-}
-
-// Get package version
-function getPackageVersion(packageName) {
-  try {
-    const pkgPath = require.resolve(`${packageName}/package.json`, {
-      paths: [process.cwd()]
-    });
-    const pkg = require(pkgPath);
-    return pkg.version;
-  } catch (e) {
-    return 'unknown';
-  }
-}
 
 // Build targets with browser-specific configurations
 const TARGETS = {
@@ -448,7 +192,7 @@ async function compileManifest(outputDir, target) {
     const configPath = path.join(rootPathPackage, 'dist', 'config', 'manifest.json');
 
     // Read and parse using JSON5. The framework defaults carry build-time
-    // tokens (the same `%%%name%%%` idiom the webpack replace plugin speaks) —
+    // tokens (the same `%%%name%%%` idiom the bundle task's replacements speak) —
     // the messaging origins are resolved facts now, never literals (#262, #583).
     let manifest = JSON5.parse(jetpack.read(manifestPath));
     const defaultConfig = JSON5.parse(template(jetpack.read(configPath), {
@@ -664,9 +408,6 @@ async function packageRawForTarget(target) {
     // Write the new content to the file
     jetpack.write(filePath, content);
   });
-
-  // Generate build.js and build.json
-  await generateBuildJs(outputDir);
 
   // Compile manifest (target-specific) and locales
   await compileManifest(outputDir, target);
@@ -928,16 +669,12 @@ function packageFnWatcher(complete) {
 module.exports = series(packageFn, packageFnWatcher);
 module.exports.packageFn = packageFn;
 module.exports.compileManifest = compileManifest;
-module.exports.generateBuildJs = generateBuildJs;
 module.exports.compileLocales = compileLocales;
 module.exports.deployStoreAssets = deployStoreAssets;
 module.exports.hook = hook;
 // The browser targets the package lane builds — the one list the CI workflow's
 // artifact upload is checked against (it ships packaged/<target>/extension.zip).
 module.exports.TARGETS = TARGETS;
-// The schema-derived bake set and its reader (#627).
-module.exports.BAKED_KEYS = BAKED_KEYS;
-module.exports.readBakedEnv = readBakedEnv;
 
 // Run hooks
 async function hook(file) {

@@ -11,7 +11,8 @@
  * TEST_EXTENDED_MODE and a real provider, so the delivered outcomes are not
  * exercised here).
  */
-const { sendDisputeEmail } = require('../../../src/manager/events/firestore/payments-disputes/on-write.js');
+const { sendDisputeEmail } = require('../../../dist/manager/events/firestore/payments-disputes/on-write.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ALERT = {
   provider: 'stripe',
@@ -24,7 +25,7 @@ const ALERT = {
   isRefunded: false,
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'Dispute alert email outcome reporting',
   type: 'group',
   timeout: 30000,
@@ -51,4 +52,4 @@ module.exports = {
       },
     },
   ],
-};
+});

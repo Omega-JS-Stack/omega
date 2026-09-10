@@ -160,14 +160,33 @@ const USER_SCHEMA = {
     clientId: { type: 'string', default: '$uuid' },
     privateKey: { type: 'string', default: '$apiKey' },
   },
+  // The documents this account owns, by KIND: `{ teams: ['team-abc'] }`
+  // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). A counted
+  // feature's catalog entry names the kinds its counters mirror onto
+  // (`usage: { mirror: ['teams'] }`), and this is what resolves a kind to real
+  // document paths — so a mirror is declared once in config instead of
+  // re-derived at every call site. Server-written like `usage`: a client that
+  // could write it could point another account's counters at its own doc.
+  owns: {
+    $passthrough: true,
+  },
   usage: {
     $passthrough: true,
+    // Admin-granted extra credits, feature id → number
+    // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). Declared
+    // HERE so the sibling `$template` never resolves it as a counter block:
+    // it is a map of limits, not a map of counts. `usage` is a framework field
+    // the security rules deny every client, so an override can only ever be
+    // server-written — which is what makes it trustworthy as a limit.
+    overrides: { $passthrough: true },
     $template: {
       monthly: { type: 'number', default: 0 },
       daily: { type: 'number', default: 0 },
       total: { type: 'number', default: 0 },
+      // When the counter last moved. The old `id` field went with the retired
+      // `increment(name, value, { id })` option (#647): nothing writes it now,
+      // and a schema field nothing fills reads as a fact that is always null.
       last: {
-        id: { type: 'string', default: null, nullable: true },
         timestamp: { type: 'string', default: '$oldDate' },
         timestampUNIX: { type: 'number', default: 0 },
       },
@@ -180,6 +199,8 @@ const USER_SCHEMA = {
       country: { type: 'string', default: null, nullable: true },
       region: { type: 'string', default: null, nullable: true },
       city: { type: 'string', default: null, nullable: true },
+      postalCode: { type: 'string', default: null, nullable: true },
+      street: { type: 'string', default: null, nullable: true },
     },
     name: {
       first: { type: 'string', default: null, nullable: true },
@@ -194,7 +215,7 @@ const USER_SCHEMA = {
       national: { type: 'number', default: 0 },
     },
   },
-  oauth2: {
+  connections: {
     $passthrough: true,
   },
   attribution: {

@@ -144,13 +144,27 @@ module.exports = async function ensureAuthentication(context) {
       enabled.push('google');
       googleClientId = googleConfig.clientId;
 
-      // Secrets belong in the gitignored secrets dir, never state/omega.json5
+      // Secrets belong in the gitignored secrets dir, never state/omega.json5.
+      // Read-compare first (#590's idiom, #623): the console's credentials
+      // barely ever move, and a manage run that rewrites an identical secret
+      // file on every pass churns the mtime every watcher and backup sees.
       const secretsPath = join(brandRoot, '.omega', 'secrets', 'google-oauth.json');
-      if (!options.dryRun) {
-        jetpack.write(secretsPath, {
-          clientId: googleConfig.clientId,
-          clientSecret: googleConfig.clientSecret,
-        });
+      const secrets = {
+        clientId: googleConfig.clientId,
+        clientSecret: googleConfig.clientSecret,
+      };
+      // A truncated write to this machine-owned file is an expected external
+      // condition: treat unparseable as absent so the next run self-heals.
+      let stored;
+      try {
+        stored = jetpack.read(secretsPath, 'json');
+      } catch {
+        stored = undefined;
+      }
+      const drifted = stored?.clientId !== secrets.clientId || stored?.clientSecret !== secrets.clientSecret;
+
+      if (drifted && !options.dryRun) {
+        jetpack.write(secretsPath, secrets);
       }
     }
   } else if (googleConfig?.enabled) {

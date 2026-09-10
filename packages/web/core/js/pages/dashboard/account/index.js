@@ -10,6 +10,7 @@ import * as deleteSection from './sections/delete.js';
 import * as dataRequestSection from './sections/data-request.js';
 import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
+import * as ordersSection from './sections/orders.js';
 import omega from '@omega.js/client';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
@@ -60,6 +61,7 @@ const sectionModules = {
   'data-request': dataRequestSection,
   connections: connectionsSection,
   refund: refundSection,
+  orders: ordersSection,
 };
 
 // Main initialization
@@ -153,11 +155,17 @@ function loadAllSectionData(authState) {
   }
 
   if (sectionModules.connections.loadData) {
-    sectionModules.connections.loadData(account, omega.config?.oauth2 || {});
+    sectionModules.connections.loadData(account, omega.config?.connections || {});
   }
 
   if (sectionModules.refund.loadData) {
     sectionModules.refund.loadData(account);
+  }
+
+  // The purchase history: one fetch, shared with the refund section
+  // ([#672](https://github.com/Omega-JS-Stack/omega/issues/672))
+  if (sectionModules.orders.loadData) {
+    sectionModules.orders.loadData(account);
   }
 }
 

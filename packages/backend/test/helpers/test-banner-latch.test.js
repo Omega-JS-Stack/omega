@@ -20,7 +20,9 @@
  * Run: npx omega test framework:helpers/test-banner-latch
  */
 
-const MANAGER_PATH = require.resolve('../../src/manager/index.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+
+const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
 
 // A FRESH copy of the manager module, so the banner latch starts unset.
 function freshManagerModule() {
@@ -95,7 +97,7 @@ function initTwice({ Manager, assert, emulator }) {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'the TEST-environment boot lines: quiet under the emulator, once when deployed',
   type: 'group',
 
@@ -134,4 +136,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -3,7 +3,9 @@
  * Sends a test push notification to a specific FCM token.
  * Requires TEST_EXTENDED_MODE=true and TEST_FCM_TOKEN env var.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Push notification send',
   auth: 'admin',
   skip: !process.env.TEST_EXTENDED_MODE
@@ -29,4 +31,4 @@ module.exports = {
     assert.ok(response.data.providers?.push, 'Should have push result');
     assert.equal(response.data.providers.push.sent, 1, 'Should have sent to 1 token');
   },
-};
+});

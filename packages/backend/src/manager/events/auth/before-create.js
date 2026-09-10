@@ -35,7 +35,14 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const { functions } = libraries;
   const ipAddress = context.ipAddress || '';
 
-  ctx.log(`beforeCreate: ${user.uid} (${user.email})`, user, context);
+  // The UID and nothing else. The AuthUserRecord carries the email, the display
+  // name and the provider data, the AuthEventContext carries the IP, the user
+  // agent and the credential, and a backend line lands in Cloud Logging for the
+  // whole retention window — so none of it rides this line
+  // ([#657](https://github.com/Omega-JS-Stack/omega/issues/657)). Both stay
+  // reachable one level down, at debug.
+  ctx.log(`beforeCreate: ${user.uid}`);
+  ctx.debug(`beforeCreate: ${user.uid} record`, user, context);
 
   // Block disposable email domains
   if (isDisposable(user.email)) {
@@ -50,27 +57,30 @@ module.exports = async ({ Manager, ctx, user, context, libraries }) => {
     return;
   }
 
-  // IP Rate Limiting using Usage system
-  const usage = await Manager.Usage().init(ctx, {
-    key: ipAddress,
-    log: true,
-  });
-
-  const signups = usage.getUsage('signups');
+  // IP rate limiting — an EXPLICIT keyed counter, never the caller's own
+  // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). The limit is
+  // this backend's own `auth.signup.maxPerIpPerDay`, not a plan number: a
+  // signup gate is a security control and the caller has no account yet.
+  // consume() is the whole gate — check, count, write — so a refusal is a
+  // throw and there is nothing here to get half right.
+  const usage = Manager.Usage().attach(ctx, { log: true }).forKey(ipAddress);
   const maxSignupsPerDay = resolveSignupLimit(Manager.config);
 
-  ctx.log(`beforeCreate: Rate limit check for ${ipAddress}: ${signups}/${maxSignupsPerDay}`);
+  try {
+    await usage.consume('signups', 1, { limit: maxSignupsPerDay });
+  } catch (e) {
+    // ONLY a rate limit is a rate limit. consume() also throws 500s — a
+    // Firestore outage, a feature the catalog does not define — and selling one
+    // of those as "too many signups from your IP" is a diagnosis nobody can act
+    // on, told to a user who did nothing wrong.
+    if (e.code !== 429) {
+      throw e;
+    }
 
-  // Block if too many signups from this IP
-  if (signups >= maxSignupsPerDay) {
-    ctx.error(`beforeCreate: Too many signups from ${ipAddress} (${signups}/${maxSignupsPerDay})`);
+    ctx.error(`beforeCreate: Too many signups from ${ipAddress} (limit ${maxSignupsPerDay}/day)`);
 
     throw new functions.auth.HttpsError('resource-exhausted', ERROR_TOO_MANY_ATTEMPTS);
   }
-
-  // Increment rate limit counter
-  usage.increment('signups');
-  await usage.update();
 
   // Run consumer hook (can throw HttpsError to block signup)
   await runAuthHook('before-create', { Manager, ctx, user, context, libraries });

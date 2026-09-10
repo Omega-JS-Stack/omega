@@ -17,6 +17,8 @@
 // Run a thunk with a recording Sentry transport injected (the transport is the
 // external boundary — the seam the framework itself null-checks in production
 // when Sentry is disabled), restoring the original afterward.
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function withSentryRecorder(Manager, fn) {
   const captured = [];
   const original = Manager.libraries.sentry;
@@ -30,7 +32,7 @@ function withSentryRecorder(Manager, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'RouteContext report() + one-door error semantics',
   type: 'group',
   tests: [
@@ -124,4 +126,4 @@ module.exports = {
       },
     },
   ],
-};
+});

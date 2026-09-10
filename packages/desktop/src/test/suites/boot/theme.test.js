@@ -6,7 +6,9 @@
 // NOTE: inspect bodies are serialized to the spawned Electron process — no closures
 // over module scope; each inspect is self-contained.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'theme — resolved appearance applied to the live page (real bundle)',
@@ -63,4 +65,4 @@ module.exports = {
       },
     },
   ],
-};
+});

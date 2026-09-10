@@ -6,7 +6,9 @@
  * The test provider simulates refund by writing a customer.subscription.deleted
  * webhook which triggers the existing pipeline.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment refund endpoint',
   type: 'group',
   timeout: 30000,
@@ -176,4 +178,4 @@ module.exports = {
       },
     },
   ],
-};
+});

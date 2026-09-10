@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 
 // State
@@ -308,7 +307,7 @@ function renderDocuments() {
 
       cells += `<td>
         <button class="btn btn-sm btn-link p-0 btn-view-doc" data-doc-id="${omega.utilities().escapeHTML(doc.id)}">
-          ${getPrerenderedIcon('file', 'fa-sm')}
+          <i class="fa-solid fa-file fa-sm"></i>
         </button>
       </td>`;
 
@@ -536,7 +535,7 @@ async function saveDocument() {
 
   if ($saveBtn) {
     $saveBtn.disabled = false;
-    $saveBtn.innerHTML = `${getPrerenderedIcon('floppy-disk', 'fa-sm me-1')} Save`;
+    $saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk fa-sm me-1"></i> Save`;
   }
 }
 
@@ -620,7 +619,7 @@ function updateBreadcrumb(segments) {
 
   $breadcrumb.innerHTML = `
     <li class="breadcrumb-item">
-      <a href="#" id="breadcrumb-root">${getPrerenderedIcon('folder', 'fa-xs')}</a>
+      <a href="#" id="breadcrumb-root"><i class="fa-solid fa-folder fa-xs"></i></a>
     </li>
   `;
 

@@ -35,8 +35,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-module.exports = {
+module.exports = defineCases({
   description: 'Generate a blog article (config check by default, full AI pipeline with TEST_EXTENDED_MODE)',
   auth: 'none',
   timeout: 300000,
@@ -71,7 +72,7 @@ module.exports = {
       }
 
       // Verify provider exists
-      const providerPath = path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${providerName}.js`);
+      const providerPath = path.join(__dirname, '..', '..', 'dist', 'manager', 'libraries', 'content', `${providerName}.js`);
       assert.ok(jetpack.exists(providerPath), `provider "${providerName}" exists at ${providerPath}`);
 
       console.log(`\n[blog-generate] Config OK:`);
@@ -90,7 +91,7 @@ module.exports = {
       return skip('blog.enabled is false in config');
     }
 
-    const publisherPath = path.join(__dirname, '..', '..', 'src', 'manager', 'events', 'cron', 'daily', 'blog-auto-publisher.js');
+    const publisherPath = path.join(__dirname, '..', '..', 'dist', 'manager', 'events', 'cron', 'daily', 'blog-auto-publisher.js');
     const publisher = require(publisherPath);
 
     // Get content entries
@@ -122,7 +123,7 @@ module.exports = {
 
     // Intercept publishArticle if BLOG_NO_PUBLISH is set
     if (env.BLOG_NO_PUBLISH) {
-      const provider = require(path.join(__dirname, '..', '..', 'src', 'manager', 'libraries', 'content', `${providerName}.js`));
+      const provider = require(path.join(__dirname, '..', '..', 'dist', 'manager', 'libraries', 'content', `${providerName}.js`));
       const originalPublish = provider.publishArticle;
       provider.publishArticle = async (ast, args) => {
         console.log(`[blog-generate] SKIPPED publishArticle (BLOG_NO_PUBLISH=1)`);
@@ -160,4 +161,4 @@ module.exports = {
 
     assert.ok(true, 'Blog auto-publisher completed');
   },
-};
+});

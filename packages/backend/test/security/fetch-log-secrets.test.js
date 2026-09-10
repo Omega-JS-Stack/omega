@@ -16,10 +16,11 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const SOURCE_DIRS = [
-  path.join(__dirname, '../../src/manager'),
-  path.join(__dirname, '../../src/mcp'),
+  path.join(__dirname, '../../dist/manager'),
+  path.join(__dirname, '../../dist/mcp'),
 ];
 
 // `log: true` anywhere in an options object.
@@ -83,7 +84,7 @@ function enclosingObject(source, index) {
   return null;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'No options object logs a secret header (#702)',
   type: 'group',
   timeout: 10000,
@@ -120,4 +121,4 @@ module.exports = {
       },
     },
   ],
-};
+});

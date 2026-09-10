@@ -34,9 +34,10 @@
  * Run: npx omega test backend:events/payments/webhook-transition-claim
  */
 const assert = require('node:assert');
-const onWrite = require('../../../src/manager/events/firestore/payments-webhooks/on-write.js');
-const { CLAIM_WINDOW_MS } = require('../../../src/manager/events/firestore/payments-webhooks/transitions/index.js');
+const onWrite = require('../../../dist/manager/events/firestore/payments-webhooks/on-write.js');
+const { CLAIM_WINDOW_MS } = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/index.js');
 const { buildAdmin, CONFIG, subscriptionPayload } = require('./_webhook-harness.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-claim-uid';
 const ORDER_ID = '_test-claim-order';
@@ -154,7 +155,7 @@ function seamCount(logs, seam) {
   return logs.filter((line) => line.includes(`${seam} skipped (testing mode)`)).length;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment transitions: one claim per order per transition name gates the dispatch',
   type: 'group',
   timeout: 30000,
@@ -385,4 +386,4 @@ module.exports = {
       },
     },
   ],
-};
+});

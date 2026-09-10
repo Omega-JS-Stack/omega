@@ -15,9 +15,9 @@ read step is cached to `.omega/cache/cloudflare/{op}.json` as a debugging aid.
 | `dns-records` | The required platform record set (GitHub Pages, `www`, the email provider's MX/SPF, DMARC; BIMI and the SendGrid CNAMEs only when configured) plus `dns.records` custom entries, diff-synced: create, update, delete. |
 | `email-routing` | Cloudflare Email Routing, only when `domain.email.providers` names cloudflare; rules come from `domain.email.forwarding` (`[{ from: 'support' \| '*', to: 'inbox@…' }]`). |
 | `zone-settings` | A flat map matching Cloudflare's own setting IDs, diffed in one bulk read and patched per changed setting (Cloudflare has no bulk PATCH). Addon settings (`speed_brain`, `fonts`) need their own GET each. Read-only and absent settings are skipped, and one setting's failure never blocks the rest. |
-| `cache-rules` | The `http_request_cache_settings` entrypoint ruleset, rules matched by description. |
+| `cache-rules` | The `http_request_cache_settings` entrypoint ruleset, rules matched by description. The framework ships the whole default set (below), so a brand that declares nothing still gets both cache lifetimes. |
 | `rules-managed-transforms` | Cloudflare's managed request/response headers, enabled or disabled per config name, PATCHed in one call. |
-| `rules-redirect` | The `http_request_dynamic_redirect` ruleset. |
+| `rules-redirect` | The `http_request_dynamic_redirect` ruleset — the ONE home for a brand's templated redirects ([#466](https://github.com/Omega-JS-Stack/omega/issues/466), below). |
 | `rules-configuration` | The `http_config_settings` ruleset. |
 | `rules-response-headers` | The `http_response_headers_transform` ruleset (always PUT — at the ruleset's id when it exists, at the phase entrypoint when it does not). |
 | `rules-security` | Custom firewall rules in `http_request_firewall_custom`. |
@@ -43,6 +43,106 @@ addresses, the BIMI logo, extra CSP hosts) belong in the company or brand layer.
 
 **Credential**: `CLOUDFLARE_TOKEN` in the brand `.env`, asked for through the shared setup
 contract. No `brand.url` → the service skips.
+
+## Cache lifetimes: /assets for a year, HTML for a minute
+
+The manager's defaults carry the whole `cacheRules` set, so a brand that declares no rules
+still reconciles both of them ([#751](https://github.com/Omega-JS-Stack/omega/issues/751)):
+
+| Rule | Matches | Edge TTL | Browser TTL |
+|---|---|---|---|
+| `Assets: Cache for 1 Year` | `/assets/*` plus `/__/auth/iframe.js`, on any host | 1 year | 1 year |
+| `HTML: Short Browser Cache` | a SITE host (not `api.`), outside `/assets`, with no file extension or ending `.html` | 2 hours | 1 minute |
+
+The safety in the one-year rule is the CONTENT HASH, and only the CSS and JS bundles carry
+one (`main-39ce99d8.css`, `first-paint-A7T6PAIK.js`): new bytes get a new URL, so the old
+one can be held forever. **Fonts and images under `/assets` are NOT hashed** — they land at
+stable names by design (`assets/fonts/inter-normal-latin.woff2`,
+`assets/images/brand/brandmark-640px.webp`), because `@font-face` src URLs are written into
+theme CSS. So replacing a font file or a logo in place pins the OLD file in visitors'
+browsers for up to a year, and a purge cannot reach a browser copy: ship such a replacement
+under a new filename, or accept the year.
+
+HTML is the opposite of a hashed bundle: its URL never changes, so whatever a browser holds
+IS what a returning visitor sees until it expires. One minute is short enough that a deploy
+is visible almost immediately; the rule sets its own 2-hour edge TTL (a cache rule overrides
+the zone's `edge_cache_ttl` setting) and a deploy purges it.
+
+**A cache rule is ZONE-scoped, so the HTML rule is guarded by host.** The zone serves the
+brand's site AND `api.<domain>`, whose Firebase rewrites answer extensionless, user-scoped
+GETs (`/authorize`, `/token`, `/omega/**`, `/mcp/**`) — edge-caching one of those would hand
+one user's answer to the next. The zone also serves `emailurl.<domain>`, the proxied SendGrid
+link-tracking CNAME, whose extensionless click and open URLs must reach SendGrid on every hit or
+campaign counts undercount. The guard is `not starts_with(http.host, "api.")` plus the same for
+`emailurl.`, rather than an equality on the site host, because every OTHER host on the zone is
+a site host: the apex, `www`, and a subdomain project served under the parent zone. Those two
+are the non-site hosts the stack creates, at every shape it builds (`api.brand.com`,
+`api.app.brand.com` — `packages/manager/src/services/cloud/ensure/hosting.js`;
+`emailurl.<domain>` — `packages/manager/src/services/edge/lib/dns-records-helpers.js`). A
+hand-added `dns.records` host for some other service is not covered; declare your own
+`cacheRules` in that case. The assets rule needs no guard: both of its paths are static files
+wherever they are served from.
+
+The two rules cannot both match one request — the HTML expression excludes `/assets` across
+BOTH of its path shapes (extensionless and `.html`), not just the extensionless one.
+Extensionless is the normal page shape here, since the default redirect rule strips trailing
+slashes (`/about`), and `not … contains "."` is how the free plan says "no file extension"
+(`matches` needs Business).
+
+`cacheRules` is an ARRAY, and arrays REPLACE across the config merge chain: a brand
+declaring its own `edge.providers.cloudflare.cacheRules` replaces the framework set whole
+(the same doctrine as `rules.redirect`), so its block has to carry any platform rule it still
+wants. A subdomain project never runs this operation at all (below) — the parent brand's
+zone owns the rules its subdomains are served under. A TTL of `0` is a legal value that
+reaches Cloudflare as declared rather than falling back to the default
+([#754](https://github.com/Omega-JS-Stack/omega/issues/754)): `browserTtl: 0` is `max-age=0`,
+revalidate on every request, and a `0` edge TTL means whatever Cloudflare's own rules grammar
+makes of it (a full edge bypass is a MODE there, not a TTL).
+
+**Static hosting contributes nothing here.** The web target publishes to GitHub Pages, which
+has no header configuration, and nothing in the stack writes a hosting config for the built
+site — so the edge is the ONE place a brand's cache lifetimes are set
+([docs/shared/deploys.md](../shared/deploys.md)).
+
+## Templated redirects live here, not in the web config
+
+A redirect whose destination is COMPUTED from the request path — DashQR's printed QR codes
+point at `/c/<id>` for unbounded ids, and every one of them must land on `/code?id=<id>` —
+cannot be enumerated as a page, and static hosting has no server to answer it with. It needs
+edge computing, so `edge.providers.cloudflare.rules.redirect` is its one home
+([#466](https://github.com/Omega-JS-Stack/omega/issues/466)): the web target's own
+`targets.web.redirects` block shipped in 0.45.0 and is retired, and a config still carrying
+it fails validation naming this key.
+
+An entry is `{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }`, in
+Cloudflare's own filter language — nothing is translated, because the edge is what evaluates
+it:
+
+```json5
+{
+  name: 'Redirect: QR short code',
+  expression: '(starts_with(http.request.uri.path, "/c/"))',
+  statusCode: 301,
+  // The target carries its OWN `?id=`, so an inbound querystring must not be appended
+  preserveQueryString: false,
+  targetUrl: { expression: 'concat("https://", http.host, "/code?id=", substring(http.request.uri.path, 3))' },
+  enabled: true,
+}
+```
+
+`targetUrl` takes `{ value }` for a fixed destination and `{ expression }` for a computed
+one. The ruleset is reconciled whole — a configured rule is created or updated by `name`,
+and a rule in Cloudflare that config does not name is REMOVED — so the block is the complete
+desired set, the manager's platform defaults (the trailing-slash rule) included.
+
+A redirect whose URLs CAN be enumerated is not this: it is a redirect PAGE in the web target
+(`redirect.url` in frontmatter on the `modules/utilities/redirect` layout,
+[docs/web/index.md](../web/index.md)).
+
+**`omega dev` does not answer these routes** (the manager call, 2026-08-30). The edge owns
+them, so `/c/<id>` is a plain 404 in dev, exactly as it is against the built output — a
+local mirror of Cloudflare's filter language would exist only to disagree with production.
+Verify a rule against the zone.
 
 ## Subdomain projects use the parent zone
 

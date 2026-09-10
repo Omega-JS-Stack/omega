@@ -19,7 +19,8 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const { loadAndExecuteJobs } = require('../../src/manager/events/cron/runner.js');
+const { loadAndExecuteJobs } = require('../../dist/manager/events/cron/runner.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const ROUTES_DOC = path.join(__dirname, '..', '..', 'docs', 'routes.md');
 const HEADING = '## New Cron Job (Consumer Project)';
@@ -59,7 +60,7 @@ async function capturingLogs(fn) {
   return lines.join('\n');
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'the documented consumer cron job runs under the real runner',
   type: 'group',
 
@@ -97,4 +98,4 @@ module.exports = {
       },
     },
   ],
-};
+});

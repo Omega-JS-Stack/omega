@@ -53,7 +53,7 @@ newsletter_cta:
         {% comment %} Client-side search over /blog/index.json — core/js/pages/blog/index.js {% endcomment %}
         <label for="blog-search" class="visually-hidden">Search posts</label>
         <div class="input-group">
-          <span class="input-group-text bg-transparent">{% omega_icon "search" %}</span>
+          <span class="input-group-text bg-transparent"><i class="fa-solid fa-search"></i></span>
           <input
             type="search"
             id="blog-search"
@@ -97,7 +97,7 @@ newsletter_cta:
             <h3 class="h1 my-2">{{ lead.post.title }}</h3>
             {% capture lead_rt %}{% omega_readtime lead.content %}{% endcapture %}
             {% component "news/byline", author: lead.post.author, date: lead.date | date: "%b %d, %Y", readtime: lead_rt, p_class: "text-body-secondary mb-3" %}
-            <span class="btn btn-outline-dark btn-sm">Read the story {% omega_icon "arrow-right", "ms-1" %}</span>
+            <span class="btn btn-outline-dark btn-sm">Read the story <i class="fa-solid fa-arrow-right ms-1"></i></span>
           </div>
         </div>
       </a>
@@ -133,14 +133,14 @@ newsletter_cta:
               {% if paginator.previous_page %}
                 <li class="page-item">
                   <a class="page-link" href="{{ paginator.previous_page_path }}" aria-label="Previous page">
-                    {% omega_icon "chevron-left" %}
+                    <i class="fa-solid fa-chevron-left"></i>
                     <span class="d-none d-sm-inline ms-1">Previous</span>
                   </a>
                 </li>
               {% else %}
                 <li class="page-item disabled">
                   <span class="page-link">
-                    {% omega_icon "chevron-left" %}
+                    <i class="fa-solid fa-chevron-left"></i>
                     <span class="d-none d-sm-inline ms-1">Previous</span>
                   </span>
                 </li>
@@ -190,14 +190,14 @@ newsletter_cta:
                 <li class="page-item">
                   <a class="page-link" href="{{ paginator.next_page_path }}" aria-label="Next page">
                     <span class="d-none d-sm-inline me-1">Next</span>
-                    {% omega_icon "chevron-right" %}
+                    <i class="fa-solid fa-chevron-right"></i>
                   </a>
                 </li>
               {% else %}
                 <li class="page-item disabled">
                   <span class="page-link">
                     <span class="d-none d-sm-inline me-1">Next</span>
-                    {% omega_icon "chevron-right" %}
+                    <i class="fa-solid fa-chevron-right"></i>
                   </span>
                 </li>
               {% endif %}
@@ -252,7 +252,7 @@ newsletter_cta:
           {% if categories.size > 0 %}
             <div class="mb-5 text-center">
               <h3 class="h5 mb-3">
-                {% omega_icon "folder", "me-2" %}
+                <i class="fa-solid fa-folder me-2"></i>
                 Categories
               </h3>
               <div>
@@ -262,7 +262,7 @@ newsletter_cta:
                   </a>
                 {% endfor %}
                 <a href="{{ resolved.config.url }}/blog/categories" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
-                  View all {% omega_icon "arrow-right", "ms-1" %}
+                  View all <i class="fa-solid fa-arrow-right ms-1"></i>
                 </a>
               </div>
             </div>
@@ -272,7 +272,7 @@ newsletter_cta:
           {% if tags.size > 0 %}
             <div class="text-center">
               <h3 class="h5 mb-3">
-                {% omega_icon "tags", "me-2" %}
+                <i class="fa-solid fa-tags me-2"></i>
                 Tags
               </h3>
               <div>
@@ -282,7 +282,7 @@ newsletter_cta:
                   </a>
                 {% endfor %}
                 <a href="{{ resolved.config.url }}/blog/tags" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
-                  View all {% omega_icon "arrow-right", "ms-1" %}
+                  View all <i class="fa-solid fa-arrow-right ms-1"></i>
                 </a>
               </div>
             </div>

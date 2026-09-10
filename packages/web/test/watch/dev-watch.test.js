@@ -18,7 +18,8 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const { configureOmega } = require('../../src/index.js');
-const { registerTemplateWatchTargets } = require('../../src/commands/dev.js');
+const { buildAssets } = require('../../src/assets.js');
+const { refreshLiveManifest, registerTemplateWatchTargets, watchAssetSources } = require('../../src/commands/dev.js');
 
 // A rebuild is chokidar's write-settle window (150ms) plus one build of the
 // fixture; the deadline is the point at which "the edit never landed" is the
@@ -98,19 +99,6 @@ function app() {
   write('_sections/toy-section/section.html', '<section data-section="{{ args.label }}">toy</section>');
   write('_sections/toy-section/section.json5', '{ defaults: { label: "BEFORE" } }');
 
-  // The active theme layer's first-paint faces: engine.js readdir's the first
-  // theme layer WITH a fonts/ dir once per config registration
-  // (site.fontPreloads), so a face added mid-session only lands through a
-  // reset. The page emits the same loop core/_includes/core/head.html does —
-  // the real chrome this fixture's toy layouts replace.
-  write(`themes/${ACTIVE_THEME}/fonts/aaa-400-normal-latin.woff2`, 'face');
-  write('pages/fonts-page.html', [
-    '---',
-    'permalink: /fonts-page.html',
-    '---',
-    '{% for font in site.fontPreloads %}<link rel="preload" href="{{ font }}"/>{% endfor %}',
-  ].join('\n'));
-
   write('pages/index.html', page('toy.html', '/', '<p data-nav="{{ site.data._includes.nav.label }}">home</p>'));
   write('pages/section-page.html', page('toy.html', '/section-page.html', '{% section "toy-section" %}'));
   write('pages/theme-page.html', page('theme-toy.html', '/theme-page.html', '<p>theme</p>'));
@@ -150,7 +138,7 @@ function app() {
  * output, deadlined: green resolves as soon as the rebuild lands, a rebuild
  * that serves the stale capture fails at the deadline.
  */
-async function startWatch(t, fixture) {
+async function startWatch(t, fixture, options = {}) {
   const Eleventy = require('@11ty/eleventy').default;
   // Eleventy re-runs the config callback ONLY on a config reset — counting
   // the runs is how a reset is told apart from an incremental rebuild.
@@ -171,6 +159,8 @@ async function startWatch(t, fixture) {
         coreDir: fixture.coreDir,
         defaultsDir: fixture.defaultsDir,
       });
+      // What `omega dev` registers beside them (the asset manifest, #765).
+      (options.watchTargets || []).forEach((target) => eleventyConfig.addWatchTarget(target));
       return configureOmega(eleventyConfig, {
         consumerDir: fixture.src,
         siteData: SITE_DATA,
@@ -179,9 +169,9 @@ async function startWatch(t, fixture) {
         coreDir: fixture.coreDir,
         defaultsDir: fixture.defaultsDir,
         environment: 'development',
-        assetManifest: {
+        assetManifest: options.assetManifest || {
           js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} },
         },
       });
     },
@@ -311,17 +301,100 @@ test('a watched _sections edit is served by the very next rebuild', async (t) =>
   await watch.pageBecomes(/data-section="AFTER-AFTER"/, 'the section defaults are re-read too', 'section-page.html');
 });
 
-test('a watched theme-layer fonts edit is served by the very next rebuild', async (t) => {
+// The font preloads left the engine for the asset manifest (#765): they are
+// picked off the compiled sheet's @font-face rules, so the CSS lane's watcher
+// — not a config-time capture — is what a theme's font edit rebuilds. The
+// whole path, end to end: the asset watcher rebuilds the sheet, folds the new
+// list into the live manifest the engine holds by reference, and rewrites the
+// manifest FILE; Eleventy watches that file, so it re-renders after the asset
+// build rather than racing it.
+test('a theme @font-face edit reaches the served head, through the manifest file', async (t) => {
   const fixture = app();
-  const watch = await startWatch(t, fixture);
 
-  assert.match(watch.page('fonts-page.html'), /"\/assets\/fonts\/aaa-400-normal-latin\.woff2"/, 'the first build preloads the authored face');
+  // The consumer-local theme layer the dev asset lane compiles
+  // (resolveAssetThemeLayers): its own main.scss, its own vendored face.
+  const themeLayer = path.join(fixture.src, 'themes', ACTIVE_THEME);
+  const face = (name) => `@font-face { font-family: ${name}; src: url(/assets/fonts/${name}.woff2); unicode-range: U+0000-00FF; }`;
+  fs.mkdirSync(path.join(themeLayer, 'css'), { recursive: true });
+  fs.mkdirSync(path.join(themeLayer, 'fonts'), { recursive: true });
+  fs.writeFileSync(path.join(themeLayer, 'fonts', 'aaa.woff2'), 'face');
+  fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), face('aaa'));
+  // The same loop core/_includes/core/head.html runs, on a page of its own.
+  fixture.write('pages/fonts-page.html', [
+    '---',
+    'permalink: /fonts-page.html',
+    '---',
+    '{% for font in assetManifest.fontPreloads %}<link rel="preload" href="{{ font }}"/>{% endfor %}',
+  ].join('\n'));
 
-  fixture.write(`themes/${ACTIVE_THEME}/fonts/mmm-400-normal-latin.woff2`, 'face');
-  await watch.pageBecomes(/"\/assets\/fonts\/mmm-400-normal-latin\.woff2"/, 'the rebuild re-reads the fonts dir, not the config-time capture', 'fonts-page.html');
+  const build = (only) => buildAssets({
+    layers: [themeLayer],
+    themeRoots: [themeLayer],
+    sectionRoots: [themeLayer],
+    themesDir: fixture.themesDir,
+    coreDir: fixture.coreDir,
+    outDir: fixture.out,
+    dev: true,
+    only: only || 'css',
+  });
 
-  fixture.write(`themes/${ACTIVE_THEME}/fonts/zzz-400-normal-latin.woff2`, 'face');
-  await watch.pageBecomes(/"\/assets\/fonts\/zzz-400-normal-latin\.woff2"/, 'every later face lands too', 'fonts-page.html');
+  const manifestPath = path.join(fixture.root, '.omega', 'asset-manifest.json');
+  const manifest = await build('css');
+  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const watcher = watchAssetSources({ dirs: [themeLayer], build, manifest, manifestPath });
+  t.after(() => watcher.close());
+
+  const watch = await startWatch(t, fixture, { assetManifest: manifest, watchTargets: [manifestPath] });
+  assert.match(watch.page('fonts-page.html'), /"\/assets\/fonts\/aaa\.woff2"/, 'the first build preloads the authored face');
+
+  fs.writeFileSync(path.join(themeLayer, 'fonts', 'mmm.woff2'), 'face');
+  // The theme layer's watch root is seconds old here, so the first save can
+  // fall before its FSEvents stream starts — the #688 nudge re-fires it until
+  // a build shows life (a rebuild that woke and served stale bytes still fails).
+  const declareBoth = () => fs.writeFileSync(path.join(themeLayer, 'css', 'main.scss'), `${face('aaa')}\n${face('mmm')}`);
+  declareBoth();
+  await watch.pageBecomes(
+    /"\/assets\/fonts\/mmm\.woff2"/,
+    'the head the watcher serves carries the face the theme just declared',
+    'fonts-page.html',
+    declareBoth,
+  );
+  assert.match(
+    fs.readFileSync(manifestPath, 'utf8'),
+    /mmm\.woff2/,
+    'the manifest file — the courier whose change is what Eleventy watches — carries it too',
+  );
+});
+
+test('a css rebuild folds its font preloads into the live manifest', () => {
+  const manifest = { css: { main: '/assets/css/main.css' }, fontPreloads: ['/assets/fonts/aaa.woff2'] };
+
+  assert.equal(
+    refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }),
+    true,
+    'a moved list is reported — that answer is what rewrites the manifest file',
+  );
+  assert.deepEqual(
+    manifest.fontPreloads,
+    ['/assets/fonts/mmm.woff2'],
+    'and it is written into the live object in place — the engine holds THIS reference',
+  );
+
+  assert.equal(
+    refreshLiveManifest(manifest, { fontPreloads: ['/assets/fonts/mmm.woff2'] }),
+    false,
+    'the SAME list is no change: an unchanged head must not trigger a re-render',
+  );
+
+  assert.equal(refreshLiveManifest(manifest, { fontPreloads: [] }), true, 'a theme that dropped its @font-face rules drops its preloads');
+  assert.deepEqual(manifest.fontPreloads, []);
+
+  // A js-only rebuild returns before the css lane, so it carries no list.
+  assert.equal(refreshLiveManifest(manifest, { js: { main: '/assets/js/main.js' } }), false, 'a js rebuild leaves the list alone');
+  assert.deepEqual(manifest.fontPreloads, []);
+  assert.equal(manifest.css.main, '/assets/css/main.css', 'and nothing else in the manifest moves');
 });
 
 test('an ordinary page edit rebuilds incrementally — no config reset', async (t) => {

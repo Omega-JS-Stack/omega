@@ -8,6 +8,7 @@ const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
 const jetpack = require('fs-jetpack');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const servePath = path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'serve.js');
 
@@ -25,7 +26,7 @@ function stageHoistedBrand() {
   return { tmp, targetDir: path.join(tmp, 'targets', 'desktop') };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'gulp/serve — electron resolution',
@@ -54,4 +55,4 @@ module.exports = {
       },
     },
   ],
-};
+});

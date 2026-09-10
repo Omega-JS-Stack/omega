@@ -6,8 +6,16 @@
  * the consumer surface, never the framework's). No catalog → null → themes
  * render an honest empty state instead of fictional plans.
  *
+ * A feature is DEFINED once, in the config's top-level `features` catalog
+ * (name, icon, definition, and a `usage` block on the metered ones), and each
+ * product names only its VALUE
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). So this
+ * composer reads BOTH halves: the catalog decides row order and copy, the
+ * product decides what its tier promises. There is nothing left to backfill —
+ * a definition cannot disagree with itself when it exists in one place.
+ *
  * Product presentation fields (optional, alongside the backend-shaped
- * id/name/type/limits/prices/trial):
+ * id/name/type/prices/trial):
  *   tagline    - short line under the plan name
  *   popular    - highlight badge on the plan card
  *   enterprise - the "talk to us" tier: leaves BOTH card lanes (plans and
@@ -17,8 +25,9 @@
  *   url        - CTA href (defaults to /signup for free plans; /contact for
  *                the enterprise tier; paid plans without a url get a
  *                checkout button instead)
- *   features   - display list [{ id, name, icon, definition, value }];
- *                value falls back to limits[id], -1 renders as Unlimited
+ *   features   - the values map { <catalog id>: value }: a number on a counted
+ *                feature (-1 renders as Unlimited), true/a string on a perk,
+ *                and `false` (or absent) means the tier does not include it
  *   hidden     - presentation-only exclusion (#348): the product is still
  *                created on every provider and purchasable by id (QA tiers,
  *                grandfathered plans), but the composer drops it before any
@@ -43,19 +52,41 @@ function normalizeValue(value) {
 }
 
 /**
- * Compose a product's display features, resolving values from limits.
- * @param {object} product - catalog entry
+ * Compose a product's display features: the FEATURES CATALOG supplies the row
+ * order, the name, the icon and the definition; the product supplies only the
+ * value. A feature the product does not name — or names `false` — is not part
+ * of that tier and renders nowhere.
+ * @param {object} product - catalog entry (payment.products)
+ * @param {object} catalog - the top-level `features` catalog
  * @returns {Array<object>} [{ id, name, icon, definition, value }]
+ * @throws {Error} on the pre-#647 features LIST, naming the migration
  */
-function composeFeatures(product) {
-  const limits = product.limits || {};
-  return (product.features || []).map((feature) => ({
-    id: feature.id,
-    name: feature.name,
-    icon: feature.icon || null,
-    definition: feature.definition || null,
-    value: normalizeValue(feature.value !== undefined ? feature.value : limits[feature.id]),
-  }));
+function composeFeatures(product, catalog) {
+  const values = (product && product.features) || {};
+
+  // The pre-#647 display LIST is a shape this composer stopped understanding
+  // the day the catalog became the one home of a feature's copy — every key
+  // lookup below misses, so an unmigrated brand would get cards with no
+  // bullets and an empty comparison matrix. Say so instead (the config
+  // validator refuses the same shape earlier; this is the backstop for the
+  // readers that reach the composer without it).
+  if (Array.isArray(values)) {
+    throw new Error(
+      `payment.products "${(product && product.id) || 'unnamed'}" carries the pre-#647 features LIST — `
+      + 'write `features: { requests: 100, support: true }` and define each feature ONCE in the '
+      + 'top-level `features` catalog (docs/shared/breaking-changes.md § Plan limits become the features catalog)',
+    );
+  }
+
+  return Object.keys(catalog)
+    .filter((id) => values[id] !== undefined && values[id] !== false)
+    .map((id) => ({
+      id: id,
+      name: catalog[id].name || id,
+      icon: catalog[id].icon || null,
+      definition: catalog[id].definition || null,
+      value: normalizeValue(values[id]),
+    }));
 }
 
 /**
@@ -63,7 +94,7 @@ function composeFeatures(product) {
  * @param {object} product - catalog entry (type subscription)
  * @returns {object} plan view-model
  */
-function composePlan(product) {
+function composePlan(product, catalog) {
   const prices = product.prices || {};
   const monthly = typeof prices.monthly === 'number' ? prices.monthly : 0;
   const annually = typeof prices.annually === 'number' ? prices.annually : 0;
@@ -85,7 +116,7 @@ function composePlan(product) {
       // more than a twelfth of what is actually charged.
       annuallyPerMonth: annually > 0 ? Math.floor(annually / 12) : 0,
     },
-    features: composeFeatures(product),
+    features: composeFeatures(product, catalog),
   };
 }
 
@@ -96,34 +127,14 @@ function composePlan(product) {
  * @param {object} product - catalog entry flagged `enterprise: true`
  * @returns {object} enterprise view-model
  */
-function composeEnterprise(product) {
+function composeEnterprise(product, catalog) {
   return {
     id: product.id,
     name: product.name,
     tagline: product.tagline || null,
     url: product.url || '/contact',
-    features: composeFeatures(product),
+    features: composeFeatures(product, catalog),
   };
-}
-
-/**
- * Backfill feature definitions by id: a definition authored on ANY product's
- * copy of a feature applies to every other copy — author the tooltip once in
- * omega.json5 and every instance (plan cards, extras, comparison) carries it.
- * @param {Array<Array<object>>} featureLists - composed feature arrays to unify
- */
-function backfillDefinitions(featureLists) {
-  const byId = new Map();
-  for (const features of featureLists) {
-    for (const feature of features) {
-      if (feature.definition && !byId.has(feature.id)) byId.set(feature.id, feature.definition);
-    }
-  }
-  for (const features of featureLists) {
-    for (const feature of features) {
-      if (!feature.definition) feature.definition = byId.get(feature.id) || null;
-    }
-  }
 }
 
 /**
@@ -198,24 +209,30 @@ function visibleProducts(payment) {
 }
 
 /**
- * Compose the pricing view-model from the shared payment section.
+ * Compose the pricing view-model from the shared payment section and the
+ * features catalog.
  * @param {object} payment - resolved config `payment` section
+ * @param {object} [features] - resolved config `features` catalog (#647)
  * @returns {object|null} { plans, oneTime, enterprise, billing, savingsPercent, comparison } or null when the catalog is empty
  */
-function composePricing(payment) {
+function composePricing(payment, features) {
   // Every lane below composes from what the page may show (a catalog of
   // nothing else renders the empty state)
   const products = visibleProducts(payment);
   if (products.length === 0) return null;
 
+  // The one home of what a feature IS. A brand with products but no catalog
+  // renders cards with no bullets rather than inventing copy for them.
+  const catalog = (features && typeof features === 'object' && !Array.isArray(features)) ? features : {};
+
   // The enterprise tier is a product like any other, marked `enterprise: true`
   // — it leaves the grid so the cards stay peers of each other
   const enterpriseProduct = products.find((product) => product.enterprise === true);
-  const enterprise = enterpriseProduct ? composeEnterprise(enterpriseProduct) : null;
+  const enterprise = enterpriseProduct ? composeEnterprise(enterpriseProduct, catalog) : null;
 
   const plans = products
     .filter((product) => (product.type || 'subscription') === 'subscription' && product.enterprise !== true)
-    .map(composePlan);
+    .map((product) => composePlan(product, catalog));
 
   const oneTime = products
     .filter((product) => product.type === 'one-time' && product.enterprise !== true)
@@ -224,7 +241,7 @@ function composePricing(payment) {
       name: product.name,
       tagline: product.tagline || null,
       price: (product.prices && typeof product.prices.once === 'number') ? product.prices.once : 0,
-      features: composeFeatures(product),
+      features: composeFeatures(product, catalog),
     }));
 
   // The comparison inherits feature values by catalog position (tiers
@@ -241,12 +258,6 @@ function composePricing(payment) {
     }
   }
 
-  // Definitions unify BEFORE the comparison copies feature objects
-  backfillDefinitions([
-    ...plans.map((plan) => plan.features),
-    ...oneTime.map((product) => product.features),
-    ...(enterprise ? [enterprise.features] : []),
-  ]);
   splitCommonFeatures(plans);
 
   // Billing toggle only exists when both cadences are actually purchasable

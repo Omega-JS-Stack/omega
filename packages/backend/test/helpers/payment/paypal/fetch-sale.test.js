@@ -19,9 +19,10 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-sale
  */
-const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
 
 const FIXTURE_SALE_REFUNDED = require('../../../fixtures/paypal/sale-refunded.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const SALE_ID = FIXTURE_SALE_REFUNDED.id;
 const PARENT_PAYMENT_ID = FIXTURE_SALE_REFUNDED.parent_payment;
@@ -71,7 +72,7 @@ function parentPayment(custom) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal fetchResource() sale retrieval',
   type: 'group',
 
@@ -179,4 +180,4 @@ module.exports = {
       },
     },
   ],
-};
+});

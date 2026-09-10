@@ -7,7 +7,9 @@
  *
  * Uses the journey-payments-one-time account (one-time events don't modify subscription state)
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: one-time invoice.payment_failed → purchase-failed',
   type: 'suite',
   timeout: 30000,
@@ -108,4 +110,4 @@ module.exports = {
       },
     },
   ],
-};
+});

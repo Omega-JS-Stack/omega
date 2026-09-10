@@ -13,8 +13,13 @@
  * ONE declaration to read: the curated `site.targets` view — the same facts
  * `/download` and `/extension` render from.
  *
- *   site.targets.desktop.releasesUrl        → every desktop shortlink
- *   site.targets.extension.listings[store]  → /extension/<store>
+ *   site.targets.desktop.downloads[platform][artifact] → every desktop shortlink
+ *   site.targets.extension.listings[store]             → /extension/<store>
+ *
+ * A download shortlink hands over the FILE, never the releases page
+ * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)): the curated
+ * view's per-artifact URLs are versionless, so a desktop release never touches
+ * the website and these links never change.
  *
  * Legacy parity that matters: `/download/<platform>` with no artifact points at
  * the platform's FIRST artifact — UJM's own pages sent /download/mac to
@@ -26,37 +31,31 @@ const { redirectPage } = require('./redirect-page.js');
 // targets.extension.listings).
 const KEY_PATTERN = /^[a-z][a-z0-9-]*$/;
 
-// The desktop platforms and artifacts a releases hub serves, in shortlink
-// order. One releases URL answers all of them (GitHub's /releases/latest picks
-// the asset), so this is the URL SHAPE the legacy pages published, nothing
-// more. Mobile stays absent — MAM is parked. Its display twin is the base
-// `frontend/pages/download` layout's `downloads.platforms` list.
-const DESKTOP_ARTIFACTS = {
-  mac: ['universal'],
-  windows: ['universal'],
-  linux: ['debian', 'snap'],
-};
-
 /** How a bad key prints in an error — readable when it is legal, quoted when not. */
 const at = (key) => (KEY_PATTERN.test(key) ? key : JSON.stringify(key));
 
 /**
- * The desktop shortlinks: one per platform (the first artifact) and one per
- * artifact, every one pointing at the releases hub. A desktop target that did
- * not opt into releases (#124) carries no `releasesUrl` and declares nothing.
+ * The desktop shortlinks: one per platform (its first artifact) and one per
+ * artifact, each pointing straight at that artifact's file. The platform and
+ * artifact keys — and their order — are the curated view's own, which is
+ * @omega.js/config's artifact catalog. A desktop target that did not opt into
+ * releases (#124) carries no `downloads` and declares nothing.
  * @param {object} [desktop] - the curated site.targets.desktop view
  * @returns {Array<{ label: string, url: string, redirect: string }>}
  */
 function readDownloads(desktop) {
-  const url = desktop && desktop.releasesUrl;
-  if (!url) return [];
+  const downloads = desktop && desktop.downloads;
+  if (!downloads) return [];
 
   const entries = [];
 
-  for (const [platform, artifacts] of Object.entries(DESKTOP_ARTIFACTS)) {
+  for (const [platform, artifacts] of Object.entries(downloads)) {
+    const urls = Object.entries(artifacts || {});
+    if (!urls.length) continue;
+
     // The bare platform URL leads with the first artifact (legacy parity).
-    entries.push({ label: `download.${platform}`, url: `/download/${platform}`, redirect: url });
-    for (const artifact of artifacts) {
+    entries.push({ label: `download.${platform}`, url: `/download/${platform}`, redirect: urls[0][1] });
+    for (const [artifact, url] of urls) {
       entries.push({ label: `download.${platform}.${artifact}`, url: `/download/${platform}/${artifact}`, redirect: url });
     }
   }

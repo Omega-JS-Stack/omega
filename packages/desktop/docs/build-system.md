@@ -1,6 +1,6 @@
 # Build System
 
-@omega.js/desktop's pipeline: **prepare-package** (framework only) → **gulp** (consumer) → **webpack** (3 targets) → **electron-builder** (packaging) → **strategy-pluggable signing**.
+@omega.js/desktop's pipeline: **prepare-package** (framework only) → **gulp** (consumer) → **esbuild** (3 bundles) → **electron-builder** (packaging) → **strategy-pluggable signing**.
 
 ## prepare-package (framework-side)
 
@@ -34,12 +34,12 @@ Auto-loads tasks from `<@omega.js/desktop>/dist/gulp/tasks/*.js` via `<@omega.js
 |---|---|---|
 | `defaults` | real | Copy `<@omega.js/desktop>/dist/defaults/*` into the consumer (skips existing files) |
 | `distribute` | real | Stage consumer `src/` + @omega.js/desktop `dist/` into `.desktop-build/` |
-| `webpack` | real | Three parallel targets — main / preload / renderer |
+| `bundle` | real | Three parallel bundles — main / preload / renderer, through @omega.js/devkit's `bundle()` wrapper. Named `webpack` until [#737](https://github.com/Omega-JS-Stack/omega/issues/737) |
 | `sass` | real | SCSS → `dist/assets/css/*` |
 | `html` | real | `src/views/**/index.html` → `dist/views/*` |
 | `build-config` | real | Materialize `dist/electron-builder.yml` from source + mode-dependent injections (`LSUIElement` for hidden mode) |
 | `package` | real | Run `electron-builder build --config dist/electron-builder.yml` (full DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux) |
-| `package-quick` | real | Quick-package for host platform/arch only — `--dir` mode, no DMG/zip/universal/notarize. ~20-30s vs ~3min for full `package`. Output: `release/<platform>-<arch>/<ProductName>.app` (or `.exe`-folder/linux-unpacked) — directly launchable. Used for smoke-testing packaged-mode behavior locally. |
+| `package-quick` | real | Quick-package for host platform/arch only — `--dir` mode, no DMG/zip/universal/notarize. ~30s vs ~3min for full `package`. Output: `release/<platform>-<arch>/<ProductName>.app` (or `.exe`-folder/linux-unpacked) — directly launchable. Used for smoke-testing packaged-mode behavior locally. `--quick` trims the electron-builder phase and NOTHING else: the build ahead of it is full and cold (#737). |
 | `release` | real | `electron-builder build --publish always` |
 | `audit` | real | Validate consumer config (required keys, valid enums, deep-link scheme format), ensure icon + entrypoints exist; in publish mode also requires `releases.repo` + `electron-builder.yml`. Throws with a numbered list of every problem found |
 | `serve` | real | Spawns `electron .` against the build output, websocket on `OMEGA_LIVERELOAD_PORT` |
@@ -52,7 +52,7 @@ exports.build = series(
   exports['hook:build:pre'],
   exports.defaults,
   exports.distribute,
-  parallel(exports.sass, exports.webpack, exports.html),
+  parallel(exports.sass, exports.bundle, exports.html),
   exports.audit,
   exports['build-config'],
   exports['hook:build:post'],
@@ -65,33 +65,41 @@ exports.packageBuild = series(exports.build, exports.package);
 // Fast (~20-30s) — smoke-testing only.
 exports.packageQuick = series(exports.build, exports['package-quick']);
 
-// `publish` = build + sign + notarize + GH Release upload + mirror to download-server.
+// `publish` = build + sign + notarize + GH Release upload (to the brand's ONE
+// public releases repo, under versionless names).
 exports.publish = series(
   exports.build,
   exports['hook:release:pre'],
   exports.release,
-  exports['mirror-downloads'],
   exports['hook:release:post'],
 );
 
 exports.default = series(exports.build, exports.serve);
 ```
 
-## Webpack — three targets
+## esbuild — three bundles
 
-All bundled in production for source protection. `app.asar` alone is not obfuscation (anyone can `npx asar extract` it) — webpack mangling is what protects framework + app source.
+All bundled in production for source protection. `app.asar` alone is not obfuscation (anyone can `npx asar extract` it) — minification and name mangling are what protect framework + app source.
 
-| Target | Entry | Output | Externals |
-|---|---|---|---|
-| `main` | `src/main.js` | `dist/main.bundle.js` | electron + node builtins + native modules from consumer's `package.json` |
-| `preload` | `src/preload.js` | `dist/preload.bundle.js` | electron only |
-| `renderer` | `src/assets/js/components/<view>/index.js` | `dist/assets/js/components/<view>.bundle.js` | none |
+Every bundle goes through @omega.js/devkit's ONE `bundle()` wrapper ([docs/devkit/index.md](../../../docs/devkit/index.md)), which composes the shared parts: the framework-deps resolve hook (#87), the production `@dev-only` strip (#18), the minify/sourcemap rules by mode, and one timing line per build. `src/gulp/tasks/bundle.js` holds only what is desktop's own.
 
-`output.module = false` per target so flipping to ESM later is a config switch, not a refactor.
+| Bundle | Entry | Output | Platform / format | Externals |
+|---|---|---|---|---|
+| `main` | `src/main.js` | `dist/main.bundle.js` | `node` / `cjs` | electron + node builtins + native modules from consumer's `package.json` |
+| `preload` | `src/preload.js` | `dist/preload.bundle.js` | `node` / `cjs` | electron — `platform: 'node'` already leaves every built-in external, same as main, so electron is the only name worth stating |
+| `renderer` | `src/assets/js/components/<view>/index.js` | `dist/assets/js/components/<view>.bundle.js` | `browser` / `iife` | none — Node built-ins resolve to an empty module (see below) |
+
+### Syntax floor — the pinned Electron answers it
+
+webpack encoded the runtime as `target: 'electron-main' | 'electron-preload' | 'web'`. esbuild splits it into `platform` (above) and `target` (the syntax floor), and the floor is READ from the Electron binary the consumer pinned: [src/utils/electron-targets.js](../src/utils/electron-targets.js) runs it once per build with `ELECTRON_RUN_AS_NODE` (no window, no focus) and takes `process.versions.node` → `node<version>` for main/preload and `process.versions.chrome` → `chrome<major>` for the renderer. The binary is resolved from the FRAMEWORK's module context — the same lookup `build-config` pins `electronVersion` with, so the bundles compile for the Electron that will actually run them. A binary that can't be run (a CI job with `ELECTRON_SKIP_BINARY_DOWNLOAD`) warns and drops the floor; it never invents a version.
+
+### Node built-ins in the renderer
+
+The renderer runs with `contextIsolation: true` — a browser-like environment with no Node globals — but libraries bundled through @omega.js/client still IMPORT `fs`, `path`, `crypto` and friends on code paths their browser builds never take. webpack answered with `resolve.fallback: { fs: false, … }`; esbuild has no such option, so the same list is a resolve hook onto one empty CommonJS module (`RENDERER_EMPTY_MODULES` in the task). `electron` is on the list too: a renderer that reached the real module would be a security hole, not a missing polyfill.
 
 ### OMEGA_BUILD_JSON injection
 
-DefinePlugin replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed config. BannerPlugin prepends an IIFE that assigns it to `globalThis` and `window` so renderer code can read `window.OMEGA_BUILD_JSON.config`.
+An esbuild `define` replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed config. A `banner` prepends an IIFE that assigns it to `globalThis` and `window` so renderer code can read `window.OMEGA_BUILD_JSON.config`. `process.env.NODE_ENV` is defined the same way — webpack derived it from its `mode`, esbuild has no modes, so the build states it.
 
 ## electron-builder
 
@@ -103,6 +111,7 @@ DefinePlugin replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed con
   - **mac**: arch (default `universal`), MAS stubs (not implemented)
   - **win**: arch (default `x64`+`ia32`), NSIS oneClick + shortcuts
   - **linux**: arch, optional snap publishing
+- Versionless `artifactName` templates from `@omega.js/config`'s `desktop-artifacts.js` — the ONE naming rule the website's direct-download URLs read too, so `/releases/latest/download/<asset>` never changes. The asset table + the whole release contract: [releasing.md](releasing.md#versionless-assets-and-direct-download-links)
 - Mode-dependent injections like `mac.extendInfo.LSUIElement: true` when `startup.mode === 'hidden'` (zero-bounce production launches — see [startup.md](startup.md))
 - `electronVersion` pinned from the INSTALLED electron (resolved via the framework's module context — electron-builder refuses semver ranges and can't see a workspace-hoisted electron from the target dir)
 - Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish owner resolves config-first: `releases.owner` → the brand's `repo.providers.github.org` → git-remote discovery (a brand-monorepo target has no git remote of its own; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
@@ -118,7 +127,7 @@ Environment variables (set in-process by the `omega build` / `omega package` / `
 
 | Var | Effect |
 |---|---|
-| `OMEGA_BUILD_MODE=true` | Production webpack (minified, name-mangled, no sourcemaps) |
+| `OMEGA_BUILD_MODE=true` | Production bundles (minified, name-mangled, no sourcemaps, `@dev-only` blocks stripped) |
 | `OMEGA_BUILD_OUTPUT=<path>` | The boot-test seam: redirect the gulp BUILD output away from `<project>/dist` (absolute, or relative to the project root). Resolved by [src/utils/dist-root.js](../src/utils/dist-root.js), which every build task's output path goes through — but `omega clean` and the generated `electron-builder.yml` stay project-relative, so this is NOT a general relocation switch; packaging under it is unsupported. Used by the boot-test runner so a test build never collides with the `npm start` watcher's `dist/` ([test-boot-layer.md](test-boot-layer.md#isolated-build-output)) |
 | `OMEGA_IS_PUBLISH=true` | electron-builder runs with `--publish always` |
 | `OMEGA_IS_SERVER=true` | Running in CI |

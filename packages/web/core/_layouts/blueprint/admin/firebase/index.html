@@ -6,14 +6,6 @@ meta:
   description: "Explore and manage Firebase data"
   breadcrumb: "Firebase Explorer"
 
-prerender_icons:
-  - name: "folder"
-  - name: "folder-open"
-  - name: "file"
-  - name: "pen"
-  - name: "floppy-disk"
-  - name: "arrow-left"
-  - name: "trash"
 config:
   theme:
     header:
@@ -36,7 +28,7 @@ config:
       </div>
       <div>
         <button class="btn btn-outline-adaptive" id="btn-refresh-explorer">
-          {% omega_icon "rotate", "fa-md me-2" %}
+          <i class="fa-solid fa-rotate fa-md me-2"></i>
           Refresh
         </button>
       </div>
@@ -50,31 +42,31 @@ config:
     <!-- Collections -->
     <div class="card">
       <div class="card-header">
-        <h6 class="mb-0">{% omega_icon "database", "fa-sm me-2" %} Collections</h6>
+        <h6 class="mb-0"><i class="fa-solid fa-database fa-sm me-2"></i> Collections</h6>
       </div>
       <div class="card-body p-2">
         <!-- Quick access -->
         <div class="nav flex-column collection-nav" id="collection-links">
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="users">
-            {% omega_icon "folder", "fa-sm me-2" %} users
+            <i class="fa-solid fa-folder fa-sm me-2"></i> users
             <span class="omega-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="notifications">
-            {% omega_icon "folder", "fa-sm me-2" %} notifications
+            <i class="fa-solid fa-folder fa-sm me-2"></i> notifications
             <span class="omega-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="payments-orders">
-            {% omega_icon "folder", "fa-sm me-2" %} payments-orders
+            <i class="fa-solid fa-folder fa-sm me-2"></i> payments-orders
             <span class="omega-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
           </a>
           <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="meta">
-            {% omega_icon "folder", "fa-sm me-2" %} meta
+            <i class="fa-solid fa-folder fa-sm me-2"></i> meta
             <span class="omega-chip collection-count">
               <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
             </span>
@@ -87,8 +79,8 @@ config:
         <form id="collection-form" data-form-state="initializing" onsubmit="return false">
           <div class="input-group input-group-sm">
             <input type="text" class="form-control" name="collection.path" placeholder="Collection path..." aria-label="Collection path" required>
-            <button type="submit" class="btn btn-outline-adaptive">
-              <span class="button-text">{% omega_icon "arrow-right", "fa-sm" %}</span>
+            <button type="submit" class="btn btn-outline-adaptive" aria-label="Load collection">
+              <span class="button-text"><i class="fa-solid fa-arrow-right fa-sm"></i></span>
             </button>
           </div>
         </form>
@@ -98,7 +90,7 @@ config:
     <!-- Query Builder -->
     <div class="card mt-3">
       <div class="card-header">
-        <h6 class="mb-0">{% omega_icon "magnifying-glass", "fa-sm me-2" %} Query</h6>
+        <h6 class="mb-0"><i class="fa-solid fa-magnifying-glass fa-sm me-2"></i> Query</h6>
       </div>
       <div class="card-body">
         <form id="query-form" data-form-state="initializing" onsubmit="return false">
@@ -123,7 +115,7 @@ config:
             <div class="form-text" style="font-size: 0.7rem;">Numbers and booleans auto-detected</div>
           </div>
           <button type="submit" class="btn btn-sm btn-adaptive w-100">
-            {% omega_icon "magnifying-glass", "fa-sm me-2" %}
+            <i class="fa-solid fa-magnifying-glass fa-sm me-2"></i>
             <span class="button-text">Run query</span>
           </button>
         </form>
@@ -140,7 +132,7 @@ config:
     <nav class="mb-3" id="explorer-breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item">
-          <a href="#" id="breadcrumb-root">{% omega_icon "database", "fa-xs" %}</a>
+          <a href="#" id="breadcrumb-root" aria-label="Collection root"><i class="fa-solid fa-database fa-xs"></i></a>
         </li>
       </ol>
     </nav>
@@ -156,7 +148,7 @@ config:
 
           <!-- Empty / No Collection -->
           <div id="docs-empty" class="text-center text-muted py-5">
-            {% omega_icon "folder-open", "fa-2xl mb-3 d-block" %}
+            <i class="fa-solid fa-folder-open fa-2xl mb-3 d-block"></i>
             Select a collection to browse documents
           </div>
 
@@ -188,11 +180,11 @@ config:
           <h6 class="mb-0 font-monospace small" id="doc-detail-path"></h6>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-adaptive" id="btn-edit-doc">
-              {% omega_icon "pen", "fa-sm me-1" %}
+              <i class="fa-solid fa-pen fa-sm me-1"></i>
               Edit
             </button>
             <button class="btn btn-sm btn-outline-adaptive" id="btn-back-to-list">
-              {% omega_icon "arrow-left", "fa-sm me-1" %}
+              <i class="fa-solid fa-arrow-left fa-sm me-1"></i>
               Back
             </button>
           </div>
@@ -207,7 +199,7 @@ config:
             <div id="doc-editor-error" class="text-danger small mt-2 d-none"></div>
             <div class="d-flex gap-2 mt-3">
               <button class="btn btn-sm btn-adaptive" id="btn-save-doc">
-                {% omega_icon "floppy-disk", "fa-sm me-1" %}
+                <i class="fa-solid fa-floppy-disk fa-sm me-1"></i>
                 Save
               </button>
               <button class="btn btn-sm btn-outline-adaptive" id="btn-cancel-edit">

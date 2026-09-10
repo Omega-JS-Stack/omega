@@ -23,7 +23,8 @@
  */
 
 const crypto = require('crypto');
-const Analytics = require('../../src/manager/helpers/analytics.js');
+const Analytics = require('../../dist/manager/helpers/analytics.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-ga4-user-data-uid';
 const EMAIL = 'buyer@example.com';
@@ -57,7 +58,7 @@ function userDataFor(Manager, settings) {
   return { userData: new Analytics(Manager, { ctx: ctx }).userData, user: ctx.usage.user };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'analytics(): the GA4 user_data match block',
   type: 'group',
 
@@ -167,5 +168,27 @@ module.exports = {
         assert.equal(userData.address.sha256_street, undefined);
       },
     },
+
+    {
+      // The postal code and the street have a home in the schema now
+      // ([#663](https://github.com/Omega-JS-Stack/omega/issues/663)):
+      // `personal.location.postalCode` and `personal.location.street`, filled by
+      // the account page. Before that they were read off field names no account
+      // carried, so GA4 got neither key from any user.
+      name: 'the-postal-code-and-street-come-off-the-account-schema',
+      auth: 'none',
+
+      run: async ({ assert, Manager }) => {
+        const { userData, user } = userDataFor(Manager, {
+          auth: { uid: UID, email: EMAIL },
+          personal: { location: { postalCode: '94035-1234', street: ' 123 Main Street. ' } },
+        });
+
+        assert.equal(user.personal.location.postalCode, '94035-1234', 'precondition: the resolver keeps the schema field');
+
+        assert.equal(userData.address.postal_code, '94035-1234', 'the postal code rides in the clear, only . and ~ removed');
+        assert.equal(userData.address.sha256_street, sha256('123 main street'), 'the street is hashed, its digits kept');
+      },
+    },
   ],
-};
+});

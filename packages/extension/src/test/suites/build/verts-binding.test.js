@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const read = (...segments) => fs.readFileSync(path.join(ROOT, ...segments), 'utf8');
@@ -18,9 +19,10 @@ const read = (...segments) => fs.readFileSync(path.join(ROOT, ...segments), 'utf
 const SURFACES = ['popup.js', 'options.js', 'sidepanel.js', 'page.js'];
 const NON_SURFACES = ['content.js', 'background.js', 'offscreen.js'];
 const VERTS_LIB = read('lib', 'verts.js');
-const PACKAGE_TASK = read('gulp', 'tasks', 'package.js');
+// The build snapshot is baked in by the bundle task ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
+const BUNDLE_TASK = read('gulp', 'tasks', 'bundle.js');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'verts auto-bind — surface wiring + house-lane pin + build-JSON plumbing',
@@ -57,9 +59,9 @@ module.exports = {
     {
       name: 'build-JSON allowlist carries advertising + company to the client',
       run: (ctx) => {
-        ctx.expect(PACKAGE_TASK).toMatch(/advertising: config\.advertising \|\| \{\},/);
-        ctx.expect(PACKAGE_TASK).toMatch(/company: config\.company \|\| \{\},/);
+        ctx.expect(BUNDLE_TASK).toMatch(/advertising: config\.advertising \|\| \{\},/);
+        ctx.expect(BUNDLE_TASK).toMatch(/company: config\.company \|\| \{\},/);
       },
     },
   ],
-};
+});

@@ -469,10 +469,12 @@ function buildAttributionContext(attribution) {
  * that read `personal.location.region` itself is how `personal.telephone.number`
  * — a field no account has ever carried — went unnoticed for a year (#388).
  *
- * `zip` and `street` have no home in the account schema TODAY. They are read
- * anyway, because the plumbing exists for every parameter the platforms accept
- * (Ian's ruling, 2026-08-24) and a brand that fills them in is matched better
- * for it; an account without them sends no key, like any other absent value.
+ * `zip` is the PLATFORM's parameter name, so it stays the bag key the tables
+ * above normalize — the account schema calls the field
+ * `personal.location.postalCode`, because a postal code is not a US zip
+ * ([#663](https://github.com/Omega-JS-Stack/omega/issues/663)). It and
+ * `personal.location.street` are the account page's optional address fields; an
+ * account that left them empty sends no key, like any other absent value.
  *
  * @param {object} [user] - A `users/{uid}` doc.
  * @returns {object} The flat field bag the per-provider tables normalize.
@@ -487,7 +489,7 @@ function readUserMatchFields(user) {
     lastName: personal.name?.last,
     city: personal.location?.city,
     state: personal.location?.region,
-    zip: personal.location?.zip,
+    zip: personal.location?.postalCode,
     country: personal.location?.country,
     street: personal.location?.street,
     dateOfBirth: personal.birthday,

@@ -6,13 +6,6 @@ meta:
   description: "Admin dashboard overview and statistics"
   breadcrumb: "Dashboard"
 
-prerender_icons:
-  - name: "users"
-  - name: "user-plus"
-  - name: "credit-card"
-  - name: "bell"
-  - name: "user"
-  - name: "circle"
 config:
   theme:
     header:
@@ -31,7 +24,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Total users</span>
-      {% omega_icon "users", "fa-sm" %}
+      <i class="fa-solid fa-users fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-total-users">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -42,7 +35,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">MRR</span>
-      {% omega_icon "credit-card", "fa-sm" %}
+      <i class="fa-solid fa-credit-card fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-mrr">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -53,7 +46,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Orders (30d)</span>
-      {% omega_icon "receipt", "fa-sm" %}
+      <i class="fa-solid fa-receipt fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-orders">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -64,7 +57,7 @@ config:
   <div class="omega-statgrid__cell">
     <div class="omega-statgrid__label">
       <span class="omega-micro">Push subscribers</span>
-      {% omega_icon "bell", "fa-sm" %}
+      <i class="fa-solid fa-bell fa-sm"></i>
     </div>
     <h3 class="omega-statgrid__value" id="stat-notifications">
       <span class="spinner-border spinner-border-sm fs-6"></span>
@@ -79,17 +72,18 @@ config:
   <div class="col-lg-7">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "chart-line", "fa-md me-2" %} Signups, last 14 days</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-chart-line fa-md me-2"></i> Signups, last 14 days</h6>
       </div>
       <div class="card-body d-flex align-items-center justify-content-center">
         <div id="chart-signups-loading" class="text-center text-muted py-4">
           <span class="spinner-border spinner-border-sm"></span>
         </div>
-        <!-- The chart helper draws without an aspect ratio (a polled panel
-             must not resize itself under the reader), so the BOX carries the
-             height — same contract as its `chartSlot` markup. -->
+        <!-- The chart helper mounts an SVG host that follows its container's
+             width and is told its height (a polled panel must not resize
+             itself under the reader), so the BOX carries the height and the
+             host fills it — same contract as its `chartSlot` markup. -->
         <div class="admin-chart-box w-100 d-none">
-          <canvas id="chart-signups"></canvas>
+          <div id="chart-signups" class="h-100"></div>
         </div>
       </div>
     </div>
@@ -99,38 +93,38 @@ config:
   <div class="col-lg-5">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "circle-exclamation", "fa-md me-2" %} Needs attention</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-circle-exclamation fa-md me-2"></i> Needs attention</h6>
       </div>
       <div class="card-body py-2">
         <div class="omega-activity">
           <div class="omega-activity__row align-items-center">
-            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "cart-shopping", "fa-sm" %}</span>
+            <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-cart-shopping fa-sm"></i></span>
             <div class="omega-activity__body">
               <div class="omega-activity__title">Abandoned carts</div>
               <p class="omega-activity__desc">Pending checkouts that never converted</p>
             </div>
             <span class="omega-count" id="att-carts"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="omega-iconbtn" href="/admin/firebase?collection=payments-carts" aria-label="Review abandoned carts">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <a class="omega-iconbtn" href="/admin/firebase?collection=payments-carts" aria-label="Review abandoned carts"><i class="fa-solid fa-arrow-right fa-sm"></i></a>
           </div>
 
           <div class="omega-activity__row align-items-center">
-            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "hourglass-half", "fa-sm" %}</span>
+            <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-hourglass-half fa-sm"></i></span>
             <div class="omega-activity__body">
               <div class="omega-activity__title">Expiring within 7 days</div>
               <p class="omega-activity__desc">Subscriptions about to lapse</p>
             </div>
             <span class="omega-count" id="att-expiring"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="omega-iconbtn" href="/admin/users" aria-label="Review expiring subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <a class="omega-iconbtn" href="/admin/users" aria-label="Review expiring subscriptions"><i class="fa-solid fa-arrow-right fa-sm"></i></a>
           </div>
 
           <div class="omega-activity__row align-items-center">
-            <span class="omega-icon-chip omega-icon-chip--neutral">{% omega_icon "triangle-exclamation", "fa-sm" %}</span>
+            <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-triangle-exclamation fa-sm"></i></span>
             <div class="omega-activity__body">
               <div class="omega-activity__title">Suspended subscriptions</div>
               <p class="omega-activity__desc">Payment failed: plan on hold</p>
             </div>
             <span class="omega-count" id="att-suspended"><span class="spinner-border spinner-border-sm"></span></span>
-            <a class="omega-iconbtn" href="/admin/users" aria-label="Review suspended subscriptions">{% omega_icon "arrow-right", "fa-sm" %}</a>
+            <a class="omega-iconbtn" href="/admin/users" aria-label="Review suspended subscriptions"><i class="fa-solid fa-arrow-right fa-sm"></i></a>
           </div>
         </div>
       </div>
@@ -144,8 +138,8 @@ config:
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "user-plus", "fa-md me-2" %} Recent signups</h6>
-        <a href="/admin/users" class="btn btn-sm btn-outline-adaptive">{% omega_icon "arrow-right", "fa-sm me-1" %} View all</a>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-user-plus fa-md me-2"></i> Recent signups</h6>
+        <a href="/admin/users" class="btn btn-sm btn-outline-adaptive"><i class="fa-solid fa-arrow-right fa-sm me-1"></i> View all</a>
       </div>
       <div class="card-body p-0">
         <div id="recent-users-loading" class="text-center text-muted py-5">
@@ -174,7 +168,7 @@ config:
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "receipt", "fa-md me-2" %} Recent orders</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-receipt fa-md me-2"></i> Recent orders</h6>
       </div>
       <div class="card-body p-0">
         <div id="recent-orders-loading" class="text-center text-muted py-5">
@@ -207,10 +201,10 @@ config:
   <div class="col-lg-7">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "newspaper", "fa-md me-2" %} Content</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-newspaper fa-md me-2"></i> Content</h6>
         <div class="d-flex gap-2">
-          <a href="/admin/posts/editor" class="btn btn-sm btn-adaptive">{% omega_icon "plus", "fa-sm me-1" %} New post</a>
-          <a href="/admin/posts" class="btn btn-sm btn-outline-adaptive">{% omega_icon "arrow-right", "fa-sm me-1" %} All posts</a>
+          <a href="/admin/posts/editor" class="btn btn-sm btn-adaptive"><i class="fa-solid fa-plus fa-sm me-1"></i> New post</a>
+          <a href="/admin/posts" class="btn btn-sm btn-outline-adaptive"><i class="fa-solid fa-arrow-right fa-sm me-1"></i> All posts</a>
         </div>
       </div>
       <div class="card-body py-2">
@@ -230,14 +224,14 @@ config:
   <div class="col-lg-5">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "chart-pie", "fa-md me-2" %} Plan distribution</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-chart-pie fa-md me-2"></i> Plan distribution</h6>
       </div>
       <div class="card-body d-flex align-items-center justify-content-center">
         <div id="chart-plans-loading" class="text-center text-muted py-4">
           <span class="spinner-border spinner-border-sm"></span>
         </div>
         <div class="admin-chart-box w-100 d-none">
-          <canvas id="chart-plans"></canvas>
+          <div id="chart-plans" class="h-100"></div>
         </div>
       </div>
     </div>
@@ -249,28 +243,28 @@ config:
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "bolt", "fa-md me-2" %} Quick actions</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-bolt fa-md me-2"></i> Quick actions</h6>
       </div>
       <div class="card-body">
         <div class="d-flex flex-wrap gap-2">
           <a href="/admin/users" class="btn btn-sm btn-outline-adaptive">
-            {% omega_icon "users", "fa-sm me-2" %}
+            <i class="fa-solid fa-users fa-sm me-2"></i>
             Manage users
           </a>
           <a href="/admin/posts/editor" class="btn btn-sm btn-outline-adaptive">
-            {% omega_icon "pen", "fa-sm me-2" %}
+            <i class="fa-solid fa-pen fa-sm me-2"></i>
             Write a post
           </a>
           <a href="/admin/calendar" class="btn btn-sm btn-outline-adaptive">
-            {% omega_icon "bell", "fa-sm me-2" %}
+            <i class="fa-solid fa-bell fa-sm me-2"></i>
             Send notification
           </a>
           <a href="/admin/firebase" class="btn btn-sm btn-outline-adaptive">
-            {% omega_icon "fire", "fa-sm me-2" %}
+            <i class="fa-solid fa-fire fa-sm me-2"></i>
             Firebase explorer
           </a>
           <a href="/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-adaptive">
-            {% omega_icon "arrow-up-right-from-square", "fa-sm me-2" %}
+            <i class="fa-solid fa-arrow-up-right-from-square fa-sm me-2"></i>
             View live site
           </a>
         </div>
@@ -281,21 +275,21 @@ config:
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% omega_icon "screwdriver-wrench", "fa-md me-2" %} Maintenance</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center"><i class="fa-solid fa-screwdriver-wrench fa-md me-2"></i> Maintenance</h6>
       </div>
       <div class="card-body">
         <p class="text-muted small mb-3">Trigger scheduled crons or export Firestore to Cloud Storage</p>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-sm btn-outline-adaptive btn-run-cron" data-cron-id="daily">
-            {% omega_icon "calendar-day", "fa-sm me-2" %}
+            <i class="fa-solid fa-calendar-day fa-sm me-2"></i>
             <span class="btn-run-cron-text">Run daily</span>
           </button>
           <button class="btn btn-sm btn-outline-adaptive btn-run-cron" data-cron-id="frequent">
-            {% omega_icon "rotate", "fa-sm me-2" %}
+            <i class="fa-solid fa-rotate fa-sm me-2"></i>
             <span class="btn-run-cron-text">Run frequent</span>
           </button>
           <button class="btn btn-sm btn-outline-adaptive" id="btn-run-backup">
-            {% omega_icon "cloud-arrow-up", "fa-sm me-2" %}
+            <i class="fa-solid fa-cloud-arrow-up fa-sm me-2"></i>
             <span id="btn-run-backup-text">Run backup</span>
           </button>
         </div>

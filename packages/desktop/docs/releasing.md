@@ -2,35 +2,67 @@
 
 End-to-end walkthrough for cutting a signed + notarized + published release of an OMEGA Desktop app.
 
-## Repo layout (private app, public releases)
+## Repo layout (private app, ONE public releases repo)
 
-@omega.js/desktop separates **three** GitHub repos for a typical app:
+@omega.js/desktop separates the app from its binaries:
 
 | Repo | Visibility | Purpose |
 |---|---|---|
 | `<owner>/<app>` | usually **private** | the app source code |
-| `<owner>/update-server` | **public** | release artifacts + auto-update feed (`latest-mac.yml` etc.) |
-| `<owner>/download-server` | **public** | fixed-name mirror at tag `installer` for marketing-site direct download links |
+| `<owner>/<brand.id>-releases` | **public** | release artifacts + auto-update feed (`latest-mac.yml` etc.) — AND the marketing site's direct-download links |
 
-Why three? Auto-update feeds and marketing downloads MUST be publicly accessible (no auth headers in `electron-updater` or in `<a href>`). Your app source can stay private. The two public repos contain only binaries — no source code.
+Why: auto-update feeds and marketing downloads MUST be publicly accessible (no auth headers in `electron-updater` or in an `<a href>`). Your app source can stay private; the public repo contains only binaries.
 
-`npx omega deploy`'s precheck auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
+ONE public repo answers both ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)), because the assets carry no version — see [Versionless assets](#versionless-assets-and-direct-download-links) below.
+
+**Its address has ONE home** ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)): `@omega.js/config`'s `releasesRepo`, which defaults the name to `<brand.id>-releases` and the owner to the brand repo's own owner. Every reader takes it from there: the electron-builder publish block the build bakes into `app-update.yml`, the deploy precheck's repo provisioning, `finalize-release`'s uploads, and the website's download buttons. Nothing reads a git remote, so a target inside a brand monorepo (and a brand nested in another repo) addresses its own repo rather than the enclosing one.
+
+`npx omega deploy`'s precheck auto-creates the public repo if it doesn't exist (uses `GH_TOKEN`). Override the defaults in `config/omega.json5` only if you need to:
 
 ```jsonc
 releases: {
   enabled: true,
-  owner:   null,               // null = use app repo owner
-  repo:    'update-server',
-},
-downloads: {
-  enabled: true,
-  owner:   null,
-  repo:    'download-server',
-  tag:     'installer',
+  // owner: null,             // null = the brand repo's owner
+  // repo:  'myapp-releases', // default: `<brand.id>-releases`
 },
 ```
 
-After release, the auto-update feed lives at `<owner>/update-server` (versioned tags), and the marketing-site download mirror lives at `<owner>/download-server` @ tag `installer` (stable filenames — links never change across versions).
+## Versionless assets and direct-download links
+
+Every artifact name is **stable across releases** — no version in it:
+
+| Platform | Artifact | Asset name |
+|---|---|---|
+| macOS | `universal` (dmg) | `<Product>-mac-universal.dmg` |
+| macOS | auto-update zip | `<Product>-mac-universal.zip` |
+| Windows | `universal` (NSIS) | `<Product>-windows-universal.exe` |
+| Linux | `debian` | `<Product>-linux-debian.deb` |
+| Linux | `appimage` | `<Product>-linux-appimage.AppImage` |
+
+`<Product>` is `app.productName` (← `brand.name`) with non-filename characters hyphenated. The rule has ONE home — `@omega.js/config`'s `desktop-artifacts.js` — which `gulp/build-config` writes into `dist/electron-builder.yml`'s artifactName templates and the website reads to build its buttons. Never spell an asset name anywhere else.
+
+Because the names never change, GitHub's latest-release redirect is a permanent direct-download URL:
+
+```
+https://github.com/<owner>/<brand.id>-releases/releases/latest/download/<asset>
+```
+
+That is what `site.targets.desktop.downloads[platform][artifact]` derives (see [docs/shared/config.md](../../../docs/shared/config.md#the-site-global-the-curated-targets-view-85-610) in the Omega repo), what the `/download` page's buttons link, and what every `/download/<platform>[/<artifact>]` shortlink redirects to. **Releasing a desktop version never touches the website**, and the published URLs never change.
+
+Auto-update is unaffected: `electron-updater` reads the feed files (`latest-mac.yml`, `latest.yml`, `latest-linux.yml`), which name whatever artifact the build produced.
+
+Because the names carry no arch either, they support exactly the default build: a **universal** mac, a **single** linux arch, and windows' multi-arch NSIS installer (one file for every arch). Nothing appends an arch back — `gulp/build-config` REFUSES a `platforms.mac.arch` that is not universal, and a `platforms.linux.arch` with more than one arch, rather than let two builds overwrite one name. Per-arch names are a future additive change.
+
+### Moving the releases repo
+
+If the releases repo has to move (rename or transfer), the rules are:
+
+- **The existing repo is the survivor** — transfer it, never build a fresh one. GitHub keeps redirects for the web pages, git remotes, the API and release-asset URLs, and `electron-updater` follows them, so every already-installed app (its feed URL is baked into `app-update.yml` at build time) keeps updating.
+- **Never reuse the old org/name.** A new repo created at the old path takes the redirect over and silently steals every installed app's update feed and every published download link.
+- Update `releases.repo` (and `releases.owner` if the owner changed) in `config/omega.json5`. The website's URLs re-derive from that on its next build; the asset names do not change.
+- **Fallback only** — if the surviving repo were a *different* repo, installed apps would need a bridge release: build once with the new feed baked in and publish it to the OLD repo, so clients update themselves onto the new feed before it is retired.
+
+> The `downloads:` block (the `download-server` mirror at tag `installer`, `gulp/mirror-downloads`) predated this: it existed only to give marketing a fixed filename, which the versionless names made free. It is GONE ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)): the task, the `publish` step, the finalize-release mirror and the second repo's provisioning are deleted, and `downloads.enabled|owner|repo|tag` are retired config keys a brand still carrying them fails validation on. One public repo, one set of assets.
 
 
 ## Prerequisites
@@ -59,7 +91,7 @@ Every verb runs `ensureTarget()` first ([#675](https://github.com/Omega-JS-Stack
 `npx omega deploy` adds the network half as a precheck (`--no-secrets` opts out):
 
 - Validates signing prereqs (warns if missing — non-fatal).
-- Pushes secrets from `.env` → GitHub Actions if `GH_TOKEN` is present.
+- Pushes the composed `.env` → GitHub Actions secrets over the `gh` CLI (`gh auth login`; a CI run, an empty cascade, no remote, or a checkout that is not the brand's declared repo skips loudly).
 
 Now drop your cert files:
 
@@ -100,7 +132,7 @@ npm run release
 ```
 
 This runs as a **single gulp invocation** (`gulp publish` with `OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true`):
-1. **build** — defaults → distribute → webpack/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
+1. **build** — defaults → distribute → bundle/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
 2. **release** — `electron-builder build --publish always`
    - Signs the `.app` with your Developer ID Application cert
    - Calls @omega.js/desktop's built-in `afterSign` hook which submits to Apple notarytool via the API key (consumer can extend via `hooks/notarize/post.js`)
@@ -114,41 +146,47 @@ A successful release on macOS prints something like:
 ```
 [notarize] Notarizing MyApp via App Store Connect API key (XXXXXXXXXX)...
 [notarize] Done in 84s.
-[release] Released 4 artifact(s):
-  • release/MyApp-1.0.0-arm64.dmg
-  • release/MyApp-1.0.0-arm64-mac.zip
-  • release/MyApp-1.0.0-x64.dmg
-  • release/MyApp-1.0.0-x64-mac.zip
+[release] Released 2 artifact(s):
+  • release/MyApp-mac-universal.dmg
+  • release/MyApp-mac-universal.zip
 ```
 
 The release will appear on the GitHub repo's Releases page (as a draft if `releaseType: draft` is set in `electron-builder.yml`, or published if `release`).
 
 ## Multi-platform release via CI
 
-CI handles the cross-platform matrix. The default workflow (`.github/workflows/build.yml`) runs on push to `main`:
+CI handles the cross-platform matrix. The scaffolded workflow is `build.yml`, dispatched by `npx omega release` / `npx omega deploy`:
+
+**Standalone the file is `.github/workflows/build.yml`; inside a brand monorepo it is the brand root's `.github/workflows/desktop-build.yml`** ([#265](https://github.com/Omega-JS-Stack/omega/issues/265), [#799](https://github.com/Omega-JS-Stack/omega/issues/799)): GitHub runs workflows from the repo root only, so `ensureTarget` composes the target's copy there and the dispatching verbs ask `@omega.js/devkit/ci-workflows`'s `composedWorkflowName` for the name, the same helper the web and extension deploy verbs use.
 
 ```
-build (matrix: macos-latest, windows-latest, ubuntu-latest)
-  └─ npm ci → npm run release:local → platform-specific signing
-windows-sign (only if platforms.win.signing.strategy != "local")
-  └─ runs on a self-hosted runner with EV USB token (or hosted windows-latest for cloud strategy)
-  └─ signs + uploads release artifacts
+setup             resolves the `platforms` input ('all' by default) into a build matrix
+                  plus per-platform flags
+build             needs setup; matrix over the resolved OSes: npm ci, then
+                  `npm run release:local` on mac and linux (sign, notarize, and
+                  electron-builder publishes the DRAFT release in the brand's releases
+                  repo), and `npm run package` on windows, whose unsigned output uploads
+                  as the `windows-unsigned` artifact
+windows-strategy  needs [setup, build]; reads platforms.win.signing.strategy from config
+                  (only when windows is in the matrix)
+windows-sign      the self-hosted EV-token box, hosted windows-latest for the cloud
+                  strategy, skipped for local: `omega sign-windows`, then
+                  `omega finalize-release --signed-dir` attaches the signed installers
+                  to that same draft
+finalize          needs [setup, build, windows-sign] under always(), gated on the build
+                  having succeeded: `omega finalize-release --publish` flips the draft to
+                  published, and only on an all-platforms run (a partial run leaves the
+                  draft standing for the next one to fill in)
 ```
 
-The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx omega push-secrets` as base64-encoded file contents) back to disk before running `npm run release`.
+The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx omega push-secrets` as base64-encoded file contents) back to disk before running `npm run release:local`.
 
-To trigger a release:
-1. Bump version in `package.json` and `config/omega.json5` (`app.version`).
-2. `git push` — workflow runs.
-3. Watch the workflow at `https://github.com/<owner>/<repo>/actions`.
+**Dispatch only, never a push trigger** ([#802](https://github.com/Omega-JS-Stack/omega/issues/802)): the workflow declares `workflow_dispatch` alone, so no commit and no tag releases anything ([docs/shared/deploys.md](../../../docs/shared/deploys.md) in the Omega repo is the contract for all four frameworks). It runs no tests either: the suites run on the developer's machine and the commit gate runs the battery at ship.
 
-For a tagged release (which is what GitHub recommends for changelogs):
-```bash
-npm version patch    # or minor / major
-git push --follow-tags
-```
-
-The workflow's `softprops/action-gh-release@v2` step uploads to the matching tag.
+To release:
+1. Bump the version in `package.json`.
+2. `npx omega release` dispatches the workflow and streams the run's logs; `--platforms windows` (or `mac,linux`) narrows the matrix. `npx omega deploy` is the same dispatch behind the network prechecks.
+3. Watch the streamed output, or the run at `https://github.com/<owner>/<repo>/actions`.
 
 ## Windows signing strategies
 
@@ -182,10 +220,10 @@ For details see [`docs/signing.md`](signing.md#windows-setup).
 
 ### CI: GitHub Releases upload fails
 - Verify `GH_TOKEN` secret is set. The auto-injected `GITHUB_TOKEN` won't work for cross-repo writes.
-- Confirm the repo's `package.json` `repository.url` points at the right `<owner>/<repo>`.
+- Confirm the config addresses the right repo: `repo.providers.github.org` (plus `repo.providers.github.repo` when the app repo is not `brand.id`) and, for the artifacts, `targets.desktop.releases`.
 
 ## Related docs
 
 - [`docs/signing.md`](signing.md) — cert file inventory, env vars, Windows strategy details
-- [`docs/build-system.md`](build-system.md) — gulp tasks, webpack targets, electron-builder integration
+- [`docs/build-system.md`](build-system.md) — gulp tasks, the three esbuild bundles, electron-builder integration
 - [`docs/startup.md`](startup.md) — `tray-only` mode injects `LSUIElement` into Info.plist at build-config time

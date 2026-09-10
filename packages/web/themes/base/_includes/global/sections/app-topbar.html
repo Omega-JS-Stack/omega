@@ -19,15 +19,18 @@
 
 <header class="omega-shell__topbar">
   <div class="omega-shell__topbar-start">
-    <!-- Drawer toggle (mobile) -->
-    <button class="btn-icon d-xl-none" type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar" aria-label="Toggle navigation">
-      {% omega_icon "bars", "fa-md" %}
-    </button>
+    {% comment %}Rail controls, on the same switch backend/core/base applies to the sidebar itself (#740): with no rail on the page they would be dead buttons naming an id the document does not carry.{% endcomment %}
+    {% unless resolved.config.theme.sidebar.enabled == false %}
+      <!-- Drawer toggle (mobile) -->
+      <button class="btn-icon d-xl-none" type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar" aria-label="Toggle navigation">
+        <i class="fa-solid fa-bars fa-md"></i>
+      </button>
 
-    <!-- Rail collapse toggle (desktop) -->
-    <button class="btn-icon d-none d-xl-inline-flex" type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar" aria-label="Toggle sidebar">
-      {% omega_icon "table-columns", "fa-sm" %}
-    </button>
+      <!-- Rail collapse toggle (desktop) -->
+      <button class="btn-icon d-none d-xl-inline-flex" type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar" aria-label="Toggle sidebar">
+        <i class="fa-solid fa-table-columns fa-sm"></i>
+      </button>
+    {% endunless %}
 
     <!-- Breadcrumb trail -->
     <div class="omega-topbar__crumbs d-none d-md-flex">
@@ -62,7 +65,7 @@
   {% if data.search %}
     <div class="omega-topbar__center">
       <form class="omega-search" action="{{ data.search.action | default: '/search' }}" method="get" role="search">
-        {% omega_icon "magnifying-glass", "fa-sm" %}
+        <i class="fa-solid fa-magnifying-glass fa-sm"></i>
         <input
           type="search"
           name="{{ data.search.name | default: 'q' }}"
@@ -83,7 +86,7 @@
         <div class="dropdown">
           {% capture notif_icon %}{{ action.icon | default: "bell" }}{% endcapture %}
           <button class="btn-icon position-relative" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false" aria-label="{{ action.label | default: 'Notifications' }}">
-            {% omega_icon notif_icon, "fa-sm" %}
+            <i class="fa-solid fa-{{ notif_icon }} fa-sm"></i>
             {% if action.badge %}
               <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill {{ action.badge.class | default: 'bg-danger' }}">
                 {{ action.badge.text }}
@@ -113,7 +116,7 @@
                       <div class="d-flex">
                         {% if notification.icon %}
                           <span class="omega-icon-chip omega-icon-chip--neutral me-3 flex-shrink-0">
-                            {% omega_icon notification.icon, "fa-sm" %}
+                            <i class="fa-solid fa-{{ notification.icon }} fa-sm"></i>
                           </span>
                         {% endif %}
                         <div class="flex-fill">
@@ -162,7 +165,7 @@
         <div class="dropdown">
           <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
             {% if action.icon %}
-              {% omega_icon action.icon, "fa-sm me-2" %}
+              <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
             {% endif %}
             <span>{{ action.label }}</span>
           </button>
@@ -173,7 +176,7 @@
               {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
               {% capture child_content %}
                 {% if child.icon %}
-                  {% omega_icon child.icon, "fa-sm me-2" %}
+                  <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
                 {% endif %}
                 <span>{{ child.label }}</span>
               {% endcapture %}
@@ -205,7 +208,7 @@
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         {% capture action_content %}
           {% if action.icon %}
-            {% omega_icon action.icon, "fa-sm me-2" %}
+            <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
           {% endif %}
           <span>{{ action.label }}</span>
         {% endcapture %}

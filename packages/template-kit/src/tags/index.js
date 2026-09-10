@@ -9,7 +9,7 @@
 
 const { iftruthy, iffalsy, iffile, urlmatches } = require('./conditionals.js');
 const { omegaReadtime, omegaFakeComments, omegaExternal, omegaSocial, omegaLanguage, omegaTranslationUrl } = require('./content.js');
-const { omegaIcon, omegaLogo, omegaImage, omegaVideo } = require('./media.js');
+const { omegaLogo, omegaImage, omegaVideo } = require('./media.js');
 const { omegaMember, omegaPost } = require('./collections.js');
 
 const TAGS = {
@@ -23,7 +23,6 @@ const TAGS = {
   omega_social: omegaSocial,
   omega_language: omegaLanguage,
   omega_translation_url: omegaTranslationUrl,
-  omega_icon: omegaIcon,
   omega_logo: omegaLogo,
   omega_image: omegaImage,
   omega_video: omegaVideo,

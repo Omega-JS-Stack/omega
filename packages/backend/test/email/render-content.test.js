@@ -11,8 +11,9 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { renderContent } = require('../../src/manager/libraries/email/prepare.js');
-const { escapeHtml } = require('../../src/manager/libraries/email/constants.js');
+const { renderContent } = require('../../dist/manager/libraries/email/prepare.js');
+const { escapeHtml } = require('../../dist/manager/libraries/email/constants.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The integration checks below prove the trust decision actually reaches the rendered
 // SendGrid payload — a unit test on renderContent alone would still pass if build()
@@ -20,7 +21,7 @@ const { escapeHtml } = require('../../src/manager/libraries/email/constants.js')
 function transactionalBuild(settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../src/manager/libraries/email/transactional/index.js');
+  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
   const Manager = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
@@ -53,7 +54,7 @@ const buildTrusted = () => (trustedBuild = trustedBuild || transactionalBuild({
   data: { content: { title: 'Alert', message: '<strong>Details:</strong>\n<ul>\n<li>Amount: $5</li>\n</ul>' } },
 }));
 
-module.exports = {
+module.exports = defineCases({
   description: 'Email renderContent trust split (untrusted escapes, trusted renders)',
   type: 'group',
   tests: [
@@ -244,4 +245,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -1,5 +1,5 @@
 // Boot-layer self-test — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the
-// site boot?" (UJM). The boot runner webpack-builds the bundled fixture consumer
+// site boot?" (UJM). The boot runner esbuild-builds the bundled fixture consumer
 // (src/test/fixtures/consumer-app) into a real main.bundle.js, spawns Electron with
 // it (the actual production boot path — bundled, not the unbundled lib code that the
 // `main` layer exercises), then runs these inspects against the live manager.
@@ -15,7 +15,9 @@
 // projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore } is the inspect argument
 // (projectRoot = the fixture root; appRoot = the staged target root holding the build).
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'fixture consumer app — boots end-to-end (real bundle)',
@@ -69,7 +71,7 @@ module.exports = {
     },
 
     {
-      description: 'webpack produced the real production bundle + view on disk',
+      description: 'the bundle task produced the real production bundle + view on disk',
       inspect: async ({ expect, appRoot }) => {
         const fs = require('fs');
         const path = require('path');
@@ -81,7 +83,7 @@ module.exports = {
     {
       // #111 — the fixture's renderer entry imports the vendored app-shell
       // module through the `__main_assets__` alias. Its declarative contract
-      // showing up in the built bundle proves the whole chain: webpack alias →
+      // showing up in the built bundle proves the whole chain: esbuild alias →
       // @omega.js/desktop's vendored dist asset → its @omega.js/client import.
       description: 'renderer bundle carries the vendored app-shell module via __main_assets__',
       inspect: async ({ expect, appRoot }) => {
@@ -94,4 +96,4 @@ module.exports = {
       },
     },
   ],
-};
+});

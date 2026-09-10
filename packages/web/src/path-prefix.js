@@ -97,6 +97,23 @@ function readPathPrefixStamp(html) {
 }
 
 /**
+ * The base path a whole BUILD carries, off the stamp `prefixHtml` leaves on
+ * <html> — one answer for the post-build passes that read a dist page by page
+ * (the #468 audit, the #430 link check). '' (an unmounted site) is what most
+ * builds answer, and the first stamped page settles it: one build, one mount.
+ * @param {Iterable<string>} pages - the built pages' HTML
+ * @returns {string} resolvePathPrefix output
+ */
+function readBuildPathPrefix(pages) {
+  for (const html of pages) {
+    const stamp = readPathPrefixStamp(html);
+    if (stamp) return stamp;
+  }
+
+  return '';
+}
+
+/**
  * Rewrite a rendered page for a mounted site: every root-relative URL
  * attribute moves under the base path, and <html> carries the value so the
  * browser half (core/js/libs/path-prefix.js) can build URLs too.
@@ -147,4 +164,4 @@ function prefixCss(css, prefix) {
   );
 }
 
-module.exports = { resolvePathPrefix, prefixUrl, stripPathPrefix, readPathPrefixStamp, prefixHtml, prefixCss };
+module.exports = { resolvePathPrefix, prefixUrl, stripPathPrefix, readPathPrefixStamp, readBuildPathPrefix, prefixHtml, prefixCss };

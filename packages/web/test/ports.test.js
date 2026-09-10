@@ -39,7 +39,7 @@ async function buildPorts() {
         consumerDir: PORTS,
         siteData,
         farmDir: path.join(PKG, '.omega', 'layout-farm-ports'),
-        assetManifest: { js: { pages: {} }, css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} } },
+        assetManifest: { js: { pages: {} }, css: { main: '/assets/css/main-TEST.css', pages: {}, layouts: {} } },
       });
     },
   });
@@ -135,7 +135,7 @@ test('real somiibo index: verbatim content page with consumer include', () => {
   assert.ok(html.includes('data-action-1="New follower"'), 'hero-demo config bridge');
 
   assert.ok(html.includes('/platforms/instagram-bot'), 'platform cards');
-  assert.ok((html.match(/class="fa[ "]/g) || []).length > 30, 'dozens of omega_icon renders');
+  assert.ok((html.match(/data-omega-fa="/g) || []).length > 30, 'dozens of icons inlined at build');
 });
 
 test('team doc renders at its permalink (Jekyll outputs team pages)', () => {

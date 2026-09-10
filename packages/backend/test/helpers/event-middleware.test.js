@@ -16,7 +16,8 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const EventMiddleware = require('../../src/manager/helpers/event-middleware.js');
+const EventMiddleware = require('../../dist/manager/helpers/event-middleware.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Write a handler file and return its absolute path.
 function handlerFile(source) {
@@ -76,7 +77,7 @@ async function settle(promise) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'EventMiddleware handler dispatch + hooks',
   type: 'group',
 
@@ -403,4 +404,4 @@ module.exports = {
       },
     },
   ],
-};
+});

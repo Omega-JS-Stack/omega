@@ -2,7 +2,9 @@
  * Test: Send feedback + plain template emails
  * Quick visual test — sends one of each to verify rendering.
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Feedback + plain template send',
   type: 'group',
   skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set' : false,
@@ -49,4 +51,4 @@ module.exports = {
       },
     },
   ],
-};
+});

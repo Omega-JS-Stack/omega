@@ -100,6 +100,28 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | Context key | `{ assistant }` / `Manager.Assistant()` / `BackendAssistant` | `{ ctx }` / `Manager.RouteContext()` / `RouteContext` (cp263) |
 | Error factory | `assistant.errorify(e, { code, sentry, log })` | `ctx.report(e, { code })` — 5xx captures to Sentry automatically, 4xx never; sending stays `ctx.respond()` |
 
+## Part 4: The dependency-resolution report
+
+`npx omega migrate` at the target root prints what the port still owes and
+changes nothing ([#600](https://github.com/Omega-JS-Stack/omega/issues/600)).
+
+Under BEM's FLAT install every framework dependency sat in the consumer's own
+`node_modules`, so a ported route could `require('fs-jetpack')` and be right.
+Under OMEGA the framework is a package with its own tree and that require
+resolves only by HOISTING, which holds on one install and not on the next. The
+requires that carry it are LAZY, inside the handler that needs them, so the
+module loads fine and the route 500s the first time a request reaches it.
+
+The verb names every bare specifier under `src/` that is neither a Node built-in
+nor a package this target's own `package.json` declares, at file:line, with the
+fix. It never installs: which version a brand wants is the brand's call. The
+scan itself is `@omega.js/devkit`'s `src/bare-requires.js`, the SAME one
+@omega.js/web's `omega migrate` runs, so a brand's two ported targets cannot get
+different answers.
+
+The one-time CONVERSIONS stay their own run-alone verbs, `omega migrate:rules`
+and `omega migrate:markers`, because those change what the project enforces.
+
 ## See also
 
 - [routes.md](routes.md) — the current route format being migrated TO

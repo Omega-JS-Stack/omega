@@ -14,6 +14,7 @@
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const BOOT_RUNNER = path.join(__dirname, '..', '..', 'runners', 'boot.js');
 
@@ -58,7 +59,7 @@ function withBootEnv(vars, fn) {
     });
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'boot layer — extension-directory discovery',
@@ -130,4 +131,4 @@ module.exports = {
       },
     },
   ],
-};
+});

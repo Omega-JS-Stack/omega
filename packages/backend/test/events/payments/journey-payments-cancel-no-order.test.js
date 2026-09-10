@@ -11,7 +11,9 @@
  * Product-agnostic: the persona's 'premium' is remapped to the brand's first paid product at
  * seed time, and the assertions compare against whatever the user doc starts with.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment journey: cancel with no order doc → cancellation pending, product intact',
   type: 'suite',
   timeout: 30000,
@@ -71,4 +73,4 @@ module.exports = {
       },
     },
   ],
-};
+});

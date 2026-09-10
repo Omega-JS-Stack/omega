@@ -110,6 +110,7 @@
   --omega-radius-pill: 50rem;
   --omega-speed: 160ms;
   --omega-speed-slow: 550ms;
+  --omega-speed-first-paint: 300ms; // the first viewport's reveal, see motion/_index.scss
   --omega-ease: cubic-bezier(0.25, 0.5, 0.35, 1);
 
   // Type stacks (D5: system stacks until Ian picks vendored faces — the

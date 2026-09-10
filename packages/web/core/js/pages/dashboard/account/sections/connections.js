@@ -1,5 +1,5 @@
 /**
- * Connections Section JavaScript - OAuth account linking
+ * Connections Section JavaScript - third-party account linking
  */
 
 // Libraries
@@ -9,16 +9,18 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('account:connections');
 
-let oauth2Config = null;
+let connectionsConfig = null;
 let accountData = null;
-let connectionForms = new Map();
+const connectionForms = new Map();
 
-// Supported providers (must match IDs in HTML)
-const supportedProviders = ['google', 'discord', 'github', 'twitter', 'facebook', 'spotify', 'apple', 'microsoft', 'linkedin', 'twitch', 'slack'];
+// What a provider id may be — the same rule the backend's confined provider
+// loader enforces (`libraries/load-provider.js`). A key outside it can never
+// resolve to a provider, so its card would only ever fail on connect.
+const PROVIDER_ID_PATTERN = /^[a-z0-9-]+$/;
 
 // Get API URL helper
 function getApiUrl() {
-  return `${omega.getApiUrl()}/omega/user/oauth2`;
+  return `${omega.getApiUrl()}/omega/user/connections`;
 }
 
 // Initialize connections section
@@ -26,18 +28,18 @@ export async function init() {
 }
 
 // Load connections data
-export async function loadData(account, sharedOAuth2Config) {
+export async function loadData(account, sharedConnectionsConfig) {
   if (!account) {
     return;
   }
 
   accountData = account;
-  oauth2Config = sharedOAuth2Config;
+  connectionsConfig = sharedConnectionsConfig;
 
   displayConnections();
 }
 
-// Display available and connected OAuth providers
+// Display available and connected providers
 function displayConnections() {
   const $loading = document.getElementById('connections-loading');
 
@@ -45,87 +47,55 @@ function displayConnections() {
     $loading.classList.add('d-none');
   }
 
-  if (!oauth2Config) {
+  if (!connectionsConfig) {
     if ($loading) {
       $loading.classList.remove('d-none');
     }
     return;
   }
 
-  const availableProviders = oauth2Config;
-  const userConnections = accountData?.oauth2 || {};
+  const availableProviders = connectionsConfig;
+  const userConnections = accountData?.connections || {};
 
   let hasEnabledProviders = false;
 
-  supportedProviders.forEach(providerId => {
+  // The CONFIG is the list (#771): every provider a brand enables gets a card
+  // — the one the page template rendered for it, or the warning card below
+  // saying what its config entry is missing.
+  Object.keys(availableProviders).forEach(providerId => {
     const providerSettings = availableProviders[providerId];
+    const isEnabled = providerSettings && providerSettings.enabled !== false;
     const $providerElement = document.getElementById(`connection-${providerId}`);
 
-    if (!$providerElement) {
+    if (!isEnabled) {
+      if ($providerElement) {
+        $providerElement.classList.add('d-none');
+      }
       return;
     }
 
-    const isEnabled = providerSettings && providerSettings.enabled !== false;
+    hasEnabledProviders = true;
 
-    if (isEnabled) {
-      hasEnabledProviders = true;
+    // A name the backend cannot load is never offered as a live connection
+    if (!PROVIDER_ID_PATTERN.test(providerId)) {
+      if ($providerElement) {
+        $providerElement.classList.add('d-none');
+      }
+
+      renderUnconfiguredCard(providerId, 'A provider id must be lowercase letters, digits, and dashes.');
+      return;
+    }
+
+    if ($providerElement) {
       $providerElement.classList.remove('d-none');
 
       initializeProviderForm(providerId);
 
-      const userConnection = userConnections[providerId];
-      updateProviderStatus(providerId, userConnection, providerSettings);
-    } else {
-      $providerElement.classList.add('d-none');
-    }
-  });
-
-  // Show warning cards for enabled API providers missing from the HTML template
-  const $connectionsList = document.getElementById('connections-list');
-  Object.keys(availableProviders).forEach(providerId => {
-    const providerSettings = availableProviders[providerId];
-    const isEnabled = providerSettings && providerSettings.enabled !== false;
-
-    if (!isEnabled) {
+      updateProviderStatus(providerId, userConnections[providerId], providerSettings);
       return;
     }
 
-    const $existing = document.getElementById(`connection-${providerId}`);
-    if ($existing) {
-      return;
-    }
-
-    // Provider is enabled in API but has no HTML element — create a warning card
-    hasEnabledProviders = true;
-    logger.warn(`Provider "${providerId}" is enabled in brand config but missing from the account page template. Add it to the connections frontmatter list.`);
-
-    const warningId = `connection-${providerId}-unconfigured`;
-    if (document.getElementById(warningId)) {
-      return;
-    }
-
-    const providerName = providerId.charAt(0).toUpperCase() + providerId.slice(1);
-    const $warning = document.createElement('div');
-    $warning.id = warningId;
-    $warning.className = 'border-top px-0 py-3';
-    $warning.innerHTML = `
-      <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
-        <div class="d-flex align-items-center">
-          <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 1.875em; font-size: 1.5rem;">
-            &#9888;
-          </div>
-          <div>
-            <h6 class="mb-0">${omega.utilities().escapeHTML(providerName)}</h6>
-            <small class="text-warning d-block">Unsupported connection: "${omega.utilities().escapeHTML(providerId)}". Update Ultimate Jekyll Manager to enable this provider.</small>
-          </div>
-        </div>
-        <div class="text-start text-sm-end flex-shrink-0">
-          <button class="btn btn-sm btn-outline-secondary" disabled>Unavailable</button>
-        </div>
-      </div>
-    `;
-
-    $connectionsList.appendChild($warning);
+    renderUnconfiguredCard(providerId, 'Add a "name" and a "logo" to its connections entry in the brand config to show this connection.');
   });
 
   const $empty = document.getElementById('connections-empty');
@@ -139,6 +109,43 @@ function displayConnections() {
   }
 }
 
+// An enabled provider that cannot be offered: either the page rendered no card
+// for it (its config entry carries no `name`/`logo`, and the framework has no
+// packaged default for that provider), or its key is not a legal provider id.
+// The card says which, since the fix differs.
+function renderUnconfiguredCard(providerId, reason) {
+  const warningId = `connection-${providerId}-unconfigured`;
+
+  if (document.getElementById(warningId)) {
+    return;
+  }
+
+  logger.warn(`Provider "${providerId}" is enabled in the brand config but cannot be offered: ${reason}`);
+
+  const providerName = providerId.charAt(0).toUpperCase() + providerId.slice(1);
+  const $warning = document.createElement('div');
+  $warning.id = warningId;
+  $warning.className = 'border-top px-0 py-3';
+  $warning.innerHTML = `
+    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
+      <div class="d-flex align-items-center">
+        <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 1.875em; font-size: 1.5rem;">
+          &#9888;
+        </div>
+        <div>
+          <h6 class="mb-0">${omega.utilities().escapeHTML(providerName)}</h6>
+          <small class="text-warning d-block">Unsupported connection: "${omega.utilities().escapeHTML(providerId)}". ${omega.utilities().escapeHTML(reason)}</small>
+        </div>
+      </div>
+      <div class="text-start text-sm-end flex-shrink-0">
+        <button class="btn btn-sm btn-outline-secondary" disabled>Unavailable</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('connections-list').appendChild($warning);
+}
+
 // Update provider status display
 function updateProviderStatus(providerId, userConnection, providerSettings) {
   const $status = document.getElementById(`${providerId}-connection-status`);
@@ -149,18 +156,12 @@ function updateProviderStatus(providerId, userConnection, providerSettings) {
 
   const isConnected = userConnection && userConnection.identity;
 
-  // Set description
+  // Set description. The CONFIG is the only source
+  // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)): the framework's
+  // config defaults carry one for every packaged provider, a brand's own entry
+  // carries its own, and a provider with neither gets the generic line
   if ($description) {
-    const defaultDescriptions = {
-      google: 'Enable single sign-on with your Google account',
-      discord: 'Connect to access Discord community features',
-      github: 'Link your GitHub account for repository access',
-      twitter: 'Share updates and connect with Twitter',
-      facebook: 'Connect your Facebook account for social features',
-    };
-
     const descriptionText = providerSettings?.description
-      || defaultDescriptions[providerId]
       || `Connect your ${providerId.charAt(0).toUpperCase() + providerId.slice(1)} account`;
 
     $description.textContent = descriptionText;
@@ -238,8 +239,8 @@ function initializeProviderForm(providerId) {
 
   formManager.on('statechange', ({ state }) => {
     if (state === 'ready') {
-      const userConnection = accountData?.oauth2?.[providerId];
-      const providerSettings = oauth2Config?.[providerId];
+      const userConnection = accountData?.connections?.[providerId];
+      const providerSettings = connectionsConfig?.[providerId];
       updateProviderStatus(providerId, userConnection, providerSettings);
     }
   });
@@ -254,7 +255,7 @@ function initializeProviderForm(providerId) {
       const success = await handleDisconnect(provider);
 
       if (success) {
-        const providerSettings = oauth2Config?.[provider];
+        const providerSettings = connectionsConfig?.[provider];
         updateProviderStatus(provider, null, providerSettings);
       }
     }
@@ -263,7 +264,7 @@ function initializeProviderForm(providerId) {
 
 // Handle connect action
 async function handleConnect(providerId) {
-  const provider = oauth2Config?.[providerId];
+  const provider = connectionsConfig?.[providerId];
 
   if (!provider || provider.enabled === false) {
     throw new Error('This connection service is not available.');
@@ -284,6 +285,10 @@ async function handleConnect(providerId) {
 
   if (response.url && /^https?:\/\//i.test(response.url)) {
     window.location.href = response.url;
+
+    // The page is leaving. Never resolve: the form stays `submitting` until the
+    // browser unloads it, so the card never redraws a second Connect button.
+    await new Promise(() => {});
   } else {
     throw new Error(response.message || 'Failed to get authorization URL');
   }
@@ -310,8 +315,8 @@ async function handleDisconnect(providerId) {
   });
 
   if (response.success) {
-    if (accountData.oauth2 && accountData.oauth2[providerId]) {
-      delete accountData.oauth2[providerId];
+    if (accountData.connections && accountData.connections[providerId]) {
+      delete accountData.connections[providerId];
     }
 
     return true;
@@ -322,7 +327,7 @@ async function handleDisconnect(providerId) {
 
 // Called when section is shown
 export function onShow() {
-  if (accountData && oauth2Config) {
+  if (accountData && connectionsConfig) {
     displayConnections();
   }
 }

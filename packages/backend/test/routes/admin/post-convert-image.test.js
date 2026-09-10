@@ -19,7 +19,8 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 
-const post = require('../../../src/manager/routes/admin/post/post');
+const post = require('../../../dist/manager/routes/admin/post/post');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { convertToJpeg, applyImageCDNParams, IMAGE_MAX_DIMENSION } = post;
 
@@ -52,7 +53,7 @@ function makeAssistant() {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'routes/admin/post/post.convertToJpeg + applyImageCDNParams',
   type: 'group',
 
@@ -155,4 +156,4 @@ module.exports = {
       },
     },
   ],
-};
+});

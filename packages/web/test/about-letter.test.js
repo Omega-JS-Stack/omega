@@ -127,7 +127,7 @@ test('#520: an emptied feed with an aside PHOTO keeps the aside — the picture 
 
 test('#520: the gallery shows the feedless form — the letter, full width', async () => {
   const pages = await buildWith(miniData, {}, 'about-letter-frames');
-  const frame = pages.get('/test/sections/section/about/letter/frames/no-feed-the-full-width-letter');
+  const frame = pages.get('/test/sections/about/letter/frames/no-feed-the-full-width-letter');
   assert.ok(frame, 'the feedless variant frame built');
 
   assert.ok(!frame.includes('omega-duo'), 'no aside column, so no duo grid either');

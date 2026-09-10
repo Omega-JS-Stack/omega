@@ -6,9 +6,18 @@ const logger = Manager.logger('test');
 const { run } = require('../test/runner.js');
 const attachLogFile = require('../utils/attach-log-file.js');
 const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.js');
+const { noMatchMessage, noMatchExitCode } = require('@omega.js/devkit/test/scope');
 const { ensureTarget } = require('./lib/ensure-target.js');
 
 module.exports = async function (options) {
+  // This process is a TEST RUN, and everything it spawns inherits that. The box's
+  // mutating verbs read it and refuse to touch a real runner home
+  // ([#337](https://github.com/Omega-JS-Stack/omega/issues/337): a suite once ran
+  // a real `runner install` on the signing box). Deliberately NOT the canonical
+  // OMEGA_TEST_MODE, which means "the app under test runs in testing mode" and
+  // would change what the boot lane's production build compiles.
+  process.env.OMEGA_TEST_RUNNER = '1';
+
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
   // @omega.js/backend's test.log and @omega.js/desktop's own dev.log pattern.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
@@ -82,6 +91,20 @@ module.exports = async function (options) {
       skipped: result.skipped,
       total:   result.passed + result.failed + result.skipped,
     })}\n`);
+  }
+
+  // A target that named files and matched none is a failed run, not an empty
+  // one: a typo'd path, or a suite renamed out from under it, used to report
+  // "0 passing" and exit 0
+  // ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
+  if (result.noMatch) {
+    logger.error(noMatchMessage(result.noMatch));
+    // Standalone that is 1. Inside a brand-root fan-out the manager forwarded
+    // ONE target to every target, so a distinct code lets it count this as a
+    // miss rather than a failure (#814).
+    process.exitCode = noMatchExitCode();
+    await attachLogFile.detach();
+    return;
   }
 
   if (result.failed > 0) {

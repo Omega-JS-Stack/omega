@@ -10,14 +10,15 @@
  * Run: npx omega test backend:cli/flags
  */
 const yargs = require('yargs');
-const { BOOLEAN_FLAGS } = require('../../src/cli/flags.js');
+const { BOOLEAN_FLAGS } = require('../../dist/cli/flags.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The same parse shape src/cli/index.js builds.
 function parse(argvLine) {
   return yargs(argvLine).boolean(BOOLEAN_FLAGS).version(false).help(false).argv;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'CLI boolean flag declarations — flags never swallow positionals',
   type: 'group',
 
@@ -60,4 +61,4 @@ module.exports = {
       },
     },
   ],
-};
+});

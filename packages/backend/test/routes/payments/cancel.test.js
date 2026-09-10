@@ -3,7 +3,9 @@
  * Tests rejection cases before any provider call is made.
  * See test/events/payments/journey-payments-cancel-endpoint.js for the full end-to-end journey.
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Payment cancel endpoint: validation errors',
   type: 'group',
   timeout: 15000,
@@ -160,4 +162,4 @@ module.exports = {
       },
     },
   ],
-};
+});

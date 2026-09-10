@@ -21,9 +21,10 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/refund-details
  */
-const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
 
 const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const REFUND_ID = FIXTURE_CAPTURE_REFUNDED.id;
 const V2_ENDPOINT = `/v2/payments/refunds/${REFUND_ID}`;
@@ -68,7 +69,7 @@ function envelope({ amount }) {
   return { id: 'WH-refund', resource: { id: REFUND_ID, amount: amount } };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal getRefundDetails() reads the refund PayPal answered for',
   type: 'group',
 
@@ -198,4 +199,4 @@ module.exports = {
       },
     },
   ],
-};
+});

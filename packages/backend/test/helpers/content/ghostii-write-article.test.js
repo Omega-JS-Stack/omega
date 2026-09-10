@@ -9,7 +9,8 @@
  * with a spy that captures and returns the request body.
  */
 const path = require('path');
-const ghostiiPath = path.resolve(__dirname, '../../../src/manager/libraries/content/ghostii.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const ghostiiPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/ghostii.js');
 
 // Capture the request body that writeArticle would send
 let capturedBody = null;
@@ -45,7 +46,7 @@ const MOCK_BRAND = {
   github: { user: 'test-user', repo: 'test-repo' },
 };
 
-module.exports = {
+module.exports = defineCases({
   description: 'content/ghostii.writeArticle() pass-through',
   type: 'group',
 
@@ -240,4 +241,4 @@ module.exports = {
       },
     },
   ],
-};
+});

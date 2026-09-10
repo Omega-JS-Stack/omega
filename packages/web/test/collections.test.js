@@ -172,6 +172,25 @@ test('a term DISPLAYS humanized — hyphens are word breaks, legacy UJM parity (
   ]);
 });
 
+test('an apostrophe term keeps its UJM slug — deleted, never a separator (#597)', () => {
+  // soundgrail's live categories: UJM published `beginners-guides`, and a
+  // slugifier that separates on the apostrophe moves the URL to
+  // `beginner-s-guides`. Straight and typographic spellings are ONE term —
+  // the markdown typographer smartens the straight one at build time.
+  const items = [
+    post({ slug: 'a', date: '2024-03-01', categories: ["Beginner's Guides"] }),
+    post({ slug: 'b', date: '2024-02-01', categories: ['Beginner’s Guides'] }),
+    post({ slug: 'c', date: '2024-01-01', categories: ["Beginner's Music Guide"] }),
+  ];
+
+  const categories = registry(new Map()).get('postCategories')(api(items));
+
+  assert.deepStrictEqual(categories.map((c) => [c.slug, c.posts.length]), [
+    ['beginners-guides', 2],
+    ['beginners-music-guide', 1],
+  ]);
+});
+
 test('underscores break words too, and separator RUNS collapse (#457)', () => {
   const items = [
     post({ slug: 'a', date: '2024-02-01', categories: ['product_updates'] }),

@@ -12,9 +12,10 @@
  * Run: npx omega test backend:helpers/recaptcha
  */
 const path = require('path');
-const { verify } = require('../../src/manager/libraries/recaptcha.js');
+const { verify } = require('../../dist/manager/libraries/recaptcha.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MODULE_PATH = require.resolve('../../src/manager/libraries/recaptcha.js');
+const MODULE_PATH = require.resolve('../../dist/manager/libraries/recaptcha.js');
 
 /**
  * Run verify() against a STUBBED siteverify, with console.warn recorded.
@@ -74,7 +75,7 @@ async function verifyOnStubbedSiteverify({ answer, token }) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'recaptcha.verify() no-secret leniency + the rejection trail',
   type: 'group',
   tests: [
@@ -162,4 +163,4 @@ module.exports = {
       },
     },
   ],
-};
+});

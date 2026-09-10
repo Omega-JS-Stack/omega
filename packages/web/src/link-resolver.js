@@ -31,11 +31,24 @@
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
+const { readBuildPathPrefix, stripPathPrefix } = require('./path-prefix.js');
 
 // Anything with a scheme (https:, mailto:, tel:, data:, javascript:, a brand's
 // own app protocol), a protocol-relative host, or a bare fragment leaves the site.
 const EXTERNAL = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|#)/;
-const LINK_ATTR = /\s(?:href|src)=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
+// EVERY attribute, in document order — not just the linking ones (#601). A
+// scan that hunts `href=` alone has no idea where an attribute value ends, so
+// an `href=` written INSIDE another attribute's value read as a link the page
+// emits: a brand hands JSON to client JS in a data attribute, the minifier
+// emits it single-quoted with the inner `\"` decoded, and ` href=\"` matched
+// as a bare value of `\` (three dead links across 130+ studymonkey pages).
+// Matching every attribute means the quote that OPENED a value is the quote
+// that closes it, and the whole value is consumed before the next match.
+const LINK_ATTR = /\s([a-zA-Z_:][a-zA-Z0-9_:.-]*)=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
+
+// The attributes whose value IS a site URL. `srcset` and `data-src` are not
+// among them, exactly as before: the name has to be the whole name.
+const LINK_ATTR_NAMES = new Set(['href', 'src']);
 
 // The pages half of a build: a feed, a sitemap or a robots file is data, not a
 // document with links in it (`/feeds/posts.json` carries escaped JSON that reads
@@ -54,6 +67,10 @@ const CODE_DISPLAY = /<pre\b[^>]*>[\s\S]*?<\/pre>/gi;
 // resort, so the reason it exists lives beside it, in a comment.
 const EXCEPTIONS_FILE = path.join('config', 'link-exceptions.json5');
 const LEGACY_EXCEPTIONS_FILE = path.join('config', 'link-exceptions.json');
+
+// The checks that file can excuse, one list per page each: the link check's
+// own (#430) and the four built-output audit checks (#468, src/dist-audit.js).
+const CHECKS = ['links', 'meta', 'fragments', 'alt', 'sitemap'];
 
 /** `/foo/` and `/foo` are the same page; `/` is its own. */
 const normalize = (url) => url.replace(/\/+$/, '') || '/';
@@ -74,16 +91,19 @@ function toPosix(file) {
  * @param {string} value - the raw attribute value
  * @param {string} dir - the emitting page's directory (site-absolute, posix)
  * @param {function(string): boolean} resolves - does this site URL exist?
- * @returns {string|null} the unresolved URL, or null when it resolves
+ * @param {string} [prefix] - the base path a mounted build carries
+ * @returns {string|null} the unresolved SITE URL, or null when it resolves
  */
-function resolveLink(value, dir, resolves) {
+function resolveLink(value, dir, resolves, prefix) {
   if (EXTERNAL.test(value)) return null;
 
   const target = value.split('#')[0].split('?')[0];
   // A bare `?query` or `#fragment` stays on the emitting page.
   if (!target) return null;
 
-  const url = normalize(target.startsWith('/') ? target : path.posix.join(dir, target));
+  const url = normalize(target.startsWith('/')
+    ? stripPathPrefix(target, prefix || '')
+    : path.posix.join(dir, target));
 
   return resolves(url) ? null : url;
 }
@@ -95,11 +115,13 @@ function resolveLink(value, dir, resolves) {
  * @param {object} options
  * @param {function(string): boolean} options.resolves - does this site URL exist?
  * @param {function(string): string} [options.dirOf] - a page id → its directory (default: it is a URL)
- * @returns {Map<string, Set<string>>} unresolved URL → the page ids emitting it
+ * @param {string} [options.prefix] - the base path a mounted build carries
+ * @returns {Map<string, Set<string>>} unresolved SITE URL → the page ids emitting it
  */
 function scanLinks(pages, options) {
   const resolves = options.resolves;
   const dirOf = options.dirOf || pageDir;
+  const prefix = options.prefix || '';
   const unresolved = new Map();
 
   for (const [id, html] of pages) {
@@ -107,10 +129,11 @@ function scanLinks(pages, options) {
     const markup = String(html).replace(CODE_DISPLAY, '');
 
     for (const match of markup.matchAll(LINK_ATTR)) {
-      const value = match[1] ?? match[2] ?? match[3];
+      if (!LINK_ATTR_NAMES.has(match[1].toLowerCase())) continue;
+      const value = match[2] ?? match[3] ?? match[4];
       if (value === undefined) continue;
 
-      const dead = resolveLink(value, dir, resolves);
+      const dead = resolveLink(value, dir, resolves, prefix);
       if (!dead) continue;
 
       if (!unresolved.has(dead)) unresolved.set(dead, new Set());
@@ -171,13 +194,20 @@ function applyExceptions(unresolved, exceptions) {
 }
 
 /**
- * Read a target's declared link exceptions. Absent file = no exceptions, which
- * is the state every brand should be in; a malformed one is a hard error, never
- * a silently empty map (that would turn the guard off).
+ * Read a target's declared exceptions. Absent file = no exceptions, which is
+ * the state every brand should be in; a malformed one is a hard error, never a
+ * silently empty map (that would turn the guard off).
+ *
+ * One list per CHECK ([#468](https://github.com/Omega-JS-Stack/omega/issues/468)),
+ * and the historical array is the link list — `"admin.html": ["/admin/new"]`
+ * means exactly what it meant when the link check was the only one. `true` in
+ * place of a list excuses the whole check on that page, which is how a check
+ * whose finding IS the page (a sitemap orphan) is declared.
+ *
  * @param {string} targetRoot - the consumer project root
- * @returns {Object<string, string[]>} source page → its allowed dead links
+ * @returns {Object<string, Object<string, string[]|true>>} page → its declared lists, by check
  */
-function loadLinkExceptions(targetRoot) {
+function loadExceptions(targetRoot) {
   const source = jetpack.read(path.join(targetRoot, EXCEPTIONS_FILE));
   if (source === undefined) {
     // A file left at the retired strict-JSON name would silently stop
@@ -190,17 +220,43 @@ function loadLinkExceptions(targetRoot) {
   }
 
   const declared = JSON5.parse(source);
+  const isList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
   const valid = declared
     && typeof declared === 'object'
     && !Array.isArray(declared)
-    && Object.values(declared).every((links) => Array.isArray(links) && links.every((l) => typeof l === 'string'));
+    && Object.values(declared).every((entry) => isList(entry)
+      || (entry && typeof entry === 'object' && !Array.isArray(entry)
+        && Object.values(entry).every((value) => value === true || isList(value))));
 
   if (!valid) {
-    throw new Error(`${EXCEPTIONS_FILE} must be an object of "<page>.html": ["/dead-link", ...] — got ${JSON.stringify(declared)}`);
+    throw new Error(`${EXCEPTIONS_FILE} must be an object of "<page>.html": ["/dead-link", ...] or "<page>.html": { ${[...CHECKS].join(': [...], ')}: true } — got ${JSON.stringify(declared)}`);
   }
 
-  return declared;
+  return Object.fromEntries(Object.entries(declared).map(([page, entry]) => {
+    if (Array.isArray(entry)) return [page, { links: entry }];
+
+    for (const check of Object.keys(entry)) {
+      // A check nobody runs is a typo, and a typo read as "no exception" is a
+      // declaration silently turned off.
+      if (!CHECKS.includes(check)) {
+        throw new Error(`${EXCEPTIONS_FILE}: "${page}" declares an unknown check "${check}" — the checks are ${CHECKS.join(', ')}`);
+      }
+    }
+
+    return [page, entry];
+  }));
+}
+
+/**
+ * The link check's slice of the declared exceptions.
+ * @param {string} targetRoot - the consumer project root
+ * @returns {Object<string, string[]>} source page → its allowed dead links
+ */
+function loadLinkExceptions(targetRoot) {
+  return Object.fromEntries(Object.entries(loadExceptions(targetRoot))
+    .filter(([, entry]) => entry.links)
+    .map(([page, entry]) => [page, entry.links]));
 }
 
 /**
@@ -214,14 +270,20 @@ function checkDistLinks(options) {
   const disk = jetpack.cwd(options.distDir);
   const files = disk.find({ matching: '**/*.html', files: true, directories: false }) || [];
   const pages = files.map((file) => [toPosix(file), disk.read(file)]);
+  // A MOUNTED build (#755) writes every root-relative URL under its base path
+  // while dist paths stay site-relative, so the emitted href has to come back
+  // off the mount before it resolves — and a dead one is reported by the SITE
+  // url, the one a brand's exception list is written in.
+  const prefix = readBuildPathPrefix(pages.map(([, html]) => html));
 
-  const unresolved = scanLinks(pages, { resolves: distResolves(options.distDir), dirOf: fileDir });
+  const unresolved = scanLinks(pages, { resolves: distResolves(options.distDir), dirOf: fileDir, prefix });
 
   return { pageCount: pages.length, ...applyExceptions(unresolved, options.exceptions || {}) };
 }
 
 module.exports = {
   checkDistLinks,
+  loadExceptions,
   loadLinkExceptions,
   scanLinks,
   applyExceptions,
@@ -230,10 +292,12 @@ module.exports = {
   normalize,
   pageDir,
   fileDir,
+  toPosix,
   EXTERNAL,
   LINK_ATTR,
   HTML_OUTPUT,
   CODE_DISPLAY,
   EXCEPTIONS_FILE,
   LEGACY_EXCEPTIONS_FILE,
+  CHECKS,
 };

@@ -2,8 +2,6 @@
 layout: frontend/core/minimal
 permalink: /test
 
-sitemap:
-  include: false
 meta:
   title: "Test page"
   description: "This is a test page for the Ultimate Jekyll Manager."

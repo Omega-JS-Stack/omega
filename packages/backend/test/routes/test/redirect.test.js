@@ -4,7 +4,9 @@
  * take a RELATIVE path — an absolute one would make it an open redirect at
  * whatever URL the backend is served from (#238).
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Redirect route (relative paths only)',
   type: 'group',
   tests: [
@@ -61,4 +63,4 @@ module.exports = {
       },
     },
   ],
-};
+});

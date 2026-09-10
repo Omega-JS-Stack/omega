@@ -21,9 +21,10 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-capture
  */
-const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
 
 const FIXTURE_CAPTURE = require('../../../fixtures/paypal/capture-completed.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const CAPTURE_ID = FIXTURE_CAPTURE.id;
 const CAPTURE_ENDPOINT = `/v2/payments/captures/${CAPTURE_ID}`;
@@ -56,7 +57,7 @@ function requestReturning(responses, calls) {
   };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal fetchResource() capture retrieval',
   type: 'group',
 
@@ -119,4 +120,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -7,6 +7,8 @@
  * - Renames `plan` → `subscription`
  * - Transforms flat `subscription.id` (string) → `subscription.product` (object)
  * - Renames `subscription.trial.activated` → `subscription.trial.claimed`
+ * - Moves `oauth2.<provider>` → `connections.<provider>`, stamping each
+ *   record with `type: 'oauth2'`, and deletes the original (#788)
  * - Removes deprecated payment/limits/trial/affiliate fields
  * - Migrates legacy timestamps → metadata.* and reconciles metadata.created
  *   against Firebase Auth's canonical creation time
@@ -181,7 +183,7 @@ const DEFAULT_USER = {
       national: 0,
     },
   },
-  oauth2: {},
+  connections: {},
   attribution: {
     affiliate: {
       code: null,
@@ -440,7 +442,7 @@ const schema = {
       },
     },
   },
-  oauth2: { type: 'object', required: true },
+  connections: { type: 'object', required: true },
   attribution: {
     type: 'object',
     required: true,
@@ -688,7 +690,79 @@ module.exports = async function ensureUsers(context) {
         };
       },
 
-      // Fix 4: Remove deprecated fields
+      // Fix 4: oauth2 → connections, each record stamped with its KIND
+      // ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)), and every
+      // record carrying the `identity.id` the connections route matches on
+      // ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)). The
+      // product concept is a CONNECTION and a connection will not always be an
+      // OAuth grant, so the field carries the product word and every record
+      // says which kind it is. The original is deleted in the same write (the
+      // standing ruling on moved fields). Both keys present keeps `connections`
+      // (written by current code, so newer) and drops the leftover, the same
+      // rule `payment-provider` follows.
+      //
+      // The BACKFILL runs over an existing `connections` map too, not only over
+      // what this run moves: the rename shipped before the id did, so a document
+      // moved by the #788 code has no `oauth2` left to trigger anything and
+      // would never gain one. A document that needs neither the move nor the
+      // backfill writes nothing at all.
+      (data) => {
+        const hasLegacy = data.oauth2 !== undefined;
+        const existing = (data.connections && typeof data.connections === 'object') ? data.connections : {};
+
+        if (!hasLegacy && Object.keys(existing).length === 0) {
+          return null;
+        }
+
+        const legacy = (data.oauth2 && typeof data.oauth2 === 'object') ? data.oauth2 : {};
+        const moved = { ...existing };
+
+        for (const [provider, record] of Object.entries(legacy)) {
+          if (provider in moved) {
+            continue;
+          }
+
+          moved[provider] = (record && typeof record === 'object')
+            ? { ...record, type: 'oauth2' }
+            : record;
+        }
+
+        // A record written before the id existed carries whatever its provider
+        // answered: Google's `sub`, Kick's numeric `user_id`. The id is filled
+        // in beside them — as a STRING, which is what the query compares — and
+        // nothing is deleted: the identity is stored as the provider gave it.
+        let backfilled = false;
+
+        for (const [provider, record] of Object.entries(moved)) {
+          if (!record || typeof record !== 'object') {
+            continue;
+          }
+
+          const identity = record.identity;
+
+          if (!identity || typeof identity !== 'object' || typeof identity.id === 'string') {
+            continue;
+          }
+
+          const stableId = identity.sub ?? identity.user_id ?? identity.id;
+
+          if (stableId === undefined || stableId === null || stableId === '') {
+            continue;
+          }
+
+          // A COPY, never a mutation of the document data this audit is reading
+          moved[provider] = { ...record, identity: { ...identity, id: `${stableId}` } };
+          backfilled = true;
+        }
+
+        if (!hasLegacy) {
+          return backfilled ? { connections: moved } : null;
+        }
+
+        return { connections: moved, oauth2: FieldValue.delete() };
+      },
+
+      // Fix 5: Remove deprecated fields
       (data) => {
         const updates = {};
         let hasUpdates = false;
@@ -726,7 +800,7 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 5: Fix affiliate.referrals from object to array,
+      // Fix 6: Fix affiliate.referrals from object to array,
       // and migrate affiliate.referrer → attribution.affiliate.code
       // NOTE: affiliate.referrer stored the referrer's UID, not their affiliate code.
       // We resolve the UID to the actual affiliate code via DB lookup.
@@ -754,14 +828,14 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 6: Migrate legacy timestamps → metadata.created/updated
+      // Fix 7: Migrate legacy timestamps → metadata.created/updated
       // Falls back to the document's server createTime/updateTime if no legacy fields exist
       createMetadataFix({
         legacyCreatedFields: ['activity.created', 'created'],
         legacyUpdatedFields: ['activity.lastActivity', 'updated'],
       }),
 
-      // Fix 7: Reconcile metadata.created against Firebase Auth's creationTime.
+      // Fix 8: Reconcile metadata.created against Firebase Auth's creationTime.
       // Auth is the canonical source for account creation — if the doc's value differs,
       // overwrite with auth's. The user record was cached in Fix 0 so no extra API call.
       (data, doc) => {
@@ -786,7 +860,7 @@ module.exports = async function ensureUsers(context) {
         };
       },
 
-      // Fix 8: Backfill auth.uid and auth.email from Firebase Auth when missing.
+      // Fix 9: Backfill auth.uid and auth.email from Firebase Auth when missing.
       // Some users end up in Firestore without the signup trigger ever running
       // (trigger silently dropped at create time, or the doc was incrementally
       // built by middleware writes only). Firebase Auth is the canonical source —
@@ -809,7 +883,7 @@ module.exports = async function ensureUsers(context) {
         return Object.keys(updates).length > 0 ? updates : null;
       },
 
-      // Fix 9: Flatten personal.company from string to object
+      // Fix 10: Flatten personal.company from string to object
       (data) => {
         if (typeof data.personal?.company !== 'string') {
           return null;
@@ -822,9 +896,9 @@ module.exports = async function ensureUsers(context) {
         };
       },
 
-      // Fix 10: Backfill consent for existing users (implicit grant at signup).
+      // Fix 11: Backfill consent for existing users (implicit grant at signup).
       // Runs before the defaults backfill so derived values aren't overwritten
-      // by DEFAULT_USER nulls. metadata.created is finalized by Fix 6/7;
+      // by DEFAULT_USER nulls. metadata.created is finalized by Fix 7/8;
       // activity.geolocation.ip is on the doc or null.
       (data) => {
         if (data.consent?.legal?.status === 'granted') {
@@ -854,9 +928,9 @@ module.exports = async function ensureUsers(context) {
         };
       },
 
-      // Fix 11: Reconcile consent.{legal,marketing}.grantedAt against metadata.created.
+      // Fix 12: Reconcile consent.{legal,marketing}.grantedAt against metadata.created.
       // Existing granted consents were backfilled from whatever metadata.created was at
-      // the time — now that Fix 7 pulls the canonical creation time from Firebase Auth,
+      // the time — now that Fix 8 pulls the canonical creation time from Firebase Auth,
       // any pre-existing grantedAt timestamps that don't match should be corrected.
       (data) => {
         const createdTimestamp = data.metadata?.created?.timestamp;
@@ -880,13 +954,13 @@ module.exports = async function ensureUsers(context) {
         return Object.keys(updates).length > 0 ? updates : null;
       },
 
-      // Fix 12: Fold the legacy attribution.utm blob → attribution.first/last.
-      // Runs before the defaults backfill for the same reason Fix 10 does: once
+      // Fix 13: Fold the legacy attribution.utm blob → attribution.first/last.
+      // Runs before the defaults backfill for the same reason Fix 11 does: once
       // the backfill has written the empty touches, the fold reads them as an
       // earlier migration's work and drops the blob it should have folded.
       createAttributionFoldFix(),
 
-      // Fix 13: Backfill all missing fields with defaults
+      // Fix 14: Backfill all missing fields with defaults
       (data) => {
         const merged = deepMergeDefaults(data, DEFAULT_USER);
 
@@ -902,7 +976,7 @@ module.exports = async function ensureUsers(context) {
         return Object.keys(updates).length > 0 ? updates : null;
       },
 
-      // Fix 14: Generate dynamic values for empty fields
+      // Fix 15: Generate dynamic values for empty fields
       // The @omega.js/backend user schema generates these at signup: affiliate.code, api.clientId, api.privateKey
       (data) => {
         const updates = {};
@@ -926,7 +1000,7 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 15: Normalize empty strings and old sentinel values to null
+      // Fix 16: Normalize empty strings and old sentinel values to null
       // Old defaults used '' for unknown strings and '127.0.0.1'/'ZZ'/'Unknown' for geolocation
       (data) => {
         const NULLABLE_FIELDS = [
@@ -974,10 +1048,10 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 16: Recursively trim whitespace from all string values
+      // Fix 17: Recursively trim whitespace from all string values
       createSanitizeFix(),
 
-      // Fix 17: Reset null values to their correct defaults for non-nullable fields
+      // Fix 18: Reset null values to their correct defaults for non-nullable fields
       (data) => {
         const RESET_MAP = {
           // Timestamps should never be null — reset to epoch
@@ -1026,8 +1100,8 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 18: Migrate usage.*.period → usage.*.monthly + add usage.*.daily
-      // Sets the whole usage.{metric} object to avoid dot-notation conflicts with Fix 19
+      // Fix 19: Migrate usage.*.period → usage.*.monthly + add usage.*.daily
+      // Sets the whole usage.{metric} object to avoid dot-notation conflicts with Fix 20
       (data) => {
         if (!data.usage || typeof data.usage !== 'object') {
           return null;
@@ -1067,7 +1141,7 @@ module.exports = async function ensureUsers(context) {
         return hasUpdates ? updates : null;
       },
 
-      // Fix 19: Delete any usage key where total == 0 (unused placeholder)
+      // Fix 20: Delete any usage key where total == 0 (unused placeholder)
       // @omega.js/backend creates usage keys on first use — no need for zero-total placeholders.
       (data) => {
         if (!data.usage || typeof data.usage !== 'object') {

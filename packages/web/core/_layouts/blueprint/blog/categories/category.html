@@ -1,5 +1,8 @@
 ---
 layout: frontend/pages/blog/categories/category
+
+meta:
+  index: false      # #564: noindex, and out of sitemap.xml with it
 ---
 
 {{ content | omega_content_format }}

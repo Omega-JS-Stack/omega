@@ -19,6 +19,26 @@ const redactSecret = require('./redact-secret.js');
 const CREDENTIAL_HEADERS = ['authorization', 'omega-admin-key', 'cookie'];
 const CREDENTIAL_DATA_KEYS = ['apikey', 'authenticationtoken'];
 
+// The credential FAMILIES a RESPONSE carries, at any depth. `GET /omega/user`
+// answers the whole user record, so the response log line printed every
+// connected provider's token and the caller's own key
+// ([#796](https://github.com/Omega-JS-Stack/omega/issues/796)). A key is
+// matched by its NORMALIZED spelling (lower-cased, `-` and `_` stripped), so
+// `access_token`, `accessToken` and `Access-Token` are one key and every
+// provider's spelling is covered by the family it ends with: `token` catches
+// the OAuth pair, the `signInToken` an admin custom token rides, and
+// `authenticationToken`; `apikey` and `privatekey` catch `api_key` /
+// `privateKey`; `secret` catches `clientSecret` and `webhook_secret`.
+const CREDENTIAL_RESPONSE_SUFFIXES = ['secret', 'token', 'password', 'privatekey', 'apikey'];
+
+// The credential names no family suffix catches.
+const CREDENTIAL_RESPONSE_KEYS = ['sessioncookie'];
+
+// What a credential that is not a string logs as. A connection's whole `token`
+// object IS the credential (the access and refresh pair together), so it is
+// replaced as one piece instead of being walked key by key.
+const REDACTED_OBJECT = '***(redacted object)';
+
 // The `test/` route folder is DEVELOPMENT-ONLY: it exists to exercise the
 // framework (echo the settings engine, increment a usage counter, reset a
 // seeded persona), and nothing in it belongs at a production URL.
@@ -214,14 +234,15 @@ Middleware.prototype.run = function (libPath, options) {
     }
 
     // Setup user
-    if (!options.setupUsage && options.authenticate) {
+    if (options.authenticate) {
       await ctx.authenticate();
     }
 
-    // Setup usage
+    // Setup usage — LAZY ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)):
+    // attaching costs nothing, and the counter resolves the account on its
+    // first consume()/read(), so a route that never counts never pays for one
     if (options.setupUsage) {
-      // ctx.usage = await Manager.Usage().init(ctx, {log: ctx.isProduction()});
-      ctx.usage = await Manager.Usage().init(ctx, {log: false});
+      ctx.usage = Manager.Usage().attach(ctx, {log: false});
     }
 
     // Log working user
@@ -231,8 +252,7 @@ Middleware.prototype.run = function (libPath, options) {
 
     // Setup analytics
     if (options.setupAnalytics) {
-      const uuid = ctx?.usage?.user?.auth?.uid
-        || ctx.request.user.auth.uid
+      const uuid = ctx.request.user.auth.uid
         || ctx.request.geolocation.ip
         || 'unknown'
 
@@ -430,6 +450,70 @@ function redactDataForLog(data) {
   return redactChannels(data, CREDENTIAL_DATA_KEYS, (value) => redactSecret(value));
 }
 
+/**
+ * The response a log line may carry: a DEEP copy with every credential key
+ * rendered by `redactSecret()`, at any depth and whatever its case.
+ *
+ * The route logger's `Sending response` line stringifies whatever a route
+ * answers, and `GET /omega/user` answers the whole user record: every
+ * `connections.<provider>.token` plus `api.privateKey` landed in Cloud Logging
+ * on every read ([#796](https://github.com/Omega-JS-Stack/omega/issues/796)).
+ * [#275](https://github.com/Omega-JS-Stack/omega/issues/275) gave the request
+ * side of that line this treatment; this is the response side. A copy because
+ * the object is what `res.json()` sends next.
+ * @param {*} response - Whatever respond() is about to send.
+ * @returns {*} A copy safe to log; anything that is not an object passes through.
+ */
+function redactResponseForLog(response) {
+  if (!response || typeof response !== 'object') {
+    return response;
+  }
+
+  // Anything that serializes itself is walked through THAT shape: the copy
+  // reads own properties, and a Date has none, so a walked Date logged as `{}`
+  // where JSON.stringify would have shown its ISO string.
+  if (typeof response.toJSON === 'function') {
+    return redactResponseForLog(response.toJSON());
+  }
+
+  if (Array.isArray(response)) {
+    return response.map((item) => redactResponseForLog(item));
+  }
+
+  const redacted = {};
+
+  for (const [key, value] of Object.entries(response)) {
+    if (!isCredentialResponseKey(key)) {
+      redacted[key] = redactResponseForLog(value);
+
+      continue;
+    }
+
+    // An absent credential says so: "no token stored" is a diagnostic the line
+    // exists for, and it gives nothing away. A flag or a count under a
+    // credential-shaped name (`hasPassword: true`) is not a secret either.
+    if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') {
+      redacted[key] = value;
+    } else {
+      redacted[key] = typeof value === 'string' ? redactSecret(value) : REDACTED_OBJECT;
+    }
+  }
+
+  return redacted;
+}
+
+/**
+ * Whether a response key names a credential, separator and case insensitively.
+ * @param {string} key - The key as the response spells it.
+ * @returns {boolean}
+ */
+function isCredentialResponseKey(key) {
+  const name = key.toLowerCase().replace(/[-_]/g, '');
+
+  return CREDENTIAL_RESPONSE_KEYS.includes(name)
+    || CREDENTIAL_RESPONSE_SUFFIXES.some((suffix) => name.endsWith(suffix));
+}
+
 // Helper to safely stringify objects by truncating long strings (like base64)
 function safeStringify(obj, maxLength = 100) {
   const truncate = (value) => {
@@ -451,6 +535,7 @@ Middleware.isRouteOutsideRoutesDir = isRouteOutsideRoutesDir;
 Middleware.projectUserForLog = projectUserForLog;
 Middleware.redactHeadersForLog = redactHeadersForLog;
 Middleware.redactDataForLog = redactDataForLog;
+Middleware.redactResponseForLog = redactResponseForLog;
 Middleware.DEV_ONLY_ROUTE_FOLDER = DEV_ONLY_ROUTE_FOLDER;
 
 module.exports = Middleware;

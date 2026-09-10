@@ -5,7 +5,9 @@
  *
  * Run: npx omega test backend:routes/verts/redirect
  */
-module.exports = {
+
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Verts redirect route (fail-closed)',
   type: 'suite',
   tests: [
@@ -142,4 +144,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -30,7 +30,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The subscriber Stripe's own record names, and the uid the forged event claims
 const OWNER_UID = '_test-refusal-report-owner';
@@ -99,7 +100,7 @@ function sdkThrowing(error) {
   return { subscriptions: { retrieve: async () => { throw error; } } };
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A refused payment webhook reports one Sentry warning; a processed one reports nothing',
   type: 'group',
   timeout: 30000,
@@ -190,4 +191,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -156,14 +156,17 @@ function runCodemod(root, options = {}) {
       const original = fs.readFileSync(filePath, 'utf8');
       const { text, edits, findings: fileFindings } = apply(original, path.relative(root, filePath));
       findings.push(...fileFindings);
+      // The WRITE answers to the text, not to the bookkeeping: a rule that
+      // changes a file and reports no edit still has to reach the disk, or the
+      // run prints a repair it never made.
+      if (options.write && text !== original) fs.writeFileSync(filePath, text);
       if (edits.length === 0) continue;
       totalEdits += edits.length;
       results.push({ path: path.relative(root, filePath), edits });
-      if (options.write && text !== original) fs.writeFileSync(filePath, text);
     }
   }
 
   return { files: results, findings, totalEdits };
 }
 
-module.exports = { runCodemod, applyRules, applyJsRules, applyJsonRules, collectTemplateFiles, TEMPLATE_EXTENSIONS };
+module.exports = { runCodemod, applyRules, applyJsRules, applyJsonRules, collectTemplateFiles, collectScriptFiles, TEMPLATE_EXTENSIONS };

@@ -5,8 +5,9 @@
 const path = require('path');
 
 const expect = require(path.join(__dirname, '..', '..', 'assert.js'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'expect() — matcher self-test',
@@ -44,4 +45,4 @@ module.exports = {
       await expect(() => { throw new Error('boom: 42'); }).toThrow(/42$/);
     } },
   ],
-};
+});

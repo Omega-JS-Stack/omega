@@ -14,8 +14,9 @@
  *
  * Run: npx omega test backend:routes/payments/intent-one-time-metadata
  */
-const StripeLib = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const stripeIntent = require('../../../src/manager/routes/payments/intent/providers/stripe.js');
+const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const stripeIntent = require('../../../dist/manager/routes/payments/intent/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-intent-metadata-uid';
 const ORDER_ID = '1212-3434-5656';
@@ -87,7 +88,7 @@ async function createOneTimeIntent() {
   return captured.params;
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Payment intent: one-time charge metadata',
   type: 'group',
   timeout: 15000,
@@ -118,4 +119,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -29,3 +29,7 @@ firebase.resolved.json
 _attic/
 .workkit/*
 !.workkit/settings.json
+
+# Rendered per rehearsal by scripts/playground-desktop-rehearsal.js: it lives in
+# the private rehearsal snapshot repo only, never in this tree.
+/.github/workflows/playground-desktop.yml

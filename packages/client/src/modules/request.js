@@ -13,6 +13,8 @@
  *   getApiUrl()          -> base API url (required for route-relative paths)
  *   getIdToken(force)    -> fresh Firebase ID token, or null when signed out
  *   onProperties(props)  -> optional; called with the parsed omega-properties object
+ *   onUnauthorized()     -> optional; called (never awaited) when an authenticated
+ *                           request comes back 401 (the session probe, #798)
  *
  * `wakeup: true` is the one option that changes the SHAPE of the call: it warms
  * a cold backend and returns nothing (see the branch below).
@@ -122,6 +124,16 @@ function createRequest(deps) {
     const data = await parseBody(response);
 
     if (!response.ok) {
+      // A 401 on an authenticated call is a moment of doubt
+      // ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): the
+      // backend refused this token, so ask the Auth server whether the session
+      // still exists at all. Never awaited and never fatal: the caller's error
+      // must not wait on a token refresh, and a probe that fails is not this
+      // request's failure.
+      if (options.auth !== false && response.status === 401) {
+        Promise.resolve(deps.onUnauthorized?.()).catch(() => {});
+      }
+
       const message = (data && typeof data === 'object' && data.message)
         || (typeof data === 'string' && data)
         || `Request failed with status ${response.status}`;

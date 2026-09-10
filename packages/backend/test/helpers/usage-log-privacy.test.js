@@ -2,19 +2,24 @@
  * Usage log-privacy test — a usage line names the counter it moved, never the document.
  *
  * `Usage` holds the WHOLE user document (`self.user`) so it can read and write the
- * counters on it, and three of its lines used to hand that document to the logger:
- * the init line and the increment/set lines. The document carries `api.privateKey`,
- * consent, the request IP and attribution, and a backend line lands in Cloud Logging
- * for the whole retention window — the live logs had the private key in them
- * ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
+ * counters on it, and its lines used to hand that document to the logger. The document
+ * carries `api.privateKey`, consent, the request IP and attribution, and a backend line
+ * lands in Cloud Logging for the whole retention window — the live logs had the private
+ * key in them ([#632](https://github.com/Omega-JS-Stack/omega/issues/632)).
  *
- * Plain-node unit test (no emulator, no network): `init()` authenticates through the
+ * The promise survives the `consume` rewrite
+ * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)): the two lines that
+ * exist now — the resolve line and the count line — name the account and the counter
+ * and nothing else.
+ *
+ * Plain-node unit test (no emulator, no network): the counter authenticates through the
  * ctx it is handed, so the document under test is the one this file supplies and the
  * assertions read the captured log output.
  */
 const assert = require('node:assert');
 
-const Usage = require('../../src/manager/helpers/usage.js');
+const Usage = require('../../dist/manager/helpers/usage.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The leak fixture: a user document shaped the way ctx.authenticate() resolves one.
 const LEAKED_KEY = 'sk_test_fake_leak';
@@ -28,14 +33,18 @@ const USER_DOC = {
   usage: { requests: { total: 10, monthly: 4, daily: 2 } },
 };
 
-/** One Usage lifecycle: init, increment, set — and every line all three wrote. */
+/** One counter lifecycle: attach, consume — and every line it wrote. */
 async function captureUsage() {
   const captured = [];
   const record = (...args) => captured.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
 
   const Manager = {
-    config: { payment: { products: [{ id: 'basic', limits: { requests: 100 } }] } },
-    storage: () => ({ get: () => ({ value: () => ({}) }) }),
+    config: {
+      features: { requests: { name: 'API Requests', usage: { pace: false } } },
+      payment: { products: [{ id: 'basic', features: { requests: 100 } }] },
+    },
+    storage: () => ({ get: () => ({ value: () => ({}) }), set: () => ({ write: () => {} }) }),
+    libraries: {},
   };
 
   const ctx = {
@@ -43,15 +52,23 @@ async function captureUsage() {
     warn: record,
     error: record,
     isDevelopment: () => true,
+    report: (e, opts) => {
+      const error = e instanceof Error ? e : new Error(e);
+      error.code = (opts || {}).code || 500;
+      return error;
+    },
     authenticate: async () => JSON.parse(JSON.stringify(USER_DOC)),
     request: { data: {}, geolocation: { ip: '203.0.113.7' } },
   };
 
   const usage = new Usage(Manager);
 
-  await usage.init(ctx, { log: true });
-  usage.increment('requests', 1);
-  usage.set('requests', 7);
+  usage.attach(ctx, { log: true });
+
+  // The write is the one thing that would need Firestore — the LINES are the subject
+  usage.write = async () => {};
+
+  await usage.consume('requests', 1);
 
   return { captured, usage };
 }
@@ -59,18 +76,18 @@ async function captureUsage() {
 let run;
 const usageRun = () => (run = run || captureUsage());
 
-module.exports = {
+module.exports = defineCases({
   description: 'Usage log privacy (counters named, the user document never serialized)',
   type: 'group',
   tests: [
     {
-      name: 'init() line names the user and its usage, not the document',
+      name: 'resolve() line names the user and its usage, not the document',
 
       async run() {
         const { captured } = await usageRun();
-        const line = captured.find((l) => l.includes('Usage.init(): Got user'));
+        const line = captured.find((l) => l.includes('Usage.resolve(): Resolved'));
 
-        assert.ok(line, `no Usage.init() line was logged: ${JSON.stringify(captured)}`);
+        assert.ok(line, `no Usage.resolve() line was logged: ${JSON.stringify(captured)}`);
         assert.ok(line.includes(UID), `line does not name the user: ${line}`);
         assert.ok(line.includes('"monthly":4'), `line lost the usage it is about: ${line}`);
         assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
@@ -78,27 +95,14 @@ module.exports = {
     },
 
     {
-      name: 'increment() line names the metric and its new value',
+      name: 'count() line names the feature and its new value',
 
       async run() {
         const { captured } = await usageRun();
-        const line = captured.find((l) => l.includes('Incremented requests'));
+        const line = captured.find((l) => l.includes('Counted 1 requests'));
 
-        assert.ok(line, `no increment line was logged: ${JSON.stringify(captured)}`);
-        assert.ok(line.includes('"monthly":5'), `line lost the incremented value: ${line}`);
-        assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
-      },
-    },
-
-    {
-      name: 'set() line names the metric and its new value',
-
-      async run() {
-        const { captured } = await usageRun();
-        const line = captured.find((l) => l.includes('Set requests'));
-
-        assert.ok(line, `no set line was logged: ${JSON.stringify(captured)}`);
-        assert.ok(line.includes('"monthly":7'), `line lost the value it set: ${line}`);
+        assert.ok(line, `no count line was logged: ${JSON.stringify(captured)}`);
+        assert.ok(line.includes('"monthly":5'), `line lost the counted value: ${line}`);
         assert.ok(!line.includes('privateKey'), `user document serialized into the log line: ${line}`);
       },
     },
@@ -114,4 +118,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -24,6 +24,8 @@
 // ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)). A getter that
 // hardcodes its port still fails these: on a bumped run it answers the classic
 // number while this reads the injected one.
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function localPort(name, classic) {
   return process.env[`OMEGA_${name}_PORT`] || classic;
 }
@@ -46,7 +48,7 @@ function withEnv(overrides, fn) {
   }
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Environment detection + URL helpers',
   type: 'group',
 
@@ -258,4 +260,4 @@ module.exports = {
       },
     },
   ],
-};
+});

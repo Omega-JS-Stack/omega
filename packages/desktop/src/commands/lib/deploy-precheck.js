@@ -8,7 +8,7 @@
  *
  *   framework freshness  the npm registry's latest vs the installed version
  *   validate-certs       the signing prereqs, soft (a warning, never fatal)
- *   provision-repos      the release/download repos config names (idempotent)
+ *   provision-repos      the public releases repo the config names (idempotent)
  *   push-secrets         the composed target env → GitHub Actions repo secrets
  *
  * Every step is soft: a precheck reports, the deploy proceeds. `--no-secrets`
@@ -20,54 +20,46 @@
  */
 const Manager = new (require('../../build.js'));
 const { runDeployPrecheck } = require('@omega.js/devkit/deploy-precheck');
+const { releasesRepo } = require('@omega.js/config');
 const { updateManager } = require('./dependencies.js');
+const { publishEnvSecrets } = require('../push-secrets.js');
 
 const package = Manager.getPackage('main');
 
 /**
- * Auto-provision the public release/download repos referenced in
- * config.releases / config.downloads. Idempotent: only creates if missing.
+ * Auto-provision the brand's ONE public releases repo, addressed by
+ * @omega.js/config's `releasesRepo` (`<brand.id>-releases` under the brand repo
+ * owner unless the config names another). Idempotent: only creates if missing.
+ * Config-only, never the git remote: a brand nested in another repo would
+ * provision under the enclosing repo's owner (#799).
+ *
+ * @param {object} input
+ * @param {Function} input.log - Progress line sink.
+ * @param {Function} input.warn - Warning sink.
+ * @param {object} [input.octokit] - Injectable client (tests); defaults to the GH_TOKEN one.
+ * @param {object} [input.config] - Injectable resolved config (tests).
  */
-async function provisionReleaseRepos({ projectDir, log, warn }) {
-  const { discoverRepo, getOctokit, ensureRepo } = require('../../utils/github.js');
-  const octokit = getOctokit();
-  if (!octokit) return;
+async function provisionReleaseRepos({ log, warn, octokit, config }) {
+  const { getOctokit, ensureRepo } = require('../../utils/github.js');
+  const client = octokit || getOctokit();
+  if (!client) return;
 
-  const config = Manager.getConfig() || {};
-  let appOwner;
-  try {
-    const discovered = await discoverRepo(projectDir);
-    appOwner = discovered.owner;
-  } catch (e) {
-    warn(`provision-repos: could not discover app owner (${e.message}). Set package.json repository.url.`);
+  const resolved = config || Manager.getConfig() || {};
+  if (resolved.releases?.enabled === false) return;
+
+  const { owner, name, repo } = releasesRepo(resolved);
+  if (!repo) {
+    warn('provision-repos: could not address the releases repo. Set repo.providers.github.org (or targets.desktop.releases.owner) and brand.id in config/omega.json5.');
     return;
   }
 
-  const targets = [];
-  if (config.releases?.enabled !== false) {
-    targets.push({
-      name:        'releases (auto-update feed)',
-      owner:       config.releases?.owner || appOwner,
-      repo:        config.releases?.repo || 'update-server',
-      description: `Public release artifacts + auto-update feed for ${appOwner}'s @omega.js/desktop apps. Managed by @omega.js/desktop.`,
-    });
-  }
-  if (config.downloads?.enabled !== false) {
-    targets.push({
-      name:        'downloads (fixed-name mirror)',
-      owner:       config.downloads?.owner || appOwner,
-      repo:        config.downloads?.repo || 'download-server',
-      description: `Fixed-name download mirror for ${appOwner}'s @omega.js/desktop apps. Managed by @omega.js/desktop.`,
-    });
-  }
+  const description = `Public release artifacts + auto-update feed for ${owner}'s @omega.js/desktop apps. Managed by @omega.js/desktop.`;
 
-  for (const t of targets) {
-    try {
-      const result = await ensureRepo(octokit, t.owner, t.repo, { description: t.description, private: false });
-      log(`provision-repos: ✓ ${result.created ? 'created ' : ''}${t.owner}/${t.repo}${result.created ? '' : ' already exists'} — ${t.name}`);
-    } catch (e) {
-      warn(`provision-repos: ✗ ${t.owner}/${t.repo} (${t.name}) — ${e.message}`);
-    }
+  try {
+    const result = await ensureRepo(client, owner, name, { description, private: false });
+    log(`provision-repos: ✓ ${result.created ? 'created ' : ''}${repo}${result.created ? '' : ' already exists'} — releases (auto-update feed + the site's download links)`);
+  } catch (e) {
+    warn(`provision-repos: ✗ ${repo} (releases) — ${e.message}`);
   }
 }
 
@@ -97,20 +89,16 @@ const STEPS = [
       if (!process.env.GH_TOKEN) {
         return log('(Skipping repo provisioning: GH_TOKEN not set.)');
       }
-      await provisionReleaseRepos({ projectDir, log, warn });
+      await provisionReleaseRepos({ log, warn });
     },
   },
   {
     name: 'push-secrets',
-    // No .env check: the target ships none of its own — the keys come from the
-    // composed target env (the brand root's .env, #678).
-    run: async ({ projectDir, log }) => {
-      require('@omega.js/config').loadEnv(projectDir);
-      if (!process.env.GH_TOKEN) {
-        return log('(Skipping push-secrets: GH_TOKEN not set in the .env cascade. Run `npx omega push-secrets` after filling it in.)');
-      }
-      await require('../push-secrets.js')({});
-    },
+    // No .env check and no PAT: the keys come from the composed target env (the
+    // brand root's .env, #678) and the transport is `gh`'s own auth session
+    // ([#682](https://github.com/Omega-JS-Stack/omega/issues/682)) — the same
+    // one-line call web and the extension make.
+    run: ({ projectDir, log, warn }) => publishEnvSecrets({ targetDir: projectDir, logger: { log, warn, error: warn } }),
   },
 ];
 

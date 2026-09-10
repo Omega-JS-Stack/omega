@@ -14,7 +14,8 @@
  * so this runs here directly — the wipe's own behavior against a real emulator
  * is proven in helpers/wipe-auth-project.
  */
-const TestCommand = require('../../src/cli/commands/test.js');
+const TestCommand = require('../../dist/cli/commands/test.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const PROJECT_ID = 'demo-omega-backend';
 
@@ -34,7 +35,7 @@ function buildCommand(testConfig) {
   return command.buildTestCommand(testConfig);
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'the test runner child is told which project it is testing',
   type: 'group',
 
@@ -111,4 +112,4 @@ module.exports = {
       },
     },
   ],
-};
+});

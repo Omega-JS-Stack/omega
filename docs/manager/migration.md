@@ -1,0 +1,203 @@
+# Migrating a legacy brand onto OMEGA
+
+> The per-brand playbook: the repeatable process that takes ONE legacy brand (a consumer of UJM / BEM / EM / BXM / WM, described by an `omega-manager` `.brands/<id>/config.json`) all the way to a live OMEGA brand monorepo. Six phases, each with exit criteria you can check by running a command or looking at a file.
+
+**Who runs this.** A brand-migration session, working inside the BRAND. Read [brand.md](brand.md) first (brand-root anatomy, the verbs, the brand hard rules), then work down this file. The monorepo's own sessions do not run migrations; they close the framework issues a migration files.
+
+**Boundaries, one job apiece.** [#148](https://github.com/Omega-JS-Stack/omega/issues/148) owns the breaking-changes register and the legacy-accommodation purge; this playbook POINTS at [../shared/breaking-changes.md](../shared/breaking-changes.md) per phase and never restates a row. [#40](https://github.com/Omega-JS-Stack/omega/issues/40) owns converter TOOLING (the `omega migrate` family); this playbook says when to run it, never how it is built. [#42](https://github.com/Omega-JS-Stack/omega/issues/42) (merged into [#149](https://github.com/Omega-JS-Stack/omega/issues/149)) owns the hard gate below.
+
+## Before you start: the two standing rules
+
+**1. The hard gate. Every run on a REAL brand starts with Ian's explicit go, per brand.** No exceptions, no "I was already in there". The gate is carried from [#42](https://github.com/Omega-JS-Stack/omega/issues/42): `somiibo` and `sweet-saucy` are named in it, and it binds every other real brand the same way. The first launch batch is `omega-brand`, ITW Creative Works, `somiibo`, `studymonkey`, `soundgrail`, `optiic`, `proxifly`; ITW carries one extra acceptance condition, its guest-post platform must work on the new stack. Two more standing facts: brands migrate SERIALLY (one at a time, so each new ruling sweeps the finished ones the same day), and the legacy password formula becomes a company owner hook (`config/hooks/account/password.js`, see [brand.md](brand.md#the-placement-contract--where-a-thing-lives-and-what-refreshes-it)) at migration time, never a re-implementation in the brand.
+
+**2. Upstream-first, and file and skip.** A defect every consumer would hit belongs in the FRAMEWORK, not in this brand. File the omega issue and leave the consumer alone: the upstream fix repairs every brand at once, and a broken surface in an unlaunched brand costs nothing, because no brand goes live until the batch cuts over together. Retired anti-patterns from the first wave: hand-authored social shortlink redirect pages ([#429](https://github.com/Omega-JS-Stack/omega/issues/429) generates them from the socials config) and a brand-side built-output link test ([#430](https://github.com/Omega-JS-Stack/omega/issues/430) made it native to `omega test`). Never author consumer security rules that exist or belong at framework level: consumer rules are for brand-custom collections and docs only. The full rule, and its "within reason" line: [brand.md § Working locally against the framework](brand.md#working-locally-against-the-framework-upstream-first) and [../shared/local-dev.md](../shared/local-dev.md).
+
+## Phase 1 - Assessment
+
+Produce a per-brand worksheet ISSUE on the omega repo naming every contract this brand touches and the manual migration step for each. The worksheet is the migration's record: decisions, deferrals and carried legacy defects all land on it.
+
+1. **Walk the register.** Work down [../shared/breaking-changes.md](../shared/breaking-changes.md), section by section, for every legacy framework this brand consumes. Copy nothing: cite the row. The cross-cutting section applies to every brand.
+2. **Inventory the WHOLE legacy `.brands/<id>/` directory, not just `config.json`.** `ls` the directory and account for EVERY file on the worksheet. The non-obvious carriers that were dropped twice in a row: `chatsy.md` / `replyify.md` (live-agent knowledge sidecars, they belong at `config/` byte-identical, or the first `omega manage` OVERWRITES the live agents' brand knowledge), `seo.json` (becomes `config/seo.json5`, the parasite-SEO entries), and `_config.yml`'s `brand.type` (feeds the Organization JSON-LD `@type`).
+3. **Read the state file too.** The Firebase SDK config is NOT in the legacy brand config: `.brands/<id>/config.json` carries only `firebase: { shared, projectId }`, and the full block lives in `.output/<id>/state.json` under `firebase.sdkConfig`. Every omega-manager-era conversion reads BOTH files. What each legacy state fact converts to is the register's [Two homes, not three](../shared/breaking-changes.md#two-homes-not-three--the-omegastatejson-cache-retired-434) section.
+4. **Diff the legacy `.env` key list against the composed one, and justify every key that did not carry.** Renaming a key is HALF the job: ported code still reading the old `process.env` name fails silently at runtime (one brand shipped `backendManagerKey: undefined` in an outbound body, swallowed). Grep the ported tree for every legacy env NAME as well as its value.
+5. **Extension-bearing brands have a fifth source file.** The extension's own GA Measurement Protocol secret lives in the legacy `<brand>-browser-extension/config/browser-extension-manager.json` at `analytics.providers.google.secret`; the brand `.env`'s `GOOGLE_ANALYTICS_SECRET` is the BACKEND stream's. Account for that analytics block explicitly (a blank id/secret pair means no action).
+6. **Inventory what the port can lose silently.** Each of these is a worksheet row before any code moves: every legacy COLLECTION (a collection nothing on the marketing pages reads drops silently and takes every byline with it), every legacy page's frontmatter KEYS (framework bands read them, and a band switched off drops the brand's own copy riding it), every hand-edit to the legacy `firestore.rules` (per-field protection added by editing the old managed block is not carried), every data-generated page FAMILY (build hook plus Firestore), and every EXTERNAL caller of the backend (crawlers, cron, sibling products, shipped apps).
+7. **A brand that declares a connection owes two by-hand steps** ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)). A worksheet row each, for every provider under the legacy `oauth2` block: rename its `OAUTH2_<PROVIDER>_CLIENT_ID`/`_CLIENT_SECRET` pair to `CONNECTIONS_<PROVIDER>_*` (brand `.env`, every `.env.<environment>` overlay, and the CI secrets), and register `<site>/connections/callback` as a redirect URI in that provider's own console BESIDE the old `/oauth2` one — a redirect URI is matched exactly, so the console edit lands before the deploy and the old URI is removed after it. The user DOCUMENTS are not by hand: `npx omega manage --migration=users --execute` moves them ([../shared/breaking-changes.md](../shared/breaking-changes.md#the-user-connection-feature-is-connections-788)).
+8. **Scope the content re-architecture separately.** A UJM site whose layouts read page frontmatter (one brand: 145 pages) needs sections or `_data/` designed as its OWN work item before the port starts. Meta-only frontmatter is not residue; it is the new contract ([../web/frontmatter.md](../web/frontmatter.md)).
+
+**Exit criteria**
+
+- A worksheet issue exists on the omega repo, labelled for this brand, listing every register row that applies and its manual step.
+- Every file in `.brands/<id>/` appears on the worksheet with its destination or an explicit "carries nothing" note.
+- The legacy `.env` key list appears on the worksheet, each key marked carried (with its new name) or justified as dropped.
+- The collections, frontmatter-key, rules-hand-edit, page-family and external-caller inventories are on the worksheet.
+
+## Phase 2 - Config conversion
+
+One target: a `config/omega.json5` at the brand root that the real loader accepts for every enabled target. Convert ONCE. Nothing dual-reads a legacy form (standing ruling, Ian 2026-07-06), so a key you leave behind is a validation error, never a silent fallback.
+
+1. **Use the mapping tables.** [../shared/config.md § Migration](../shared/config.md#migration--legacy-configs--omegajson5) is the SSOT, one table per legacy framework plus the retired-name and retired-path lists. `npx omega migrate` in a website target converts the UJM half for you ([../web/index.md](../web/index.md)); everything else is by hand. On a brand ALREADY on omega.json5, brand-root `npx omega migrate` deletes the retired keys in place ([index.md](index.md)); it removes the dead key and never guesses the new value.
+2. **Provisioned facts go to their REAL home.** A provisioned fact lands in `config/omega.json5` and a secret lands in the brand `.env`. Do not seed a `.omega/state.json`: its service-keyed content is retired and the file is now machine records only ([#434](https://github.com/Omega-JS-Stack/omega/issues/434)).
+3. **Keep legacy secret VALUES under the renamed keys.** `BACKEND_MANAGER_KEY`'s value becomes `OMEGA_ADMIN_KEY`'s value: webhooks and parent/child callers still authenticate with the old value. AI keys carry to the bare vendor names (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, [#639](https://github.com/Omega-JS-Stack/omega/issues/639)); dropping them silently disables contact inference.
+4. **GA streams are per target.** Legacy state carries one stream per surface. A website measurement id set at the SHARED level makes backend and extension inherit it and land their events in the website's stream. Override per stream at `targets.<type>.analytics.providers.google.id`, and give the extension its own `targets/extension/.env` with the extension stream's `GOOGLE_ANALYTICS_SECRET` (the target layer overrides the brand layer; verify it is gitignored).
+5. **A comment is not an opt-out.** Every legacy `<service>: false` must land as an explicit `enabled: false` under its new home, or the framework default re-enables the service and the next interactive manage run offers to create an agent the brand opted out of. Example: `inbound: { email: { providers: { replyify: { enabled: false } } } }`. Grep the legacy config for every `: false` and prove each one landed.
+6. **Add the FontAwesome root during conversion, not after the first warning-triangle build.** Pro-only icon names render the FA-free triangle with no error. Set `OMEGA_FONTAWESOME_ROOT` in the brand-root `.env` to the machine's staged Pro pack (fleet convention: `~/.omega/fontawesome`, holding `svgs/{solid,brands}`). It is a machine-local key and never enrolls as a CI secret; CI resolves Pro icons through the npm token lane instead ([../shared/icons.md](../shared/icons.md)).
+7. **Check the legacy consent switch.** `consent.enabled: false` beside loaded analytics providers is a legal-posture contradiction the schema itself calls out ([../shared/config.md § Consent](../shared/config.md#consent-clientconsent--383)). Preserve legacy parity in the config and file the decision as its own brand issue.
+8. **On ANY resumed migration, re-validate before trusting prior verification.** A paused migration's config rots: one brand validated clean on Aug 15 and no longer built on Aug 21, because four key shapes had retired in between. Re-run `loadConfig` for every target and reconcile against the register before continuing.
+9. **Review with two lenses, then score.** Lens one is value fidelity (does every carried value match the source byte for byte); lens two is an exhaustive source-key WALK (does every key in every source file have an accounted-for destination). The key-walk lens is the one that found a dropped App Check `siteKey` and the GA stream regression; fidelity alone found nothing. Run both on every brand's conversion.
+
+**Exit criteria**
+
+- `loadConfig` returns zero errors for every enabled target, run fresh (not a remembered result). One legacy shape to expect here: `cloud.apiSubdomain` is a BOOLEAN (`false` skips the `api.{domain}` hosting domain), never the subdomain string, and the loader rejects the string form loudly.
+- No retired key remains: brand-root `npx omega migrate --dry-run` prints nothing to remove.
+- Every legacy service opt-out appears as an explicit `enabled: false`; every legacy secret value appears under its new key name in `.env`; no secret-shaped key appears in `config/omega.json5`.
+- The two-lens review is recorded on the worksheet with its findings resolved.
+
+## Phase 3 - Repo restructure
+
+The shape is [brand.md § Brand root anatomy](brand.md#brand-root-anatomy): one repo, npm workspaces, `config/omega.json5` plus `.env` at the root, one dir per enabled target under `targets/`.
+
+1. **Repo birth order matters, twice.** Let `npx omega onboard` write `.gitignore` FIRST, then enable any session tooling and merge its lines in by hand: onboard fills gaps only and never touches an existing file, so enabling tooling first means the brand ignore set silently never lands. A later manage run heals only `.omega/`, `logs/` and `.env.*`; **`.env`, `node_modules/` and `dist/` never land at all**, which is how a commit ends up staging `.env`. And `gh repo create --clone` on an empty repo inits a local `master` while the org default is `main`, so the first push fails on `src refspec main does not match any`: run `git branch -m master main` before anything else. **The new repo's NAME is `<brand.id>-omega`**, the `<brand.id>-<role>` rule ([#809](https://github.com/Omega-JS-Stack/omega/issues/809)): `omega` is the source monorepo's role, beside the `<brand.id>-releases` repo a desktop target publishes to. The framework derives both, so the brand config types no repo name at all; a brand that keeps a pre-rule name (a legacy repo nobody is renaming) declares it once with `repo.providers.github.repo`. Every legacy brand repo is PRIVATE, websites included; the new one is too.
+2. **Merge the per-surface legacy repos into `targets/`.** `targets/website`, `targets/backend`, `targets/desktop`, `targets/extension` (register row: [omega-manager to @omega.js/manager](../shared/breaking-changes.md#omega-manager--omegajsmanager)). The word `apps/` is retired everywhere ([#443](https://github.com/Omega-JS-Stack/omega/issues/443)).
+3. **A brand that landed on `apps/` is fixed ONCE, by the registered migration.** `npx omega manage --migration=targets-rename --execute` (bare is the audit and moves nothing), then `npm install` at the brand root so npm re-links the workspaces. Nothing heals it inside a normal run and both folders at once fails loudly rather than guessing. Home: `packages/manager/src/services/migrations/ensure/targets-rename.js` ([migrations.md](migrations.md)). After it: grep the brand-AUTHORED files for `apps/` paths (the migration moves the folder, never your text), and re-validate the loader for both targets.
+4. **Composed CI workflows come from the composer, never from a hand.** A hand-written file carrying the "GENERATED" header is both wrong and silently overwritten on the next real run: one brand's hand-written extension publish workflow used a workflow-level `defaults.run.working-directory`, which also applies to the steps BEFORE `actions/checkout`, so the job died on step 1. The composer emits per-step working directories instead ([../shared/deploys.md § Scaffolded workflows](../shared/deploys.md#scaffolded-workflows--no-push-triggers)). On every pass that touches a brand, recompose each composed workflow at framework HEAD and diff it: a diff that is not a path change is framework drift and lands as its own `fix(ci)` commit. Nested `targets/<target>/.github/` copies are framework-generated strays; delete them in the migration commit.
+
+**Exit criteria**
+
+- The repo root holds `config/omega.json5`, `.env`, `package.json` with a `targets/*` workspaces glob, and `AGENTS.md` + `CLAUDE.md` per the doc chain.
+- `ls` shows `targets/` and no `apps/`, and `grep -r "apps/" ` over brand-authored files is empty.
+- `npm install` at the brand root links every target; `npx omega manage --service=workspace` reports no unmapped target.
+- Every `.github/workflows/*.yml` is composer output at framework HEAD, and no `targets/*/.github/` directory survives.
+
+## Phase 4 - Per-target migration
+
+One target at a time. A target is DONE when it builds, its suites are green, the linked local stack serves it, and its parity evidence is on the worksheet. Only then does the next target start. Lanes and scoping for every command below: [../shared/testing.md](../shared/testing.md#the-three-verification-tiers-what-runs-when).
+
+**Three rules that hold for every target.**
+
+- **A green build proves nothing about runtime.** Renamed identifiers, stripped frontmatter and dead bindings all fail silently. After every port, grep the consumer for every legacy identifier the framework renamed, then diff the rendered output against the legacy build.
+- **Finish with ZERO unknown-arg warnings.** Each one is a renamed arg to map or a dead key to delete. One brand rendered the framework's own CTA subline on 13 pages, with 160 tests green, because UJM's `description` is OMEGA's `subheadline` and dead args elsewhere had muted the channel.
+- **Legacy code is not a spec.** Port latent legacy bugs AS-IS for parity and flag each for a deliberate post-parity fix (fixing one changes behavior and cost). Leave an in-tree `carried from legacy` comment naming the worksheet issue, so nobody "fixes" one unannounced.
+
+### Website (`@omega.js/web`)
+
+1. Run `npx omega migrate --check` in `targets/website`, read every finding, then run `npx omega migrate`. It converts config, runs the codemods, and deletes the Ruby toolchain files ([../web/index.md](../web/index.md)). Its dependency-resolution scan is devkit's, shared with the backend's own `npx omega migrate` (backend phase, rule 10), so BOTH targets get scanned and neither can answer differently.
+2. Move the consumer's own modules directory out of `src/assets/js/modules/` before the first build (the fleet used `js/libs/`). That lane is DELETED, not reserved: nothing builds it in any layer, so its files ship nowhere and the build warns naming the directory. Put a consumer theme at `src/themes/<id>`, not the target root.
+3. A partial theme inherits classy's Bootstrap CONFIG, not just its CSS. Audit every knob classy re-values that the legacy theme left stock (type scale first) and restore through the `@forward 'omega:theme' with (…)` hatch. PREFIX the theme knobs before adding the hatch, or the un-prefixed names collide with the re-exported Bootstrap members.
+4. Re-derive any overridden base layout from the CURRENT base. Never copy the legacy file: the includes it calls have moved.
+5. Walk the band gates in both directions. Bands legacy showed must be ENABLED (several default `enabled: false`), demo surfaces legacy lacked must be switched OFF (the About photo band and the hero demo frame default ON with framework demo copy), and a page that authored copy for a band ENABLES the band and empties its demo args, never `false` (a `false` gate kills the brand's own copy riding the band). A legacy top-level `features:` frontmatter block is renamed (the index layout reads `resolved.bento`, and `features` is a config section now: [Plan limits become the features catalog](../shared/breaking-changes.md#plan-limits-become-the-features-catalog-647)).
+6. Pin the mastheads. A page that never set its own masthead renders the NEW theme's default, which differs from the old theme's. Pin legacy values through the sidecar heading args (`hero.headline` / `hero.headline_accent` / `hero.subheadline`), and pin the h1 for EVERY page in the parity suite with no exemptions: an exempted page is exactly where this class hides. The blog HUB is the usual miss (the framework ships "Thoughts, news and stories"): materialize it with `npx omega customize /blog` and set its hero copy in `blog.11tydata.json`.
+7. Pin CONTENT COUNTS, not just title/description/h1. Counts computed from source data are what catch an empty grid: LiquidJS does not resolve outer-scope variables inside a `where_exp` expression string the way Jekyll's did, so a ported filter renders empty grids with a green build, a green smoke run and 153 green parity tests. Capture the term into the expression as a literal instead.
+8. Spell page modules per page DIR (`js/pages/edit/index.js`), or reach for a `[name]` wildcard file for a page family. A 4-segment module is the historic silent drop ([#469](https://github.com/Omega-JS-Stack/omega/issues/469)).
+9. Data-generated page families port as: a frozen data snapshot vendored at the TARGET root (never `src/`), the build hook's selection / filter / slugify logic replayed as `_data` plus pagination templates, and parity defined as exact URL-set equality per family against the deployed legacy tree. Reproduce the hook's bugs and file the fixes.
+10. Diff every shortlink destination. Handle patterns can change destination ENTITY (`/company/` to `/in/`, `/artist/` to `/user/`); the `{ handle, redirect }` escape hatch restores the legacy target. Social shortlink redirect pages are generated from the socials config now, never hand-authored ([#429](https://github.com/Omega-JS-Stack/omega/issues/429)).
+11. There is no successor lane for UJM `pricing.plans` frontmatter: pricing presentation belongs in config `payment.products`. A sidecar `plans` array REPLACES the composed plans and blanks every amount.
+12. Sweep the built output for engine-dialect drift: LiquidJS `divided_by` is float where Jekyll's was integer, and markdown punctuation changed with the renderer ([#547](https://github.com/Omega-JS-Stack/omega/issues/547)).
+13. Never author a web `redirects` config key. Templated redirect rules live at the edge under `edge.providers.cloudflare.rules.redirect`; an enumerable redirect is a redirect PAGE ([edge.md](edge.md), and the register's UJM Redirects row).
+
+### Backend (`@omega.js/backend`)
+
+1. Rename `assistant` to `ctx` at every call site, and DELETE `respond()`'s `{ sentry: true }` option: codes at or above 500 auto-capture now.
+2. Consumer backends are src-first: legacy `functions/{routes,schemas,lib}` becomes `src/{routes,schemas,lib}`, and `dist/` is staged output.
+3. Rename every ported test file to `<concern>.test.js`. The runner matches `*.test.js` only, and a plain `.js` suite reports zero tests with no error ([#481](https://github.com/Omega-JS-Stack/omega/issues/481)).
+4. Convert declarative schemas whose fields are named `types` / `default` / `min` and friends to the zod `fields` form: the leaf detection collided with those names and resolved the whole schema to `{}`, so every request 400'd ([#256](https://github.com/Omega-JS-Stack/omega/issues/256)).
+5. Trace the middleware order before ruling that a port changed a route's surface. A consumer route with no settings schema 500s BEFORE its handler in BEM and in OMEGA alike (an empty `schemas/` throws, it does not pass through). Entry-shape drift is the sibling class: a stale cron doc shape means the job silently never runs ([#495](https://github.com/Omega-JS-Stack/omega/issues/495)).
+6. Prove rename-only parity by a NORMALIZED re-diff: the residue must be only the contract edits. The normalizer is what catches that OpenAI `assistant` ROLE STRINGS have to survive an `assistant` to `ctx` identifier rename.
+7. Rules: the brand's `firestore.rules` is a pure SOURCE seed now and the framework half compiles in ([#255](https://github.com/Omega-JS-Stack/omega/issues/255), [#353](https://github.com/Omega-JS-Stack/omega/issues/353)). Convert with `npx omega migrate:rules`, which is a RUN-ALONE verb and never a side effect of another one; pre-family markers convert with `npx omega migrate:markers` ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)). Decide the POSTURE first (phase 5, rule 1). Until then, pin the posture normalized-byte-equal against the real legacy file and re-declare any hand-edited per-field protection in your own `match /users/{uid}` block, which merges into the framework's.
+8. Run the target checks READ-ONLY while the brand is not deploying: `npx omega test --offline` blocks every live mutation the checks would make (index deploys, bucket lifecycle, seeding) and downgrades them to reported warnings ([#284](https://github.com/Omega-JS-Stack/omega/issues/284)). Let the index sync run before hand-writing indexes: the live project drifts both ahead of and behind the legacy indexes file.
+9. Prove the static lane is socket-free with a connect-trap preload: a static suite that opens a socket is a suite that will fail in CI for a reason unrelated to the port.
+10. Run `npx omega migrate` in the backend target and declare every bare require it names ([#600](https://github.com/Omega-JS-Stack/omega/issues/600)). BEM's FLAT install answered a route's bare `require('fs-jetpack')`; OMEGA's does only by hoisting, and the requires that carry this are LAZY, inside the handler, so the module loads fine and the route 500s on the first real request. The verb REPORTS (file, line, fix) and installs nothing: which version a brand wants is the brand's call. Run it in `targets/website` too, where the same scan rides `npx omega migrate --check`.
+11. Move every EXTERNAL caller before launch. The BEM `command:` wire format is gone: a legacy client posting `{ command: … }` to the bare `/backend-manager` prefix gets a silent 302, not an error. Each caller takes the one-line move to `POST /omega/admin/firestore` with a Bearer `OMEGA_ADMIN_KEY`. The URL alias itself stays on purpose ([Deliberate compatibility that REMAINS](../shared/breaking-changes.md#deliberate-compatibility-that-remains)); the wire format does not.
+
+### Desktop (`@omega.js/desktop`)
+
+No fleet brand has migrated a desktop target yet, so this lane has no field-proven traps of its own: work the register's [electron-manager section](../shared/breaking-changes.md#electron-manager--omegajsdesktop) row by row and add what you find to the trap register below.
+
+1. Swap the dependency and every `require('electron-manager/…')` path in `src/main.js`, `src/preload.js`, the renderer components, `gulpfile.js` and the tests.
+2. Rename the preload global (`window.em` to `window.desktop`), the theme attribute (`data-em-theme-set` to `data-omega-theme-set`), and the client bridge property (`manager.webManager` to `manager.omega`).
+3. Move the config per the mapping table, including the per-OS move (`targets.mac` / `.win` / `.linux` to `targets.desktop.platforms.*`) and the signing strategy key.
+4. On the signing box, by hand: the retired Windows runner logon keys are deleted and `WIN_CSC_LINK` is renamed to `WIN_EV_TOKEN_PATH`. Nothing reads the old names.
+5. Expect the shared config schema to report findings the legacy config carried silently, and fix them rather than muting them.
+
+### Extension (`@omega.js/extension`)
+
+1. Swap the dependency and the require paths, rename `data-wm-bind` to `data-omega-bind`, the `bxm:` cross-context commands to `omega:`, and the runtime singleton to `manager.omega`. A consumer on a pre-2.0.0 hook layout runs `npx omega migrate` once.
+2. Copy `config/icon.png` from the legacy repo. The packager silently PRUNES manifest icon entries whose files are missing, so a portless icon config ships an iconless extension. Copy `config/messages.json` too: it carries the store-visible name and description, and a missing one ships scaffold placeholders.
+3. Verify the packaged build carries the extension's static IMAGES (the missing lane was [#259](https://github.com/Omega-JS-Stack/omega/issues/259)) and that the production manifest carries no dev origin: the manifest is a UNION merge with framework defaults, so a consumer can add but historically could not remove ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)).
+4. `theme.id` is shared config but theme sets are per framework: a custom website theme needs `targets.extension.theme.id` set, or the extension sass build dies unactionably ([#261](https://github.com/Omega-JS-Stack/omega/issues/261)).
+5. Keep MV3 top-level constants synchronous with `%%% brand.url %%%` build tokens rather than a hardcoded host. Extension bundles get tokens only, never runtime dev ports.
+6. Boot tests that evaluate inside a Firebase-initializing service worker need a timeout well above the 20s default on the first run after a build.
+7. MV3 discipline survives the port: every listener registers above `new Manager()`, and only `setPanelBehavior` goes in the init promise.
+
+**Exit criteria (per target, before the next target starts)**
+
+- The target's production build exits 0 with zero unknown-arg warnings (`npx omega build` on every target type — the extension has the verb too since [#81](https://github.com/Omega-JS-Stack/omega/issues/81), and its `npm run build` is the thin alias of it).
+- `npx omega test` is green in the target (project scope), including the parity suite this port added.
+- The target is linked to the framework monorepo (`npx omega i local` in the target, ONE time, the link is durable) and the brand-root `omega dev` serves it, with the surface checked by hand against the legacy one ([../shared/local-dev.md](../shared/local-dev.md#brand-root-one-command-omega-dev-web--backend-together)).
+- The parity evidence is on the worksheet: the identifier grep, the rendered-output diff, the per-band or per-route counts, and every carried legacy defect with its in-tree comment.
+
+## Phase 5 - Deploy and cutover
+
+Cutover is per BRAND, not per target. Nothing here runs before every target has passed phase 4.
+
+1. **Decide the Firestore rules posture BEFORE the first deploy.** This is a launch decision, not a build detail: adopting the compiled artifact changes what the LIVE project enforces ([#522](https://github.com/Omega-JS-Stack/omega/issues/522)). Record the decision on the worksheet, run `npx omega migrate:rules` deliberately and alone, and re-pin the posture test to the decided state.
+2. **Deploy with the verb.** `omega deploy` at the brand root fans out in dependency order (backend, then web, then extension and desktop), and each target's own deploy verb runs ([../shared/deploys.md § The verb](../shared/deploys.md#the-verb--omega-deploy-on-every-target)). Commits and pushes never publish anything.
+3. **The real-Stripe step.** Put the REAL key in place, run `npx omega manage`, and CONFIRM the two Dashboard-only latches when the payment service prints their guidance: Radar rules and Enhanced Dispute Protection have no API, so `payment.providers.stripe.radarConfirmed` and `.disputesConfirmed` are the record that a human did it ([payment.md](payment.md)). A brand that skips this launches with the fraud posture unset and nothing to say so.
+4. **Recompose the CI workflows LAST.** The composer's secrets block derives from the env schema, so its list changes whenever the brand's `.env` keys change: one brand's workflow went stale by exactly one secret between compose and commit. Recompose after the final `.env` is settled, diff, commit.
+5. **Run the verify sweep.** `omega pipeline --verify` at the brand root runs `verify:site`, `verify:domain` and `verify:cloudflare` against the live surface and scores them like deploy legs ([../shared/deploys.md § One command, repo to live](../shared/deploys.md#one-command-repo-to-live--manage--deploy--verify-48)). A deployed brand that does not answer from the outside is not cut over.
+
+**Exit criteria**
+
+- The rules-posture decision is recorded on the worksheet and the live project matches it.
+- `omega deploy` at the brand root exits 0 for every target in one run.
+- The Stripe Radar and dispute latches are `true` in `config/omega.json5`, set by a real confirmation.
+- Every composed workflow is regenerated after the final `.env` and committed.
+- The verify sweep is green for the brand's canonical URL, its DNS, and its edge.
+
+## Phase 6 - Retirement
+
+1. **The legacy repo flips to read-only reference.** It keeps serving history and nothing more (AGENTS.md HARD RULE 1). Nothing in this playbook ever asks for a commit in a legacy repo.
+2. **Delete the orphaned functions.** The `bm_*` Cloud Functions keep RUNNING after the `omega_*` deploy renames them: repoint every trigger, scheduler and webhook first, then delete the old ones from the Firebase project.
+3. **Retire the central entry.** The brand's `.brands/<id>/` entry in omega-manager is dead once the brand carries its own `config/omega.json5`. Its DIRECTORY listing inverts rather than disappearing: the brand now PUSHES its own entry into the parent project's `brands` collection on every manage walk ([directory.md](directory.md)), so set `parent` and the opt-in blocks and let the walk write it.
+4. **Legacy infrastructure entries migrate per the standing rulings.** The brand's registry entry on the company server is the `server` service's ([server.md](server.md)); anything else legacy-side is a worksheet row with a named owner, never an orphan.
+5. **Redirect rules live at the edge.** There is no web-config redirect shape (the `targets.web.redirects` key shipped in 0.45.0 and was withdrawn). Legacy dashboard-authored rules move into `edge.providers.cloudflare.rules.redirect` so the zone has a declared source, and `omega manage` then owns the ruleset and REMOVES what config does not name.
+6. **The deliberate aliases stay.** `/backend-manager/*` and the other rows in [Deliberate compatibility that REMAINS](../shared/breaking-changes.md#deliberate-compatibility-that-remains) retire on their own named conditions, never because a migration finished.
+
+**Exit criteria**
+
+- The legacy repo is archived or otherwise marked read-only, and its README points at the brand monorepo.
+- No `bm_*` function remains in the Firebase project, and every trigger/scheduler/webhook names an `omega_*` function.
+- The brand's directory entry is present in the parent project and written by the brand's own walk.
+- The `.brands/<id>/` entry is retired, and every legacy infrastructure row on the worksheet is closed.
+- The worksheet issue is closed, pointing at the CHANGELOG entry or the cutover commit.
+
+## Trap register
+
+Classes that have no single phase step: framework regressions to note rather than work around, workarounds that a later ruling superseded, and lane gaps a port still hits by hand. Every issue below is the framework's own tracker, and each row is a VERIFICATION of what the framework now does, not a workaround. **A row's state is judged against the TREE this doc ships with, never against the issue's label**: a fix lands in the working tree before its issue closes, so read the code the brand is linked to and trust that.
+
+| Class | What it looks like | Tracked as |
+|---|---|---|
+| Non-image static assets | Audio and video under `src/assets` never reached `dist/`, so a ported alarm sound or video 404s live with a green build | [#295](https://github.com/Omega-JS-Stack/omega/issues/295) |
+| Taxonomy page meta | Every blog tag and category page shared the site title and description (one brand: 303 pages) | [#294](https://github.com/Omega-JS-Stack/omega/issues/294) |
+| A green build that is not green | `omega build` exited 0 on fatal config errors, so a scripted build proved nothing | [#426](https://github.com/Omega-JS-Stack/omega/issues/426) |
+| Opposite contracts on sibling args | The hero's two buttons obeyed opposite `enabled` rules, so a faithful port could invert them | [#438](https://github.com/Omega-JS-Stack/omega/issues/438) |
+| Bands with no opt-out | A section rendering unconditionally with hardcoded demo copy: keep its phrases OUT of the placeholder tripwire until the gate exists, or the suite is red by design | [#456](https://github.com/Omega-JS-Stack/omega/issues/456) |
+| Silently dropped page modules | A 4-segment page module shipped a page with no JS and no CSS, build green | [#469](https://github.com/Omega-JS-Stack/omega/issues/469) |
+| Invisible test suites | BEM-era plain `.js` test files are invisible to the OMEGA runner and report a false pass 0 | [#481](https://github.com/Omega-JS-Stack/omega/issues/481) |
+| Entry shapes that never run | A doc shape the runner never calls (a stale cron entry) means the job silently never fires | [#495](https://github.com/Omega-JS-Stack/omega/issues/495) |
+| Section defaults that are live demo copy | An absent key ships the framework's demo sentence onto a brand page | [#512](https://github.com/Omega-JS-Stack/omega/issues/512) |
+| A deploy chain that rewrites posture | `setup` plus `deploy` used to auto-fix a deferred `firestore.rules` in place, changing LIVE posture on the first deploy with no prompt | [#522](https://github.com/Omega-JS-Stack/omega/issues/522) |
+| Punctuation and number dialects | Kramdown smart punctuation lost on every post; LiquidJS `divided_by` is float where Jekyll's was integer | [#547](https://github.com/Omega-JS-Stack/omega/issues/547) |
+| Offline builds | `--cached-only` builds died offline on an auth-helper fetch | [#548](https://github.com/Omega-JS-Stack/omega/issues/548) |
+| Legacy Jekyll collections | The converter DROPS the legacy `collections:` block and emits one manual-step note per collection, because a Jekyll collection carries no grouping `field` and `targets.web.collections` requires one. Verify: one note per legacy collection in the migrate report, and no `collections` key in the converted config. Then, BY HAND, declare `targets.web.collections.<name>` with its `field` (the dotted frontmatter path its category pages group on) and move the documents to `src/_<name>/` | [#589](https://github.com/Omega-JS-Stack/omega/issues/589) |
+| `authorizedFetch` rewrite | The codemod carries the two dead shapes with the rename: it drops `response: 'json'` (the parsed body IS the return value) and rewrites `err.status` to `err.code`. Verify: no surviving `response: 'json'` or `err.status` on a rewritten call, and read the finding's own leftovers list (the `output` option, and the `/backend-manager/` route segment that is now `/omega/`) | [#594](https://github.com/Omega-JS-Stack/omega/issues/594) |
+| UJM per-render globals | The codemod hoists `{% assign random_id = 100 \| omega_random %}` above the first bare `random_id` read (under the frontmatter fence where there is one) and is idempotent. Verify: every file that reads `random_id` carries the assign, since the un-assigned read renders EMPTY and hands every repeated block on the page one shared id | [#595](https://github.com/Omega-JS-Stack/omega/issues/595) |
+| Bare requires in ported routes | A route's bare `require()` of a framework dependency resolved under the flat BEM install and does not under the linked OMEGA one. The scan runs on BOTH ported targets: `npx omega migrate` in the backend target and `npx omega migrate --check` in the website, one devkit module behind both. Verify: `npx omega migrate` names nothing in either target, and every package it named is in that target's own package.json (never installed for you) | [#600](https://github.com/Omega-JS-Stack/omega/issues/600) |
+| Fleet fan-out | There is no cross-brand runner: serial, one brand at a time, is the process | [#431](https://github.com/Omega-JS-Stack/omega/issues/431) |
+
+**Superseded, so do not carry them forward.**
+
+- **Array concat workarounds are retired.** Sidecar arrays REPLACE layout defaults at HEAD, JSON and `.11tydata.js` alike ([#269](https://github.com/Omega-JS-Stack/omega/issues/269), [#543](https://github.com/Omega-JS-Stack/omega/issues/543)), so the renamed-key and `eleventyComputed` workarounds are unnecessary for a new port. Earlier ports' renamed keys still work and need no revert.
+- **`omega setup` no longer exists**, so its live-mutation problem is not solved with PATH shims: the audit half runs inside `omega test` (`--offline` blocks every mutation) and the network half is a precheck inside `omega deploy`, opted out with `--no-secrets` on web, desktop and extension. The BACKEND has no separate precheck (its network steps are inside the verb itself), so it ACCEPTS `--no-secrets` and ignores it: parity of spelling, not of behavior ([#675](https://github.com/Omega-JS-Stack/omega/issues/675), [#284](https://github.com/Omega-JS-Stack/omega/issues/284)).
+- **Rules are not deferred to a supervised `setup` pass** any more: `npx omega migrate:rules` is the run-alone verb, taken deliberately with the posture decision made first.
+- **The `targets-rename` lib lives at `packages/manager/src/services/migrations/ensure/targets-rename.js`**, not at any `lib/` path, and the word `apps/` is retired throughout.

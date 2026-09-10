@@ -13,7 +13,7 @@ Light token-replacement engine for HTML pages. Uses `{{ var }}` syntax, dot-nota
    - Writes the final HTML to `dist/views/<name>/index.html`
 4. The page template auto-includes:
    - `assets/css/main.bundle.css` (compiled from `src/assets/scss/main.scss` by gulp/sass) — present on every page
-   - `assets/js/components/<page.name>.bundle.js` (per-view webpack output) — only the JS for this page
+   - `assets/js/components/<page.name>.bundle.js` (per-view renderer bundle) — only the JS for this page
 
 ## Page name
 
@@ -22,7 +22,7 @@ Light token-replacement engine for HTML pages. Uses `{{ var }}` syntax, dot-nota
 - `src/views/settings/index.html`    → `page.name = 'settings'`
 - `src/views/blog/post.html`         → `page.name = 'blog/post'`
 
-This naming lines up with the webpack renderer entry naming so the JS bundle path resolves correctly.
+This naming lines up with the renderer bundle's entry naming so the JS bundle path resolves correctly.
 
 ## Page template variables
 

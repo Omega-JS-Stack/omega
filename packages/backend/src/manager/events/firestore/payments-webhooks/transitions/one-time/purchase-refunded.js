@@ -10,12 +10,21 @@
  * getRefundDetails() and passed as a unified { amount, currency, reason } object,
  * the same ones on-write.js records on the order.
  *
- * NOTE: No email template exists for a refunded one-time purchase yet, so this
- * only logs — the same stub shape purchase-failed.js uses. The subscription twin
- * (subscription/payment-refunded.js) sends the 'order'/'refunded' email.
+ * The mail IS the subscription twin's (subscription/payment-refunded.js) — the same
+ * `order` template, the same `refunded` event, the same computed refund fields —
+ * so it is sent by that same handler rather than a second copy of it here (the
+ * winback delegation precedent). Only the log line names the one-time lane, and
+ * it says more: the amount that came back is this record's whole point. A
+ * customer refunded on a one-time purchase used to hear nothing at all — the
+ * handler was a log-only stub, so their only notice was the line on their
+ * statement ([#673](https://github.com/Omega-JS-Stack/omega/issues/673)).
  */
-module.exports = async function ({ before, after, order, uid, userDoc, ctx, refundDetails }) {
+const paymentRefunded = require('../subscription/payment-refunded.js');
+
+module.exports = async function (context) {
+  const { after, order, uid, ctx, refundDetails } = context;
+
   ctx.log(`Transition [one-time/purchase-refunded]: uid=${uid}, orderId=${order?.id}, product=${after?.product?.id}, amount=${refundDetails?.amount || 'unknown'} ${refundDetails?.currency || 'USD'}, reason=${refundDetails?.reason || 'none'}`);
 
-  // TODO: Send a one-time refund email once a template exists
+  return paymentRefunded(context);
 };

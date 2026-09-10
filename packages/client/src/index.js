@@ -52,6 +52,9 @@ class Manager {
       this._authReadyResolve = resolve;
     });
 
+    // The session probe's moments are registered ONCE per instance (#798)
+    this._sessionProbeMomentsWired = false;
+
     // Initialize modules
     this._storage = new Storage();
     this._utilities = new Utilities(this);
@@ -73,6 +76,10 @@ class Manager {
         ? this._auth.getIdToken(force)
         : null,
       onProperties: (properties) => mergeUsageIntoBindings(this._bindings, properties),
+      // A 401 is the third moment of doubt (#798): the backend refused this
+      // token, so the client asks the Auth server whether the session is still
+      // there at all. Fire-and-forget: the caller's error is unchanged.
+      onUnauthorized: () => this._auth.probeSession(),
     });
   }
 
@@ -625,6 +632,38 @@ class Manager {
         this._chatsy.setUser(resolved ? { id: resolved.uid, email: resolved.email, firstName: resolved.displayName, photoURL: resolved.photoURL } : null);
       }
     });
+
+    // The moments of doubt ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)).
+    // Firebase asks the Auth server about the persisted session on page load
+    // and at the hourly refresh and never again, so a revoked, disabled or
+    // deleted account (or a dev backend whose emulator restarted) keeps this
+    // tab signed in until a reload. The tab coming back into view and the
+    // network coming back are the two free moments to re-ask; the third is a
+    // 401 (wired as the request layer's onUnauthorized dep). No timer: a
+    // periodic ping would be a request per open tab for nothing.
+    if (!this._sessionProbeMomentsWired) {
+      this._sessionProbeMomentsWired = true;
+
+      // Swallowed at the call site: the probe classifies its own answer, so the
+      // only way it rejects is a sign-out that failed, and an event handler is
+      // nobody's promise to catch.
+      //
+      // The extension's background service worker has no document, and a
+      // headless host may carry neither
+      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            this._auth.probeSession().catch(() => {});
+          }
+        });
+      }
+
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('online', () => {
+          this._auth.probeSession().catch(() => {});
+        });
+      }
+    }
   }
 
   // Getters for Firebase services

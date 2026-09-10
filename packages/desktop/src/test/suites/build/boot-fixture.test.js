@@ -19,8 +19,9 @@ const Manager = require('../../../build.js');
 
 const package = Manager.getPackage('main');
 const fixture = require(path.join(__dirname, '..', '..', 'fixtures', 'consumer-app', 'package.json'));
+const defineCases = require('@omega.js/devkit/test/define-cases');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'boot fixture manifest — a converged consumer, so the boot layer runs offline',
@@ -44,4 +45,4 @@ module.exports = {
       },
     },
   ],
-};
+});

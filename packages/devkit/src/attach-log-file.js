@@ -7,6 +7,14 @@
 // Writes go to an open fd SYNCHRONOUSLY. A stream's buffer dies with the process, which
 // dropped exactly the lines describing a crash; the per-write syscall buys the crash tail.
 //
+// `append: true` opens the file for APPEND instead, for a log MORE THAN ONE process writes
+// (the signing box's runner log: a `runner start` parent, then every `sign-windows` its
+// listener spawns). Default is unchanged — one launch, one log.
+//
+// attach(filePath, { env, attachInCI, append }) — `env` is the environment the CI check
+// reads (the test seam), `attachInCI` keeps the tee on a runner, `append` keeps what the
+// last process wrote.
+//
 // The default export is a process-wide SINGLETON (the common case: one CLI verb tees its
 // whole run to one file). `createTee()` returns an INDEPENDENT tee. Tees STACK: an attach
 // captures the CURRENT writers — the raw stream, or an outer tee's patched writer — so
@@ -15,6 +23,9 @@
 // file, the way a shared singleton did.
 //
 // Skipped in CI: a runner has its own log capture and wants no logs/ left in the workspace.
+// `attachInCI: true` opts out of that skip, for a sink whose file is the POINT rather than
+// workspace debris (the signing box's own runner log, which a CI job is exactly when it
+// matters). Default is unchanged: every other caller still skips.
 //
 // `createChildLog()` is the sibling sink for output that never passes through this
 // process' writers at all — a SPAWNED child's piped stdout/stderr. See below.
@@ -46,8 +57,9 @@ function createTee() {
 
   function attach(filePath, options) {
     const env = (options && options.env) || process.env;
+    const attachInCI = Boolean(options && options.attachInCI);
 
-    if (!filePath || isCI(env)) { return NOOP_DETACH; }
+    if (!filePath || (isCI(env) && !attachInCI)) { return NOOP_DETACH; }
 
     const abs = path.resolve(filePath);
 
@@ -59,7 +71,7 @@ function createTee() {
     let fd;
     try {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fd = fs.openSync(abs, 'w');
+      fd = fs.openSync(abs, options && options.append ? 'a' : 'w');
       fs.writeSync(fd, `# omega log — ${new Date().toISOString()} — pid=${process.pid}\n`);
     } catch (e) {
       // A log file we cannot open is a lost log, never a lost process — the tee exists to

@@ -2,8 +2,6 @@
 layout: frontend/core/base
 permalink: /test/libraries/verts
 
-sitemap:
-  include: false
 meta:
   title: "Vert unit test page"
   description: "Test page for demonstrating verts/unit section types"
@@ -30,7 +28,7 @@ meta:
       <!-- Config state: what the units on this page can actually do -->
       <div class="card p-3 mb-5">
         <div class="d-flex align-items-center gap-2 mb-2">
-          {% omega_icon "circle-info", "fa-sm" %}
+          <i class="fa-solid fa-circle-info fa-sm"></i>
           <strong>Advertising config</strong>
         </div>
         {% iftruthy resolved.config.advertising %}

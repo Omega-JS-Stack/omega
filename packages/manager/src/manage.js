@@ -13,16 +13,15 @@
  * mode lands.
  */
 
-const { join } = require('node:path');
 const chalk = require('chalk').default;
-const { loadEnvChain } = require('@omega.js/config');
+const { loadEnvRoots } = require('@omega.js/config');
 
 const { SERVICE_ORDER, BOOT_SERVICES, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
 const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { writeRunOutput } = require('./lib/run-output.js');
 const { formatDuration } = require('./lib/duration.js');
-const { runPreflight } = require('./lib/preflight.js');
+const { runPreflight, assertFamilyVersions } = require('./lib/preflight.js');
 const ensureTargetsRename = require('./services/migrations/ensure/targets-rename.js');
 const { CONSENT_REQUIRED } = require('./lib/google-auth.js');
 const { RunSummary } = require('./lib/run-summary.js');
@@ -144,11 +143,19 @@ async function runManage(startDir, options = {}) {
   }
 
   // Secrets chain: shell env > brand .env > company .env — the shared
-  // cascade (files load strongest-first, never overriding what's set)
-  loadEnvChain([
-    join(brandRoot, '.env'),
-    companyConfig ? join(marker.companyRoot, '.env') : null,
-  ]);
+  // cascade (files load strongest-first, never overriding what's set), each
+  // layer overlaid by its own `.env.<environment>` file
+  // ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)). The manage
+  // walk judges every key on the RESOLVED cascade, so a value that lives only
+  // in an overlay must be visible here or the mint lane would re-mint it.
+  //
+  // `production` is PINNED, never the shell's answer: manage reconciles REAL
+  // infrastructure with production credentials, and the mint lane has to see
+  // the key it would otherwise re-mint.
+  loadEnvRoots([
+    brandRoot,
+    companyConfig ? marker.companyRoot : null,
+  ], { environment: 'production' });
 
   // The company layer itself is folded by @omega.js/config off the same stamp
   // (#83) — loadBrand takes no company argument; what we resolved here is
@@ -204,6 +211,13 @@ async function runManage(startDir, options = {}) {
   console.log(`  ${chalk.dim('Enabled:')}  ${brand.enabledTargets.join(', ') || chalk.yellow('none enabled')}`);
   console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.map((entry) => `${entry.name}${entry.target ? chalk.dim(`→${entry.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
+
+  // Lockstep (#794): the @omega.js family ships ONE version, so a brand
+  // running a framework from one release beside a client from another is
+  // refused HERE — before any service reconciles anything on top of two
+  // copies of the runtime and two copies of the config validator. `file:`
+  // links (the local era) and targets with nothing installed are exempt.
+  assertFamilyVersions({ brandRoot, targets: brand.targets });
 
   // Preflight (the REQUIRES registry): check the enabled services' declared
   // env vars + Google scopes up front — ONE consolidated fix walkthrough

@@ -3,7 +3,9 @@
 // In the harness, no consumer src/menu/index.js exists, so menu falls back to
 // the default template. We then exercise the runtime define()/builder API.
 
-module.exports = {
+const defineCases = require('@omega.js/devkit/test/define-cases');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'menu (main)',
@@ -364,6 +366,34 @@ module.exports = {
       },
     },
     {
+      name: 'view/developer carries the Simulate update submenu (dev only)',
+      run: (ctx) => {
+        const orig = ctx.manager.isDevelopment;
+        ctx.manager.isDevelopment = () => true;
+        try {
+          ctx.manager.menu.define(({ menu: m }) => m.useDefaults());
+          const item = ctx.manager.menu.find('view/developer/simulate-update');
+          ctx.expect(item).toBeTruthy();
+          ctx.expect(item.label).toBe('Simulate update');
+          ctx.expect(item.submenu.map((i) => i.id)).toEqual([
+            'view/developer/simulate-update/available',
+            'view/developer/simulate-update/unavailable',
+            'view/developer/simulate-update/error',
+          ]);
+        } finally {
+          ctx.manager.isDevelopment = orig;
+        }
+
+        ctx.manager.isDevelopment = () => false;
+        try {
+          ctx.manager.menu.define(({ menu: m }) => m.useDefaults());
+          ctx.expect(ctx.manager.menu.has('view/developer/simulate-update')).toBe(false);
+        } finally {
+          ctx.manager.isDevelopment = orig;
+        }
+      },
+    },
+    {
       name: 'menu development top-level appears only in dev mode',
       run: (ctx) => {
         const orig = ctx.manager.isDevelopment;
@@ -386,4 +416,4 @@ module.exports = {
       },
     },
   ],
-};
+});

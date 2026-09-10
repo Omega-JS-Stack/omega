@@ -6,11 +6,13 @@
  * - Users can read their own document
  * - Users can create/update their own document (non-protected fields only)
  * - Users cannot read/write other users' documents
- * - Protected fields (auth, roles, flags, subscription, affiliate, api, metadata, usage, consent, trackingConsent, attribution, verifications) cannot be written by users
+ * - Protected fields (auth, connections, roles, flags, subscription, affiliate, api, metadata, activity, usage, owns, consent, trackingConsent, attribution, verifications) cannot be written by users
  *
  * @see templates/firestore.framework.rules (compiled into dist/firestore.rules)
  */
-module.exports = {
+
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+module.exports = defineCases({
   description: 'Firestore security rules for user documents',
   type: 'group',
   timeout: 30000,
@@ -208,6 +210,79 @@ module.exports = {
             usage: {
               requests: 0, // Try to reset usage
             },
+          }, { merge: true })
+        );
+      },
+    },
+
+    // Test 10.5: User cannot grant itself usage OVERRIDES, nor aim another
+    // account's mirrored counters at a document of its own — both are limits,
+    // and a client that could write either would be writing its own quota
+    // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647))
+    {
+      name: 'user-cannot-write-usage-overrides-or-owns',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        // Should fail - usage.overrides rides the protected `usage` key
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            usage: {
+              overrides: { requests: 999999 }, // Try to grant itself credits
+            },
+          }, { merge: true })
+        );
+
+        // Should fail - `owns` resolves a feature's mirror documents
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            owns: { teams: ['someone-elses-team'] },
+          }, { merge: true })
+        );
+      },
+    },
+
+    // Test 10.6: User cannot forge a connected PROVIDER, nor rewrite its own
+    // sign-in record — `connections` is a credential store the server spends and
+    // `activity` is the security trail the before-signin event writes
+    // ([#771](https://github.com/Omega-JS-Stack/omega/issues/771))
+    {
+      name: 'user-cannot-write-connections-or-activity',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+
+        // Should fail - a planted `connections.<provider>` is a connection the
+        // account page renders as real, and the status route hands its
+        // refresh_token straight to the provider.
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            connections: {
+              github: { token: { refresh_token: 'forged-refresh-token' } },
+            },
+          }, { merge: true })
+        );
+
+        // Should fail - `activity` is the sign-in/security record (IP, user
+        // agent, locale) the before-signin event writes server-side; a client
+        // that could write it would be editing its own audit trail.
+        await rules.expectFailure(
+          db.doc(`users/${uid}`).set({
+            activity: {
+              geolocation: { ip: '0.0.0.0' },
+            },
+          }, { merge: true })
+        );
+
+        // Should succeed - `personal` is the user's own, and stays writable.
+        await rules.expectSuccess(
+          db.doc(`users/${uid}`).set({
+            personal: { name: { first: 'Rules' } },
           }, { merge: true })
         );
       },
@@ -439,4 +514,4 @@ module.exports = {
     // its own users/{uid} doc as long as it writes no framework-owned key) and
     // that denied DELETE
   ],
-};
+});

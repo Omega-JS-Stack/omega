@@ -57,9 +57,7 @@ Transactional.prototype.build = async function (settings) {
   const categories = prepare.buildCategories('transactional', brand.id, settings.categories);
   const signoff = prepare.resolveSignoff(settings?.data?.signoff, brand);
 
-  // TEMPORARY: shim for emails queued before the MJML migration (old template names)
-  const LEGACY_TEMPLATE_MAP = { 'default': 'card', 'core/engagement/feedback': 'feedback' };
-  const templateName = LEGACY_TEMPLATE_MAP[settings.template] || settings.template || 'card';
+  const templateName = resolveTemplateName(settings);
 
   // --- 2. Recipients ---
   let to = normalizeRecipients(settings.to);
@@ -76,7 +74,7 @@ Transactional.prototype.build = async function (settings) {
   const rawUserDoc = to[0]?._userDoc || {};
   const userProperties = Manager.User(rawUserDoc).properties;
   delete userProperties.api;
-  delete userProperties.oauth2;
+  delete userProperties.connections;
   delete userProperties.activity;
   delete userProperties.affiliate;
   delete userProperties.attribution;
@@ -219,11 +217,12 @@ Transactional.prototype.build = async function (settings) {
 };
 
 /**
- * Build and send an email via SendGrid, or queue it if scheduled beyond the limit.
+ * Build and send an email via SendGrid, or queue it if scheduled beyond the limit,
+ * or record it in testing mode instead of delivering it.
  * Calls .build() internally — callers only need to pass raw settings.
  *
  * @param {object} settings - Email settings (to, cc, bcc, subject, template, etc.)
- * @returns {{ status: string, options?: object, response?: object }}
+ * @returns {{ status: 'sent'|'queued'|'captured', options?: object, response?: object }}
  * @throws {Error} With code 400 for validation errors, code 500 for send failures
  */
 Transactional.prototype.send = async function (settings) {
@@ -236,16 +235,39 @@ Transactional.prototype.send = async function (settings) {
 
   const email = await self.build(settings);
 
-  // Initialize SendGrid
-  const sendgrid = Manager.require('@sendgrid/mail');
-  sendgrid.setApiKey(env.get('SENDGRID_API_KEY'));
-
   // If scheduled beyond the limit, queue for later
   if (email.sendAt && email.sendAt >= moment().add(SEND_AT_LIMIT, 'hours').unix()) {
     await saveToEmailQueue(settings, email.sendAt, admin, ctx);
 
     return { status: 'queued', options: email, response: null };
   }
+
+  // Testing-mode capture — the ONE seam that stands in for SendGrid, so no caller
+  // has to gate itself and every sender behaves alike
+  // ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). It sits PAST
+  // build(), so the brand, the recipients, the template data and the MJML render
+  // are the real ones and a broken email fails a test. Extended mode is untouched:
+  // it still delivers. The audit trail and the analytics event belong to a delivery
+  // and are not written for a capture.
+  const capture = require('../../../../test/utils/email-capture.js');
+
+  if (capture.isCapturing(ctx)) {
+    const record = capture.recordCaptured(Manager, {
+      to: email.to,
+      template: resolveTemplateName(settings),
+      subject: email.subject,
+      html: email.content[0]?.value,
+      sendAt: email.sendAt || null,
+    });
+
+    ctx.log(`Email.send(): captured (testing mode): to=${record.to.join(', ')}, template=${record.template}`);
+
+    return { status: 'captured', options: email, response: null };
+  }
+
+  // Initialize SendGrid
+  const sendgrid = Manager.require('@sendgrid/mail');
+  sendgrid.setApiKey(env.get('SENDGRID_API_KEY'));
 
   // Send via SendGrid
   const send = await sendgrid.send(email).catch(e => e);
@@ -271,6 +293,24 @@ Transactional.prototype.send = async function (settings) {
 
   return { status: 'sent', options: email, response: send };
 };
+
+// --- Templates ---
+
+// TEMPORARY: shim for emails queued before the MJML migration (old template names)
+const LEGACY_TEMPLATE_MAP = { 'default': 'card', 'core/engagement/feedback': 'feedback' };
+
+/**
+ * The template that actually renders these settings.
+ *
+ * Its own function because build() renders through it and the testing-mode capture
+ * records it — a second copy of the legacy map would drift from the render.
+ *
+ * @param {object} settings - Email settings
+ * @returns {string} The resolved template name
+ */
+function resolveTemplateName(settings) {
+  return LEGACY_TEMPLATE_MAP[settings.template] || settings.template || 'card';
+}
 
 // --- Recipients (transactional-only) ---
 

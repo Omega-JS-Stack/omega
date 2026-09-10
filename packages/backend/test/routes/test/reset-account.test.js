@@ -1,4 +1,5 @@
 const uuid = require('uuid');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 /**
  * Test: test/reset-account
@@ -7,7 +8,7 @@ const uuid = require('uuid');
  * that persona back to the shape the seeder defines — user doc AND canonical
  * purchase record — for the CALLER's own account only.
  */
-module.exports = {
+module.exports = defineCases({
   description: 'Reset a seeded persona back to its seed (development/testing only)',
   type: 'group',
   timeout: 60000,
@@ -122,4 +123,4 @@ module.exports = {
       },
     },
   ],
-};
+});

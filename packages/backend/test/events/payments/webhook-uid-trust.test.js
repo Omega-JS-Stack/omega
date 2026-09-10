@@ -27,7 +27,8 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The subscriber the subscription actually belongs to, on Stripe's own record
 const OWNER_UID = '_test-uid-trust-owner';
@@ -84,7 +85,7 @@ function runForgedEvent() {
   });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'A webhook write is steered by the uid on the provider\'s record, never by the uid its payload claimed',
   type: 'group',
   timeout: 30000,
@@ -199,4 +200,4 @@ module.exports = {
       },
     },
   ],
-};
+});

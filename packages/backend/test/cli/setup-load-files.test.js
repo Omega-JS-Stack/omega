@@ -14,7 +14,8 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { loadFiles: loadTargetFiles } = require('../../src/cli/utils/target-checks.js');
+const { loadFiles: loadTargetFiles } = require('../../dist/cli/utils/target-checks.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const REMOTECONFIG = {
   conditions: [],
@@ -38,7 +39,7 @@ function loadFiles(targetPath) {
   return loadTargetFiles({ firebaseProjectPath: targetPath, argv: {}, options: {} });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'target checks: loadFiles() reads the target-root remoteconfig template',
   type: 'group',
   timeout: 10000,
@@ -62,4 +63,4 @@ module.exports = {
       },
     },
   ],
-};
+});

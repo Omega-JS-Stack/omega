@@ -5,12 +5,13 @@
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  * Mirrors stripe/to-unified-subscription.js for consistent coverage
  */
-const PayPal = require('../../../../src/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ACTIVE = require('../../../fixtures/paypal/subscription-active.json');
 const FIXTURE_CANCELLED = require('../../../fixtures/paypal/subscription-cancelled.json');
 const FIXTURE_SUSPENDED = require('../../../fixtures/paypal/subscription-suspended.json');
+const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 // Mock config matching the @omega.js/backend template (new flat price structure)
 const MOCK_CONFIG = {
@@ -35,7 +36,7 @@ function toUnifiedSubscription(rawSubscription, options) {
   return PayPal.toUnifiedSubscription(rawSubscription, { config: MOCK_CONFIG, ...options });
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'PayPal toUnifiedSubscription() transformation',
   type: 'group',
 
@@ -880,4 +881,4 @@ module.exports = {
       },
     },
   ],
-};
+});

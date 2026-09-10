@@ -16,9 +16,11 @@
  * Run: npx omega test backend:helpers/payment/fetch-failure
  */
 const assert = require('node:assert');
-const Stripe = require('../../../src/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../src/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../src/manager/libraries/payment/providers/chargebee.js');
+const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
+const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const RESOURCE_ID = '_test-res-lookup';
 
@@ -46,7 +48,7 @@ async function throwsFrom(fn) {
   assert.fail('A failed lookup must throw — there is nothing to fall back to');
 }
 
-module.exports = {
+module.exports = defineCases({
   description: 'Provider fetchResource() failure classification',
   type: 'group',
 
@@ -77,6 +79,38 @@ module.exports = {
         }, () => Chargebee.fetchResource('subscription', RESOURCE_ID, {})));
 
         assert.equal(error.notFound, false, 'an unreachable API is not a provider saying the resource is gone');
+        assert.match(error.message, /could not be reached/, 'the message says the lookup never got an answer');
+      },
+    },
+
+    {
+      name: 'coinbase-classifies-a-404-as-not-found',
+      async run() {
+        // Coinbase Commerce carries the status on the error the way Chargebee
+        // does, so the ONE classifier answers for it with no new rule
+        // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642))
+        const notThere = new Error('Coinbase Commerce API 404: Not found');
+        notThere.statusCode = 404;
+
+        const error = await throwsFrom(() => withTransport(Coinbase, 'request', async () => {
+          throw notThere;
+        }, () => Coinbase.fetchResource('charge', RESOURCE_ID, {})));
+
+        assert.equal(error.notFound, true, 'Coinbase answering 404 means the charge is gone');
+        assert.equal(error.provider, 'coinbase', 'the failure names the provider that was asked');
+        assert.equal(error.resourceId, RESOURCE_ID, 'and the resource it was asked about');
+        assert.match(error.message, /coinbase does not have charge/, 'the message says the provider does not have it');
+      },
+    },
+
+    {
+      name: 'coinbase-classifies-an-unreachable-api-as-transient',
+      async run() {
+        const error = await throwsFrom(() => withTransport(Coinbase, 'request', async () => {
+          throw new Error('fetch failed');
+        }, () => Coinbase.fetchResource('charge', RESOURCE_ID, {})));
+
+        assert.equal(error.notFound, false, 'an unreachable API is not a provider saying the charge is gone');
         assert.match(error.message, /could not be reached/, 'the message says the lookup never got an answer');
       },
     },
@@ -151,6 +185,21 @@ module.exports = {
     },
 
     {
+      name: 'a-refund-miss-names-the-call-that-missed',
+      async run() {
+        // The failure names its own call site: a refund lookup thrown from
+        // getRefundDetails() used to read `fetchResource(refund/…)`, pointing
+        // whoever reads the log at a function that never ran.
+        const error = await throwsFrom(() => withTransport(PayPal, 'request', async () => {
+          throw new Error('PayPal API 404: The specified resource does not exist.');
+        }, () => PayPal.getRefundDetails({ id: 'SALE-1' }, { refundId: RESOURCE_ID, eventType: 'PAYMENT.SALE.REFUNDED' })));
+
+        assert.match(error.message, /getRefundDetails\(refund\//, 'the refund lookup names getRefundDetails, not fetchResource');
+        assert.equal(error.notFound, true, 'and still classifies — a 404 refund is gone');
+      },
+    },
+
+    {
       name: 'an-unknown-resource-type-is-never-read-as-not-found',
       async run() {
         // A resource type the library does not know is a fault on THIS side. It must
@@ -163,4 +212,4 @@ module.exports = {
       },
     },
   ],
-};
+});

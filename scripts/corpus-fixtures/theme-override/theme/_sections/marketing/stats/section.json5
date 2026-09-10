@@ -1,0 +1,17 @@
+{
+  description: 'Corpus tier-2 override of the base stats band — base markup plus one invisible marker element, and a section.js of its own. Proves BOTH section lanes in one folder: the html the cascade resolved is this one, and this folder\'s js is what rides the bundle. json5 is never inheritable (the folder is its own manifest), so the args and defaults are carried here.',
+
+  args: {
+    items: 'array',
+    after: 'html',
+  },
+
+  defaults: {
+    items: [
+      { number: '50,000+', label: 'Active users', sublabel: 'From 120+ countries' },
+      { number: '99.98%', label: 'Uptime', sublabel: 'Last 12 months' },
+      { number: '200+', label: 'Releases shipped', sublabel: 'And counting' },
+      { number: '4.9', label: 'Average rating', sublabel: 'Across review platforms' },
+    ],
+  },
+}

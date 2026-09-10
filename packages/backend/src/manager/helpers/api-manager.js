@@ -58,9 +58,16 @@ ApiManager.prototype.init = function (options) {
     const products = self.Manager.config.payment?.products || [];
     options.plans = {};
 
+    // A product's counted-feature NUMBERS (#647): its `features` map holds a
+    // number per counted feature and a true/false/string per perk, and only
+    // the numbers are limits.
     for (const product of products) {
+      const values = product.features || {};
+
       options.plans[product.id] = {
-        limits: product.limits || {},
+        limits: Object.fromEntries(
+          Object.entries(values).filter(([, value]) => typeof value === 'number'),
+        ),
       };
     }
 
@@ -111,7 +118,6 @@ ApiManager.prototype._createNewUser = function (authenticatedUser, planId, persi
     newUser.subscription.limits[id] = get(authenticatedUser, `subscription.limits.${id}`, currentPlan[id])
     // const product = data.products[id]
     // options.plans[product.planId] = {}
-    // options.plans[product.planId].limits = product.limits || {};
   });
 
 

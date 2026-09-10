@@ -15,12 +15,13 @@
  *   - Lowercase the result
  *   - Non-string input → empty string
  */
-const Utilities = require('../../src/manager/helpers/utilities.js');
+const Utilities = require('../../dist/manager/helpers/utilities.js');
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const Manager = { libraries: {} };
 const utilities = new Utilities(Manager);
 
-module.exports = {
+module.exports = defineCases({
   description: 'Utilities.slugify()',
   type: 'group',
 
@@ -391,4 +392,4 @@ module.exports = {
       },
     },
   ],
-};
+});

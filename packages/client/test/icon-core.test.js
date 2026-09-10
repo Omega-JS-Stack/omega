@@ -62,6 +62,17 @@ describe('icon-core', () => {
     assert.strictEqual(parse('btn btn-primary'), null);
   });
 
+  it('#619: country flags are the second namespace, on the same lookup', () => {
+    const parse = (classes) => core.parseIconClasses(classes.split(' '));
+
+    assert.deepStrictEqual(parse('omega-flag omega-flag-us'), { name: 'us', style: 'flags' });
+    assert.deepStrictEqual(parse('omega-flag omega-flag-jp me-2'), { name: 'jp', style: 'flags' });
+    // The namespace WINS over any fa-* class beside it — a flag is a flag.
+    assert.deepStrictEqual(parse('fa-solid fa-rocket omega-flag-us'), { name: 'us', style: 'flags' });
+    // The bare marker class names no country, so it names no icon.
+    assert.strictEqual(parse('omega-flag'), null);
+  });
+
   it('#183: every size class the shared sheet ships parses as a modifier, not a name', () => {
     const parse = (classes) => core.parseIconClasses(classes.split(' '));
 
@@ -100,6 +111,18 @@ describe('icon-core', () => {
 
     // non-SVG input passes through untouched
     assert.strictEqual(core.injectSvgAttributes('not svg'), 'not svg');
+  });
+
+  it('strips every comment from the SVG it prepares', () => {
+    // Font Awesome ships its license comment inside every glyph. Injected
+    // verbatim, its `-->` TERMINATES any surrounding HTML comment — an icon
+    // inside a commented-out block (body.html's parked flash-sale banner)
+    // rendered the whole dead block on every page. Attribution lives on in
+    // the emitted /assets/icons/ set files, which are copied, not rebuilt.
+    const raw = '<svg viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.0 by @fontawesome --><path d="M0 0"/></svg>';
+    const out = core.injectSvgAttributes(raw);
+    assert.ok(!out.includes('<!--'), 'no comment survives into the injected markup');
+    assert.ok(out.includes('<path d="M0 0"/>'), 'the glyph itself is untouched');
   });
 
   it('builds the alias map from icon-families metadata', () => {
