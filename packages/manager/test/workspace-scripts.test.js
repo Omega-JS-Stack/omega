@@ -348,6 +348,19 @@ test('scripts op: an unparseable target manifest WARNS the run instead of report
   assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), '{ not json', 'never touched');
 });
 
+test('scripts op: a dry run whose only finding is an unreadable target manifest reports warned, never an empty plan', async () => {
+  const root = tmpBrand({ name: 'f-dry', workspaces: ['targets/*'], scripts: ROOT_OK });
+  plantTarget(root, 'website', '{ not json',
+    '@omega.js/web',
+    { name: '@omega.js/web', projectScripts: { start: 'omega dev' } });
+
+  // There is nothing to PLAN (no heal, no sync), so the dry run reports exactly
+  // what a real run would rather than a plan with no parts in it.
+  const result = await scriptsOp(opInput(root, { options: { dryRun: true } }));
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /targets\/website\/package\.json doesn't parse/);
+});
+
 // ─── The retired `npx omega setup` migration (#707) ──────────────────────────
 
 // A pre-#675 backend target verbatim: every framework script chained the

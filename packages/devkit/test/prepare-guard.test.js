@@ -39,14 +39,18 @@ function makeScratch(t) {
  * @param {string} root - Directory to write the monorepo into.
  * @param {object} [options]
  * @param {boolean} [options.guarded] - Wire the guard into the prepare script.
+ * @param {boolean} [options.installed] - Give the root a node_modules dir (default true).
  * @returns {{root: string, packageDir: string, buildsLog: string}}
  */
 function writeMonorepo(root, options = {}) {
-  const { guarded = true } = options;
+  const { guarded = true, installed = true } = options;
   const packageDir = path.join(root, 'packages', 'widget');
 
   fs.mkdirSync(path.join(root, 'packages', 'devkit'), { recursive: true });
   fs.mkdirSync(packageDir, { recursive: true });
+  // An INSTALLED checkout: the root node_modules is the guard's marker for
+  // "there is something to build with" (the uninstalled case has its own test)
+  if (installed) fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
     name: 'omega',
     version: '1.0.0',
@@ -148,6 +152,27 @@ test('a consumer install reaching into the monorepo skips the prepare', (t) => {
   assert.equal(decision.skip, true);
   assert.equal(decision.reason, 'consumer-install');
   assert.equal(decision.monorepoRoot, scratch);
+});
+
+test('an uninstalled checkout skips on any install, wherever the root is (npm reifies a linked prepare before that checkout is installed)', (t) => {
+  const scratch = makeScratch(t);
+  const { root, packageDir } = writeMonorepo(path.join(scratch, 'monorepo'), { installed: false });
+
+  // A brand outside the checkout, and a brand INSIDE it (the snapshot a nested
+  // brand deploys): both skip, because there is no prepare-package to build with
+  for (const installRoot of [path.join(scratch, 'brand'), path.join(root, 'brands', 'brand')]) {
+    const decision = prepareDecision({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: installRoot } });
+    assert.equal(decision.skip, true);
+    assert.equal(decision.reason, 'monorepo-uninstalled');
+  }
+
+  const { result, warnings } = captured(() => guardPrepare({ packageDir, env: { npm_command: 'ci', npm_config_local_prefix: path.join(scratch, 'brand') } }));
+  assert.equal(result, false);
+  assert.match(warnings, /not installed yet/);
+
+  // The same package with the checkout installed builds for its own root
+  fs.mkdirSync(path.join(root, 'node_modules'));
+  assert.equal(prepareDecision({ packageDir, env: { npm_command: 'install', npm_config_local_prefix: root } }).skip, false);
 });
 
 test('npm ci in a consumer skips too — it installs the tree the same way', (t) => {

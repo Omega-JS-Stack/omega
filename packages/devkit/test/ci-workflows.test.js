@@ -12,7 +12,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows } = require('../src/ci-workflows');
+const { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows, FIREWALL_ACTION, FIREWALL_STEP_ID } = require('../src/ci-workflows');
 
 const TEMP = path.join(__dirname, '..', '.temp', `ci-workflows-${process.pid}`);
 let caseIndex = 0;
@@ -173,9 +173,10 @@ test('the REAL extension template: the git config step stays at the root, the bu
   assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm install\n/);
   assert.match(composed, / {6}- name: Build and publish extension\n {8}working-directory: targets\/extension\n {8}run: \|\n/);
 
-  // `uses:` steps are never scoped — checkout and friends want the repo root
-  assert.match(composed, / {6}- name: Checkout repository\n {8}uses: actions\/checkout@v4\n/);
-  assert.match(composed, / {6}- name: Setup Node\.js\n {8}uses: actions\/setup-node@v4\n/);
+  // `uses:` steps are never scoped: checkout and friends want the repo root.
+  // The version is left open here: the pin itself is one test's job (#880).
+  assert.match(composed, / {6}- name: Checkout repository\n {8}uses: actions\/checkout@\S+\n/);
+  assert.match(composed, / {6}- name: Setup Node\.js\n {8}uses: actions\/setup-node@\S+\n/);
 });
 
 test('the REAL templates: no hashFiles() pattern is left pointing at the repo root', () => {
@@ -229,7 +230,9 @@ test('the REAL desktop template: artifact paths ride the target dir, in both YAM
   assert.match(composed, /^ {10}name: windows-unsigned$/m);
 
   // checkout's own inputs are never rewritten — they are not paths in the tree
-  assert.match(composed, /^ {10}fetch-depth: 0$/m);
+  // (the depth itself went shallow in #880; the point here is that composition
+  // leaves it alone)
+  assert.match(composed, /^ {10}fetch-depth: 1$/m);
 });
 
 test('the REAL extension template: a target with no path-bearing action inputs is unchanged beyond its run steps', () => {
@@ -534,4 +537,141 @@ test('reconcile: a brand with no .github/workflows dir is a clean no-op', () => 
   const { brandRoot } = stageBrand({});
 
   assert.deepEqual(reconcileComposedWorkflows({ brandRoot, liveTargets: [], logger: quiet }), { removed: [] });
+});
+
+test('the {{ installFirewall }} token renders the pinned action and its cmd shim, at the token\'s own indentation (#872)', () => {
+  const template = [
+    'name: Build',
+    '',
+    'jobs:',
+    '  build:',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    '      - uses: actions/checkout@v4',
+    '      {{ installFirewall }}',
+    '      - name: Install dependencies',
+    '        run: sfw npm ci',
+    '',
+  ].join('\n');
+
+  const composed = composeWorkflow(template, { targetPath: 'targets/website', targetName: 'website' });
+  const binary = `\\$\\{\\{ steps\\.${FIREWALL_STEP_ID}\\.outputs\\.firewall-path-binary \\}\\}`;
+
+  // Both steps land where the token stood, spelled as list items at its indent.
+  // The shim is the Windows half: the action caches an EXTENSION-LESS `sfw` and
+  // cmd.exe cannot run one, so a copy named `sfw.exe` goes beside it (#872).
+  assert.match(composed, new RegExp([
+    '      - uses: actions/checkout@v4\\n',
+    '(?:      #[^\\n]*\\n)*',
+    '      - name: [^\\n]+\\n',
+    `        id: ${FIREWALL_STEP_ID}\\n`,
+    `        uses: ${FIREWALL_ACTION.replace('/', '\\/')}\\n`,
+    '        with:\\n',
+    '          mode: firewall-free\\n',
+    '(?:      #[^\\n]*\\n)*',
+    '      - name: [^\\n]+\\n',
+    "        if: runner\\.os == 'Windows'\\n",
+    '        shell: cmd\\n',
+    // The shim is a `run:` step, so the composition scopes it like any other:
+    // harmless, because the path it copies is the absolute one the action reports
+    '        working-directory: targets/website\\n',
+    `        run: copy "${binary}" "${binary}\\.exe"\\n`,
+    '      - name: Install dependencies\\n',
+  ].join('')));
+
+  // No token survives, and no template ever names the action itself
+  assert.doesNotMatch(composed, /\{\{ installFirewall \}\}/);
+  assert.doesNotMatch(template, /SocketDev/);
+
+  // A `uses:` step is never scoped to the target: the action runs at the root
+  assert.doesNotMatch(composed, /uses: SocketDev\/action@[^\n]*\n\s+working-directory:/);
+  // ...while the install it wraps still is
+  assert.match(composed, /working-directory: targets\/website\n\s+run: sfw npm ci/);
+});
+
+test('a template carrying no token is left exactly as it was (#872)', () => {
+  const template = 'name: Build\n\njobs:\n  build:\n    steps:\n      - run: echo hi\n';
+
+  assert.equal(composeWorkflow(template, { targetPath: 'targets/website', targetName: 'website' }).includes('SocketDev'), false);
+});
+
+test('the REAL templates: every firewalled install job gets its binary from the pinned official action (#871)', () => {
+  const templates = frameworkTemplates();
+  assert.ok(templates.length, 'no framework template found');
+
+  for (const template of templates) {
+    // The npm launcher fetches the binary through GitHub's ANONYMOUS API and a
+    // hosted runner's shared address exhausts that quota; the action downloads
+    // with the job's own token. And no template quietly installs unfirewalled.
+    assert.doesNotMatch(template.contents, /npm install -g sfw/, `${template.label}: installs the firewall through npm`);
+    assert.doesNotMatch(template.contents, /falling back to plain npm/, `${template.label}: falls back to an unfirewalled install`);
+
+    const composed = composeWorkflow(template.contents, { targetPath: 'targets/extension', targetName: 'extension' });
+    for (const job of jobBlocks(composed)) {
+      // `npm.cmd` is the Windows spelling (#872): the firewall resolves the command
+      // literally, with no PATHEXT, so a cmd-shelled leg names the file it wants.
+      const install = job.search(/\bsfw npm(?:\.cmd)? (ci|install)\b/);
+      if (install === -1) {
+        continue;
+      }
+
+      const action = job.search(/uses: SocketDev\/action@v\d+\.\d+\.\d+\n\s+with:\n\s+mode: firewall-free\n/);
+      assert.notEqual(action, -1, `${template.label}: a job runs sfw without installing it through the pinned action`);
+      assert.ok(action < install, `${template.label}: the firewall is installed after the install it wraps`);
+      // A `uses:` step is never scoped to the target: the action runs at the root
+      assert.doesNotMatch(job, /uses: SocketDev\/action@[^\n]*\n\s+working-directory:/, `${template.label}: the action step was scoped`);
+
+      // And the Windows shim rides along on EVERY template (#872): a job that
+      // forces `shell: cmd` (the desktop build does) cannot execute the
+      // extension-less `sfw` the action caches on Windows. The `if` makes the
+      // step a no-op on the other runners.
+      const shim = job.search(new RegExp(`run: copy "\\$\\{\\{ steps\\.${FIREWALL_STEP_ID}\\.outputs\\.firewall-path-binary \\}\\}"`));
+      assert.notEqual(shim, -1, `${template.label}: the firewall is installed without the Windows cmd shim`);
+      assert.ok(action < shim && shim < install, `${template.label}: the shim does not sit between the action and the install it wraps`);
+    }
+  }
+});
+
+test('the REAL templates: no `npx` on a runner can reach the registry (#872)', () => {
+  const templates = frameworkTemplates();
+  assert.ok(templates.length, 'no framework template found');
+
+  for (const template of templates) {
+    // Comments are allowed to NAME a command a human types on a laptop; steps
+    // are not: this reads the executable lines only.
+    const steps = template.contents.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+
+    for (const [, invocation] of steps.matchAll(/\bnpx\s+(\S+)/g)) {
+      assert.equal(invocation, '--no-install', `${template.label}: \`npx ${invocation}\` lets npx install a stranger's package from the registry, with every secret in the job env`);
+    }
+
+    // And the bin it runs is the FRAMEWORK's own (`omega-backend`,
+    // `omega-web`, `omega-extension`, `omega-desktop`), never the shared name
+    // all four packages declare: which one a runner linked is an install-order
+    // accident, and a workflow belongs to exactly one framework.
+    for (const [, bin] of steps.matchAll(/\bnpx\s+--no-install\s+(\S+)/g)) {
+      assert.doesNotMatch(bin, /^(omega|omg|mgr)$/, `${template.label}: \`npx --no-install ${bin}\` names the shared bin, not this framework's own`);
+    }
+  }
+});
+
+// One action-version pair across all four templates
+// ([#880](https://github.com/Omega-JS-Stack/omega/issues/880)): every runner
+// checks out and sets up node with the same two actions, so four templates
+// drifting apart is four upgrades to remember instead of one.
+test('the REAL templates: all four pin the SAME actions/checkout and actions/setup-node (#880)', () => {
+  const EXPECTED = { 'actions/checkout': 'v7', 'actions/setup-node': 'v6' };
+  const templates = frameworkTemplates();
+  // The four frameworks, and a fifth would join this pin the day it scaffolds one
+  assert.equal(templates.length, 4, `expected the four framework templates, found ${templates.map((t) => t.label).join(', ')}`);
+
+  for (const { label, contents } of templates) {
+
+    for (const [action, version] of Object.entries(EXPECTED)) {
+      const pinned = [...new Set([...contents.matchAll(new RegExp(`uses: ${action}@(\\S+)`, 'g'))].map(([, found]) => found))];
+      // Empty means the template uses the action not at all, which is the same
+      // defect from the other side: every one of the four does both.
+      assert.deepEqual(pinned, [version], `${label}: ${action} is pinned to [${pinned.join(', ')}], not the one ${version} all four share`);
+    }
+  }
 });

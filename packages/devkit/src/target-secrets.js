@@ -39,11 +39,17 @@
  * cascade (`CSC_LINK=config/certs/dev-id.p12`) and what CI needs is the FILE, so
  * it base64-encodes an existing file between COLLECT and PUBLISH. That seam is
  * the only shape difference between the three binds — the transport is one.
+ *
+ * Backend binds it too ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
+ * over a second seam: `extraSecrets`, already-valued keys with no `.env` home at
+ * all. Its deploy credential is a service-account FILE the firebase manage
+ * service mints, so there is nothing in the cascade to compose it from, and the
+ * runner still needs it as a repo secret like everything else.
  */
 const { composeTargetEnv } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
 const { publishActionsSecrets } = require('./actions-secrets.js');
-const { resolveRepo } = require('./deploy.js');
+const { resolveRepo, resolveDeployLane } = require('./deploy.js');
 
 /**
  * The publishable secrets for a target: the schema's delivery set for it,
@@ -112,6 +118,8 @@ function declaredBrandRepo(options) {
  * @param {object} options.logger - `{ log, warn, error }`.
  * @param {object} [options.env] - Env map (default: process.env).
  * @param {function} [options.resolveValue] - Value seam (see collectTargetSecrets).
+ * @param {Object<string, string>} [options.extraSecrets] - Already-valued keys
+ *   that have no `.env` home, merged OVER the composed set.
  * @param {function} [options.execFn] - Injectable `gh` exec (tests).
  * @param {function} [options.gitExecFn] - Injectable `git` exec for remote discovery (tests).
  * @returns {{ skipped: string }|{ published: string[], failed: Array<object> }}
@@ -128,20 +136,20 @@ function publishTargetSecrets(options) {
     return { skipped: 'ci' };
   }
 
-  const secrets = collectTargetSecrets({ targetDir, target, resolveValue: options.resolveValue });
+  // The schema's set, plus the caller's own already-valued keys. An extra has
+  // no `.env` home to compose from (backend's deploy credential is a FILE the
+  // firebase service mints, #872), so it arrives valued and travels verbatim:
+  // `resolveValue` is the COMPOSED half's seam and would only mangle it. An
+  // empty extra claims no key, exactly as an empty composed value does.
+  const secrets = { ...collectTargetSecrets({ targetDir, target, resolveValue: options.resolveValue }) };
+  for (const [key, value] of Object.entries(options.extraSecrets || {})) {
+    if (value) secrets[key] = value;
+  }
+
   const keys = Object.keys(secrets);
   if (!keys.length) {
     logger.warn('Skipping secret publication — no keys composed for this target from the .env cascade (company/brand/target)');
     return { skipped: 'no-secrets' };
-  }
-
-  let repo;
-  try {
-    const { owner, repo: name } = resolveRepo({ cwd: targetDir, execFn: options.gitExecFn });
-    repo = `${owner}/${name}`;
-  } catch (e) {
-    logger.warn(`Skipping secret publication — no GitHub remote here (${e.message})`);
-    return { skipped: 'no-remote' };
   }
 
   const declared = declaredBrandRepo({ targetDir, target });
@@ -149,9 +157,31 @@ function publishTargetSecrets(options) {
     logger.warn('Skipping secret publication — this brand names no GitHub repo in config (repo.providers.github). Set it, then re-run `omega deploy`.');
     return { skipped: 'no-declared-repo' };
   }
-  if (declared.toLowerCase() !== repo.toLowerCase()) {
-    logger.warn(`Skipping secret publication — the git remote here is ${repo}, but this brand's repo is ${declared}. Run \`omega deploy\` from the brand's own checkout.`);
-    return { skipped: 'repo-mismatch' };
+
+  // A NESTED brand (its root is not the toplevel of the git repo it sits in)
+  // has a remote that answers the ENCLOSING repo by construction, and its
+  // deploy pushes a snapshot to the DECLARED repo regardless
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), so the
+  // mismatch guard would only ever skip a publish that is correct. Every other
+  // guard stays: what the guard protects against is a checkout that COULD have
+  // been the brand's own and is not.
+  const { nested } = resolveDeployLane({ dir: targetDir, execFn: options.gitExecFn });
+  const repo = declared;
+
+  if (!nested) {
+    let remote;
+    try {
+      const { owner, repo: name } = resolveRepo({ cwd: targetDir, execFn: options.gitExecFn });
+      remote = `${owner}/${name}`;
+    } catch (e) {
+      logger.warn(`Skipping secret publication — no GitHub remote here (${e.message})`);
+      return { skipped: 'no-remote' };
+    }
+
+    if (declared.toLowerCase() !== remote.toLowerCase()) {
+      logger.warn(`Skipping secret publication — the git remote here is ${remote}, but this brand's repo is ${declared}. Run \`omega deploy\` from the brand's own checkout.`);
+      return { skipped: 'repo-mismatch' };
+    }
   }
 
   logger.log(`Publishing ${keys.length} secret(s) to ${repo}: ${keys.join(', ')}`);

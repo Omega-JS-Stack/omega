@@ -33,6 +33,8 @@
     "./merge-line-files": "./src/merge-line-files.js",
     "./translate": "./src/translate/index.js",
     "./deploy": "./src/deploy.js",
+    "./deploy-snapshot": "./src/deploy-snapshot.js",
+    "./pack-local": "./src/pack-local.js",
     "./update": "./src/update.js",
     "./deploy-record": "./src/deploy-record.js",
     "./clean-dirs": "./src/clean-dirs.js",

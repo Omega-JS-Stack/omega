@@ -82,13 +82,14 @@
   },
 
   // Brand repo (github service: repo + Pages; the admin/post CMS routes
-  // commit to the same repo). No `repo` slug — the derivation defaults
-  // resolve it: name = `<brand.id>-omega` (playground-omega), owner = org. The repo
-  // exists (gh-pages holds built output); the SOURCE lands on main at arc
-  // close (Ian 2026-07-12) — until then CMS creates fail at the branch
-  // lookup. shared: the org profile belongs to the OMEGA project, not this
-  // rehearsal brand. public: GitHub Pages on a free org needs a public repo
-  // — only built site output lands in it (gh-pages), public by definition.
+  // commit to the same repo). No `repo` slug, the derivation defaults
+  // resolve it: name = `<brand.id>-omega` (playground-omega), owner = org. The
+  // SOURCE lands on main through every deploy (#872): this brand is a folder
+  // inside the omega monorepo, so `omega deploy` takes the snapshot lane and
+  // force-pushes the brand folder to the repo's main before it dispatches.
+  // shared: the org profile belongs to the OMEGA project, not this test
+  // brand. public: GitHub Pages on a free org needs a public repo, and the
+  // snapshot plus the built site output are all that land in it.
   repo: {
     providers: {
       github: {

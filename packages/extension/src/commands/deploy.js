@@ -1,21 +1,31 @@
 /**
  * `omega deploy` — the explicit publish verb (D13: commits never
- * auto-publish). Syncs the working tree (commit + push — push triggers
- * NOTHING), then dispatches the scaffolded publish workflow: CI builds,
- * uploads to the stores when credentials are present, and attaches the
- * package zip to a GitHub release (the durable artifact channel).
+ * auto-publish). Delivers the brand to its repo and dispatches the scaffolded
+ * publish workflow: CI builds, uploads to the stores when credentials are
+ * present, and attaches the package zip to a GitHub release (the durable
+ * artifact channel).
+ *
+ * ONE lane, the same one every target takes
+ * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the executor
+ * resolves it from the brand: a nested or linked brand packs its local
+ * frameworks and force-pushes a SNAPSHOT of the brand folder, an ordinary
+ * brand commits and pushes, and then it waits for the workflow and dispatches. A
+ * linked tree no longer switches itself to the direct lane; `--direct` is how a
+ * human asks for that.
  *
  * Every run starts with the local scaffold the retired `omega setup` used to
- * own (ensureTarget, #675) and then runs setup's NETWORK half as a precheck
- * before the dispatch. `--no-secrets` skips that precheck.
+ * own (ensureTarget, #675); a DISPATCH then runs setup's NETWORK half as a
+ * precheck before it sends. `--no-secrets` skips that precheck, and `--direct`
+ * never reaches it at all.
  *
- * Flags: --dry-run (print the exact dispatch, send nothing; skips sync),
- * --no-sync (dispatch without committing/pushing first).
+ * Flags: --dry-run (print the exact dispatch, send nothing; skips the push),
+ * --no-sync (dispatch without committing/pushing first: the push lane, and a linked own-repo brand's workflow sync),
+ * --direct (build + store-publish from this machine: `npm run release`).
  */
 const { execSync } = require('node:child_process');
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('deploy');
-const { deployViaDispatch, dispatchRepo, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
 const { ensureTarget } = require('./lib/ensure-target.js');
@@ -30,8 +40,17 @@ module.exports = async function (options) {
   // and quiet on a converged target.
   await ensureTarget({ projectDir, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
-  // The NETWORK half, as a precheck: a deploy is the verb that needs the
-  // remote side right. A dry run sends nothing, so it prechecks nothing.
+  // The direct lane, on request: build + store-publish from THIS machine.
+  // BEFORE the precheck, which belongs to the CI lane (web and backend already
+  // order it this way): a local deploy publishes nothing to the repo and needs
+  // no `gh` session, so pushing this target's store credentials into Actions
+  // secrets on the way past is exactly what it must not do (#872).
+  if (options.direct) {
+    return deployDirect({ dryRun, exec: options.exec });
+  }
+
+  // The NETWORK half, as a precheck: the CI lane needs the remote side right
+  // (its secrets). A dry run sends nothing, so it prechecks nothing.
   if (!dryRun) {
     await deployPrecheck({ projectDir, options, logger });
   }
@@ -44,40 +63,60 @@ module.exports = async function (options) {
     workflow: 'publish.yml',
   });
 
-  // Linked local packages (tree-wide file: specs — cp194) → the LOCAL lane
-  // automatically: build + store-publish from this machine with the linked
-  // frameworks bundled in. Mirrored rule (Ian 2026-07-20); CI dispatch is
-  // only for registry-clean trees.
-  if (findLocalSpecs({ dir: process.cwd() }).length > 0) {
-    logger.log('Linked local packages detected — building + publishing LOCALLY (linked frameworks bundled; store credentials must be available in this shell). CI dispatch resumes after `omega i live`.');
-    if (dryRun) {
-      logger.log('DRY RUN — would run: npm run release (local build + store publish)');
-      return;
-    }
-    execSync('npm run release', { stdio: 'inherit' });
-    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'local' } });
-    return logger.log('Deployed from the LOCAL build (linked frameworks included).');
-  }
-
-  if (!dryRun && options.sync !== false) {
-    logger.log('Syncing (commit + push — publishes nothing by itself)...');
-    syncWorkingTree({ message: 'Deploy', logger });
-  }
-
+  // ONE lane for all four targets (#872): the executor resolves it from the
+  // BRAND (`dir`): pack + snapshot push when the brand is nested or linked,
+  // commit + push when it is neither, and then it waits for the workflow and
+  // dispatches. `--no-sync` skips the push on both lanes that have one.
   const { owner, repo } = dispatchAddress();
-  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, owner, repo, dryRun });
+  const { plan, dispatched, lane } = await deployViaDispatch({
+    workflow: WORKFLOW,
+    owner,
+    repo,
+    dir: process.cwd(),
+    dryRun,
+    sync: options.sync !== false,
+    logger,
+  });
 
   if (dispatched) {
     require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'dispatch' } });
-    logger.log(`Dispatched ${WORKFLOW} — CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
+    logger.log(`Dispatched ${WORKFLOW} (${lane.mode} lane, ref ${lane.ref}): CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {
-    logger.log('DRY RUN — would send:');
+    logger.log(`DRY RUN (${lane.mode} lane, ref ${lane.ref}), would send:`);
     logger.log(`  ${plan.method} ${plan.url}`);
     logger.log(`  body: ${JSON.stringify(plan.body)}`);
     logger.log(`  then watch: ${plan.runsUrl}`);
   }
 };
+
+/**
+ * The direct lane, asked for by a human (`--direct`,
+ * [#872](https://github.com/Omega-JS-Stack/omega/issues/872)): build +
+ * store-publish from THIS machine, with whatever frameworks are linked here
+ * bundled in. It used to select itself whenever the tree carried a `file:`
+ * spec, which took the CI lane away from the brands that need it most; a
+ * linked brand now packs its frameworks into the snapshot the runner installs.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.dryRun] - Print what would run, run nothing.
+ * @param {function} [options.exec] - Injectable shell (tests).
+ * @returns {void}
+ */
+function deployDirect(options) {
+  options = options || {};
+  const exec = options.exec || execSync;
+
+  if (options.dryRun) {
+    return logger.log('DRY RUN, would run: npm run release (local build + store publish)');
+  }
+
+  logger.log('Building + publishing LOCALLY (store credentials must be available in this shell)...');
+  exec('npm run release', { stdio: 'inherit' });
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'direct' } });
+
+  return logger.log('Deployed from the LOCAL build.');
+}
 
 /**
  * The repo this target's CI dispatch addresses: the brand's own, from its
@@ -95,3 +134,4 @@ function dispatchAddress() {
 }
 
 module.exports.dispatchAddress = dispatchAddress;
+module.exports.deployDirect = deployDirect;

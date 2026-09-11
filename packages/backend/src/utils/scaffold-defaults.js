@@ -5,7 +5,16 @@
 // against a temp dir — mirrors BXM's exported scaffoldDefaults.
 
 const path = require('path');
-const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
+const { renderSecretsBlock, renderEnvFileKeys } = require('@omega.js/config/env-delivery');
+
+// The framework's own manifest: its pinned Cloud Functions runtime is the Node
+// the deploy workflow runs on, the same one `engines.node` carries into the
+// staged manifest, so the runner can never deploy from a different major.
+const frameworkPackage = require('../../package.json');
+
+const WORKFLOW = '.github/workflows/deploy.yml';
 
 // minimatch FILE_MAP (last-match-wins). @omega.js/backend's contract:
 //   - everything copies on first scaffold only (consumer files are never clobbered)
@@ -33,6 +42,10 @@ const FILE_MAP = {
   // missing by the `**/*` rule above, never clobbered.
   'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
+  // The deploy workflow is FRAMEWORK-owned: re-rendered on every verb so the
+  // generated env block tracks the schema and the pinned node tracks the
+  // framework ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+  [WORKFLOW]: { overwrite: true },
 };
 
 /**
@@ -53,19 +66,57 @@ function scaffoldDefaults(options) {
   // rules; consumer content is never destroyed). Standalone projects keep them.
   const fileMap = { ...FILE_MAP };
   const { resolveSeedMode } = require('@omega.js/config');
-  if (!resolveSeedMode(options.outputDir).standalone) {
+  const seed = resolveSeedMode(options.outputDir);
+  const defaultsDir = options.defaultsDir || path.resolve(__dirname, '../defaults');
+
+  // The deploy workflow's env block and .env writer are GENERATED from the env
+  // schema (#627, #872): one `KEY: ${{ secrets.KEY }}` line per key delivered
+  // to backend, and the JSON list of the names its runtime reads, which the
+  // workflow's node writer serializes out of the runner env. Both are
+  // re-rendered on every verb, so a key added to the schema reaches CI without
+  // anyone editing a workflow.
+  fileMap[WORKFLOW] = {
+    ...fileMap[WORKFLOW],
+    template: {
+      versions: { node: String(parseInt(frameworkPackage.omega.functionsRuntime, 10)) },
+      githubSecrets: renderSecretsBlock('backend', { indent: '  ' }),
+      envFileKeys: renderEnvFileKeys('backend'),
+    },
+  };
+
+  if (!seed.standalone) {
     fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
+    // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
+    // .github/workflows/ in a brand monorepo can never fire. It is composed
+    // into the brand root below instead, scoped to this target's path.
+    fileMap['.github/**/*'] = { skip: true };
   }
 
-  return applyDefaults({
-    defaultsDir: options.defaultsDir || path.resolve(__dirname, '../defaults'),
+  const result = applyDefaults({
+    defaultsDir,
     outputDir: options.outputDir,
     fileMap,
+    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
+    // (#872): the brand lane gets it inside composeWorkflow below, a STANDALONE
+    // target here. The action and its pin live in ONE place.
+    transform: (contents) => renderInstallFirewall(contents),
     logger: options.logger,
   });
+
+  if (!seed.standalone) {
+    composeTargetWorkflows({
+      sourceDir: path.join(defaultsDir, '.github', 'workflows'),
+      targetDir: options.outputDir,
+      brandRoot: seed.brandRoot,
+      transform: (contents) => renderTemplate(contents, fileMap[WORKFLOW].template),
+      logger: options.logger || console,
+    });
+  }
+
+  return result;
 }
 
 module.exports = { scaffoldDefaults, FILE_MAP };

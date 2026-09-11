@@ -13,8 +13,18 @@ const path = require('node:path');
 const { execSync, execFileSync } = require('node:child_process');
 
 const { findBrandRoot, discoverTargets, frameworkPackagesOf } = require('./local.js');
+const { stageLocalPackages, STAGING_DIR } = require('./pack-local.js');
+const { pushSnapshot, waitForWorkflow, ghHeaders } = require('./deploy-snapshot.js');
 
 const API_BASE = 'https://api.github.com';
+
+// The branch a SNAPSHOT lands on, by what the brand is:
+// - a nested brand's repo is a MIRROR of the folder, so the snapshot IS that
+//   repo's source and it belongs on the default branch;
+// - a linked brand that owns its repo gets a snapshot BRANCH instead, so its
+//   real history never carries packed tarballs.
+const MIRROR_REF = 'main';
+const SNAPSHOT_REF = 'omega-deploy';
 
 /**
  * Parse a git remote URL into { owner, repo }.
@@ -139,12 +149,7 @@ async function dispatchWorkflow(plan, options = {}) {
   const fetchFn = options.fetchFn || fetch;
   const response = await fetchFn(plan.url, {
     method: plan.method,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${options.token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'omega-deploy',
-    },
+    headers: ghHeaders(options.token),
     body: JSON.stringify(plan.body),
   });
 
@@ -155,52 +160,149 @@ async function dispatchWorkflow(plan, options = {}) {
   return plan;
 }
 
+// The four things a lane DOES, in one injectable seam (the `steps` shape
+// `deploy-precheck` uses): the tests drive the order without a push, a pack or
+// a network call, and the defaults are the real modules.
+const LANE_STEPS = {
+  stage: stageLocalPackages,
+  push: pushSnapshot,
+  wait: waitForWorkflow,
+  sync: syncWorkingTree,
+};
+
 /**
- * The one deploy path: resolve repo + token, build the plan, dispatch — or
- * return the plan untouched when dryRun is set.
+ * The one deploy path: resolve repo + token, resolve the LANE, carry the code
+ * to GitHub the way that lane says, then dispatch. A dryRun returns the plan
+ * untouched instead.
+ *
+ * The lane runs only when the caller names a `dir` (a local tree). A
+ * server-side dispatch (the admin post route) has no working tree at all and
+ * addresses code GitHub already has, so it dispatches and nothing else.
+ *
  * @param {object} options
  * @param {string} options.workflow - workflow file name
+ * @param {string} [options.dir] - any dir inside the brand (turns the lane on)
  * @param {string} [options.cwd] - repo dir for remote resolution
  * @param {string} [options.owner] - explicit owner (skips git resolution)
  * @param {string} [options.repo] - explicit repo (skips git resolution)
- * @param {string} [options.ref] - branch (default main)
+ * @param {string} [options.ref] - branch (default: the lane's, else main)
  * @param {object} [options.inputs] - workflow inputs
  * @param {boolean} [options.dryRun] - build the plan but never send
+ * @param {boolean} [options.sync] - false skips the commit + push (the push
+ *   lane's whole delivery, and a linked own-repo brand's workflow sync)
+ * @param {string} [options.message] - commit/snapshot message
+ * @param {object} [options.logger] - logger with `log` (silent when omitted)
  * @param {object} [options.env] - env map for token resolution
  * @param {function} [options.fetchFn] - injectable fetch
  * @param {function} [options.execFn] - injectable exec
- * @returns {Promise<{ plan: object, dispatched: boolean }>}
+ * @param {object} [options.steps] - lane step overrides (tests)
+ * @returns {Promise<{ plan: object, dispatched: boolean, lane: object|null }>}
  */
 async function deployViaDispatch(options) {
   const target = options.owner && options.repo
     ? { owner: options.owner, repo: options.repo }
     : resolveRepo({ cwd: options.cwd, execFn: options.execFn });
 
+  const lane = options.dir ? resolveDeployLane({ dir: options.dir, execFn: options.execFn }) : null;
+  const logger = options.logger;
+
   const plan = buildDispatch({
     owner: target.owner,
     repo: target.repo,
     workflow: options.workflow,
-    ref: options.ref,
+    ref: options.ref || (lane ? lane.ref : null),
     inputs: options.inputs,
   });
 
   if (options.dryRun) {
-    return { plan, dispatched: false };
+    // The plan IS the dry run, the lane included: what would happen, with
+    // neither git nor the network touched.
+    return { plan, dispatched: false, lane };
   }
 
   const token = options.token || resolveToken({ env: options.env, execFn: options.execFn });
+  const steps = { ...LANE_STEPS, ...(options.steps || {}) };
+
+  if (lane && lane.mode === 'snapshot') {
+    // A linked brand that OWNS its repo syncs first: GitHub registers a
+    // workflow from the repo's DEFAULT branch (the listing and the dispatch
+    // both read the file from there, and the ref only picks the checkout the
+    // run uses), and the snapshot branch is not it. So the composed workflow
+    // reaches main through the developer's own commit and the snapshot carries
+    // only the tarballs ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+    // A nested brand has nobody to sync to: the enclosing repo is not the
+    // brand's, and the snapshot IS its repo's source.
+    if (lane.linked && !lane.nested && options.sync !== false) {
+      steps.sync({ cwd: lane.brandRoot, message: options.message, logger });
+    }
+
+    if (logger) {
+      logger.log(`Snapshotting ${lane.brandRoot} to ${target.owner}/${target.repo}#${plan.body.ref}${lane.linked ? ' (packing its linked packages)' : ''}`);
+    }
+
+    // Packed tarballs are files in the tree, so they ride the snapshot like
+    // anything else untracked and not ignored.
+    const staging = lane.linked
+      ? await steps.stage({ dir: lane.brandRoot, log: logger ? (line) => logger.log(line) : undefined })
+      : null;
+
+    try {
+      steps.push({
+        brandRoot: lane.brandRoot,
+        owner: target.owner,
+        repo: target.repo,
+        ref: plan.body.ref,
+        token,
+        message: options.message,
+        // What the stage just wrote has to reach the runner, so the push
+        // refuses a tree whose ignore rules would drop it.
+        require: staging ? [STAGING_DIR, 'package-lock.json'] : [],
+      });
+    } finally {
+      // ALWAYS, and as early as possible: the push carried the staged shape, so
+      // the developer's tree goes back before anything else can fail.
+      if (staging) {
+        await staging.restore();
+      }
+    }
+  } else if (lane) {
+    // A brand with no git repo has nothing to commit or push: the dispatch is
+    // the whole lane, on whatever GitHub already holds.
+    if (lane.repo && options.sync !== false) {
+      steps.sync({ cwd: lane.brandRoot, message: options.message, logger });
+    }
+  }
+
+  if (lane) {
+    // Both lanes wait the same way: GitHub indexes a workflow it has just
+    // received a few seconds late, and a brand's FIRST deploy is exactly the
+    // push that carries the composed file. The wait reads the default branch,
+    // which is where a dispatch reads the workflow from.
+    await steps.wait({
+      owner: target.owner,
+      repo: target.repo,
+      workflow: options.workflow,
+      ref: plan.body.ref,
+      token,
+      fetchFn: options.fetchFn,
+      logger,
+    });
+  }
+
   await dispatchWorkflow(plan, { token, fetchFn: options.fetchFn });
-  return { plan, dispatched: true };
+  return { plan, dispatched: true, lane };
 }
 
 /**
  * Find every `file:` @omega.js spec in the brand tree. npm resolves the
  * WHOLE workspace tree on any install, so one linked sibling target breaks a
  * CI install even when the deploying target is clean (the cp194 lesson —
- * linking is tree-wide, so detection is too). Deploy verbs use this to
- * AUTO-SELECT their local-artifact lane (mirrored rule, Ian 2026-07-20:
- * a linked brand ships the LOCAL framework — build here, ship the artifact;
- * CI dispatch is only for registry-clean trees).
+ * linking is tree-wide, so detection is too). `resolveDeployLane` reads it
+ * to pick the SNAPSHOT lane, which packs the linked frameworks so the runner
+ * installs the same code this tree runs
+ * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872); this replaces
+ * the 2026-07-20 rule that a linked brand built and shipped the artifact from
+ * this machine, which is `--direct` now).
  * @param {object} [options]
  * @param {string} [options.dir] - Any directory inside the brand (default cwd).
  * @returns {string[]} One line per offender: `<manifest> → <name>: <spec>`.
@@ -222,21 +324,62 @@ function findLocalSpecs(options = {}) {
 }
 
 /**
- * Throw when the brand tree carries `file:` @omega.js specs — for lanes with
- * no local-artifact fallback where dispatching would only burn a CI run.
- * @param {object} [options]
+ * The LANE a deploy takes, derived once for every target
+ * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+ *
+ * Two facts decide it, and neither is a preference:
+ * - NESTED: the brand root is not the toplevel of the git repo it sits in (a
+ *   brand inside this monorepo), so there is no repo whose contents ARE the
+ *   brand for a workflow to run from. Its declared repo is a MIRROR of the
+ *   folder, so the snapshot is that repo's source and lands on `main`.
+ * - LINKED: the brand tree carries a `file:` @omega.js spec anywhere. A runner
+ *   can install none of those, so the packed tarballs have to travel, and they
+ *   must never enter the brand's real history: the snapshot goes to its own
+ *   branch instead.
+ *
+ * Neither holding is the ordinary PUSH lane: commit, push the branch the
+ * developer is on, dispatch it. A brand outside git altogether (`repo` false)
+ * has nothing to commit or push, so its push lane is the dispatch alone.
+ *
+ * @param {object} [options] - Options.
  * @param {string} [options.dir] - Any directory inside the brand (default cwd).
- * @throws {Error} Listing every file:-spec'd @omega.js dependency, per target.
+ * @param {function} [options.execFn] - Injectable exec (tests).
+ * @returns {{ mode: string, ref: string, nested: boolean, linked: boolean, repo: boolean, brandRoot: string }}
+ *   The lane, plus the brand root every step of it works from.
  */
-function assertNoLocalSpecs(options = {}) {
-  const offenders = findLocalSpecs(options);
-  if (offenders.length > 0) {
-    throw new Error(
-      'Local file: packages are linked somewhere in this brand — CI cannot install them.\n'
-      + `  ${offenders.join('\n  ')}\n`
-      + 'Deploy from the local-artifact lane, or restore registry specs first (omega i live).'
-    );
+function resolveDeployLane(options = {}) {
+  const brandRoot = findBrandRoot(options.dir || process.cwd());
+  const execFn = options.execFn || ((cmd, opts) => execSync(cmd, opts).toString());
+  const git = (command) => {
+    try {
+      return String(execFn(command, { cwd: brandRoot, stdio: ['ignore', 'pipe', 'ignore'] })).trim();
+    } catch (e) {
+      // A brand outside git at all: there is nothing to snapshot and nothing to
+      // push, so the lane is the plain one and the deploy speaks for itself.
+      return '';
+    }
+  };
+
+  const toplevel = git('git rev-parse --show-toplevel');
+  const repo = Boolean(toplevel);
+  const nested = repo && path.resolve(toplevel) !== path.resolve(brandRoot);
+  const linked = findLocalSpecs({ dir: brandRoot }).length > 0;
+
+  if (nested) {
+    return { mode: 'snapshot', ref: MIRROR_REF, nested, linked, repo, brandRoot };
   }
+  if (linked && !toplevel) {
+    // A linked brand has to SNAPSHOT (the packed tarballs travel no other way),
+    // and a snapshot is built out of a git index, so no repo is no lane. Said
+    // by name HERE, because the push would otherwise die a step later on a raw
+    // `fatal: not a git repository` out of `git check-ignore` (#872).
+    throw new Error(`${brandRoot} is not inside a git repo, and a linked brand needs a git repo to snapshot from: \`git init\` the brand, or restore registry versions with \`omega i live\`.`);
+  }
+  if (linked) {
+    return { mode: 'snapshot', ref: SNAPSHOT_REF, nested, linked, repo, brandRoot };
+  }
+
+  return { mode: 'push', ref: git('git rev-parse --abbrev-ref HEAD') || MIRROR_REF, nested, linked, repo, brandRoot };
 }
 
 /**
@@ -281,6 +424,6 @@ module.exports = {
   dispatchWorkflow,
   deployViaDispatch,
   findLocalSpecs,
-  assertNoLocalSpecs,
+  resolveDeployLane,
   syncWorkingTree,
 };

@@ -18,7 +18,7 @@ async function run() {
   // alias table / the router's built-in help (the built-ins printed an empty
   // stub and version "0.0.0" — yargs can't resolve our package version here).
   const argv = require('yargs')(process.argv.slice(2))
-    .boolean(['extended', 'local', 'quick', 'q'])
+    .boolean(['extended', 'local', 'quick', 'q', 'direct', 'dry-run', 'sync', 'secrets'])
     .version(false)
     .help(false)
     .parseSync();

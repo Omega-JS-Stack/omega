@@ -36,12 +36,12 @@
  * can never shadow a brand edit.
  *
  * node_modules is NOT staged: local runs resolve up from dist/ to the target
- * root's install (plain Node resolution); deploys keep cp100d's
- * stage-local-packages (packed file: deps + lockfile) on top of this stage.
+ * root's install (plain Node resolution); deploys layer the devkit pack step
+ * (packed file: deps + lockfile, cp100d's rule) on top of this stage.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig, composeTargetEnv, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { composeTargetConfig, composeTargetEnv, artifactEnvValues, serializeEnv, resolveEnvChain, findBrandRoot, envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
 const { compileFirestoreRules, COMPILED_RULES_FILE, BRAND_RULES_FILE } = require('./compile-rules');
 const { isCustomProject } = require('./project-type');
 
@@ -183,6 +183,12 @@ function stageFunctions(options) {
   //     that stages composes this file, so a brand-root key reaches the
   //     upload without anyone remembering to run a manage first.
   const composed = composeTargetEnv({ targetDir: projectDir, target: 'backend', environment: options.environment });
+  //     The composer resolves every key the target CLAIMS, because the secrets
+  //     publisher needs the `ci` values too; the artifact's own .env is the
+  //     narrower half ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+  //     artifactEnvValues drops the runner-only keys, so the license key the
+  //     deploy checks with rides the deploy PROCESS and never the upload.
+  composed.values = artifactEnvValues('backend', composed.values);
   //     The one COMPUTED key in the file (#320): the deploy's license verdict,
   //     which no cascade layer can supply and no human writes. Deploy-only, so
   //     a local stage composes byte-identically to before.

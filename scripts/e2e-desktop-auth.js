@@ -198,6 +198,10 @@ function stageApp({ projectId, apiKey, ports }) {
     brand: {
       id: BRAND_ID,
       name: 'Desktop Auth E2E',
+      // The .deb target needs a homepage and a maintainer (#872): build-config
+      // refuses the config without them, so the staged brand spells both.
+      url: 'https://desktop-auth-e2e.test',
+      contact: { email: 'support@desktop-auth-e2e.test' },
       images: { icon: '' },
     },
     // The renderer's @omega.js/client reads `environment` + `dev.ports`: development

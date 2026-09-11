@@ -303,6 +303,28 @@ class FirebaseAPI {
     }
   }
 
+  /**
+   * A service account's OWN IAM policy (who may act as it), which is a
+   * different resource from the project policy: `roles/iam.serviceAccountUser`
+   * only counts when it is granted HERE
+   * ([#878](https://github.com/Omega-JS-Stack/omega/issues/878)).
+   *
+   * The sibling project-level read passes the policy version in its body; this
+   * IAM resource declares no request body and takes it on the query string.
+   */
+  async getServiceAccountIamPolicy(projectId, serviceAccountEmail) {
+    return this.request(`https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${serviceAccountEmail}:getIamPolicy?options.requestedPolicyVersion=3`, {
+      method: 'POST',
+    });
+  }
+
+  async setServiceAccountIamPolicy(projectId, serviceAccountEmail, policy) {
+    return this.request(`https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${serviceAccountEmail}:setIamPolicy`, {
+      method: 'POST',
+      body: JSON.stringify({ policy }),
+    });
+  }
+
   async createServiceAccount(projectId, accountId, displayName) {
     return this.request(`https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`, {
       method: 'POST',

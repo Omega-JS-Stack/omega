@@ -24,7 +24,7 @@
   "scripts": {
     "start": "npm run prepare:watch",
     "test": "node src/test/parse-audit.js && node bin/omega-backend test",
-    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },
   "engines": {

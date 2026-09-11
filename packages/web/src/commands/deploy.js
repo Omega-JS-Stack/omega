@@ -1,27 +1,33 @@
 /**
  * `omega deploy` — the explicit publish verb (D13: commits never
- * auto-publish). Syncs the working tree (commit + push — push triggers
- * NOTHING), then dispatches the scaffolded build workflow so CI runs the
- * SAME build and publishes to gh-pages.
+ * auto-publish). Delivers the brand to its repo and dispatches the scaffolded
+ * build workflow so CI runs the SAME build and publishes to gh-pages.
+ *
+ * ONE lane, the same one every target takes
+ * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the executor
+ * resolves it from the brand (`@omega.js/devkit/deploy`'s resolveDeployLane):
+ * a nested or linked brand packs its local frameworks and force-pushes a
+ * SNAPSHOT of the brand folder, an ordinary brand commits and pushes. Then it
+ * waits for the workflow and dispatches. A linked tree no longer switches
+ * itself to the direct lane; `--direct` is how a human asks for that.
  *
  * Every run starts with the local scaffold the retired `omega setup` used to
- * own (ensureTarget) and, on the dispatch lane, its NETWORK half as a precheck:
- * the brand's .env keys are published as repo secrets so CI has what the
- * scaffolded workflow asks for. `--no-secrets` opts out.
+ * own (ensureTarget) and its NETWORK half as a precheck: the brand's .env keys
+ * are published as repo secrets so CI has what the scaffolded workflow asks
+ * for. `--no-secrets` opts out.
  *
- * Flags: --dry-run (print the exact dispatch, send nothing; skips sync),
- * --local (production build only — no sync, no dispatch),
- * --no-sync (dispatch without committing/pushing first),
+ * Flags: --dry-run (print the exact dispatch, send nothing; skips the push),
+ * --local (production build only: no push, no dispatch),
+ * --no-sync (dispatch without committing/pushing first: the push lane, and a linked own-repo brand's workflow sync),
  * --direct (build + push dist straight to the brand repo's gh-pages —
- * the no-CI path: cp117b for the pipeline command, and any brand whose
+ * the no-CI path: the pipeline command's lane, and any brand whose
  * repo has no workflows yet; CI dispatch stays the default verb).
- * Refuses to deploy with local `file:` packages installed.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
-const { deployViaDispatch, dispatchRepo, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
 const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { deployPrecheck } = require('./lib/deploy-precheck.js');
@@ -371,8 +377,6 @@ module.exports = async function (options) {
   // what writes that manifest on a virgin target.
   ensureTarget({ projectDir: process.cwd(), log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
-  const project = require(path.join(process.cwd(), 'package.json'));
-
   // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
   // dir under a per-target name (#265) — dispatch what setup actually composed.
   const WORKFLOW = composedWorkflowName({
@@ -394,17 +398,6 @@ module.exports = async function (options) {
     return;
   }
 
-  // Linked local packages (tree-wide @omega.js file: specs — cp194: one
-  // linked SIBLING breaks the CI install — or any file: dep in THIS target) →
-  // the DIRECT lane automatically. Mirrored rule (Ian 2026-07-20): a linked
-  // brand ships the LOCAL framework — build here, push output; CI dispatch
-  // is only for registry-clean trees.
-  const allDeps = JSON.stringify(project.dependencies || {}) + JSON.stringify(project.devDependencies || {});
-  if (findLocalSpecs({ dir: process.cwd() }).length > 0 || allDeps.includes('file:')) {
-    logger.log('Linked local packages detected — deploying via the DIRECT lane (local build, output-only push). CI dispatch resumes after `omega i live`.');
-    return deployDirect({ dryRun });
-  }
-
   // The NETWORK half of the retired setup, as a precheck before the dispatch:
   // the workflow reads its secrets from the repo, so they are published here
   // rather than by a command someone had to remember (#675). A dry run sends
@@ -413,21 +406,29 @@ module.exports = async function (options) {
     await deployPrecheck({ projectDir: process.cwd(), options, logger });
   }
 
-  if (!dryRun && options.sync !== false) {
-    logger.log('Syncing (commit + push — publishes nothing by itself)...');
-    syncWorkingTree({ message: 'Deploy', logger });
-  }
-
+  // ONE lane for all four targets ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)):
+  // the executor resolves it from the BRAND (`dir`): a nested or linked brand
+  // packs its local frameworks and pushes a snapshot, a registry-clean brand
+  // that is its own repo syncs and pushes. Then it waits for the workflow and
+  // dispatches. `--no-sync` skips the push on both lanes that have one.
   const { owner, repo } = dispatchAddress();
-  const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, owner, repo, dryRun });
+  const { plan, dispatched, lane } = await deployViaDispatch({
+    workflow: WORKFLOW,
+    owner,
+    repo,
+    dir: process.cwd(),
+    dryRun,
+    sync: options.sync !== false,
+    logger,
+  });
 
   if (dispatched) {
     const { targetInstance } = require('@omega.js/config');
     require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: targetInstance(process.cwd(), 'web'), detail: { method: 'dispatch' } });
-    logger.log(`Dispatched ${WORKFLOW} — CI builds and publishes this deploy.`);
+    logger.log(`Dispatched ${WORKFLOW} (${lane.mode} lane, ref ${lane.ref}): CI builds and publishes this deploy.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {
-    logger.log('DRY RUN — would send:');
+    logger.log(`DRY RUN (${lane.mode} lane, ref ${lane.ref}), would send:`);
     logger.log(`  ${plan.method} ${plan.url}`);
     logger.log(`  body: ${JSON.stringify(plan.body)}`);
     logger.log(`  then watch: ${plan.runsUrl}`);

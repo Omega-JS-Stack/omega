@@ -9,7 +9,7 @@ const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
-const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -149,7 +149,12 @@ function siteTokenTransform(contents, item) {
   }
 
   try {
-    return template(contents, {
+    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
+    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): this pass
+    // writes a STANDALONE target's own copy, and composeWorkflow renders the
+    // same token on the brand-root copy. The action and its pin live in ONE
+    // place, so the template restates neither.
+    return renderInstallFirewall(template(contents, {
       site: config,
       versions: cleanVersions.versions,
       extension: {
@@ -164,7 +169,7 @@ function siteTokenTransform(contents, item) {
       githubSecrets: renderSecretsBlock('extension', { indent: '  ' }),
     }, {
       brackets: ['[', ']'],
-    });
+    }));
   } catch (error) {
     logger.error(`Error processing templates in ${item.name}:`, error);
     return contents;

@@ -36,6 +36,23 @@ function tmpTarget(env) {
   return dir;
 }
 
+/**
+ * A `git` stub that answers PER COMMAND. The publisher resolves the deploy lane
+ * before it guards ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
+ * so `rev-parse --show-toplevel` has to answer that this checkout IS the brand
+ * root: an unplaced answer reads as a NESTED brand, whose remote names the
+ * enclosing repo by construction and whose mismatch guard is therefore skipped.
+ *
+ * @param {string|function} remote - What `git config --get remote.origin.url` answers (or throws).
+ * @returns {function} `(command, options) => string`
+ */
+function gitStub(remote) {
+  return (command, options) => {
+    if (command.includes('rev-parse')) return `${options.cwd}\n`;
+    return typeof remote === 'function' ? remote() : remote;
+  };
+}
+
 /** A brand root (config/omega.json5) with a target under targets/. */
 function tmpBrand(options) {
   const { brandEnv, targetEnv } = options || {};
@@ -262,6 +279,9 @@ test('setup step: no remote, no .env, and CI each skip LOUDLY without touching g
   const noGh = () => { throw new Error('gh must not run'); };
 
   const remoteless = tmpTarget('GH_TOKEN=ghp\n');
+  // The brand DECLARES its repo: that guard runs first, so a target without one
+  // never reaches the remote probe this case is about.
+  declareRepo(remoteless, 'acme/site');
   const warnings = [];
   const loud = { log: (m) => warnings.push(m), warn: (m) => warnings.push(m), error: (m) => warnings.push(m) };
 
@@ -271,7 +291,7 @@ test('setup step: no remote, no .env, and CI each skip LOUDLY without touching g
       logger: loud,
       env: {},
       execFn: noGh,
-      gitExecFn: () => { throw new Error('fatal: no such remote'); },
+      gitExecFn: gitStub(() => { throw new Error('fatal: no such remote'); }),
     }),
     { skipped: 'no-remote' },
   );
@@ -338,7 +358,7 @@ test('setup step: a remote that is not the brand\'s own repo skips loudly (never
       targetDir: dir,
       logger: loud,
       env: {},
-      gitExecFn: () => 'git@github.com:Omega-JS-Stack/omega.git\n',
+      gitExecFn: gitStub('git@github.com:Omega-JS-Stack/omega.git\n'),
       execFn: () => { throw new Error('gh must not run'); },
     }),
     { skipped: 'repo-mismatch' },
@@ -350,7 +370,7 @@ test('setup step: a remote that is not the brand\'s own repo skips loudly (never
     targetDir: dir,
     logger: quiet,
     env: {},
-    gitExecFn: () => 'git@github.com:acme/my-brand-omega.git\n',
+    gitExecFn: gitStub('git@github.com:acme/my-brand-omega.git\n'),
     execFn: () => '',
   });
   assert.deepStrictEqual(published.published, ['GH_TOKEN']);

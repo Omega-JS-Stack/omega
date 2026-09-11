@@ -104,6 +104,32 @@ module.exports = defineCases({
     },
 
     {
+      name: 'the-license-key-rides-the-deploy-process-never-the-upload',
+      auth: 'none',
+
+      // #320 + #872: the backend deploy runs on a runner now, so the license
+      // key is delivered to this target (`ci`) and the composer resolves it,
+      // which is how the precheck publishes it as the repo secret the workflow
+      // injects. The ARTIFACT is the narrower half: a functions upload carrying
+      // the brand's license key is the one thing #320 forbids.
+      async run({ assert }) {
+        const { root, targetDir } = seedBrand({
+          brandEnv: 'OMEGA_LICENSE_KEY="omg_live_brand"\nOMEGA_ADMIN_KEY="brand-admin"\n',
+        });
+
+        try {
+          const env = stagedEnv(targetDir, { environment: 'production', licenseStatus: 'licensed' });
+
+          assert.equal(env.OMEGA_LICENSE_KEY, undefined, 'a runner-only key never lands in the .env the upload ships with');
+          assert.equal(env.OMEGA_LICENSE_STATUS, 'licensed', 'the VERDICT is what the artifact carries');
+          assert.equal(env.OMEGA_ADMIN_KEY, 'brand-admin', 'every `env` delivery still composes');
+        } finally {
+          jetpack.remove(root);
+        }
+      },
+    },
+
+    {
       name: 'the-target-env-wins-per-key',
       auth: 'none',
 

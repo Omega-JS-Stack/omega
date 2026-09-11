@@ -8,6 +8,6 @@
  * users/abc123` would lose the doc path the same way).
  */
 
-const BOOLEAN_FLAGS = ['extended', 'legacy', 'force', 'raw', 'emulator', 'seed', 'seed-campaigns', 'production', 'offline'];
+const BOOLEAN_FLAGS = ['extended', 'legacy', 'force', 'raw', 'emulator', 'seed', 'seed-campaigns', 'production', 'offline', 'direct', 'dry-run', 'secrets', 'sync'];
 
 module.exports = { BOOLEAN_FLAGS };

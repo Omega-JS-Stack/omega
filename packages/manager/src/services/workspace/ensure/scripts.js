@@ -45,9 +45,10 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
   }
 
   const { scripts, changes } = healPackageScripts(pkg);
+  // What the walk could not read, carried into the run summary below
+  const warnings = [];
 
   const targetWork = [];
-  const warnings = [];
   for (const entry of targets) {
     // A custom target's scripts are the brand's own contract (#603) — no
     // framework declares them, so there is nothing to sync against
@@ -85,7 +86,10 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
     return null;
   }
 
-  if (options.dryRun) {
+  // A warnings-only run has nothing to plan (a target manifest that will not
+  // parse): it falls through to the warned return below, so `--dry-run` reports
+  // the same status a real run would.
+  if (options.dryRun && (changes.length || targetWork.length)) {
     const parts = [];
     if (changes.length) parts.push(`heal root scripts (${changes.join(', ')})`);
     for (const work of targetWork) {

@@ -28,7 +28,7 @@ const { validateConfig, runSchema, formatErrors, resolvedBrandHost } = require('
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, reloadEnv, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
-const { WORKFLOW_OWNED_KEYS, workflowSecretKeys, bakeKeys, publishSecretKeys, renderSecretsBlock } = require('./env-delivery.js');
+const { WORKFLOW_OWNED_KEYS, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
 const { checkEnvRules } = require('./env-rules.js');
 const { readCompanyRoot, COMPANY_MARKER } = require('./company.js');
 const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('./edit.js');
@@ -104,9 +104,12 @@ module.exports = {
   // a hand-written list, and a secret can never bake into an artifact
   WORKFLOW_OWNED_KEYS,
   workflowSecretKeys,
+  envFileKeys,
+  artifactEnvValues,
   bakeKeys,
   publishSecretKeys,
   renderSecretsBlock,
+  renderEnvFileKeys,
 
   // The env presence checker (#626) — the ONE evaluator of `required` and
   // `requiredWhen`; every consumer calls it, none keeps its own if

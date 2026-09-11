@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { evaluatePipeline, findRunRecord, resolveVerifyTargets, buildChildArgs, CORE_SERVICES } = require('../src/commands/pipeline.js');
+const { evaluatePipeline, findRunRecord, resolveVerifyTargets, buildChildArgs, CORE_SERVICES, DEPLOY_LEGS, PUBLISH_LEGS } = require('../src/commands/pipeline.js');
 const { runVerifyLegs } = require('../src/lib/verify-live.js');
 
 /** Full-run record where every core service is green. */
@@ -105,6 +105,17 @@ test('pipeline: deploy legs ride the same rules — an error leg fails, a green 
   const verdict = evaluatePipeline(bad);
   assert.equal(verdict.pass, false);
   assert.match(verdict.failures[0], /deploy:backend: error — exit 1/);
+});
+
+// #872: every target's bare `omega deploy` is a CI dispatch now. The pipeline
+// is the LOCAL lane, so the legs it can run from this machine say so.
+test('pipeline: the deployable legs run LOCALLY (--direct), the publish legs stay gated', () => {
+  assert.deepEqual(DEPLOY_LEGS.web, ['npm', 'run', 'deploy', '--', '--direct']);
+  assert.deepEqual(DEPLOY_LEGS.backend, ['npm', 'run', 'deploy', '--', '--direct'], 'the backend leg deploys from this machine, not through CI');
+
+  for (const target of PUBLISH_LEGS) {
+    assert.ok(!DEPLOY_LEGS[target].includes('--direct'), `${target} is a gated publish leg, never a local one`);
+  }
 });
 
 test('pipeline: verify targets follow the deploy legs; --verify alone sweeps every verifiable target', () => {

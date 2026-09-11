@@ -21,9 +21,20 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
 
+// The same consumer, with the framework installed from a `file:` spec: a LINK
+// (a directory) or the packed tarball a deploy snapshot ships.
+function stageLocalConsumer(spec, dir) {
+  const tmp = stageConsumer(dir);
+  const manifestPath = path.join(tmp, 'package.json');
+  const manifest = jetpack.read(manifestPath, 'json');
+  manifest.devDependencies[package.name] = spec;
+  jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return tmp;
+}
+
 // A consumer whose peer deps are already satisfied — the steady state.
-function stageConsumer() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-ensure-'));
+function stageConsumer(dir) {
+  const tmp = dir || fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-ensure-'));
   const devDependencies = { [package.name]: `^${package.version}` };
   for (const [name, ver] of Object.entries(package.peerDependencies || {})) {
     devDependencies[name] = ver;
@@ -115,6 +126,46 @@ module.exports = defineCases({
         const result = await deployPrecheck({ projectDir: '/tmp/x', options: {}, logger: quiet, steps });
         ctx.expect(ran).toEqual(['framework-freshness', 'validate-certs', 'provision-repos', 'push-secrets']);
         ctx.expect(result.ran).toEqual(ran);
+      },
+    },
+    // Locality ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): a
+    // `file:` spec is only a LINK when it points at a directory. The deploy
+    // snapshot installs the framework from a packed tarball, which publishes
+    // exactly like a registry install, and warning on it told every CI run its
+    // own lane was broken.
+    {
+      name: 'a `file:` link to a directory still warns that it never publishes',
+      run: async (ctx) => {
+        const tmp = stageLocalConsumer('file:./local-framework');
+        jetpack.write(path.join(tmp, 'local-framework', 'package.json'), `${JSON.stringify({ name: package.name, version: package.version })}\n`);
+
+        try {
+          const warnings = [];
+          await ensureTarget({ projectDir: tmp, warn: (message) => warnings.push(message) });
+
+          ctx.expect(warnings.some((message) => message.includes('WILL NOT WORK when published'))).toBe(true);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'a `file:` spec pointing at a packed tarball never warns',
+      run: async (ctx) => {
+        // The real snapshot layout: the target sits two levels under the brand
+        // root and the packed tarballs live at the root.
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-snapshot-'));
+        const tmp = stageLocalConsumer('file:../../omega_modules/omega.js-desktop-0.50.0.tgz', path.join(root, 'targets', 'desktop'));
+        jetpack.write(path.join(root, 'omega_modules', 'omega.js-desktop-0.50.0.tgz'), 'not really a tarball');
+
+        try {
+          const warnings = [];
+          await ensureTarget({ projectDir: tmp, warn: (message) => warnings.push(message) });
+
+          ctx.expect(warnings.some((message) => message.includes('WILL NOT WORK when published'))).toBe(false);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
       },
     },
     {

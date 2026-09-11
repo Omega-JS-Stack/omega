@@ -229,12 +229,12 @@ const ENV_SCHEMA = [
   {
     name:        'OMEGA_LICENSE_KEY',
     owner:       'workspace',
-    targets:     ['web', 'desktop', 'extension'],
+    targets:     ['web', 'backend', 'desktop', 'extension'],
     group:       'license',
     secret:      true,
     required:    false,
-    delivery:    { web: 'ci', desktop: 'ci', extension: 'ci' },
-    description: 'The omegajs.dev account API key that licenses this brand: a deploy checks it with the omega backend and bakes the verdict into the artifact — payments live and no omega attribution, or payments gated and attribution shown. It travels CLI → server at deploy time ONLY: every delivery is `ci` (the three targets whose deploys build on a runner), it never bakes, and the backend — which deploys straight from the CLI — takes no delivery at all, so it can never land in the .env the functions artifact ships with.',
+    delivery:    { web: 'ci', backend: 'ci', desktop: 'ci', extension: 'ci' },
+    description: 'The omegajs.dev account API key that licenses this brand: a deploy checks it with the omega backend and bakes the verdict into the artifact, payments live and no omega attribution, or payments gated and attribution shown. It travels CLI → server at deploy time ONLY: every delivery is `ci`, on all four targets, because every deploy now runs on a runner (the backend since [#872](https://github.com/Omega-JS-Stack/omega/issues/872), whose `omega deploy --direct` step reads the key out of the workflow env and would otherwise stamp every CI deploy `keyless`). It never bakes, and `ci` is what keeps it out of every backend `.env`: the workflow writes only `env` deliveries, and the stage strips the runner-only keys out of the composed values, so it can never land in the .env the functions artifact ships with.',
   },
 
   // ── third-party credentials, by owning service ───────────────────────────
@@ -964,6 +964,16 @@ const ENV_SCHEMA = [
     secret:      false,
     required:    false,
     description: "The deploy-time license verdict (#320), written into dist/.env by the backend deploy itself — `licensed` or `keyless`. It is COMPUTED, never supplied: the runtime group renders no brand .env line, so nothing composes one down from the brand layer. The payment provider libraries refuse live processing on `keyless`; absent (every local lane, the emulator, a test) is today's behavior exactly.",
+  },
+  {
+    name:        'OMEGA_SERVICE_ACCOUNT_JSON',
+    owner:       'cloud',
+    targets:     ['backend'],
+    group:       'runtime',
+    secret:      true,
+    required:    false,
+    delivery:    { backend: 'ci' },
+    description: "The deploy credential, as the service-account JSON's own CONTENTS ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the backend deploy runs on a runner now, and a runner has no `.omega/secrets/` to read the key file from, so the deploy precheck publishes the file's bytes as this repo secret and the composed workflow writes them back to the path `firebase deploy` authenticates with. It is a FILE everywhere else, so it renders no brand .env line (the runtime group) and never composes into the artifact's own .env.",
   },
   {
     name:        'CLAUDE_CODE_OAUTH_TOKEN',

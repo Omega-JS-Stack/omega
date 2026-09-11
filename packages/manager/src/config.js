@@ -709,6 +709,7 @@ const OPERATIONS = {
     { name: 'org', ensure: true },        // Org profile matches the brand (skipped for shared orgs)
     { name: 'repo', ensure: true },       // The brand-monorepo repo exists with the right settings
     { name: 'pages', ensure: true },      // GitHub Pages on gh-pages + custom domain (web target)
+    { name: 'runners', ensure: true },    // Org runner group serves the public repo (#872: desktop + self-hosted Windows signer)
   ],
 
   edge: [

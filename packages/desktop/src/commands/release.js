@@ -2,8 +2,13 @@
 //
 // Replaces the old "do it from my laptop" release flow with "let CI do it, but make it
 // feel local." User runs `npm run release` (or `npx omega release`) and gets:
-//   1. A workflow_dispatch POST to GH Actions on the brand's repo (owner/repo from the
-//      config, and the workflow file the scaffold actually wrote: see dispatchTarget).
+//   1. The ONE deploy lane every target takes (`@omega.js/devkit/deploy`'s
+//      deployViaDispatch, #872): the brand is delivered to its repo (packed +
+//      snapshot-pushed when it is nested or linked, committed + pushed when it
+//      is neither, and BOTH when it is linked and owns its repo, because GitHub
+//      registers a workflow from the default branch), and the workflow is
+//      dispatched on the ref that lane chose (the brand's own repo and the
+//      composed workflow name: see dispatchTarget).
 //   2. A few seconds of waiting while GH spins up the run.
 //   3. Live polling of every job's logs at 5s intervals, printing NEW lines as they
 //      arrive (job-prefixed) so it looks like streaming.
@@ -20,7 +25,7 @@ const fs       = require('fs');
 const jetpack  = require('fs-jetpack');
 
 const { getOctokit } = require('../utils/github.js');
-const { dispatchRepo } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
 const Manager = new (require('../build.js'));
 
 const logger = Manager.logger('release');
@@ -43,9 +48,6 @@ module.exports = async function release(options = {}) {
 
   const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: Manager.getConfig() });
 
-  // Discover ref (current branch or override via --ref).
-  const ref = options.ref || (await currentBranch(projectRoot)) || 'main';
-
   // Optional --platforms / --platform flag forwarded as a workflow input. Accepts a
   // single value ('windows') or comma-separated list ('mac,linux'). Special value
   // 'all' or undefined builds every platform — same as the workflow's default. We
@@ -53,17 +55,27 @@ module.exports = async function release(options = {}) {
   // workflows (without a `platforms` input declared) keep working unchanged.
   const platforms = options.platforms || options.platform || null;
 
-  const dispatchArgs = { owner, repo, workflow_id: WORKFLOW_FILE, ref };
-  if (platforms) dispatchArgs.inputs = { platforms: String(platforms) };
-
   const platformsLabel = platforms ? ` (platforms=${platforms})` : '';
-  logger.log(`Triggering ${owner}/${repo} workflow ${WORKFLOW_FILE} on ref=${ref}${platformsLabel}...`);
+  logger.log(`Triggering ${owner}/${repo} workflow ${WORKFLOW_FILE}${platformsLabel}...`);
 
   // 1. Mark a "before" timestamp so we can identify the new run we just dispatched.
   const before = new Date();
 
-  // 2. Dispatch.
-  await octokit.rest.actions.createWorkflowDispatch(dispatchArgs);
+  // 2. Deliver the brand and dispatch, through the ONE lane (#872). The ref is
+  // the lane's to choose (`main` for a nested brand's mirror repo, the
+  // snapshot branch for a linked one, the current branch on the push lane),
+  // and an explicit `--ref` still wins.
+  const { lane } = await deployViaDispatch({
+    workflow: WORKFLOW_FILE,
+    owner,
+    repo,
+    dir: projectRoot,
+    ref: options.ref,
+    inputs: platforms ? { platforms: String(platforms) } : undefined,
+    sync: options.sync !== false,
+    logger,
+  });
+  logger.log(`Dispatched ${WORKFLOW_FILE} (${lane.mode} lane, ref ${lane.ref}): CI builds, signs, and publishes the release artifacts.`);
 
   // 3. Wait for the new run to appear (GH Actions takes a few seconds to register it).
   const run = await waitForNewRun({ octokit, owner, repo, after: before, workflowFile: WORKFLOW_FILE });
@@ -260,16 +272,6 @@ async function waitForNewRun({ octokit, owner, repo, after, workflowFile }) {
 function formatStatusBanner(run, jobs) {
   const parts = jobs.map((j) => `${jobSymbol(j)} ${j.name}`);
   return `── ${run.status}${run.conclusion ? ` (${run.conclusion})` : ''} ── ${parts.join('  |  ')}`;
-}
-
-async function currentBranch(projectRoot) {
-  try {
-    const { execute } = require('node-powertools');
-    const out = await execute('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot, log: false });
-    return String(out || '').trim();
-  } catch (e) {
-    return null;
-  }
 }
 
 function sleep(ms) {

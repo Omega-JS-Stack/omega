@@ -29,6 +29,22 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
+// The ONE pinned Socket Firewall action. A workflow installs the firewall
+// through Socket's own action rather than through npm ([#871](https://github.com/Omega-JS-Stack/omega/issues/871)):
+// the action downloads the binary with the job's token, so a hosted runner's
+// shared anonymous GitHub API quota never fails the step, and it caches it.
+// Pinning a new version is this one edit, and every brand picks it up on its
+// next verb ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+const FIREWALL_ACTION = 'SocketDev/action@v1.3.2';
+
+// The token every framework template carries where that step belongs, on its
+// own line, indented as the list item it becomes.
+const FIREWALL_TOKEN = '{{ installFirewall }}';
+
+// The action step's `id`, so the Windows shim below can read the binary path
+// the action reports (`firewall-path-binary`) instead of guessing at it.
+const FIREWALL_STEP_ID = 'omega-firewall';
+
 /**
  * Action inputs that name a path inside the checkout, per action. `uses:` steps
  * ignore `working-directory:` entirely (it is a `run:` key), so a composed
@@ -48,6 +64,49 @@ const SCOPED_ACTION_INPUTS = {
 };
 
 /**
+ * Render every `{{ installFirewall }}` token into the pinned Socket Firewall
+ * step, at the indentation the token itself stands at.
+ *
+ * The step is written ONCE, here, instead of four times across the framework
+ * templates: the action and its version live in `FIREWALL_ACTION` above, so a
+ * version bump is one edit rather than a sweep of every template that happens
+ * to install the firewall ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+ * A template carrying no token is returned untouched.
+ *
+ * @param {string} contents - The workflow template.
+ * @returns {string} The same text with every token replaced.
+ */
+function renderInstallFirewall(contents) {
+  return contents.replace(new RegExp(`^([ \\t]*)${escapeRegExp(FIREWALL_TOKEN)}[ \\t]*$`, 'gm'), (full, indent) => [
+    `${indent}# The firewall binary comes through Socket's own action (#871): it downloads`,
+    `${indent}# with the job's token, so the shared anonymous GitHub API quota of a hosted`,
+    `${indent}# runner never fails the step, and it caches the binary between runs.`,
+    `${indent}- name: Install Socket Firewall`,
+    `${indent}  id: ${FIREWALL_STEP_ID}`,
+    `${indent}  uses: ${FIREWALL_ACTION}`,
+    `${indent}  with:`,
+    `${indent}    mode: firewall-free`,
+    // The action caches the Windows binary under the extension-less name `sfw`
+    // and puts its directory on PATH. cmd.exe cannot execute a file with no
+    // extension, and the desktop build forces `shell: cmd` on Windows, so every
+    // windows leg died on `'sfw' is not recognized` (#872). One copy next to the
+    // original, named `sfw.exe`, and cmd finds it through the same PATH entry.
+    // Rendered on every template: the `if` makes it a no-op everywhere else.
+    // Under cmd, not bash: a self-hosted Windows box (the EV signer) has no bash
+    // on the runner's PATH, and cmd is the one shell every Windows runner has.
+    `${indent}- name: Expose Socket Firewall to cmd (Windows)`,
+    `${indent}  if: runner.os == 'Windows'`,
+    `${indent}  shell: cmd`,
+    `${indent}  run: copy "\${{ steps.${FIREWALL_STEP_ID}.outputs.firewall-path-binary }}" "\${{ steps.${FIREWALL_STEP_ID}.outputs.firewall-path-binary }}.exe"`,
+  ].join('\n'));
+}
+
+/** The literal, safe to drop into a RegExp. */
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Compose one framework workflow template for a target inside a brand monorepo.
  * Pure: text in, text out.
  * @param {string} contents - The (already rendered) workflow template
@@ -60,7 +119,9 @@ function composeWorkflow(contents, options) {
   const targetPath = options.targetPath;
   const targetName = options.targetName;
 
-  let composed = contents;
+  // Before anything else, so the scoping pass below sees the rendered step for
+  // what it is: a `uses:` step, which is never scoped to the target dir.
+  let composed = renderInstallFirewall(contents);
 
   // Display name carries the target — two targets' runs are told apart in the
   // Actions list, where only the workflow name shows.
@@ -517,4 +578,4 @@ function header(targetPath) {
   ].join('\n');
 }
 
-module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows };
+module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows, renderInstallFirewall, FIREWALL_ACTION, FIREWALL_STEP_ID, FIREWALL_TOKEN };

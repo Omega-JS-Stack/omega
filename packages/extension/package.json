@@ -27,7 +27,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "test": "node ./bin/omega-extension test"
   },

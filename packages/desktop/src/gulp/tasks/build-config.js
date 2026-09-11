@@ -92,6 +92,10 @@ module.exports = function buildConfig(done) {
       logger.log('Applied electronBuilder overrides from omega.json5');
     }
 
+    // The deb target's metadata, checked AFTER the overrides so a consumer that
+    // spells `linux.maintainer` itself passes (#872).
+    assertLinuxPackageMetadata(builderConfig);
+
     // Serialize to YAML and write.
     const yml = yaml.dump(builderConfig, { lineWidth: -1, noRefs: true });
     jetpack.write(distPath, yml);
@@ -212,6 +216,18 @@ function baseConfig(config, extras = {}) {
   const artifactTemplate = (platform, artifact) => desktopArtifactName(productName, platform, artifact, '${ext}');
   const safeProductName = sanitizeProductName(productName);
 
+  // The two METADATA facts the .deb target requires, both from the BRAND
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)). electron-builder
+  // reads the homepage off the app's package.json, never off its own config, and
+  // `extraMetadata` is the block it merges into that manifest at build time; the
+  // maintainer is `linux.maintainer`, else the manifest's `author` name + email.
+  // Missing, they fail the deb build LATE, after the AppImage has already
+  // published, which is what run 34584322778 did. Absent values are left OUT
+  // here (never an empty string) and named by assertLinuxPackageMetadata below.
+  const homepage = trimmed(config.brand.url);
+  const supportEmail = trimmed(config.brand.contact?.email);
+  const maintainer = supportEmail ? `${config.brand.name || productName} <${supportEmail}>` : '';
+
   // Build linux target list — `deb` + `AppImage` always; `snap` if enabled.
   const linuxTargets = [
     { target: 'deb',      arch: linuxArch },
@@ -225,6 +241,10 @@ function baseConfig(config, extras = {}) {
     appId,
     productName,
     copyright,
+
+    // Merged into the app's package.json for the build: the only way to hand
+    // electron-builder a homepage, which the .deb target requires (#872).
+    ...(homepage ? { extraMetadata: { homepage } } : {}),
 
     directories: {
       output:         'release',
@@ -243,6 +263,17 @@ function baseConfig(config, extras = {}) {
       // the file content differs between the x64 and arm64 builds.
       '!logs/**',
       '!**/logs/**',
+      // Scratch and state dirs are never app content (#866): the boot runner stages
+      // .omega/test-app with symlinks into the target, and the packager followed
+      // them (dangling after a folder rename). src/ stays: the runtime reads
+      // src/integrations/* from the app root. Root-anchored on purpose: these dirs
+      // exist only at the target root (logs/ above also appears inside node_modules).
+      '!.omega/**',
+      '!.claude/**',
+      '!.temp/**',
+      '!.cache/**',
+      '!.gh-runners/**',
+      '!test/**',
     ],
 
     asar: true,
@@ -302,6 +333,7 @@ function baseConfig(config, extras = {}) {
     linux: {
       target:       linuxTargets,
       category:     category.linux,
+      ...(maintainer ? { maintainer } : {}),
       // The FALLBACK, which only the snap reaches — deb and AppImage are the
       // two published artifacts and carry their own names below. The snap is
       // never a release asset (the Snap Store publishes it), so it keeps ${arch}.
@@ -433,6 +465,41 @@ function shouldInjectLSUIElement(config) {
     || config?.startup?.openAtLogin?.mode === 'hidden';
 }
 
+// A config string with something in it, else ''. Never `undefined` leaking into
+// a rendered YAML value.
+function trimmed(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Refuse to write a config whose .deb target cannot build (#872). electron-builder
+ * fails on a missing homepage or maintainer at PACKAGE time, one target into the
+ * linux run and after the AppImage has uploaded; this says the same thing at
+ * config time, naming the omega.json5 key to set.
+ *
+ * @param {object} builderConfig - The composed electron-builder config.
+ */
+function assertLinuxPackageMetadata(builderConfig) {
+  const targets = (builderConfig.linux?.target || []).map((entry) => (typeof entry === 'string' ? entry : entry?.target));
+  if (!targets.includes('deb')) {
+    return;
+  }
+
+  const missing = [];
+  if (!builderConfig.extraMetadata?.homepage) {
+    missing.push('brand.url (the .deb needs a project homepage)');
+  }
+  if (!builderConfig.linux?.maintainer) {
+    missing.push('brand.contact.email (the .deb needs a package maintainer)');
+  }
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  throw new Error(`The linux .deb target cannot be built from this config. Set in config/omega.json5: ${missing.join('; ')}. A brand that genuinely has neither can spell targets.desktop.electronBuilder.linux.maintainer and .extraMetadata.homepage directly.`);
+}
+
 // Exported for tests. deepMerge is @omega.js/config's (cp73c consolidation) —
 // same contract the local copy had: objects merge per-key, arrays REPLACE
 // (consumer `mac.target: [...]` fully replaces ours, never concatenates).
@@ -443,3 +510,4 @@ module.exports.publishConfig = publishConfig;
 module.exports.expandYear    = expandYear;
 module.exports.resolveCategory = resolveCategory;
 module.exports.CATEGORY_MAP  = CATEGORY_MAP;
+module.exports.assertLinuxPackageMetadata = assertLinuxPackageMetadata;

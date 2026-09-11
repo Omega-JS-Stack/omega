@@ -22,7 +22,9 @@
  *  - `--dry-run` forwards to the child (plan-only pass, still asserted).
  *  - `--deploy=web,backend,desktop,extension` runs the DEPLOY legs after
  *    the service cycle (web = `omega deploy --direct` gh-pages push;
- *    backend = a REAL functions deploy). Off by default; each leg lands in
+ *    backend = `omega deploy --direct`, a REAL functions deploy from this
+ *    machine rather than the CI dispatch its bare verb now takes). Off by
+ *    default; each leg lands in
  *    the scorecard as `deploy:<target>` and an exit-nonzero leg fails the
  *    pipeline. desktop/extension are PUBLISH legs (GH release flow / store
  *    CI dispatch — both Ian-gated): without `--publish` they record as a
@@ -48,10 +50,16 @@ const { resolveBrandRoot, loadBrand, discoverTargets } = require('../lib/brand.j
 const { runVerifyLegs, VERIFY_LEGS } = require('../lib/verify-live.js');
 
 // deploy target → the command run in that target's dir (desktop/
-// extension targets carry no deploy script — their D13 verb is the local bin)
+// extension targets carry no deploy script: their D13 verb is the local bin).
+//
+// The pipeline is the LOCAL lane: it proves the brand deploys from THIS
+// machine, so the two targets that can publish from here pass `--direct`
+// ([#872](https://github.com/Omega-JS-Stack/omega/issues/872) gave backend the
+// same CI default web has had, and the same `--direct` escape from it). The
+// publish legs below stay gated rather than direct.
 const DEPLOY_LEGS = {
   web: ['npm', 'run', 'deploy', '--', '--direct'],
-  backend: ['npm', 'run', 'deploy'],
+  backend: ['npm', 'run', 'deploy', '--', '--direct'],
   desktop: ['npx', 'omega', 'deploy'],
   extension: ['npx', 'omega', 'deploy'],
 };
@@ -317,3 +325,4 @@ module.exports.resolveVerifyTargets = resolveVerifyTargets;
 module.exports.buildChildArgs = buildChildArgs;
 module.exports.CORE_SERVICES = CORE_SERVICES;
 module.exports.PUBLISH_LEGS = PUBLISH_LEGS;
+module.exports.DEPLOY_LEGS = DEPLOY_LEGS;

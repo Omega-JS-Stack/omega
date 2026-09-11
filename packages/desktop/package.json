@@ -94,7 +94,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "test": "node ./bin/omega-desktop test"
   },
@@ -172,6 +172,7 @@
     "node-powertools": "^3.0.0",
     "plist": "^4.0.0",
     "sass": "^1.99.0",
+    "sharp": "^0.35.3",
     "uuid": "^14.0.0",
     "wonderful-fetch": "^2.0.5",
     "wonderful-version": "^1.3.2",

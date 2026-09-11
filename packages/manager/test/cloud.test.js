@@ -28,6 +28,12 @@ const PROJECT = 'fixture-proj';
 const PROJECT_NUMBER = '123456789';
 const SA_EMAIL = `firebase-adminsdk-x1@${PROJECT}.iam.gserviceaccount.com`;
 const ZONE = { id: 'zone-1', name: DOMAIN, status: 'active' };
+// The two runtime accounts a functions deploy acts as, and the role that lets
+// the deploy account do it (#878)
+const APPSPOT_SA = `${PROJECT}@appspot.gserviceaccount.com`;
+const COMPUTE_SA = `${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`;
+const ACT_AS_ROLE = 'roles/iam.serviceAccountUser';
+const SCHEDULER_ROLE = 'roles/cloudscheduler.admin';
 const DOWN = '\x1B[B'; // arrow-down escape for select() answers
 
 // The handler's REQUIRED_SERVICES list, pinned (drift here should fail loudly)
@@ -70,7 +76,7 @@ function brandConfig({ cloud = {}, sdkConfig } = {}) {
 const MUTATING_METHODS = new Set([
   'linkBillingAccount', 'enableService', 'enableServices', 'setIamPolicy',
   'updateProjectName', 'createWebApp', 'updateWebAppDisplayName', 'createBrand',
-  'createServiceAccount', 'createServiceAccountKey', 'createHostingSite',
+  'createServiceAccount', 'createServiceAccountKey', 'setServiceAccountIamPolicy', 'createHostingSite',
   'createCustomDomain', 'undeleteCustomDomain', 'createFirestoreDatabase',
   'enableFirestorePITR', 'createRealtimeDatabase', 'createDefaultStorageBucket',
   'initializeIdentityPlatform', 'updateIdentityConfig',
@@ -81,7 +87,7 @@ const API_METHODS = [
   'getProjectBillingInfo', 'listEnabledServices', 'getProjectNumber', 'getIamPolicy',
   'getGcpProject', 'listWebApps', 'getWebAppConfig', 'listBrands', 'listServiceAccounts',
   'listHostingSites', 'checkDomainStatus', 'getFirestoreDatabase', 'listRealtimeDatabases',
-  'getIdentityConfig', 'getIdpConfig', 'getStorageBucket', 'isServiceEnabled',
+  'getIdentityConfig', 'getIdpConfig', 'getStorageBucket', 'isServiceEnabled', 'getServiceAccountIamPolicy',
   'getAuthenticatedEmail', 'listBillingAccounts', 'listOrganizations',
 ];
 
@@ -223,7 +229,7 @@ function convergedResponses() {
       bindings: [
         ...['roles/storage.objectAdmin', 'roles/cloudbuild.builds.builder', 'roles/artifactregistry.writer']
           .map((role) => ({ role, members: [`serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`] })),
-        ...['roles/firebase.admin', 'roles/firebaseauth.admin', 'roles/datastore.owner', 'roles/serviceusage.serviceUsageConsumer']
+        ...['roles/firebase.admin', 'roles/firebaseauth.admin', 'roles/datastore.owner', 'roles/serviceusage.serviceUsageConsumer', 'roles/cloudscheduler.admin']
           .map((role) => ({ role, members: [`serviceAccount:${SA_EMAIL}`] })),
       ],
     }),
@@ -232,6 +238,8 @@ function convergedResponses() {
     getWebAppConfig: { ...RAW_SDK },
     listBrands: [{ name: `projects/${PROJECT_NUMBER}/brands/b1`, applicationTitle: 'Fixture Brand', supportEmail: `support@${DOMAIN}`, orgInternalOnly: false }],
     listServiceAccounts: [{ email: SA_EMAIL }],
+    // The deploy grant (#878) lives on each runtime account's OWN policy
+    getServiceAccountIamPolicy: () => ({ bindings: [{ role: ACT_AS_ROLE, members: [`serviceAccount:${SA_EMAIL}`] }] }),
     listHostingSites: [{ name: `projects/${PROJECT}/sites/${PROJECT}` }],
     checkDomainStatus: { exists: true, verified: true, ownershipState: 'OWNERSHIP_ACTIVE', hostState: 'HOST_ACTIVE', requiredDnsUpdates: [] },
     getFirestoreDatabase: { locationId: 'nam5', pointInTimeRecoveryEnablement: 'POINT_IN_TIME_RECOVERY_ENABLED' },
@@ -657,6 +665,143 @@ test('service-account: missing key is created and saved to .omega/secrets (the O
   // No per-target copy: dist/ staging pulls from .omega/secrets at build time
   assert.equal(jetpack.exists(path.join(backendPath, 'functions', 'service-account.json')), false);
   assert.equal(jetpack.exists(path.join(backendPath, 'service-account.json')), false);
+});
+
+test('service-account: a missing cloudscheduler.admin is granted on the PROJECT policy (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const converged = convergedResponses();
+  const api = fakeFirebase({
+    ...converged,
+    getIamPolicy: () => ({
+      bindings: converged.getIamPolicy().bindings.filter((b) => b.role !== SCHEDULER_ROLE),
+    }),
+    setIamPolicy: {},
+  });
+
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot() }));
+
+  const writes = api.callsTo('setIamPolicy');
+  assert.equal(writes.length, 1, 'the one missing role is granted in a single policy write');
+  const binding = writes[0].args[1].bindings.find((b) => b.role === SCHEDULER_ROLE);
+  assert.ok(binding.members.includes(`serviceAccount:${SA_EMAIL}`), 'the deploy account carries the scheduler role');
+  assert.notEqual(result.status, 'warned');
+});
+
+// ─── The deploy grant: actAs on the two default runtime accounts (#878) ──────
+
+/** The act-as binding as the live policy carries it. */
+function actAsPolicy(members) {
+  return { bindings: [{ role: ACT_AS_ROLE, members }] };
+}
+
+test('service-account: a missing actAs binding is granted on BOTH default runtime accounts (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    getServiceAccountIamPolicy: () => ({ bindings: [] }),
+    setServiceAccountIamPolicy: {},
+  });
+
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot() }));
+
+  const writes = api.callsTo('setServiceAccountIamPolicy');
+  assert.deepEqual(writes.map((call) => call.args[1]), [APPSPOT_SA, COMPUTE_SA], 'one write per runtime account, and no more');
+  for (const write of writes) {
+    const binding = write.args[2].bindings.find((b) => b.role === ACT_AS_ROLE);
+    assert.ok(binding.members.includes(`serviceAccount:${SA_EMAIL}`), `${write.args[1]} carries the deploy account under ${ACT_AS_ROLE}`);
+  }
+  assert.notEqual(result.status, 'warned');
+  assert.equal(result.state.serviceAccount.email, SA_EMAIL);
+});
+
+test('service-account: an account that already carries actAs is not written again (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    getServiceAccountIamPolicy: (projectId, email) => (
+      email === APPSPOT_SA ? actAsPolicy([`serviceAccount:${SA_EMAIL}`]) : { bindings: [] }
+    ),
+    setServiceAccountIamPolicy: {},
+  });
+
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot() }));
+
+  const writes = api.callsTo('setServiceAccountIamPolicy');
+  assert.equal(writes.length, 1, 'only the account that was missing it is written');
+  assert.equal(writes[0].args[1], COMPUTE_SA);
+  assert.notEqual(result.status, 'warned');
+});
+
+test('service-account: a dry run PLANS the actAs grant and writes nothing (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    getServiceAccountIamPolicy: () => ({ bindings: [] }),
+  });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  try {
+    await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot(), options: { dryRun: true } }));
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.deepEqual(api.mutations(), [], 'a dry run grants nothing');
+  assert.match(lines.join('\n'), /Dry run .{0,3} would grant roles\/iam\.serviceAccountUser on the default service accounts/);
+});
+
+test('service-account: a refused actAs grant warns LOUDLY with the by-hand command (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    getServiceAccountIamPolicy: () => ({ bindings: [] }),
+    setServiceAccountIamPolicy: () => { throw new Error('Permission denied (403)'); },
+  });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot() }));
+  } finally {
+    console.log = originalLog;
+  }
+
+  // The run summary names the operation by this reason (#643)
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /roles\/iam\.serviceAccountUser/);
+  assert.match(result.reason, new RegExp(APPSPOT_SA.replace(/\./g, '\\.')));
+  assert.equal(result.state.serviceAccount.email, SA_EMAIL, 'the key the rest of the run needs still travels');
+  assert.match(lines.join('\n'), new RegExp(`gcloud iam service-accounts add-iam-policy-binding ${APPSPOT_SA} --project ${PROJECT} --member="serviceAccount:${SA_EMAIL}" --role="${ACT_AS_ROLE}"`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('service-account: a failed project number lookup is blamed on the LOOKUP, not on an account (#878)', async () => {
+  const handler = require('../src/services/cloud/ensure/service-account.js');
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    getProjectNumber: () => { throw new Error('caller lacks resourcemanager.projects.get'); },
+  });
+  const lines = [];
+  const originalLog = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+
+  let result;
+  try {
+    result = await handler(handlerContext(brandConfig(), api, { brandRoot: stagedRoot() }));
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.equal(result.status, 'warned');
+  assert.match(result.reason, /the project number lookup failed/);
+  assert.doesNotMatch(result.reason, new RegExp(APPSPOT_SA.replace(/\./g, '\\.')), 'no account is named for a failure that happened before any account was read');
+  assert.equal(api.callsTo('setServiceAccountIamPolicy').length, 0, 'nothing was granted');
+  assert.equal(result.state.serviceAccount.email, SA_EMAIL, 'the key the rest of the run needs still travels');
+  assert.match(lines.join('\n'), /Could not resolve the project number for the deploy role grant/);
+  assert.doesNotMatch(lines.join('\n'), /add-iam-policy-binding/, 'no by-hand command, because there is no account to paste into one');
 });
 
 // ─── Authentication (manual flows → warned, config diffs → PATCH) ────────────

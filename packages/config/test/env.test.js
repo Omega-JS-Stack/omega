@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadEnv, reloadEnv, resolveEnvChain, loadEnvChain, loadEnvRoots, readCompanyRoot, composeTargetEnv, serializeEnv, ENV_ENVIRONMENTS, envEnvironment } = require('../src/index.js');
+const { loadEnv, reloadEnv, resolveEnvChain, loadEnvChain, loadEnvRoots, readCompanyRoot, composeTargetEnv, artifactEnvValues, serializeEnv, ENV_ENVIRONMENTS, envEnvironment } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -725,6 +725,31 @@ test('composeTargetEnv: the schema still filters an overlay — an unclaimed key
   assert.strictEqual(values.CSC_KEY_PASSWORD, undefined, 'an overlay is filtered by the schema exactly like the base');
 });
 
+test('composeTargetEnv: the backend composes the license key for the PUBLISHER, and the artifact never carries it (#872)', (t) => {
+  const root = makeFixture('env-compose-license', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'OMEGA_LICENSE_KEY=omg_live_fixture\nOMEGA_ADMIN_KEY=admin\n',
+  });
+  cleanup(t, root);
+
+  const { values } = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'backend'),
+    target: 'backend',
+    environment: 'production',
+  });
+
+  // The precheck publishes this value as the repo secret the composed workflow
+  // injects, so the runner's `omega deploy --direct` can run the license check
+  // where the deploy now runs. That is the ONLY reason it composes at all.
+  assert.strictEqual(values.OMEGA_LICENSE_KEY, 'omg_live_fixture');
+
+  // The .env the functions upload ships with is the narrower set: a `ci`
+  // delivery is a runner-env key, never an artifact line.
+  const shipped = artifactEnvValues('backend', values);
+  assert.strictEqual(shipped.OMEGA_LICENSE_KEY, undefined, 'a shipped .env with the license key in it is the one thing #320 forbids');
+  assert.strictEqual(shipped.OMEGA_ADMIN_KEY, 'admin', 'every `env` delivery still rides');
+});
+
 // ─── serializeEnv ───
 
 test('serializeEnv: every value double-quoted, backslashes/quotes/newlines escaped', () => {
@@ -752,4 +777,27 @@ test('serializeEnv: every value double-quoted, backslashes/quotes/newlines escap
   assert.strictEqual(parsed.MULTILINE, 'line1\nline2');
   assert.strictEqual(parsed.PLAIN, 'value');
   assert.strictEqual(parsed.EMPTY, '');
+});
+
+// The backend deploy workflow writes the runner's `.env` through this
+// serializer ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): a
+// node one-liner reads the generated key list out of the runner env and hands
+// the values here, so no shell ever expands one. The step it replaced was a
+// heredoc of `KEY="$KEY"` lines, where a value carrying a newline split its own
+// line and everything after it parsed as a key of its own.
+test('serializeEnv: a hostile value stays on its own line, and never bleeds into the next key', () => {
+  const hostile = 'a"b\\c\nOMEGA_ADMIN_KEY="stolen"';
+  const content = serializeEnv({ FIRST: hostile, SECOND: 'intact' });
+
+  assert.strictEqual(content.split('\n').filter(Boolean).length, 2, 'one line per key, whatever the value holds');
+
+  const parsed = require('dotenv').parse(content);
+  assert.deepStrictEqual(Object.keys(parsed), ['FIRST', 'SECOND'], 'the file declares exactly the keys it was given');
+  assert.strictEqual(parsed.SECOND, 'intact', 'the neighbouring key survives the quote');
+  assert.strictEqual(parsed.OMEGA_ADMIN_KEY, undefined, 'a value can never inject a key of its own');
+  // Known asymmetry, pinned rather than assumed: dotenv unescapes `\n` on read
+  // but leaves `\"` and `\\` as written, so a quote or a backslash comes back
+  // escaped. The file is LINE-SAFE, which is what the writer owes; the value
+  // fidelity of the pair is a schema-wide concern, not this step's.
+  assert.match(parsed.FIRST, /^a\\"b\\\\c\n/, 'the newline restores; the quote and backslash come back escaped');
 });

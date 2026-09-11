@@ -5,11 +5,12 @@
  * target tree — src copy, derived manifest, composed brand⊕local config (#31), and
  * the target-root files that ride the artifact. Exercised on real temp trees.
  *
- * stage-local-packages: Cloud Build can't follow file: paths outside the
- * functions folder, and its buildpack runs `npm ci` (lockfile required) — such
- * deps pack into functions/omega_modules/, package.json respells, the lockfile
- * regenerates, and everything restores afterward. Exercised against REAL npm
- * on a throwaway package — no mocks.
+ * The local-package PACK is `@omega.js/devkit/pack-local` since
+ * [#872](https://github.com/Omega-JS-Stack/omega/issues/872) (every deploy lane
+ * packs the same way), and its algorithm cases live with it in
+ * `packages/devkit/test/pack-local.test.js`. What stays here is the DEPLOY-level
+ * contract: a staging failure exits the verb nonzero, naming the package it
+ * could not stage, instead of printing an ✗ that reads like a success.
  */
 
 const os = require('os');
@@ -18,7 +19,6 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 
-const stageLocalPackages = require('../../dist/cli/utils/stage-local-packages.js');
 const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const { loadConfig } = require('../helpers/_shared-config.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -30,202 +30,11 @@ function makeTmp() {
 }
 
 module.exports = defineCases({
-  description: 'Deploy staging — local file: deps pack into the functions upload',
+  description: 'Deploy staging: the functions upload is self-contained',
   type: 'group',
   timeout: 120000,
 
   tests: [
-    {
-      name: 'stages-outside-file-deps-and-restores',
-      async run({ assert }) {
-        const tmp = makeTmp();
-
-        // A tiny real package OUTSIDE the functions dir...
-        const pkgDir = path.join(tmp, 'fakepkg');
-        jetpack.write(path.join(pkgDir, 'package.json'), JSON.stringify({
-          name: '@omega.js/fakepkg',
-          version: '1.0.0',
-          private: true,
-          main: 'index.js',
-        }, null, 2));
-        jetpack.write(path.join(pkgDir, 'index.js'), 'module.exports = 1;\n');
-
-        // ...referenced the way the monorepo's functions dirs do it
-        const functionsPath = path.join(tmp, 'functions');
-        jetpack.write(path.join(functionsPath, 'package.json'), `${JSON.stringify({
-          name: 'test-functions',
-          version: '0.0.1',
-          private: true,
-          dependencies: { '@omega.js/fakepkg': 'file:../fakepkg' },
-        }, null, 2)}\n`);
-
-        const staging = await stageLocalPackages({ functionsPath });
-
-        // Staged: tarball vendored inside, dep respelled, lockfile matches
-        assert.deepEqual(staging.staged, ['@omega.js/fakepkg']);
-        const stagedPkg = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
-        assert.equal(stagedPkg.dependencies['@omega.js/fakepkg'], 'file:omega_modules/omega.js-fakepkg-1.0.0.tgz');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules', 'omega.js-fakepkg-1.0.0.tgz')), 'file');
-
-        const lock = jetpack.read(path.join(functionsPath, 'package-lock.json'), 'json');
-        assert.ok(lock, 'lockfile generated for the staged shape');
-        assert.ok(lock.packages['node_modules/@omega.js/fakepkg'], 'lockfile resolves the staged tarball');
-
-        // Restore: original shape back verbatim, staging artifacts gone
-        await staging.restore();
-        const restored = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
-        assert.equal(restored.dependencies['@omega.js/fakepkg'], 'file:../fakepkg');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'package-lock.json')), false, 'lockfile absent again (none existed before)');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'staging dir removed');
-
-        jetpack.remove(tmp);
-      },
-    },
-
-    {
-      name: 'no-op-when-no-outside-file-deps',
-      async run({ assert }) {
-        const tmp = makeTmp();
-
-        const functionsPath = path.join(tmp, 'functions');
-        jetpack.write(path.join(functionsPath, 'package.json'), JSON.stringify({
-          name: 'fns',
-          version: '1.0.0',
-          private: true,
-          dependencies: { 'firebase-admin': '^13.0.0' },
-        }, null, 2));
-
-        const staging = await stageLocalPackages({ functionsPath });
-
-        assert.deepEqual(staging.staged, []);
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'nothing staged');
-        await staging.restore(); // harmless no-op
-
-        jetpack.remove(tmp);
-      },
-    },
-
-    {
-      // #331: the lane packed only the framework package itself. @omega.js/client
-      // is a REAL runtime dependency of @omega.js/backend (never vendored) and is
-      // unpublished under the publish latch — so regenerating the lock against the
-      // staged shape asked the REGISTRY for it and 404'd, and no deploy ran.
-      name: 'packs-linked-omega-deps-transitively-so-the-lock-never-asks-the-registry',
-      async run({ assert }) {
-        const tmp = makeTmp();
-
-        // A local @omega.js package that exists NOWHERE but this disk — the
-        // registry-404 shape (client under the publish latch)
-        const depDir = path.join(tmp, 'workspace', 'faketransitive');
-        jetpack.write(path.join(depDir, 'package.json'), JSON.stringify({
-          name: '@omega.js/faketransitive',
-          version: '0.1.0',
-          private: true,
-          main: 'index.js',
-        }, null, 2));
-        jetpack.write(path.join(depDir, 'index.js'), 'module.exports = 1;\n');
-
-        // The framework package: declares it by REGISTRY spec (that is how
-        // @omega.js/backend spells @omega.js/client) and resolves it through a
-        // node_modules SYMLINK — the local-era shape npm workspaces / `mgr i local` make
-        const pkgDir = path.join(tmp, 'fakeframework');
-        jetpack.write(path.join(pkgDir, 'package.json'), JSON.stringify({
-          name: '@omega.js/fakeframework',
-          version: '1.0.0',
-          private: true,
-          main: 'index.js',
-          dependencies: { '@omega.js/faketransitive': '^0.1.0' },
-        }, null, 2));
-        jetpack.write(path.join(pkgDir, 'index.js'), 'module.exports = 2;\n');
-        jetpack.dir(path.join(pkgDir, 'node_modules', '@omega.js'));
-        fs.symlinkSync(depDir, path.join(pkgDir, 'node_modules', '@omega.js', 'faketransitive'), 'dir');
-
-        const functionsPath = path.join(tmp, 'functions');
-        jetpack.write(path.join(functionsPath, 'package.json'), `${JSON.stringify({
-          name: 'test-functions',
-          version: '0.0.1',
-          private: true,
-          dependencies: { '@omega.js/fakeframework': 'file:../fakeframework' },
-        }, null, 2)}\n`);
-
-        const staging = await stageLocalPackages({ functionsPath });
-
-        // BOTH packages ride the upload — the linked one too
-        assert.deepEqual(staging.staged, ['@omega.js/fakeframework', '@omega.js/faketransitive']);
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules', 'omega.js-fakeframework-1.0.0.tgz')), 'file');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules', 'omega.js-faketransitive-0.1.0.tgz')), 'file');
-
-        // The framework tarball still declares `^0.1.0` internally — only an
-        // override redirects that NESTED resolution to the packed artifact
-        const stagedPkg = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
-        assert.equal(stagedPkg.dependencies['@omega.js/fakeframework'], 'file:omega_modules/omega.js-fakeframework-1.0.0.tgz');
-        assert.equal(stagedPkg.overrides['@omega.js/faketransitive'], 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
-
-        // The lock npm ci will read: resolved from the tarball, never the registry
-        const lock = jetpack.read(path.join(functionsPath, 'package-lock.json'), 'json');
-        const locked = lock.packages['node_modules/@omega.js/faketransitive'];
-        assert.ok(locked, 'the linked dependency is in the lockfile');
-        assert.equal(locked.resolved, 'file:omega_modules/omega.js-faketransitive-0.1.0.tgz');
-
-        // Restore: the override is staging-only, gone with everything else
-        await staging.restore();
-        const restored = jetpack.read(path.join(functionsPath, 'package.json'), 'json');
-        assert.equal(restored.dependencies['@omega.js/fakeframework'], 'file:../fakeframework');
-        assert.equal(restored.overrides, undefined, 'staging overrides never survive the restore');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'staging dir removed');
-
-        jetpack.remove(tmp);
-      },
-    },
-
-    {
-      // #331's second half: a failed staging must stop the deploy loudly — throw
-      // (never a swallowed ✗), and leave the functions folder exactly as found.
-      name: 'staging-failure-throws-and-restores-the-functions-folder',
-      async run({ assert }) {
-        const tmp = makeTmp();
-
-        const pkgDir = path.join(tmp, 'fakepkg');
-        jetpack.write(path.join(pkgDir, 'package.json'), JSON.stringify({
-          name: '@omega.js/fakepkg',
-          version: '1.0.0',
-          private: true,
-          main: 'index.js',
-        }, null, 2));
-        jetpack.write(path.join(pkgDir, 'index.js'), 'module.exports = 1;\n');
-
-        // The pack succeeds, then the LOCK REGEN fails (a file: spec pointing at
-        // a tarball that does not exist) — the failure lands AFTER the manifest
-        // was respelled on disk, which is exactly where the 404 landed
-        const functionsPath = path.join(tmp, 'functions');
-        const original = `${JSON.stringify({
-          name: 'test-functions',
-          version: '0.0.1',
-          private: true,
-          dependencies: {
-            '@omega.js/fakepkg': 'file:../fakepkg',
-            'never-here': 'file:missing-tarball.tgz',
-          },
-        }, null, 2)}\n`;
-        jetpack.write(path.join(functionsPath, 'package.json'), original);
-
-        let message = '';
-        try {
-          await stageLocalPackages({ functionsPath });
-        } catch (e) {
-          message = e.message;
-        }
-
-        assert.ok(message, 'a failing staging step throws — the deploy stops');
-        assert.ok(/staging failed/i.test(message), `the error names the staging lane: ${message}`);
-        assert.equal(jetpack.read(path.join(functionsPath, 'package.json')), original, 'manifest restored verbatim');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'no half-staged tarballs left behind');
-        assert.equal(jetpack.exists(path.join(functionsPath, 'package-lock.json')), false, 'no half-written lockfile left behind');
-
-        jetpack.remove(tmp);
-      },
-    },
-
     {
       // The exit code IS the contract: the observed #331 run printed the ✗ and
       // read as a success. Spawn the real bin — nothing else pins an exit code.
@@ -248,7 +57,8 @@ module.exports = defineCases({
         jetpack.write(path.join(targetRoot, 'firebase.json'), JSON.stringify({ functions: { source: 'dist' } }, null, 2));
         jetpack.dir(path.join(tmp, 'brokenpkg'));
 
-        const run = spawnSync(process.execPath, [BACKEND_BIN, 'deploy'], {
+        // `--direct` IS the staging lane (#872): the bare verb dispatches CI now.
+        const run = spawnSync(process.execPath, [BACKEND_BIN, 'deploy', '--direct'], {
           cwd: targetRoot,
           encoding: 'utf8',
           env: { ...process.env, OMEGA_SKIP_FRESHNESS: '1' },

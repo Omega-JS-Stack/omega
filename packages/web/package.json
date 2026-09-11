@@ -52,7 +52,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('@omega.js/devkit/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "translate:defaults": "node src/translate/generate-defaults.js",
     "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js && node --require @omega.js/devkit/test/stdout-guard --test --test-concurrency=1 test/watch/*.test.js"

@@ -116,6 +116,7 @@ An esbuild `define` replaces the bare identifier `OMEGA_BUILD_JSON` with the par
 - `electronVersion` pinned from the INSTALLED electron (resolved via the framework's module context — electron-builder refuses semver ranges and can't see a workspace-hoisted electron from the target dir)
 - Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish owner resolves config-first: `releases.owner` → the brand's `repo.providers.github.org` → git-remote discovery (a brand-monorepo target has no git remote of its own; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
 - Optional passthrough: `fileAssociations`, `protocols`
+- The `files` list: everything under the target root except source maps, `.env` files, `logs/`, and the scratch and state dirs `.omega/`, `.claude/`, `.temp/`, `.cache/`, `.gh-runners/` and `test/` ([#866](https://github.com/Omega-JS-Stack/omega/issues/866): the boot runner stages `.omega/test-app` with symlinks into the target, and the packager followed them). `src/` ships, because the runtime reads `src/integrations/*` from the app root; `config/` (the build resources dir) and `release/` are excluded by electron-builder itself
 
 The full per-target reference (every config knob, default value, and what it produces in YAML) lives in **[installer-options.md](installer-options.md)**.
 

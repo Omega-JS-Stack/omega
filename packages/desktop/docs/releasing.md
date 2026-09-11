@@ -181,7 +181,7 @@ finalize          needs [setup, build, windows-sign] under always(), gated on th
 
 The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx omega push-secrets` as base64-encoded file contents) back to disk before running `npm run release:local`.
 
-**Dispatch only, never a push trigger** ([#802](https://github.com/Omega-JS-Stack/omega/issues/802)): the workflow declares `workflow_dispatch` alone, so no commit and no tag releases anything ([docs/shared/deploys.md](../../../docs/shared/deploys.md) in the Omega repo is the contract for all four frameworks). It runs no tests either: the suites run on the developer's machine and the commit gate runs the battery at ship.
+**Dispatch only, never a push trigger** ([#802](https://github.com/Omega-JS-Stack/omega/issues/802)): the workflow declares the two dispatch triggers (`workflow_dispatch` and `repository_dispatch: [omega-deploy]`, [#880](https://github.com/Omega-JS-Stack/omega/issues/880)) and nothing else, so no commit and no tag releases anything ([docs/shared/deploys.md](../../../docs/shared/deploys.md) in the Omega repo is the contract for all four frameworks). It runs no tests either: the suites run on the developer's machine and the commit gate runs the battery at ship.
 
 To release:
 1. Bump the version in `package.json`.

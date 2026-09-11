@@ -44,6 +44,23 @@ function declareRepo(dir, slug) {
   ].join('\n'));
 }
 
+/**
+ * A `git` stub that answers PER COMMAND. The publisher resolves the deploy lane
+ * before it guards ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
+ * so `rev-parse --show-toplevel` has to answer that this checkout IS the brand
+ * root: an UNPLACED answer reads as a nested brand, whose remote is the
+ * enclosing repo by construction and whose mismatch guard is therefore skipped.
+ *
+ * @param {string|function} remote - What `git config --get remote.origin.url` answers (or throws).
+ * @returns {function} `(command, options) => string`
+ */
+function gitStub(remote) {
+  return (command, options) => {
+    if (command.includes('rev-parse')) return `${options.cwd}\n`;
+    return typeof remote === 'function' ? remote() : remote;
+  };
+}
+
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
@@ -204,7 +221,7 @@ module.exports = defineCases({
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: () => { throw new Error('fatal: no such remote'); },
+            gitExecFn: gitStub(() => { throw new Error('fatal: no such remote'); }),
           })).toEqual({ skipped: 'no-remote' });
 
           // The enclosing checkout is not the brand's repo — never arm a
@@ -214,7 +231,7 @@ module.exports = defineCases({
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: () => 'git@github.com:Omega-JS-Stack/omega.git\n',
+            gitExecFn: gitStub('git@github.com:Omega-JS-Stack/omega.git\n'),
           })).toEqual({ skipped: 'repo-mismatch' });
 
           fs.rmSync(keyed, { recursive: true, force: true });

@@ -71,6 +71,21 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'baseConfig: files never pack the target\'s scratch and state dirs (#866)',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const files = baseConfig({}).files;
+        // The boot runner stages .omega/test-app with symlinks into the target and the
+        // packager followed them (dangling after a folder rename); none of these dirs
+        // is app content anyway.
+        for (const dir of ['.omega', '.claude', '.temp', '.cache', '.gh-runners', 'test']) {
+          ctx.expect(files).toContain(`!${dir}/**`);
+        }
+        // src/ stays: the runtime reads src/integrations/* from the app root.
+        ctx.expect(files.includes('!src/**')).toBe(false);
+      },
+    },
+    {
       name: 'baseConfig: artifact names carry NO version, from @omega.js/config\'s ONE rule (#620)',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
@@ -451,6 +466,63 @@ module.exports = defineCases({
         const out = baseConfig({});
         ctx.expect(out.fileAssociations).toBeUndefined();
         ctx.expect(out.protocols).toBeUndefined();
+      },
+    },
+    // The .deb target's two metadata facts (#872). electron-builder reads the
+    // homepage off the app package.json (`extraMetadata` is what it merges in) and
+    // the maintainer off `linux.maintainer`; without them the deb build dies at
+    // PACKAGE time, after the AppImage of the same run has already uploaded.
+    {
+      name: 'baseConfig: the brand url and support email become the deb metadata (#872)',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const yaml = require('js-yaml');
+
+        const out = baseConfig({
+          brand: {
+            name: 'OMEGA Playground',
+            url: 'https://playground.omegajs.dev',
+            contact: { email: 'support@playground.omegajs.dev' },
+          },
+        });
+
+        ctx.expect(out.extraMetadata.homepage).toBe('https://playground.omegajs.dev');
+        ctx.expect(out.linux.maintainer).toBe('OMEGA Playground <support@playground.omegajs.dev>');
+
+        // And they survive into the file that is actually written.
+        const written = yaml.load(yaml.dump(out, { lineWidth: -1, noRefs: true }));
+        ctx.expect(written.extraMetadata.homepage).toBe('https://playground.omegajs.dev');
+        ctx.expect(written.linux.maintainer).toBe('OMEGA Playground <support@playground.omegajs.dev>');
+      },
+    },
+    {
+      name: 'assertLinuxPackageMetadata: an absent value names its config key and never writes an empty one',
+      run: async (ctx) => {
+        const { baseConfig, assertLinuxPackageMetadata } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+
+        const bare = baseConfig({});
+        // Nothing to derive, so nothing is emitted: no `maintainer: ''` in the yml.
+        ctx.expect('extraMetadata' in bare).toBe(false);
+        ctx.expect('maintainer' in bare.linux).toBe(false);
+
+        await ctx.expect(() => assertLinuxPackageMetadata(bare)).toThrow(/brand\.url/);
+        await ctx.expect(() => assertLinuxPackageMetadata(bare)).toThrow(/brand\.contact\.email/);
+
+        // Only the missing half is named.
+        const noEmail = baseConfig({ brand: { name: 'App', url: 'https://app.example.com' } });
+        await ctx.expect(() => assertLinuxPackageMetadata(noEmail)).toThrow(/brand\.contact\.email/);
+        ctx.expect(noEmail.extraMetadata.homepage).toBe('https://app.example.com');
+
+        // A consumer override of `linux.maintainer` satisfies it, which is why the
+        // assert runs after the electronBuilder merge and not inside baseConfig.
+        const overridden = baseConfig({ brand: { name: 'App', url: 'https://app.example.com' } });
+        overridden.linux.maintainer = 'App Team <team@app.example.com>';
+        assertLinuxPackageMetadata(overridden);
+
+        // And a build with no deb target has nothing to check.
+        const noDeb = baseConfig({});
+        noDeb.linux.target = [{ target: 'AppImage', arch: ['x64'] }];
+        assertLinuxPackageMetadata(noDeb);
       },
     },
   ],

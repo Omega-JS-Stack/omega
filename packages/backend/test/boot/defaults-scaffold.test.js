@@ -42,6 +42,7 @@ module.exports = defineCases({
         // a target .env is a human-only override; keys live in the brand root
         // .env and every verb composes dist/.env from the cascade (#678).
         const expected = [
+          '.github/workflows/deploy.yml',
           '.gitignore',
           'AGENTS.md',
           'CHANGELOG.md',
@@ -119,6 +120,78 @@ module.exports = defineCases({
       },
     },
     {
+      // #872: the backend deploy runs on a runner now, so the workflow it
+      // dispatches has to REBUILD everything a laptop reads off the brand:
+      // the target's .env and the service-account key. Both are generated from
+      // the env schema, so a key added there reaches CI with no workflow edit.
+      name: 'deploy-workflow-rebuilds-the-env-and-the-key-the-runner-lacks',
+      async run({ assert }) {
+        const tmp = makeTmp();
+        scaffoldDefaults({ outputDir: tmp, logger: quiet });
+
+        const workflow = jetpack.read(path.join(tmp, '.github', 'workflows', 'deploy.yml'));
+
+        // No token survives the render (an unrendered one is not a missing
+        // step, it is a file GitHub refuses to parse). `${{ secrets.X }}` is
+        // GitHub's own syntax and is left alone by the tolerant renderer.
+        for (const token of ['{{ versions.node }}', '{{ githubSecrets }}', '{{ envFileKeys }}', '{{ installFirewall }}']) {
+          assert.equal(workflow.includes(token), false, `${token} was left unrendered`);
+        }
+
+        // The firewall step is the pinned action, rendered from devkit's ONE
+        // declaration, and the install it wraps runs through it.
+        assert.ok(/uses: SocketDev\/action@v\d+\.\d+\.\d+/.test(workflow), 'the pinned firewall action is rendered');
+        assert.ok(workflow.includes('sfw npm install'), 'the install runs behind the firewall');
+
+        // Every key the schema delivers to backend arrives in the runner env,
+        // and the `env` half is the list the .env writer reads back out of it.
+        const { workflowSecretKeys, envFileKeys, renderEnvFileKeys } = require('../../dist/vendor/config/env-delivery.js');
+        for (const key of workflowSecretKeys('backend')) {
+          assert.ok(workflow.includes(`${key}: \${{ secrets.${key} }}`), `${key} must reach the runner env`);
+        }
+        assert.ok(workflow.includes(renderEnvFileKeys('backend')), 'the writer carries the generated key list, verbatim JSON');
+        for (const key of envFileKeys('backend')) {
+          assert.ok(workflow.includes(`"${key}"`), `${key} must be written into the target .env`);
+        }
+
+        // The VALUES never touch a shell: node writes the file through the
+        // config serializer, so a secret carrying a newline cannot split its
+        // line or inject a key (the heredoc this replaced did, #872).
+        assert.ok(workflow.includes('serializeEnv'), 'the .env is written through the config serializer');
+        assert.equal(/cat > \.env/.test(workflow), false, 'no heredoc pastes a secret into the shell');
+
+        // The license key is delivered to backend as well now, so the runner's
+        // own deploy resolves a verdict instead of stamping every CI deploy
+        // keyless, and it is never a line in the .env the artifact ships with.
+        assert.ok(workflow.includes('OMEGA_LICENSE_KEY: ${{ secrets.OMEGA_LICENSE_KEY }}'), 'the runner carries the license key for the check');
+        assert.equal(envFileKeys('backend').includes('OMEGA_LICENSE_KEY'), false, 'and the writer never puts it in the artifact .env');
+
+        // The deploy credential becomes a FILE, and both clients authenticate
+        // with it: firebase through the env var, gcloud (the public-invoker
+        // fix) through its own activated account.
+        assert.ok(workflow.includes('> service-account.json'), 'the service-account JSON is written back to disk');
+        assert.ok(workflow.includes('GOOGLE_APPLICATION_CREDENTIALS='), 'firebase deploy authenticates through the written key');
+        assert.ok(workflow.includes('gcloud auth activate-service-account --key-file'), 'gcloud ignores GOOGLE_APPLICATION_CREDENTIALS, so the runner activates the account');
+        assert.ok(workflow.includes('npx --no-install omega-backend deploy --direct'), 'the runner runs this framework verb, never a second deploy path');
+
+        // The install has to carry the DEV dependencies too (#872): a brand's
+        // own @omega.js/manager and the frameworks it declares as devDeps are
+        // what link the bins this job runs, and npm skips every one of them
+        // under NODE_ENV=production. The first playground run installed
+        // nothing but the two runtime frameworks and then hung 30 minutes on a
+        // bin that did not exist.
+        assert.equal(/^\s*NODE_ENV:/m.test(workflow), false, 'NODE_ENV in the job env makes the install skip devDependencies');
+
+        // And no `npx` STEP here may reach the registry: a missing bin under a
+        // bare `npx omega` is a stranger's package, run with every secret in
+        // env. (Comments are allowed to name the shape they warn about.)
+        const steps = workflow.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+        for (const [, invocation] of steps.matchAll(/\bnpx\s+(\S+)/g)) {
+          assert.equal(invocation, '--no-install', `npx ${invocation} can install from the registry`);
+        }
+      },
+    },
+    {
       name: 'remerge-preserves-consumer-values-and-custom-sections',
       async run({ assert }) {
         const tmp = makeTmp();
@@ -153,6 +226,15 @@ module.exports = defineCases({
           assert.equal(jetpack.exists(path.join(targetDir, file)), 'file', `${file} should still scaffold`);
         }
         assert.equal(result.removed.length, 0, 'nothing to sweep on a fresh app');
+
+        // CI (#265/#872): GitHub runs workflows from the REPO ROOT only, so the
+        // target gets none of its own and the brand root gets the composed one,
+        // every post-checkout run step scoped to this target's path.
+        assert.equal(jetpack.exists(path.join(targetDir, '.github', 'workflows', 'deploy.yml')), false, 'a brand target scaffolds no per-target CI');
+        const composed = jetpack.read(path.join(tmp, '.github', 'workflows', 'backend-deploy.yml'));
+        assert.ok(composed, 'the brand root carries the composed workflow');
+        assert.ok(composed.includes('working-directory: targets/backend'), 'every run step executes in the target dir');
+        assert.ok(composed.includes('npx --no-install omega-backend deploy --direct'), 'the runner runs the framework verb itself');
       },
     },
     {

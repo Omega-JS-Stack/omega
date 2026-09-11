@@ -34,7 +34,7 @@ const version = require('wonderful-version');
 const Manager = new (require('../../build.js'));
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
-const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const logger = Manager.logger('ensure-target');
@@ -205,6 +205,12 @@ async function copyDefaults(projectDir, engineLogger) {
       // rule above; a STANDALONE target (its own git root) keeps its own copy.
       ...(isBrandTarget ? { '.github/**/*': { skip: true } } : {}),
     },
+    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
+    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the brand
+    // lane gets it inside composeWorkflow below, a STANDALONE target here, on
+    // the copy this engine writes. The action and its pin live in ONE place,
+    // so none of the four templates restates them.
+    transform: (contents) => renderInstallFirewall(contents),
     logger: engineLogger,
   });
 
@@ -224,7 +230,7 @@ async function copyDefaults(projectDir, engineLogger) {
   return applied;
 }
 
-/** Warn when the framework is a `file:` link — that install never publishes. */
+/** Warn when the framework is a `file:` LINK, the install that never publishes. */
 function checkLocality(projectDir, warn) {
   const project = readProject(projectDir);
   const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
@@ -233,9 +239,23 @@ function checkLocality(projectDir, warn) {
     throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
-  if (installedVersion.startsWith('file:')) {
+  // Not every `file:` spec is a link. A spec pointing at a DIRECTORY is the
+  // `omega i local` symlink and it is dead on any other machine; one pointing at
+  // a packed `.tgz` is what the deploy snapshot ships
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and that install
+  // carries the real package. Warning on the tarball told every CI run its own
+  // lane was broken.
+  if (installedVersion.startsWith('file:') && isLinkedSpec(projectDir, installedVersion)) {
     warn(`⚠️  You are using the local version of ${package.name}. This WILL NOT WORK when published.`);
   }
+}
+
+/** Does a `file:` spec resolve to a directory (a link) rather than a tarball? */
+function isLinkedSpec(projectDir, spec) {
+  const target = spec.replace(/^file:/, '');
+  const resolved = path.isAbsolute(target) ? target : path.join(projectDir, target);
+
+  return jetpack.exists(resolved) === 'dir';
 }
 
 /**

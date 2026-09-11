@@ -1,13 +1,32 @@
+/**
+ * `omega deploy`: the explicit publish verb, on the ONE lane every target
+ * takes ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+ *
+ * The DEFAULT is a dispatch of the brand's composed backend workflow: the
+ * executor delivers the brand to its repo (packed + snapshot-pushed when the
+ * brand is nested or linked, committed + pushed when it is neither), waits for
+ * the workflow, and dispatches it. The runner then runs THIS verb with
+ * `--direct`, which is the whole local behavior: license verdict, stage,
+ * local-package staging, `firebase deploy`, public-invoker IAM.
+ *
+ * The precheck is the sibling frameworks' (#675): the target's composed .env
+ * keys are published as repo Actions secrets, because the runner has no .env
+ * of its own to read. `--no-secrets` opts out.
+ */
 const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
-const stageLocalPackages = require('../utils/stage-local-packages');
+const { stageLocalPackages } = require('@omega.js/devkit/pack-local');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { refuseWhenCustom } = require('../utils/project-type');
-const { loadConfig, loadEnv } = require('@omega.js/config');
+const { loadConfig, loadEnv, resolveSeedMode } = require('@omega.js/config');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
+const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
+const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+const { ensureTarget } = require('../utils/ensure-target');
+const { deployPrecheck } = require('../utils/deploy-precheck');
 
 const DEFAULT_REGION = 'us-central1';
 
@@ -18,6 +37,81 @@ class DeployCommand extends BaseCommand {
     // Custom-server mode has no Cloud Functions to publish (#584) — refuse
     // before staging, so nothing is written for a deploy that cannot happen.
     if (refuseWhenCustom(self.firebaseProjectPath, 'deploy')) return;
+
+    return self.argv?.direct ? this.deployDirect() : this.dispatchDeploy();
+  }
+
+  /**
+   * The CI lane (the default): deliver the brand to its repo and dispatch the
+   * composed backend workflow, which runs `omega deploy --direct` on a runner.
+   */
+  async dispatchDeploy() {
+    const self = this.main;
+    const dryRun = self.argv?.dryRun || self.argv?.['dry-run'];
+
+    // The local scaffold every verb runs, and the step that COMPOSES the
+    // workflow this dispatch is about to name, so a target whose brand never
+    // had one gets it written on the way past.
+    ensureTarget({
+      projectDir: self.firebaseProjectPath,
+      log: (message) => this.log(chalk.gray(`  ${message}`)),
+    });
+
+    // The NETWORK half, as a precheck: the runner has no `.env` and no service
+    // account, so the workflow rebuilds both from repo secrets. A dry run sends
+    // nothing, so it prechecks nothing.
+    if (!dryRun) {
+      await deployPrecheck({
+        projectDir: self.firebaseProjectPath,
+        options: self.argv || {},
+        logger: { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`), error: (line) => this.logError(`  ${line}`) },
+      });
+    }
+
+    // Inside a brand monorepo the target's CI lives in the BRAND ROOT's
+    // workflows dir under a per-target name (#265): dispatch what the scaffold
+    // actually composed.
+    const workflow = composedWorkflowName({
+      targetDir: self.firebaseProjectPath,
+      brandRoot: resolveSeedMode(self.firebaseProjectPath).brandRoot,
+      workflow: 'deploy.yml',
+    });
+
+    const { owner, repo } = dispatchRepo(loadConfig(self.firebaseProjectPath, 'backend').config);
+    const { plan, dispatched, lane } = await deployViaDispatch({
+      workflow,
+      owner,
+      repo,
+      dir: self.firebaseProjectPath,
+      dryRun,
+      sync: self.argv?.sync !== false,
+      logger: { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`) },
+    });
+
+    if (!dispatched) {
+      this.log(chalk.gray(`  DRY RUN (${lane.mode} lane, ref ${lane.ref}), would send:`));
+      this.log(chalk.gray(`    ${plan.method} ${plan.url}`));
+      this.log(chalk.gray(`    body: ${JSON.stringify(plan.body)}`));
+      return this.log(chalk.gray(`    then watch: ${plan.runsUrl}`));
+    }
+
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: 'backend', detail: { method: 'dispatch' } });
+    this.log(chalk.gray(`  Dispatched ${workflow} (${lane.mode} lane, ref ${lane.ref}): CI deploys this backend.`));
+    this.log(chalk.gray(`  Watch: ${plan.runsUrl}`));
+  }
+
+  /**
+   * The direct lane (`--direct`): the deploy itself, from this machine or from
+   * the runner the workflow started. Everything below is unchanged behavior.
+   */
+  async deployDirect() {
+    const self = this.main;
+    const only = self.argv?.only ? ` --only ${self.argv.only}` : '';
+
+    // The plan and nothing else, the same line the other three print (#872).
+    if (self.argv?.dryRun || self.argv?.['dry-run']) {
+      return this.log(`DRY RUN, would run: firebase deploy${only} (this machine)`);
+    }
 
     const logPath = this.getLogsPath('deploy.log');
     attachLogFile(logPath);
@@ -49,9 +143,8 @@ class DeployCommand extends BaseCommand {
     // and no other environment's overlay ever rides along (#586).
     this.ensureStaged({ environment: 'production', licenseStatus });
 
-    // --only pass-through (e.g. `omega deploy --only hosting` — deploys
-    // hosting on Spark plans where functions would demand Blaze)
-    const only = self.argv?.only ? ` --only ${self.argv.only}` : '';
+    // --only above passes through (e.g. `omega deploy --only hosting` deploys
+    // hosting on Spark plans where functions would demand Blaze).
 
     // Local file: dependencies (local-first @omega.js packages) can't be
     // followed by Cloud Build — stage them into the upload as packed tarballs
@@ -68,7 +161,7 @@ class DeployCommand extends BaseCommand {
     }
 
     const staging = deployingFunctions
-      ? await stageLocalPackages({ functionsPath, log: (message) => this.log(message) })
+      ? await stageLocalPackages({ dir: functionsPath, log: (message) => this.log(message) })
       : null;
 
     try {
@@ -142,7 +235,15 @@ class DeployCommand extends BaseCommand {
       httpFunctions = JSON.parse(output)
         .filter((fn) => fn.httpsTrigger)
         .map((fn) => fn.name.split('/').pop());
-    } catch {
+    } catch (e) {
+      // On a laptop this is the ordinary "no gcloud here" and the deploy speaks
+      // for itself. On a RUNNER the workflow installed and authenticated gcloud
+      // itself, so a listing that fails is a broken deploy: every HTTP function
+      // answers 403 at the IAM level until someone guesses why. The run goes
+      // red and says so ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+      if (process.env.CI || process.env.GITHUB_ACTIONS) {
+        throw new Error(`Could not list HTTP functions to make them publicly invocable (gcloud: ${e.message}). The functions deployed, but every HTTP function answers 403 until an allUsers invoker binding exists.`);
+      }
       return;
     }
 

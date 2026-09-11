@@ -383,6 +383,27 @@ own list derives from it, so a new key is **one entry**, never four edits.
   `@omega.js/config/env-delivery` derives everything from these declarations: each
   target's workflow secrets block, its bake list, and its publish-step secret set. No
   hand-kept `${{ secrets.KEY }}` list survives anywhere.
+- **A workflow block carries `ci` + `bake`, except the backend's, which carries `env` too**
+  ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)). Everywhere else the artifact holds its values inside itself and reads
+  no env file, so the CI half is the whole block. The backend's deployed artifact ships a
+  COMPOSED `.env`, and its deploy runs on a runner with no brand checkout to compose one
+  from, so its workflow writes that file out of the runner env: every `env` delivery has to
+  be up there to be written. `WORKFLOW_MODES` in `env-delivery.js` is the one home of that
+  exception; `DEFAULT_WORKFLOW_MODES` is every other target. Riding with it is
+  **`OMEGA_SERVICE_ACCOUNT_JSON`** (`delivery: { backend: 'ci' }`), the deploy credential as
+  the key file's own CONTENTS: it is a FILE on every other lane (minted into the brand's
+  `.omega/secrets/`, staged into `dist/`), so it renders no brand `.env` line, and the
+  backend's precheck values it from that authored chain instead of from a composed env.
+  Riding beside it: **`OMEGA_LICENSE_KEY`** (`ci` on all four targets now), because the
+  license check runs inside the deploy and the backend's deploy runs on a runner too.
+- **`ci` is what keeps a key out of an artifact's `.env`.** The two lanes that write a
+  backend `.env` read that one declaration: `envFileKeys('backend')` (the generated key
+  list the workflow's writer reads out of the runner env) takes the `env` deliveries only,
+  and `artifactEnvValues('backend', values)` strips every `ci` key out of the COMPOSED
+  values before the stage serializes `dist/.env`. The composer itself resolves a value for
+  everything the target claims, `ci` included, because the secrets publisher has to value
+  what it publishes from the same cascade as everything else: the artifact is the narrower
+  half, and those two functions are where that is said.
 - **A baked key is public at rest.** Anyone who unpacks the app can read it, so a
   `secret: true` entry may only bake when it also declares `publicAtRest: true` — the
   renderer THROWS otherwise, on every lane, so a real credential can never reach an
@@ -466,7 +487,7 @@ Who derives from it:
 | `@omega.js/config` `envKeysForTarget(target)` (the rendering lane's list) | `ENV_SCHEMA` + `envFileGroups()` — the NAMED keys a target reads, which placeholders a brand `.env` carries |
 | `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `requiredEnvKeys('backend')` for the boot guard, and `envEnvironment()` re-exported as `env.environment()` ([docs/backend/index.md](../backend/index.md)) |
 | `@omega.js/manager` `lib/scaffold.js` (the onboard stub) + `lib/gitignore.js` (the heal) | `ENV_ENVIRONMENTS` — one empty `.env.<environment>` per name, and the `.env.*` ignore |
-| `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest` — each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, and all secret publishers send exactly its set |
+| `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest` — each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, backend's composed `deploy.yml` renders both its secrets block and the KEY LIST its node `.env` writer reads out of the runner env ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and all secret publishers send exactly its set |
 | `@omega.js/config` `env-rules.js` (the one presence checker) | `required` + `requiredWhen` — the violations the backend boot, the desktop/extension bakes, and the manager's manage walk act on, each at its own severity |
 
 ## Owner hooks (`config/hooks/`) — cp91

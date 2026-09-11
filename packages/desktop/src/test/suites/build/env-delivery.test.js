@@ -74,8 +74,10 @@ module.exports = defineCases({
           // The two DELIBERATE step-level overrides survive: the mac signing
           // assets are decoded to files, so those two names are paths there,
           // not the base64 secrets the workflow env carries.
-          ctx.expect(workflow).toContain('CSC_LINK:         config/certs/dev-id.p12');
-          ctx.expect(workflow).toContain('APPLE_API_KEY:    config/certs/AuthKey.p8');
+          // Each override is gated on its secret existing (#872): an empty secret
+          // reads as UNSET after the sanitize pass, so a brand with no cert builds unsigned.
+          ctx.expect(workflow).toContain("CSC_LINK:         ${{ secrets.CSC_LINK != '' && 'config/certs/dev-id.p12' || '' }}");
+          ctx.expect(workflow).toContain("APPLE_API_KEY:    ${{ secrets.APPLE_API_KEY != '' && 'config/certs/AuthKey.p8' || '' }}");
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

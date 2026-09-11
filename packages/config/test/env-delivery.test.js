@@ -16,12 +16,14 @@ const assert = require('node:assert/strict');
 
 const {
   workflowSecretKeys, renderSecretsBlock, bakeKeys, publishSecretKeys,
+  envFileKeys, renderEnvFileKeys, artifactEnvValues,
   WORKFLOW_OWNED_KEYS, DELIVERY_MODES,
 } = require('../src/index.js');
 
 // A miniature schema: one entry per rule the renderer applies.
 const FIXTURE = [
   { name: 'BACKEND_ONLY',    owner: 't', targets: ['backend'],          group: 'backend-services', secret: true,  required: false, delivery: { backend: 'env' },              description: 'Read from the composed dist/.env.' },
+  { name: 'BACKEND_RUNNER',  owner: 't', targets: ['backend'],          group: 'license',          secret: true,  required: false, delivery: { backend: 'ci' },               description: 'The deploy process reads it on the runner; the artifact never does.' },
   { name: 'GH_TOKEN',        owner: 't', targets: ['web'],              group: 'github',           secret: true,  required: false, delivery: { web: 'ci' },                   description: 'The workflow template declares this one itself.' },
   { name: 'WEB_CI',          owner: 't', targets: ['web'],              group: 'captcha',          secret: false, required: false, delivery: { web: 'ci' },                   description: 'Injected into the web build step.' },
   { name: 'MACHINE_PATH',    owner: 't', targets: ['web'],              group: 'fontawesome',      secret: false, required: false, delivery: { web: 'ci' }, machineLocal: true, description: 'A developer-machine path — never published.' },
@@ -147,9 +149,68 @@ test('a workflow-owned key is PUBLISHED and never re-rendered — the #715 dupli
   }
 });
 
-test('backend: every key is an env delivery — nothing rides a runner', () => {
-  assert.deepEqual(workflowSecretKeys('backend'), []);
+// #872: the backend deploy runs on a RUNNER now, and a runner has no `.env`.
+// So the workflow carries every key delivered to backend and WRITES the target
+// .env from them, which makes the `env` deliveries part of its set.
+test('backend: the runner carries the env deliveries too, because the workflow writes the .env (#872)', () => {
+  const keys = workflowSecretKeys('backend', { schema: FIXTURE });
+
+  assert.deepEqual(keys, ['BACKEND_ONLY', 'BACKEND_RUNNER'], 'an `env` key rides the runner so the workflow can write it, beside the runner-only `ci` keys');
+  assert.deepEqual(bakeKeys('backend', { schema: FIXTURE }), [], 'nothing bakes into a functions upload');
+
+  // The other three targets are untouched: their artifacts carry no .env, so
+  // an `env` delivery there would be a key nothing reads.
+  assert.deepEqual(workflowSecretKeys('web', { schema: FIXTURE }), ['GH_TOKEN', 'STREAM_SECRET', 'WEB_CI']);
+  assert.deepEqual(workflowSecretKeys('extension', { schema: FIXTURE }), ['BAKED']);
+});
+
+test('renderEnvFileKeys(): the KEY LIST the backend workflow writes its .env from, as JSON (#872)', () => {
+  // The workflow's writer is a node one-liner that reads these names out of the
+  // runner env and writes the file through serializeEnv, the same serializer
+  // every other .env writeback rides: the shell never sees a value, so a value
+  // carrying a quote, a backslash or a newline cannot corrupt the file.
+  assert.equal(renderEnvFileKeys('backend', { schema: FIXTURE }), '["BACKEND_ONLY"]');
+  assert.deepEqual(JSON.parse(renderEnvFileKeys('backend', { schema: FIXTURE })), envFileKeys('backend', { schema: FIXTURE }));
+
+  // The key set is the SCHEMA's `env` deliveries. A `ci` key rides the runner
+  // env (the deploy credential, the license key the deploy checks with) and is
+  // never a line in the .env the artifact ships with.
+  assert.deepEqual(envFileKeys('backend', { schema: FIXTURE }), ['BACKEND_ONLY']);
+  assert.deepEqual(envFileKeys('web', { schema: FIXTURE }), [], 'no other target ships a .env');
+
+  // A target that delivers nothing still renders valid JSON, so the one-liner
+  // parses and writes an empty file rather than dying on a bare token.
+  assert.equal(renderEnvFileKeys('desktop', { schema: FIXTURE }), '[]');
+});
+
+test('artifactEnvValues(): the composed values minus every runner-only key (#872)', () => {
+  // The composer (env.js) resolves a value for everything the schema delivers
+  // to a target, because the secrets publisher needs `ci` values to publish.
+  // The ARTIFACT's own .env is the narrower set: what the deployed code reads.
+  const composed = { BACKEND_ONLY: 'kept', BACKEND_RUNNER: 'runner-only', DYNAMIC_THING: 'pattern-family' };
+
+  assert.deepEqual(artifactEnvValues('backend', composed, { schema: FIXTURE }), {
+    BACKEND_ONLY: 'kept',
+    DYNAMIC_THING: 'pattern-family',
+  });
+
+  assert.deepEqual(composed.BACKEND_RUNNER, 'runner-only', 'it filters, it never mutates the composed map');
+  assert.deepEqual(artifactEnvValues('web', composed, { schema: FIXTURE }), composed, 'a target with no `ci` claim on these keys keeps them all');
+});
+
+test('backend: the real inventory the workflow injects and writes (#872)', () => {
+  const keys = workflowSecretKeys('backend');
+
+  assert.ok(keys.includes('OMEGA_ADMIN_KEY'), 'the runtime keys ride the runner so the .env can be written');
+  assert.ok(keys.includes('STRIPE_SECRET_KEY'));
+  assert.ok(keys.includes('OMEGA_SERVICE_ACCOUNT_JSON'), 'the deploy credential the runner authenticates with');
   assert.deepEqual(bakeKeys('backend'), []);
+
+  // The .env the workflow writes carries the RUNTIME half only
+  const envKeys = envFileKeys('backend');
+  assert.ok(envKeys.includes('OMEGA_ADMIN_KEY'));
+  assert.ok(!envKeys.includes('OMEGA_SERVICE_ACCOUNT_JSON'), 'the service account is a FILE, not a runtime env line');
+  assert.ok(JSON.parse(renderEnvFileKeys('backend')).includes('OMEGA_ADMIN_KEY'));
 });
 
 test('desktop: the signing + publishing set the build workflow injects today', () => {
@@ -212,12 +273,21 @@ test('the license key rides the runner env and NEVER an artifact (#320)', () => 
     assert.ok(!bakeKeys(target).includes('OMEGA_LICENSE_KEY'), `${target} must never bake the license key`);
   }
 
-  for (const target of ['web', 'desktop', 'extension']) {
-    assert.ok(workflowSecretKeys(target).includes('OMEGA_LICENSE_KEY'), `${target} builds on a runner, so the check needs it there`);
+  // All FOUR now: the backend's deploy runs on a runner too (#872), and the
+  // check runs inside `omega deploy --direct` there, so a keyless verdict would
+  // be stamped into every CI-deployed backend without this delivery.
+  for (const target of ['web', 'backend', 'desktop', 'extension']) {
+    assert.ok(workflowSecretKeys(target).includes('OMEGA_LICENSE_KEY'), `${target} deploys on a runner, so the check needs it there`);
     assert.ok(publishSecretKeys(target).includes('OMEGA_LICENSE_KEY'), `${target}'s repo secret must exist for the workflow to read`);
   }
 
-  // The backend deploys straight from the CLI: no runner, and no delivery that
-  // would write the key into the .env its artifact ships with.
-  assert.ok(!workflowSecretKeys('backend').includes('OMEGA_LICENSE_KEY'));
+  // `ci`, never `env`: the runner env carries it for the verdict, and neither
+  // .env-writing lane of the backend ever sees it, so the key can never land in
+  // the .env the functions artifact ships with.
+  assert.ok(!envFileKeys('backend').includes('OMEGA_LICENSE_KEY'), 'the workflow writes no line for it');
+  assert.deepEqual(
+    artifactEnvValues('backend', { OMEGA_LICENSE_KEY: 'omg_live_key', OMEGA_ADMIN_KEY: 'admin' }),
+    { OMEGA_ADMIN_KEY: 'admin' },
+    'and the stage strips it out of the composed values',
+  );
 });

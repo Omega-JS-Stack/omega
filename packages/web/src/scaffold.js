@@ -13,7 +13,7 @@
  */
 const path = require('node:path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
-const { composeTargetWorkflows } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
 const { resolveSeedMode } = require('@omega.js/config');
 const { renderSecretsBlock } = require('./github-secrets.js');
 const { PATHS } = require('./paths.js');
@@ -104,6 +104,12 @@ function scaffoldDefaults(options) {
     defaultsDir,
     outputDir: options.outputDir,
     fileMap,
+    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
+    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the brand
+    // lane gets it inside composeWorkflow below, and a STANDALONE target gets
+    // it here, on the copy the scaffold engine writes. The action and its pin
+    // live in ONE place, so no template restates them.
+    transform: (contents) => renderInstallFirewall(contents),
     logger: options.logger,
   });
 

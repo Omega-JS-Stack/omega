@@ -16,17 +16,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- [#880](../../issues/880) — The desktop release workflow matches its three siblings: both dispatch triggers, the shared header, one action-version pair (`actions/checkout@v7`, `actions/setup-node@v6`) across all four templates, shallow checkouts, a version log, and a `timeout-minutes` on every job.
+- [#872](../../issues/872) — One deploy lane on every target: `omega deploy` packs a linked brand's frameworks into tarballs, snapshots the brand folder to its repo and dispatches; `--direct` deploys here instead. Backend gains a workflow and a secrets precheck; the manage walk checks the org runner group.
+- [#871](../../issues/871) — Every scaffolded CI workflow gets Socket Firewall from Socket's own pinned GitHub Action, which downloads with the job's token and caches the binary, so a hosted runner's anonymous API quota no longer fails the install. The composer renders that step from one template token, once.
+- [#872](../../issues/872) — The env schema gains `OMEGA_SERVICE_ACCOUNT_JSON` (a backend `ci` delivery) and delivers `OMEGA_LICENSE_KEY` to the backend runner; the repo ensure and the deploy wait both flip a `gh-pages` default branch back to `main`; a runner whose HTTP functions cannot be made public fails the deploy by name.
+- [#868](../../issues/868) — The prepare guard is required by a relative path and skips a checkout with no `node_modules`, so a linked brand's install runs it before there is anything to resolve or build with.
 - [#808](../../issues/808) — The playground is id `playground` in `brands/playground-omega`; the real brand's repo and folder are `omega-omega`. One repo rule, applied everywhere.
 - [#467](../../issues/467) — Every visible lockup (nav, footer, sidebar, auth, app, checkout, portal, extension, download) renders a brand's minted `brandmark.svg` when it exists, else the configured raster; `brand.images.brandmark` stays raster for payment and social cards.
 - [#743](../../issues/743) — An extension's build snapshot rides INSIDE every bundle: `OMEGA_BUILD_JSON` is baked in at bundle time, so the service worker and every page context read it with no file to load. The `build.js` JSONP and its `build.json` sidecar are no longer written; delete any `importScripts('/build.js')` you added.
 - [#609](../../issues/609) — The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
 ### Fixed
+- [#879](../../issues/879) — The manage walk's runner-group check reads a `visibility: selected` group's repository list, so a group that allows public repositories but leaves the brand repo off it fails the walk by name instead of passing green while a dispatched desktop release queues forever.
+- [#878](../../issues/878) — The manage walk grants the deploy service account `roles/iam.serviceAccountUser` on the App Engine and compute default service accounts, so a dispatched backend deploy can act as them; the deploy precheck reads both policies first and names a missing grant with the exact gcloud command.
+- [#872](../../issues/872) — Desktop CI builds run for a brand with no certificate: the firewall binary works under cmd, inline base64 credentials are accepted, mac assets decode only when present, unsigned apps skip notarization, the `.deb` gets homepage and maintainer from the brand, and every template runs its framework bin with `npx --no-install`.
+- [#866](../../issues/866) — The packaged desktop app no longer carries the target's scratch and state dirs: `.omega`, `.claude`, `.temp`, `.cache`, `.gh-runners` and `test` are excluded, so a stale boot-test symlink can no longer break a release.
 - [#864](../../issues/864) — A Windows sign at a locked console no longer hangs six hours: `sign-windows` refuses a locked console up front, each `signtool` attempt has a three-minute limit, the PIN watcher reports a dialog it could not reach, and the sign job carries `timeout-minutes`.
 - [#769](../../issues/769) — Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#467](../../issues/467) — The head warms the analytics and Firebase origins a page really uses, each gated on the config its loader reads; the theme's italic latin faces preload too, ending the 0.02 shift the hero accent caused; and every page whose opening band is a masthead paints as a first-paint band.
 - [#212](../../issues/212) — The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) — The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.
+
+### Removed
+- [#872](../../issues/872) — The `rehearse:desktop` script, the two `scripts/playground-desktop-*.js` generators and the private rehearsal lane; and the 2026-07-20 rule that a linked brand deployed from the local machine on its own (`--direct` is the explicit ask now).
 
 ## [0.50.0] 2026-09-09
 

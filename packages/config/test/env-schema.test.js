@@ -225,16 +225,18 @@ test('OMEGA_LICENSE_KEY travels CLI → server at deploy, and never into an arti
   assert.equal(entry.required, false, 'keyless is a supported state — attribution shown, payments gated');
   assert.equal('generated' in entry, false, 'omegajs.dev issues it; OMEGA cannot mint it');
 
-  // Every delivery is 'ci': the three targets whose deploys BUILD on an Actions
-  // runner get it in the runner env for the check, and nothing else.
-  assert.deepEqual(entry.targets, ['web', 'desktop', 'extension']);
-  assert.deepEqual(entry.delivery, { web: 'ci', desktop: 'ci', extension: 'ci' });
+  // Every delivery is 'ci': ALL FOUR targets deploy from an Actions runner now
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), so the check
+  // runs where the deploy runs and the key is in that runner's env, nothing else.
+  assert.deepEqual(entry.targets, ['web', 'backend', 'desktop', 'extension']);
+  assert.deepEqual(entry.delivery, { web: 'ci', backend: 'ci', desktop: 'ci', extension: 'ci' });
 
-  // The backend deploys from the CLI, never a runner, so it needs no delivery
-  // at all — and an 'env' one would compose the key into dist/.env and ship it
-  // INSIDE the deployed functions artifact, which is the one thing it must not do.
-  assert.ok(!entry.targets.includes('backend'), 'a backend deploy reads it from the .env cascade in the CLI process');
-  assert.ok(!envKeysForTarget('backend').includes('OMEGA_LICENSE_KEY'), 'it must never compose into targets/backend/.env');
+  // `ci` is the WHOLE of what keeps it out of the functions upload: an 'env'
+  // delivery would compose the key into dist/.env and ship it INSIDE the
+  // deployed artifact, which is the one thing it must not do. The two lanes
+  // that write a backend .env both read that declaration (env-delivery's
+  // envFileKeys for the workflow's writer, artifactEnvValues for the stage).
+  assert.equal(entry.delivery.backend, 'ci', 'the runner env carries it for the check, the artifact never does');
 
   assert.equal('publicAtRest' in entry, false, 'nothing bakes it — a baked license key is a license key anyone can copy');
 });
@@ -333,9 +335,17 @@ test('the two lanes a brand actually feeds declare how every key reaches them', 
     }
   }
 
-  // The backend is the one target that ships an .env with its artifact
+  // The backend is the one target that ships an .env with its artifact, so
+  // `env` is how a brand key reaches it. Its `ci` deliveries are the two keys
+  // the RUNNER needs and the artifact never does
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the deploy
+  // credential, and the license key the deploy checks before it stages.
   const backendModes = new Set(ENV_SCHEMA.filter((entry) => entry.delivery?.backend).map((entry) => entry.delivery.backend));
-  assert.deepEqual([...backendModes], ['env']);
+  assert.deepEqual([...backendModes].sort(), ['ci', 'env']);
+  assert.deepEqual(
+    ENV_SCHEMA.filter((entry) => entry.delivery?.backend === 'ci').map((entry) => entry.name),
+    ['OMEGA_LICENSE_KEY', 'OMEGA_SERVICE_ACCOUNT_JSON'],
+  );
 });
 
 test('the nine Windows cloud-signing keys the desktop workflow injects are declared (#627)', () => {

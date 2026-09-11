@@ -35,6 +35,23 @@ function tmpBrand({ brandEnv, targetEnv, repo } = {}) {
   return { brand, target };
 }
 
+/**
+ * A `git` stub that answers PER COMMAND. The publisher resolves the deploy lane
+ * before it guards ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
+ * so `rev-parse --show-toplevel` has to answer that this checkout IS the brand
+ * root: an unplaced answer reads as a NESTED brand, whose remote names the
+ * enclosing repo by construction and whose mismatch guard is therefore skipped.
+ *
+ * @param {string|function} remote - What `git config --get remote.origin.url` answers (or throws).
+ * @returns {function} `(command, options) => string`
+ */
+function gitStub(remote) {
+  return (command, options) => {
+    if (command.includes('rev-parse')) return `${options.cwd}\n`;
+    return typeof remote === 'function' ? remote() : remote;
+  };
+}
+
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
@@ -65,7 +82,7 @@ module.exports = defineCases({
             targetDir: target,
             logger: quiet,
             env: {},
-            gitExecFn: () => 'git@github.com:acme/app.git\n',
+            gitExecFn: gitStub('git@github.com:acme/app.git\n'),
             execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
           });
 
@@ -108,7 +125,7 @@ module.exports = defineCases({
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: () => 'git@github.com:Omega-JS-Stack/omega.git\n',
+            gitExecFn: gitStub('git@github.com:Omega-JS-Stack/omega.git\n'),
           })).toEqual({ skipped: 'repo-mismatch' });
 
           ctx.expect(pushSecrets.publishEnvSecrets({
@@ -116,7 +133,7 @@ module.exports = defineCases({
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: () => 'git@github.com:acme/app.git\n',
+            gitExecFn: gitStub('git@github.com:acme/app.git\n'),
           })).toEqual({ skipped: 'no-declared-repo' });
 
           const heard = said.join('\n');

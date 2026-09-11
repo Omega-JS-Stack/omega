@@ -8,6 +8,7 @@
  */
 const chalk = require('chalk').default;
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { computeDefaultAccount } = require('../lib/runtime-accounts.js');
 
 const REQUIRED_SERVICES = [
   'serviceusage.googleapis.com', // Must be first — Firebase CLI v15.20.0+ pre-flight checks require it
@@ -67,7 +68,7 @@ module.exports = async function ensureServices(context) {
   // === WRITE: compute service account roles (diff-based) ===
   try {
     const projectNumber = await api.getProjectNumber(projectId);
-    const member = `serviceAccount:${projectNumber}-compute@developer.gserviceaccount.com`;
+    const member = `serviceAccount:${computeDefaultAccount(projectNumber)}`;
 
     const policy = await api.getIamPolicy(projectId);
     let changed = false;

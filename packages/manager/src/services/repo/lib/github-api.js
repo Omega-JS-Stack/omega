@@ -95,6 +95,42 @@ class GitHubAPI {
   }
 
   /**
+   * Get an account (org or user): the OWNER's type, which is what tells a
+   * personal-account brand (no runner groups exist) from an org one (#872).
+   * `users/{owner}` answers for both kinds; null if not found.
+   */
+  getUser(owner) {
+    try {
+      return this.runJsonCommand(['api', `users/${owner}`]);
+    } catch (error) {
+      if (error.message.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get the org's Actions runner groups (#872), as `{ total_count, runner_groups }`.
+   * Throws on 403/404 (a token without the admin scope), which the runners
+   * ensure step reads as "unreadable", never as a refusal.
+   */
+  getRunnerGroups(org) {
+    return this.runJsonCommand(['api', `orgs/${org}/actions/runner-groups`]);
+  }
+
+  /**
+   * Get the repositories a `visibility: selected` runner group serves (#879),
+   * as `{ total_count, repositories }`. Reads the first 100, the page ceiling
+   * GitHub allows (a signer group past that is not a shape we build for).
+   * Throws on 403/404 like the groups read, which the runners ensure step
+   * reads as "unreadable", never as a refusal.
+   */
+  getRunnerGroupRepositories(org, groupId) {
+    return this.runJsonCommand(['api', `orgs/${org}/actions/runner-groups/${groupId}/repositories?per_page=100`]);
+  }
+
+  /**
    * Get repository details (null if not found)
    */
   getRepo(owner, repoName) {

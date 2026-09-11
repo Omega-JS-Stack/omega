@@ -23,8 +23,7 @@
     "test:auth": "node scripts/lane.js test:auth \"node scripts/e2e-auth-token.js\"",
     "test:flows": "node scripts/lane.js test:flows \"node scripts/e2e-flows.js\"",
     "test:journey": "node scripts/lane.js test:journey \"node scripts/e2e-journey.js\"",
-    "release:check": "node scripts/release-check.js",
-    "rehearse:desktop": "node scripts/playground-desktop-rehearsal.js"
+    "release:check": "node scripts/release-check.js"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

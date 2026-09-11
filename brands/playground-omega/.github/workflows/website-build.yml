@@ -64,23 +64,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # The firewall binary comes through Socket's own action (#871): it downloads
+      # with the job's token, so the shared anonymous GitHub API quota of a hosted
+      # runner never fails the step, and it caches the binary between runs.
       - name: Install Socket Firewall
-        working-directory: targets/website
-        run: npm install -g sfw
+        uses: SocketDev/action@v1.3.2
+        with:
+          mode: firewall-free
 
       - name: Run node install
         working-directory: targets/website
-        run: |
-          for attempt in 1 2 3; do
-            echo "Install attempt $attempt of 3 (sfw)..."
-            sfw npm install && break
-            echo "Attempt $attempt failed"
-            if [ "$attempt" -eq 3 ]; then
-              echo "⚠ All sfw attempts failed, falling back to plain npm install"
-              npm install
-            fi
-            sleep 15
-          done
+        run: sfw npm install
 
       - name: Log versions
         working-directory: targets/website

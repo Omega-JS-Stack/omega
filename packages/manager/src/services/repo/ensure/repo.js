@@ -68,6 +68,15 @@ module.exports = async function ensureRepo(context) {
     console.log(`      homepage: "${repo.homepage || '(none)'}" ${chalk.dim('→')} "${chalk.cyan(homepage)}"`);
   }
 
+  // Built output is never the default branch (#872): a first deploy that
+  // creates gh-pages on an empty repo leaves GitHub pointing the repo (and
+  // every workflow dispatch, which reads the DEFAULT branch) at the
+  // published site. Only ever flipped back to a `main` that exists.
+  if (repo.default_branch === 'gh-pages' && api.branchExists(repoOwner, repoName, 'main')) {
+    updates.default_branch = 'main';
+    console.log(`      default_branch: ${repo.default_branch} ${chalk.dim('→')} ${chalk.cyan('main')}`);
+  }
+
   const state = { repo: { fullName, htmlUrl: repo.html_url, private: isPrivate } };
 
   if (Object.keys(updates).length === 0) {

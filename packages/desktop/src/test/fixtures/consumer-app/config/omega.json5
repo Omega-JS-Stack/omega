@@ -6,6 +6,12 @@
   brand: {
     id: 'desktop-fixture',
     name: 'Desktop Fixture Consumer',
+    // The .deb target needs a homepage and a maintainer (#872): build-config
+    // refuses the config without them, so the fixture spells both.
+    url: 'https://desktop-fixture.test',
+    contact: {
+      email: 'support@desktop-fixture.test',
+    },
     images: {
       // Empty → build-config falls back to @omega.js/desktop's bundled default icon (no icon file shipped).
       icon: '',

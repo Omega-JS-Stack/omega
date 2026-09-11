@@ -75,7 +75,9 @@ module.exports = defineCases({
           delete require.cache[deployPath];
           const DeployCommand = require(deployPath);
 
-          const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: {}, options: {} });
+          // The direct lane is the one that resolves the license (#872): the bare
+          // verb dispatches a runner, which runs `--direct` itself.
+          const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: { direct: true }, options: {} });
           command.log = () => {};
 
           try {
