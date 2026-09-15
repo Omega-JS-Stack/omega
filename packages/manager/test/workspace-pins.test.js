@@ -21,7 +21,7 @@ const ANSWERS = {
   name: 'Pin Brand',
   url: 'https://pinbrand.test',
   email: 'hi@pinbrand.test',
-  targets: ['web', 'backend', 'desktop'],
+  targets: [{ name: 'web', type: 'web' }, { name: 'backend', type: 'backend' }, { name: 'desktop', type: 'desktop' }],
 };
 
 function tempDir() {
@@ -45,11 +45,11 @@ test('pin writer: every target pins its framework at the same version — no car
 
   // The backend's framework is a RUNTIME dep (the stage derives dist/package.json
   // from it); every other target declares its framework as a devDependency
-  assert.deepEqual(readJson(path.join(root, 'targets', 'website', 'package.json')).devDependencies, { '@omega.js/web': MANAGER_VERSION });
+  assert.deepEqual(readJson(path.join(root, 'targets', 'web', 'package.json')).devDependencies, { '@omega.js/web': MANAGER_VERSION });
   assert.deepEqual(readJson(path.join(root, 'targets', 'desktop', 'package.json')).devDependencies, { '@omega.js/desktop': MANAGER_VERSION });
   assert.deepEqual(readJson(path.join(root, 'targets', 'backend', 'package.json')).dependencies, { '@omega.js/backend': MANAGER_VERSION });
 
-  for (const file of ['package.json', 'targets/website/package.json', 'targets/backend/package.json', 'targets/desktop/package.json']) {
+  for (const file of ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json']) {
     const raw = fs.readFileSync(path.join(root, file), 'utf8');
     assert.ok(!/"@omega\.js\/[^"]+": "[\^~*]/.test(raw), `${file} carries a range instead of a pin`);
   }
@@ -58,22 +58,22 @@ test('pin writer: every target pins its framework at the same version — no car
 test('pin writer: a `file:` spec already present is left untouched (the local era)', () => {
   const root = tempDir();
   const linkedRoot = '{\n  "name": "pinbrand",\n  "private": true,\n  "workspaces": ["targets/*"],\n  "devDependencies": { "@omega.js/manager": "file:../omega/packages/manager" }\n}\n';
-  const linkedTarget = '{\n  "name": "pinbrand-website",\n  "devDependencies": { "@omega.js/web": "file:../../../omega/packages/web" }\n}\n';
+  const linkedTarget = '{\n  "name": "pinbrand-web",\n  "devDependencies": { "@omega.js/web": "file:../../../omega/packages/web" }\n}\n';
   fs.writeFileSync(path.join(root, 'package.json'), linkedRoot);
-  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), linkedTarget);
+  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), linkedTarget);
 
   applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
   assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), linkedRoot);
-  assert.equal(fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8'), linkedTarget);
+  assert.equal(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'), linkedTarget);
 });
 
 test('pin writer: idempotent — a rerun over an already-pinned brand writes nothing', () => {
   const root = tempDir();
   applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));
 
-  const files = ['package.json', 'targets/website/package.json', 'targets/backend/package.json', 'targets/desktop/package.json'];
+  const files = ['package.json', 'targets/web/package.json', 'targets/backend/package.json', 'targets/desktop/package.json'];
   const before = files.map((file) => fs.readFileSync(path.join(root, file), 'utf8'));
 
   const rerun = applyScaffoldPlan(root, buildScaffoldPlan(ANSWERS));

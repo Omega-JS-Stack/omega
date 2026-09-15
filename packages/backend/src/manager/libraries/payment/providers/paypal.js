@@ -2,6 +2,7 @@ const powertools = require('node-powertools');
 const fetchFailure = require('../fetch-failure.js');
 const assertRefundLinkage = require('../refund-linkage.js');
 const env = require('../../env.js');
+const Manager = require('../../../index.js');
 const assertLicensedPayments = require('../license.js');
 
 // Epoch zero timestamps (used as default/empty dates)
@@ -68,11 +69,17 @@ const PayPal = {
       return cachedToken;
     }
 
-    const clientId = env.get('PAYPAL_CLIENT_ID');
+    // The client id is PUBLIC (every checkout page ships it), so config is its
+    // one home and this reads it straight (#893); the secret half stays in .env
+    const clientId = Manager.config?.payment?.providers?.paypal?.clientId;
     const clientSecret = env.get('PAYPAL_CLIENT_SECRET');
 
-    if (!clientId || !clientSecret) {
-      throw new Error('PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET environment variables are required');
+    if (!clientId) {
+      throw new Error('payment.providers.paypal.clientId is required in config/omega.json5');
+    }
+
+    if (!clientSecret) {
+      throw new Error('PAYPAL_CLIENT_SECRET environment variable is required');
     }
 
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');

@@ -23,9 +23,9 @@ Opt in at the shared (brand) level of `config/omega.json5`:
 
 ```json5
 {
-  // Which project's directory this brand belongs in. Required — no parent
-  // relationship, no directory to push into.
-  parent: 'https://itwcreativeworks.com',
+  // Which company's directory this brand belongs in ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)).
+  // Required: a brand that names no company has no directory to push into.
+  company: { id: 'itw-creative-works' },
 
   // Opt in. Absent, `false`, or an empty block all mean "do not push": the
   // parent publishes the collection for anyone to read, so participation is
@@ -96,8 +96,8 @@ point of the collection.
 
 ## The gates and the diff
 
-Three gates, each a clean skip, in order: `directory.enabled: true`, a `parent` to push
-into, and not a `demo-*` (emulator-only) brand — the cloud service's gate, for the same
+Three gates, each a clean skip, in order: `directory.enabled: true`, a `company: { id }` to
+push into (#677), and not a `demo-*` (emulator-only) brand, the cloud service's gate, for the same
 reason: an offline fixture must never reach a live project. A missing
 `DIRECTORY_SERVICE_ACCOUNT` skips too.
 
@@ -118,14 +118,14 @@ Target: `brands/{brand.id}` in the parent project.
 | `brand.id` | document id `brands/{brand.id}`, and `brand.id` | Unchanged; denormalized into the entry as legacy did |
 | `brand.name` | `brand.name` | Unchanged — the ITW routes read `brand.brand.name` |
 | `brand.url` | `brand.url` | Unchanged — the ITW routes derive the brand's API host from it |
-| `github.orgMain` / `github.orgWebsite` + `github.templates.website.{useOrgWebsite,suffix}` | `github.owner` | **Derived, not carried.** Legacy pushed the raw org pair and the CONSUMER picked between them; the entry now carries the already-resolved owner from `repo.providers.github` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)) |
+| `github.orgMain` / `github.orgWebsite` + `github.templates.website.{useOrgWebsite,suffix}` | `github.owner` | **Derived, not carried.** Legacy pushed the raw org pair and the CONSUMER picked between them; the entry now carries the already-resolved owner from the one `repo` block, `repo.org` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)) |
 | `brand.id` + `github.templates.website.suffix` (`'-website'` default), composed by the consumer | `github.name` | **Derived, not carried.** One repo per brand now (the brand monorepo), so the `<id><suffix>` composition retires with the split-repo era |
 | — | `github.repo` | New: the `owner/name` slug the GitHub API takes, so no consumer composes it |
 | `sponsorships.acceptable` | `sponsorships.acceptable` | Verbatim |
 | `sponsorships.unacceptable` | `sponsorships.unacceptable` | Verbatim |
 | `sponsorships.prices['guest-post']` | `sponsorships.prices['guest-post']` | Verbatim (USD) |
 | `sponsorships.prices['link-insertion']` | `sponsorships.prices['link-insertion']` | Verbatim (USD) |
-| `parent` | — | Not published: it names WHERE the entry goes, it is not part of the entry |
+| `company` | (nothing) | Not published: it names WHERE the entry goes, it is not part of the entry |
 
 The two placement keys are the only ones the 23 legacy brands with a `sponsorships` block
 ever used. `prices` is an open map, not an enum — a new placement type is a config line, not

@@ -14,7 +14,7 @@ production.
 ## Structure
 
 - `config/omega.json5` — brand-level shared config (apps inherit + override)
-- `targets/website/` — the web app (framework: `@omega.js/web`) — newsflash theme
+- `targets/web/`: the web app (framework: `@omega.js/web`), newsflash theme
 - `targets/backend/` — the backend app (framework: `@omega.js/backend`)
 - `.env` — credentials (gitignored; offline brand needs none)
 - `.omega/` — manager state + run output (gitignored, machine-owned)
@@ -30,5 +30,5 @@ auto-bumps past whatever the playground's live stack holds (the boot log and
 cd targets/backend && npm run emulator
 
 # website dev server (pinned: https://localhost:4100)
-cd targets/website && npm start
+cd targets/web && npm start
 ```

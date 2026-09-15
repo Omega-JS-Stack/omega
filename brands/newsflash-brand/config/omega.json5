@@ -7,12 +7,16 @@
 // no real external services, never production. Secrets NEVER live here —
 // the loader hard-fails secret-shaped keys.
 {
-  // No webhook parent: offline testbed, no SendGrid account, no sub-brands.
-  parent: false,
+  // The COMPANY this brand belongs to (#677): one key, outside `brand`, naming
+  // the parent's own brand.id. It plays the SUB-BRAND of the playground in the
+  // company-mode ads proof, so the resolved company.url is what
+  // advertising.providers.inhouse.source 'company' derives api.<host> from.
+  // webhooks: false because this is an offline testbed with no SendGrid or
+  // Beehiiv account to point anywhere (#677).
+  company: { id: "playground", webhooks: false },
   brand: {
     id: "daily-build",
     name: "The Daily Build",
-    company: "ITW Creative Works",
     description: "The dev-news daily: ship logs, release radar, and the state of the toolchain, fresh off the press.",
     tagline: "Fresh off the press.",
     color: "#F03612", // newsflash vermilion — the theme's signature accent drives the --omega-accent-* ramps
@@ -39,16 +43,6 @@
       brandmark: "/assets/images/brand/brandmark.png",
       social: "/assets/images/brand/social.png",
     },
-  },
-
-  // COMPANY LAYER (ads step 6): The Daily Build plays the SUB-BRAND in the
-  // company-mode ads proof — advertising.providers.inhouse.source 'company'
-  // resolves this url through the standard api derivation
-  // (api.playground.omegajs.dev in production; the offline proof pairs it
-  // with the playground's local emulator — scripts/e2e-verts-company.js).
-  // Public-by-design value; this brand stays fully offline.
-  company: {
-    url: "https://playground.omegajs.dev",
   },
 
   // Deliberately ABSENT sections (offline testbed — no real resources ever):
@@ -89,7 +83,9 @@
   },
 
   // COMPANY-MODE ADS (ads step 6 proof): no AdSense (offline brand) — house
-  // units fill from the PARENT company's inventory (`company` above). tags =
+  // units fill from the PARENT company's inventory (the resolved company.url,
+  // api.playground.omegajs.dev in production; the offline proof pairs it with
+  // the playground's local emulator: scripts/e2e-verts-company.js). tags =
   // this brand's contextual targeting input on every serve request.
   advertising: {
     providers: {
@@ -111,23 +107,23 @@
   features: {
     articles: {
       name: "Articles",
-      icon: "newspaper",
+      icon: "fa-solid fa-newspaper",
       definition: "Full articles you can read per month.",
       usage: {},
     },
     ticker: {
       name: "Live ticker",
-      icon: "bolt",
+      icon: "fa-solid fa-bolt",
       definition: "The real-time wire of releases, incidents, and ship logs.",
     },
     briefing: {
       name: "Morning briefing",
-      icon: "mug-hot",
+      icon: "fa-solid fa-mug-hot",
       definition: "The editor's daily digest in your inbox before standup.",
     },
     archive: {
       name: "Full archive",
-      icon: "box-archive",
+      icon: "fa-solid fa-box-archive",
       definition: "Lifetime access to every past issue and column.",
     },
   },
@@ -200,10 +196,11 @@
   // publishes the resolved map (firebase.resolved.json + .temp/ports.json).
   targets: {
     web: {
+      type: "web",
       ports: {
         website: 4100,
       },
     },
-    backend: {},
+    backend: { type: "backend" },
   },
 }

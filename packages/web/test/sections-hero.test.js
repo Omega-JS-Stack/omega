@@ -78,8 +78,8 @@ test('#435: hero cards render (count + content) and warn-free — ported stat ca
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(
     '{% section "marketing/hero" %}\ncards:\n'
-    + '  - number: "99%"\n    label: Undetectable\n    icon: shield-check\n'
-    + '  - number: "500K+"\n    label: Pieces created\n    icon: file-lines\n'
+    + '  - number: "99%"\n    label: Undetectable\n    icon: fa-solid fa-shield-check\n'
+    + '  - number: "500K+"\n    label: Pieces created\n    icon: fa-solid fa-file-lines\n'
     + '  - number: "30+"\n    label: Languages\n'
     + '{% endsection %}',
     SITE,
@@ -179,8 +179,8 @@ test('#476: an authored class replaces the default and an authored icon renders'
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(
     '{% section "marketing/hero" %}\n'
-    + 'primary_button:\n  text: "Get started free"\n  href: /dashboard\n  icon: rocket\n  class: btn-light\n'
-    + 'secondary_button:\n  enabled: true\n  text: "Explore solutions"\n  href: /pricing\n  icon: book-open\n  class: btn-outline-light\n'
+    + 'primary_button:\n  text: "Get started free"\n  href: /dashboard\n  icon: fa-solid fa-rocket\n  class: btn-light\n'
+    + 'secondary_button:\n  enabled: true\n  text: "Explore solutions"\n  href: /pricing\n  icon: fa-solid fa-book-open\n  class: btn-outline-light\n'
     + '{% endsection %}',
     SITE,
   );

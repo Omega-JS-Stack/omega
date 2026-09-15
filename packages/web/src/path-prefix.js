@@ -26,6 +26,7 @@
  */
 
 const { mapSrcset } = require('./srcset.js');
+const { readHtmlStamp } = require('./html-stamp.js');
 
 // The attributes a browser resolves as a URL. The lookbehind keeps `data-src`,
 // `data-srcset` and friends out of scope (same guard cachebreak-html.js uses):
@@ -91,9 +92,7 @@ function stripPathPrefix(pathname, prefix) {
  * @returns {string} resolvePathPrefix output ('' when the page is unmounted)
  */
 function readPathPrefixStamp(html) {
-  const match = /<html\b[^>]*\bdata-omega-path-prefix="([^"]*)"/i.exec(String(html));
-
-  return resolvePathPrefix(match ? match[1] : '');
+  return resolvePathPrefix(readHtmlStamp(html, 'data-omega-path-prefix') ?? '');
 }
 
 /**

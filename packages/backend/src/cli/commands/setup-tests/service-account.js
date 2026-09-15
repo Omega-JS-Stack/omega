@@ -54,10 +54,11 @@ class ServiceAccountTest extends BaseTest {
   /** First existing SA in the source chain; target root as the write default. */
   resolveSaPath() {
     const { findBrandRoot } = require('@omega.js/config');
+    const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
     const path = require('path');
     const targetRootPath = `${this.self.firebaseProjectPath}/service-account.json`;
     const brandRoot = findBrandRoot(this.self.firebaseProjectPath);
-    const brandPath = brandRoot ? path.join(brandRoot, '.omega', 'secrets', 'service-account.json') : null;
+    const brandPath = brandRoot ? path.join(brandRoot, SERVICE_ACCOUNT_REL) : null;
 
     if (jetpack.exists(targetRootPath)) return targetRootPath;
     if (brandPath && jetpack.exists(brandPath)) return brandPath;
@@ -77,7 +78,7 @@ class ServiceAccountTest extends BaseTest {
     }
 
     console.log(chalk.red(`There is no automatic fix for this check.`));
-    console.log(chalk.red(`Please install a service account --> ` + chalk.yellow.red(`${this.self.projectUrl}/settings/serviceaccounts/adminsdk`)));
+    console.log(chalk.red(`Please install a service account --> ${chalk.yellow.red(`${this.self.projectUrl}/settings/serviceaccounts/adminsdk`)}`));
     throw new Error('Missing or incorrect service-account.json');
   }
 }

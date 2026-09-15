@@ -10,18 +10,24 @@ const chalk = require('chalk').default;
 const { API_BASE } = require('./apple-api.js');
 
 /**
- * Cert type → the provisioning profile type that consumes it. Installer
- * cert types need no profile (null). Both G1 and G2 Developer ID
- * Application certs use MAC_APP_DIRECT — Apple distinguishes them by the
- * underlying cert chain.
+ * Cert type → the provisioning profile type that consumes it, `null` for a
+ * type that needs none (the walk skips those outright).
+ *
+ * DEVELOPER_ID types need none ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
+ * Developer ID is DIRECT distribution, signed and notarized, and a Mac runs it
+ * with no profile embedded at all. A profile is only for entitlements Apple
+ * reviews, which a direct-distribution app does not carry. Requesting one
+ * anyway produced a per-brand file every build then had to be told to ignore,
+ * and a stale one in a target dir was the only thing validate-certs had to
+ * complain about. Installer types already needed none.
  */
 const CERT_TYPE_TO_PROFILE_TYPE = {
   DEVELOPMENT: 'IOS_APP_DEVELOPMENT',
   IOS_DISTRIBUTION: 'IOS_APP_STORE',
   MAC_INSTALLER_DISTRIBUTION: null,
   MAC_APP_DISTRIBUTION: 'MAC_APP_STORE',
-  DEVELOPER_ID_APPLICATION: 'MAC_APP_DIRECT',
-  DEVELOPER_ID_APPLICATION_G2: 'MAC_APP_DIRECT',
+  DEVELOPER_ID_APPLICATION: null,
+  DEVELOPER_ID_APPLICATION_G2: null,
   DEVELOPER_ID_INSTALLER: null,
   DEVELOPER_ID_INSTALLER_G2: null,
 };

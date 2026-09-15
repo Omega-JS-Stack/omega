@@ -1,8 +1,14 @@
+// The ONE build snapshot (#743): `/build.js` is written by the bundle task and
+// packaged with the artifact, and a classic MV3 service worker loads it the way
+// every OMEGA worker does. First line on purpose, so `self.OMEGA_BUILD_JSON` is
+// there before anything below reads it.
+importScripts('/build.js');
+
 // Libraries
 import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
-import { attachTo as attachUrlHelpers } from './utils/url-helpers.js';
+import { attachTo as attachUrlHelpers, requiredPort } from './utils/url-helpers.js';
 import { createRequest } from '@omega.js/client/modules/request.js';
 
 // Firebase (static imports - a service worker cannot fetch code at runtime under MV3, so dynamic import() is not an option)
@@ -24,13 +30,6 @@ const installLogger = new LoggerLite('install');
 // single flag re-enables it if an offline lane ever lands.
 const CACHE_WARMING_ENABLED = false;
 
-// Auth emulator port for TESTING builds. An extension context has no
-// `process.env`, so the resolved map arrives BAKED in OMEGA_BUILD_JSON's
-// `config.dev.ports` ([#300](https://github.com/Omega-JS-Stack/omega/issues/300));
-// the classic default is the fallback for a build made with no stack up (mirrors
-// url-helpers' classic-5002 hosting note).
-const AUTH_EMULATOR_PORT = 9099;
-
 // ⚠️⚠️⚠️ CRITICAL: Setup global listeners BEFORE any async operations ⚠️⚠️⚠️
 // https://stackoverflow.com/questions/78270541/cant-catch-fcm-notificationclick-event-in-service-worker-using-firebase-messa
 // Note: ES6 static imports above are fine - they're hoisted and bundled by the build.
@@ -45,15 +44,15 @@ class Manager {
     this.authLogger = null;
     this.serviceWorker = null;
 
-    // Load the snapshot the bundle baked in (#743 — the banner assigns it onto
-    // self/globalThis ahead of this file's own code, so it is always already there).
+    // The snapshot /build.js assigned onto `self` (#743), already there by the
+    // time this file's own code runs.
     this.config = serviceWorker.OMEGA_BUILD_JSON?.config || {};
 
     // Defaults
     this.version = this.config?.version || 'unknown';
     this.brand = this.config?.brand || { name: 'unknown' };
     this.brand.id = this.config?.brand?.id || 'extension';
-    this.environment = this.config?.omega?.environment || 'production';
+    this.environment = this.config?.environment || 'production';
     this.libraries = {
       firebase: null,
       firebaseAuth: null,
@@ -61,7 +60,7 @@ class Manager {
       promoServer: false,
     };
     this.cache = {
-      breaker: this.config?.omega?.cache_breaker || new Date().getTime(),
+      breaker: this.config?.buildTime || new Date().getTime(),
       name: ''
     };
   }
@@ -438,7 +437,14 @@ class Manager {
     // move @omega.js/client makes for emulator runs. Only a build baked with
     // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
     if (this.isTesting()) {
-      const port = this.config?.dev?.ports?.auth || AUTH_EMULATOR_PORT;
+      // An extension context has no `process.env`, so the resolved map arrives
+      // BAKED in OMEGA_BUILD_JSON's `config.dev.ports`
+      // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). The
+      // classic auth port used to sit under it for a build made with no stack
+      // up; it is gone (#834), numbers and all, because a neighbouring
+      // project's emulator holding that port reads as an auth mystery rather
+      // than as a port problem.
+      const port = requiredPort(this, 'OMEGA_AUTH_PORT', 'auth');
       this.authLogger.log(`Testing build — connecting auth to the emulator on :${port}`);
       connectAuthEmulator(this.libraries.firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
     }
@@ -532,7 +538,7 @@ class Manager {
     if (this.environment !== 'development') return;
 
     // Get port from config or use default
-    const port = this.config?.omega?.liveReloadPort || 35729;
+    const port = this.config?.dev?.liveReloadPort || 35729;
 
     // Setup livereload
     const address = `ws://localhost:${port}/livereload`;

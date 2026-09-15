@@ -2,16 +2,77 @@
  * SVG logo generator — wordmark and combomark SVGs via opentype.js
  * text-to-path conversion. All text is converted to path outlines so the
  * SVGs are self-contained (no font dependency at render time).
+ *
+ * The path DATA is rendered here rather than by opentype.js's
+ * `Path.prototype.toPathData`: its rounding helper builds a number by
+ * string concatenation (`Math.round(decimalPart + 'e+' + places)`), so a
+ * coordinate sitting within float noise of an integer stringifies in
+ * exponential notation and rounds to NaN, which truncates the glyph at
+ * that token and renders the whole wordmark as a sliver (#916; upstream
+ * https://github.com/opentypejs/opentype.js/issues/876, fixed on master
+ * in 9c0a65f but absent from every release through 2.0.0). The commands
+ * opentype hands us are clean, so rendering them ourselves is the fix.
  */
+
+/**
+ * Render SVG path data from opentype.js path commands, the compact way
+ * (a leading minus separates a pair on its own, so only non-negative
+ * values need a space in front).
+ *
+ * @param {Array<Object>} commands - opentype.js path commands
+ * @param {number} decimals - Coordinate decimal places
+ * @returns {string} The `d` attribute value
+ */
+function renderPathData(commands, decimals = 4) {
+  const pack = (values) => values.map((value, index) => {
+    const text = String(Number(value.toFixed(decimals)));
+    return index > 0 && !text.startsWith('-') ? ` ${text}` : text;
+  }).join('');
+
+  return commands.map((command) => {
+    switch (command.type) {
+      case 'M': return `M${pack([command.x, command.y])}`;
+      case 'L': return `L${pack([command.x, command.y])}`;
+      case 'C': return `C${pack([command.x1, command.y1, command.x2, command.y2, command.x, command.y])}`;
+      case 'Q': return `Q${pack([command.x1, command.y1, command.x, command.y])}`;
+      case 'Z': return 'Z';
+      // opentype.js emits only those five; anything else means the font
+      // parsed into a shape we have never seen, not a path we can draw
+      default: throw new Error(`unknown opentype path command "${command.type}"`);
+    }
+  }).join('');
+}
+
+/**
+ * Render a text path and refuse a non-finite coordinate. One NaN poisons
+ * the whole `<path>` and every raster derived from it while the step
+ * still reports success, so a broken sliver ships unnoticed (#916):
+ * the run fails instead, naming the font file and the text.
+ *
+ * @param {Object} path - opentype.js Path for the text
+ * @param {string} text - The text that was converted
+ * @param {string} fontPath - Full path of the font file it came from
+ * @returns {string} The `d` attribute value
+ */
+function textPathData(path, text, fontPath) {
+  const pathData = renderPathData(path.commands);
+
+  if (/NaN|Infinity/.test(pathData)) {
+    throw new Error(`font "${fontPath}" produced a non-finite outline for "${text}" (the path carries NaN or Infinity); refusing to write a broken logo`);
+  }
+
+  return pathData;
+}
 
 /**
  * Generate a wordmark SVG (text-only logo).
  *
  * @param {string} brandName - The brand name text
  * @param {Object} font - opentype.js Font object
+ * @param {string} fontPath - Full path of the font file (named when an outline is unusable)
  * @returns {string} SVG markup
  */
-function generateWordmark(brandName, font) {
+function generateWordmark(brandName, font, fontPath) {
   const fontSize = 72;
   const fill = '#000000';
 
@@ -25,7 +86,7 @@ function generateWordmark(brandName, font) {
   const translateX = -bbox.x1;
   const translateY = -bbox.y1;
 
-  const pathData = path.toPathData(4);
+  const pathData = textPathData(path, brandName, fontPath);
 
   return buildSvg(width, height, [
     `<path d="${pathData}" fill="${fill}" transform="translate(${round(translateX)}, ${round(translateY)})"/>`,
@@ -38,9 +99,10 @@ function generateWordmark(brandName, font) {
  * @param {string} brandName - The brand name text
  * @param {string} brandmarkSvg - Raw SVG content of the brandmark
  * @param {Object} font - opentype.js Font object
+ * @param {string} fontPath - Full path of the font file (named when an outline is unusable)
  * @returns {string} SVG markup
  */
-function generateCombomark(brandName, brandmarkSvg, font) {
+function generateCombomark(brandName, brandmarkSvg, font, fontPath) {
   const fontSize = 72;
   const fill = '#000000';
   const gapRatio = 0.3; // Gap between brandmark and text as fraction of brandmark height
@@ -68,7 +130,7 @@ function generateCombomark(brandName, brandmarkSvg, font) {
   const textOffsetX = brandmarkWidth + gapWidth - textBbox.x1;
   const textOffsetY = (totalHeight - textHeight) / 2 - textBbox.y1;
 
-  const textPathData = textPath.toPathData(4);
+  const pathData = textPathData(textPath, brandName, fontPath);
 
   const brandmarkInner = extractSvgInner(brandmarkSvg);
   const viewBoxStr = `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
@@ -79,7 +141,7 @@ function generateCombomark(brandName, brandmarkSvg, font) {
     `<svg x="${round(brandmarkX)}" y="${round(brandmarkY)}" width="${round(brandmarkWidth)}" height="${round(brandmarkHeight)}" viewBox="${viewBoxStr}">`,
     ...brandmarkInner.map((line) => `  ${line}`),
     `</svg>`,
-    `<path d="${textPathData}" fill="${fill}" transform="translate(${round(textOffsetX)}, ${round(textOffsetY)})"/>`,
+    `<path d="${pathData}" fill="${fill}" transform="translate(${round(textOffsetX)}, ${round(textOffsetY)})"/>`,
   ]);
 }
 
@@ -151,4 +213,4 @@ function round(n) {
   return Math.round(n * 100) / 100;
 }
 
-module.exports = { generateWordmark, generateCombomark };
+module.exports = { generateWordmark, generateCombomark, renderPathData };

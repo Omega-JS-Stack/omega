@@ -134,17 +134,19 @@ test('template rule renders {{ key.path }}; unknown keys (GitHub ${{ }}) survive
   assert.equal(jetpack.read(path.join(outputDir, 'wf.yml')), 'node: 22\ntoken: ${{ secrets.GH_TOKEN }}');
 });
 
-test('mergeLines rule: consumer custom values survive, new framework keys arrive', () => {
+test('mergeLines rule: consumer custom values survive, new framework keys arrive, a retired line leaves', () => {
   const { defaultsDir, outputDir } = stage({
     '_.env': `${DEFAULT_MARKER}\nGH_TOKEN=""\nNEW_KEY=""\n${CUSTOM_MARKER}\n`,
+    '_.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/*\n${CUSTOM_MARKER}\n`,
   }, {
     '.env': `${DEFAULT_MARKER}\nGH_TOKEN="mine"\n${CUSTOM_MARKER}\nCUSTOM="kept"\n`,
+    '.gitignore': `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/\n${CUSTOM_MARKER}\nmy-secret-dir/\n`,
   });
 
   const result = applyDefaults({
     defaultsDir,
     outputDir,
-    fileMap: { '_.env': { mergeLines: true } },
+    fileMap: { '{_.env,_.gitignore}': { mergeLines: true } },
     logger: quiet,
   });
 
@@ -152,14 +154,27 @@ test('mergeLines rule: consumer custom values survive, new framework keys arrive
   assert.match(env, /GH_TOKEN="mine"/);
   assert.match(env, /NEW_KEY=""/);
   assert.match(env, /CUSTOM="kept"/);
-  assert.deepEqual(result.merged, ['.env']);
+
+  // The framework block is fully managed (#926): a line the new block no longer
+  // carries leaves the consumer instead of moving under the Custom marker.
+  const gitignore = jetpack.read(path.join(outputDir, '.gitignore'));
+  assert.doesNotMatch(gitignore, /^config\/certs\/$/m);
+  assert.match(gitignore, /^config\/certs\/\*$/m);
+  assert.match(gitignore, /my-secret-dir\//);
+
+  assert.deepEqual(result.merged.slice().sort(), ['.env', '.gitignore']);
 });
 
 test('merge rule (JSON5): consumer values + consumer-only keys survive, `default` sentinel replaced', () => {
   const { defaultsDir, outputDir } = stage({
     'config/app.json5': JSON5.stringify({ theme: { id: 'classy' }, port: 1000, fresh: true }, null, 2),
   }, {
-    'config/app.json5': JSON5.stringify({ theme: { id: 'custom' }, port: 'default', consumerOnly: { nested: 1 } }, null, 2),
+    'config/app.json5': JSON5.stringify({
+      theme: { id: 'custom', retiredSentinel: 'default', retiredValue: 'keep-me' },
+      port: 'default',
+      consumerOnly: { nested: 1 },
+      retiredSentinel: 'default',
+    }, null, 2),
   });
 
   applyDefaults({
@@ -174,6 +189,91 @@ test('merge rule (JSON5): consumer values + consumer-only keys survive, `default
   assert.equal(merged.port, 1000);
   assert.equal(merged.fresh, true);
   assert.deepEqual(merged.consumerOnly, { nested: 1 });
+
+  // A key the framework no longer declares whose value is the `default` sentinel
+  // is the framework's own unset marker, so it drops at every level (#926); a key
+  // holding a real value is the consumer's and stays.
+  assert.equal('retiredSentinel' in merged, false);
+  assert.equal('retiredSentinel' in merged.theme, false);
+  assert.equal(merged.theme.retiredValue, 'keep-me');
+});
+
+// The consumer's config/omega.json5 is hand-edited: comments, blank lines and
+// the trailing newline are theirs, so the merge writes only the differing keys
+// through the comment-preserving editor instead of re-stringifying the file (#928).
+const COMMENTED_CONSUMER = [
+  '// Consumer notes: hand edited, keep these comments.',
+  '{',
+  '  theme: {',
+  "    id: 'custom', // the brand's own theme",
+  '  },',
+  '',
+  '  port: 1000,',
+  '}',
+].join('\n');
+
+const COMMENTED_DEFAULTS = [
+  '{',
+  '  theme: {',
+  "    id: 'classy',",
+  '  },',
+  '  port: 1000,',
+  '  fresh: true,',
+  '}',
+  '',
+].join('\n');
+
+const COMMENTED_MERGED = [
+  '// Consumer notes: hand edited, keep these comments.',
+  '{',
+  '  theme: {',
+  "    id: 'custom', // the brand's own theme",
+  '  },',
+  '',
+  '  port: 1000,',
+  '  fresh: true,',
+  '}',
+  '',
+].join('\n');
+
+test('merge rule (JSON5): comments, blank lines and formatting survive, the file ends with one newline', () => {
+  const { defaultsDir, outputDir } = stage({
+    'config/app.json5': COMMENTED_DEFAULTS,
+  }, {
+    // No trailing newline: the merge adds the one the consumer's editor dropped.
+    'config/app.json5': COMMENTED_CONSUMER,
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'config/app.json5': { merge: true } },
+    logger: quiet,
+  });
+
+  assert.equal(jetpack.read(path.join(outputDir, 'config', 'app.json5')), COMMENTED_MERGED);
+  assert.deepEqual(result.merged, [path.join('config', 'app.json5')]);
+});
+
+test('merge rule (JSON5): a rerun with nothing to change writes nothing', () => {
+  const { defaultsDir, outputDir } = stage({
+    'config/app.json5': COMMENTED_DEFAULTS,
+  }, {
+    'config/app.json5': COMMENTED_CONSUMER,
+  });
+  const config = {
+    defaultsDir,
+    outputDir,
+    fileMap: { 'config/app.json5': { merge: true } },
+    logger: quiet,
+  };
+
+  applyDefaults(config);
+  const second = applyDefaults(config);
+
+  assert.deepEqual(second.merged, []);
+  assert.deepEqual(second.skipped, [path.join('config', 'app.json5')]);
+  assert.equal(jetpack.read(path.join(outputDir, 'config', 'app.json5')), COMMENTED_MERGED);
 });
 
 test('files subset (watch single-file mode) processes only the listed source', () => {

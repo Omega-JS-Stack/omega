@@ -618,50 +618,53 @@ function getBrowserFromUserAgent(userAgent) {
   return 'Unknown Browser';
 }
 
-// Get platform name from platform string
+// A stored login record's platform, as a label. The record carries the CLIENT's
+// platform vocabulary (`omega.utilities().getPlatform()` wrote it: mac,
+// windows, linux, ios, android, chromeos), so this is a lookup of those words
+// and not a second ua-sniffing copy of the detector
+// ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)). A word this map
+// does not carry is a record from a platform the detector itself could not
+// name, which is exactly what 'Unknown' says.
+const PLATFORM_LABELS = {
+  mac: 'macOS',
+  windows: 'Windows',
+  linux: 'Linux',
+  ios: 'iOS',
+  android: 'Android',
+  chromeos: 'Chromebook',
+};
+
 function getPlatformName(platform) {
   if (!platform) {
     return 'Unknown Device';
   }
 
-  const platformLower = platform.toLowerCase();
-
-  if (platformLower.includes('mac') || platformLower.includes('darwin')) {
-    return 'macOS';
-  } else if (platformLower.includes('win')) {
-    return 'Windows';
-  } else if (platformLower.includes('linux')) {
-    return 'Linux';
-  } else if (platformLower.includes('android')) {
-    return 'Android';
-  } else if (platformLower.includes('ios') || platformLower.includes('iphone') || platformLower.includes('ipad')) {
-    return 'iOS';
-  } else {
-    return 'Unknown';
-  }
+  return PLATFORM_LABELS[String(platform).toLowerCase()] || 'Unknown';
 }
 
-// Get device icon based on device type
+// Get device icon based on device type. The map carries the FULL Font Awesome
+// class string (#929) and the emit adds only the size: a platform mark lives in
+// the brands family, which a `fa-solid` wrapper could never reach.
 function getDeviceIcon(device) {
   const deviceLower = (device || '').toLowerCase();
-  let iconName = 'desktop'; // default
+  let iconClasses = 'fa-solid fa-desktop'; // default
 
   if (deviceLower.includes('iphone')
       || deviceLower.includes('ipad')
       || deviceLower.includes('ios')
       || deviceLower.includes('mac')) {
-    iconName = 'apple';
+    iconClasses = 'fa-brands fa-apple';
   } else if (deviceLower.includes('android')) {
-    iconName = 'android';
+    iconClasses = 'fa-brands fa-android';
   } else if (deviceLower.includes('windows')) {
-    iconName = 'windows';
+    iconClasses = 'fa-brands fa-windows';
   } else if (deviceLower.includes('linux')) {
-    iconName = 'linux';
+    iconClasses = 'fa-brands fa-linux';
   } else if (deviceLower.includes('chrome')) {
-    iconName = 'chrome';
+    iconClasses = 'fa-brands fa-chrome';
   }
 
-  return `<i class="fa-solid fa-${iconName} fa-xl"></i>`;
+  return `<i class="${iconClasses} fa-xl"></i>`;
 }
 
 // Format location from session data

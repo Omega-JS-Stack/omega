@@ -37,10 +37,14 @@ const env = require('../env.js');
 const { renderEmail } = require('./generators/lib/mjml-template.js');
 
 /**
- * Resolve brand data with email-safe images (SVG→PNG).
+ * Resolve brand data with email-safe images (SVG→PNG), plus the RESOLVED
+ * company the footer credits ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)):
+ * the loader fills `company` from the brand's `company: { id }`, and a brand
+ * with no company resolves to its own name and url, so the footer needs no
+ * fallback of its own.
  *
  * @param {object} Manager
- * @returns {{ brand: object, brandDomain: string }}
+ * @returns {{ brand: object, brandDomain: string, company: object }}
  */
 function resolveBrand(Manager) {
   const raw = Manager.config?.brand;
@@ -58,7 +62,10 @@ function resolveBrand(Manager) {
 
   const brandDomain = brand.contact.email.split('@')[1];
 
-  return { brand, brandDomain };
+  const company = _.cloneDeep(Manager.config?.company || {});
+  company.images = sanitizeImagesForEmail(company.images || {}, company.url || brand.url);
+
+  return { brand, brandDomain, company };
 }
 
 /**
@@ -296,6 +303,7 @@ function buildUnsubscribeUrl({ email, groupId, template, websiteUrl }) {
  */
 function buildTemplateData({
   brand,
+  company,
   subject,
   preview,
   contentHtml,
@@ -319,6 +327,8 @@ function buildTemplateData({
     },
     signoff,
     brand,
+    // The RESOLVED company (#677): the footer's wordmark and credit line
+    company: company || {},
   };
 
   // Deep-merge caller data on top of defaults.

@@ -12,6 +12,13 @@ const os = require('node:os');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
 
+const { recordBrand } = require('@omega.js/config');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677). Tests that need their own
+// home still override it per test.
+require('./lib/temp-home.js');
+
 const { DEFAULTS } = require('../src/config.js');
 const { loadBrand } = require('../src/lib/brand.js');
 const { collectCommits } = require('../src/devlog/lib/collect-commits.js');
@@ -23,12 +30,12 @@ const { runDevlog } = require('../src/devlog/index.js');
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 /** A loaded-brand shape with just what the devlog libs read. */
-function fakeBrand(id, { org = 'fixture-org', repo, name, url } = {}) {
+function fakeBrand(id, { org = 'fixture-org', name, url } = {}) {
   return {
     id,
     config: {
       brand: { id, name: name ?? `${id} brand`, url: url ?? `https://${id}.test` },
-      repo: { providers: { github: { org, repo } } },
+      ...(org ? { repo: { provider: 'github', org } } : {}),
     },
   };
 }
@@ -83,18 +90,18 @@ const ARTICLE = {
   categories: ['engineering'],
 };
 
-/** A minimal brand monorepo dir (the company.test fixture shape). */
+/** A minimal brand monorepo dir. */
 function stageBrandDir(parentDir, dirName, { config } = {}) {
   const root = path.join(parentDir, dirName);
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), config || `{
   brand: { id: '${dirName}', name: '${dirName} brand', url: 'https://${dirName}.test' },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }`);
 
-  const website = path.join(root, 'targets', 'website');
-  fs.mkdirSync(website, { recursive: true });
-  fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({ name: `${dirName}-website`, private: true }));
+  const web = path.join(root, 'targets', 'web');
+  fs.mkdirSync(web, { recursive: true });
+  fs.writeFileSync(path.join(web, 'package.json'), JSON.stringify({ name: `${dirName}-web`, private: true }));
 
   return root;
 }
@@ -102,26 +109,10 @@ function stageBrandDir(parentDir, dirName, { config } = {}) {
 function devlogConfig(id, { enabled = true, org = 'fixture-org' } = {}) {
   return `{
   brand: { id: '${id}', name: '${id} brand', url: 'https://${id}.test' },
-  targets: { web: {} },
-  repo: { providers: { github: { org: '${org}' } } },
+  targets: { web: { type: 'web' } },
+  repo: { provider: 'github', org: '${org}' },
   devlog: { enabled: ${enabled}, providers: { ghostii: { orgs: ['${org}'] } } },
 }`;
-}
-
-/** A company workspace with brands under ./brands. */
-function stageCompany(brandSpecs) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-company-'));
-  fs.mkdirSync(path.join(root, 'config'));
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brands: { roots: ['./brands'] } }");
-
-  const brandsDir = path.join(root, 'brands');
-  fs.mkdirSync(brandsDir);
-  const brands = {};
-  for (const [id, config] of Object.entries(brandSpecs)) {
-    brands[id] = stageBrandDir(brandsDir, id, { config });
-  }
-
-  return { root, brands };
 }
 
 // ─── Config default ──────────────────────────────────────────────────────────
@@ -137,42 +128,39 @@ test('devlog: DEFAULTS carry the devlog block, disabled with website destination
 
 // ─── Project map ─────────────────────────────────────────────────────────────
 
-test('devlog: project map derives repo identity like the github service (a typed slug, else `<brand.id>-omega`)', () => {
+test('devlog: the project map addresses the SOURCE repo the one derivation names (#883)', () => {
   const brands = [
     fakeBrand('alpha'),
-    fakeBrand('beta', { repo: 'beta-monorepo' }),
-    fakeBrand('gamma', { org: null }), // no github.org — skipped, like the service
+    fakeBrand('beta'),
+    fakeBrand('gamma', { org: null }), // no repo.org: skipped, like the repo service
   ];
 
   const map = buildProjectMap(brands);
   assert.deepEqual(map, {
     'alpha-omega': { project: 'alpha brand', url: 'https://alpha.test' },
-    'beta-monorepo': { project: 'beta brand', url: 'https://beta.test' },
+    'beta-omega': { project: 'beta brand', url: 'https://beta.test' },
   });
 
   const repos = buildBrandRepos(brands);
   assert.deepEqual(repos, [
     { owner: 'fixture-org', repo: 'alpha-omega' },
-    { owner: 'fixture-org', repo: 'beta-monorepo' },
+    { owner: 'fixture-org', repo: 'beta-omega' },
   ]);
 });
 
-test('devlog: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
-  // ../omega-omega's real shape: org Omega-JS-Stack, repo
-  // "itw-creative-works/omega-omega". An owner read off `org` scans a repo that
-  // does not exist.
-  const brands = [fakeBrand('acme', { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' })];
+test('devlog: a brand in another org scans THAT org, never the first one', () => {
+  const brands = [fakeBrand('acme', { org: 'Acme-Org' })];
 
   assert.deepEqual(buildProjectMap(brands), {
-    'acme-app': { project: 'acme brand', url: 'https://acme.test' },
+    'acme-omega': { project: 'acme brand', url: 'https://acme.test' },
   });
-  assert.deepEqual(buildBrandRepos(brands), [{ owner: 'itw-creative-works', repo: 'acme-app' }]);
+  assert.deepEqual(buildBrandRepos(brands), [{ owner: 'Acme-Org', repo: 'acme-omega' }]);
 });
 
 test('devlog: excludeRepos drops repos from both map and scan list; duplicates collapse', () => {
-  // The copy TYPES the slug the first brand derives, which is what makes the two
-  // one repo, and the duplicate the collapse is about.
-  const brands = [fakeBrand('alpha'), fakeBrand('alpha-copy', { repo: 'alpha-omega' }), fakeBrand('beta')];
+  // Two brands in one org whose ids derive the same source repo are ONE repo,
+  // and the duplicate the collapse is about.
+  const brands = [fakeBrand('alpha'), fakeBrand('alpha'), fakeBrand('beta')];
 
   const map = buildProjectMap(brands, { excludeRepos: ['beta-omega'] });
   assert.deepEqual(Object.keys(map), ['alpha-omega']);
@@ -261,7 +249,7 @@ function brandConfigFor(id, overrides = {}) {
       enabled: true,
       providers: { ghostii: { ...DEFAULTS.devlog.providers.ghostii, orgs: ['fixture-org'], ...overrides } },
     },
-    repo: { providers: { github: { org: 'fixture-org' } } },
+    repo: { provider: 'github', org: 'fixture-org' },
   };
 }
 
@@ -373,7 +361,7 @@ test('devlog: publish writes into the website target, commits ONLY the post file
   const { postPath, url } = publishToWebsite({ brand, post: POST });
 
   const year = String(new Date().getFullYear());
-  assert.ok(postPath.includes(path.join('targets', 'website', 'src', '_posts', year, 'devlog')));
+  assert.ok(postPath.includes(path.join('targets', 'web', 'src', '_posts', year, 'devlog')));
   assert.ok(postPath.endsWith('-auth-round-trips.md'));
   assert.equal(url, 'https://alpha.test/blog/auth-round-trips');
 
@@ -395,21 +383,6 @@ test('devlog: publish throws when the brand has no website target', () => {
 
 // ─── runDevlog resolution + dry-run ──────────────────────────────────────────
 
-test('devlog: company runs need exactly one enabled brand (or --brand)', async () => {
-  const none = stageCompany({
-    'brand-a': devlogConfig('brand-a', { enabled: false }),
-    'brand-b': devlogConfig('brand-b', { enabled: false }),
-  });
-  await assert.rejects(runDevlog(none.root), /No brand has devlog.enabled/);
-
-  const both = stageCompany({
-    'brand-a': devlogConfig('brand-a'),
-    'brand-b': devlogConfig('brand-b'),
-  });
-  await assert.rejects(runDevlog(both.root), /Multiple brands have devlog.enabled \(brand-a, brand-b\)/);
-  await assert.rejects(runDevlog(both.root, { brand: 'brand-z' }), /Brand not found: brand-z/);
-});
-
 test('devlog: brand-root runs enforce enabled + orgs and reject mismatched --brand', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-brand-'));
   const disabled = stageBrandDir(tmp, 'alpha', { config: devlogConfig('alpha', { enabled: false }) });
@@ -419,7 +392,7 @@ test('devlog: brand-root runs enforce enabled + orgs and reject mismatched --bra
   const noOrgs = stageBrandDir(tmp, 'beta', {
     config: `{
   brand: { id: 'beta', name: 'beta brand', url: 'https://beta.test' },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
   devlog: { enabled: true },
 }`,
   });
@@ -471,23 +444,20 @@ test('devlog: the secrets chain reads the brand .env.production overlay, whateve
   }
 });
 
-test('devlog: --dry-run previews to .omega/devlog/ and picks the single enabled company brand', async () => {
-  const { root, brands } = stageCompany({
-    'brand-a': devlogConfig('brand-a', { enabled: false }),
-    'brand-b': devlogConfig('brand-b'),
-  });
+test('devlog: --dry-run previews to the brand\'s .omega/devlog/', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-dry-'));
+  const brandRoot = stageBrandDir(tmp, 'brand-b', { config: devlogConfig('brand-b') });
 
   const api = fakeApi([
     { match: /^orgs\/fixture-org\/repos/, body: [{ name: 'tool', archived: false, private: false, pushed_at: FRESH() }] },
     { match: /repos\/fixture-org\/tool\/commits/, body: [ghCommit('feat: sharpen the tool')] },
-    { match: /repos\/fixture-org\/brand-(a|b)\/commits/, body: new Error('404') },
+    { match: /repos\/fixture-org\/brand-b\/commits/, body: new Error('404') },
   ]);
 
-  const report = await runDevlog(root, { dryRun: true }, {
+  const report = await runDevlog(brandRoot, { dryRun: true }, {
     githubApi: api,
     generatePost: async ({ commits, projectMap }) => {
-      // The sibling map covers BOTH brands even though only one publishes
-      assert.deepEqual(Object.keys(projectMap).sort(), ['brand-a-omega', 'brand-b-omega']);
+      assert.deepEqual(Object.keys(projectMap).sort(), ['brand-b-omega']);
       assert.equal(commits.length, 1);
       return { ...POST, slug: 'sharpen-the-tool' };
     },
@@ -495,6 +465,40 @@ test('devlog: --dry-run previews to .omega/devlog/ and picks the single enabled 
 
   assert.equal(report.published, false);
   assert.equal(report.commits, 1);
-  assert.equal(report.previewPath, path.join(brands['brand-b'], '.omega', 'devlog', 'sharpen-the-tool.md'));
+  assert.equal(report.previewPath, path.join(brandRoot, '.omega', 'devlog', 'sharpen-the-tool.md'));
   assert.ok(fs.readFileSync(report.previewPath, 'utf8').includes('layout: blueprint/blog/post'));
+});
+
+// #677: the company layer is a layer likeany other: the shared `.env` inside
+// the company brand's `company/` tree loads UNDER the brand's own.
+test('devlog: the company .env resolves through the ONE resolver and loads under the brand\'s', async (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-devlog-co-'));
+  const brandRoot = stageBrandDir(tmp, 'alpha', {
+    config: devlogConfig('alpha').replace('{', "{\n  company: { id: 'fixture-co' },"),
+  });
+
+  // The company brand, its tree, and the registry line its own run wrote
+  const companyBrandRoot = path.join(tmp, 'fixture-co');
+  fs.mkdirSync(path.join(companyBrandRoot, 'company'), { recursive: true });
+  fs.writeFileSync(path.join(companyBrandRoot, 'company', '.env'), 'DEVLOG_COMPANY_KEY="from-the-company"\nDEVLOG_SHARED_KEY="from-the-company"\n');
+  fs.writeFileSync(path.join(brandRoot, '.env'), 'DEVLOG_SHARED_KEY="from-the-brand"\n');
+
+  const previousHome = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(tmp, 'home');
+  t.after(() => {
+    delete process.env.DEVLOG_COMPANY_KEY;
+    delete process.env.DEVLOG_SHARED_KEY;
+    if (previousHome === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previousHome;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+  recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+
+  await runDevlog(brandRoot, {}, {
+    githubApi: fakeApi([]),
+    generatePost: async () => { throw new Error('must not generate'); },
+  });
+
+  assert.equal(process.env.DEVLOG_COMPANY_KEY, 'from-the-company', 'the company layer fills the gap');
+  assert.equal(process.env.DEVLOG_SHARED_KEY, 'from-the-brand', 'the brand still wins over its company');
 });

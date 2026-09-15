@@ -9,7 +9,7 @@ to it, idempotently.
 ## Structure
 
 - `config/omega.json5` — brand-level shared config (apps inherit + override)
-- `targets/website/` — the web app (framework: `@omega.js/web`)
+- `targets/web/`: the web app (framework: `@omega.js/web`)
 - `targets/backend/` — the backend app (framework: `@omega.js/backend`)
 - `targets/desktop/` — the desktop app (framework: `@omega.js/desktop`)
 - `targets/extension/` — the extension app (framework: `@omega.js/extension`)

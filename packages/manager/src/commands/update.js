@@ -65,7 +65,7 @@ module.exports = async (options = {}) => {
 
   const forwarded = buildForwardedFlags(options);
 
-  console.log(chalk.bold(`\nOMEGA brand update — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target).join(', ')})`)}`));
+  console.log(chalk.bold(`\nOMEGA brand update: ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.name).join(', ')})`)}`));
 
   // ─── Fan out, streaming each target's report — targets are independent ─────
   const summary = [];

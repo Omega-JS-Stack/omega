@@ -17,6 +17,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test, before } = require('node:test');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { buildSite } = require('../src/build.js');
 const { resolveStaticDirs, copyStaticAssets } = require('../src/static-assets.js');
 
@@ -65,6 +70,7 @@ before(async () => {
   mint(['consumer-assets', 'css', 'main.scss'], 'raw-source-must-not-ship');
   mint(['consumer-assets', 'fonts', 'unreferenced.woff2'], 'pruned-face-must-not-return');
 
+  setEnvironment('development');
   await buildSite({
     consumerDir: SITE,
     siteData: {

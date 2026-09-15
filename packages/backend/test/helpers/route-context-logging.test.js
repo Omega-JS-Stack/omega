@@ -40,6 +40,7 @@ function withConsoleRecorder(fn) {
 // over everything else, so it has to come off too.
 function withProductionEnvironment(fn) {
   const original = {
+    OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
     OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
     ENVIRONMENT: process.env.ENVIRONMENT,
     TERM_PROGRAM: process.env.TERM_PROGRAM,
@@ -49,6 +50,9 @@ function withProductionEnvironment(fn) {
   delete process.env.OMEGA_TEST_MODE;
   delete process.env.TERM_PROGRAM;
   delete process.env.FUNCTIONS_EMULATOR;
+  // The ONE environment input (#817): a deployed production run is what this
+  // simulates, so the lane names it outright.
+  process.env.OMEGA_ENVIRONMENT = 'production';
   process.env.ENVIRONMENT = 'production';
 
   try {
@@ -137,13 +141,15 @@ module.exports = defineCases({
         const saved = process.env.FUNCTIONS_EMULATOR;
         const savedTestMode = process.env.OMEGA_TEST_MODE;
         const savedEnvironment = process.env.ENVIRONMENT;
+        const savedInput = process.env.OMEGA_ENVIRONMENT;
         process.env.FUNCTIONS_EMULATOR = 'true';
-        // Drop the runner's test-mode flag AND its ENVIRONMENT so getEnvironment()
-        // genuinely resolves through the FUNCTIONS_EMULATOR branch — with either
-        // set, resolution short-circuits before the emulator check and this test
-        // would duplicate the local-run one.
+        // An emulator run is a DEVELOPMENT lane, and the boot names the input
+        // from exactly that ambient answer (#817). Naming it here is what a real
+        // emulator boot leaves in the process; the runner's own test-mode word
+        // comes off so this does not duplicate the local-run case.
         delete process.env.OMEGA_TEST_MODE;
         delete process.env.ENVIRONMENT;
+        process.env.OMEGA_ENVIRONMENT = 'development';
         try {
           const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
 
@@ -174,6 +180,11 @@ module.exports = defineCases({
             delete process.env.ENVIRONMENT;
           } else {
             process.env.ENVIRONMENT = savedEnvironment;
+          }
+          if (savedInput === undefined) {
+            delete process.env.OMEGA_ENVIRONMENT;
+          } else {
+            process.env.OMEGA_ENVIRONMENT = savedInput;
           }
         }
       },

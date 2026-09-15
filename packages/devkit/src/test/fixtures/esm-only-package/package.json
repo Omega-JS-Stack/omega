@@ -1,0 +1,13 @@
+{
+  "name": "esm-only-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An ESM-only dependency, as every OMEGA target's bundle lane has to be able to carry one (#906)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "browser": "./browser.js",
+      "default": "./index.js"
+    }
+  }
+}

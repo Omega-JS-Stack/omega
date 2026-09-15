@@ -16,7 +16,7 @@ const { PATHS, resolveClientEntry } = require('./paths.js');
 const { consumerPaths, loadSiteData } = require('./consumer.js');
 const { scaffoldDefaults } = require('./scaffold.js');
 const { runMigration } = require('./migrate/index.js');
-const { getEnvironment, isDevelopment, isProduction, isTesting } = require('./mode-helpers.js');
+const { getEnvironment, isDevelopment, isProduction, isTesting } = require('@omega.js/config/environment');
 
 module.exports = {
   configureOmega,

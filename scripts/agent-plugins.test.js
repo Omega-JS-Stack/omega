@@ -240,7 +240,7 @@ const brand = ({ config, targets } = {}) => {
   fs.mkdirSync(path.join(dir, 'config'));
   fs.writeFileSync(
     path.join(dir, 'config', 'omega.json5'),
-    config === undefined ? "{\n  brand: { name: 'A Brand' },\n  targets: {\n    web: {},\n    backend: {},\n  },\n}\n" : config,
+    config === undefined ? "{\n  brand: { name: 'A Brand' },\n  targets: {\n    web: { type: 'web' },\n    backend: { type: 'backend' },\n  },\n}\n" : config,
   );
   for (const [name, manifest] of Object.entries(targets || {})) {
     const target = path.join(dir, 'targets', name);
@@ -252,7 +252,7 @@ const brand = ({ config, targets } = {}) => {
 
 const doneWhenBrand = () => brand({
   targets: {
-    website: { name: 'a-brand-website', dependencies: { '@omega.js/web': '^1.0.0' } },
+    web: { name: 'a-brand-web', dependencies: { '@omega.js/web': '^1.0.0' } },
     backend: { name: 'a-brand-backend', dependencies: { '@omega.js/backend': '^1.0.0' } },
   },
 });
@@ -276,7 +276,7 @@ test('inject: a brand injection names the framework map as required reading', ()
 
 test('inject: a target directory the config never names still asks for its skill', () => {
   const dir = brand({
-    config: "{\n  targets: {\n    web: {},\n  },\n}\n",
+    config: "{\n  targets: {\n    web: { type: 'web' },\n  },\n}\n",
     targets: { app: { name: 'a-brand-app', devDependencies: { '@omega.js/desktop': '^1.0.0' } } },
   });
   assert.match(inject(dir), /omega:desktop/);
@@ -284,8 +284,19 @@ test('inject: a target directory the config never names still asks for its skill
 });
 
 test('inject: a target declared in config with no directory yet still asks for its skill', () => {
-  const dir = brand({ config: "{\n  targets: {\n    extension: {},\n  },\n}\n" });
+  const dir = brand({ config: "{\n  targets: {\n    extension: { type: 'extension' },\n  },\n}\n" });
   assert.match(inject(dir), /omega:extension/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// The KEY is a NAME (#886), so the entry's `type` is the only thing that can
+// say which framework runs there: a brand that calls its extension `addon`
+// asks for omega:extension exactly like one that calls it `extension`.
+test('inject: a target the brand NAMED itself asks by its declared type (#886)', () => {
+  const dir = brand({ config: "{\n  targets: {\n    addon: { type: 'extension' },\n    storefront: { type: 'web' },\n  },\n}\n" });
+  const ctx = JSON.parse(inject(dir)).hookSpecificOutput.additionalContext;
+  assert.match(ctx, /omega:extension/);
+  assert.match(ctx, /omega:web/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -314,7 +325,7 @@ test('inject: a custom target maps to nothing', () => {
 });
 
 test('inject: an unreadable config still yields the brand set from the manifests', () => {
-  const dir = brand({ config: '{ this is not json5 at all', targets: { website: { name: 'w', dependencies: { '@omega.js/web': '^1.0.0' } } } });
+  const dir = brand({ config: '{ this is not json5 at all', targets: { web: { name: 'w', dependencies: { '@omega.js/web': '^1.0.0' } } } });
   const ctx = JSON.parse(inject(dir)).hookSpecificOutput.additionalContext;
   assert.match(ctx, /omega:web/);
   assert.match(ctx, /omega:main/);
@@ -322,7 +333,7 @@ test('inject: an unreadable config still yields the brand set from the manifests
 });
 
 test('inject: a target that appears mid-session re-triggers its own line only', () => {
-  const dir = brand({ config: '{}', targets: { website: { name: 'w', dependencies: { '@omega.js/web': '^1.0.0' } } } });
+  const dir = brand({ config: '{}', targets: { web: { name: 'w', dependencies: { '@omega.js/web': '^1.0.0' } } } });
   const session = `grow-${process.pid}-${Date.now()}`;
   assert.match(inject(dir, session), /omega:web/);
 
@@ -391,7 +402,7 @@ const monorepo = () => {
 test('gate: a target edit is refused until that target\'s skill was invoked', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'pages', 'index.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'pages', 'index.html');
 
   const refused = gate(file, session);
   assert.equal(refused.status, 2, 'the write went through with no skill loaded');
@@ -421,7 +432,7 @@ test('gate: each target surface gates on its own skill', () => {
 test('gate: the bare skill name records the same invocation', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'index.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'index.html');
   skillInvoked({ name: 'web' }, session);
   assert.equal(gate(file, session).status, 0);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -504,7 +515,7 @@ test('gate: a theme surface gates on omega:theme as well as its framework skill'
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('gate: a website target\'s theme surfaces gate on omega:theme too', () => {
+test('gate: a web target\'s theme surfaces gate on omega:theme too', () => {
   const dir = doneWhenBrand();
   const surfaces = [
     ['themes', 'toy', 'css', 'main.scss'],
@@ -518,7 +529,7 @@ test('gate: a website target\'s theme surfaces gate on omega:theme too', () => {
 
   for (const surface of surfaces) {
     const session = gateSession();
-    const file = path.join(dir, 'targets', 'website', ...surface);
+    const file = path.join(dir, 'targets', 'web', ...surface);
 
     const refused = gate(file, session);
     assert.equal(refused.status, 2, `${surface.join('/')} was not gated`);
@@ -537,7 +548,7 @@ test('gate: a page, and a non-web target, stay on their own skill alone', () => 
   const session = gateSession();
 
   // src/pages/ is CONTENT, not a cascade layer.
-  const page = gate(path.join(dir, 'targets', 'website', 'src', 'pages', 'index.html'), session);
+  const page = gate(path.join(dir, 'targets', 'web', 'src', 'pages', 'index.html'), session);
   assert.equal(page.status, 2);
   assert.match(page.stderr, /omega:web/);
   assert.doesNotMatch(page.stderr, /omega:theme/, 'a page asked for the theme skill');
@@ -565,17 +576,17 @@ test('gate: a brand fixture inside an internal package is that package\'s busine
   fs.mkdirSync(path.join(fixture, 'config'), { recursive: true });
   fs.writeFileSync(
     path.join(fixture, 'config', 'omega.json5'),
-    "{\n  targets: {\n    website: {},\n  },\n}\n",
+    "{\n  targets: {\n    web: { type: 'web' },\n  },\n}\n",
   );
-  fs.mkdirSync(path.join(fixture, 'targets', 'website'), { recursive: true });
+  fs.mkdirSync(path.join(fixture, 'targets', 'web'), { recursive: true });
   fs.writeFileSync(
-    path.join(fixture, 'targets', 'website', 'package.json'),
-    JSON.stringify({ name: 'fixture-website', dependencies: { '@omega.js/web': '^1.0.0' } }),
+    path.join(fixture, 'targets', 'web', 'package.json'),
+    JSON.stringify({ name: 'fixture-web', dependencies: { '@omega.js/web': '^1.0.0' } }),
   );
 
   // packages/devkit owns the whole tree and has no skill, so the fixture brand
   // inside it never becomes a brand of its own.
-  const file = path.join(fixture, 'targets', 'website', 'src', 'index.html');
+  const file = path.join(fixture, 'targets', 'web', 'src', 'index.html');
   assert.equal(gate(file, gateSession()).status, 0, 'a devkit fixture brand gated on its fixture target');
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -599,7 +610,7 @@ test('gate: a nested packages/ inside an internal package cannot win the lookup'
 test('gate: a target path with a space gates whole', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'pages', 'case studies.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'pages', 'case studies.html');
 
   const refused = gate(file, session);
   assert.equal(refused.status, 2, 'the path was truncated at the space');
@@ -619,8 +630,8 @@ test('gate: no file path, and a project with nothing omega about it, are silent'
   }).status, 0);
 
   const dir = project({ name: 'somebody-else', dependencies: { react: '^19.0.0' } });
-  fs.mkdirSync(path.join(dir, 'targets', 'website'), { recursive: true });
-  assert.equal(gate(path.join(dir, 'targets', 'website', 'index.html'), session).status, 0);
+  fs.mkdirSync(path.join(dir, 'targets', 'web'), { recursive: true });
+  assert.equal(gate(path.join(dir, 'targets', 'web', 'index.html'), session).status, 0);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -654,7 +665,7 @@ const mark = (args, extra) => spawnSync(GATE_MARK, args, { encoding: 'utf8', env
 test('gate: mark.sh records the read for an agent with no Skill tool', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'pages', 'index.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'pages', 'index.html');
   assert.equal(gate(file, session).status, 2, 'the surface was not gated to begin with');
 
   const marked = mark(['omega:web', '--session', session]);
@@ -669,7 +680,7 @@ test('gate: mark.sh records the read for an agent with no Skill tool', () => {
 test('gate: mark.sh takes the bare skill spelling the Skill event takes', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'pages', 'index.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'pages', 'index.html');
   assert.equal(gate(file, session).status, 2, 'the surface was not gated to begin with');
 
   const marked = mark(['web', '--session', session]);
@@ -689,7 +700,7 @@ test('gate: mark.sh prefers --session over the environment', () => {
 test('gate: mark.sh takes the session id off the environment', () => {
   const dir = doneWhenBrand();
   const session = gateSession();
-  const file = path.join(dir, 'targets', 'website', 'src', 'index.html');
+  const file = path.join(dir, 'targets', 'web', 'src', 'index.html');
   assert.equal(mark(['omega:web'], { CLAUDE_SESSION_ID: session }).status, 0);
   assert.equal(gate(file, session).status, 0);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -909,7 +920,7 @@ const write = (dir, rel, body) => {
 const guardBrand = () => {
   const dir = brand({
     targets: {
-      website: { name: 'a-brand-website', dependencies: { '@omega.js/web': '^1.0.0' } },
+      web: { name: 'a-brand-web', dependencies: { '@omega.js/web': '^1.0.0' } },
       backend: { name: 'a-brand-backend', dependencies: { '@omega.js/backend': '^1.0.0' } },
     },
   });
@@ -945,7 +956,7 @@ test('guard: generated and vendored files are refused outright', () => {
   const dir = guardBrand();
   const cases = [
     ['node_modules/@omega.js/web/core/_includes/core/head.html', /node_modules/],
-    ['targets/website/dist/index.html', /dist/],
+    ['targets/web/dist/index.html', /dist/],
     ['targets/backend/database.rules.json', /omega\.json5|setup/],
   ];
   for (const [rel, names] of cases) {
@@ -959,9 +970,9 @@ test('guard: generated and vendored files are refused outright', () => {
 
 test('guard: a generated header refuses the whole file', () => {
   const dir = guardBrand();
-  const marked = write(dir, 'targets/website/src/generated.html',
+  const marked = write(dir, 'targets/web/src/generated.html',
     '<!-- GENERATED FILE — DO NOT EDIT -->\n<p>x</p>\n');
-  const banner = write(dir, 'targets/website/src/banner.html',
+  const banner = write(dir, 'targets/web/src/banner.html',
     '<!-- Generated by @omega.js/web -->\n<p>x</p>\n');
 
   for (const file of [marked, banner]) {
@@ -976,12 +987,12 @@ test('guard: a shadow copy is refused and names the framework file it mirrors', 
   const dir = guardBrand();
   // One row per real override-layer root — the MECHANISM lanes only.
   const table = [
-    ['targets/website/src/_layouts/blueprint/index.html', '@omega.js/web/core/_layouts/blueprint/index.html'],
-    ['targets/website/src/_includes/core/head.html', '@omega.js/web/core/_includes/core/head.html'],
-    ['targets/website/src/_includes/marketing/nav.html', '@omega.js/web/themes/classy/_includes/marketing/nav.html'],
-    ['targets/website/src/_sections/marketing/hero/section.html', '@omega.js/web/themes/base/_sections/marketing/hero/section.html'],
-    ['targets/website/src/assets/css/pages/404/index.scss', '@omega.js/web/core/css/pages/404/index.scss'],
-    ['targets/website/src/assets/css/base/_type.scss', '@omega.js/web/themes/classy/css/base/_type.scss'],
+    ['targets/web/src/_layouts/blueprint/index.html', '@omega.js/web/core/_layouts/blueprint/index.html'],
+    ['targets/web/src/_includes/core/head.html', '@omega.js/web/core/_includes/core/head.html'],
+    ['targets/web/src/_includes/marketing/nav.html', '@omega.js/web/themes/classy/_includes/marketing/nav.html'],
+    ['targets/web/src/_sections/marketing/hero/section.html', '@omega.js/web/themes/base/_sections/marketing/hero/section.html'],
+    ['targets/web/src/assets/css/pages/404/index.scss', '@omega.js/web/core/css/pages/404/index.scss'],
+    ['targets/web/src/assets/css/base/_type.scss', '@omega.js/web/themes/classy/css/base/_type.scss'],
     ['targets/backend/firestore.framework.rules', '@omega.js/backend/templates/firestore.framework.rules'],
     ['targets/backend/src/routes/general/email/post.js', '@omega.js/backend/src/manager/routes/general/email/post.js'],
     ['targets/backend/src/schemas/general/email/post.js', '@omega.js/backend/src/manager/schemas/general/email/post.js'],
@@ -1004,7 +1015,7 @@ test('guard: content is never guarded — a brand page named like a default is i
   // src/pages/ is the DESIGNED place for a brand's own copy: every page the
   // framework ships a default for is a page a brand is expected to write.
   for (const name of ['index.md', 'about.md', 'pricing.md', 'contact.md']) {
-    const rel = `targets/website/src/pages/${name}`;
+    const rel = `targets/web/src/pages/${name}`;
     assert.equal(guard(write(dir, rel, '# our own page\n')).status, 0, `${rel} was refused`);
     assert.equal(guard(path.join(dir, rel), { content: '# a fresh page\n' }).status, 0, `a new ${rel} was refused`);
   }
@@ -1015,12 +1026,12 @@ test('guard: the documented consumer entry files are free, and a union lane is n
   const dir = guardBrand();
   const free = [
     // theming.md tier 1 / the web guide's REPLACE-with-extend lane
-    'targets/website/src/assets/css/main.scss',
-    'targets/website/src/assets/js/main.js',
+    'targets/web/src/assets/css/main.scss',
+    'targets/web/src/assets/js/main.js',
     // page and layout modules are a UNION (#624) — every layer's file runs
-    'targets/website/src/assets/js/pages/blog.js',
+    'targets/web/src/assets/js/pages/blog.js',
     // not a layer root at all
-    'targets/website/src/js/main.js',
+    'targets/web/src/js/main.js',
     // the brand's authored Cloud Functions entry
     'targets/backend/src/index.js',
   ];
@@ -1032,7 +1043,7 @@ test('guard: the documented consumer entry files are free, and a union lane is n
 
 test('guard: the marker in the first five lines passes the same file', () => {
   const dir = guardBrand();
-  const rel = 'targets/website/src/_includes/core/head.html';
+  const rel = 'targets/web/src/_includes/core/head.html';
   assert.equal(guard(write(dir, rel, 'a hand-written copy\n')).status, 2, 'the shadow was not refused to begin with');
 
   write(dir, rel, '<!-- omega:consumer-override: this brand ships its own head -->\n<head></head>\n');
@@ -1046,7 +1057,7 @@ test('guard: the marker in the first five lines passes the same file', () => {
 
 test('guard: a NEW shadow path is judged on the content being written', () => {
   const dir = guardBrand();
-  const file = path.join(dir, 'targets', 'website', 'src', '_includes', 'core', 'head.html');
+  const file = path.join(dir, 'targets', 'web', 'src', '_includes', 'core', 'head.html');
 
   const refused = guard(file, { content: '<head></head>\n' });
   assert.equal(refused.status, 2, 'a brand-new shadow include was let through');
@@ -1060,10 +1071,10 @@ test('guard: a NEW shadow path is judged on the content being written', () => {
 test('guard: OMEGA_CONSUMER_OVERRIDE=1 skips class 2 and never class 1', () => {
   const dir = guardBrand();
   const env = { OMEGA_CONSUMER_OVERRIDE: '1' };
-  const shadow = write(dir, 'targets/website/src/_includes/core/head.html', 'a hand-written copy\n');
+  const shadow = write(dir, 'targets/web/src/_includes/core/head.html', 'a hand-written copy\n');
   assert.equal(guard(shadow, { env }).status, 0, 'the env flag did not skip the shadow check');
 
-  for (const rel of ['node_modules/@omega.js/web/core/css/main.scss', 'targets/website/dist/index.html', 'targets/backend/database.rules.json']) {
+  for (const rel of ['node_modules/@omega.js/web/core/css/main.scss', 'targets/web/dist/index.html', 'targets/backend/database.rules.json']) {
     assert.equal(guard(path.join(dir, rel), { env }).status, 2, `${rel} escaped through the env flag`);
   }
   fs.rmSync(dir, { recursive: true, force: true });
@@ -1072,7 +1083,7 @@ test('guard: OMEGA_CONSUMER_OVERRIDE=1 skips class 2 and never class 1', () => {
 test('guard: plain brand files and the brand\'s own rules source are free', () => {
   const dir = guardBrand();
   const free = [
-    'targets/website/src/assets/css/brand.scss',
+    'targets/web/src/assets/css/brand.scss',
     'targets/backend/src/routes/checkout/post.js',
     'targets/backend/firestore.rules',
     'targets/backend/storage.rules',
@@ -1090,12 +1101,12 @@ test('guard: the monorepo itself is never guarded', () => {
   const dir = monorepo();
   install(dir, 'web', { 'core/_includes/core/head.html': '<head></head>\n' });
   fs.mkdirSync(path.join(dir, 'brands', 'playground', 'config'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'brands', 'playground', 'config', 'omega.json5'), "{\n  targets: {\n    website: {},\n  },\n}\n");
-  write(dir, 'brands/playground/targets/website/package.json', JSON.stringify({ name: 'p', dependencies: { '@omega.js/web': '^1.0.0' } }));
+  fs.writeFileSync(path.join(dir, 'brands', 'playground', 'config', 'omega.json5'), "{\n  targets: {\n    web: { type: 'web' },\n  },\n}\n");
+  write(dir, 'brands/playground/targets/web/package.json', JSON.stringify({ name: 'p', dependencies: { '@omega.js/web': '^1.0.0' } }));
   install(path.join(dir, 'brands', 'playground'), 'web', { 'core/_includes/core/head.html': '<head></head>\n' });
 
   for (const rel of [
-    'brands/playground/targets/website/src/_includes/core/head.html',
+    'brands/playground/targets/web/src/_includes/core/head.html',
     'packages/web/dist/index.js',
     'packages/web/core/_includes/core/head.html',
   ]) {
@@ -1121,7 +1132,7 @@ test('guard: a project that is not a brand, and a missing jq, fail open', () => 
     fs.symlinkSync(real, path.join(bin, tool));
   }
   const dir = guardBrand();
-  const jqless = guard(path.join(dir, 'targets', 'website', 'dist', 'index.html'), { env: { PATH: bin } });
+  const jqless = guard(path.join(dir, 'targets', 'web', 'dist', 'index.html'), { env: { PATH: bin } });
   assert.equal(jqless.status, 0, `no jq did not fail open: ${jqless.stderr}`);
   fs.rmSync(bin, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
@@ -1138,7 +1149,7 @@ test('guard: a relative file_path fails open instead of walking forever', () => 
     input: JSON.stringify({
       hook_event_name: 'PreToolUse',
       tool_name: 'Edit',
-      tool_input: { file_path: 'targets/website/src/_includes/core/head.html' },
+      tool_input: { file_path: 'targets/web/src/_includes/core/head.html' },
     }),
     cwd: dir,
     encoding: 'utf8',
@@ -1154,4 +1165,164 @@ test('guard: hooks.json wires the guard as a third PreToolUse Write|Edit command
   assert.ok(entry, 'no PreToolUse Write|Edit entry');
   const commands = entry.hooks.map((hook) => hook.command);
   assert.ok(commands.some((command) => /hooks\/guard\/run\.sh/.test(command)), 'the guard is not registered');
+});
+
+// ---- npx hook (PreToolUse Bash): the registry-fetch refusal ----
+
+const NPX_HOOK = path.join(ROOT, 'agent-plugins', 'claude', 'hooks', 'npx', 'run.sh');
+
+// A Bash event carries the command and the session's working directory; the
+// hook resolves the bin from that directory up.
+const npx = (command, cwd, { env, raw } = {}) => spawnSync(NPX_HOOK, {
+  input: raw !== undefined ? raw : JSON.stringify({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    cwd,
+    tool_input: { command },
+  }),
+  encoding: 'utf8',
+  cwd,
+  env: { ...process.env, ...(env || {}) },
+});
+
+// A checkout with, or without, the one bin that proves a framework is installed.
+const npxDir = ({ bin = false, nested } = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-npx-'));
+  fs.mkdirSync(path.join(dir, '.git'));
+  if (bin) {
+    fs.mkdirSync(path.join(dir, 'node_modules', '.bin'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
+  }
+  if (nested) fs.mkdirSync(path.join(dir, nested), { recursive: true });
+  return dir;
+};
+
+// Every form that means "run the omega CLI through the registry fetcher".
+const NPX_FORMS = [
+  'npx omega deploy',
+  'npx omg test',
+  'npx --no-install mgr version',
+  'npx -y omega build',
+  'npm exec omega build',
+  'npm exec -- omega',
+  'npm run build && npx omega test',
+  // A VERSION spec is the most direct registry fetch of the lot, so the bin
+  // name carries an optional `@<spec>` suffix.
+  'npx omega@latest build',
+  'npx omg@next build',
+  'npm exec -- mgr@1.2.3 build',
+];
+
+test('npx: every npx/npm exec form is refused where no omega bin resolves', () => {
+  const dir = npxDir();
+  for (const command of NPX_FORMS) {
+    const result = npx(command, dir);
+    assert.equal(result.status, 2, `${command} was let through`);
+    assert.match(result.stderr, /omega:npx/, `${command} refusal lacks the hook name`);
+    assert.match(result.stderr, /node_modules\/\.bin\/omega/, `${command} refusal lacks the bin it looked for`);
+    assert.ok(result.stderr.includes(dir), `${command} refusal does not name the directory it searched`);
+    // The sibling hooks' message shape: the finding, where it looked, the fix,
+    // then the doc that owns the rule.
+    assert.match(result.stderr, /run the install first, or run the package's own bin by path/, `${command} refusal lacks the fix`);
+    assert.match(result.stderr, /docs\/shared\/local-dev\.md/, `${command} refusal lacks the doc pointer`);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('npx: the same forms pass once the bin is installed', () => {
+  const dir = npxDir({ bin: true });
+  for (const command of NPX_FORMS) {
+    assert.equal(npx(command, dir).status, 0, `${command} was refused with the bin present`);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('npx: the walk reaches the bin at the root of a nested target', () => {
+  const dir = npxDir({ bin: true, nested: path.join('targets', 'web', 'src') });
+  assert.equal(npx('npx omega build', path.join(dir, 'targets', 'web', 'src')).status, 0);
+
+  const bare = npxDir({ nested: path.join('targets', 'web', 'src') });
+  assert.equal(npx('npx omega build', path.join(bare, 'targets', 'web', 'src')).status, 2, 'a nested dir with no bin anywhere up was allowed');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(bare, { recursive: true, force: true });
+});
+
+test('npx: the walk stops at the git root', () => {
+  // The bin sits ABOVE the checkout, which is not this project's install.
+  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-npx-outer-'));
+  fs.mkdirSync(path.join(outer, 'node_modules', '.bin'), { recursive: true });
+  fs.writeFileSync(path.join(outer, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
+  const inner = path.join(outer, 'checkout');
+  fs.mkdirSync(path.join(inner, '.git'), { recursive: true });
+  assert.equal(npx('npx omega build', inner).status, 2, 'the walk climbed past the git root');
+  fs.rmSync(outer, { recursive: true, force: true });
+});
+
+test('npx: an absolute cd prefix resolves from the directory it lands in', () => {
+  const installed = npxDir({ bin: true });
+  const bare = npxDir();
+
+  assert.equal(npx(`cd ${installed} && npx omega build`, bare).status, 0, 'the cd target with the bin was refused');
+  assert.equal(npx(`cd ${bare} && npx omega build`, installed).status, 2, 'the cd target without the bin was allowed');
+  // A relative hop cannot be resolved from here, so it fails open.
+  assert.equal(npx('cd targets/web && npx omega build', bare).status, 0, 'a relative cd did not fail open');
+  fs.rmSync(installed, { recursive: true, force: true });
+  fs.rmSync(bare, { recursive: true, force: true });
+});
+
+test('npx: commands that do not name the omega bins are never touched', () => {
+  const dir = npxDir();
+  const free = [
+    'npx eleventy --serve',
+    'npx omega-foo build',
+    'npm exec eleventy',
+    'npm run omega',
+    'echo "npx omega build"',
+    './node_modules/.bin/omega test',
+    '',
+  ];
+  for (const command of free) {
+    assert.equal(npx(command, dir).status, 0, `${command || '<empty>'} was refused`);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('npx: a missing command, garbage stdin, and no jq all fail open', () => {
+  const dir = npxDir();
+  assert.equal(npx(undefined, dir, { raw: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: {} }) }).status, 0, 'a payload with no command was refused');
+  assert.equal(npx(undefined, dir, { raw: 'not json at all' }).status, 0, 'garbage stdin was refused');
+  assert.equal(npx(undefined, dir, { raw: '' }).status, 0, 'empty stdin was refused');
+
+  // No jq: a PATH carrying every other tool the script uses, and not that one.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-npx-bin-'));
+  for (const tool of ['env', 'bash', 'cat', 'dirname']) {
+    const real = execFileSync('command', ['-v', tool], { shell: '/bin/bash', encoding: 'utf8' }).trim();
+    fs.symlinkSync(real, path.join(bin, tool));
+  }
+  const jqless = npx('npx omega deploy', dir, { env: { PATH: bin } });
+  assert.equal(jqless.status, 0, `no jq did not fail open: ${jqless.stderr}`);
+  fs.rmSync(bin, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('npx: with no cwd in the payload the hook reads its own', () => {
+  const dir = npxDir();
+  const result = npx(undefined, dir, {
+    raw: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npx omega deploy' } }),
+  });
+  assert.equal(result.status, 2, 'the hook did not fall back to its own working directory');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('npx: hooks.json wires the refusal as PreToolUse on Bash', () => {
+  const hooks = readJson(path.join(ROOT, 'agent-plugins', 'claude', 'hooks', 'hooks.json')).hooks;
+  const entry = hooks.PreToolUse.find((h) => h.matcher === 'Bash');
+  assert.ok(entry, 'no PreToolUse Bash entry');
+  const commands = entry.hooks.map((hook) => hook.command);
+  assert.ok(commands.some((command) => /hooks\/npx\/run\.sh/.test(command)), 'the npx hook is not registered');
+
+  // The Write|Edit entry keeps its three hooks, untouched by the new one.
+  const writes = hooks.PreToolUse.find((h) => h.matcher === 'Write|Edit');
+  assert.ok(writes, 'the Write|Edit entry is gone');
+  assert.equal(writes.hooks.length, 3, 'the Write|Edit entry changed shape');
 });

@@ -2,6 +2,7 @@ const powertools = require('node-powertools');
 const fetchFailure = require('../fetch-failure.js');
 const assertRefundLinkage = require('../refund-linkage.js');
 const env = require('../../env.js');
+const Manager = require('../../../index.js');
 const assertLicensedPayments = require('../license.js');
 
 // Epoch zero timestamps (used as default/empty dates)
@@ -24,7 +25,7 @@ let cachedConfig = null;
 const Chargebee = {
   /**
    * Initialize or return the Chargebee config
-   * API key from CHARGEBEE_API_KEY env; site from CHARGEBEE_SITE env (set by Manager from config)
+   * API key from CHARGEBEE_API_KEY env; site from payment.providers.chargebee.site in config (#893)
    * @returns {{ apiKey: string, site: string, baseUrl: string }}
    */
   init() {
@@ -42,10 +43,12 @@ const Chargebee = {
       throw new Error('CHARGEBEE_API_KEY environment variable is required');
     }
 
-    const site = env.get('CHARGEBEE_SITE');
+    // The site name is PUBLIC (it is in every Chargebee URL), so config is its
+    // one home and this reads it straight (#893)
+    const site = Manager.config?.payment?.providers?.chargebee?.site;
 
     if (!site) {
-      throw new Error('CHARGEBEE_SITE environment variable is required (set from config payment.providers.chargebee.site)');
+      throw new Error('payment.providers.chargebee.site is required in config/omega.json5');
     }
 
     cachedConfig = {

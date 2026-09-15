@@ -94,7 +94,8 @@ function parseFeed(ymlText) {
 /**
  * Pick the install artifact for a platform from a parsed feed.
  *   darwin — zip, preferring `-<arch>-mac.zip` → `-universal-mac.zip` →
- *            `-mac-universal.zip` (the versionless form, #620) → `-mac.zip`
+ *            `-mac-universal.zip` (the #620 name) → `-mac.zip` (the name
+ *            @omega.js/desktop packages the auto-update zip under since #867)
  *   win32  — the NSIS setup .exe (run silently with /S; NSIS is what lets RM
  *            self-update via electron-updater on Windows)
  *   linux  — the .AppImage entry
@@ -111,8 +112,10 @@ function pickArtifact(feed, platform, arch) {
   if (platform === 'darwin') {
     picked = names.find((n) => n.endsWith(`-${arch}-mac.zip`))
       || names.find((n) => n.endsWith('-universal-mac.zip'))
-      // The name @omega.js/desktop packages under since #620 — a feed published
-      // before it still answers on one of the forms above.
+      // A feed published before #867 still carries the arch-shaped name; the
+      // last form is what @omega.js/desktop packages the mac auto-update zip
+      // under now. This reads the RM app's OWN feed, so every published form
+      // stays answerable.
       || names.find((n) => n.endsWith('-mac-universal.zip'))
       || names.find((n) => n.endsWith('-mac.zip'));
   } else if (platform === 'win32') {

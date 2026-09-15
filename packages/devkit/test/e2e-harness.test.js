@@ -43,27 +43,36 @@ function write(filePath, contents) {
 
 // ---- discoverTargets
 
-test('discoverTargets finds the backend and website target dirs', () => {
-  const root = makeTempBrand(['targets/backend/package.json', 'targets/website/package.json']);
+test('discoverTargets finds the backend and web target dirs', () => {
+  const root = makeTempBrand(['targets/backend/package.json', 'targets/web/package.json']);
   const targets = discoverTargets(root);
   assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
-  assert.equal(targets.website, path.join(root, 'targets', 'website'));
+  assert.equal(targets.web, path.join(root, 'targets', 'web'));
+});
+
+test('discoverTargets finds the web leg by TYPE, whatever the brand named it (#886)', () => {
+  const root = makeTempBrand(['targets/storefront/package.json', 'targets/api/package.json']);
+  write(path.join(root, 'config', 'omega.json5'), "{ targets: { storefront: { type: 'web' }, api: { type: 'backend' } } }\n");
+
+  const targets = discoverTargets(root);
+  assert.equal(targets.web, path.join(root, 'targets', 'storefront'));
+  assert.equal(targets.backend, path.join(root, 'targets', 'api'));
 });
 
 test('discoverTargets returns nulls for missing targets and a missing targets dir', () => {
-  const partial = makeTempBrand(['targets/website/package.json']);
+  const partial = makeTempBrand(['targets/web/package.json']);
   assert.equal(discoverTargets(partial).backend, null);
-  assert.equal(discoverTargets(partial).website, path.join(partial, 'targets', 'website'));
+  assert.equal(discoverTargets(partial).web, path.join(partial, 'targets', 'web'));
 
   const bare = makeTempBrand([]);
-  assert.deepEqual(discoverTargets(bare), { backend: null, website: null });
+  assert.deepEqual(discoverTargets(bare), { backend: null, web: null });
 });
 
 test('discoverTargets ignores dot-dirs and plain files in targets/', () => {
   const root = makeTempBrand(['targets/.DS_Store', 'targets/notes.md', 'targets/backend/package.json']);
   const targets = discoverTargets(root);
   assert.equal(targets.backend, path.join(root, 'targets', 'backend'));
-  assert.equal(targets.website, null);
+  assert.equal(targets.web, null);
 });
 
 // ---- the ready markers (the contract with @omega.js/backend and @omega.js/web)
@@ -93,7 +102,7 @@ test('resolveLocalBin climbs to the nearest install carrying the bin', () => {
 test('resolveLocalBin prefers the NEAREST install over an outer one', () => {
   const root = makeTempBrand([]);
   write(path.join(root, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
-  const targetDir = path.join(root, 'targets', 'website');
+  const targetDir = path.join(root, 'targets', 'web');
   write(path.join(targetDir, 'node_modules', '.bin', 'omega'), '#!/bin/sh\n');
 
   assert.equal(resolveLocalBin('omega', targetDir), path.join(targetDir, 'node_modules', '.bin', 'omega'));
@@ -107,29 +116,29 @@ test('a missing bin fails loudly, naming the install to run', () => {
   );
 });
 
-// ---- resolveDevTarget: the website leg's precondition
+// ---- resolveDevTarget: the web leg's precondition
 
-test('a website target declaring @omega.js/web resolves to that framework', () => {
+test('a web target declaring @omega.js/web resolves to that framework', () => {
   const root = makeTempBrand([]);
-  const websiteDir = path.join(root, 'targets', 'website');
-  write(path.join(websiteDir, 'package.json'), JSON.stringify({
-    name: 'website', devDependencies: { '@omega.js/web': '*' },
+  const webDir = path.join(root, 'targets', 'web');
+  write(path.join(webDir, 'package.json'), JSON.stringify({
+    name: 'web', devDependencies: { '@omega.js/web': '*' },
   }));
 
-  const target = resolveDevTarget(websiteDir, root);
+  const target = resolveDevTarget(webDir, root);
   assert.equal(target.kind, 'framework');
   assert.equal(target.name, '@omega.js/web');
 });
 
-test('a website target declaring NO framework refuses by name (never a stray dispatch)', () => {
+test('a web target declaring NO framework refuses by name (never a stray dispatch)', () => {
   const root = makeTempBrand([]);
-  write(path.join(root, 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
-  const websiteDir = path.join(root, 'targets', 'website');
-  write(path.join(websiteDir, 'package.json'), JSON.stringify({ name: 'website' }));
+  write(path.join(root, 'config', 'omega.json5'), "{ targets: { web: { type: 'web' } } }\n");
+  const webDir = path.join(root, 'targets', 'web');
+  write(path.join(webDir, 'package.json'), JSON.stringify({ name: 'web' }));
 
   assert.throws(
-    () => resolveDevTarget(websiteDir, root),
-    /^Error: targets\/website declares no web framework dependency, so there is no `omega dev` to boot/,
+    () => resolveDevTarget(webDir, root),
+    /^Error: targets\/web declares no web framework dependency, so there is no `omega dev` to boot/,
   );
 });
 

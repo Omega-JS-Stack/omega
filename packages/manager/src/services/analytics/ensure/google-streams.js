@@ -18,7 +18,7 @@
  *
  * The two halves land in their two homes as they resolve. Each stream's
  * measurement ID goes to CONFIG, at
- * `targets.{target}.analytics.providers.google.id` — the per-surface
+ * `targets.{name}.analytics.providers.google.id`: the per-surface
  * override every framework reads through the merge chain, the same shape the
  * monitoring service uses for its per-target DSNs (#417). Each stream's
  * Measurement Protocol secret goes to the brand .env, under
@@ -27,6 +27,7 @@
  * travels together.
  */
 const chalk = require('chalk').default;
+const { targetEntries, targetUrl } = require('@omega.js/config');
 const { pressEnterToOpen } = require('@omega.js/devkit/prompt');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
@@ -34,9 +35,9 @@ const { writeEnvValue } = require('../../../lib/env-secret.js');
 const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
-// target → stream URI subdomain (null = the root domain) + display name.
-// Subdomains for app targets are virtual — they exist only to give each
-// target a distinct stream URI. Unlisted targets default to their own name.
+// target TYPE → stream URI subdomain (null = the target's own url) + display
+// name. Subdomains for app targets are virtual: they exist only to give each
+// target a distinct stream URI. Unlisted types default to the target's name.
 const STREAM_TARGETS = {
   web: { displayName: 'Website', subdomain: null },
   backend: { displayName: 'Backend', subdomain: 'api' },
@@ -56,7 +57,7 @@ function isCleanSecret(secret) {
 }
 
 module.exports = async function ensureGoogleStreams(context) {
-  const { analyticsApi: api, propertyId, accountId, domain, brand, brandConfig, brandRoot, options = {} } = context;
+  const { analyticsApi: api, propertyId, accountId, domain, brandConfig, brandRoot, options = {} } = context;
 
   // Config drift check: a propertyId pointing at a deleted/inaccessible
   // property should say so instead of erroring cryptically per stream
@@ -77,9 +78,16 @@ module.exports = async function ensureGoogleStreams(context) {
   const planned = [];
   const configEdits = {};
 
-  for (const target of brand.enabledTargets) {
-    const spec = STREAM_TARGETS[target] || { displayName: target, subdomain: target };
-    const uri = spec.subdomain ? `https://${spec.subdomain}.${domain}` : `https://${domain}`;
+  // Every declared target, by NAME with its TYPE (#886): the type picks the
+  // stream's display name and its virtual subdomain, while a web target
+  // measures on ITS OWN url, so a second web target named `community` gets
+  // the community stream instead of a second root-domain one.
+  for (const entry of targetEntries(brandConfig)) {
+    const target = entry.name;
+    const spec = STREAM_TARGETS[entry.type] || { displayName: entry.name, subdomain: entry.name };
+    const uri = spec.subdomain
+      ? `https://${spec.subdomain}.${domain}`
+      : (targetUrl(brandConfig, entry.name) || `https://${domain}`);
     const displayName = `${brandConfig.brand.name} - ${spec.displayName}`;
 
     let stream = existing.find((s) => s.type === 'WEB_DATA_STREAM' && s.webStreamData?.defaultUri === uri);
@@ -127,7 +135,8 @@ module.exports = async function ensureGoogleStreams(context) {
 
     // Measurement Protocol secret — the brand .env holds the last resolved
     // value, so a failed listing below degrades to it instead of to nothing
-    const secretEnvName = streamSecretEnvName(target);
+    // The brand .env key is the env schema's, keyed by TYPE (#678)
+    const secretEnvName = streamSecretEnvName(entry.type);
     let apiSecret = process.env[secretEnvName] || null;
     try {
       const secrets = await api.listMeasurementProtocolSecrets(propertyId, streamId);

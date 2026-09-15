@@ -41,7 +41,7 @@ social_signin:
                   <span class="d-inline-flex me-2" aria-hidden="true">{% omega_logo provider.logo, "brandmarks" %}</span>
                 {% endiftruthy %}
                 {% iffalsy provider.logo %}
-                  <i class="fa-solid fa-{{ provider.icon }} me-2"></i>
+                  <i class="{{ provider.icon }} me-2" aria-hidden="true"></i>
                 {% endiffalsy %}
                 <span class="button-text">Continue with {{ provider.name }}</span>
               </button>

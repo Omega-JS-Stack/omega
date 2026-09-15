@@ -3,7 +3,7 @@
  * test` at the brand root and by the brand-root `omega test` walk (#775).
  *
  * Infrastructure is the shared harness from @omega.js/devkit: the classic-port
- * hold, the backend emulator with its seeded personas, the website's real dev
+ * hold, the backend emulator with its seeded personas, the web target's real dev
  * server, and the browser (resolved from this brand root, which is why nothing
  * here installs puppeteer). This file is only the brand-specific STEPS.
  */
@@ -58,7 +58,7 @@ async function waitForAuthState(page, check, label, timeout = WEBHOOK_TIMEOUT) {
 async function main() {
   const harness = new E2eHarness(BRAND_ROOT);
 
-  // The site URL prints in the 'website serves' step detail — the port is
+  // The site URL prints in the 'the website serves' step detail: the port is
   // allocator-resolved during boot, so it isn't known (truthfully) yet here.
   console.log('\nSandbox brand cross-stack e2e');
   console.log(`  user: ${EMAIL}\n`);
@@ -78,7 +78,7 @@ async function main() {
     await harness.step('page boots @omega.js/client against the emulators', async () => {
       // The lane's page is a REAL @omega.js/web page served by the real
       // `omega dev`; its module hangs the hooks below off the client the
-      // framework boots (targets/website/src/assets/js/pages/e2e/index.js).
+      // framework boots (targets/web/src/assets/js/pages/e2e/index.js).
       await page.goto(lanePage, { waitUntil: 'load' });
       // A client that fails to boot never flips isReady; the boot's own
       // `Page module error:` line in page.log is the diagnosis

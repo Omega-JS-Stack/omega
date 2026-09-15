@@ -1,14 +1,17 @@
 /**
- * launch-omega-extension tests — the upstream is only as portable as this
- * resolution, and its two failure modes (manager absent, manager present but
- * without the extension server on disk) must name what was expected.
+ * launch-omega-extension tests. The upstream is only as portable as this
+ * resolution, and since [#927](https://github.com/Omega-JS-Stack/omega/issues/927)
+ * there is only one thing to resolve: the server file this package ships
+ * beside the launcher. It used to be hunted down inside an installed
+ * `@omega.js/manager`, which never publishes the tree it lived in.
  */
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 
-const { resolveManagerRoot, resolveServerPath, main } = require('../src/launch-omega-extension.js');
+const { SERVER, resolveServerPath, main } = require('../src/launch-omega-extension.js');
 
 /**
  * Capture everything written to stderr while running a function.
@@ -28,52 +31,35 @@ function captureStderr(run) {
   return chunks.join('');
 }
 
-test('the manager root is the main export two dirnames up', () => {
-  assert.equal(resolveManagerRoot({ resolve: () => '/somewhere/node_modules/@omega.js/manager/dist/index.js' }), '/somewhere/node_modules/@omega.js/manager');
-});
-
-test('the server path is the extension MCP entry inside that root', () => {
-  const resolved = resolveServerPath({
-    resolve: () => '/pkgs/manager/dist/index.js',
-    exists: (file) => file === path.join('/pkgs/manager', 'extension', 'mcp-server', 'index.js'),
-  });
-  assert.deepEqual(resolved, { server: path.join('/pkgs/manager', 'extension', 'mcp-server', 'index.js') });
-});
-
-test('this monorepo resolves a real extension MCP server on disk', () => {
+test('the server is the file this package ships beside the launcher', () => {
   const resolved = resolveServerPath();
   assert.equal(resolved.error, undefined, resolved.error);
-  assert.match(resolved.server, /manager[/\\]extension[/\\]mcp-server[/\\]index\.js$/);
+  assert.equal(resolved.server, SERVER);
+  assert.match(resolved.server, /mcp-router[/\\]servers[/\\]omega-extension[/\\]index\.js$/);
+  assert.equal(fs.existsSync(resolved.server), true, 'the shipped server is not on disk');
 });
 
-test('an unresolvable manager falls back to the monorepo sibling package', () => {
-  const seen = [];
-  const root = resolveManagerRoot({
-    resolve: () => { throw new Error('Cannot find module'); },
-    exists: (file) => { seen.push(file); return true; },
-  });
-  assert.match(root, /packages[/\\]manager$/);
-  assert.deepEqual(seen, [path.join(root, 'package.json')]);
+test('the shipped server imports nothing but this package own dependencies', () => {
+  // The whole point of the move: the upstream starts with no manager, no brand
+  // and no NODE_PATH, so every bare import must resolve from the server itself.
+  const source = fs.readFileSync(SERVER, 'utf8');
+  const bare = [...source.matchAll(/require\('([^.][^']*)'\)/g)].map((match) => match[1]);
+  assert.ok(bare.length > 0, 'no imports found: the scan is broken, not the server');
+  for (const request of bare) {
+    assert.doesNotThrow(() => require.resolve(request, { paths: [path.dirname(SERVER)] }), `${request} does not resolve for the shipped server`);
+  }
 });
 
-test('an uninstalled manager with no sibling fails loudly, naming the package', () => {
-  const resolved = resolveServerPath({
-    resolve: () => { throw new Error('Cannot find module'); },
-    exists: () => false,
-  });
-  assert.match(resolved.error, /@omega\.js\/manager is not installed/);
+test('a broken install fails loudly, naming the file this package ships', () => {
+  const resolved = resolveServerPath({ exists: () => false });
+  assert.match(resolved.error, /servers[/\\]omega-extension[/\\]index\.js is missing/);
+  assert.match(resolved.error, /@omega\.js\/mcp-router ships/);
 });
 
-test('an installed manager missing the extension server fails loudly, naming the file', () => {
-  const resolved = resolveServerPath({ resolve: () => '/pkgs/manager/dist/index.js', exists: () => false });
-  assert.match(resolved.error, /extension[/\\]mcp-server[/\\]index\.js is missing/);
-});
-
-test('main runs the resolved server on this node and forwards its exit code', () => {
+test('main runs the shipped server on this node and forwards its exit code', () => {
   const calls = [];
   const exits = [];
   main({
-    resolve: () => '/pkgs/manager/dist/index.js',
     exists: () => true,
     execPath: '/usr/bin/node',
     exit: (code) => exits.push(code),
@@ -84,12 +70,11 @@ test('main runs the resolved server on this node and forwards its exit code', ()
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].command, '/usr/bin/node');
-  assert.deepEqual(calls[0].args, [path.join('/pkgs/manager', 'extension', 'mcp-server', 'index.js')]);
+  assert.deepEqual(calls[0].args, [SERVER]);
   assert.equal(calls[0].options.stdio, 'inherit');
-  // The server's imports (the MCP SDK, ws) resolve through this package's
-  // node_modules when the manager tree has none of its own.
-  assert.ok(calls[0].options.env.NODE_PATH.split(path.delimiter)
-    .some((entry) => /mcp-router[/\\]node_modules$/.test(entry)));
+  // No env override at all: a NODE_PATH used to carry this package's
+  // node_modules to a server that sat in someone else's tree.
+  assert.equal(calls[0].options.env, undefined);
   assert.deepEqual(exits, [0]);
 });
 
@@ -97,12 +82,11 @@ test('a missing server exits 1 without spawning', () => {
   const exits = [];
   const said = captureStderr(() => {
     main({
-      resolve: () => '/pkgs/manager/dist/index.js',
       exists: () => false,
       exit: (code) => exits.push(code),
       spawn: () => assert.fail('must not spawn when the server is missing'),
     });
   });
   assert.deepEqual(exits, [1]);
-  assert.match(said, /mcp-server/);
+  assert.match(said, /omega-extension/);
 });

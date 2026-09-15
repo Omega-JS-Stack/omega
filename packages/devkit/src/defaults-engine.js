@@ -15,7 +15,9 @@
 //   template   object         render `{{ key.path }}` tokens with this data
 //                             (tolerant: unknown keys survive verbatim, so GitHub
 //                             Actions' `${{ secrets.X }}` passes through)
-//   merge      bool           JSON5 defaults-merge with the existing file
+//   merge      bool           JSON5 defaults-merge with the existing file, written
+//                             through @omega.js/config's comment-preserving editor
+//                             (only the differing keys change; comments stay)
 //   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/AGENTS.md)
 //   retire     bool           brand-context per-target doc retirement: NEVER scaffold
 //                             the file; an existing framework-owned-only copy is
@@ -38,6 +40,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { isDeepStrictEqual } = require('node:util');
 const jetpack = require('fs-jetpack');
 const { minimatch } = require('minimatch');
 const { mergeLineBasedFiles, hasSectionMarkers, getCustomSection } = require('./merge-line-files');
@@ -206,9 +209,7 @@ function applyDefaults(config) {
 
     if (options.merge && exists) {
       try {
-        const JSON5 = require('json5');
-        const merged = mergeJson5Defaults(JSON5.parse(jetpack.read(destination)), JSON5.parse(contents));
-        contents = JSON5.stringify(merged, null, 2);
+        contents = mergeJson5Text(jetpack.read(destination), contents);
         didMerge = true;
       } catch (error) {
         logger.error(`Error merging config file ${finalRelative}: ${error.message}`);
@@ -335,7 +336,10 @@ function renderTemplate(content, context) {
 
 // JSON5 defaults merge (BXM's mergeConfigs): framework defaults provide shape and
 // order; the consumer's values win unless they're the literal string 'default';
-// consumer-only keys survive at every nesting level.
+// consumer-only keys survive at every nesting level, EXCEPT one holding the
+// 'default' sentinel, which is the framework's own unset marker and drops (#926).
+// A JSON5 file carries no framework-block marker, so that sentinel is the only
+// signal telling a key the framework retired from a key the consumer added.
 function mergeJson5Defaults(existingConfig, newConfig) {
   const merged = { ...newConfig };
 
@@ -356,9 +360,11 @@ function mergeJson5Defaults(existingConfig, newConfig) {
       }
     }
 
-    // Consumer-only keys survive at every level.
+    // Consumer-only keys survive at every level, except a leftover 'default'
+    // sentinel: that is the framework's unset marker for a key it no longer
+    // declares, so it leaves with the key (#926).
     for (const key in source) {
-      if (!Object.prototype.hasOwnProperty.call(newDefaults, key)) {
+      if (!Object.prototype.hasOwnProperty.call(newDefaults, key) && source[key] !== 'default') {
         target[key] = source[key];
       }
     }
@@ -367,6 +373,62 @@ function mergeJson5Defaults(existingConfig, newConfig) {
   mergeNested(merged, existingConfig, newConfig);
 
   return merged;
+}
+
+// The merge WRITE: the consumer's JSON5 is hand-edited, so the merged object is
+// never re-stringified over it (that stripped every comment and the trailing
+// newline, #928). The merge result is diffed against the file on disk and the
+// differences go through @omega.js/config's comment-preserving editor, so only
+// the changed value spans move, every other byte survives, and an unchanged merge
+// returns the source untouched so the engine's idempotency check skips the write.
+// Output always ends with exactly one newline.
+function mergeJson5Text(existingText, defaultsText) {
+  const JSON5 = require('json5');
+  const { applyConfigEdits, applyConfigRemovals } = require('@omega.js/config');
+
+  const existing = JSON5.parse(existingText);
+  const merged = mergeJson5Defaults(existing, JSON5.parse(defaultsText));
+
+  const edits = {};
+  const removals = [];
+  diffConfigPaths(existing, merged, '', edits, removals);
+
+  // Nothing to change is not a write: the file goes back byte for byte, final
+  // newline included or not, so a rerun never touches it.
+  if (removals.length === 0 && Object.keys(edits).length === 0) {
+    return existingText;
+  }
+
+  const written = applyConfigEdits(applyConfigRemovals(existingText, removals), edits);
+
+  return written.replace(/\n*$/, '\n');
+}
+
+// Diff the merged object against the one on disk into editor operations: dot-paths
+// to set (a leaf whose value differs, plus a key or whole branch the file lacks)
+// and dot-paths to delete (a key the merge dropped, #926's `default` sentinel).
+// Two objects at the same path recurse; anything else (primitive, array, or a
+// branch landing where the file has no object) is one value the editor writes whole.
+function diffConfigPaths(existing, merged, prefix, edits, removals) {
+  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+  for (const key of Object.keys(merged)) {
+    const keyPath = prefix ? `${prefix}.${key}` : key;
+    const nextValue = merged[key];
+    const priorValue = existing[key];
+
+    if (isObject(nextValue) && isObject(priorValue)) {
+      diffConfigPaths(priorValue, nextValue, keyPath, edits, removals);
+    } else if (!isDeepStrictEqual(priorValue, nextValue)) {
+      edits[keyPath] = nextValue;
+    }
+  }
+
+  for (const key of Object.keys(existing)) {
+    if (!Object.prototype.hasOwnProperty.call(merged, key)) {
+      removals.push(prefix ? `${prefix}.${key}` : key);
+    }
+  }
 }
 
 module.exports = { applyDefaults, mergeJson5Defaults, renderTemplate };

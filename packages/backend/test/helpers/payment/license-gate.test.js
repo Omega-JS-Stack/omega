@@ -89,8 +89,10 @@ module.exports = defineCases({
 
       // Absent is the local shape: only a deploy writes the key, so an emulator
       // run, a test lane and a demo-* project must behave as they did before
-      // the gate existed. Each init is then blocked by its OWN missing
-      // credential, which is today's behavior.
+      // the gate existed. Each init is then blocked by its OWN missing input,
+      // which is today's behavior: a credential in the env, or, since #893
+      // moved the public ids out of the env, a key in config/omega.json5 the
+      // offline fixture leaves null.
       async run() {
         for (const status of ['licensed', undefined]) {
           await withStatus(status, async () => {
@@ -98,7 +100,11 @@ module.exports = defineCases({
               const error = await throwsFrom(() => library.init(), `${name} still needs its credentials`);
 
               assert.notEqual(error.name, 'UnlicensedPaymentsError', `${name} must not be license-gated when status is ${status}`);
-              assert.match(error.message, /environment variables? (is|are) required/, `${name} fails for its own missing credential`);
+              assert.match(
+                error.message,
+                /environment variables? (is|are) required|is required in config\/omega\.json5/,
+                `${name} fails for its own missing input, got: ${error.message}`,
+              );
             }
           });
         }

@@ -5,7 +5,7 @@
  * foot.html used to emit the GA4, Meta and TikTok snippets straight into the
  * page whenever an id was configured, which meant every visitor was counted
  * before the banner had even finished animating in. The chrome still emits the
- * IDS (`window.Configuration.analytics`); the scripts themselves are injected
+ * IDS (`window.OMEGA_BUILD_JSON.config.analytics`); the scripts themselves are injected
  * from here, and only for a category the visitor's consent allows:
  *
  *   ga4    → `analytics`

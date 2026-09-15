@@ -134,7 +134,7 @@ module.exports = defineCases({
         // No token survives the render (an unrendered one is not a missing
         // step, it is a file GitHub refuses to parse). `${{ secrets.X }}` is
         // GitHub's own syntax and is left alone by the tolerant renderer.
-        for (const token of ['{{ versions.node }}', '{{ githubSecrets }}', '{{ envFileKeys }}', '{{ installFirewall }}']) {
+        for (const token of ['{{ versions.node }}', '{{ githubSecrets }}', '{{ envFileKeys }}', '{{ installFirewall }}', '{{ installWorkspace }}']) {
           assert.equal(workflow.includes(token), false, `${token} was left unrendered`);
         }
 
@@ -142,6 +142,11 @@ module.exports = defineCases({
         // declaration, and the install it wraps runs through it.
         assert.ok(/uses: SocketDev\/action@v\d+\.\d+\.\d+/.test(workflow), 'the pinned firewall action is rendered');
         assert.ok(workflow.includes('sfw npm install'), 'the install runs behind the firewall');
+
+        // A STANDALONE target is its own repo root and declares no workspaces,
+        // so the workspace flag a composed brand job carries renders to nothing
+        // here ([#898](https://github.com/Omega-JS-Stack/omega/issues/898)).
+        assert.equal(workflow.includes('--workspace'), false, 'a standalone install names a workspace that does not exist');
 
         // Every key the schema delivers to backend arrives in the runner env,
         // and the `env` half is the list the .env writer reads back out of it.
@@ -172,7 +177,7 @@ module.exports = defineCases({
         assert.ok(workflow.includes('> service-account.json'), 'the service-account JSON is written back to disk');
         assert.ok(workflow.includes('GOOGLE_APPLICATION_CREDENTIALS='), 'firebase deploy authenticates through the written key');
         assert.ok(workflow.includes('gcloud auth activate-service-account --key-file'), 'gcloud ignores GOOGLE_APPLICATION_CREDENTIALS, so the runner activates the account');
-        assert.ok(workflow.includes('npx --no-install omega-backend deploy --direct'), 'the runner runs this framework verb, never a second deploy path');
+        assert.ok(workflow.includes('node "${{ github.workspace }}/node_modules/@omega.js/backend/bin/omega" deploy --direct'), 'the runner runs this framework verb by path, never a second deploy path');
 
         // The install has to carry the DEV dependencies too (#872): a brand's
         // own @omega.js/manager and the frameworks it declares as devDeps are
@@ -182,12 +187,53 @@ module.exports = defineCases({
         // bin that did not exist.
         assert.equal(/^\s*NODE_ENV:/m.test(workflow), false, 'NODE_ENV in the job env makes the install skip devDependencies');
 
-        // And no `npx` STEP here may reach the registry: a missing bin under a
-        // bare `npx omega` is a stranger's package, run with every secret in
-        // env. (Comments are allowed to name the shape they warn about.)
+        // And no STEP here runs `npx` at all ([#877](https://github.com/Omega-JS-Stack/omega/issues/877)):
+        // a missing bin under a bare `npx omega` is a stranger's package, run
+        // with every secret in env, so the workflow resolves no bin NAME and
+        // runs the framework's own file instead. (Comments are allowed to name
+        // the shape they warn about.)
         const steps = workflow.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
-        for (const [, invocation] of steps.matchAll(/\bnpx\s+(\S+)/g)) {
-          assert.equal(invocation, '--no-install', `npx ${invocation} can install from the registry`);
+        assert.equal(/\bnpx\b/.test(steps), false, 'a step runs npx, which can reach the registry');
+        assert.equal(/\bomega-backend\b/.test(steps), false, 'a step names the removed per-framework bin');
+      },
+    },
+    {
+      // #876 + #835: two kinds of key the SCHEMA cannot name reach the runner
+      // through the brand's composed production .env, and both halves of the
+      // workflow (the injected block and the .env writer's key list) render
+      // from that one set.
+      name: 'deploy-workflow-carries-the-connections-family-and-the-consumers-own-keys',
+      async run({ assert }) {
+        const tmp = makeTmp();
+        // A brand root with a backend target, so the composer reads the brand
+        // .env the way a real verb does.
+        jetpack.write(path.join(tmp, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        jetpack.write(path.join(tmp, '.env'), [
+          'CONNECTIONS_GITHUB_CLIENT_ID="gh-client-id"',
+          'ACME_WEBHOOK_KEY="acme-webhook"',
+          'OMEGA_FONTAWESOME_ROOT="/Users/someone/fa"',
+          '',
+        ].join('\n'));
+        jetpack.write(path.join(tmp, '.env.production'), 'CONNECTIONS_GITHUB_CLIENT_SECRET="gh-client-secret"\n');
+
+        const targetDir = path.join(tmp, 'targets', 'backend');
+        jetpack.dir(targetDir);
+        scaffoldDefaults({ outputDir: targetDir, logger: quiet });
+
+        // A brand target's workflow composes to the BRAND ROOT, scoped to this
+        // target's path (#265).
+        const workflow = jetpack.read(path.join(tmp, '.github', 'workflows', 'backend-deploy.yml'));
+
+        for (const key of ['CONNECTIONS_GITHUB_CLIENT_ID', 'CONNECTIONS_GITHUB_CLIENT_SECRET', 'ACME_WEBHOOK_KEY']) {
+          assert.ok(workflow.includes(`${key}: \${{ secrets.${key} }}`), `${key} must reach the runner env`);
+          assert.ok(workflow.includes(`"${key}"`), `${key} must be written into the target .env`);
+        }
+
+        // The machine-local path never leaves the laptop (#454), and no VALUE
+        // is ever rendered into a workflow.
+        assert.equal(workflow.includes('OMEGA_FONTAWESOME_ROOT'), false, 'a machine-local key must never reach CI');
+        for (const value of ['gh-client-id', 'gh-client-secret', 'acme-webhook']) {
+          assert.equal(workflow.includes(value), false, 'a workflow carries key NAMES, never values');
         }
       },
     },
@@ -234,7 +280,11 @@ module.exports = defineCases({
         const composed = jetpack.read(path.join(tmp, '.github', 'workflows', 'backend-deploy.yml'));
         assert.ok(composed, 'the brand root carries the composed workflow');
         assert.ok(composed.includes('working-directory: targets/backend'), 'every run step executes in the target dir');
-        assert.ok(composed.includes('npx --no-install omega-backend deploy --direct'), 'the runner runs the framework verb itself');
+        assert.ok(composed.includes('node "${{ github.workspace }}/node_modules/@omega.js/backend/bin/omega" deploy --direct'), 'the runner runs the framework verb itself, by path');
+
+        // …and installs only this target's workspace, so the runner's node
+        // never installs another target's engines pin ([#898](https://github.com/Omega-JS-Stack/omega/issues/898)).
+        assert.ok(composed.includes('sfw npm install --workspace .'), 'the composed job installs the whole brand root');
       },
     },
     {

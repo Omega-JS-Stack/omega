@@ -23,19 +23,20 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'isTesting() returns true (we are running under OMEGA_TEST_MODE=true)',
+      name: 'isTesting() returns true (this lane named OMEGA_ENVIRONMENT=testing)',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.isTesting()).toBe(true);
       },
     },
     {
-      name: 'isDevelopment() works (renderer has no app.isPackaged so it falls through)',
+      name: 'isDevelopment() answers the one input, with no renderer-specific sniff',
       run: (ctx) => {
-        // In renderer process, `electron.app` is undefined, so the helper falls back
-        // to NODE_ENV / config.em.environment. The test harness seeds config with
-        // environment='production' so this should report false.
+        // Nothing here reads app.isPackaged or NODE_ENV any more (#817): the
+        // preload has a process, so the lane's OMEGA_ENVIRONMENT answers, and a
+        // real renderer bundle answers from the baked config.environment.
         const v = window.__emTestManager.isDevelopment();
         ctx.expect(typeof v).toBe('boolean');
+        ctx.expect(v).toBe(false);
       },
     },
     {
@@ -44,7 +45,7 @@ module.exports = defineCases({
         const dev  = window.__emTestManager.isDevelopment();
         const test = window.__emTestManager.isTesting();
         const prod = window.__emTestManager.isProduction();
-        // We run under OMEGA_TEST_MODE=true → testing wins; dev and prod are both false.
+        // This lane named testing; dev and prod are both false.
         ctx.expect(test).toBe(true);
         ctx.expect(dev).toBe(false);
         ctx.expect(prod).toBe(false);
@@ -62,16 +63,18 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getEnvironment(): testing (OMEGA_TEST_MODE) takes precedence over config.em.environment',
+      name: 'getEnvironment(): the lane variable wins over the baked config.environment',
       run: (ctx) => {
-        // The test runner sets OMEGA_TEST_MODE=true, which wins over any config override —
-        // getEnvironment() always reports 'testing' here regardless of em.environment.
-        window.__emTestManager.setConfig('em.environment', 'production');
+        // The test runner names OMEGA_ENVIRONMENT=testing, and this preload has a
+        // process to read it from, so it wins over whatever the artifact was
+        // baked as (#817). A real renderer bundle has no process and takes the
+        // baked word, which is the other half of the same one-input rule.
+        window.__emTestManager.setConfig('environment', 'production');
         ctx.expect(window.__emTestManager.getEnvironment()).toBe('testing');
-        window.__emTestManager.setConfig('em.environment', 'development');
+        window.__emTestManager.setConfig('environment', 'development');
         ctx.expect(window.__emTestManager.getEnvironment()).toBe('testing');
         // Reset.
-        window.__emTestManager.setConfig('em.environment', 'production');
+        window.__emTestManager.setConfig('environment', 'production');
       },
     },
     {
@@ -104,7 +107,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getWebsiteUrl: dev → the classic dev origin https://localhost:4000',
+      name: 'getWebsiteUrl: dev → https://localhost:4000, from the baked classic map',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('https://localhost:4000');
       },
@@ -118,9 +121,9 @@ module.exports = defineCases({
     {
       name: 'getWebsiteUrl: no-arg resolves local under testing; explicit arg overrides',
       run: (ctx) => {
-        // The renderer always runs under OMEGA_TEST_MODE (testing wins), so the no-arg form
-        // correctly resolves LOCAL regardless of config — that's the safety guarantee.
-        window.__emTestManager.setConfig('em.environment', 'production');
+        // This lane is testing, so the no-arg form resolves LOCAL regardless of
+        // what the artifact was baked as: that's the safety guarantee.
+        window.__emTestManager.setConfig('environment', 'production');
         ctx.expect(window.__emTestManager.getWebsiteUrl()).toBe('https://localhost:4000');
         // An explicit env arg bypasses the current environment and pins the mapping.
         ctx.expect(window.__emTestManager.getWebsiteUrl('production')).toBe('https://example.com');

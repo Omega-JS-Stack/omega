@@ -144,7 +144,7 @@ test('env-keys: a key added to the env schema reaches both lanes with no other e
     assert.match(fs.readFileSync(path.join(brandRoot, '.env'), 'utf8'), /^FIXTURE_DERIVED_KEY="fixture-derived-value"$/m);
 
     // Lane 2 — the onboard scaffold stub
-    const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: ['backend'] });
+    const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: [{ name: 'backend', type: 'backend' }] });
     const stub = plan.find((file) => file.path === '.env').contents;
     assert.match(stub, /^FIXTURE_DERIVED_KEY="fixture-derived-value"$/m, 'the onboard stub provisions it');
   } finally {
@@ -155,7 +155,7 @@ test('env-keys: a key added to the env schema reaches both lanes with no other e
 });
 
 test('the scaffold writes an empty .env.<environment> beside the .env, and gitignores them (#586)', () => {
-  const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: ['backend'] });
+  const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: [{ name: 'backend', type: 'backend' }] });
   const file = (relative) => plan.find((entry) => entry.path === relative);
 
   // `.env` is the base; `.env.<environment>` overlays it for the run's own
@@ -176,7 +176,7 @@ test('the scaffold writes an empty .env.<environment> beside the .env, and gitig
 });
 
 test('env-keys: the onboard stub mints the SAME list, double-quoted', () => {
-  const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: ['backend'] });
+  const plan = buildScaffoldPlan({ id: 'acme', name: 'Acme', url: 'https://acme.dev', email: 'hi@acme.dev', targets: [{ name: 'backend', type: 'backend' }] });
   const stub = plan.find((file) => file.path === '.env').contents;
 
   for (const name of Object.keys(GENERATED_ENV_KEYS)) {

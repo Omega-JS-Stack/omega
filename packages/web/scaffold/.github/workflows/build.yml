@@ -4,13 +4,11 @@
 #
 # Deliberate deploys (D13): commits never auto-publish — save = commit,
 # publish = an explicit dispatch (`omega deploy`, the CMS publish action, or
-# a plain HTTP workflow_dispatch/repository_dispatch call).
+# a plain HTTP workflow_dispatch call).
 name: Compile and Build Site
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [omega-deploy]
 
 concurrency:
   group: ${{ github.ref }}
@@ -18,9 +16,9 @@ concurrency:
 
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  # The purge step's gate reads this (#715): the `secrets` context is available
-  # in NO `if` expression — one such line and GitHub refuses to parse the whole
-  # file, so an absent secret has to arrive as an empty env value instead.
+  # The deploy's post-publish purge reads this (#715): an absent secret arrives
+  # as an empty env value, and the verb skips the purge with a line instead of
+  # failing the run.
   CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
   NODE_VERSION: '{{ versions.node }}'
   # Generated from the brand's .env cascade — one line per published Actions
@@ -49,31 +47,34 @@ jobs:
           fetch-depth: 1
 
       - name: Setup node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       {{ installFirewall }}
 
       - name: Run node install
-        run: sfw npm install
+        run: sfw npm install {{ installWorkspace }}
 
-      # Never bare `npx omega` on a runner: a missing bin makes npx fetch a
-      # stranger's package with the secrets in env (#872). The framework's own
-      # bin is unambiguous here (this workflow belongs to exactly one
-      # framework), and `--no-install` turns a missing one into a loud failure.
+      # No npx on a runner, in any spelling (#877): which package won npm's
+      # shared `omega` bin link is an install-order accident, and an `npx omega`
+      # that finds nothing linked fetches a stranger's package from the REGISTRY
+      # with every secret in the job env. This workflow belongs to exactly one
+      # framework, so it runs that framework's own bin FILE. The path is
+      # anchored at the workspace root: npm hoists a workspace's dependencies
+      # there, where a target-scoped `./node_modules` never sees them (#898).
       - name: Log versions
         run: |
           echo "Node: $(node -v)"
           echo "NPM: $(npm -v)"
-          echo "Omega: $(npx --no-install omega-web version)"
+          echo "Omega: $(node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" version)"
 
       # Optimized-image cache (the cache-uj-imagemin branch successor):
       # content-addressed, reproducible binaries — never committed. An exact
       # key hit skips all image processing; a prefix hit re-processes only
       # changed images.
       - name: Restore optimized-image cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .omega/cache/imagemin
           key: omega-imagemin-${{ hashFiles('src/assets/images/**') }}
@@ -81,11 +82,11 @@ jobs:
             omega-imagemin-
 
       # Base path (#358): a Pages PROJECT site serves under `/<repo>/`, a
-      # custom domain (brand.url → CNAME) at the domain root — and everything
-      # the build emits is root-relative, so the build has to be told. Derived
-      # by the SAME function `omega deploy --direct` uses, off the config in
-      # this checkout (GITHUB_REPOSITORY names the repo when it carries no
-      # slug); an explicitly set OMEGA_PATH_PREFIX wins and passes through.
+      # custom domain (the target url → CNAME) at the domain root, and
+      # everything the build emits is root-relative, so the build has to be
+      # told. The deploy step derives this for its own build; printing it here
+      # puts the value in the log before anything consumes it, and an
+      # explicitly set OMEGA_PATH_PREFIX wins in both places.
       - name: Resolve base path
         run: |
           PREFIX="$(node -p "require('@omega.js/web/deploy').targetPathPrefix()")"
@@ -103,34 +104,27 @@ jobs:
       - name: Log disk usage (before build)
         run: df -h /
 
-      # NODE_ENV rides the build step only (#872): at job scope npm would skip
-      # every devDependency on install, and a brand's frameworks are devDependencies
+      # ONE build and ONE push, both the framework's own (#883): `deploy
+      # --direct` builds the site and force-pushes ./dist as a single orphan
+      # commit to the WEBSITE repo (<brand.id>-<target>), writes the CNAME and
+      # .nojekyll, points Pages at the branch, and purges the Cloudflare zone
+      # when CLOUDFLARE_TOKEN is set. It is the SAME code a laptop runs, so CI
+      # and a hand deploy can never publish different things. No input here
+      # names a repo: the config derives it.
+      #
+      # NODE_ENV rides this step only (#872): at job scope npm would skip every
+      # devDependency on install, and a brand's frameworks are devDependencies
       # on some targets. The build itself needs it to pick production mode.
-      - name: Build
+      # GH_TOKEN is the brand's cross-repo token: the push and the Pages call
+      # both land on a repo this workflow does not live in.
+      - name: Build and deploy to gh-pages
         env:
           NODE_ENV: 'production'
-        run: |
-          npm run build
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" deploy --direct
 
       # `if: always()` (#568): this reading is the one that matters when the
       # build itself is what ran out of room.
       - name: Log disk usage (after build)
         if: always()
         run: df -h /
-
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GH_TOKEN }}
-          publish_dir: ./dist
-          # One commit on gh-pages, forever (#568). Without it the branch grows
-          # by a whole site per deploy, and the deploy action clones it again
-          # before copying the build in. It holds build artifacts only, so
-          # discarding its history is intended.
-          force_orphan: true
-
-      # Post-publish edge-cache purge — runs only when the repo has a
-      # CLOUDFLARE_TOKEN secret; skips silently otherwise.
-      - name: Purge Cloudflare cache
-        if: env.CLOUDFLARE_TOKEN != ''
-        run: npx --no-install omega-web purge

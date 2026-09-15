@@ -194,17 +194,100 @@ test('findTarget: the walk stops at the nearest .git — a context outside the r
 
 // ─── run() dispatch ──────────────────────────────────────────────────────────
 
-test('run(): no target context falls back to the HOST CLI (bootstrap case, e.g. a verb in a fresh dir)', async () => {
+test('run(): no target context and no manager installed falls back to the HOST CLI (bootstrap case, e.g. a verb in a fresh dir)', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-boot-'));
   const cwd0 = process.cwd();
+  const error0 = console.error;
+  const notes = [];
   let ran = 0;
+  console.error = (...args) => { notes.push(args.join(' ')); };
   process.chdir(scratch);
   try {
     await run({ hostName: '@omega.js/web', hostRun: () => { ran += 1; } });
   } finally {
     process.chdir(cwd0);
+    console.error = error0;
   }
   assert.equal(ran, 1);
+  // The manager preference (#908) must not swallow this lane: with nothing
+  // installed there is no manager CLI to hand over to.
+  const note = notes.join('\n');
+  assert.match(note, /no target context found from [\s\S]*running @omega\.js\/web/);
+  assert.doesNotMatch(note, /running @omega\.js\/manager/);
+});
+
+/**
+ * A targetless cwd with a fake @omega.js/manager installed above it: the fresh
+ * brand-template clone after `npm i --save-dev @omega.js/manager`, where the
+ * backend won npm's .bin/omega link because the manager depends on it (#908).
+ * @returns {{ workDir: string, marker: string }}
+ */
+function stageInstalledManager() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-mgr-'));
+  fs.mkdirSync(path.join(scratch, '.git'), { recursive: true }); // bound the walk
+  const workDir = path.join(scratch, 'clone');
+  fs.mkdirSync(workDir);
+
+  const mgrDir = path.join(scratch, 'node_modules', '@omega.js', 'manager');
+  fs.mkdirSync(mgrDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(mgrDir, 'package.json'),
+    JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } })
+  );
+  const marker = path.join(scratch, 'marker.txt');
+  fs.writeFileSync(
+    path.join(mgrDir, 'cli.js'),
+    `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, 'manager-dispatched'); } };`
+  );
+
+  return { workDir, marker };
+}
+
+test('run(): no target context dispatches to an INSTALLED manager, never the hoist-winner host (#908)', async () => {
+  // The reported break: `npx omega onboard` in a fresh clone that had installed
+  // only @omega.js/manager reached the BACKEND's CLI, which knows no such verb.
+  const { workDir, marker } = stageInstalledManager();
+  const cwd0 = process.cwd();
+  const error0 = console.error;
+  const notes = [];
+  console.error = (...args) => { notes.push(args.join(' ')); };
+  process.chdir(workDir);
+  try {
+    await run({
+      hostName: '@omega.js/backend',
+      hostRun: () => { throw new Error('must not run the backend'); },
+      argv: ['onboard', '--id=notifly'],
+    });
+  } finally {
+    process.chdir(cwd0);
+    console.error = error0;
+  }
+
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'manager-dispatched');
+  const note = notes.join('\n');
+  assert.match(note, /no target context found from .*: running @omega\.js\/manager/);
+  assert.ok(note.includes(fs.realpathSync(workDir)), `the note names the cwd: ${note}`);
+});
+
+test('run(): an installed manager never rescues a REFUSED verb with no target context (#699)', async () => {
+  // Order stands: the contextless-verb guard runs ahead of every dispatch, so a
+  // mutating verb is still refused before the manager is even resolved.
+  const { workDir, marker } = stageInstalledManager();
+  const runner = path.join(path.dirname(workDir), 'runner.js');
+  fs.writeFileSync(
+    runner,
+    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
+      + `.run({ hostName: '@omega.js/backend', hostRun: () => console.log('HOST-RAN') });`
+  );
+
+  const out = require('child_process').spawnSync(
+    process.execPath, [runner, 'deploy', '--yes'], { cwd: workDir, encoding: 'utf8' }
+  );
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false);
+  assert.match(out.stderr, /refusing to run "deploy"/);
+  assert.equal(fs.existsSync(marker), false, 'the manager CLI never started');
 });
 
 test('run(): host match executes hostRun (no dispatch)', async () => {

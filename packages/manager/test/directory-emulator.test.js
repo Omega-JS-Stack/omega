@@ -19,7 +19,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const os = require('node:os');
+const path = require('node:path');
 const jetpack = require('fs-jetpack');
+
+// The machine home is a temp dir for this file: the parent brand below is
+// registered in a REGISTRY, and a fixture line must never land in the
+// developer's own (#677).
+require('./lib/temp-home.js');
+
+const { recordBrand, resolveCompany } = require('@omega.js/config');
 
 const { OPERATIONS } = require('../src/config.js');
 const { encodeFields, decodeFields } = require('../src/lib/firestore-rest.js');
@@ -32,6 +40,18 @@ delete process.env.DIRECTORY_SERVICE_ACCOUNT;
 const PROJECT_ID = 'demo-omega-directory';
 const BRAND_ID = 'emulator-brand';
 const DOC_PATH = `brands/${BRAND_ID}`;
+const COMPANY_ID = 'parent-brand';
+
+// The parent this brand names, and the registry line the parent's own walk
+// writes (#677): `company: { id }` is the whole relationship, and the id
+// resolves through the machine registry rather than through a url.
+const BRAND_ROOT = jetpack.tmpDir({ prefix: 'omega-directory-emulator-brand-' }).cwd();
+const COMPANY_ROOT = jetpack.tmpDir({ prefix: 'omega-directory-emulator-company-' }).cwd();
+
+jetpack.write(path.join(COMPANY_ROOT, 'config', 'omega.json5'), JSON.stringify({
+  brand: { id: COMPANY_ID, name: 'Parent Brand', url: 'https://parent-brand.test' },
+}, null, 2));
+recordBrand({ id: COMPANY_ID, root: COMPANY_ROOT, name: 'Parent Brand', url: 'https://parent-brand.test' });
 
 // ─── The client under the service ────────────────────────────────────────────
 
@@ -91,23 +111,23 @@ function emulatorClient(port) {
 function brandConfig(guestPostPrice) {
   return {
     brand: { id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' },
-    parent: 'https://parent-brand.test',
+    company: { id: COMPANY_ID },
     directory: { enabled: true },
     cloud: { config: { projectId: 'emulator-brand-prod' } },
-    repo: { providers: { github: { org: 'emulator-org' } } },
+    repo: { provider: 'github', org: 'emulator-org' },
     sponsorships: {
       acceptable: ['tech'],
       unacceptable: ['gambling'],
       prices: { 'guest-post': guestPostPrice, 'link-insertion': 50 },
     },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
   };
 }
 
 function runService(config, db) {
   return service.run({
     brandId: BRAND_ID,
-    brandRoot: '/tmp/omega-manager-directory-emulator-unused',
+    brandRoot: BRAND_ROOT,
     brandConfig: config,
     brand: { id: BRAND_ID, config, enabledTargets: Object.keys(config.targets), targets: [] },
     targets: [],
@@ -117,6 +137,16 @@ function runService(config, db) {
     directoryDb: db,
   });
 }
+
+// ─── The fixture's own proof (no emulator) ───────────────────────────────────
+
+test('the fixture names its parent the way a brand does: company.id resolves through the registry (#677)', () => {
+  const company = resolveCompany(BRAND_ROOT, brandConfig(70));
+
+  assert.equal(company.id, COMPANY_ID);
+  assert.equal(company.root, COMPANY_ROOT, 'the registered parent root is what the resolver answers');
+  assert.equal(company.name, 'Parent Brand');
+});
 
 // ─── The lane ────────────────────────────────────────────────────────────────
 
@@ -147,7 +177,7 @@ test('directory: a config price change lands in the parent doc; an unchanged con
   let doc = await db.getDoc(DOC_PATH);
   assert.equal(doc.sponsorships.prices['guest-post'], 70);
   assert.deepEqual(doc.brand, { id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' });
-  assert.deepEqual(doc.github, { owner: 'emulator-org', name: `${BRAND_ID}-omega`, repo: `emulator-org/${BRAND_ID}-omega` });
+  assert.deepEqual(doc.github, { owner: 'emulator-org', name: `${BRAND_ID}-omega`, slug: `emulator-org/${BRAND_ID}-omega` });
   assert.equal(doc.orderCount, 7, 'the hub-owned field survived the push');
 
   // ── Second walk, unchanged config: zero writes, untouched document ────────

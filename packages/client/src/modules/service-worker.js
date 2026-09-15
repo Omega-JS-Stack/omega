@@ -55,7 +55,8 @@ class ServiceWorker {
       // Build config object to pass to service worker
       const config = {
         brand: this.manager.config.brand?.id,
-        environment: this.manager.config.environment,
+        // The ONE environment surface (#817), never the raw baked fact.
+        environment: this.manager.getEnvironment(),
         buildTime: this.manager.config.buildTime,
         firebase: this.manager._resolveFirebaseConfig()
       };

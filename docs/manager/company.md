@@ -1,64 +1,162 @@
-# The company workspace
+# The company
 
-> The COMPANY → BRAND rung: one workspace whose config, secrets, and signing material every brand it manages inherits. Two commands own it — `omega company init` makes the workspace, `omega company adopt` joins a brand to it. The runtime behavior (discovery, the per-brand fan-out, the child-process model) is in [packages/manager/README.md](../../packages/manager/README.md) § Company mode.
+> The COMPANY to BRAND rung: ONE key joins a brand to its company, and the company's shared config, secrets and signing material live in a `company/` folder inside the company brand's own repo. One resolver in `@omega.js/config` answers every question about it ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)).
 
-## What a company workspace IS
+## The one key
 
-A **repo, not a machine cache.** Machine-wide state stays in `~/.omega` (auth token caches, the per-machine deploy record); the company workspace is a directory you clone, commit, and share with the company's other machines. It owns exactly four things:
+A brand states its company OUTSIDE `brand` (Ian 2026-09-12: "brand key is for things about this brand, and the parent/company/organization key is OUTSIDE of that"), naming the parent by its own `brand.id`:
 
-| What | Where | Reaches a brand by |
+```json5
+company: { id: 'itw-creative-works' },                   // a sub-brand
+company: { id: 'self' },                                 // the company brand itself, kept visible on purpose
+company: { id: 'itw-creative-works', webhooks: false },  // ...whose provider ACCOUNT is somebody else's
+```
+
+The typed keys are the whole surface:
+
+| Key | Type | Default | What it says |
+|---|---|---|---|
+| `company.id` | string | none | The company this brand belongs to, by the parent's own `brand.id`, or the literal `'self'` on the company brand itself. Absent means the brand IS the whole entity |
+| `company.webhooks` | boolean | `true` | Whether the manage walk may repoint this company's provider ACCOUNT webhooks. `false` says the SendGrid Event Webhook and the Beehiiv webhook belong to someone else (a shared account whose one account-level webhook points at their production), so the campaigns and newsletter services leave them alone. It is the successor to the retired top-level `parent: false` ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)) |
+
+The loader FILLS the same key at load, so what a reader sees is:
+
+```js
+company: { id, name, url, images: { wordmark }, webhooks }
+```
+
+One name, one shape, at every level (the same-name doctrine, [../shared/rulings.md](../shared/rulings.md)). The name, url and wordmark come from the PARENT's own config, so no brand ever restates a fact its parent owns; `webhooks` is the brand's OWN statement and is read from its own file at every branch. A brand with no `company` key resolves to `{ id: null, name: brand.name, url: brand.url, images: {}, webhooks: true }`, so no reader anywhere carries a fallback: the footer credit, the email wordmark, the in-house ads api and the webhook topology all read one shape.
+
+The onboard and manage walks ask for `company.id` like any other field: joining a company is a single answer.
+
+## The company tree
+
+The company's shared files live in `company/`, INSIDE the company brand's repo, shaped like a brand:
+
+```
+itw-creative-works-omega/          # the company brand's own repo
+  config/omega.json5               # its OWN brand config (company: { id: 'self' })
+  company/
+    config/omega.json5             # the layer every brand of the company inherits
+    .env                           # the shared secrets
+    .omega/certificates/apple/     # the shared signing tree
+```
+
+Secrets and signing material inside it stay gitignored exactly as a brand's do.
+
+## Making one: `omega company init`
+
+One command, run INSIDE the company brand, the brand whose own config says
+`company: { id: 'self' }`. Anywhere else it refuses, because a tree in a brand that is not the
+company would never be read:
+
+```bash
+npx omega company init
+# → <brand root>/company/
+#   ✓ created config/omega.json5   the layer every brand of the company inherits
+#   ✓ created .gitignore           .env* and .omega/: the unshareable half, mirrored from the brand's rules
+#   ✓ created .env                 the shared secrets, in the same canonical shape a brand .env has
+#   ✓ created README.md
+#   ✓ created .omega/certificates/apple/certificates/   the shared Apple signing tree
+#   ✓ created .omega/certificates/apple/csr/
+#   ✓ created assets/templates/                         the shared PSD templates a brand seeds from
+```
+
+Fill-missing, like every OMEGA scaffold: a rerun creates what is missing and rewrites not one
+byte of what is there. The config layer it writes is brand-AGNOSTIC: commented placeholders
+for the sections a company usually owns (identity contact, `account.admins`, the GA account,
+the Sentry org, the Apple `bundleIdPrefix`) and nothing about the brand the folder sits inside.
+
+Joining is not a command: a brand types `company: { id }` in its own config, and `omega
+onboard` and the manage walk's workspace service both ASK for it, in the same words, when a
+brand carries none.
+
+### ITW, the worked example
+
+```
+itw-creative-works-omega/            # the company brand's repo, company: { id: 'self' }
+  config/omega.json5
+  .env                               # ITW's OWN brand secrets
+  company/
+    config/omega.json5               # the layer every ITW brand inherits
+    .env                             # GOOGLE_CLIENT_ID/_SECRET, GH_TOKEN, CLOUDFLARE_TOKEN,
+                                     # NAMECHEAP_*, RECAPTCHA_*, SENTRY_AUTH_TOKEN,
+                                     # SENDGRID_API_KEY, BEEHIIV_API_KEY, the Apple set
+    .omega/certificates/apple/       # the ONE Apple account that signs everything ITW ships
+    assets/templates/
+
+playground-omega/                    # a brand of it, company: { id: 'itw-creative-works' }
+  config/omega.json5
+```
+
+The playground's run resolves ITW through the registry, layers `company/config/omega.json5`
+under its own config, loads `company/.env` under its own `.env`, and signs from ITW's tree.
+Nothing is copied into the playground, and nothing is duplicated in its files.
+
+## Inheritance is ONE rule
+
+**A brand-level file the child lacks resolves from the company's `company/` at the same relative path.** That is the whole mechanism, and it is one function:
+
+```js
+const { resolveCompany } = require('@omega.js/config');
+
+const company = resolveCompany(brandRoot);
+company.file('.env');                                     // the shared secrets, or null
+company.file('config/hooks/account/password.js');         // a company-wide hook, or null
+company.file('.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12');
+```
+
+So a NEW kind of inherited file costs zero code (Ian: "I want it organized in a way so we could just add files, and they'll automatically be inherited"). Config and `.env` merge as LAYERS (company under brand, brand wins); everything else resolves by path.
+
+Today's consumers, all of them through that one function:
+
+| What | Where it resolves from | Who reads it |
 |---|---|---|
-| The config layer | `config/omega.json5` (the `brands` key is what MAKES it a company root) | the merge chain: manager DEFAULTS ← **company** ← brand ← `targets.<type>` ← local |
-| The shared secrets | `.env` | the env chain: shell env > brand `.env` > **company `.env`** |
-| The shared Apple signing tree | `.omega/certificates/apple/` | `signingRoot = companyRoot \|\| brandRoot` — the certificates + disperse services read the company's tree for every company-managed brand |
-| Where the brands are | `brands.roots` in that config (default `['./brands']`; `['..']` treats the workspace's siblings as brands) | company-wide runs (`omega manage` from the company root) |
+| The config layer | `company/config/omega.json5` | the merge chain: schema defaults, framework defaults, **company**, brand, `targets.<name>`, local ([../shared/config.md](../shared/config.md)) |
+| The shared secrets | `company/.env` | the env chain: shell, local `.env`, brand `.env`, **company `.env`** |
+| Owner hooks | `company/config/hooks/<point>.js` | the brand's own hook first, then the company's |
+| The Apple signing tree | `company/.omega/certificates/apple/` | the certificates walk and every desktop reader: ONE two-tier resolution ([#892](https://github.com/Omega-JS-Stack/omega/issues/892)) that READS the company tree first and the brand's own second, and WRITES every new CSR, `.cer` and `.p12` into the company tree. Nothing COPIES it out ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the desktop env load derives `CSC_LINK` and `APPLE_API_KEY` as absolute paths INTO the tree |
 
-A brand behaves IDENTICALLY everywhere — standalone, nested under `brands/`, or a loose sibling. The company layer only changes what defaults it inherits.
+**Resolved, never copied** (Ian: "RESOLVED at runtime, right? similar with certs"): the child's `.env` never receives company values, and the loaded environment has them.
 
-## The stamp is the whole link
+**The doctrine line:** a brand with a company reuses the company tree first, always.
 
-The reverse link needs no nesting and no registry: a brand carries `.omega/company.json` (`{ "root": "/abs/path/to/company" }`), and every brand-local run reads it, layers the company config (minus the `brands` key), loads the company `.env` under the brand's own, resolves the signing tree there, and prints a `Company:` line in its header. A marker pointing at something that is no longer a company root warns and the run continues standalone; no marker at all = standalone. That is the ONE mechanism — `omega company adopt` writes exactly this file, `omega onboard` writes it for brands it creates in a company, and a company-wide `omega manage` re-stamps every brand it discovers.
+## Where the company IS: the machine registry
 
-## `omega company init [path]`
+Membership is config; LOCATION is a cache. Every `loadConfig()` writes or refreshes its own brand's line in `~/.omega/brands.json`:
 
-Scaffolds the workspace in one command (default: the current directory). **Idempotent** — it fills gaps only and never overwrites a file that exists, so rerunning it after an edit is a byte-level no-op.
-
-```bash
-mkdir my-company && cd my-company
-npx omega company init          # or: npx omega company init ~/Developer/my-company
+```json5
+{
+  "itw-creative-works": { "root": "/Users/ian/Developer/.../itw-creative-works-omega", "name": "ITW Creative Works", "url": "https://itwcreativeworks.com", "updatedAt": "2026-09-12T10:00:00.000Z" }
+}
 ```
 
-What it writes:
+Nobody maintains it: run any omega verb inside a brand once and its line is there (a line whose root has vanished is pruned on the next write). `OMEGA_HOME` moves the home, which is how the test lanes keep fixtures out of a developer's real registry.
 
-| Path | What it is |
-|---|---|
-| `config/omega.json5` | The company layer: a real `brands: { roots: ['./brands'] }` plus commented, brand-agnostic placeholders for the sections a company usually owns (identity, `account.admins`, the GA account, the Sentry org, the Apple `bundleIdPrefix`) |
-| `.env` | The canonical group template with every key commented out — no values, no generated secrets (a brand's own `.env` always wins over this file) |
-| `.gitignore` | The tracking decisions below |
-| `README.md` | A short stub: what's here, and the verbs |
-| `.omega/certificates/apple/{certificates,csr,profiles}/` | The shared signing tree, created empty — the App Store Connect `AuthKey_*.p8` goes at its root. Carries its own self-protecting `.gitignore` (`*`) so signing material can never be committed even if the tree is copied elsewhere |
-| `brands/` | The default `brands.roots` entry, created empty |
+Every manage run states the answer in its header, always: membership is a fact of the brand, and "none" is an answer:
 
-**Tracked vs ignored.** The repo tracks the config skeleton, the README, and the `.gitignore` — the shareable half. Ignored: `.env` (secrets), `.omega/` (the signing tree's `.p8`/`.p12`/CSR private keys, plus run output and caches), `logs/`, and `brands/` — each managed brand is its OWN git repo and must never be embedded in this one. Signing material moves between machines out of band, never through git; the certificates service re-downloads or recreates what it can, and preserves the CSR private key that pairs with each issued certificate.
-
-## `omega company adopt <brand-path>`
-
-Run from anywhere inside the company workspace. Adoption is the ONE step a brand needs:
-
-```bash
-npx omega company adopt brands/acme      # or any path: ../acme, /abs/path/to/acme
+```
+  Company:  itw-creative-works (/Users/ian/Developer/.../itw-creative-works-omega)
+  Company:  itw-creative-works (not on this machine)
+  Company:  none
 ```
 
-It writes the brand's `.omega/company.json` and nothing else. Idempotent: a marker already pointing here is left untouched. It refuses what would be wrong rather than guessing — a cwd that is not a company root, a path with no `config/omega.json5`, or a path that is itself a company workspace (the hierarchy is one rung: company → brands). A brand outside `brands.roots` is still stamped — its own runs inherit the company — but the command warns that company-wide runs won't include it until its parent dir joins `brands.roots`.
+A company that is not on this machine also prints ONE line per run and keeps going with no company layer:
 
-New brands need no adopt step: `omega onboard` from a company root lands the brand under `brands.roots[0]` and stamps it in the same pass.
-
-## After adoption
-
-```bash
-npx omega manage                  # from the company root: the full walk, once per brand (child process each)
-npx omega manage --brand=acme     # one brand
-npx omega manage --parallel       # every brand concurrently
+```
+Company itw-creative-works is not on this machine: inheritance off. Clone it and run any omega verb inside it once.
 ```
 
-Brand-local runs need nothing new — `npm run manage` inside an adopted brand already layers the company. See [packages/manager/README.md](../../packages/manager/README.md) § Company mode for the fan-out mechanics, the per-brand log tee, and why children are processes; [../shared/config.md](../shared/config.md) for the merge chain itself.
+## Off-laptop: the machine that dispatches resolves, the runner receives
+
+No runner ever reads `company/`. A deploy resolves the company on the developer's machine and writes ONE generated file beside the brand config, which the mirror push carries and then removes:
+
+```
+config/company-resolved.json5    // { config: <the company layer>, company: { id, name, url, images } }
+```
+
+The loader reads it when the registry has no line, so a runner gets exactly what the dispatching machine resolved (it is `config/company-resolved.json5`, beside the brand config, because every brand ignores `.omega/` whole and git cannot re-include a path under an excluded directory). The env half needs nothing: the deploy precheck's secrets push sends the COMPOSED target env (company, then brand, then target) as that repo's own secrets, so the company's `.env` values are already there.
+
+## Extending it later
+
+The resolver is the only seam (Ian: "is it easily extendible"). Swapping where `root` and `file()` come from (a fetched parent backend, a secret store, multi-level chains) touches no consumer.

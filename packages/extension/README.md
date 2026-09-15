@@ -41,7 +41,7 @@
    ```
 3. Open Chrome and navigate to `chrome://extensions`.
 4. Enable **Developer mode**.
-5. Click **Load unpacked** and select the `packaged/chromium/raw` folder in your project.
+5. Click **Load unpacked** and select the `packaged/chrome/raw` folder in your project.
 6. Your extension is loaded and live-reloads on source changes.
 
 ## 📦 Sync with the template
@@ -119,22 +119,35 @@ Upload the `.zip` files under `packaged/<browser>/` to each browser's extension 
 OMEGA_IS_PUBLISH=true npm run build
 ```
 
-Add store credentials to your `.env`:
+Each store's own listing ID is public, so it lives in `config/omega.json5`
+beside that listing's url:
+
+```json5
+targets: {
+  extension: {
+    type: 'extension',
+    listings: {
+      chrome:  { id: '...' },
+      firefox: { id: 'extension@yourbrand.com' },
+      edge:    { id: '...' },
+    },
+  },
+},
+```
+
+Add the store API credentials to your `.env`:
 
 ```bash
 # Chrome Web Store
-CHROME_EXTENSION_ID="..."
 CHROME_CLIENT_ID="..."
 CHROME_CLIENT_SECRET="..."
 CHROME_REFRESH_TOKEN="..."
 
 # Firefox Add-ons
-FIREFOX_EXTENSION_ID="..."
 FIREFOX_API_KEY="..."
 FIREFOX_API_SECRET="..."
 
 # Microsoft Edge Add-ons
-EDGE_PRODUCT_ID="..."
 EDGE_CLIENT_ID="..."
 EDGE_API_KEY="..."
 ```

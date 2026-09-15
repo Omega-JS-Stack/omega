@@ -15,7 +15,7 @@ const { test } = require('node:test');
 
 const { resolveWebsitePort, websiteWantedPort, devPortsOption, devWebsiteOrigin } = require('../src/commands/dev.js');
 const { writePortsFile, readPortsFile } = require('@omega.js/config');
-const { buildWith, miniData } = require('./lib/build.js');
+const { buildWith, readBuildJson, runBuildJs, miniData } = require('./lib/build.js');
 
 function occupy(port) {
   return new Promise((resolve) => {
@@ -72,23 +72,26 @@ test('config ports.website pins', async () => {
   assert.equal(bumped, false);
 });
 
-// ---- websiteWantedPort (multi-instance offsets — deterministic, no binding)
+// ---- websiteWantedPort (per-target offsets: deterministic, no binding)
 
-test('websiteWantedPort: each instance wants base + its array position, side-by-side capable', () => {
-  // 2-instance web brand: targets/website (main) + targets/website-admin
-  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-instances-'));
+test('websiteWantedPort: each web target wants base + its position among the web targets (#886)', () => {
+  // A brand running two NAMED web targets: targets/web + targets/admin
+  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-named-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{
     brand: { id: 'acme', name: 'Acme' },
-    targets: { web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.acme.test' }] },
+    targets: {
+      web: { type: 'web' },
+      admin: { type: 'web', url: 'https://admin.acme.test' },
+    },
   }`);
-  const website = path.join(brand, 'targets', 'website');
-  const admin = path.join(brand, 'targets', 'website-admin');
-  fs.mkdirSync(website, { recursive: true });
+  const web = path.join(brand, 'targets', 'web');
+  const admin = path.join(brand, 'targets', 'admin');
+  fs.mkdirSync(web, { recursive: true });
   fs.mkdirSync(admin, { recursive: true });
 
-  assert.equal(websiteWantedPort(website), 4000, 'main stays on the classic base');
-  assert.equal(websiteWantedPort(admin), 4001, 'admin offsets by its instances-array position');
+  assert.equal(websiteWantedPort(web), 4000, 'the first web target stays on the classic base');
+  assert.equal(websiteWantedPort(admin), 4001, 'admin offsets by its position among the web targets');
 
   // Env-derived base carries the offset too
   process.env.OMEGA_WEBSITE_PORT = '42840';
@@ -99,17 +102,17 @@ test('websiteWantedPort: each instance wants base + its array position, side-by-
   }
 });
 
-test('websiteWantedPort: single-object brands and config-less dirs stay on the classic base (zero breaking change)', () => {
+test('websiteWantedPort: a one-web-target brand and config-less dirs stay on the classic base', () => {
   const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-single-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{
     brand: { id: 'acme', name: 'Acme' },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   }`);
-  const website = path.join(brand, 'targets', 'website');
-  fs.mkdirSync(website, { recursive: true });
+  const web = path.join(brand, 'targets', 'web');
+  fs.mkdirSync(web, { recursive: true });
 
-  assert.equal(websiteWantedPort(website), 4000);
+  assert.equal(websiteWantedPort(web), 4000);
   assert.equal(websiteWantedPort(os.tmpdir()), 4000, 'no config → classic base, never a dev-loop failure');
 });
 
@@ -124,7 +127,7 @@ function bumpedBrand(ports) {
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), '{}');
   const backend = path.join(brand, 'targets', 'backend');
-  const website = path.join(brand, 'targets', 'website');
+  const website = path.join(brand, 'targets', 'web');
   fs.mkdirSync(path.join(backend, '.temp'), { recursive: true });
   fs.mkdirSync(path.join(website, '.temp'), { recursive: true });
   const publish = (map) => fs.writeFileSync(path.join(backend, '.temp', 'ports.json'), JSON.stringify({
@@ -134,24 +137,30 @@ function bumpedBrand(ports) {
   return { brand, backend, website, publish };
 }
 
-test('devPortsOption: the backend map merges OVER the website\'s own, re-read on every call (#300)', () => {
+test('devPortsOption: the classic floor, the backend map over it, this server\'s port on top (#300, #834)', () => {
+  const { CLASSIC_PORTS } = require('@omega.js/config');
   const { website, publish } = bumpedBrand({ auth: 9100, firestore: 8081, hosting: 5003 });
 
   const dev = devPortsOption(website, 4001, 'https://localhost:4001');
   assert.deepEqual(dev(), {
-    ports: { auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
+    // The classic map is the FLOOR, from @omega.js/config
+    // ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)): nothing in
+    // the browser carries a copy of these numbers any more, so a page always
+    // receives a COMPLETE map, with the live stack's resolved numbers over it.
+    ports: { ...CLASSIC_PORTS, auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
     origin: 'https://localhost:4001',
     authEmulatorProxy: true,
-  }, 'the sibling backend map rides along with this server\'s own port');
+  }, 'the sibling backend map rides over the classics, under this server\'s own port');
 
   // The emulator restarted onto different numbers — the NEXT read carries them
   // (a boot-time read would still be handing out 9100 here)
   publish({ auth: 9200, firestore: 8181, hosting: 5103 });
-  assert.deepEqual(dev().ports, { auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
+  assert.deepEqual(dev().ports, { ...CLASSIC_PORTS, auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
 
-  // A website-only dev session still publishes its own port, never a stale guess
+  // A website-only dev session publishes its own port over the classic floor,
+  // never a stale guess and never a hole for the browser to assume through
   const standalone = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-standalone-'));
-  assert.deepEqual(devPortsOption(standalone, 4000, 'http://localhost:4000')().ports, { website: 4000 });
+  assert.deepEqual(devPortsOption(standalone, 4000, 'http://localhost:4000')().ports, { ...CLASSIC_PORTS, website: 4000 });
 });
 
 test('the dev website ORIGIN is a resolved fact: published beside the map, carried in the chrome (#262)', () => {
@@ -173,28 +182,32 @@ test('the dev website ORIGIN is a resolved fact: published beside the map, carri
   assert.deepEqual(readPortsFile(website), { website: 4001 }, 'the port map reads back unchanged');
 });
 
-test('the rendered dev page carries the BUMPED emulator ports, refreshed per render (#300)', async () => {
+test('the built dev snapshot carries the BUMPED emulator ports, refreshed per build (#300)', async () => {
   const { website, publish } = bumpedBrand({ auth: 9100, firestore: 8081, hosting: 5003 });
   const dev = devPortsOption(website, 4001);
 
-  const first = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-render-1');
-  const html = first.get('/');
-  assert.ok(html, 'the dev page rendered');
-  const baked = JSON.parse(html.match(/dev: (\{.*?\}),\n/s)[1]);
-  assert.deepEqual(baked.ports, { auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
-    'the browser is handed the map of the stack that is ACTUALLY running');
+  const { CLASSIC_PORTS } = require('@omega.js/config');
 
-  // Emulator restart between renders: the next render bakes the new numbers,
-  // because the ports file is read at render time and not once at boot
+  const first = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-render-1');
+  assert.ok(first.get('/'), 'the dev page rendered');
+  assert.deepEqual(buildChrome(first).ports, { ...CLASSIC_PORTS, auth: 9100, firestore: 8081, hosting: 5003, website: 4001 },
+    'the browser is handed the map of the stack that is ACTUALLY running, over the classic floor (#834)');
+
+  // Emulator restart between builds: the next build writes the new numbers,
+  // because the ports file is read on the way in and not once at boot
   publish({ auth: 9200, firestore: 8181, hosting: 5103 });
   const second = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-render-2');
-  const rebaked = JSON.parse(second.get('/').match(/dev: (\{.*?\}),\n/s)[1]);
-  assert.deepEqual(rebaked.ports, { auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
+  assert.deepEqual(buildChrome(second).ports, { ...CLASSIC_PORTS, auth: 9200, firestore: 8181, hosting: 5103, website: 4001 });
 });
 
-/** The dev chrome a page carries, read back out of its Configuration block. */
-function pageChrome(html) {
-  return JSON.parse(html.match(/dev: (\{.*?\}),\n/s)[1]);
+/** The dev chrome a BUILD wrote, read back out of its /build.js (#743). */
+function buildChrome(pages) {
+  return readBuildJson(pages).config.dev;
+}
+
+/** The dev chrome a SERVED build.js carries, read the way a browser runs it. */
+function servedChrome(source) {
+  return runBuildJs(source).config.dev;
 }
 
 /**
@@ -233,19 +246,21 @@ function devServer(name, outDir, port, dev) {
   return server;
 }
 
-test('boot order website-then-backend: the SERVED page carries the backend map, no re-render in between (#346)', async (t) => {
+test('boot order website-then-backend: the SERVED /build.js carries the backend map, no rebuild in between (#346)', async (t) => {
+  const { CLASSIC_PORTS } = require('@omega.js/config');
   const { website, publish } = bumpedBrand(null);
   const port = 42850;
   const dev = devPortsOption(website, port);
 
   // The website build finishes in under a second while the backend seeds for
-  // minutes, so every page of the initial build bakes the website-only map
+  // minutes, so the snapshot it writes carries the website-only map
   const pages = await buildWith(miniData, { environment: 'development', dev }, 'dev-ports-serve');
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-serve-'));
-  const index = path.join(out, 'index.html');
-  fs.writeFileSync(index, pages.get('/'));
-  assert.deepEqual(pageChrome(fs.readFileSync(index, 'utf8')).ports, { website: port },
-    'the bake is stale by construction — the emulator suite came up after it');
+  const buildJs = path.join(out, 'build.js');
+  fs.writeFileSync(buildJs, pages.get('/build.js'));
+  fs.writeFileSync(path.join(out, 'index.html'), pages.get('/'));
+  assert.deepEqual(servedChrome(fs.readFileSync(buildJs, 'utf8')).ports, { ...CLASSIC_PORTS, website: port },
+    'the written snapshot is stale by construction: the emulator suite came up after it, so only the classic floor is under this server\'s own port');
 
   // The REAL dev server, handed the REAL options object the dev loop builds:
   // a rewrite that only works outside eleventy's response wrapper (the one
@@ -253,35 +268,39 @@ test('boot order website-then-backend: the SERVED page carries the backend map, 
   const server = devServer('dev-ports-346', out, port, dev);
   t.after(() => server.close());
 
-  // The emulator suite lands, minutes in: no file changed under src/, so no
-  // page ever re-renders — and the very next request still carries the map
+  // The emulator suite lands, minutes in: nothing changed under src/, so no
+  // rebuild ever runs, and the very next request for thefile carries the map
   publish({ auth: 9100, firestore: 8081, hosting: 5003 });
-  const served = await navigate(port, '/');
-  assert.deepEqual(pageChrome(served), {
-    ports: { auth: 9100, firestore: 8081, hosting: 5003, website: port },
+  const served = await navigate(port, '/build.js');
+  assert.deepEqual(servedChrome(served), {
+    ports: { ...CLASSIC_PORTS, auth: 9100, firestore: 8081, hosting: 5003, website: port },
     authEmulatorProxy: true,
-  }, 'the served page is handed the stack that is ACTUALLY running');
-  assert.ok(served.includes('/.11ty/reload-client.js'), 'the live-reload injection still lands on top of the rewrite');
+  }, 'the served snapshot is handed the stack that is ACTUALLY running');
 
   // Mid-session emulator restart onto bumped numbers — same story, next request
   publish({ auth: 9200, firestore: 8181, hosting: 5103 });
-  assert.deepEqual(pageChrome(await navigate(port, '/')).ports, { auth: 9200, firestore: 8181, hosting: 5103, website: port });
+  assert.deepEqual(servedChrome(await navigate(port, '/build.js')).ports,
+    { ...CLASSIC_PORTS, auth: 9200, firestore: 8181, hosting: 5103, website: port });
 
-  // The bake is ADVISORY: dist on disk is byte-for-byte what the build wrote
-  assert.deepEqual(pageChrome(fs.readFileSync(index, 'utf8')).ports, { website: port });
+  // The page is untouched by the rewrite, and still gets eleventy's live-reload
+  const page = await navigate(port, '/');
+  assert.ok(page.includes('/.11ty/reload-client.js'), 'a page is served as it was built, live-reload and all');
+
+  // The written file is ADVISORY: dist on disk is byte-for-byte what the build wrote
+  assert.deepEqual(servedChrome(fs.readFileSync(buildJs, 'utf8')).ports, { ...CLASSIC_PORTS, website: port });
 });
 
-test('the serve-time rewrite is the page chrome only: no asset, no chrome-less page (#346)', async (t) => {
+test('the serve-time rewrite is /build.js only: no asset, no page (#346)', async (t) => {
   const { website } = bumpedBrand({ auth: 9100 });
   const port = 42860;
   const dev = devPortsOption(website, port);
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-untouched-'));
 
-  // A page with no Configuration block (a redirect stub) and a js bundle whose
-  // SOURCE happens to read like the chrome — content type is all that stands
-  // between it and a rewrite
+  // A page (a redirect stub) and a js bundle whose SOURCE reads exactly like
+  // the snapshot's dev statement: the PATH is all that stands between them and
+  // a rewrite, so a bundle that quotes it is served verbatim.
   const stub = '<!doctype html>\n<html><head><meta http-equiv="refresh" content="0; url=/signin"></head><body></body></html>\n';
-  const bundle = 'const config = {\n    dev: {"ports":{"website":1}},\n  };\nexport default config;\n';
+  const bundle = 'self.OMEGA_BUILD_JSON.config.dev = {"ports":{"website":1}};\nexport default {};\n';
   fs.writeFileSync(path.join(out, 'redirect.html'), stub);
   fs.mkdirSync(path.join(out, 'assets', 'js'), { recursive: true });
   fs.writeFileSync(path.join(out, 'assets', 'js', 'main.js'), bundle);
@@ -292,13 +311,19 @@ test('the serve-time rewrite is the page chrome only: no asset, no chrome-less p
   assert.equal(await navigate(port, '/assets/js/main.js'), bundle, 'a js bundle is served verbatim');
   const served = await navigate(port, '/redirect');
   assert.equal(served.replace(/<script type="module" integrity=[^>]+><\/script>/, ''), stub,
-    'a chrome-less page is its own markup plus eleventy\'s live-reload script, and nothing else');
+    'a page is its own markup plus eleventy\'s live-reload script, and nothing else');
 });
 
-test('a production build bakes no dev chrome at all', async () => {
+test('a production build writes no dev chrome at all', async () => {
   const pages = await buildWith(miniData, { environment: 'production' }, 'dev-ports-render-prod');
-  // Minified output — the chrome is `dev:null`, so no port map can ever ship
-  assert.ok(pages.get('/').includes('environment:"production",dev:null,'));
+  const buildJson = readBuildJson(pages);
+
+  assert.equal(buildJson.config.environment, 'production');
+  // The statement is always there, so the shape is one shape everywhere and the
+  // serve-time rewrite has one line to find; `null` is what a build with no
+  // local stack writes, and no port map can ever ship in it.
+  assert.ok(pages.get('/build.js').includes('self.OMEGA_BUILD_JSON.config.dev = null;'));
+  assert.equal(buildJson.config.dev, null);
 });
 
 test('devServerOptions: auth-emulator proxy + clean-url + image fallback middleware + live-reload watch on the built asset trees', () => {

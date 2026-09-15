@@ -16,7 +16,7 @@ publication webhook pointed at the parent backend's forwarder.
   matches subscriber values by DISPLAY name, so fields are diffed by `display`; a kind
   mismatch is a delete + recreate.
 - **`segments`** — Beehiiv has NO segment-create API. The read side lists what exists;
-  interactive runs offer to drive the dashboard UI through the companion Chrome extension
+  interactive runs offer to drive the dashboard UI through the OMEGA Companion extension
   (trusted-event browser automation) or to open the dashboard for manual creation, then
   RE-verify against the API so "created" means Beehiiv says so. Non-interactive and dry runs
   never mutate: missing segments warn with human-readable conditions.
@@ -34,7 +34,8 @@ Fields and segments `@omega.js/backend` does not own are never touched.
 | `marketing.newsletter.enabled: false` | Skip. |
 | `marketing.newsletter.providers.beehiiv` | The vendor is a KEY under `providers` — no entry, no service. |
 | `marketing.newsletter.providers.beehiiv.publicationId` | The publication; written back when resolved. |
-| `parent` | Whose backend the webhook points at (`'self'` for the parent brand). |
+| `company.id` | Whose backend the webhook points at: the RESOLVED `company.url`, which is this brand's own url when it names no company ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)). |
+| `company.webhooks: false` | The one deliberate opt-out: the provider ACCOUNT is shared and its single account-level webhook belongs to somebody else, so the walk leaves it alone. |
 
 **Credentials**: `BEEHIIV_API_KEY` in the brand `.env`; `OMEGA_WEBHOOK_KEY` is minted by the
 setup contract, never asked for.

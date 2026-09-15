@@ -16,7 +16,7 @@ const { configureOmega } = require('./engine.js');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { emitLanguageFlags } = require('./language-flags.js');
 const { resolveThemeLayers } = require('./layers.js');
-const { getEnvironment } = require('./mode-helpers.js');
+const { getEnvironment, setEnvironment } = require('@omega.js/config/environment');
 const { PATHS } = require('./paths.js');
 
 /**
@@ -26,7 +26,8 @@ const { PATHS } = require('./paths.js');
  * @param {object} options.siteData - raw site data (resolved omega config shape)
  * @param {string} options.outDir - output dir (cleared first)
  * @param {string} options.clientEntry - @omega.js/client entry for the `@omega.js/client` esbuild alias
- * @param {string} [options.version] - the consumer package version (build meta / service worker, and the Configuration block the client reads)
+ * @param {string} [options.version] - the consumer package version (build meta / service worker, and the OMEGA_BUILD_JSON bake the client reads)
+ * @param {string} [options.packageName] - the consumer package name (the bake's `package` block, #894)
  * @param {string} [options.siteAssetsDir] - the consumer's own asset layer (js/pages page modules)
  * @param {string} [options.themesDir] - default: packaged themes
  * @param {string} [options.coreDir] - default: packaged core
@@ -44,10 +45,12 @@ const { PATHS } = require('./paths.js');
  * @returns {Promise<{ timings: object, htmlCount: number, manifest: object, pathPrefix: string }>}
  */
 async function buildSite(options) {
-  // The environment (#717): resolved ONCE here, from the one surface, and
-  // handed to both emit lanes below — the build meta and the engine read the
-  // same answer instead of each re-testing a loose `options.environment`.
-  const environment = getEnvironment.call(options);
+  // The environment (#717, one module since
+  // [#817](https://github.com/Omega-JS-Stack/omega/issues/817)): a lane that
+  // named one (`omega build` is production, `omega dev` is development) makes
+  // it THE input for this process, and everything downstream reads that one
+  // answer instead of each re-testing a loose `options.environment`.
+  const environment = options.environment ? setEnvironment(options.environment) : getEnvironment();
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
@@ -97,7 +100,8 @@ async function buildSite(options) {
     fs.writeFileSync(options.manifestPath, JSON.stringify(manifest, null, 2));
   }
 
-  // ---- service worker + build meta: /service-worker.js, /build.js, /build.json
+  // ---- service worker + build meta: /service-worker.js, /build.json
+  //      (/build.js is the engine's, written on the way into the Eleventy run)
   await phase('service-worker', async () => {
     writeBuildMeta({
       siteData: options.siteData,
@@ -160,6 +164,7 @@ async function buildSite(options) {
           assetManifest: manifest,
           environment,
           version: options.version,
+          packageName: options.packageName,
           pathPrefix,
           license: options.license,
         }),

@@ -2,7 +2,7 @@
  * Test: POST /admin/post
  * Tests the admin create post endpoint
  * Creates blog posts via GitHub with image extraction and @post/ body rewriting
- * Requires admin/blogger role, GitHub API key, and a resolvable github repo (targets.backend.github.repo slug or repo.providers.github.org + brand.id)
+ * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
  */
 const { Octokit } = require('@octokit/rest');
 const sharp = require('sharp');
@@ -117,14 +117,15 @@ module.exports = defineCases({
           return;
         }
 
-        const { brandRepoOwner, brandRepoName } = require('../../helpers/_shared-config.js');
-        if (!brandRepoOwner(config) || !brandRepoName(config)) {
-          assert.fail('github repo not resolvable (targets.backend.github.repo slug or repo.providers.github.org + brand.id)');
+        const { sourceRepo } = require('../../helpers/_shared-config.js');
+        const source = sourceRepo(config);
+        if (!source) {
+          assert.fail('source repo not resolvable (set repo.org + brand.id)');
           return;
         }
 
         // Parse owner/repo for cleanup later
-        const repoMatch = [null, brandRepoOwner(config), brandRepoName(config)];
+        const repoMatch = [null, source.owner, source.name];
 
         state.owner = repoMatch[1];
         state.repo = repoMatch[2];

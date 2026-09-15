@@ -7,11 +7,12 @@
  * the copy drifted from the real merge rules. The framework runs the recipe at
  * boot and publishes the finished value at `config.resolved.github`.
  *
- * Two things are pinned: the exposed value obeys the REAL merge semantics
- * (a composed config, loaded by the real loader, with and without the backend
- * target's `github.repo` override), and it IS @omega.js/config's own derivation
- * rather than a second implementation living here. The booted Manager carries
- * the group, which is the surface consumer code actually reads.
+ * Two things are pinned: the exposed value is the SOURCE repo the one `repo`
+ * block derives ([#883](https://github.com/Omega-JS-Stack/omega/issues/883):
+ * `<brand.id>-omega` under `repo.org`, loaded by the real loader), and it IS
+ * @omega.js/config's own derivation rather than a second implementation living
+ * here. The booted Manager carries the group, which is the surface consumer
+ * code actually reads.
  *
  * Run: npx omega test backend:helpers/resolved-config
  */
@@ -19,18 +20,18 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const { resolvedConfigValues } = require('../../dist/manager/helpers/resolved-config.js');
-const { loadConfig, brandRepo } = require('./_shared-config.js');
+const { loadConfig, sourceRepo } = require('./_shared-config.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A real brand config on disk, composed through the real backend loader — the
 // target overlay is the half of the rule no hand-built object proves.
-function composeBrandConfig(targetsBackend) {
+function composeBrandConfig(targetsBackend, repo) {
   const root = jetpack.tmpDir({ prefix: 'resolved-config-' }).path();
 
   jetpack.write(path.join(root, 'config', 'omega.json5'), `{
     brand: { id: 'acme' },
-    repo: { providers: { github: { org: 'Acme-Org' } } },
-    targets: { backend: ${JSON.stringify(targetsBackend)} },
+    ${repo === null ? '' : `repo: ${JSON.stringify(repo || { provider: 'github', org: 'Acme-Org' })},`}
+    targets: { backend: ${JSON.stringify({ type: 'backend', ...targetsBackend })} },
   }`);
 
   try {
@@ -46,7 +47,7 @@ module.exports = defineCases({
 
   tests: [
     {
-      name: 'github-repo-slug-derives-from-the-shared-provider-block',
+      name: 'the-source-repo-derives-from-the-one-repo-block',
       auth: 'none',
 
       async run({ assert }) {
@@ -55,23 +56,19 @@ module.exports = defineCases({
         assert.deepEqual(resolvedConfigValues(config).github, {
           owner: 'Acme-Org',
           name: 'acme-omega',
-          repo: 'Acme-Org/acme-omega',
+          slug: 'Acme-Org/acme-omega',
         });
       },
     },
 
     {
-      name: 'backend-target-github-override-wins',
+      name: 'no-repo-block-is-null-never-half-an-address',
       auth: 'none',
 
       async run({ assert }) {
-        const config = composeBrandConfig({ github: { repo: 'itw-creative-works/acme-content' } });
-
-        assert.deepEqual(resolvedConfigValues(config).github, {
-          owner: 'itw-creative-works',
-          name: 'acme-content',
-          repo: 'itw-creative-works/acme-content',
-        });
+        // #883: a brand that declares no org has no content repo, and the CMS
+        // routes answer "GitHub repo not configured" off exactly this value.
+        assert.equal(resolvedConfigValues(composeBrandConfig({}, null)).github, null);
       },
     },
 
@@ -82,11 +79,11 @@ module.exports = defineCases({
       async run({ assert }) {
         // The whole point of #290: ONE implementation, in @omega.js/config. If
         // this ever diverges, a second copy of the rule has grown here.
-        for (const targetsBackend of [{}, { github: { repo: 'itw-creative-works/acme-content' } }]) {
-          const config = composeBrandConfig(targetsBackend);
+        for (const repo of [undefined, { provider: 'github', org: 'Other-Org' }]) {
+          const config = composeBrandConfig({}, repo);
 
-          assert.deepEqual(resolvedConfigValues(config).github, brandRepo(config),
-            `resolved.github must equal @omega.js/config's brandRepo() (targets.backend: ${JSON.stringify(targetsBackend)})`);
+          assert.deepEqual(resolvedConfigValues(config).github, sourceRepo(config),
+            `resolved.github must equal @omega.js/config's sourceRepo() (repo: ${JSON.stringify(repo)})`);
         }
       },
     },
@@ -96,10 +93,9 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert, Manager }) {
-        // The surface consumer code reads: `Manager.config.resolved.github.repo`
+        // The surface consumer code reads: `Manager.config.resolved.github.slug`
         // on the config object every route/hook/cron already receives.
-        assert.equal(typeof Manager.config.resolved.github.repo, 'string', 'the booted config must carry resolved.github.repo');
-        assert.deepEqual(Manager.config.resolved.github, brandRepo(Manager.config), 'the booted value must be the config package derivation');
+        assert.deepEqual(Manager.config.resolved.github, sourceRepo(Manager.config), 'the booted value must be the config package derivation');
       },
     },
   ],

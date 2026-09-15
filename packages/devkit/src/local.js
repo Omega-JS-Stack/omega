@@ -1549,6 +1549,34 @@ function healFailedMessage(result) {
 }
 
 /**
+ * Leave the #350 prepare gate wired on a package this process just prepared
+ * ([#870](https://github.com/Omega-JS-Stack/omega/issues/870)). prepare-package
+ * rewrites `scripts.prepare` to its own UNGUARDED string on the way through, and
+ * a heal that left it there hands a consumer install the door back. The prepare
+ * script restores it in a `finally`, so this is the net for the case a finally
+ * cannot reach: a prepare killed outright, or one that never ran the gate at all.
+ * The guard is loaded from the devkit BESIDE the prepared package, the same hop
+ * the gated script's own relative require makes, and its path is built at runtime
+ * rather than written as a literal specifier, because devkit's vendored copies
+ * carry `src/` only and a relative require of `tools/` would send the vendor walk
+ * outside the module root.
+ * @param {object} options
+ * @param {string} options.monorepoRoot - The monorepo containing the package.
+ * @param {string} options.packageDir - The package that was prepared.
+ * @returns {boolean} Whether the manifest holds the gate now (true when the
+ *   checkout carries no guard to enforce).
+ */
+function keepPrepareGuarded(options) {
+  const { monorepoRoot, packageDir } = options;
+  const guardPath = path.join(monorepoRoot, 'packages', 'devkit', 'tools', 'prepare-guard.js');
+  if (!fs.existsSync(guardPath)) {
+    return true;
+  }
+
+  return require(guardPath).ensureGuarded({ packageDir }).guarded;
+}
+
+/**
  * Check that a locally-linked framework's dist is at least as new as its src —
  * reporting or rebuilding it when a src edit landed without a prepare, so
  * consumers never run stale dist code just because nobody remembered to
@@ -1661,6 +1689,10 @@ function ensureFreshLocalDist(options) {
       stdio: 'inherit',
       shell: process.platform === 'win32',
     });
+
+    // Whatever that prepare did, it does not get to leave the gate off (#870)
+    const guarded = inMonorepo ? keepPrepareGuarded({ monorepoRoot, packageDir: realDir }) : true;
+
     if (result.status !== 0) {
       const failure = `npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status}`;
       if (inMonorepo) {
@@ -1671,6 +1703,21 @@ function ensureFreshLocalDist(options) {
       console.warn(`omega: rebuild failed (${failure} in ${realDir}) — continuing on the stale dist`);
       return { status: 'rebuild-failed', packageName, dir: realDir };
     }
+
+    // A prepare that ended with the gate off hands a consumer install the #350
+    // door back, so a heal that could not put it back is a FAILED heal like any
+    // other: the boot stops on it rather than running on an ungated package.
+    if (!guarded) {
+      return {
+        status: 'heal-failed',
+        packageName,
+        dir: realDir,
+        reason,
+        failure: 'npm run prepare left scripts.prepare off the #350 gate',
+        monorepoRoot,
+      };
+    }
+
     return { status: 'rebuilt', by: 'self', packageName, dir: realDir };
   });
 }

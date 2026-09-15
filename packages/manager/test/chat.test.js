@@ -34,7 +34,7 @@ const OWNER_UID = 'uid_owner1';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ chatsy = {}, targets = { web: {}, backend: {} }, images = { brandmark: BRANDMARK }, products, features } = {}) {
+function brandConfig({ chatsy = {}, targets = { web: { type: 'web' }, backend: { type: 'backend' } }, images = { brandmark: BRANDMARK }, products, features } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: URL, description: DESCRIPTION, images },
     features: features,
@@ -236,9 +236,17 @@ test('chat: a shared agent managed by another brand skips the service', async ()
 });
 
 test('chat: skips without a web target (the widget lives on the website)', async () => {
-  const result = await runService(brandConfig({ targets: { backend: {} } }), { db: fakeDb() });
+  const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /no web target/);
+});
+
+// The gate is by TYPE (#886): a brand may name its web target anything
+test('chat: a web target named `site` runs the service, key spelling is not the gate', async () => {
+  const config = brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } });
+  const result = await runService(config, { db: fakeDb(convergedResponses(config)) });
+
+  assert.notEqual(result.status, 'skipped');
 });
 
 test('chat: skips without chatsy.agentId', async () => {

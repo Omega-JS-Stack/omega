@@ -87,7 +87,7 @@ npx omega logs test --lines=100 # last 100 lines of the previous test run
 npx omega logs build --path     # just the path, for piping
 ```
 
-Anything else fails naming the four surfaces. (The four files themselves are described in the lifetime table below; `ci.log` and `signing.log` are not tail targets.)
+Anything else fails naming the four surfaces. (The four files themselves are described in the lifetime table below; `deploy.log` and `signing.log` are not tail targets.)
 
 `mgr logs` only resolves the dev path (`<cwd>/logs/<surface>.log`). To find the production runtime log on a user's machine, use the table above or call `getLogFilePath()` from app code.
 
@@ -173,7 +173,7 @@ window "main": closed (destroyed)
 activate (macOS) — surfacing main (visible=false, minimized=false)
 _ensureDockVisible — calling dock.show()
 _ensureDockVisible — dock already visible
-second-instance — argv=["..."] cwd=/...
+second-instance argv=["..."] eventArgv=["..."] cwd=/...
 second-instance — surfacing main (visible=false, minimized=false)
 ```
 
@@ -209,7 +209,7 @@ File path resolution in main:
 
 The transport is set up lazily on first `log()` call, so importing `LoggerLite` in build/CLI contexts that have no Electron is harmless.
 
-## Coexisting with `dev.log`, `build.log`, `test.log`, and `ci.log`
+## Coexisting with `dev.log`, `build.log`, `test.log`, and `deploy.log`
 
 Five separate logs in `<projectRoot>/logs/`:
 
@@ -219,11 +219,11 @@ Five separate logs in `<projectRoot>/logs/`:
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
-| `ci.log` | GH Actions release run output (streamed locally during `npm run release`) | Truncated each release run |
+| `deploy.log` | GH Actions run output, streamed locally by the follower every target's deploy uses (`omega deploy`, `npm run release`) ([#873](https://github.com/Omega-JS-Stack/omega/issues/873); this was `ci.log`) | Truncated each deploy |
 | `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `omega-signing.log` instead) | Appended (not truncated) |
 
 `dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `OMEGA_LOG_FILE=false`; override its path with `OMEGA_LOG_FILE=<path>`.)
 
-They serve different purposes and don't overlap — `dev.log`/`build.log` show you "is the build still running?", `test.log` shows you "which test failed on the last run?", `ci.log` shows you "did the release workflow pass?", `runtime.log` shows you "is my app's auto-updater finding the right release feed?". All useful.
+They serve different purposes and don't overlap: `dev.log`/`build.log` show you "is the build still running?", `test.log` shows you "which test failed on the last run?", `deploy.log` shows you "did the release workflow pass?", `runtime.log` shows you "is my app's auto-updater finding the right release feed?". All useful.
 
 In production: only `runtime.log` exists (no project, no gulp, no GH Actions stream).

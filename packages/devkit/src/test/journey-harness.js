@@ -5,7 +5,7 @@
  *
  *   birth   → the REAL onboard wizard (flags mode) in a temp dir OUTSIDE
  *             the monorepo — where hoist-luck can't save anything
- *   link    → `omega i local` from the website target (tree-wide file: flip +
+ *   link    → `omega i local` from the web target (tree-wide file: flip +
  *             ONE brand-root install; also links @omega.js/manager at the
  *             brand root so brand-level verbs exist at all)
  *   boot    → `omega dev` at the brand root (web + backend emulator, N7
@@ -33,6 +33,7 @@ const http = require('node:http');
 const https = require('node:https');
 const { spawn, spawnSync } = require('node:child_process');
 const { createStepsLog } = require('./steps-log.js');
+const { targetOfType } = require('./target-of-type.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real target builds dominate; a warm rerun finishes far inside them.
@@ -45,8 +46,10 @@ const TIMEOUTS = {
 };
 
 // Boot ordering preference (cosmetic — matches the rehearsal); targets
-// themselves come from the scaffold output on disk, never from a map here.
-const TARGET_ORDER = ['website', 'backend', 'desktop', 'extension', 'mobile'];
+// themselves come from the scaffold output on disk, never from a map here. The
+// words are TYPES, which are also the names the wizard gives a brand's first
+// target of each type (#886).
+const TARGET_ORDER = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 
 // Lockstep with @omega.js/backend cli/commands/emulator.js (same marker the
 // devkit e2e-harness waits for — it fires AFTER persona seeding).
@@ -401,9 +404,9 @@ async function runJourney(options) {
 
     const targets = discoverBrandTargets(run.brandRoot);
 
-    // ── Link — one `i local` from the website target links the whole tree ─
+    // ── Link: one `i local` from the web target links the whole tree ─
     await run.step('`omega i local` links every framework + the manager (one tree install)', async () => {
-      const linkFrom = targets.find((dir) => path.basename(dir) === 'website') || targets[0];
+      const linkFrom = targetOfType(run.brandRoot, 'web')?.dir || targets[0];
       const webBin = path.join(run.monorepoRoot, 'packages', 'web', 'bin', 'omega');
       await run.runToExit('link', process.execPath, [webBin, 'i', 'local'],
         { cwd: linkFrom, env: run.childEnv(), timeout: TIMEOUTS.link });
@@ -438,8 +441,11 @@ async function runJourney(options) {
     });
 
     // ── Boot — `omega dev` at the brand root, probe the homepage ──────────
-    const bootsWeb = targets.some((dir) => path.basename(dir) === 'website');
-    const bootsBackend = targets.some((dir) => path.basename(dir) === 'backend');
+    // Both legs resolve by TYPE (#886): a backend named `api` boots exactly
+    // like a web target named `site` does
+    const web = targetOfType(run.brandRoot, 'web');
+    const bootsWeb = web !== null;
+    const bootsBackend = targetOfType(run.brandRoot, 'backend') !== null;
     if (bootsWeb || bootsBackend) {
       const orphansAtBoot = emulatorOrphans();
       await run.step(`\`omega dev\` boots${bootsWeb ? ' web' : ''}${bootsBackend ? ' + backend emulator' : ''}`, async () => {
@@ -492,7 +498,7 @@ async function runJourney(options) {
         // authored 10 days before the corpus epoch, so it must land ~10 days
         // before today; ±1 day absorbs a UTC midnight between boot and now).
         await run.step('sample content materialized (gitignored tree, rolling dates)', async () => {
-          const sampleRoot = path.join(run.brandRoot, 'targets', 'website', '.omega', 'sample-content');
+          const sampleRoot = path.join(web.dir, '.omega', 'sample-content');
           const posts = fs.readdirSync(path.join(sampleRoot, '_posts')).sort();
           if (posts.length !== 11) throw new Error(`expected 11 sample posts, found ${posts.length}`);
           if (fs.readFileSync(path.join(sampleRoot, '.gitignore'), 'utf8') !== '*\n') {
@@ -534,7 +540,11 @@ async function runJourney(options) {
       // error (live probe of a never-deployed brand) may flip the exit.
       // 'manage' is the named verb (#229) — bare `omega` prints help now, so a
       // bare spawn here would leave the boot-lane run file as the newest one.
-      await run.runToExit('manage', run.dispatcherBin(run.brandRoot), ['manage'], {
+      // A headless run has no way to collect the ship credentials a declared
+      // store format needs, so the publishing service refuses by design
+      // (#867) and the walk would stop there, ahead of update. The walk keeps
+      // going; the allowed set below is what names that refusal expected.
+      await run.runToExit('manage', run.dispatcherBin(run.brandRoot), ['manage', '--continue-on-error'], {
         cwd: run.brandRoot,
         env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }, { scrub: true }),
         timeout: TIMEOUTS.manage,
@@ -557,8 +567,8 @@ async function runJourney(options) {
         throw new Error(`unexpected service errors: ${unexpected.map((entry) => `${entry.service} (${entry.error || 'no detail'})`).join(', ')} (${runFile})`);
       }
 
-      if (bootsWeb && !fs.existsSync(path.join(run.brandRoot, 'targets', 'website', 'dist', 'index.html'))) {
-        throw new Error('update reported success but targets/website/dist/index.html is missing');
+      if (bootsWeb && !fs.existsSync(path.join(web.dir, 'dist', 'index.html'))) {
+        throw new Error(`update reported success but ${web.name}/dist/index.html is missing`);
       }
       return `${services.length} services; update success; errors only in {${[...allowedErrors].join(', ')}}`;
     });

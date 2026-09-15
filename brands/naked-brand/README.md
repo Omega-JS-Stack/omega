@@ -20,7 +20,7 @@ lives in the committed config.
 ## Structure
 
 - `config/omega.json5` — the whole brand-level config, and it is short
-- `targets/website/` — the one enabled target (framework: `@omega.js/web`)
+- `targets/web/`: the one enabled target (framework: `@omega.js/web`)
 
 There is deliberately **no** `AGENTS.md`/`CLAUDE.md`, no `.env`, no
 `.omega/`, no second target, and no page content. Those are things a walk is

@@ -170,6 +170,48 @@ test('nested tees fan out; LIFO detach leaves the outer file intact and still re
   assert.deepEqual(spy.chunks.stdout, ['both tees\n', 'outer only\n']);
 });
 
+test('the singleton stacks too: a second attach layers instead of replacing', (t) => {
+  // Same shape as the nested-tees case above, but through the process-wide
+  // singleton: a verb that runs another verb in process (`omega test` running
+  // `omega deploy`) attaches a second path on the SAME tee, and the first file
+  // must keep receiving once the second layer comes off.
+  const outerPath = scratchFile('singleton-outer.log');
+  const innerPath = scratchFile('singleton-inner.log');
+  t.after(() => {
+    fs.rmSync(outerPath, { force: true });
+    fs.rmSync(innerPath, { force: true });
+  });
+
+  const spy = spyWriters();
+  const detachOuter = attachLogFile(outerPath, NO_CI);
+  const detachInner = attachLogFile(innerPath, NO_CI);
+  try {
+    process.stdout.write('both layers\n');
+
+    // The module-level detach pops the NEWEST layer, the inner one.
+    attachLogFile.detach();
+
+    process.stdout.write('outer only\n');
+  } finally {
+    // Each layer's own handle, never a second module-level pop: this suite may
+    // itself run under a live singleton tee, and a blind pop would take it.
+    detachInner();
+    detachOuter();
+    spy.restore();
+  }
+
+  const outerContents = fs.readFileSync(outerPath, 'utf8');
+  const innerContents = fs.readFileSync(innerPath, 'utf8');
+
+  assert.match(outerContents, /^both layers$/m);
+  assert.match(outerContents, /^outer only$/m, 'the outer layer must survive the inner detach');
+  assert.match(innerContents, /^both layers$/m);
+  assert.ok(!innerContents.includes('outer only'), 'a detached layer must stop receiving');
+
+  // Both layers fanned out to the terminal exactly once per write.
+  assert.deepEqual(spy.chunks.stdout, ['both layers\n', 'outer only\n']);
+});
+
 test('detach restores the exact prior writers', () => {
   const logPath = scratchFile('restore.log');
   const spy = spyWriters();

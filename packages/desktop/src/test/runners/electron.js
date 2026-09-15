@@ -36,7 +36,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
     }
 
     const childEnv = Object.assign({}, process.env, {
-      OMEGA_TEST_MODE:              'true',   // canonical signal — manager.isTesting() picks it up
+      OMEGA_ENVIRONMENT:          'testing', // the one environment input (#817): this lane names it
       ELECTRON_NO_ATTACH_CONSOLE: '1',
       NODE_OPTIONS:              '',
     });

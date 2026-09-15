@@ -7,6 +7,11 @@
  * GET /content/post, then title + body → PUT /admin/post (frontmatter is
  * preserved server-side). D13: saving dispatches a site build unless the
  * deploy switch is off.
+ *
+ * Every CMS call names THIS website ([#887](https://github.com/Omega-JS-Stack/omega/issues/887)):
+ * one backend serves every website a brand runs, so the target name the build
+ * baked into the client config rides along. A build that resolved no name
+ * sends nothing, and the backend's one-web-target default answers.
  */
 
 // Libraries
@@ -104,6 +109,9 @@ async function enterEditMode() {
   try {
     const url = new URL(`${omega.getApiUrl()}/omega/content/post`);
     url.searchParams.set('url', editUrl);
+    if (targetName()) {
+      url.searchParams.set('target', targetName());
+    }
 
     const post = await omega.request(url.toString(), {
       method: 'GET',
@@ -175,6 +183,10 @@ function initForm() {
       payload.author = post.author.trim();
     }
 
+    if (targetName()) {
+      payload.target = targetName();
+    }
+
     try {
       const response = await omega.request(`/omega/admin/post`, {
         method: editUrl ? 'PUT' : 'POST',
@@ -190,6 +202,14 @@ function initForm() {
       formManager.showError(error.message || 'Failed to save the post');
     }
   });
+}
+
+// WHICH website this page belongs to (#887): the build's own target name, from
+// the client config the page was baked with. Absent (a build that resolved no
+// name) means "do not say", which is what the backend's single-web-target
+// default expects.
+function targetName() {
+  return omega.config.target || null;
 }
 
 function splitList(value) {

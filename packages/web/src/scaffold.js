@@ -13,9 +13,9 @@
  */
 const path = require('node:path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
-const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
-const { resolveSeedMode } = require('@omega.js/config');
-const { renderSecretsBlock } = require('./github-secrets.js');
+const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
+const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { PATHS } = require('./paths.js');
 
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
@@ -71,10 +71,14 @@ function scaffoldDefaults(options) {
   // list `omega deploy` publishes as repo secrets. `overwrite: true` means
   // every setup re-renders it, so the block heals like every other scaffolded
   // default.
+  // The composed half (#835): the brand's PRODUCTION values name the keys the
+  // schema cannot, which on web is the consumer's own `.env` lines. NAMES only
+  // ever reach the workflow file; no value is rendered anywhere.
+  const { values: composed } = composeTargetEnv({ targetDir: options.outputDir, target: 'web', environment: 'production' });
   const workflow = FILE_MAP['.github/workflows/build.yml'];
   const workflowTokens = {
     ...workflow.template,
-    githubSecrets: renderSecretsBlock('web'),
+    githubSecrets: renderSecretsBlock('web', { indent: '  ', values: composed }),
   };
   fileMap['.github/workflows/build.yml'] = { ...workflow, template: workflowTokens };
 
@@ -104,12 +108,15 @@ function scaffoldDefaults(options) {
     defaultsDir,
     outputDir: options.outputDir,
     fileMap,
-    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
-    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the brand
-    // lane gets it inside composeWorkflow below, and a STANDALONE target gets
-    // it here, on the copy the scaffold engine writes. The action and its pin
-    // live in ONE place, so no template restates them.
-    transform: (contents) => renderInstallFirewall(contents),
+    // The firewall step and the workspace flag are devkit's, rendered wherever
+    // a workflow is WRITTEN ([#872](https://github.com/Omega-JS-Stack/omega/issues/872),
+    // [#898](https://github.com/Omega-JS-Stack/omega/issues/898)): the brand
+    // lane gets both inside composeWorkflow below, and a STANDALONE target gets
+    // them here, on the copy the scaffold engine writes. The action, its pin
+    // and the flag live in ONE place, so no template restates them. A
+    // standalone target is its own repo root and declares no workspaces, so the
+    // flag renders to nothing here.
+    transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: options.logger,
   });
 

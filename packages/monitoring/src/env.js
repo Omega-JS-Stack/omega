@@ -8,20 +8,30 @@
  *   OMEGA_SENTRY_ENABLED=false  kill switch — nothing reports, ever
  *   OMEGA_TEST_RUNNER           a test run never pollutes a live project
  *   OMEGA_SENTRY_FORCE=true     report from a non-production run (local proving)
- *   OMEGA_BUILD_MODE=true       the DEFAULT production signal, for hosts that
- *                               have no runtime one
+ *   the ONE environment         the DEFAULT production signal, for hosts that
+ *                               pass no runtime one
  *
- * The production signal is the host's to supply. @omega.js/desktop has no
- * runtime answer — "should we ship telemetry" is a property of its BUILD, so it
- * falls through to OMEGA_BUILD_MODE. @omega.js/backend does have one
- * (`Manager.isProduction()`, env-derived and stable for the life of the
- * process) and passes it in.
+ * The production signal is the host's to supply, and the DEFAULT is the one
+ * environment every OMEGA target answers from
+ * ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)):
+ * `@omega.js/config/environment`'s `isProduction()`, read off the host the gates
+ * were asked for (`process.env.OMEGA_ENVIRONMENT` on Node, the host's baked
+ * `config.environment` in a browser-ish context such as a renderer bundle).
+ * OMEGA_BUILD_MODE used to be that default, which made it a FIFTH production
+ * signal with its own opinion: a build-mode run of a development artifact
+ * reported as production, and a packaged production app whose lane did not
+ * carry the flag reported as development. @omega.js/backend still passes its
+ * own answer in (`Manager.isProduction()`), and a boolean a host supplies
+ * always wins.
  */
+
+const { isProduction } = require('@omega.js/config/environment');
 
 /**
  * Read the environment gates for core.resolveConfig().
- * @param {object} [host] - the host's own signals
- * @param {boolean} [host.isProduction] - overrides the OMEGA_BUILD_MODE default
+ * @param {object} [host] - the host's own signals, and the context the one
+ *   environment is read off (a Manager carrying the baked `config`)
+ * @param {boolean} [host.isProduction] - overrides the one environment's answer
  * @param {boolean} [host.allowInDev] - the host's own dev opt-in (e.g. @omega.js/backend's `reportErrorsInDev`)
  * @returns {{ killed: boolean, killedReason: string|null, isProduction: boolean, allowInDev: boolean }}
  */
@@ -41,7 +51,7 @@ function readGates(host) {
     killedReason,
     isProduction: typeof host.isProduction === 'boolean'
       ? host.isProduction
-      : env.OMEGA_BUILD_MODE === 'true',
+      : isProduction.call(host),
     allowInDev:   !!host.allowInDev || env.OMEGA_SENTRY_FORCE === 'true',
   };
 }

@@ -69,14 +69,15 @@ const NO_ENV = {
 module.exports = defineCases({
   type: 'group', // independent tests; run all even on failure
   layer: 'build',
-  description: 'utils/url-helpers: every local helper resolves env → baked dev.ports → classic',
+  description: 'utils/url-helpers: every local helper resolves env, then the baked dev.ports, then throws',
   tests: [
     {
-      name: 'exports { attachTo, getApiUrl, localPort }',
+      name: 'exports { attachTo, getApiUrl, localPort, requiredPort }',
       run: (ctx) => {
         ctx.expect(typeof helpers.attachTo).toBe('function');
         ctx.expect(typeof helpers.getApiUrl).toBe('function');
         ctx.expect(typeof helpers.localPort).toBe('function');
+        ctx.expect(typeof helpers.requiredPort).toBe('function');
       },
     },
     {
@@ -107,11 +108,19 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'neither channel → the classic hosting port 5002',
+      // The classic 5002 used to answer here (#834). It is gone: a dev build
+      // always bakes the resolved map, so neither channel answering means the
+      // artifact is broken, and a wrong API base is a silent connection refusal
+      // or a hit on a neighbouring project's stack.
+      name: 'neither channel → a throw naming the port and the bundle task',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(helpers.getApiUrl.call(fakeManager('testing'))).toBe('http://localhost:5002');
-          ctx.expect(helpers.getApiUrl.call(fakeManager('development'))).toBe('http://localhost:5002');
+          for (const environment of ['testing', 'development']) {
+            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment)))
+              .toThrow(/dev port for `hosting`/);
+            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment)))
+              .toThrow(/bundle task/);
+          }
         });
       },
     },
@@ -163,11 +172,11 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getFunctionsUrl: neither channel → the classic functions port 5001',
+      name: 'getFunctionsUrl: neither channel → a throw naming the port (#834)',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(helpers.getFunctionsUrl.call(fakeManager('development')))
-            .toBe('http://localhost:5001/demo-app/us-central1');
+          ctx.expect(() => helpers.getFunctionsUrl.call(fakeManager('development')))
+            .toThrow(/dev port for `functions`/);
         });
       },
     },
@@ -200,10 +209,11 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getWebsiteUrl: neither channel → the classic dev origin https://localhost:4000',
+      name: 'getWebsiteUrl: neither channel → a throw naming the port (#834)',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(helpers.getWebsiteUrl.call(fakeManager('development'))).toBe('https://localhost:4000');
+          ctx.expect(() => helpers.getWebsiteUrl.call(fakeManager('development')))
+            .toThrow(/dev port for `website`/);
         });
       },
     },
@@ -228,12 +238,18 @@ module.exports = defineCases({
       },
     },
     {
-      // The lockstep the renderer bundle forces: url-helpers rides the browser
-      // bundle, so it cannot require @omega.js/config (fs/net/json5) and mirrors
-      // the constant instead. This Node-side case is what keeps the copy honest.
-      name: 'CLASSIC_DEV_ORIGIN is in lockstep with @omega.js/config',
+      // There is no lockstep copy to keep honest any more (#834): the classic
+      // numbers live ONLY in @omega.js/config, the bundle task bakes them into
+      // the artifact as the floor of the resolved map, and this module reads
+      // that map. A copy here would be the exact defect the issue closed.
+      name: 'no classic constants live in this module (#834)',
       run: (ctx) => {
-        ctx.expect(helpers.CLASSIC_DEV_ORIGIN).toBe(require('@omega.js/config').CLASSIC_DEV_ORIGIN);
+        ctx.expect(helpers.CLASSIC_DEV_ORIGIN).toBe(undefined);
+        const source = require('fs').readFileSync(require.resolve('../../../utils/url-helpers.js'), 'utf8');
+        const code = source.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+        for (const classic of ['4000', '5001', '5002', '9099']) {
+          ctx.expect(code.includes(classic)).toBe(false);
+        }
       },
     },
     {
@@ -244,7 +260,7 @@ module.exports = defineCases({
         withEnv(NO_ENV, () => {
           // getAuthUrl calls `this.getWebsiteUrl()`, which attachTo() supplies on a
           // real Manager — hand the stand-in the same helper.
-          const manager = fakeManager('development');
+          const manager = fakeManager('development', { website: 4000 });
           manager.getWebsiteUrl = helpers.getWebsiteUrl;
           const url = new URL(helpers.getAuthUrl.call(manager));
           ctx.expect(url.origin).toBe('https://localhost:4000');
@@ -274,8 +290,12 @@ module.exports = defineCases({
           withBridgeManager(fakeManager('testing', { auth: 9109 }), () => {
             ctx.expect(clientBridge._authEmulatorPort()).toBe(9109);
           });
+          // The classic 9099 used to answer here (#834): nothing identity-checks
+          // what holds that port, so a neighbouring project's emulator read as
+          // an auth mystery instead of a port problem.
           withBridgeManager(fakeManager('testing'), () => {
-            ctx.expect(clientBridge._authEmulatorPort()).toBe(9099);
+            ctx.expect(() => clientBridge._authEmulatorPort()).toThrow(/dev port for `auth`/);
+            ctx.expect(() => clientBridge._authEmulatorPort()).toThrow(/bundle task/);
           });
         });
         withEnv({ OMEGA_AUTH_PORT: '9119' }, () => {

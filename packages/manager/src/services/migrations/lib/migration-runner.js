@@ -111,7 +111,9 @@ async function runMigration(context, options) {
   // The manage-wide --dry-run vetoes --execute: passing both means "don't write"
   const execute = (context.options?.execute && !context.options?.dryRun) || false;
   const verbose = context.options?.verbose || false;
-  const limit = context.options?.limit || 0;
+  // A CLI value arrives as a STRING, and `--limit 0` means "no limit": the bare
+  // read made "0" truthy and capped the batch at zero documents (#920).
+  const limit = Number(context.options?.limit) || 0;
   const ids = context.options?.ids ? String(context.options.ids).split(',').map((id) => id.trim()) : null;
   const batchSize = limit ? Math.min(options.batchSize || 500, limit) : (options.batchSize || 500);
 

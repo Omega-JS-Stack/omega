@@ -1,6 +1,6 @@
 // Renderer-process Manager singleton.
 // Consumer entry (per view): `new (require('@omega.js/desktop/renderer'))().initialize()`.
-// Reads window.OMEGA_BUILD_JSON.config (injected by the bundle task's esbuild `define`), bootstraps @omega.js/client + auth.
+// Reads window.OMEGA_BUILD_JSON.config (the one dist/build.js the view's shell loads, #743), bootstraps @omega.js/client + auth.
 //
 // Auth bridge:
 //   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
@@ -32,10 +32,22 @@ Manager.prototype.initialize = async function (overrides) {
   const self = this;
 
   // Merge runtime overrides on top of build-time config.
-  // OMEGA_BUILD_JSON is injected by the bundle task's esbuild `define`; its `banner`
-  // also makes it available on globalThis.OMEGA_BUILD_JSON for DevTools introspection.
-  const buildJson = (typeof OMEGA_BUILD_JSON !== 'undefined' && OMEGA_BUILD_JSON) || {};
+  // OMEGA_BUILD_JSON comes off the window: the view's shell loads the ONE
+  // `dist/build.js` ahead of this bundle (#743), which is also what makes it
+  // readable from DevTools.
+  const buildJson = (typeof window !== 'undefined' && window.OMEGA_BUILD_JSON) || {};
   self.config = Object.assign({}, buildJson.config || {}, overrides || {});
+
+  // The RUNNING environment beats the baked one, exactly as it does in main
+  // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). A page has no
+  // `process`, so `isTesting()` here reads `config.environment`, the word the
+  // BUILD was for; the preload does have it and hands it over on the bridge, so a
+  // test lane booting a production artifact gets the same answer in this renderer
+  // that main gives. No second signal: it is the one input, one context removed.
+  const runningEnvironment = (typeof window !== 'undefined' && window.desktop?.environment) || null;
+  if (runningEnvironment) {
+    self.config.environment = runningEnvironment;
+  }
 
   self.logger.log('Initializing @omega.js/desktop (renderer)...');
 

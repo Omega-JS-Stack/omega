@@ -178,18 +178,16 @@ async function generate(Manager, ctx, settings, opts = {}) {
   // Defaults to 'github' so production cron path "just works" without flag fiddling.
   const host = opts.imageHost || 'github';
 
-  // CDN base URL — resolves from the parent config.
-  // parent: 'https://itwcreativeworks.com' → cdn.itwcreativeworks.com
-  // parent: 'self' / '' / null             → falls back to brand.url
+  // CDN base URL: the RESOLVED company's host
+  // ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)):
+  // company.url 'https://itwcreativeworks.com' → cdn.itwcreativeworks.com, and
+  // a brand with no company resolves company.url to its OWN url, so there is
+  // nothing to fall back to.
   let cdnBase = null;
   if (USE_CDN_URLS && host === 'github') {
-    const parentUrl = Manager.config?.parent;
-    let cdnDomain;
-    if (parentUrl && parentUrl !== 'self' && parentUrl !== '$self' && parentUrl.startsWith('http')) {
-      cdnDomain = new URL(parentUrl).hostname;
-    } else {
-      cdnDomain = brand?.url ? new URL(brand.url).hostname : null;
-    }
+    const companyUrl = Manager.config?.company?.url || brand?.url;
+    const cdnDomain = companyUrl && companyUrl.startsWith('http') ? new URL(companyUrl).hostname : null;
+
     if (cdnDomain) {
       cdnBase = `https://cdn.${cdnDomain}/newsletters`;
     }

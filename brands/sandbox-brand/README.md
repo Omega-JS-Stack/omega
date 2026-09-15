@@ -28,13 +28,13 @@ is continuously dogfooded.
 | App | Framework | Notes |
 |-----|-----------|-------|
 | `targets/backend` | `packages/backend` (@omega.js/backend) | Real @omega.js/backend consumer: full framework corpus (routes/events/rules/…) runs against the emulator, not just the self-test boot smoke |
-| `targets/website` | `packages/web` (@omega.js/web) | Real @omega.js/web consumer since [#775](https://github.com/Omega-JS-Stack/omega/issues/775) (it was a hand-rolled esbuild page until then, which meant the lane could only ever drive a fixture). Two pages on the bare `core/root` layout: `/` says what this brand is, and `/e2e` is what the lane opens. The `window.__omega` hooks live in that page's own module, `src/assets/js/pages/e2e/index.js`, bound to the URL by the page-asset key with nothing declared, and they hang off the client the FRAMEWORK boots (`omega dev` in development connects it to the emulator suite with zero flags, N5) |
+| `targets/web` | `packages/web` (@omega.js/web) | Real @omega.js/web consumer since [#775](https://github.com/Omega-JS-Stack/omega/issues/775) (it was a hand-rolled esbuild page until then, which meant the lane could only ever drive a fixture). Two pages on the bare `core/root` layout: `/` says what this brand is, and `/e2e` is what the lane opens. The `window.__omega` hooks live in that page's own module, `src/assets/js/pages/e2e/index.js`, bound to the URL by the page-asset key with nothing declared, and they hang off the client the FRAMEWORK boots (`omega dev` in development connects it to the emulator suite with zero flags, N5) |
 
 ## Cross-stack e2e (`npm test` at the brand root)
 
 `test/e2e/run.js` is a consumer of the **shared brand e2e harness**
 (`@omega.js/devkit/test/e2e-harness`), which owns the infrastructure: target
-discovery (`targets/backend` + `targets/website`), the classic-port hold that
+discovery (`targets/backend` + `targets/web`), the classic-port hold that
 lets the stack boot beside a live dev session, emulator boot **with persona
 seeding** (the harness waits for the post-seed ready marker so browser steps
 never race the seed wipe), the website's REAL `omega dev`, the browser, and the
@@ -72,7 +72,7 @@ cd targets/backend/functions && npm install
 npx omega test            # boots the emulator (demo project) + runs the corpus
 npm run test:backend    # same thing, proxied from the brand root
 
-# targets/website needs NO install inside the monorepo — its deps (esbuild,
+# targets/web needs NO install inside the monorepo: its deps (esbuild,
 # @omega.js/client, firebase, puppeteer) resolve from the workspace root via
 # Node's directory climb. The declared deps make it installable standalone.
 ```

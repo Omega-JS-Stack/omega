@@ -137,7 +137,7 @@ const CONVERGED = {
 function brandConfig() {
   return {
     brand: { id: BRAND_ID, name: 'Emulator Brand', url: 'https://emulator-brand.test' },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     cloud: { shared: false },
   };
 }

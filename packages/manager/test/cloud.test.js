@@ -65,7 +65,7 @@ function brandConfig({ cloud = {}, sdkConfig } = {}) {
       ...cloud,
       config: { projectId: PROJECT, ...(sdkConfig || {}), ...(cloud.config || {}) },
     },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
   };
   if (sdkConfig) {
     config.cloud.provider = 'firebase';

@@ -6,7 +6,7 @@
  * chatsy settings: nothing reads that name.
  *
  * Like secrets.js this is a key-NAME test, walked at every depth (shared
- * level, inside a target entry, inside an instance array) — the rename moved
+ * level, inside a target entry, inside an array item): the rename moved
  * the key, not its home. Only unambiguous renames belong here: a name that
  * still exists as a legitimate key somewhere in the schema (`google`/`meta`
  * under `analytics.providers`) would false-positive and is left to the mapping
@@ -20,15 +20,32 @@
  * name (`slapform` → `forms.providers.slapform`), and folded two keys into
  * `cloud`. A name test can't express those — `slapform` is legitimate again
  * one level down, and `firebase` lives on as `client.firebase` — so these
- * match one EXACT path from the root.
- *
- * `github` is deliberately NOT here: the brand's own `github` (content
- * identity, unchanged; a shared key since #277) lives at the top level, and
- * a `targets.backend.github` override is overlaid there too by the resolved
- * view, so a name test would false-positive. Its rename to
- * `repo.providers.github` is carried by the mapping tables in
- * docs/shared/config.md instead.
+ * match one EXACT path from the root, with the target NAME read as its TYPE
+ * (#886) so a `targets.web.*` row fires on every web target a brand runs.
  */
+
+const { TARGETS, CUSTOM_TARGET_TYPE } = require('./schema.js');
+
+// Every legal target `type`, so a per-type row set covers all of them (#883).
+const TARGET_TYPES = [...TARGETS, CUSTOM_TARGET_TYPE];
+
+/**
+ * The `translation.exclude` → `translation.include` move (#858): every route
+ * the brand skipped becomes a negation, in the order it was written, on top
+ * of `**`. The FRAMEWORK default (`['**', '!blog/**']`) is deliberately not
+ * what a carrying brand lands on: it was translating its blog, and a
+ * conversion that changed which pages reach a provider would be a behavior
+ * change dressed as a rename. Routes are normalized the way the translation
+ * pass normalizes them (no leading or trailing slash), so `/changelog/` lands
+ * as `!changelog`.
+ * @param {*} value - the authored `exclude` list
+ * @returns {string[]} the `include` list that means the same thing
+ */
+function excludeToInclude(value) {
+  const routes = Array.isArray(value) ? value : [];
+
+  return ['**', ...routes.map((entry) => `!${String(entry).replace(/^\/+|\/+$/g, '')}`)];
+}
 
 // key name → { replacement, why } (docs/shared/config.md carries the rows)
 const RETIRED_KEYS = {
@@ -45,16 +62,16 @@ const RETIRED_KEYS = {
     why: 'the banner became a real consent gate (#383) — the block names the DECISION, not the cookie, and its palette/theme/type keys are gone (tokens paint it, the visitor\'s region picks opt-in vs opt-out)',
   },
 
-  // The web instance IS the subdomain (#588). `brand.subdomains` was read by
+  // The web TARGET is the subdomain (#588). `brand.subdomains` was read by
   // ONE thing (the cloud hosting op, which ensured an api.{sub}.{domain} per
   // entry) and declared by nothing: no schema rule, no default, never
   // materialized. Ian's 2026-09-01 call gave the fact a real home. A NAME test
   // by the rule above: `subdomains` exists nowhere else in the schema (the
   // legacy searchConsole.subdomains was dropped outright), so the walk catches
-  // it at every depth, instance arrays included.
+  // it at every depth, target entries included.
   subdomains: {
     replacement: 'targets.web',
-    why: "each subdomain is a web INSTANCE (#588): [\"admin\", \"cdn\"] becomes web: [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }], where the id IS the subdomain (https://admin.<brand host>), an entry's own `url` overrides it for a custom host, and the subdomains share ONE api.<domain>",
+    why: "each subdomain is its own web TARGET (#588/#886): [\"admin\", \"cdn\"] becomes sibling keys beside the main site, `admin: { type: 'web' }, cdn: { type: 'web' }`, where the NAME is the subdomain (https://admin.<brand host>), an entry's own `url` overrides it for a custom host, and the targets share ONE api.<domain>",
   },
 
   // The feature is `connections` now (#788, Ian 2026-09-03): a user connection
@@ -66,6 +83,16 @@ const RETIRED_KEYS = {
   oauth2: {
     replacement: 'connections',
     why: "the product concept is a CONNECTION (#788) — the per-provider block is unchanged, the credentials are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair now, and a brand's own provider lives at targets/backend/src/connections/<name>.js",
+  },
+
+  // The company block names the parent (#677), so `parent` is retired
+  // OUTRIGHT: the topology moved to `company: { id }` first, and the last
+  // meaning it carried, the webhook opt-out, is `company: { webhooks: false }`
+  // now. A NAME test by the rule above: `parent` exists nowhere else in the
+  // schema.
+  parent: {
+    replacement: 'company.webhooks',
+    why: "the company block names the parent (#677): the topology is `company: { id: '<parent brand.id>' }` (or 'self'), and the only other thing `parent` ever said, `false` for \"the provider ACCOUNT is shared and its one account-level webhook is owned elsewhere\", is `company: { webhooks: false }`",
   },
 };
 
@@ -201,7 +228,7 @@ const RETIRED_PATHS = {
   },
   'monitoring.dsn': {
     replacement: 'monitoring.providers.sentry.dsn',
-    why: 'provider-hung Sentry settings live under the provider that reads them (#425) — per-surface DSNs are targets.<type>.monitoring.providers.sentry.dsn',
+    why: 'provider-hung Sentry settings live under the provider that reads them (#425): per-surface DSNs are targets.<name>.monitoring.providers.sentry.dsn',
   },
   'monitoring.environment': {
     replacement: 'monitoring.providers.sentry.environment',
@@ -310,6 +337,32 @@ const RETIRED_PATHS = {
     why: 'two homes for one fact (#610) — the /extension page and its shortlinks read the extension target\'s store listings, curated onto site.targets.extension.listings',
   },
 
+  // ─── the four schema-less web sections (#850) ─────────────────────────
+  // Everything the build processes has a schema home (Ian 2026-09-09). These
+  // four were the exception: legacy UJM presentation blocks the converter
+  // wrote under `targets.web`, which @omega.js/web carried in a PRIVATE list
+  // (`WEB_ONLY_SECTIONS`) purely to let its own `config:` guard pass them.
+  // The list is gone, so each one is a registered path instead of a key that
+  // validates clean and reaches nothing. Matched at their AUTHORED path, the
+  // one place a carrying brand has them (a root spelling on a web load is the
+  // same key overlaid, exactly as with the #610 pair above).
+  'targets.web.favicon': {
+    replacement: 'nothing for the path; brand.images.favicon for the source image',
+    why: 'the favicon set is MINTED from the brand images (#850): the manager assets service mints it and the web build bridges it to /assets/images/favicon, so a path override pointed the whole site at an unminted folder; theme-color comes from `brand.color` now, the one place a brand states its hex',
+  },
+  'targets.web.manifest': {
+    replacement: 'nothing: the minted set ships site.webmanifest',
+    why: 'no reader anywhere in @omega.js/web (#850): the web app manifest that ships is the minted set\'s own site.webmanifest, so every key under this block was a value nothing consulted',
+  },
+  'targets.web.icons': {
+    replacement: 'the `icon` on the link itself, as Font Awesome classes',
+    why: 'one icon mechanism (#619): a footer link carries its own `fa-*` classes (`icon: \'fa-brands fa-github\'`), so the name-to-markup map is gone; the legacy block only ever held a `style`, which the map lookup could never resolve',
+  },
+  'targets.web.currency': {
+    replacement: 'payment.currency',
+    why: 'two homes for one fact (#850): the price currency belongs to the payment section every other surface reads it from, and the pricing JSON-LD reads it there',
+  },
+
   // ─── redirects are not web config (#466) ──────────────────────────────
   // The block shipped for one wave (0.45.0) and was withdrawn: static hosting
   // has no server, so the map could only be answered CLIENT-side off the built
@@ -378,20 +431,172 @@ const RETIRED_PATHS = {
     replacement: 'nothing: the versionless assets live on the `v<x.y.z>` release',
     why: 'one public releases repo per brand (#620/#799): a stable mirror tag is what `/releases/latest/download/<asset>` replaced, so no tag is configured anywhere',
   },
+
+  // ─── one repo block, and no repo name anywhere (#883) ──────────────────
+  // A brand's repo hosting used to be spelled in four places: the
+  // `repo.providers.github` block, a separate top-level `github` identity, a
+  // `targets.<name>.github.repo` override, and the desktop releases
+  // owner/repo. One block says it now (`repo: { provider, org }`), every repo
+  // name derives from `<brand.id>-<role>`, and visibility is the brand root
+  // package.json's `private` field. Matched at their AUTHORED paths, one row
+  // per LEAF: each of these validated clean under the new shape and silently
+  // addressed a repo nothing publishes to.
+  'repo.providers.github.org': {
+    replacement: 'repo.org',
+    why: 'ONE repo block (#883): `repo: { provider: \'github\', org }` is the whole declaration, and the org owns every repo the brand derives',
+  },
+  'repo.providers.github.repo': {
+    replacement: 'nothing: the source repo IS `<brand.id>-omega`',
+    why: 'no repo NAME is configurable anywhere (#883): a repo name that must differ is a brand id that must differ, so rename the GitHub repo to `<brand.id>-omega` instead',
+  },
+  'repo.providers.github.private': {
+    replacement: 'the brand root package.json `private` field',
+    why: 'visibility has ONE statement (#883): `private: true` (or absent) is a private brand, `false` a public one, and the manage walk reconciles the repo to it in both directions',
+  },
+  'repo.providers.github.shared': {
+    replacement: 'nothing: an org may host many brands, and no brand rewrites an org profile',
+    why: 'the org-profile reconcile is gone (#883), so there is no shared-org exception left to declare',
+  },
+  'repo.providers.github.enabled': {
+    replacement: 'the presence of the `repo` block',
+    why: 'presence is the switch (#883), exactly as a target key\'s presence enables that target: a brand that hosts its source somewhere the manager does not touch omits the block',
+  },
+  'github.user': {
+    replacement: 'nothing: the org is `repo.org`',
+    why: 'the separate GitHub identity block is gone (#883): nothing read `user`, and every repo address derives from `repo.org` plus `brand.id`',
+  },
+  'github.website': {
+    replacement: 'nothing: a web target\'s site repo is `<brand.id>-<target name>`',
+    why: 'the website repo derives now (#883): each GitHub-hosted web target publishes its built site to its own `<brand.id>-<name>` repo, Pages serving it at the target\'s url',
+  },
+  // ─── the company is ONE key, outside `brand` (#677) ────────────────────
+  // `brand.company` was a typed DISPLAY NAME (Ian 2026-09-12: "brand.company
+  // hardcoded was a workaround"): the parent's name is the parent's to state,
+  // so it resolves now. Registered at its authored path, because `company` is
+  // a legitimate key one level up and at the top level.
+  'brand.company': {
+    replacement: 'company.name (resolved from `company: { id }`)',
+    why: "the company is ONE top-level key now (#677): type `company: { id: '<parent brand.id>' }` (or 'self') and the loader fills company.name/url/images from the parent's own config, so no brand restates its parent's facts",
+  },
+  'brand.images.companyWordmark': {
+    replacement: 'company.images.wordmark (resolved from `company: { id }`)',
+    why: "the parent's wordmark is the parent's own `brand.images.wordmark` (#677), resolved through `company: { id }` for every sub-brand instead of pasted into each one",
+  },
+
+  // ─── the ONE platform vocabulary (#867) ───────────────────────────────
+  // The client's words everywhere (`mac`, `windows`, `linux`), and what a
+  // target ships is DECLARED per format. Both of these validated clean while
+  // nothing read them: a brand still saying `win` got @omega.js/desktop's
+  // default Windows settings and its own were ignored, and a brand still
+  // saying `snap.enabled: true` published no snap at all. Registered at both
+  // shapes a brand can write them in: inside the target entry (the brand file)
+  // and at the top level (a target's own config/omega.json5).
+  'platforms.win': {
+    replacement: 'platforms.windows (with its formats inside: platforms.windows.formats.nsis)',
+    why: "ONE platform vocabulary, the client's (#867): run `npx omega manage --migration=platform-names --execute` at the brand root to rewrite it (it also renames config/icons/macos/ to config/icons/mac/). Run the migration BEFORE `omega migrate`, which deletes a retired key rather than moving it",
+  },
+  'targets.desktop.platforms.win': {
+    replacement: 'targets.desktop.platforms.windows (with its formats inside: platforms.windows.formats.nsis)',
+    why: "ONE platform vocabulary, the client's (#867): run `npx omega manage --migration=platform-names --execute` at the brand root to rewrite it (it also renames config/icons/macos/ to config/icons/mac/). Run the migration BEFORE `omega migrate`, which deletes a retired key rather than moving it",
+  },
+  'platforms.linux.snap': {
+    replacement: 'platforms.linux.formats.snap (presence IS the switch, so the `enabled` flag is gone)',
+    why: 'what a target ships is one declaration now (#867): every platform and format defaults ON and `platforms.linux.formats.snap: false` is the only way to drop the snap. Its settings (channels, confinement, grade, autoStart) move inside the format. `npx omega manage --migration=platform-names --execute` performs the move',
+  },
+  'targets.desktop.platforms.linux.snap': {
+    replacement: 'targets.desktop.platforms.linux.formats.snap (presence IS the switch, so the `enabled` flag is gone)',
+    why: 'what a target ships is one declaration now (#867): every platform and format defaults ON and `platforms.linux.formats.snap: false` is the only way to drop the snap. Its settings (channels, confinement, grade, autoStart) move inside the format. `npx omega manage --migration=platform-names --execute` performs the move',
+  },
+
+  // ─── the translation list says what to TRANSLATE (#858) ───────────────
+  // Ian 2026-09-13: an exclude list defaulted to "translate everything", so a
+  // brand that never thought about it paid a provider for its whole blog. The
+  // list is `translation.include` now: globs with `!` negation, defaulting to
+  // ['**', '!blog/**'] in the DEFAULTS layer, and the page half is the same
+  // key one level down (`translation.include: true`/`false` in frontmatter),
+  // which is Ian's 2026-09-09 same-name ruling. The row carries a `convert`,
+  // so `omega migrate` MOVES the setting instead of only deleting it: each
+  // excluded route becomes a negation on top of the default. Registered at its
+  // authored path AND at the `targets.web` overlay, the two places a brand can
+  // write it; `translation` is a legitimate key name at both.
+  'translation.exclude': {
+    replacement: 'translation.include',
+    why: "the route list says what to TRANSLATE now (#858, Ian 2026-09-13): globs with `!` negation, read in .gitignore order, defaulting to ['**', '!blog/**'], so `exclude: ['docs']` becomes `include: ['**', '!docs']`, and a page overrides it for itself with `translation.include: true`/`false` in its own frontmatter. `omega migrate` performs the move",
+    convert: excludeToInclude,
+  },
+  'targets.web.translation.exclude': {
+    replacement: 'targets.web.translation.include',
+    why: "the route list says what to TRANSLATE now (#858, Ian 2026-09-13): globs with `!` negation, read in .gitignore order, defaulting to ['**', '!blog/**'], so `exclude: ['docs']` becomes `include: ['**', '!docs']`, and a page overrides it for itself with `translation.include: true`/`false` in its own frontmatter. `omega migrate` performs the move",
+    convert: excludeToInclude,
+  },
+
+  'targets.desktop.releases.owner': {
+    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.org`',
+    why: 'one public releases repo per brand (#883), with no override: `releases: {}` stays the presence switch for the site\'s download links',
+  },
+  'targets.desktop.releases.repo': {
+    replacement: 'nothing: the releases repo is `<brand.id>-releases` under `repo.org`',
+    why: 'one public releases repo per brand (#883), with no override: `releases: {}` stays the presence switch for the site\'s download links',
+  },
 };
 
-// A multi-instance target is an ARRAY, so the walked path carries the position
-// (`targets.web.0.meta`) while every RETIRED_PATHS row names the shape
-// (`targets.web.meta`) — without this, each `targets.<type>.*` row missed the
-// array form outright (#732). Matching only: the REPORTED path keeps the index,
-// which is where the author finds the key.
-function withoutIndices(keyPath) {
-  return keyPath.split('.').filter((segment) => !/^\d+$/.test(segment)).join('.');
+// The per-target `github` override, one row per TYPE (#883). The type-row rule
+// above (shapePath reads a target's NAME as its TYPE) makes each row fire on
+// every target of that type a brand runs, and enumerating TARGET_TYPES is what
+// keeps a type nobody thought of from slipping through: the backend's CMS
+// content repo is the override that existed, but the key validated clean on any
+// target and pointed the commits at a repo nothing else addressed.
+for (const type of TARGET_TYPES) {
+  RETIRED_PATHS[`targets.${type}.github.repo`] = {
+    replacement: 'nothing: every repo the brand owns is `<brand.id>-<role>` under `repo.org`',
+    why: 'no repo NAME is configurable anywhere (#883): the CMS commits to the SOURCE repo `<brand.id>-omega`, so a content repo of its own is a brand of its own',
+  };
 }
 
-function walk(node, path, found) {
+// The walked path is not always the SHAPE a RETIRED_PATHS row names, two ways:
+// a value inside an array carries its position (`redirects.0.from`), and a
+// target carries its NAME while the rows name its TYPE (#886). Both are
+// normalized for MATCHING only: the REPORTED path stays the real one, which is
+// where the author finds the key.
+//
+// The name normalization is what makes a `targets.web.*` row fire on EVERY web
+// target a brand runs (`targets.community.meta.title` when community is
+// `type: 'web'`), which is the shape a brand with two sites has (#732, #886).
+function shapePath(keyPath, targetTypes) {
+  const parts = keyPath.split('.').filter((segment) => !/^\d+$/.test(segment));
+
+  if (parts[0] === 'targets' && parts.length > 1 && targetTypes[parts[1]]) {
+    parts[1] = targetTypes[parts[1]];
+  }
+
+  return parts.join('.');
+}
+
+/**
+ * Every declared target's name → type, read off the config being walked. A
+ * sub-tree with no `targets` map (or entries with no `type`) yields {}, so the
+ * rows then match by the key as written.
+ * @param {object} object - Parsed config (or any sub-tree of one).
+ * @returns {object} name → type.
+ */
+function targetTypes(object) {
+  const targets = object && object.targets;
+  if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return {};
+
+  const types = {};
+  Object.keys(targets).forEach((name) => {
+    const entry = targets[name];
+    if (entry && typeof entry === 'object' && !Array.isArray(entry) && typeof entry.type === 'string') {
+      types[name] = entry.type;
+    }
+  });
+
+  return types;
+}
+
+function walk(node, path, found, types) {
   if (Array.isArray(node)) {
-    node.forEach((item, index) => walk(item, path ? `${path}.${index}` : String(index), found));
+    node.forEach((item, index) => walk(item, path ? `${path}.${index}` : String(index), found, types));
     return;
   }
 
@@ -406,13 +611,13 @@ function walk(node, path, found) {
       found.push({ path: keyPath, key, ...RETIRED_KEYS[key] });
     }
 
-    const shapePath = withoutIndices(keyPath);
+    const shape = shapePath(keyPath, types);
 
-    if (RETIRED_PATHS[shapePath]) {
-      found.push({ path: keyPath, key, ...RETIRED_PATHS[shapePath] });
+    if (RETIRED_PATHS[shape]) {
+      found.push({ path: keyPath, key, ...RETIRED_PATHS[shape] });
     }
 
-    walk(node[key], keyPath, found);
+    walk(node[key], keyPath, found, types);
   });
 }
 
@@ -423,7 +628,7 @@ function walk(node, path, found) {
  */
 function findRetiredKeys(object) {
   const found = [];
-  walk(object, '', found);
+  walk(object, '', found, targetTypes(object));
   return found;
 }
 

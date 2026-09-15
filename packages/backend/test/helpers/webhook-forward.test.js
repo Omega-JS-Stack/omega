@@ -3,13 +3,14 @@
  *
  * Why this exists as a unit test (not an emulator test):
  *
- * The forwarder is gated on Manager.isParent() (config.parent === 'self'). In real test runs
+ * The forwarder is gated on Manager.isParent(): the brand names no company, or
+ * names itself as one (`company: { id: 'self' }`, #677). In real test runs
  * we run AGAINST a child brand's @omega.js/backend (Somiibo, etc.), so the route is invisible
  * (404). To verify the fan-out logic, we exercise the route handler directly
  * against a mocked admin SDK + mocked fetch, no HTTP needed.
  *
  * What's covered:
- *   - Gate: returns 404 if Manager.isParent() returns false (config.parent !== 'self')
+ *   - Gate: returns 404 if Manager.isParent() returns false (the brand belongs to a company)
  *   - Auth: returns 401 if key missing/wrong
  *   - Provider validation: returns 400 if missing
  *   - Brand iteration: reads brands collection, derives API URLs
@@ -101,13 +102,14 @@ function makeAssistant({ query, body }) {
 
 function makeManager(configOverrides) {
   const config = {
-    parent: 'self',
+    company: { id: 'self', url: 'https://itwcreativeworks.com', images: {} },
     ...configOverrides,
   };
   return {
     config,
     libraries: {}, // Not used in this route — admin comes in via libraries arg
-    isParent: () => config.parent === 'self',
+    // The real gate's rule (#677): no company, or this brand IS the company
+    isParent: () => !config.company?.id || config.company.id === 'self',
   };
 }
 
@@ -145,12 +147,12 @@ module.exports = defineCases({
     // ─── Gating ───
 
     {
-      name: 'returns-404-when-parent-not-self',
+      name: 'returns-404-when-the-brand-belongs-to-a-company',
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
-          const Manager = makeManager({ parent: 'https://api.itwcreativeworks.com' }); // NOT 'self'
+          const Manager = makeManager({ company: { id: 'itw-creative-works', url: 'https://itwcreativeworks.com', images: {} } }); // belongs to a company
           const admin = makeAdminMock([]);
 
           await route({ ctx, Manager, libraries: { admin } });
@@ -163,17 +165,17 @@ module.exports = defineCases({
     },
 
     {
-      name: 'allows-route-when-parent-is-self',
+      name: 'allows-route-when-the-brand-is-the-company',
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
-          const Manager = makeManager({ parent: 'self' });
+          const Manager = makeManager({ company: { id: 'self', url: 'https://itwcreativeworks.com', images: {} } });
           const admin = makeAdminMock([]); // No brands — but route still reaches the fan-out step
 
           await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(ctx._responses[0].code, 200, 'should return 200 when parent: self');
+          assert.equal(ctx._responses[0].code, 200, "should return 200 when company.id is 'self'");
           assert.equal(ctx._responses[0].data.forwarded, 0, 'no brands means 0 forwarded');
         });
       },

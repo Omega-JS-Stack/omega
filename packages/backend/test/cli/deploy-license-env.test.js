@@ -35,10 +35,15 @@ function makeBrand() {
     // NOT a demo-* project: a demo id short-circuits the check before the key
     // is ever read, which would prove nothing.
     cloud: { config: { projectId: 'lane-live' } },
-    targets: { backend: {} },
+    targets: { backend: { type: 'backend' } },
   }, null, 2));
   jetpack.write(path.join(brandRoot, '.env'), 'OMEGA_LICENSE_KEY="brand-root-key"\n');
-  jetpack.dir(projectDir);
+
+  // The brand's ONE version (#869): the deploy reads it before either lane and
+  // refuses a target that drifted, so the fixture carries the number at both
+  // levels the way a real brand does.
+  jetpack.write(path.join(brandRoot, 'package.json'), JSON.stringify({ name: 'lane-brand', version: '0.0.0', private: true }, null, 2));
+  jetpack.write(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'lane-backend', version: '0.0.0', private: true }, null, 2));
 
   return { projectDir, cleanup: () => jetpack.remove(brandRoot) };
 }

@@ -93,7 +93,9 @@ function stage(prefix = '') {
 const CONFIG = {
   brand: { name: 'MiniCo', url: 'https://mini.co' },
   socials: { twitter: 'minico' },
-  translation: { languages: ['es', 'ar'], exclude: ['skipme'] },
+  // `include` is the route list (#858): the default ['**', '!blog/**'] plus one
+  // brand page kept out by hand, the successor of the old `exclude: ['skipme']`.
+  translation: { languages: ['es', 'ar'], include: ['**', '!blog/**', '!skipme'] },
 };
 
 // The same brand served as a project site under /workkit: brand.url carries
@@ -126,7 +128,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.ok(fs.existsSync(path.join(dist, 'ar.html')));
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'signin')), 'framework default page excluded from the provider pass');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'admin')), 'system folder excluded');
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'skipme')), 'config exclude honored');
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'skipme')), 'the include list\'s negation honored');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'twitter.html')), 'socials redirect excluded');
   assert.strictEqual(stats.pages, 2);
 
@@ -210,7 +212,7 @@ test('#605: the framework keeps its own default pages off the provider with no c
   const stats = await translate({
     root,
     outDir: dist,
-    // No `exclude` key whatsoever — a brand should not have to name any of this
+    // No route list whatsoever: a brand should not have to name any of this
     config: { brand: { name: 'MiniCo', url: 'https://mini.co' }, translation: { languages: ['es'] } },
     send: fakeSend([]),
   });

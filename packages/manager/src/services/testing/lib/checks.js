@@ -20,7 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
-const { brandRepo, brandRepoName, instanceIdFromDirName, resolveInstanceUrl } = require('@omega.js/config');
+const { sourceRepo, targetUrl } = require('@omega.js/config');
 const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
 
 const MAX_RETRIES = 3;
@@ -298,15 +298,14 @@ function checkWorkingTree(recorder, ctx) {
 // ── Live checks ─────────────────────────────────────────────────────────────
 
 /**
- * Homepage check — the deployed site answers on ITS instance's URL: the
- * instance entry's url (multi-instance targets), else the id AS a subdomain of
- * the brand host (#588), falling back to the brand URL for the single-instance
- * world. Deploy records key per instance too, so a never-deployed admin
- * instance nudges without failing a live main.
+ * Homepage check: the deployed site answers on ITS OWN url, which the target
+ * NAME resolves (#886) through the one derivation (`targetUrl`): the entry's
+ * url, else the name AS a subdomain of the brand host (#588), else the brand
+ * url for a target named for its type. Deploy records key per name too, so a
+ * never-deployed admin target nudges without failing a live web.
  */
 async function checkHomepage(recorder, entry, ctx) {
-  const instance = instanceIdFromDirName(entry.name, entry.target);
-  const url = resolveInstanceUrl(ctx.brandConfig.targets?.[entry.target], instance, ctx.brandConfig);
+  const url = targetUrl(ctx.brandConfig, entry.name);
   const name = `${entry.name}: homepage`;
 
   if (!url) {
@@ -323,14 +322,14 @@ async function checkHomepage(recorder, entry, ctx) {
   // (never-deployed vs deployed-but-down — Ian 2026-07-17). A live HIT on a
   // record-less brand adopts: the record is per-machine, so fresh clones of
   // deployed brands self-heal here.
-  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: entry.target, instance });
+  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: entry.name });
   const { response, duration, error } = await fetchWithRetry(ctx, url);
   const live = !error && response.status >= 200 && response.status < 400;
 
   if (live) {
     recorder.pass(name, `${url} → ${response.status} (${duration}ms)`);
     if (!deployed) {
-      recordDeploy({ dir: ctx.brandRoot, target: entry.target, instance, detail: { adopted: true } });
+      recordDeploy({ dir: ctx.brandRoot, target: entry.name, detail: { adopted: true } });
     }
   } else if (!deployed) {
     recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${url})`);
@@ -368,7 +367,7 @@ async function checkApiHealth(recorder, entry, ctx) {
   }
 
   // Same never-deployed vs deployed-but-down split as checkHomepage
-  const deployRecord = readDeployRecord({ dir: ctx.brandRoot, target: entry.target });
+  const deployRecord = readDeployRecord({ dir: ctx.brandRoot, target: entry.name });
   const { response, duration, error } = await fetchWithRetry(ctx, apiUrl);
   const live = !error && response.status >= 200 && response.status < 400;
 
@@ -383,7 +382,7 @@ async function checkApiHealth(recorder, entry, ctx) {
 
   recorder.pass(name, `${apiUrl} → ${response.status} (${duration}ms)`);
   if (!deployRecord) {
-    recordDeploy({ dir: ctx.brandRoot, target: entry.target, detail: { adopted: true } });
+    recordDeploy({ dir: ctx.brandRoot, target: entry.name, detail: { adopted: true } });
   }
 
   // Deployed-version comparison from the health payload
@@ -411,17 +410,17 @@ async function checkApiHealth(recorder, entry, ctx) {
 }
 
 /**
- * GitHub Actions check — latest workflow run of the brand repo. Silent when
- * no repo.providers.github.org is configured (the github service already reports that skip)
- * or when the gh CLI is unavailable.
+ * GitHub Actions check: the latest workflow run of the brand's SOURCE repo, the
+ * one every workflow runs in (#883). Silent when the brand declares no
+ * `repo.org` (the repo service already reports that skip) or when the gh CLI
+ * is unavailable.
  */
 function checkGitHubActions(recorder, ctx) {
-  const github = ctx.brandConfig.repo?.providers?.github || {};
-  if (!github.org) return;
+  // The service's own brand id stands in for a config that names no brand.
+  const source = sourceRepo({ ...ctx.brandConfig, brand: { ...ctx.brandConfig.brand, id: ctx.brandConfig.brand?.id || ctx.brandId } });
+  if (!source) return;
 
-  // BOTH halves from the one derivation (an `owner/name` slug owns itself); the
-  // service's own brand id stands in for a config that names no brand.
-  const repo = brandRepo(ctx.brandConfig).repo || `${github.org}/${brandRepoName({ brand: { id: ctx.brandId } })}`;
+  const repo = source.slug;
 
   if (ctx.dryRun) {
     recorder.would(`gh run list --repo ${repo}`);

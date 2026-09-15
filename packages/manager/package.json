@@ -29,7 +29,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
   },
@@ -40,8 +40,8 @@
     "type": "copy",
     "hooks": {
       "after": [
-        "node -e \"require('@omega.js/devkit/vendor')()\"",
-        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\""
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\"",
+        "node -e \"require('@omega.js/devkit/vendor')()\""
       ],
       "afterBlocking": true
     }
@@ -63,8 +63,7 @@
     "puppeteer": "^24.43.1",
     "sharp": "^0.35.3",
     "stripe": "^22.3.0",
-    "ws": "^8.21.0",
-    "yargs": "^18.0.0"
+    "ws": "^8.21.0"
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": ">=0.2"

@@ -51,30 +51,52 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'bin/omega-desktop exists',
+      name: 'bin/omega exists',
       run: (ctx) => {
-        const binFile = path.join(root, 'bin', 'omega-desktop');
+        const binFile = path.join(root, 'bin', 'omega');
         ctx.expect(fs.existsSync(binFile)).toBeTruthy();
       },
     },
     {
-      name: 'bin/omega-desktop is executable',
+      name: 'bin/omega is executable',
       run: (ctx) => {
         // NTFS has no execute bit, so the mode carries nothing to assert on a
         // Windows checkout — the existence case above still runs everywhere.
         if (process.platform === 'win32') ctx.skip('NTFS has no execute bit — `stat.mode & 0o100` is meaningless on Windows');
-        const stat = fs.statSync(path.join(root, 'bin', 'omega-desktop'));
+        const stat = fs.statSync(path.join(root, 'bin', 'omega'));
         ctx.expect((stat.mode & 0o100) !== 0).toBeTruthy();
       },
     },
     {
-      name: 'cli-run disables yargs built-in --help/--version (router owns both)',
+      name: 'cli-run declares its value-less flags and claims neither --help nor --version (the router owns both)',
       run: (ctx) => {
-        // The built-ins printed an empty stub and version "0.0.0" instead of
-        // reaching the alias table / the router's generated help (wave-6 D1).
-        const source = fs.readFileSync(path.join(root, 'dist', 'cli-run.js'), 'utf8');
-        ctx.expect(source.includes('.version(false)')).toBeTruthy();
-        ctx.expect(source.includes('.help(false)')).toBeTruthy();
+        // The parse the bin really performs (#920). The built-ins it replaced
+        // printed an empty stub and version "0.0.0" instead of reaching the
+        // alias table / the router's generated help (wave-6 D1).
+        const { BOOLEAN_FLAGS } = require(path.join(root, 'dist', 'cli-run.js'));
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+        // A value-less flag never swallows the next positional.
+        const scoped = parse(['test', '--extended', 'mgr:build/cli']);
+        ctx.expect(scoped.extended).toBe(true);
+        ctx.expect(scoped._.join(' ')).toBe('test mgr:build/cli');
+
+        // A value flag keeps its value in the SPACE-separated form CI writes
+        // (src/defaults/.github/workflows/build.yml).
+        const signing = parse(['sign-windows', '--in', 'release', '--out', 'release/signed']);
+        ctx.expect(signing.in).toBe('release');
+        ctx.expect(signing.out).toBe('release/signed');
+        ctx.expect(parse(['finalize-release', '--signed-dir', 'release/signed']).signedDir).toBe('release/signed');
+
+        // Every value-LESS flag is declared, so none of them can eat the token
+        // after it: `omega logs --tail runtime` keeps the log name.
+        const tailed = parse(['logs', '--tail', 'runtime']);
+        ctx.expect(tailed.tail).toBe(true);
+        ctx.expect(tailed._.join(' ')).toBe('logs runtime');
+
+        // And --help reaches the router rather than a built-in.
+        ctx.expect(parse(['deploy', '--help']).help).toBe(true);
       },
     },
     {

@@ -6,7 +6,7 @@
     {
       label: 'Unsized action',
       href: '/unsized',
-      icon: 'bolt',
+      icon: 'fa-solid fa-bolt',
       class: 'btn-adaptive',
     },
     {
@@ -16,7 +16,7 @@
     },
     {
       label: 'Unsized dropdown',
-      icon: 'gear',
+      icon: 'fa-solid fa-gear',
       class: 'btn-adaptive',
       dropdown: [
         { label: 'One', href: '/one' },

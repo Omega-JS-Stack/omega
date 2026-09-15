@@ -55,11 +55,11 @@ function stageBrand({ manager = true, puppeteer = 'installed', chrome = 'present
 test('the walk stops at the nearest manifest declaring @omega.js/manager', () => {
   const root = stageBrand();
   // A target sits between the lane and the brand root, with its own manifest
-  write(path.join(root, 'targets', 'website', 'package.json'), JSON.stringify({ name: 'website' }));
-  write(path.join(root, 'targets', 'website', 'test', 'e2e', 'run.js'), '');
+  write(path.join(root, 'targets', 'web', 'package.json'), JSON.stringify({ name: 'web' }));
+  write(path.join(root, 'targets', 'web', 'test', 'e2e', 'run.js'), '');
 
   assert.equal(puppeteerRoot(path.join(root, 'test', 'e2e')), root);
-  assert.equal(puppeteerRoot(path.join(root, 'targets', 'website', 'test', 'e2e')), root,
+  assert.equal(puppeteerRoot(path.join(root, 'targets', 'web', 'test', 'e2e')), root,
     'a target target-root manifest is not the brand root');
 });
 
@@ -79,8 +79,8 @@ test('with no manager declared anywhere, the NEAREST manifest answers, never the
 
 test('a DECLARING ancestor still wins over the nearer non-declaring one', () => {
   const root = stageBrand();
-  const targetDir = path.join(root, 'targets', 'website');
-  write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'website' }));
+  const targetDir = path.join(root, 'targets', 'web');
+  write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'web' }));
 
   // The brand root declares the manager; the target manifest between them does
   // not, and must not capture the walk.
@@ -89,9 +89,9 @@ test('a DECLARING ancestor still wins over the nearer non-declaring one', () => 
 
 test('an unreadable manifest is walked past, never read as a brand root', () => {
   const root = stageBrand();
-  write(path.join(root, 'targets', 'website', 'package.json'), '{ not json');
+  write(path.join(root, 'targets', 'web', 'package.json'), '{ not json');
 
-  assert.equal(puppeteerRoot(path.join(root, 'targets', 'website')), root);
+  assert.equal(puppeteerRoot(path.join(root, 'targets', 'web')), root);
 });
 
 test('inside this monorepo the walk stops at the nearest package (no brand above it)', () => {

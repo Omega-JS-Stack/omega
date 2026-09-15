@@ -54,9 +54,15 @@ function buildTheme(theme) {
 
 // The forked half: build the named theme and hand the result back.
 if (require.main === module) {
+  const { setEnvironment } = require('@omega.js/config/environment');
   const { buildSite } = require('../../src/build.js');
   const siteData = JSON.parse(fs.readFileSync(path.join(SITE, 'site-data.json'), 'utf8'));
   const theme = process.argv[2];
+
+  // This child IS the lane, so it names the environment
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). The contract
+  // fixture pins rendering, which is the dev shape.
+  setEnvironment('development');
   buildSite({
     consumerDir: SITE,
     siteData: { ...siteData, theme: { id: theme } },

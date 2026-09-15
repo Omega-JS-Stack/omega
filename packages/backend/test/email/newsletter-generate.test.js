@@ -329,17 +329,17 @@ module.exports = defineCases({
     // Everything below this point talks to the real parent server and the AI
     // providers. The parent URL is required for any of it.
     // Use Manager.getParentApiUrl() — same helper the production newsletter
-    // generator uses. config.parent stores the parent's brand URL WITHOUT the
-    // `api.` subdomain (e.g. 'https://itwcreativeworks.com'); the helper
-    // inserts `api.` at call time. PARENT_API_URL env override is honored
-    // verbatim for one-off testing against a different parent.
+    // generator uses. The resolved `company.url` is the parent's brand URL
+    // WITHOUT the `api.` subdomain (e.g. 'https://itwcreativeworks.com', #677);
+    // the helper inserts `api.` at call time. PARENT_API_URL env override is
+    // honored verbatim for one-off testing against a different parent.
     // When NEWSLETTER_SOURCE is set, skip parent URL checks and source fetching —
     // the generator's built-in resolver (resolveSources) handles everything.
     let sources = [];
 
     if (!env.NEWSLETTER_SOURCE) {
       const parentUrl = env.PARENT_API_URL || Manager.getParentApiUrl();
-      assert.ok(parentUrl, 'PARENT_API_URL (env) or parent (config) must be set for the AI pipeline. Set TEST_EXTENDED_MODE=1 to run it, or omit TEST_EXTENDED_MODE for the fast fixture preview.');
+      assert.ok(parentUrl, 'PARENT_API_URL (env) or a resolved company.url must be set for the AI pipeline. Set TEST_EXTENDED_MODE=1 to run it, or omit TEST_EXTENDED_MODE for the fast fixture preview.');
 
       // --- Peek mode (early return) ---
       if (env.NEWSLETTER_PEEK) {

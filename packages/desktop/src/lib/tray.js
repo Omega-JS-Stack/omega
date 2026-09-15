@@ -166,15 +166,16 @@ const tray = {
   //
   // Returns null if nothing is found (caller logs).
   _defaultIconPath() {
-    const platform = process.platform === 'darwin' ? 'macos'
-      : process.platform === 'win32' ? 'windows'
-      : 'linux';
+    // The icon dirs are OMEGA's vocabulary (mac/windows/linux), so the OS is
+    // read through the one translation point (#867). Electron runs nowhere else,
+    // so an unknown OS falling back to linux is the safe read.
+    const platform = require('../utils/platform.js').desktopPlatform() || 'linux';
     // INPUT name (what consumers ship in config/icons/<platform>/ or global/) is always tray.png.
-    // OUTPUT name (what gulp/build-config writes into dist/config/icons/macos/) is
-    // trayTemplate.png on mac — the `Template` suffix is a macOS magic marker that
+    // OUTPUT name (what gulp/build-config writes into dist/config/icons/mac/) is
+    // trayTemplate.png on mac: the `Template` suffix is a macOS magic marker that
     // makes the OS auto-invert the icon in dark mode.
     const inFile  = 'tray.png';
-    const outFile = platform === 'macos' ? 'trayTemplate.png' : 'tray.png';
+    const outFile = platform === 'mac' ? 'trayTemplate.png' : 'tray.png';
     const fallbackFile = 'icon.png'; // tray → app icon if absent
 
     const projectRoot = require('../utils/app-root.js')();

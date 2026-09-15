@@ -1155,11 +1155,23 @@ module.exports = defineCases({
           jetpack.write(path.join(home, 'actions-runner-foo', 'config.cmd'), 'rem foo');
           jetpack.write(path.join(home, '_template', 'config.cmd'), 'rem template');
 
+          // The job guard's allow lists are configuration too
+          // ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)): a list
+          // narrowed by hand outlives an uninstall exactly as the `.env` does.
+          // The hook SCRIPT is install state, and the next install writes it back.
+          jetpack.write(path.join(home, 'allowed-repos.txt'), 'Omega-JS-Stack/omega-omega\n');
+          jetpack.write(path.join(home, 'allowed-actors.txt'), 'ianwieds\n');
+          jetpack.write(path.join(home, 'job-started.js'), '// stale copy');
+
           await runner.removeRunnerHomeWithRetry(new Set(), home);
 
-          ctx.expect(jetpack.list(home).sort()).toEqual(['.env', 'logs']);
+          ctx.expect(jetpack.list(home).sort()).toEqual(['.env', 'allowed-actors.txt', 'allowed-repos.txt', 'logs']);
           ctx.expect(jetpack.read(path.join(home, '.env'))).toBe('WIN_CSC_KEY_PASSWORD=keep-me');
           ctx.expect(jetpack.read(runnerEnv.runnerLogFile(home))).toBe('# omega log\n');
+          ctx.expect(jetpack.read(path.join(home, 'allowed-repos.txt'))).toBe('Omega-JS-Stack/omega-omega\n');
+
+          jetpack.remove(path.join(home, 'allowed-repos.txt'));
+          jetpack.remove(path.join(home, 'allowed-actors.txt'));
 
           // A kept org dir (its deregistration failed) survives beside them.
           jetpack.write(path.join(home, 'actions-runner-bar', 'config.cmd'), 'rem bar');
@@ -2584,10 +2596,21 @@ module.exports = defineCases({
           });
 
           ctx.expect(fs.readFileSync(path.join(home, 'home', '.gitconfig'), 'utf8')).toBe('[core]\n\tautocrlf = false\n');
+          // The job guard is healed on the same pass
+          // ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)): a box
+          // that installed before it would otherwise come online signing for
+          // anything. Both lines, in one `<runner dir>\.env`.
+          const hook = path.join(home, 'job-started.js');
+          ctx.expect(jetpack.exists(hook)).toBe('file');
           for (const org of orgs) {
-            ctx.expect(fs.readFileSync(path.join(home, `actions-runner-${org}`, '.env'), 'utf8')).toBe(`HOME=${path.join(home, 'home')}\n`);
+            ctx.expect(fs.readFileSync(path.join(home, `actions-runner-${org}`, '.env'), 'utf8')).toBe(`HOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${hook}\n`);
             ctx.expect(logged.join('\n')).toContain(`HOME for ${org}: ${path.join(home, 'home')}`);
+            ctx.expect(logged.join('\n')).toContain(`Job guard for ${org}: ${hook}`);
           }
+          // `start` asks GitHub nothing, so the actor list is the operator's to
+          // fill: the file is there with its header, and an empty list refuses.
+          ctx.expect(jetpack.exists(path.join(home, 'allowed-repos.txt'))).toBe('file');
+          ctx.expect(jetpack.exists(path.join(home, 'allowed-actors.txt'))).toBe('file');
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
           for (const file of shortcuts) jetpack.remove(file);

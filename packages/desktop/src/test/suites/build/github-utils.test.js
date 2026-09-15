@@ -1,6 +1,9 @@
-// Build-layer tests for src/utils/github.js — the octokit factory + repo ensure.
-// Repo DISCOVERY is not this module's job any more (#799): the app repo and the
-// releases repo come from @omega.js/config, never a package.json or a git remote.
+// Build-layer tests for src/utils/github.js: the octokit factory, and nothing
+// else. Repo DISCOVERY is not this module's job (#799): the source repo and the
+// releases repo come from @omega.js/config, never a package.json or a git
+// remote. Repo CREATION is not either (#883): `@omega.js/devkit/github-repo`'s
+// ensureRepo is the one home, so a bug in it is fixed once for the manage walk,
+// the web deploy and the release precheck alike.
 
 const path    = require('path');
 const defineCases = require('@omega.js/devkit/test/define-cases');
@@ -8,17 +11,20 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'utils/github — octokit factory + repo ensure',
+  description: 'utils/github: the octokit factory, and only that',
   tests: [
     {
-      name: 'github utils exports the octokit surface and NO repo discovery (#799)',
+      name: 'github utils exports the octokit surface, no discovery (#799) and no ensure (#883)',
       run: (ctx) => {
         const mod = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
         ctx.expect(typeof mod.getOctokit).toBe('function');
-        ctx.expect(typeof mod.ensureRepo).toBe('function');
         // The git-remote fallback is gone: in a brand monorepo it answered the
         // ENCLOSING repo, so every release verb targeted the wrong owner.
         ctx.expect(mod.discoverRepo).toBeUndefined();
+        // And the second ensureRepo is gone with it: one implementation, in
+        // devkit, so a repo this framework creates matches every other.
+        ctx.expect(mod.ensureRepo).toBeUndefined();
+        ctx.expect(typeof require('@omega.js/devkit/github-repo').ensureRepo).toBe('function');
       },
     },
     {

@@ -5,41 +5,58 @@ Cross-platform code signing reference. Covers macOS (sign + notarize), Windows (
 ## tl;dr
 
 - **macOS production**: Developer ID Application cert + notarization API key. Files in `config/certs/`. Env vars point at them.
-- **Windows production**: EV USB token (self-hosted runner now) or cloud signing (future, pluggable via `platforms.win.signing.strategy`).
+- **Windows production**: EV USB token (self-hosted runner now) or cloud signing (future, pluggable via `platforms.windows.signing.strategy`).
 - **Linux**: No signing for AppImage/deb. Snap/Flatpak have their own pipelines.
 
 ## Where files live
 
+Signing material lives in the SIGNING TREE and is read there, never copied into a target
+([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
+
 ```
+<company brand>/company/.omega/certificates/apple/   # read FIRST when the brand names a company
+<your brand>/.omega/certificates/apple/              # read second
+  certificates/DEVELOPER_ID_APPLICATION_G2.p12       # what CSC_LINK resolves to
+  certificates/DEVELOPER_ID_INSTALLER_G2.p12         # only for .pkg builds (rare)
+  AuthKey_XXXXXXXXXX.p8                              # what APPLE_API_KEY resolves to
+
 <your-app>/
   build/
-    entitlements.mac.plist             # universal — already in @omega.js/desktop defaults
+    entitlements.mac.plist             # universal, already in @omega.js/desktop defaults
     icon.icns / icon.ico / icon.png    # per-brand
-    certs/                             # gitignored
-      developer-id-application.p12     # universal across team
-      developer-id-installer.p12       # only for .pkg builds (rare)
-      AuthKey_XXXXXXXXXX.p8            # universal across team
-      <app-name>.provisionprofile      # per-app (only if entitlements require)
-  .env                                 # gitignored — env vars referencing config/certs/*
+  config/certs/                        # gitignored, and EMPTY on a developer machine:
+                                       # only a RUNNER writes here, decoding the pushed secrets
+    README.md                          # the ONE tracked file here (#913): it says the above
+  .env                                 # gitignored, and it carries no signing PATH: only
+                                       # CSC_KEY_PASSWORD and the APPLE_* three
 ```
+
+There is no provisioning profile: Developer ID is direct distribution, signed and notarized,
+and needs none.
 
 ## Where the macOS certificate comes from (the lookup order)
 
-A signed build resolves its Developer ID Application certificate in ONE order
-([src/utils/resolve-signing-cert.js](../src/utils/resolve-signing-cert.js), applied at the
-gulp boundary):
+Every desktop boot (the CLI and gulp alike) derives the signing paths ONCE, at the env load
+([src/utils/load-env.js](../src/utils/load-env.js), over `@omega.js/devkit/signing-env`), so
+the build, `omega validate-certs` and the deploy precheck's secret publish all read the same
+answer. `CSC_LINK` resolves in ONE order:
 
 1. **`CSC_LINK`** in the environment — an explicit answer always wins.
-2. **The brand's signing tree** —
-   `<brandRoot>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12`,
-   where the brand root is the nearest directory at or above the target carrying a `.omega/`.
-   This is the portable/CI path: `@omega.js/manager`'s certificates service produces the
-   tree ([the manager guide](../../../docs/manager/index.md)).
-3. **The company's tree**, when the brand is company-managed. A brand is NEVER physically
-   inside its company folder — membership is the `.omega/company.json` stamp at the brand
-   root, read through `@omega.js/config`'s `readCompanyRoot` (the ecosystem's one company
-   rule). The stamp's target is used as given: it is explicit config, not discovery.
+2. **The COMPANY's tree**, when the brand names a company and that company is on this
+   machine: a brand with a company reuses the company tree first, always
+   ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)). A brand is NEVER physically
+   inside its company folder: membership is its `company: { id }` key, resolved through
+   `@omega.js/config`'s `resolveCompany` (the ecosystem's one company rule), and the
+   certificate is one more relative path through that resolver's `file()`:
+   `<company>/company/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12`.
+3. **The brand's own signing tree**:
+   `<brandRoot>/.omega/certificates/apple/certificates/DEVELOPER_ID_APPLICATION_G2.p12`.
+   `@omega.js/manager`'s certificates service produces the tree
+   ([the manager guide](../../../docs/manager/index.md)).
 4. **The macOS Keychain** — electron-builder's own identity auto-discovery.
+
+`APPLE_API_KEY` follows the same order for `AuthKey_<APPLE_API_KEY_ID>.p8` (an unset id means
+there is no filename to look for). Both derived values are ABSOLUTE paths into the tree.
 
 **Keychain stays the default.** A project with no signing tree resolves to it exactly as
 before. Two further conditions keep a build on the Keychain rather than handing
@@ -47,10 +64,8 @@ electron-builder a file it cannot use: no `CSC_KEY_PASSWORD` in the `.env` casca
 password that does not OPEN the `.p12` (verified with `openssl pkcs12 -legacy`, retried
 without the flag for LibreSSL — stock macOS openssl — which reads legacy containers but
 rejects the flag; a missing openssl is named as the reason rather than blamed on the
-password). The build log names the source it picked, and the reason, on every run.
-
-The brand-root walk stops **below the home directory**: `~/.omega` is a real personal
-overlay on developer machines, so a tree at or above `~` is never a signing tree.
+password). Either case prints one line naming the file and the reason, and leaves the key
+unset rather than failing the build silently.
 
 The password itself never lives in config: `CSC_KEY_PASSWORD` comes from the `.env`
 cascade (the manager's certificates service writes it to the signing root's `.env`),
@@ -110,10 +125,12 @@ npx omega validate-certs
 ```
 
 This checks:
-- macOS Keychain has a Developer ID Application identity
 - `CSC_LINK` exists and is readable
+- macOS Keychain has a Developer ID Application identity, and ONLY when `CSC_LINK` names no certificate: electron-builder imports a `CSC_LINK` `.p12` into its own temporary keychain, so the login keychain says nothing about that build
 - API key file exists and `APPLE_API_KEY_ID` + `APPLE_API_ISSUER` are set
 - Team ID matches the cert
+
+The electron-builder floor is 26.16.1 (the package's peer range, installed by ensure-target for any consumer below it): every earlier build hands the `.p12` password to `security set-key-partition-list`, which wants the temporary keychain's own password, and the macos-26 runner image rejects the mismatch (electron-userland/electron-builder#10066, [#891](https://github.com/Omega-JS-Stack/omega/issues/891)).
 
 ### 5. Build + notarize
 
@@ -141,7 +158,14 @@ Buy an EV code-signing cert from Sectigo, DigiCert, SSL.com, etc. Get a physical
 
 Setting the box up is [`docs/runner.md`](runner.md) — the runner home, the Startup-folder auto-start, the commands, and the Session 0 / Session 1 rule that makes the whole thing work.
 
+**A workflow that targets this runner fires only on dispatch**, and the box enforces it ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)). Whoever can start a job on the signing box can sign binaries with your token, so two guards stand between a stray trigger and `signtool`:
+
+- The generated `windows-sign` job runs only on `workflow_dispatch`, the one trigger the file carries (#923). A `push` or `pull_request` trigger added to `build.yml` later SKIPS the sign job instead of signing what it built.
+- The runner itself refuses the job before its first step. `npx omega runner install` writes `job-started.js` beside the runner and points every registration's `ACTIONS_RUNNER_HOOK_JOB_STARTED` at it; the hook exits nonzero, failing the job with one line, unless the event is a dispatch, `GITHUB_REPOSITORY` is on `allowed-repos.txt` and `GITHUB_ACTOR` is on `allowed-actors.txt`. Both lists live on the box and are yours to edit ([`docs/runner.md`](runner.md) § One-time setup).
+
 `npx omega sign-windows` is the strategy-aware command that drives `signtool` (or the cloud provider CLI).
+
+Every signed artifact is verified before the job moves on, and the log says so in the mac lane's shape: `Signed and verified: signtool verify /pa accepts <file>.` mirrors macOS's `Stapled and verified: ...`, so a deploy log proves the Windows signature was checked rather than only claimed ([#918](https://github.com/Omega-JS-Stack/omega/issues/918)). A failing verify aborts the job.
 
 ### Cloud signing (future migration)
 
@@ -163,22 +187,25 @@ If no signing runner is available, CI uploads the unsigned `.exe` and a develope
 
 ## Pushing secrets to GitHub Actions
 
-@omega.js/desktop ships a command that pushes the target's **composed env** to the repo's GitHub Actions secrets over the same shared `gh` transport that the web and extension publish verbs use (`gh secret set`, which seals each value with the repo's public key locally): values travel on **stdin**, never in argv, and are never logged. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
+`omega deploy`'s precheck pushes the target's **composed env** to the repo's GitHub Actions secrets over the same shared `gh` transport the other three frameworks use (`gh secret set`, which seals each value with the repo's public key locally): values travel on **stdin**, never in argv, and are never logged. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents**: the workflow decodes back to a temp file at job start.
+
+There is no standalone `omega push-secrets` verb ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the push happens where it matters, and the manage walk's `repo` service runs the same function when you want a brand brought current without deploying.
 
 ```bash
-# Make sure the brand root's .env holds your signing creds, and that `gh auth login` has run
-npx omega push-secrets
+# Make sure the brand root's .env holds CSC_KEY_PASSWORD + the APPLE_* three, and `gh auth login` has run
+npx omega deploy
 
-# Push only specific keys
-npx omega push-secrets --only=CSC_LINK,CSC_KEY_PASSWORD
+# See exactly what it would publish, and publish nothing
+npx omega deploy --dry-run
 ```
 
 Behavior:
 - The source is `composeTargetEnv({ targetDir, target: 'desktop' })`: company `.env` ← brand `.env` ← target `.env`, the brand-side layers filtered by the env schema to the keys the desktop target reads. The brand root's `.env` is the one file you keep; a target `.env` is an optional per-key override.
 - Files only — the shell is never a source — and an empty value never claims a key, so unset keys simply don't publish.
 - Auto-detects "is this a path?" — relative or absolute paths ending in `.p12`/`.pem`/`.cer`/`.p8`/`.provisionprofile`/`.crt`/`.key`/`.json` that exist on disk (target root first, brand root second) get base64-encoded.
-- Publishes to the git remote's `owner/repo`, and REFUSES unless the brand's own config claims it (`repo.providers.github`) — a fork, a template clone or a vendored target never arms a stranger's Actions with your certificates.
+- Publishes to the brand's SOURCE repo (`repo.org` + `brand.id` → `<brand.id>-omega`), and REFUSES unless the checkout's own remote IS that repo: a fork, a template clone or a vendored target never arms a stranger's Actions with your certificates.
 - No PAT: the credential is `gh`'s auth session. A missing or signed-out `gh` fails loudly with install/auth instructions; a CI run, an empty cascade, a remote-less checkout or a repo mismatch skips loudly.
+- `CSC_LINK` and `APPLE_API_KEY` are DERIVED, never typed ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the env load resolved them from the signing tree, so the publish sends those files' bytes. A typed value still wins, and a key the config REQUIRES that neither the tree nor the `.env` answers STOPS the deploy (the step is `fatal`), naming both tier paths it looked in and `omega manage --service certificates`, publishing nothing.
 - Logs key NAMES only; never a value.
 
 The corresponding decode step in CI looks like:
@@ -211,7 +238,6 @@ GitHub Actions secrets you'll need (per repo):
 | Secret | Purpose |
 |---|---|
 | `GH_TOKEN` | Cross-repo publish, secret rotation |
-| `OMEGA_ADMIN_KEY` | Privileged backend API calls |
 | `CSC_LINK` | base64-encoded `.p12` (workflow decodes to file) |
 | `CSC_KEY_PASSWORD` | `.p12` password |
 | `APPLE_API_KEY` | base64-encoded `.p8` |
@@ -251,7 +277,7 @@ The workflow base64-decodes secrets into temp files inside `config/certs/` at jo
 
 ### Windows: "SignTool Error: No certificates were found"
 - Token unplugged or middleware not running.
-- For cloud: verify `platforms.win.signing.cloud.provider` in `config/omega.json5` matches the provider whose creds are in `.env`.
+- For cloud: verify `platforms.windows.signing.cloud.provider` in `config/omega.json5` matches the provider whose creds are in `.env`.
 
 ## What lives in `build/`
 

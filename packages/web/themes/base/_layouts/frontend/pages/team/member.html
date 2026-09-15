@@ -51,10 +51,12 @@ layout: frontend/core/base
           {% iftruthy resolved.member.links %}
             <span class="d-inline-flex gap-2">
               {% for link in resolved.member.links %}
-                {% assign link_icon = link.id %}
-                {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                {% comment %} The id names a PLATFORM, not an icon (#929): a profile link
+                is always a brand mark, and `website` is the one that is not. {% endcomment %}
+                {% assign link_icon = 'fa-brands fa-' | append: link.id %}
+                {% if link.id == "website" %}{% assign link_icon = "fa-solid fa-globe" %}{% endif %}
                 <a href="{{ link.url }}" class="omega-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                  <i class="fa-solid fa-{{ link_icon }} fa-sm"></i>
+                  <i class="{{ link_icon }} fa-sm" aria-hidden="true"></i>
                 </a>
               {% endfor %}
             </span>

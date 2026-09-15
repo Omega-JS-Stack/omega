@@ -14,7 +14,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
-const { deepMerge, desktopArtifactName, sanitizeProductName, releasesRepo } = require('@omega.js/config');
+const { deepMerge, enabledFormats, desktopArtifactName, sanitizeProductName, releasesRepo } = require('@omega.js/config');
 const Manager = new (require('../../build.js'));
 
 const { writeMacEntitlements } = require('../../lib/sign-helpers/entitlements.js');
@@ -40,7 +40,7 @@ module.exports = function buildConfig(done) {
     // 2. Resolve + copy icons (3-tier waterfall) into dist/config/icons/.
     const emDefaultsRoot = path.join(__dirname, '..', '..', 'defaults', 'config');
     const icons = await resolveAndCopy({ config, projectRoot, distRoot, emDefaultsRoot });
-    logger.log(`resolved icons: mac=${Object.keys(icons.macos).length}, win=${Object.keys(icons.windows).length}, linux=${Object.keys(icons.linux).length}`);
+    logger.log(`resolved icons: mac=${Object.keys(icons.mac).length}, windows=${Object.keys(icons.windows).length}, linux=${Object.keys(icons.linux).length}`);
 
     // Build the full config object from @omega.js/desktop defaults + consumer overrides.
     let builderConfig = baseConfig(config, { entitlementsPath, icons, distRoot, projectRoot });
@@ -79,12 +79,14 @@ module.exports = function buildConfig(done) {
       builderConfig.publish = publish;
       logger.log(`releases → publish block: github ${publish.owner}/${publish.repo}`);
     } else if (config.releases?.enabled !== false) {
-      logger.warn('Could not address the releases repo (no github org and no releases.owner); leaving publish block off.');
+      logger.warn('Could not address the releases repo (set repo.org and brand.id); leaving publish block off.');
     }
 
-    // Inject afterSign → @omega.js/desktop's built-in notarize hook.
-    builderConfig.afterSign = require.resolve('@omega.js/desktop/hooks/notarize');
-    logger.log(`afterSign → ${builderConfig.afterSign}`);
+    // Inject the two notarize hooks (the .app, then each .dmg).
+    for (const [hook, file] of Object.entries(notarizeHooks())) {
+      builderConfig[hook] = file;
+      logger.log(`${hook} → ${file}`);
+    }
 
     // Apply consumer overrides last so they win.
     if (config.electronBuilder && typeof config.electronBuilder === 'object') {
@@ -102,6 +104,24 @@ module.exports = function buildConfig(done) {
     logger.log(`wrote ${distPath} (mode=${startupMode})`);
   }).then(() => done(), done);
 };
+
+// OMEGA's format words → electron-builder's target names (#867). THE one point
+// where the foreign spelling is used: `appimage` is `AppImage` to
+// electron-builder, and its per-target config block is `appImage` again.
+const BUILDER_TARGETS = {
+  dmg:      'dmg',
+  nsis:     'nsis',
+  deb:      'deb',
+  appimage: 'AppImage',
+  snap:     'snap',
+};
+
+// A platform's install-knob block. `platforms.<platform>: false` (the whole
+// platform dropped) and an absent block read the same here: defaults, and no
+// target, because enabledFormats already said it ships nothing.
+function platformBlock(declaration) {
+  return declaration && typeof declaration === 'object' ? declaration : {};
+}
 
 // Generic-category → per-platform mapping. Consumer sets `app.category` to one of these
 // keys; @omega.js/desktop emits the corresponding mac UTI string and Linux freedesktop category.
@@ -157,10 +177,21 @@ function baseConfig(config, extras = {}) {
   const languages  = Array.isArray(config.app.languages) ? config.app.languages : ['en'];
   const darkModeSupport = config.app.darkModeSupport !== false;  // default true
 
-  // Per-platform config blocks. Each is fully optional — every key has a default.
-  const macTargetCfg   = config.platforms?.mac   || {};
-  const winTargetCfg   = config.platforms?.win   || {};
-  const linuxTargetCfg = config.platforms?.linux || {};
+  // What this brand SHIPS, from the ONE declaration (#867):
+  // `platforms.<mac|windows|linux>.formats.<dmg|nsis|deb|appimage|snap>`, where
+  // presence is the switch and every format defaults ON. @omega.js/config's
+  // format table is the vocabulary; the electron-builder spelling of each
+  // format is translated at ONE point below (BUILDER_TARGETS).
+  const shipped = enabledFormats(config, 'desktop');
+  const ships = (platform, format) => shipped.some((entry) => entry.platform === platform && entry.format === format);
+  const formatOptions = (platform, format) => shipped.find((entry) => entry.platform === platform && entry.format === format)?.options || {};
+
+  // Per-platform config blocks (the install knobs beside `formats`). Each is
+  // fully optional: every key has a default. A platform switched off with
+  // `false` reads as an empty block here and ships no target below.
+  const macTargetCfg   = platformBlock(config.platforms?.mac);
+  const winTargetCfg   = platformBlock(config.platforms?.windows);
+  const linuxTargetCfg = platformBlock(config.platforms?.linux);
 
   const macArch   = Array.isArray(macTargetCfg.arch)   && macTargetCfg.arch.length   ? macTargetCfg.arch   : ['universal'];
   const winArch   = Array.isArray(winTargetCfg.arch)   && winTargetCfg.arch.length   ? winTargetCfg.arch   : ['x64', 'ia32'];
@@ -178,20 +209,18 @@ function baseConfig(config, extras = {}) {
   const nsisRunAfterFinish     = winTargetCfg.runAfterFinish !== false;
   const nsisPerMachine         = winTargetCfg.perMachine === true;
 
-  // Snap publishing — opt-in via explicit `platforms.linux.snap.enabled: true` in
-  // config. The framework scaffold ships with that field set to true by default
-  // (so new consumers get snap publishing out of the box once their credentials
-  // are wired up), but if the field is missing entirely we default to OFF — that
-  // way callers who never knew about snap don't suddenly start emitting a snap
-  // target. Even when enabled, the snap target is auto-skipped when
-  // SNAPCRAFT_STORE_CREDENTIALS isn't set, so a fresh project doesn't fail CI
-  // before the user wires up snapcraft auth.
-  const snapCfg = linuxTargetCfg.snap || {};
-  const snapConfigEnabled = snapCfg.enabled === true;
+  // Snap publishing rides the declaration like every other format
+  // (`platforms.linux.formats.snap`, on unless dropped with `false`), and its
+  // settings live inside it. It is still auto-skipped when
+  // SNAPCRAFT_STORE_CREDENTIALS is absent, so a brand that has not run the
+  // manage walk's Snap ask yet gets a clean .deb + .AppImage build instead of a
+  // CI failure.
+  const snapCfg = formatOptions('linux', 'snap');
+  const snapConfigEnabled = ships('linux', 'snap');
   const haveSnapCreds = !!process.env.SNAPCRAFT_STORE_CREDENTIALS;
   const snapEnabled = snapConfigEnabled && haveSnapCreds;
   if (snapConfigEnabled && !haveSnapCreds) {
-    logger.log('Snap target enabled in config but SNAPCRAFT_STORE_CREDENTIALS not set — skipping snap target. Run `snapcraft export-login -` and add to .env to enable.');
+    logger.log('This build ships the snap (platforms.linux.formats.snap, on unless dropped with `false`) but SNAPCRAFT_STORE_CREDENTIALS is not set, skipping the snap target. Run `npx omega manage` (it asks) or `snapcraft export-login -` and add the blob to .env.');
   }
 
   const { entitlementsPath, icons, distRoot, projectRoot } = extras;
@@ -205,15 +234,12 @@ function baseConfig(config, extras = {}) {
     return abs;
   };
 
-  // Artifact filenames come from @omega.js/config's desktop-artifacts — the ONE
+  // Artifact filenames come from @omega.js/config's platforms.js: the ONE
   // naming rule (#620), shared with the website's direct-download URLs
   // (`site.targets.desktop.downloads`). They carry no version, which is what
   // makes `/releases/latest/download/<asset>` a link that never changes, and
   // they sanitize the productName (electron-builder's `${productName}` keeps
-  // spaces, which become dots in NSIS output). Passing electron-builder's
-  // literal `${ext}` yields a TEMPLATE, for the platform fallbacks that serve
-  // more than one target (mac's dmg + auto-update zip).
-  const artifactTemplate = (platform, artifact) => desktopArtifactName(productName, platform, artifact, '${ext}');
+  // spaces, which become dots in NSIS output).
   const safeProductName = sanitizeProductName(productName);
 
   // The two METADATA facts the .deb target requires, both from the BRAND
@@ -228,14 +254,23 @@ function baseConfig(config, extras = {}) {
   const supportEmail = trimmed(config.brand.contact?.email);
   const maintainer = supportEmail ? `${config.brand.name || productName} <${supportEmail}>` : '';
 
-  // Build linux target list — `deb` + `AppImage` always; `snap` if enabled.
-  const linuxTargets = [
-    { target: 'deb',      arch: linuxArch },
-    { target: 'AppImage', arch: linuxArch },
-  ];
-  if (snapEnabled) {
-    linuxTargets.push({ target: 'snap', arch: linuxArch });
-  }
+  // The target lists, straight off the declaration. The snap is the one format
+  // with a second gate (its credentials, above); everything else ships because
+  // the brand declared it.
+  const linuxTargets = shipped
+    .filter((entry) => entry.platform === 'linux' && (entry.format !== 'snap' || snapEnabled))
+    .map((entry) => ({ target: BUILDER_TARGETS[entry.format], arch: linuxArch }));
+
+  // mac ships the dmg the site links plus the auto-update ZIP electron-updater
+  // fetches from the feed. The zip is NOT a declared format (nobody links it),
+  // so it rides the dmg leg: no dmg, no mac build at all.
+  const macTargets = ships('mac', 'dmg')
+    ? [{ target: 'dmg', arch: macArch }, { target: 'zip', arch: macArch }]
+    : [];
+
+  const winTargets = shipped
+    .filter((entry) => entry.platform === 'windows')
+    .map((entry) => ({ target: BUILDER_TARGETS[entry.format], arch: winArch }));
 
   const out = {
     appId,
@@ -286,29 +321,31 @@ function baseConfig(config, extras = {}) {
       // Silicon. Trade-off: ~2x file size (~225MB vs ~117MB single-arch), ~2x mac
       // build time (electron-builder builds both archs then stitches them with lipo).
       // Win: one user-facing download, no "which one do I pick?" choice for end users.
-      target: [
-        { target: 'dmg', arch: macArch },
-        { target: 'zip', arch: macArch },
-      ],
+      target: macTargets,
       hardenedRuntime:    true,
       gatekeeperAssess:   false,
       notarize: false,   // notarization runs via afterSign hook
-      // mac.artifactName is the FALLBACK template for mac targets that don't
-      // have their own, and it serves BOTH mac targets: the .dmg the site links
-      // (`Product-mac-universal.dmg`) and the .zip electron-updater fetches
-      // from the feed (`Product-mac-universal.zip`). One template, so the dmg
-      // needs no override of its own. No ${arch}: with arch=universal there is
-      // one artifact per target — and a non-universal mac arch is refused
-      // outright (assertArchRules), because nothing appends the arch back.
-      artifactName: artifactTemplate('mac', 'universal'),
+      // mac.artifactName is the FALLBACK for mac targets with no name of their
+      // own, which is the auto-update .zip: it carries no format segment
+      // because it is not a format anyone declares or links (the feed names
+      // it). The .dmg has its own name below, the one the site links. No
+      // ${arch}: with arch=universal there is one artifact per target, and a
+      // non-universal mac arch is refused outright (assertArchRules) because
+      // nothing appends the arch back.
+      artifactName: `${safeProductName}-mac.\${ext}`,
     },
 
-    dmg: {},
+    dmg: {
+      artifactName: desktopArtifactName(productName, 'mac', 'dmg'),
+      // Signed with the same Developer ID identity as the app: Gatekeeper
+      // assesses a downloaded image by its OWN signature (the notarize-artifacts
+      // hook's `--context context:primary-signature`), and electron-builder
+      // leaves the image unsigned unless told (#891).
+      sign: true,
+    },
 
     win: {
-      target: [
-        { target: 'nsis', arch: winArch },
-      ],
+      target: winTargets,
       signtoolOptions: {
         signingHashAlgorithms: ['sha256'],
       },
@@ -316,9 +353,10 @@ function baseConfig(config, extras = {}) {
     },
 
     nsis: {
-      // ONE installer for every winArch (electron-builder merges them), so the
-      // name says `universal` like the site's `/download/windows/universal`.
-      artifactName:            artifactTemplate('windows', 'universal'),
+      // ONE installer for every winArch (electron-builder merges them), which
+      // is why the name carries no arch: it is the file `/download/windows/nsis`
+      // hands over.
+      artifactName:            desktopArtifactName(productName, 'windows', 'nsis'),
       oneClick:                nsisOneClick,
       perMachine:              nsisPerMachine,
       // `createDesktopShortcut: 'always'` ensures the icon is created even when the
@@ -344,7 +382,7 @@ function baseConfig(config, extras = {}) {
     // linux.artifactName otherwise, and one template cannot say both). One
     // target apiece, so these are the finished filenames, not templates.
     deb: {
-      artifactName: desktopArtifactName(productName, 'linux', 'debian'),
+      artifactName: desktopArtifactName(productName, 'linux', 'deb'),
     },
 
     appImage: {
@@ -382,8 +420,8 @@ function baseConfig(config, extras = {}) {
   }
 
   // Wire icons. electron-builder resolves these as paths relative to the cwd it was invoked from (projectRoot).
-  if (icons?.macos?.app)  out.mac.icon   = rel(icons.macos.app);
-  if (icons?.macos?.dmg)  out.dmg.background = rel(icons.macos.dmg);
+  if (icons?.mac?.app)  out.mac.icon   = rel(icons.mac.app);
+  if (icons?.mac?.dmg)  out.dmg.background = rel(icons.mac.dmg);
   if (icons?.windows?.app) out.win.icon  = rel(icons.windows.app);
   if (icons?.linux?.app)   out.linux.icon = rel(icons.linux.app);
 
@@ -437,7 +475,7 @@ function assertArchRules(arch, options) {
 
 // The electron-builder `publish` block: the brand's ONE public releases repo,
 // resolved by @omega.js/config's releasesRepo (`<brand.id>-releases` under the
-// brand repo owner unless the config names another). Config-only on purpose:
+// brand's org, #883: never a typed name). Config-only on purpose:
 // this address is baked into app-update.yml and polled by every installed copy
 // forever, and a brand-monorepo app's git remote is the repo it is NESTED in
 // (the playground inside the framework monorepo), which would bake a feed that
@@ -448,12 +486,26 @@ function publishConfig(config) {
     return null;
   }
 
-  const { owner, name } = releasesRepo(config);
-  if (!owner || !name) {
+  const releases = releasesRepo(config);
+  if (!releases) {
     return null;
   }
 
-  return { provider: 'github', owner, repo: name, releaseType: 'release' };
+  return { provider: 'github', owner: releases.owner, repo: releases.name, releaseType: 'release' };
+}
+
+// The electron-builder hooks that notarize ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
+// `afterSign` for the .app, and `artifactBuildCompleted` for each .dmg. The
+// ticket stapled to the app INSIDE an image is not stapled to the image, and a
+// user's Mac assesses the image first. The DMG hook is PER ARTIFACT because
+// electron-builder awaits it before it emits the `artifactCreated` its
+// publisher uploads on; `afterAllArtifactBuild` fires after every upload is
+// queued, so a proof there ships an unstapled image (run 34738410986).
+function notarizeHooks() {
+  return {
+    afterSign: require.resolve('@omega.js/desktop/hooks/notarize'),
+    artifactBuildCompleted: require.resolve('@omega.js/desktop/hooks/notarize-artifacts'),
+  };
 }
 
 // Whether the packaged app gets LSUIElement=true in Info.plist. True for
@@ -507,6 +559,7 @@ module.exports.baseConfig    = baseConfig;
 module.exports.deepMerge     = deepMerge;
 module.exports.shouldInjectLSUIElement = shouldInjectLSUIElement;
 module.exports.publishConfig = publishConfig;
+module.exports.notarizeHooks = notarizeHooks;
 module.exports.expandYear    = expandYear;
 module.exports.resolveCategory = resolveCategory;
 module.exports.CATEGORY_MAP  = CATEGORY_MAP;

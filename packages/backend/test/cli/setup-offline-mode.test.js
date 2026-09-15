@@ -113,7 +113,7 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        // Undeclared, yargs would eat the next positional as --offline's value.
+        // Undeclared, the next positional would land as --offline's value.
         assert.equal(BOOLEAN_FLAGS.includes('offline'), true, 'offline must be in the declared boolean list');
       },
     },

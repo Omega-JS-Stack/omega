@@ -10,6 +10,7 @@ const compiler = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
 const filter = require('gulp-filter').default;
+const { composeBrandTokens, renderBrandScss } = require('@omega.js/devkit/brand-tokens');
 const { resolveThemeId } = require('../../lib/theme.js');
 
 // Load package
@@ -74,6 +75,9 @@ function sass(complete) {
 
   // Generate component-specific scss
   generateComponentScss();
+
+  // Generate the brand partial
+  generateBrandScss();
 
   // Compile
   const stream = src(input, { sourcemaps: true })
@@ -232,6 +236,18 @@ function generateComponentScss() {
   logger.log('Merged component partials not yet implemented');
 }
 
+// The brand partial ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)):
+// `brand.color` is the ONE accent hex, and it reaches the css through this
+// GENERATED partial rather than a literal a consumer keeps in sync by hand.
+// Written to the project's dist (already a loadPath, same channel as
+// _component-specific.scss above) before every compile, so a config edit is the
+// only edit. Same renderer @omega.js/desktop writes: one hex, one ramp.
+function generateBrandScss() {
+  const outputPath = path.resolve(rootPathProject, 'dist/assets/css/_brand.scss');
+
+  jetpack.write(outputPath, renderBrandScss(composeBrandTokens(config.brand?.color)));
+}
+
 function isComponentPartial(file) {
   return file.includes('/assets/css/components/') && file.endsWith('index.scss');
 }
@@ -250,3 +266,6 @@ module.exports = series(
   sass,
   sassWatcher
 );
+
+// The compile step alone, for tests that drive it over a fixture project.
+module.exports.sass = sass;

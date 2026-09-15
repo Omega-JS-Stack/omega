@@ -41,7 +41,13 @@ const protocol = {
     // initialize() and quits the duplicate WITHOUT running the rest of the boot
     // (two live instances would fight over storage, servers, and — for agents like
     // restart-manager — shared runtime files).
-    protocol._hasLock = app.requestSingleInstanceLock();
+    //
+    // The object rides along because the event's OWN argv is Chromium-processed
+    // (switches first, Chromium's own switches spliced in, the values detached at
+    // the end), so a brand parsing it reads its flags empty (#921). `additionalData`
+    // arrives untouched as the fourth argument of second-instance, so every brand
+    // gets the duplicate's real command line, in order, for free.
+    protocol._hasLock = app.requestSingleInstanceLock({ argv: process.argv, cwd: process.cwd() });
     if (!protocol._hasLock) {
       logger.warn('single-instance lock lost — another copy of the app is running.');
     } else {

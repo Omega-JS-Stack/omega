@@ -125,7 +125,7 @@ function cliVerbs() {
 
 /**
  * Does a repo-relative path claim hold? A `targets/<target>` token is the
- * consumer world's app layout (`targets/website`, `targets/backend`), which resolves
+ * consumer world's app layout (`targets/web`, `targets/backend`), which resolves
  * inside any brand under brands/ rather than at the repo root.
  *
  * @param {string} claimed - Repo-relative path from a skill

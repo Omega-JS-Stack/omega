@@ -20,7 +20,7 @@ const SRC = path.join(__dirname, '..', '..', '..');
 // task fresh — the same model as package-task.test.js's inProject().
 function scaffoldWithBrand(brand) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-brand-'));
-  jetpack.write(path.join(tmp, 'config', 'omega.json5'), `${JSON.stringify({ brand, targets: { extension: {} } }, null, 2)}\n`);
+  jetpack.write(path.join(tmp, 'config', 'omega.json5'), `${JSON.stringify({ brand, targets: { extension: { type: 'extension' } } }, null, 2)}\n`);
 
   const oldCwd = process.cwd();
   const flush = () => {
@@ -85,7 +85,7 @@ module.exports = defineCases({
         jetpack.write(path.join(tmp, 'config', 'omega.json5'), JSON5.stringify({
           brand: { id: 'my-brand' },
           liveReloadPort: 40000,
-          targets: { extension: { custom: true } },
+          targets: { extension: { type: 'extension', custom: true } },
         }, null, 2));
 
         scaffoldDefaults({ outputDir: tmp });

@@ -16,41 +16,53 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
+const { recordBrand } = require('@omega.js/config');
+
 const dev = require('../src/commands/dev.js');
 
 /**
- * A website target inside a brand monorepo, with a company root above it:
- * <root>/company/.env, <root>/brand/.env, <root>/brand/targets/website/.
+ * A web target inside a brand monorepo whose brand names a company
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): the company's
+ * shared `.env` lives in the company brand's own `company/` tree, and WHERE
+ * that brand is comes from the machine registry: pointed at this fixture's
+ * own home so the developer's `~/.omega` never sees a line.
+ *
+ * <root>/parent/company/.env, <root>/brand/.env, <root>/brand/targets/web/.
  */
 function brandFixture(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-env-watch-')));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const previousHome = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(root, 'home');
+  t.after(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+    if (previousHome === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previousHome;
+  });
 
-  const companyRoot = path.join(root, 'company');
+  const companyDir = path.join(root, 'parent', 'company');
   const brandRoot = path.join(root, 'brand');
-  const targetDir = path.join(brandRoot, 'targets', 'website');
+  const targetDir = path.join(brandRoot, 'targets', 'web');
 
-  fs.mkdirSync(companyRoot, { recursive: true });
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.mkdirSync(companyDir, { recursive: true });
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.mkdirSync(targetDir, { recursive: true });
 
-  fs.writeFileSync(path.join(companyRoot, '.env'), '');
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
-  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture" }, targets: { web: {} } }');
+  fs.writeFileSync(path.join(companyDir, '.env'), '');
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture" }, company: { id: "fixture-co" }, targets: { web: { type: "web" } } }');
+  recordBrand({ id: 'fixture-co', root: path.join(root, 'parent'), name: 'Fixture Co' });
 
-  return { companyRoot, brandRoot, targetDir };
+  return { companyDir, brandRoot, targetDir };
 }
 
 test('the dev watcher lists every layer of the .env chain, overlays included', (t) => {
-  const { companyRoot, brandRoot, targetDir } = brandFixture(t);
+  const { companyDir, brandRoot, targetDir } = brandFixture(t);
 
   const watcher = dev.watchEnvSources(targetDir, { environment: 'development' });
   t.after(() => watcher.close());
 
   assert.deepEqual(watcher.inputs.map((input) => input.path), [
-    path.join(companyRoot, '.env'),
-    path.join(companyRoot, '.env.development'),
+    path.join(companyDir, '.env'),
+    path.join(companyDir, '.env.development'),
     path.join(brandRoot, '.env'),
     path.join(brandRoot, '.env.development'),
     path.join(targetDir, '.env'),

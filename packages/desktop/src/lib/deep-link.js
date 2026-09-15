@@ -3,8 +3,9 @@
 // Cross-platform plumbing handled internally:
 //   - macOS: the OS routes `<scheme>://...` URLs via `app.on('open-url')`. Cold-start opens may queue
 //            them before whenReady; we drain them after.
-//   - Windows/Linux: deep links arrive as the LAST entry in `process.argv` on cold-start, and as the
-//            `argv` arg of `app.on('second-instance')` on warm-start.
+//   - Windows/Linux: deep links arrive as the LAST entry in `process.argv` on cold-start, and on
+//            warm-start via `app.on('second-instance')` (read from the `additionalData` argument,
+//            which carries the duplicate's real argv; the event's own `argv` is Chromium-processed).
 //
 // Public API on manager.deepLink:
 //
@@ -23,8 +24,8 @@
 //     ctx.params   // { id: '42' }
 //     ctx.query    // { ref: 'abc' }
 //     ctx.source   // 'cold-start' | 'warm-start' | 'manual'
-//     ctx.argv     // process.argv (cold) or second-instance argv
-//     ctx.cwd      // process.cwd() or second-instance cwd
+//     ctx.argv     // process.argv (cold) or the duplicate's real argv (warm, via additionalData)
+//     ctx.cwd      // process.cwd() or the duplicate's cwd (warm)
 //     ctx.handled  // mutate: set true to suppress fall-through to '*' catch-all
 //   });
 //
@@ -117,8 +118,14 @@ const deepLink = {
     // Windows/Linux warm-start: another instance launched (e.g. user double-clicked the
     // app icon while it's already running, or a deep link arrived). The OS gave us the
     // lock, killed the duplicate, and forwarded its argv here.
-    app.on('second-instance', (_event, argv, cwd) => {
-      logger.log(`second-instance — argv=${JSON.stringify(argv)} cwd=${cwd}`);
+    app.on('second-instance', (_event, argv, cwd, additionalData) => {
+      // The event's own argv is Chromium-processed (switches first, the values detached
+      // at the end), so the duplicate's REAL command line rides along in the object it
+      // passed to requestSingleInstanceLock (#921). The fallback covers a duplicate
+      // started by a build from before that object existed.
+      const realArgv = Array.isArray(additionalData?.argv) ? additionalData.argv : argv;
+      const realCwd  = additionalData?.cwd || cwd;
+      logger.log(`second-instance argv=${JSON.stringify(realArgv)} eventArgv=${JSON.stringify(argv)} cwd=${realCwd}`);
 
       // Surface the main window. With hidden-mode apps, the consumer typically created
       // `main` with `show: false` at boot, so it's in the registry but invisible — we
@@ -134,9 +141,9 @@ const deepLink = {
         logger.log('second-instance — no main window in registry; ignoring');
       }
 
-      const url = deepLink._extractUrlFromArgv(argv);
+      const url = deepLink._extractUrlFromArgv(realArgv);
       if (url) {
-        deepLink._handle(url, 'warm-start', { argv, cwd });
+        deepLink._handle(url, 'warm-start', { argv: realArgv, cwd: realCwd });
       }
     });
   },

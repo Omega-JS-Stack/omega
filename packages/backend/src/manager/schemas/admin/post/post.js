@@ -17,6 +17,9 @@ module.exports = () => f.object({
   date: f.string({ default: undefined }),
   id: f.number({ default: undefined }),
   postPath: f.string({ default: 'guest' }),
+  // Which web target the post belongs to (#887): optional for a brand with one
+  // web target, required when it runs several
+  target: f.string({ default: undefined }),
   source: f.string({ default: null }),
   // D13: content-publish implies deploy — false opts out of the build dispatch
   deploy: f.boolean({ default: true, required: false }),

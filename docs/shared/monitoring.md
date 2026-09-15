@@ -31,7 +31,7 @@ One block, `monitoring`, in omega.json5, with the monitor named as a KEY under `
 presence IS the enable signal at runtime — there is no separate runtime `enabled` flag (the same
 convention every other role section follows: a block's credentials are its switch); the role-level
 `enabled: false` is the manager's skip switch for the provisioning service. Per-surface DSNs are
-`targets.<type>.monitoring.providers.sentry.dsn` overrides.
+`targets.<name>.monitoring.providers.sentry.dsn` overrides.
 
 ```jsonc
 monitoring: {
@@ -79,12 +79,19 @@ In the order they win:
 | `OMEGA_SENTRY_ENABLED=false` | Kill switch. Nothing reports, ever. |
 | `OMEGA_TEST_RUNNER` | A test run never pollutes a live project. |
 | `OMEGA_SENTRY_FORCE=true` | Report from a non-production run (local proving). |
-| `OMEGA_BUILD_MODE=true` | The default production signal, for a host with no runtime one. |
+| the ONE environment | The default production signal, for a host that passes no runtime one. |
 
-The production signal is the host's to supply. @omega.js/desktop has no runtime answer — "should we
-ship telemetry" is a property of its BUILD — so it falls through to `OMEGA_BUILD_MODE`.
-@omega.js/backend has one (`Manager.isProduction()`, env-derived and stable for the life of the
-process) and passes it in, alongside its own `reportErrorsInDev` option.
+The production signal is the host's to supply, and the DEFAULT is the one environment every OMEGA
+target answers from ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)):
+`@omega.js/config/environment`'s `isProduction()`, read off the host the gates were asked for
+(`process.env.OMEGA_ENVIRONMENT` on Node, the host's baked `config.environment` in a browser-ish
+context such as a renderer bundle). `OMEGA_BUILD_MODE` used to be that default, which made it a
+FIFTH production signal with an opinion of its own: a build-mode run of a development artifact
+reported as production, and a packaged production app whose lane did not carry the flag reported as
+development. @omega.js/backend still passes its own answer in (`Manager.isProduction()`, env-derived
+and stable for the life of the process), alongside its own `reportErrorsInDev` option, and a boolean
+a host supplies always wins. A context that names no environment at all throws by name, the same way
+every other read of the one environment does.
 
 ## Release tags
 
@@ -101,7 +108,7 @@ Each host supplies its own version identity:
 | `@omega.js/backend` | the functions package version. The id is `brand.id`, falling back to the project id on a config missing one (which already warns at boot). |
 | `@omega.js/desktop` (main + renderer) | `app.getVersion()` — the packaged app version, with `brand.id` read off the resolved config |
 | `@omega.js/client` in `@omega.js/extension` | the extension target's package version, baked into the build blob as `config.version` |
-| `@omega.js/client` in `@omega.js/web` | the website target's package version, read off the target root's package.json and emitted in the page `Configuration` block as `version` |
+| `@omega.js/client` in `@omega.js/web` | the website target's package version, read off the target root's package.json and baked into the page's `OMEGA_BUILD_JSON.config` as `version` |
 | `@omega.js/client` in the `@omega.js/desktop` renderer | the desktop target's package version, folded into `OMEGA_BUILD_JSON.config` at bake time (the renderer only ever sees `buildJson.config`) |
 
 The client reads `config.version` and falls back to `config.buildTime`. Every host above bakes a
@@ -140,13 +147,20 @@ config: a page never opts its own credentials back into an event ([#661](https:/
 
 ## How the config reaches a browser
 
-The client reads a `sentry: { enabled, config }` namespace on its init blob, and every framework
-maps it from `monitoring.providers.sentry`:
+The client reads a `sentry: { enabled, config }` namespace on its init blob, and it maps that
+namespace from `monitoring.providers.sentry` ITSELF, once, for every framework
+([#894](https://github.com/Omega-JS-Stack/omega/issues/894)): each browser surface bakes the
+canonical section into `OMEGA_BUILD_JSON.config` and `_canonicalConfiguration()` in
+`packages/client/src/index.js` turns a DSN's presence into the switch. That home outranks a
+stale `client.sentry` blob, which keeps reporting until a brand migrates
+([#485](https://github.com/Omega-JS-Stack/omega/issues/485)); with no canonical DSN the off
+state rides first, so the legacy blob still decides.
 
-| Framework | Where |
+| Framework | Where the section is baked |
 |---|---|
-| `@omega.js/web` | the `Configuration` block in `core/_includes/core/foot.html` — `resolved.monitoring.providers.sentry` → `sentry`. A real DSN is emitted AFTER the `resolved.client` loop, so the canonical home outranks a stale `client.sentry` ([#485](https://github.com/Omega-JS-Stack/omega/issues/485)); with no DSN there, the off state rides before the loop, so a brand not yet migrated off `client.sentry` keeps reporting |
-| `@omega.js/extension` | `src/gulp/tasks/bundle.js` (`composeBuildConfig`, baked into every bundle) |
+| `@omega.js/web` | the engine's per-build snapshot, written as `<outDir>/build.js` (#743) |
+| `@omega.js/extension` | `src/gulp/tasks/bundle.js` (`composeBuildJson`, written as `dist/build.js`) |
+| `@omega.js/desktop` | `src/gulp/tasks/bundle.js` (`composeClientBuildJson`, written as `dist/build.js` for the renderer) |
 
 The client's `sentry.config` is the PROVIDER block, flat — nothing role-level ever rides into
 `Sentry.init`. Node/Electron hosts pass the whole `monitoring` section instead and core's

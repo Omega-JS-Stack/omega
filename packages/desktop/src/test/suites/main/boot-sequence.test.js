@@ -69,7 +69,7 @@ module.exports = defineCases({
     {
       name: 'getEnvironment returns testing under the test harness',
       run: (ctx) => {
-        // The harness spawn sets OMEGA_TEST_MODE=true → testing wins over everything.
+        // The harness spawn names OMEGA_ENVIRONMENT=testing, the one input.
         ctx.expect(ctx.manager.getEnvironment()).toBe('testing');
       },
     },

@@ -87,56 +87,6 @@
   </div>
 </div>
 
-<!-- Configuration -->
-<script type="text/javascript">
-  var Configuration = {
-    runtime: "web",
-    environment: "{{ jekyll.environment }}",
-    dev: {{ jekyll.dev | jsonify }},
-    buildTime: {{ site.omega.cache_breaker | default: 0 }},
-    // The app's own package version — @omega.js/client tags every error report
-    // `brand.id@version` and falls back to buildTime without it (#380).
-    version: {{ site.omega.version | jsonify }},
-    brand: {{ resolved.config.brand | jsonify }},
-    advertising: {{ resolved.config.advertising | jsonify }},
-    // Company layer (verts source: 'company' resolves company.url → api URL)
-    company: {{ resolved.config.company | jsonify }},
-    // Canonical providers shape straight through (C4 cp106a — no flatten
-    // bridge; secrets never ride: omega.json5 carries ids only)
-    analytics: {{ resolved.config.analytics | jsonify }},
-    // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
-    // (#380, reshaped #425). DSN presence IS the switch, and the provider block
-    // feeds @omega.js/monitoring, which applies the shared defaults.
-    {% assign sentryConfig = resolved.config.monitoring.providers.sentry %}
-    // The off state rides BEFORE the client loop, so a brand still parked at a
-    // legacy `client.sentry` keeps reporting until the one-time migration
-    // moves it (#485 part 3).
-    {% unless sentryConfig.dsn %}
-      sentry: { enabled: false, config: {} },
-    {% endunless %}
-    {% for item in resolved.config.client %}
-      {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
-    {% endfor %}
-    // A real DSN at the canonical home rides AFTER the loop and wins (#485):
-    // the one error-reporting config seam outranks a stale client blob the two
-    // keys' coexistence would otherwise decide by accident.
-    {% if sentryConfig.dsn %}
-      sentry: { enabled: true, config: {{ sentryConfig | jsonify }} },
-    {% endif %}
-    env: {{ resolved.config.client.env | jsonify }},
-    captcha: {{ resolved.config.captcha | jsonify }},
-    // Role sections the page/client runtime reads directly (#23): the contact
-    // page's form endpoint and the chat widget's agent + settings. CURATED to
-    // those leaves at their real paths — the provisioning-only siblings
-    // (template ids, plan, update flags, sponsorshipsUrl) never go public.
-    {% assign slapform = resolved.config.forms.providers.slapform %}
-    forms: {% if slapform %}{ providers: { slapform: { formId: {{ slapform.formId | jsonify }} } } }{% else %}null{% endif %},
-    {% assign chatsy = resolved.config.inbound.chat.providers.chatsy %}
-    inbound: {% if chatsy %}{ chat: { providers: { chatsy: { enabled: {{ chatsy.enabled | jsonify }}, agentId: {{ chatsy.agentId | jsonify }}, settings: {{ chatsy.settings | jsonify }} } } } }{% else %}null{% endif %},
-    connections: {{ resolved.config.connections | jsonify }},
-  };
-</script>
-
 <!-- JS bundles: ESM with code splitting — @omega.js/client + the boot runtime live
      in a shared chunk both bundles import, so the singleton initializes once.
      Module scripts are deferred and execute in document order: main (bootMain)
@@ -192,7 +142,8 @@
   }
 </script>
 
-<!-- Analytics providers: the CONFIG rides in `Configuration.analytics` above,
+<!-- Analytics providers: the CONFIG rides in `OMEGA_BUILD_JSON.config.analytics`
+     above,
      and the loaders are injected at runtime by core/js/core/analytics-loader.js
      once consent allows the provider's category (#383). The chrome emitting the
      snippets directly is what made the old cookie banner decorative — every
@@ -418,7 +369,7 @@
       "offers": {
         "@type": "Offer",
         "url": "{{ resolved.config.url }}{{ page.url }}",
-        "priceCurrency": "{{ resolved.config.currency }}",
+        "priceCurrency": "{{ resolved.config.payment.currency }}",
         "price": "{{ resolved.product.price }}",
         "itemCondition": "http://schema.org/NewCondition",
         "availability": "http://schema.org/InStock"

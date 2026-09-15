@@ -206,7 +206,7 @@ class FirestoreCommand extends BaseCommand {
       return [];
     }
 
-    // yargs: single --where gives string, multiple gives array
+    // The parse declares --where a MULTIPLE: one clause is a string, several an array
     const rawClauses = Array.isArray(argv.where) ? argv.where : [argv.where];
     const operators = ['>=', '<=', '!=', '==', '>', '<'];
 

@@ -20,20 +20,30 @@ const SRC = path.join(__dirname, '..', '..', '..');
 const serveTask = require(path.join(SRC, 'gulp', 'tasks', 'serve.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-// An extension target inside a brand monorepo, with a company root above it:
-// <root>/company/.env, <root>/brand/.env, <root>/brand/targets/extension/.
+// An extension target inside a brand monorepo whose brand names a COMPANY
+// (#677): the parent brand's company/ tree holds the shared .env, and the
+// machine registry line (the parent's own runs write it) says where it is.
 function seedBrand() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'extension-env-watch-')));
-  const companyRoot = path.join(root, 'company');
+  const parentRoot = path.join(root, 'parent');
+  const companyRoot = path.join(parentRoot, 'company');
   const brandRoot = path.join(root, 'brand');
   const targetDir = path.join(brandRoot, 'targets', 'extension');
 
+  jetpack.write(path.join(parentRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture-co" }, company: { id: "self" } }');
   jetpack.write(path.join(companyRoot, '.env'), '');
-  jetpack.write(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
-  jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture" }, targets: { extension: {} } }');
+  jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "fixture" }, company: { id: "fixture-co" }, targets: { extension: { type: "extension" } } }');
+  jetpack.write(path.join(root, 'home', 'brands.json'), JSON.stringify({ 'fixture-co': { root: parentRoot } }));
   jetpack.dir(targetDir);
 
-  return { root, companyRoot, brandRoot, targetDir };
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(root, 'home');
+  const restore = () => {
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  };
+
+  return { root, companyRoot, brandRoot, targetDir, restore };
 }
 
 module.exports = defineCases({
@@ -44,7 +54,7 @@ module.exports = defineCases({
     {
       name: 'the serve watcher lists company, brand and target — overlays included',
       run: (ctx) => {
-        const { root, companyRoot, brandRoot, targetDir } = seedBrand();
+        const { root, companyRoot, brandRoot, targetDir, restore } = seedBrand();
         const watcher = serveTask.watchEnvSources(targetDir, { environment: 'development' });
 
         try {
@@ -61,6 +71,7 @@ module.exports = defineCases({
           ]);
         } finally {
           watcher.close();
+          restore();
           fs.rmSync(root, { recursive: true, force: true });
         }
       },

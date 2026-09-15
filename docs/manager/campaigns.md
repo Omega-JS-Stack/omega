@@ -64,8 +64,11 @@ send time. A dry run names the groups it would create and writes nothing.
   and warns only when nobody can be asked.
 - `brand.contact.person.name` — the human the backend's personal sends sign off as. REQUIRED
   here: without it the walk fails ([#694](https://github.com/Omega-JS-Stack/omega/issues/694)).
-- `parent` — whose backend the Event Webhook points at (`'self'` when this brand IS the
-  parent; `false` is a deliberate opt-out).
+- `company` names whose backend the Event Webhook points at
+  ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): the RESOLVED `company.url`,
+  which is this brand's own url when it names no company. `company: { webhooks: false }` is
+  the one deliberate opt-out, for a shared provider ACCOUNT whose single account-level webhook
+  belongs to somebody else.
 
 **Credentials**: `SENDGRID_API_KEY` in the brand `.env`. `OMEGA_WEBHOOK_KEY` is OMEGA's own
 and is MINTED by the setup contract rather than asked for

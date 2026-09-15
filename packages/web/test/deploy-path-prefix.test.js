@@ -6,15 +6,15 @@
  *   brand.url set   → the site serves at that domain's root (the CNAME deploy
  *                     writes cannot carry a path) → `/`
  *   brand.url unset → the default project address
- *                     `https://<owner>.github.io/<name>/` → `/<name>/`, from
- *                     the same config slug the direct plan resolves.
+ *                     `https://<owner>.github.io/<name>/` → `/<name>/`, where
+ *                     `<name>` is the WEBSITE repo the direct plan pushes to
+ *                     (`<brand.id>-<target>`, #883).
  *
  * Both lanes fill it from the ONE derivation: the `--direct` lane sets it
- * around the build it runs itself, and the CI-dispatch lane's scaffolded
- * workflow calls the same function remotely (`GITHUB_REPOSITORY` names the
- * repo when the checked-out config carries no slug). An explicitly exported
- * value always wins — publisher machinery (workkit's publish) supplies its
- * own — and normalization stays in src/path-prefix.js, never a second copy.
+ * around the build it runs itself, and CI runs that same lane. An explicitly
+ * exported value always wins: publisher machinery (workkit's publish)
+ * supplies its own, and normalization stays in src/path-prefix.js, never a
+ * second copy.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -36,58 +36,67 @@ function tmpTarget(config) {
   return dir;
 }
 
+// The website repo the prefix derives from is `<brand.id>-<target name>`, and
+// the target name comes from the dir a deploy runs in: a standalone project's
+// dir names nothing, so it reads the `web` its own scaffold declares.
+const TARGETS = { targets: { web: { type: 'web' } } };
+const STANDALONE = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-prefix-standalone-'));
+
 test('brand.url set → the domain root: a CNAME cannot carry a path', () => {
-  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://omegajs.dev' }, repo: { providers: { github: { repo: 'Org/omega-brand' } } } }, {}), '/');
-  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'http://www.example.com/landing' } }, {}), '/');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://omegajs.dev' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'http://www.example.com/landing' } }, {}, STANDALONE), '/');
 });
 
-test('brand.url unset → the Pages project address /<name>/, from the slug the deploy plan resolves', () => {
-  assert.equal(deployPathPrefix({ repo: { providers: { github: { org: 'Org', repo: 'site' } } }, brand: { id: 'b' } }, {}), '/site/');
-  assert.equal(deployPathPrefix({ repo: { providers: { github: { repo: 'itw-creative-works/omega-brand' } } } }, {}), '/omega-brand/', 'the owner/name slug names the repo, not the owner');
-  assert.equal(deployPathPrefix({ brand: { id: 'my-brand' } }, {}), '/my-brand-omega/', 'the derived `<brand.id>-omega` repo is the slug fallback (same chain as the direct plan)');
+test('brand.url unset → the Pages project address, named by the WEBSITE repo (#883)', () => {
+  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/b-web/');
+  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'my-brand' }, ...TARGETS }, {}, STANDALONE), '/my-brand-web/', 'the same repo the direct plan pushes to');
+  assert.equal(deployPathPrefix({ brand: { id: 'b' }, ...TARGETS }, {}, STANDALONE), '/', 'no org, no repo to name a path with: the #355 default');
 });
 
 // #366 — a *.github.io brand.url is the PROJECT ADDRESS, not a custom domain:
 // the path it carries is the mount, so following the deploy's advice cannot
 // move the build to the domain root.
 test('a *.github.io brand.url names its own mount — the path it carries IS the base path (#366)', () => {
-  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, {}), '/workkit/');
-  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit/' }, repo: { providers: { github: { repo: 'Org/site' } } } }, {}), '/workkit/', 'the URL names the mount, not the slug');
-  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io' }, repo: { providers: { github: { repo: 'Org/site' } } } }, {}), '/site/', 'a bare Pages host names no project — the slug does');
-  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, { OMEGA_PATH_PREFIX: '/other' }), '/other', 'an explicit export still wins');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, {}, STANDALONE), '/workkit/');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io/workkit/' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/workkit/', 'the URL names the mount, not the repo');
+  assert.equal(deployPathPrefix({ brand: { id: 'b', url: 'https://owner.github.io' }, repo: { org: 'Org' }, ...TARGETS }, {}, STANDALONE), '/b-web/', 'a bare Pages host names no project: the website repo does');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://owner.github.io/workkit' } }, { OMEGA_PATH_PREFIX: '/other' }, STANDALONE), '/other', 'an explicit export still wins');
 });
 
-test('no config slug → GITHUB_REPOSITORY names the repo (the CI lane derives remotely)', () => {
-  assert.equal(deployPathPrefix({}, { GITHUB_REPOSITORY: 'Omega-JS-Stack/omega-brand' }), '/omega-brand/');
-  assert.equal(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/omega-brand' }), '/', 'a custom domain still wins over the repo address');
-  assert.equal(deployPathPrefix({}, {}), '/', 'nothing to derive → the domain root, the #355 default');
+// #883: GITHUB_REPOSITORY names the repo the RUN checked out (the source
+// monorepo), never the website repo this site is published to, so it can no
+// longer name the mount: a run that read it would mount the build under the
+// source repo's name and 404 every asset.
+test('GITHUB_REPOSITORY names the source repo, so it names nothing here (#883)', () => {
+  assert.equal(deployPathPrefix({ brand: { id: 'b' }, ...TARGETS }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/b-omega' }, STANDALONE), '/');
+  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS }, { GITHUB_REPOSITORY: 'Omega-JS-Stack/b-omega' }, STANDALONE), '/b-web/', 'the website repo names it instead');
+  assert.equal(deployPathPrefix({ ...TARGETS }, {}, STANDALONE), '/', 'nothing to derive → the domain root, the #355 default');
 });
 
 test('an explicitly exported OMEGA_PATH_PREFIX wins the autofill; a blank one is unset', () => {
-  const project = { repo: { providers: { github: { repo: 'Org/site' } } } };
-  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/workkit' }), '/workkit', 'the publisher value wins');
-  assert.equal(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, { OMEGA_PATH_PREFIX: '/workkit' }), '/workkit');
-  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/' }), '/', 'an explicit root is a value, not an absence');
-  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '   ' }), '/site/', 'blank is unset — an empty Actions secret must not suppress the autofill');
-  assert.equal(deployPathPrefix(project, {}), '/site/');
+  const project = { repo: { org: 'Org' }, brand: { id: 'b' }, ...TARGETS };
+  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/workkit' }, STANDALONE), '/workkit', 'the publisher value wins');
+  assert.equal(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, { OMEGA_PATH_PREFIX: '/workkit' }, STANDALONE), '/workkit');
+  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '/' }, STANDALONE), '/', 'an explicit root is a value, not an absence');
+  assert.equal(deployPathPrefix(project, { OMEGA_PATH_PREFIX: '   ' }, STANDALONE), '/b-web/', 'blank is unset: an empty Actions secret must not suppress the autofill');
+  assert.equal(deployPathPrefix(project, {}, STANDALONE), '/b-web/');
 });
 
 test('the value normalizes through resolvePathPrefix — ONE normalizer (#355 owns it)', () => {
-  assert.equal(deployPathPrefix({ repo: { providers: { github: { repo: 'Org//My-Site//' } } } }, {}), '/My-Site/');
-  assert.equal(deployPathPrefix({ brand: { id: '  spaced  ' } }, {}), '/spaced-omega/');
+  assert.equal(deployPathPrefix({ repo: { org: 'Org' }, brand: { id: '  spaced  ' }, ...TARGETS }, {}, STANDALONE), '/spaced-web/');
 
   // What the build receives is what #355 normalizes: the two agree exactly.
-  const derived = deployPathPrefix({ repo: { providers: { github: { repo: 'Org/site' } } } }, {});
-  assert.equal(resolvePathPrefix(derived), '/site', 'the build mounts the site under /site');
-  assert.equal(resolvePathPrefix(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, {})), '', 'a domain-root deploy runs no prefix pass at all');
+  const derived = deployPathPrefix({ repo: { org: 'Org' }, brand: { id: 'site' }, ...TARGETS }, {}, STANDALONE);
+  assert.equal(resolvePathPrefix(derived), '/site-web', 'the build mounts the site under /site-web');
+  assert.equal(resolvePathPrefix(deployPathPrefix({ brand: { url: 'https://omegajs.dev' } }, {}, STANDALONE)), '', 'a domain-root deploy runs no prefix pass at all');
 });
 
 test('targetPathPrefix: the target-dir entry point loads the composed config (the CI lane calls this)', () => {
-  const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, targets: { web: {} } }\n");
-  assert.equal(targetPathPrefix(project, {}), '/acme-omega/', 'no brand.url → the project address');
+  const project = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, repo: { org: 'Acme-Org' }, targets: { web: { type: 'web' } } }\n");
+  assert.equal(targetPathPrefix(project, {}), '/acme-web/', 'no brand.url → the project address of the website repo');
   fs.rmSync(project, { recursive: true, force: true });
 
-  const domain = tmpTarget("{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  const domain = tmpTarget("{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   assert.equal(targetPathPrefix(domain, {}), '/', 'brand.url → the domain root');
   assert.equal(targetPathPrefix(domain, { OMEGA_PATH_PREFIX: '/workkit' }), '/workkit', 'explicit still wins');
   fs.rmSync(domain, { recursive: true, force: true });
@@ -110,8 +119,8 @@ test('the scaffolded CI workflow derives the same value before its build step', 
   assert.match(workflow, /require\('@omega\.js\/web\/deploy'\)\.targetPathPrefix\(\)/, 'CI calls the ONE derivation, not a copy of the rule');
   assert.match(workflow, /OMEGA_PATH_PREFIX=.*>> "\$GITHUB_ENV"/, 'the derived value becomes the job env for the build');
   assert.ok(
-    workflow.indexOf('OMEGA_PATH_PREFIX') < workflow.indexOf('npm run build'),
-    'derived BEFORE the build that consumes it',
+    workflow.indexOf('OMEGA_PATH_PREFIX') < workflow.indexOf('name: Build and deploy'),
+    'derived BEFORE the build+deploy step that consumes it',
   );
   assert.ok(
     workflow.indexOf('sfw npm install') < workflow.indexOf('OMEGA_PATH_PREFIX'),
@@ -131,7 +140,7 @@ test('the package exports the deploy module CI requires by name', () => {
 // consumed it would publish a site mounted from a config nothing reads. It fails
 // where it is called, one step before the build refuses the same file.
 test('targetPathPrefix: a fatal config finding is a refusal, never a base path (#426)', () => {
-  const broken = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, payment: { processors: { stripe: {} } }, targets: { web: {} } }\n");
+  const broken = tmpTarget("{ brand: { id: 'acme', name: 'Acme' }, payment: { processors: { stripe: {} } }, targets: { web: { type: 'web' } } }\n");
 
   assert.throws(
     () => targetPathPrefix(broken, {}),

@@ -25,22 +25,24 @@ module.exports = defineCases({
   description: 'auth-persistence (main)',
   tests: [
     {
-      name: 'resolve(): default is safeStorage; explicit none disables; unknown warns to null',
+      name: 'resolve(): a test run is none, whatever the config says',
       run: async (ctx) => {
         const m = ctx.manager;
+        ctx.expect(m.isTesting()).toBe(true);
         m.config.omega = m.config.omega || {};
         const orig = m.config.omega.authPersistence;
         try {
+          // Unset, and explicitly asking for the vault, both land on none: the harness
+          // never signs a real user in, so it never asks the OS keychain
+          // ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
           delete m.config.omega.authPersistence;
-          const def = await authPersistence.resolve(m);
-          // Default resolves to safeStorage when the OS vault is available, null otherwise —
-          // both are valid environments; assert it never picks something else.
-          if (def) ctx.expect(def.name).toBe('safeStorage');
+          ctx.expect(await authPersistence.resolve(m)).toBeNull();
+          ctx.expect(authPersistence.getActive()).toBeNull();
 
-          m.config.omega.authPersistence = 'none';
+          m.config.omega.authPersistence = 'safeStorage';
           ctx.expect(await authPersistence.resolve(m)).toBeNull();
 
-          m.config.omega.authPersistence = 'does-not-exist';
+          m.config.omega.authPersistence = 'none';
           ctx.expect(await authPersistence.resolve(m)).toBeNull();
         } finally {
           if (orig !== undefined) m.config.omega.authPersistence = orig;
@@ -50,23 +52,18 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'register(): validates the strategy surface and makes it selectable',
+      name: 'register(): validates the strategy surface and adds it to the registry',
       run: async (ctx) => {
-        const m = ctx.manager;
         ctx.expect(() => authPersistence.register('bad', {})).toThrow(/must implement/);
 
         authPersistence.register('desktop-test-custom', fakeStrategy());
-        m.config.omega = m.config.omega || {};
-        const orig = m.config.omega.authPersistence;
         try {
-          m.config.omega.authPersistence = 'desktop-test-custom';
-          const active = await authPersistence.resolve(m);
-          ctx.expect(active.name).toBe('desktop-test-custom');
+          // Selection by config is proven at the build layer, on a production manager:
+          // under test mode resolve() answers none before it reads a thing.
+          ctx.expect(authPersistence._strategies['desktop-test-custom'].name).toBe('desktop-test-custom');
+          ctx.expect(await authPersistence._strategies['desktop-test-custom'].available()).toBe(true);
         } finally {
-          if (orig !== undefined) m.config.omega.authPersistence = orig;
-          else delete m.config.omega.authPersistence;
           delete authPersistence._strategies['desktop-test-custom'];
-          await authPersistence.resolve(m);
         }
       },
     },

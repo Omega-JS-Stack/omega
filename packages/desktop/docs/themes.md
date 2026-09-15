@@ -19,17 +19,31 @@ The active theme is selected via `config.theme.id` (default `'classy'`). The `gu
 Your `src/assets/scss/main.scss` becomes:
 
 ```scss
+// Generated from `brand.color` in config/omega.json5 by the sass task.
+@use 'brand';
+
 @use 'omega-desktop' as * with (
-  $primary: #2563EB,
+  $primary: brand.$primary,
   // $secondary: #6C757D,
   // $border-radius: 0.5rem,
 );
+
+// The runtime --omega-accent ramp, AFTER the framework import so it wins the
+// cascade over the token sheet's placeholders.
+@include brand.ramp;
 
 // Custom global styles below...
 main {
   padding: 2rem;
 }
 ```
+
+`$primary` is `brand.color`, not a literal: the sass task writes
+`dist/assets/scss/_brand.scss` from the resolved config before every compile, so
+recoloring the app is a config edit. Want an accent that DIVERGES from the
+brand? Put the literal back in its place: `$primary: #2563EB,`. No `brand.color`
+set at all, and the partial carries the framework default
+([shared/theming.md](shared/theming.md), [#912](https://github.com/Omega-JS-Stack/omega/issues/912)).
 
 That single import gives you:
 - Full Bootstrap 5 (utilities, components, grid, etc.)

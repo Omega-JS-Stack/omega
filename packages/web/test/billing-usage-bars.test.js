@@ -72,10 +72,12 @@ function bundleOnce() {
 
 // The FEATURES CATALOG: `saves` is counted and paced (the default), `exports`
 // is counted but opted out of pacing, `support` is a perk.
+// A catalog `icon` carries the FULL Font Awesome class string (#929), so a
+// brand can name any family its set carries: `saves` proves a brand mark.
 const FEATURE_CATALOG = {
-  saves: { name: 'Saves', icon: 'feather', definition: 'Notes you can save each month.', usage: {} },
-  exports: { name: 'Exports', icon: 'file-export', usage: { pace: false } },
-  support: { name: 'Priority support', icon: 'headset' },
+  saves: { name: 'Saves', icon: 'fa-brands fa-figma', definition: 'Notes you can save each month.', usage: {} },
+  exports: { name: 'Exports', icon: 'fa-solid fa-file-export', usage: { pace: false } },
+  support: { name: 'Priority support', icon: 'fa-solid fa-headset' },
 };
 
 const PAYMENT_CONFIG = {
@@ -154,7 +156,8 @@ test('usage bars: a bar per counted feature, both counters, catalog copy', async
 
   // The catalog's name, icon and definition — not a hard-coded label map
   assert.ok(html.includes('Saves'), 'the catalog name');
-  assert.ok(html.includes('fa-feather'), 'the catalog icon');
+  assert.ok(html.includes('<i class="fa-brands fa-figma fa-sm me-1 text-muted">'), 'the catalog icon, emitted exactly as authored (#929)');
+  assert.ok(!html.includes('fa-solid fa-fa-'), 'and never re-wrapped by the bar');
   assert.ok(html.includes('data-bs-title="Notes you can save each month."'), 'the catalog definition, on hover');
 
   // BOTH counters for the paced feature: 3100/month → ceil over a 28-31 day

@@ -36,7 +36,7 @@ Every browser tool arrives through a single MCP server, `mcp-router` (`@omega.js
 | `chrome-devtools` | The default: a fresh isolated Chrome | nothing |
 | `chrome-devtools-electron` | An ALREADY-RUNNING omega desktop dev app | the app started with a remote-debugging port |
 | `chrome-devtools-extension` | An unpacked extension in Chrome for Testing | `OMEGA_EXTENSION_PATH` |
-| `omega-extension` | The manager's own extension automation server | `@omega.js/manager` installed |
+| `omega-extension` | Driving the user's OWN browser through the OMEGA Companion extension | the extension installed (below); the bridge ships in the router |
 
 Two meta-tools control them per session, and neither touches disk:
 
@@ -52,6 +52,10 @@ This skill's default browser is always a fresh Chrome. To drive an already-runni
 ## Browser extensions
 
 To test an unpacked extension, enable `chrome-devtools-extension`: same isolated model, but it launches Chrome for Testing (from puppeteer's download cache) with the extension at `$OMEGA_EXTENSION_PATH` pre-loaded and the extension tool category on (`install_extension`, `list_extensions`, `reload_extension`, `trigger_extension_action`, …). Set `OMEGA_EXTENSION_PATH` to the built extension directory before the session starts. No Chrome for Testing installed → it fails loudly; install one with `npx puppeteer browsers install chrome`.
+
+## The OMEGA Companion (`omega-extension`)
+
+A different job from the three above: it drives the user's OWN browser, with their logins, through the OMEGA Companion extension over a local WebSocket (port 9876). The bridge ships inside the router, so nothing else has to be installed for the upstream to start, but the tools only answer once the extension is connected: install the OMEGA Companion from the Chrome Web Store, or load `omega-omega/targets/extension/packaged/chrome/raw/` unpacked at `chrome://extensions` with Developer mode on (`npx omega build` in that target writes it). No connection → the call fails saying so.
 
 ## Available tools
 

@@ -5,17 +5,19 @@
 // The manager (already bootstrapped by the test harness) is the natural object under test.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 
-// Every case that pins a CLASSIC local answer silences the whole baked `dev`
-// block: the `dev.ports` map (#745) and the `dev.origin` the website publishes
-// (#747). The harness manager loads src/defaults' config, which carries no `dev`
-// block, so today this is a no-op guard; it exists so a harness that one day
-// seeds a real build blob cannot turn these classic pins red.
-function withoutBakedPorts(manager, fn) {
+// Every case that pins a CLASSIC local answer states the baked `dev` block a
+// real dev artifact carries: since
+// [#834](https://github.com/Omega-JS-Stack/omega/issues/834) the bundle task
+// bakes the classic map as the FLOOR of the resolved one, so the classics reach
+// these helpers the way they reach a shipped dev build, from @omega.js/config,
+// and no copy of the numbers lives in this file or in url-helpers.js.
+function withClassicBakedPorts(manager, fn) {
   const original = manager.config.dev;
-  delete manager.config.dev;
+  manager.config.dev = { ports: { ...CLASSIC_PORTS } };
   try { return fn(); } finally {
-    if (original !== undefined) manager.config.dev = original;
+    if (original !== undefined) manager.config.dev = original; else delete manager.config.dev;
   }
 }
 
@@ -25,54 +27,62 @@ module.exports = defineCases({
   description: 'url-helpers (cross-context)',
   tests: [
     {
-      name: 'getEnvironment: testing (OMEGA_TEST_MODE) wins; else config.em.environment',
+      // The environment reads ONE input
+      // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the
+      // `OMEGA_ENVIRONMENT` variable the lane set, and the baked
+      // `config.environment` when the process has none (a packaged app, which
+      // has no parent lane to inherit from). The legacy `config.em.environment`
+      // override is gone with the copy that read it, and so are the
+      // app.isPackaged / OMEGA_BUILD_MODE / NODE_ENV sniffs.
+      name: 'getEnvironment: the process input, then the baked config.environment',
       run: (ctx) => {
         const m = ctx.manager;
-        const orig = m.config?.em?.environment;
-        const origTest = process.env.OMEGA_TEST_MODE;
-        m.config.em = m.config.em || {};
+        const origConfigEnv = m.config.environment;
+        const origVar = process.env.OMEGA_ENVIRONMENT;
         try {
-          // Testing takes precedence over the config override.
-          process.env.OMEGA_TEST_MODE = 'true';
-          m.config.em.environment = 'production';
-          ctx.expect(m.getEnvironment()).toBe('testing');
-          // With testing cleared, the config override is honored.
-          delete process.env.OMEGA_TEST_MODE;
-          m.config.em.environment = 'development';
-          ctx.expect(m.getEnvironment()).toBe('development');
-          m.config.em.environment = 'production';
-          ctx.expect(m.getEnvironment()).toBe('production');
+          // The lane's variable is the answer wherever it exists.
+          m.config.environment = 'production';
+          for (const name of ['development', 'testing', 'production']) {
+            process.env.OMEGA_ENVIRONMENT = name;
+            ctx.expect(m.getEnvironment()).toBe(name);
+          }
+
+          // With no variable, the artifact's own baked word answers.
+          delete process.env.OMEGA_ENVIRONMENT;
+          for (const name of ['development', 'testing', 'production']) {
+            m.config.environment = name;
+            ctx.expect(m.getEnvironment()).toBe(name);
+          }
+
+          // Neither is a loud error, never a default.
+          delete m.config.environment;
+          let threw;
+          try { m.getEnvironment(); } catch (e) { threw = e; }
+          ctx.expect(threw).toBeDefined();
+          ctx.expect(threw.message).toMatch(/OMEGA_ENVIRONMENT/);
         } finally {
-          m.config.em.environment = orig;
-          if (origTest === undefined) delete process.env.OMEGA_TEST_MODE; else process.env.OMEGA_TEST_MODE = origTest;
+          if (origConfigEnv !== undefined) m.config.environment = origConfigEnv; else delete m.config.environment;
+          if (origVar !== undefined) process.env.OMEGA_ENVIRONMENT = origVar; else delete process.env.OMEGA_ENVIRONMENT;
         }
       },
     },
     {
-      // In the MAIN process, app.isPackaged is the authoritative signal and beats the
-      // OMEGA_BUILD_MODE fallback. The test harness is unpackaged, so once testing + config are
-      // cleared, getEnvironment() resolves to 'development' from app.isPackaged === false —
-      // regardless of OMEGA_BUILD_MODE. (The OMEGA_BUILD_MODE fallback only applies where `app` is
-      // unavailable: renderer / preload / plain Node — covered by the build-layer manager test.)
-      name: 'getEnvironment: app.isPackaged (unpackaged → development) wins over OMEGA_BUILD_MODE in main',
+      // The three checks DERIVE from getEnvironment(), on the REAL main-process
+      // Manager, so they can never disagree with it.
+      name: 'the three is*() checks derive from it, and exactly one is true',
       run: (ctx) => {
         const m = ctx.manager;
-        const origEnv  = m.config?.em?.environment;
-        const origBuild = process.env.OMEGA_BUILD_MODE;
-        const origTest = process.env.OMEGA_TEST_MODE;
-        if (m.config.em) delete m.config.em.environment;
-        delete process.env.OMEGA_TEST_MODE; // isolate from testing precedence
+        const origVar = process.env.OMEGA_ENVIRONMENT;
         try {
-          // Unpackaged harness → 'development' even with OMEGA_BUILD_MODE set (app.isPackaged wins).
-          process.env.OMEGA_BUILD_MODE = 'true';
-          ctx.expect(m.getEnvironment()).toBe('development');
-          delete process.env.OMEGA_BUILD_MODE;
-          ctx.expect(m.getEnvironment()).toBe('development');
+          for (const name of ['development', 'testing', 'production']) {
+            process.env.OMEGA_ENVIRONMENT = name;
+            ctx.expect(m.isDevelopment()).toBe(name === 'development');
+            ctx.expect(m.isTesting()).toBe(name === 'testing');
+            ctx.expect(m.isProduction()).toBe(name === 'production');
+            ctx.expect([m.isDevelopment(), m.isTesting(), m.isProduction()].filter(Boolean).length).toBe(1);
+          }
         } finally {
-          if (origEnv !== undefined) m.config.em.environment = origEnv;
-          if (origBuild !== undefined) process.env.OMEGA_BUILD_MODE = origBuild;
-          else delete process.env.OMEGA_BUILD_MODE;
-          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
+          if (origVar !== undefined) process.env.OMEGA_ENVIRONMENT = origVar; else delete process.env.OMEGA_ENVIRONMENT;
         }
       },
     },
@@ -85,7 +95,7 @@ module.exports = defineCases({
         const orig = m.config.cloud.config.projectId;
         m.config.cloud.config.projectId = 'demo-app';
         try {
-          withoutBakedPorts(m, () => {
+          withClassicBakedPorts(m, () => {
             ctx.expect(m.getFunctionsUrl('development')).toBe('http://localhost:5001/demo-app/us-central1');
           });
         } finally { m.config.cloud.config.projectId = orig; }
@@ -121,14 +131,14 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getApiUrl: dev returns http://localhost:5002 (no published ports)',
+      name: 'getApiUrl: dev returns http://localhost:5002 from the baked classic map',
       run: (ctx) => {
         const origHttps = process.env.OMEGA_HTTPS_PORT;
         const origHosting = process.env.OMEGA_HOSTING_PORT;
         delete process.env.OMEGA_HTTPS_PORT;
         delete process.env.OMEGA_HOSTING_PORT;
         try {
-          withoutBakedPorts(ctx.manager, () => {
+          withClassicBakedPorts(ctx.manager, () => {
             ctx.expect(ctx.manager.getApiUrl('development')).toBe('http://localhost:5002');
           });
         } finally {
@@ -147,7 +157,7 @@ module.exports = defineCases({
         delete process.env.OMEGA_HTTPS_PORT;
         delete process.env.OMEGA_HOSTING_PORT;
         try {
-          withoutBakedPorts(ctx.manager, () => {
+          withClassicBakedPorts(ctx.manager, () => {
             ctx.expect(ctx.manager.getApiUrl('testing')).toBe('http://localhost:5002');
           });
         } finally {
@@ -243,12 +253,12 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getWebsiteUrl: dev returns the classic dev origin https://localhost:4000',
+      name: 'getWebsiteUrl: dev returns https://localhost:4000 from the baked classic map',
       run: (ctx) => {
         const orig = process.env.OMEGA_WEBSITE_PORT;
         delete process.env.OMEGA_WEBSITE_PORT;
         try {
-          withoutBakedPorts(ctx.manager, () => {
+          withClassicBakedPorts(ctx.manager, () => {
             ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('https://localhost:4000');
           });
         } finally {
@@ -326,7 +336,7 @@ module.exports = defineCases({
         const origId = m.config.brand.id;
         m.config.brand.id = 'demo';
         try {
-          withoutBakedPorts(m, () => {
+          withClassicBakedPorts(m, () => {
             const url = new URL(m.getAuthUrl('development'));
             ctx.expect(url.origin).toBe('https://localhost:4000');
             ctx.expect(url.pathname).toBe('/signin');
@@ -372,10 +382,12 @@ module.exports = defineCases({
         m.config.brand.id = 'demo';
         try {
           const loopback = 'http://127.0.0.1:49152/auth/token?state=abc';
-          const url = new URL(m.getAuthUrl('development', loopback));
-          const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
-          ctx.expect(tokenUrl.pathname).toBe('/token');
-          ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe(loopback);
+          withClassicBakedPorts(m, () => {
+            const url = new URL(m.getAuthUrl('development', loopback));
+            const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
+            ctx.expect(tokenUrl.pathname).toBe('/token');
+            ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe(loopback);
+          });
         } finally {
           if (origId !== undefined) m.config.brand.id = origId; else delete m.config.brand.id;
         }
@@ -388,39 +400,36 @@ module.exports = defineCases({
         const orig = m.config.brand?.id;
         if (m.config.brand) delete m.config.brand.id;
         try {
-          let threw;
-          try { m.getAuthUrl('development'); } catch (e) { threw = e; }
-          ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toMatch(/brand\.id/);
+          withClassicBakedPorts(m, () => {
+            let threw;
+            try { m.getAuthUrl('development'); } catch (e) { threw = e; }
+            ctx.expect(threw).toBeDefined();
+            ctx.expect(threw.message).toMatch(/brand\.id/);
+          });
         } finally {
           if (orig !== undefined) m.config.brand.id = orig;
         }
       },
     },
     {
-      name: 'getWebsiteUrl: respects current environment (config override) when no arg passed',
+      // With no argument, the getters take the CURRENT environment, which is
+      // the one input (#817): whatever the lane named for this process.
+      name: 'getWebsiteUrl: respects the current environment when no arg passed',
       run: (ctx) => {
         const m = ctx.manager;
-        const origEnv = m.config.em?.environment;
-        const origTest = process.env.OMEGA_TEST_MODE;
-        m.config.em = m.config.em || {};
+        const origVar = process.env.OMEGA_ENVIRONMENT;
         m.config.brand = m.config.brand || {};
         const origUrl = m.config.brand.url;
         m.config.brand.url = 'https://example.com';
-        // Clear OMEGA_TEST_MODE so the config override is exercised — otherwise testing wins
-        // (correctly) and every URL resolves local regardless of config.
-        delete process.env.OMEGA_TEST_MODE;
         try {
-          m.config.em.environment = 'development';
-          withoutBakedPorts(m, () => {
+          process.env.OMEGA_ENVIRONMENT = 'development';
+          withClassicBakedPorts(m, () => {
             ctx.expect(m.getWebsiteUrl()).toBe('https://localhost:4000');
           });
-          m.config.em.environment = 'production';
+          process.env.OMEGA_ENVIRONMENT = 'production';
           ctx.expect(m.getWebsiteUrl()).toBe('https://example.com');
         } finally {
-          if (origEnv !== undefined) m.config.em.environment = origEnv;
-          else delete m.config.em.environment;
-          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
+          if (origVar !== undefined) process.env.OMEGA_ENVIRONMENT = origVar; else delete process.env.OMEGA_ENVIRONMENT;
           m.config.brand.url = origUrl;
         }
       },

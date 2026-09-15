@@ -26,8 +26,8 @@ const SCRAMBLED = `// File header — stays at the very top.
   },
   zebraCustom: { x: 1 }, // unknown key (trailing comment rides along)
 
-  // Parent topology note.
-  parent: false,
+  // Company topology note.
+  company: { id: "acme-co" },
   domain: {
     providers: { namecheap: {} },
   },
@@ -38,14 +38,14 @@ test('applyCanonicalOrder: keys land in canonical order, comments travel, data i
   const result = applyCanonicalOrder(SCRAMBLED);
 
   const keys = Object.keys(JSON5.parse(result));
-  assert.deepStrictEqual(keys, ['parent', 'brand', 'domain', 'marketing', 'zebraCustom']);
+  assert.deepStrictEqual(keys, ['brand', 'company', 'domain', 'marketing', 'zebraCustom']);
 
   // Comment blocks moved WITH their keys
   const brandComment = result.indexOf('this comment must travel');
   const brandKey = result.indexOf('brand: {');
   assert.ok(brandComment !== -1 && brandComment < brandKey, 'brand comment sits above brand');
-  assert.ok(result.indexOf('Parent topology note') < result.indexOf('parent: false'), 'parent comment sits above parent');
-  assert.ok(result.indexOf('Parent topology note') < brandComment, 'parent block moved above brand block');
+  assert.ok(result.indexOf('Company topology note') < result.indexOf('company: {'), 'company comment sits above company');
+  assert.ok(result.indexOf('Company topology note') > brandComment, 'company block moved below brand block');
 
   // Header comment stays at the very top, trailing comment rides its key
   assert.ok(result.startsWith('// File header'));
@@ -73,7 +73,7 @@ test('applyCanonicalOrder: unknown keys keep their relative order after known ke
 
 test('applyCanonicalOrder: targets is LAST by policy — even unknown keys never sort past it', () => {
   const source = `{
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
   theme: { id: "classy" },
   zzzUnknown: 1,
   brand: { id: "x" },
@@ -109,7 +109,7 @@ test('writeConfigValues normalizes key order on every writeback', () => {
 
   const written = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
   const keys = Object.keys(JSON5.parse(written));
-  assert.deepStrictEqual(keys, ['parent', 'brand', 'domain', 'marketing', 'zebraCustom']);
+  assert.deepStrictEqual(keys, ['brand', 'company', 'domain', 'marketing', 'zebraCustom']);
   assert.match(written, /listId: "lst_2"/);
 
   fs.rmSync(root, { recursive: true, force: true });
@@ -159,11 +159,11 @@ test('loadConfig: a target with no omega.json5 of its own rides the brand file a
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: "demo", name: "Demo" },
   targets: {
-    web: { theme: { id: "classy" } },
+    web: { type: "web", theme: { id: "classy" } },
   },
 }
 `);
-  const targetDir = path.join(root, 'targets', 'website');
+  const targetDir = path.join(root, 'targets', 'web');
   fs.mkdirSync(targetDir, { recursive: true });
 
   const { config, enabled, files } = loadConfig(targetDir, 'web');

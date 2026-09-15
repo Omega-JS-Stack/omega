@@ -8,7 +8,7 @@ const os      = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Helper: stage a consumer dir with config/omega.json5 containing the given
-// platforms.win.signing.strategy (under targets.desktop in the raw file). Returns the
+// platforms.windows.signing.strategy (under targets.desktop in the raw file). Returns the
 // abs path to the temp dir; caller is responsible for chdir'ing into it and cleaning up.
 function stageStrategyConfig({ strategy, cloudProvider }) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-sign-'));
@@ -17,7 +17,7 @@ function stageStrategyConfig({ strategy, cloudProvider }) {
   if (cloudProvider) signing.cloud = { provider: cloudProvider };
   fs.writeFileSync(
     path.join(tmp, 'config', 'omega.json5'),
-    JSON.stringify({ targets: { desktop: { platforms: { win: { signing } } } } }),
+    JSON.stringify({ targets: { desktop: { type: 'desktop', platforms: { windows: { signing } } } } }),
   );
   return tmp;
 }
@@ -39,74 +39,51 @@ module.exports = defineCases({
   layer: 'build',
   description: 'release pipeline — package / release / sign-windows / notarize hook',
   tests: [
-    {
-      name: 'release: the dispatch address is the CONFIG\'s brand repo and the COMPOSED workflow name (#799)',
-      run: (ctx) => {
-        const { dispatchTarget } = require(path.join(__dirname, '..', '..', '..', 'commands', 'release.js'));
-        const { brandRoot, targetDir } = stageBrand({ brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } });
 
-        try {
-          // A target nested in a brand (and the brand nested in another repo, as
-          // the playground is here) dispatches on the repo its CONFIG names: the
-          // enclosing git remote is somebody else's repo entirely.
-          // The name is the derived `<brand.id>-omega` default (#809): the config
-          // declares an org and no repo of its own.
-          ctx.expect(dispatchTarget({
-            projectRoot: targetDir,
-            config: { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org' } } } },
-          })).toEqual({ owner: 'Acme-Org', repo: 'acme-omega', workflow: 'desktop-build.yml' });
-        } finally {
-          fs.rmSync(brandRoot, { recursive: true, force: true });
-        }
-      },
-    },
     {
-      name: 'release: a STANDALONE target dispatches the plain build.yml, and an unaddressable repo throws',
-      run: (ctx) => {
-        const { dispatchTarget } = require(path.join(__dirname, '..', '..', '..', 'commands', 'release.js'));
-        const standalone = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-standalone-'));
-
-        try {
-          const config = { brand: { id: 'acme' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' } } } };
-          ctx.expect(dispatchTarget({ projectRoot: standalone, config })).toEqual({
-            owner: 'itw-creative-works', repo: 'acme-app', workflow: 'build.yml',
-          });
-
-          // Half an address addresses nothing: fail loudly instead of POSTing to
-          // `undefined/acme`.
-          ctx.expect(() => dispatchTarget({ projectRoot: standalone, config: { brand: { id: 'acme' } } }))
-            .toThrow(/brand repo/);
-        } finally {
-          fs.rmSync(standalone, { recursive: true, force: true });
-        }
-      },
-    },
-    {
-      name: 'deploy-precheck: provisions <owner>/<brand.id>-releases from config, never a discovered owner (#799)',
+      name: 'deploy-precheck: provisions <org>/<brand.id>-releases PUBLIC through the devkit ensureRepo (#799, #883)',
       run: async (ctx) => {
         const { provisionReleaseRepos } = require(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'deploy-precheck.js'));
-        const created = [];
-        const octokit = {
-          rest: {
-            repos: {
-              get: async () => { const error = new Error('Not Found'); error.status = 404; throw error; },
-              createInOrg: async (args) => created.push(`${args.org}/${args.name}`),
-              createForAuthenticatedUser: async (args) => created.push(`me/${args.name}`),
-            },
-            users: { getAuthenticated: async () => ({ data: { login: 'somebody-else' } }) },
-          },
-        };
+        const calls = [];
         const lines = [];
 
         await provisionReleaseRepos({
           log: (line) => lines.push(line),
           warn: (line) => lines.push(line),
-          octokit,
-          config: { brand: { id: 'omega-playground' }, repo: { providers: { github: { org: 'Omega-JS-Stack' } } }, releases: {} },
+          config: { brand: { id: 'omega-playground' }, repo: { provider: 'github', org: 'Omega-JS-Stack' }, releases: {} },
+          // The ONE github boundary (#883): `gh` with an argv array, so the
+          // create is readable here exactly as it runs.
+          execFn: (file, args) => {
+            calls.push({ file, args });
+            if (args[0] === 'api') throw new Error('gh api failed: 404 Not Found');
+            return '';
+          },
         });
 
-        ctx.expect(created).toEqual(['Omega-JS-Stack/omega-playground-releases']);
+        const create = calls.find((call) => call.args[0] === 'repo');
+        ctx.expect(create.file).toBe('gh');
+        ctx.expect(create.args.slice(0, 4)).toEqual(['repo', 'create', 'Omega-JS-Stack/omega-playground-releases', '--public']);
+        // A release needs a tag and a tag needs a commit: this is the one repo
+        // that is created WITH one.
+        ctx.expect(create.args).toContain('--add-readme');
         ctx.expect(lines.join('\n')).toContain('Omega-JS-Stack/omega-playground-releases');
+      },
+    },
+
+    {
+      name: 'deploy-precheck: a config that names no org warns and creates nothing (#883)',
+      run: async (ctx) => {
+        const { provisionReleaseRepos } = require(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'deploy-precheck.js'));
+        const lines = [];
+
+        await provisionReleaseRepos({
+          log: (line) => lines.push(line),
+          warn: (line) => lines.push(line),
+          config: { brand: { id: 'acme' }, releases: {} },
+          execFn: () => { throw new Error('gh must not run'); },
+        });
+
+        ctx.expect(lines.join('\n')).toContain('repo.org');
       },
     },
     {
@@ -115,8 +92,8 @@ module.exports = defineCases({
         const finalizeRelease = require(path.join(__dirname, '..', '..', '..', 'commands', 'finalize-release.js'));
         const { brandRoot, targetDir } = stageBrand({
           brand: { id: 'acme' },
-          repo: { providers: { github: { org: 'Acme-Org' } } },
-          targets: { desktop: { releases: {} } },
+          repo: { provider: 'github', org: 'Acme-Org' },
+          targets: { desktop: { type: 'desktop', releases: {} } },
         });
         fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-desktop', version: '1.2.3' }));
 
@@ -333,7 +310,9 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'notarize hook: warns + returns when API key env vars are missing',
+      // Flipped by #891: a mac build that reaches this hook is one this
+      // framework ships, so credentials it cannot find stop the build.
+      name: 'notarize hook: THROWS when the API key env vars are missing',
       run: async (ctx) => {
         const notarize = require(path.join(__dirname, '..', '..', '..', 'hooks', 'notarize.js'));
         // Snapshot + clear env.
@@ -347,12 +326,11 @@ module.exports = defineCases({
         delete process.env.APPLE_API_ISSUER;
 
         try {
-          const result = await notarize({
+          await ctx.expect(() => notarize({
             electronPlatformName: 'darwin',
             appOutDir: '/tmp',
             packager: { appInfo: { productFilename: 'test' } },
-          });
-          ctx.expect(result).toBeUndefined();
+          })).toThrow(/APPLE_API_KEY, APPLE_API_KEY_ID and APPLE_API_ISSUER are required/);
         } finally {
           for (const [k, v] of Object.entries(snapshot)) {
             if (v !== undefined) process.env[k] = v;

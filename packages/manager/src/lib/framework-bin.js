@@ -11,6 +11,12 @@
  * with NO flags (a package script has no contract for them) and steps aside
  * loudly when it declares no such script.
  *
+ * And the ONE place they decide WHERE a target's scaffold comes from
+ * (`resolveTargetScaffold`, #901): the deploy fan-out runs each selected
+ * target's `ensureTarget` in-process, through the `./ensure-target` subpath
+ * every framework exposes, because there is no scaffold verb to spawn. A
+ * custom target has no framework scaffold and steps aside the same way.
+ *
  * A backend in CUSTOM-SERVER mode (#584) takes the script lane for the verbs
  * its framework cannot serve — `omega deploy` is a Functions deploy and
  * `omega test` is the emulator lane, and both REFUSE in that mode. It stays a
@@ -153,4 +159,50 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
   };
 }
 
-module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun };
+/**
+ * The scaffold function the brand-root deploy runs on one target, IN-PROCESS
+ * (#901): every framework exposes its `ensureTarget` at the one subpath
+ * `@omega.js/<framework>/ensure-target`, so the fan-out composes each target's
+ * workflow into the brand root before its one push without a verb to spawn.
+ *
+ * @param {object} entry - A discoverTargets entry ({ name, dir, path, target, custom, projectType }).
+ * @returns {{ kind: 'framework'|'skip'|'error', framework?: string,
+ *   ensureTarget?: Function, detail?: string }}
+ */
+function resolveTargetScaffold(entry) {
+  // A custom target is the brand's own scripts end to end: no framework wrote
+  // its tree, so there is nothing to scaffold and nothing has failed.
+  if (entry.custom) {
+    return { kind: 'skip', detail: 'a custom target has no framework scaffold' };
+  }
+
+  const target = findTarget(entry.path);
+  if (!target || target.kind !== 'framework') {
+    return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
+  }
+
+  // The subpath resolution honors an exports map (web, desktop, extension) and
+  // the backend's package-root file alike, from where the target declares the
+  // dependency. A framework that ships neither is a framework out of date with
+  // its manager, which is a loud failure rather than a skipped scaffold.
+  // The LOAD rides in the same try: a module that throws while it is being
+  // required is the same kind of failure as one that does not resolve, and both
+  // answer the fan-out's "scaffold failed, nothing was pushed" line rather than
+  // a raw stack out of the middle of a brand deploy.
+  let resolved;
+  let ensureTarget;
+  try {
+    resolved = require.resolve(`${target.name}/ensure-target`, { paths: [target.dir] });
+    ensureTarget = require(resolved).ensureTarget;
+  } catch (e) {
+    // `resolved` separates the two failures the one try now covers: unset means
+    // the subpath itself is missing, set means the module threw on the way in.
+    return resolved
+      ? { kind: 'error', detail: `${target.name}/ensure-target failed to load: ${e.message}` }
+      : { kind: 'error', detail: `${target.name} exposes no ensure-target entry (update it)` };
+  }
+
+  return { kind: 'framework', framework: target.name, ensureTarget };
+}
+
+module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun, resolveTargetScaffold };

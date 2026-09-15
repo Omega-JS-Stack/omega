@@ -15,6 +15,12 @@
   data-page-path="{{ page.url }}"
 
   data-environment="{{ jekyll.environment | default: 'development' }}"
+  {%- comment -%} #858: a page's own answer to the site's `translation.include`
+  list, stamped only when the page states one. The translation pass runs
+  post-build over dist/ (and `omega translate` runs with no build at all), so
+  the built page is where a frontmatter answer is readable, the same seam the
+  base-path stamp uses. {%- endcomment -%}
+  {%- if resolved.translation.include == true %} data-omega-translate="true"{% elsif resolved.translation.include == false %} data-omega-translate="false"{% endif %}
   data-platform=""
   data-device=""
   data-runtime=""

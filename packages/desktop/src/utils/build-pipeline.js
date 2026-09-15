@@ -18,18 +18,18 @@ function gulpCommand(task) {
 // loads the whole command surface.
 //
 // There is no `setup` step any more (#675): the local half runs inside the gulp
-// `defaults` task, which is the first step of every gulp build. What the plans
-// still need before signing is the Apple artifacts (#678) — `certs`.
+// `defaults` task, which is the first step of every gulp build. There is no
+// `certs` copy step either ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
+// signing material is READ IN PLACE from the signing tree, and the env load
+// derives the paths to it once (utils/load-env.js).
 const RUNNERS = {
   clean: (options) => require('../commands/clean.js')(options),
-  certs: () => {
-    const Manager = new (require('../build.js'));
-    require('./deliver-certs.js').deliverTargetCerts({
-      projectDir: Manager.getRootPath('project'),
-      logger: Manager.logger('certs'),
-    });
-  },
-  'validate-certs': (options) => require('../commands/validate-certs.js')(options),
+  // The credentials the brand's DECLARED formats cannot ship without (#867),
+  // refused before a minute of build time. Publish declares this step; a bare
+  // build does not, because a build puts nothing in front of users.
+  'ship-keys': () => require('./ship-keys.js').assertShipKeys(),
+  // `strict` rides the STEP: publish declares it (#891), a bare verb does not.
+  'validate-certs': (options, step) => require('../commands/validate-certs.js')({ ...options, strict: step.strict === true || options.strict === true }),
   gulp: (options, step) => execute(gulpCommand(step.task), { log: true }),
 };
 

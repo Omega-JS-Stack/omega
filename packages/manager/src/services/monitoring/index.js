@@ -1,7 +1,7 @@
 /**
  * Monitoring service (Sentry provider) — one error-monitoring project per enabled target
  * (web/backend/desktop/extension), with each project's DSN landed in
- * targets.<type>.monitoring.providers.sentry.dsn via the comment-preserving
+ * targets.<name>.monitoring.providers.sentry.dsn via the comment-preserving
  * writeback — the exact key every framework's runtime reads through the config
  * merge chain. DSNs are public by design (schema-pinned); only the auth token
  * is a secret.

@@ -1,6 +1,6 @@
 /**
- * Test: the backend's push-secrets bind, the precheck step that makes a CI
- * deploy possible at all ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
+ * Test: the backend's secrets PRECHECK STEP, the one that makes a CI deploy
+ * possible at all ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
  *
  * Backend had no precheck while its deploy ran from the CLI. It runs on a
  * RUNNER now, and a runner has neither the brand's `.env` nor the
@@ -9,10 +9,12 @@
  * OMEGA_SERVICE_ACCOUNT_JSON over the extra-secrets seam, because a file has no
  * `.env` line to compose from.
  *
- * Web, desktop and the extension each pin their own bind (desktop's
- * `build/push-secrets` suite is the shape this mirrors); this is backend's.
- * What the shared publisher owns (the loud skips, the declared-repo guard) is
- * pinned once in @omega.js/devkit's target-secrets suite.
+ * There is no backend BIND any more
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the four
+ * framework bind files are one seam TABLE inside the shared publisher, so what
+ * this suite pins is backend's half, the service-account chain and the step
+ * list. The transport, the loud skips, the declared-repo guard and the seam
+ * table itself are pinned once in @omega.js/devkit's target-secrets suite.
  *
  * Offline by construction: the brand is a temp dir and the `gh`/`git`
  * boundaries are injected, so the real send shape is proven without a repo, a
@@ -25,21 +27,31 @@ const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const pushSecrets = require('../../dist/cli/utils/push-secrets.js');
+const { collectTargetSecrets, declaredBrandRepo, publishTargetSecrets } = require('../../dist/vendor/devkit/target-secrets.js');
+const { serviceAccountSecret } = require('../../dist/vendor/devkit/target-seams.js');
 const { deployPrecheck, STEPS } = require('../../dist/cli/utils/deploy-precheck.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const quiet = { log() {}, warn() {}, error() {} };
 
+/**
+ * The schema-required backend keys as a `.env` fragment. A publish refuses when
+ * a required key resolves empty ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)),
+ * so any fixture that PUBLISHES carries them. Placeholders, never real values.
+ */
+const REQUIRED_ENV = 'OMEGA_WEBHOOK_KEY="fixture-webhook"\n'
+  + 'OMEGA_NAMESPACE="0f9d7a4e-0000-4000-8000-000000000000"\n'
+  + 'UNSUBSCRIBE_HMAC_KEY="fixture-unsubscribe-hmac"\n';
+
 /** A brand root (config/omega.json5) with a targets/backend target under it. */
-function seedBrand({ brandEnv, repo } = {}) {
+function seedBrand({ brandEnv, org } = {}) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-secrets-')));
   const targetDir = path.join(root, 'targets', 'backend');
 
   jetpack.write(path.join(root, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    ...(repo ? { repo: { providers: { github: { repo } } } } : {}),
-    targets: { backend: {} },
+    ...(org ? { repo: { provider: 'github', org } } : {}),
+    targets: { backend: { type: 'backend' } },
   }));
   if (brandEnv !== undefined) jetpack.write(path.join(root, '.env'), brandEnv);
   jetpack.dir(targetDir);
@@ -65,17 +77,18 @@ function gitStub(remote) {
 
 /** Publish with both boundaries injected, returning the recorded `gh` calls. */
 function publish(targetDir, gh) {
-  return pushSecrets.publishEnvSecrets({
+  return publishTargetSecrets({
     targetDir,
+    target: 'backend',
     logger: quiet,
     env: {},
-    gitExecFn: gitStub('git@github.com:acme/app.git\n'),
+    gitExecFn: gitStub('git@github.com:acme/fixture-omega.git\n'),
     execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
   });
 }
 
 module.exports = defineCases({
-  description: 'backend push-secrets (#872): the composed env plus the service-account FILE',
+  description: 'backend secrets (#872): the composed env plus the service-account FILE',
   type: 'group',
   timeout: 30000,
 
@@ -86,8 +99,8 @@ module.exports = defineCases({
 
       async run({ assert }) {
         const { root, targetDir } = seedBrand({
-          repo: 'acme/app',
-          brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n',
+          org: 'acme',
+          brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n${REQUIRED_ENV}`,
         });
         // The key's ONE home in a brand monorepo: the firebase manage service
         // mints it there, and Google shows a key once.
@@ -106,7 +119,7 @@ module.exports = defineCases({
           // every value goes on stdin rather than argv.
           const sent = gh.find((call) => call.args.includes('OMEGA_SERVICE_ACCOUNT_JSON'));
           assert.equal(sent.input, key, 'the key file is published verbatim');
-          assert.deepEqual(sent.args, ['secret', 'set', 'OMEGA_SERVICE_ACCOUNT_JSON', '--repo', 'acme/app']);
+          assert.deepEqual(sent.args, ['secret', 'set', 'OMEGA_SERVICE_ACCOUNT_JSON', '--repo', 'acme/fixture-omega']);
           assert.equal(gh.every((call) => call.file === 'gh'), true, 'one transport: the gh CLI');
           assert.deepEqual(gh[0].args, ['auth', 'status'], 'an unusable gh fails before anything is sent');
         } finally {
@@ -116,18 +129,21 @@ module.exports = defineCases({
     },
 
     {
-      name: 'collectEnvSecrets-composes-the-brand-env-and-adds-the-key-file',
+      name: 'the-composed-brand-env-plus-the-key-file-is-the-published-set',
       auth: 'none',
 
       async run({ assert }) {
         const { root, targetDir } = seedBrand({
-          repo: 'acme/app',
+          org: 'acme',
           brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\nOMEGA_LICENSE_KEY="omg_live_brand"\n',
         });
         jetpack.write(path.join(root, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account"}');
 
         try {
-          const secrets = pushSecrets.collectEnvSecrets(targetDir);
+          const secrets = {
+            ...collectTargetSecrets({ targetDir, target: 'backend' }),
+            ...serviceAccountSecret(targetDir),
+          };
 
           assert.equal(secrets.OMEGA_ADMIN_KEY, 'brand-admin', 'the brand-root .env supplies the target');
           assert.equal(secrets.OMEGA_LICENSE_KEY, 'omg_live_brand');
@@ -143,12 +159,12 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        const declared = seedBrand({ repo: 'acme/app' });
+        const declared = seedBrand({ org: 'acme' });
         const undeclared = seedBrand();
 
         try {
-          assert.equal(pushSecrets.declaredBrandRepo(declared.targetDir), 'acme/app');
-          assert.equal(pushSecrets.declaredBrandRepo(undeclared.targetDir), null, 'an inferred remote is never a declaration');
+          assert.equal(declaredBrandRepo({ targetDir: declared.targetDir, target: 'backend' }), 'acme/fixture-omega');
+          assert.equal(declaredBrandRepo({ targetDir: undeclared.targetDir, target: 'backend' }), null, 'an inferred remote is never a declaration');
         } finally {
           jetpack.remove(declared.root);
           jetpack.remove(undeclared.root);
@@ -161,13 +177,13 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ repo: 'acme/app', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
+        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         jetpack.write(path.join(root, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account","project_id":"brand"}');
         jetpack.write(path.join(targetDir, 'service-account.json'), '{"type":"service_account","project_id":"target"}');
 
         try {
           assert.deepEqual(
-            pushSecrets.serviceAccountSecret(targetDir),
+            serviceAccountSecret(targetDir),
             { OMEGA_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"target"}' },
             'the target root owns its copy when it has one, the same chain the stage reads',
           );
@@ -185,11 +201,11 @@ module.exports = defineCases({
       // authenticate, and the MISSING secret is what says so. Publishing an
       // empty one would look like a credential and fail at `firebase deploy`.
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ repo: 'acme/app', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
+        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: `OMEGA_ADMIN_KEY="brand-admin"\n${REQUIRED_ENV}` });
 
         const gh = [];
         try {
-          assert.deepEqual(pushSecrets.serviceAccountSecret(targetDir), {}, 'no file, no key');
+          assert.deepEqual(serviceAccountSecret(targetDir), {}, 'no file, no key');
 
           const result = publish(targetDir, gh);
           assert.equal(result.published.includes('OMEGA_SERVICE_ACCOUNT_JSON'), false, 'nothing invents a credential');
@@ -207,7 +223,7 @@ module.exports = defineCases({
       // The same opt-out name web, desktop and the extension honor. On backend
       // the flag used to be accepted and ignored.
       async run({ assert }) {
-        const { root, targetDir } = seedBrand({ repo: 'acme/app', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
+        const { root, targetDir } = seedBrand({ org: 'acme', brandEnv: 'OMEGA_ADMIN_KEY="brand-admin"\n' });
         const ran = [];
 
         try {
@@ -233,6 +249,9 @@ module.exports = defineCases({
 
           // The real list, so the bind itself is pinned and not just the runner.
           assert.deepEqual(STEPS.map((step) => step.name), ['verify-deploy-roles', 'push-secrets']);
+          // FATAL on all four frameworks (#891): the runner deploys with what
+          // this step sends, so a refused or half publish stops the deploy.
+          assert.equal(STEPS.find((step) => step.name === 'push-secrets').fatal, true);
         } finally {
           jetpack.remove(root);
         }

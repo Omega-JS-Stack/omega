@@ -21,15 +21,17 @@ const MONOREPO_ROOT = path.join(__dirname, '..');
 
 // The full consumer shape: every framework target, classy defaults. The
 // .invalid URL (RFC 2606) guarantees the never-deployed live probe can never
-// false-pass on someone else's real domain. allowedServiceErrors is EMPTY
-// since cp196: a never-deployed brand's live checks nudge (warn), so NO
-// service may error on a virgin brand.
+// false-pass on someone else's real domain. Since cp196 a never-deployed
+// brand's live checks nudge (warn), so no service may error on a virgin brand,
+// with ONE designed exception: `publishing` refuses a declared store format
+// whose developer keys a headless run cannot collect (#867), and this lane
+// runs creds-scrubbed on purpose. Every other service must stay green.
 const SPEC = {
   id: 'journey-brand',
   url: 'https://journey-brand.invalid',
   targets: ['web', 'backend', 'desktop', 'extension'],
   expect: { brandName: 'Journey Brand', themeId: 'classy' },
-  allowedServiceErrors: [],
+  allowedServiceErrors: ['publishing'],
 };
 
 async function main() {

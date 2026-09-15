@@ -11,11 +11,11 @@
  *
  * Brand-monorepo hierarchy: when projectDir is a target inside a brand
  * monorepo ({brand}/targets/{target}), the brand root's config/omega.json5 is the
- * brand layer under the target's file, and a brand stamped with
- * .omega/company.json inherits its company root's file underneath that.
- * Resolution for a target:
+ * brand layer under the target's file, and a brand naming a company
+ * (`company: { id }`) inherits that company's own config/omega.json5 underneath
+ * that (#677). Resolution for a target:
  *
- *   schema defaults ← framework defaults ← company ← brand shared ← brand targets[target] ← local shared ← local targets[target]
+ *   schema defaults ← framework defaults ← company ← company.<environment> ← brand shared ← brand targets[name] ← brand.<environment> ← local shared ← local targets[name] ← local.<environment>
  *
  * The bottom layer derives from the schema's own `default:` entries
  * ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)) — the one home
@@ -23,21 +23,36 @@
  * framework genuinely differs.
  *
  * The company file layers exactly like the brand file (shared, then its
- * targets[target] entry) minus its `brands` key — company plumbing that means
- * nothing inside a brand.
+ * targets[name] entry) minus its `brands` key, which is company plumbing that
+ * means nothing inside a brand.
  *
- * Multi-instance targets: a targets[target] value may be an ARRAY of id'd
- * instance entries — the target dir names WHICH instance (targets/website-admin →
- * web/admin, canonical dir → main) and that instance's entry is the target
- * layer for this target (see instances.js; the single-object form applies to
- * every target of the type, unchanged).
+ * Every layer is TWO files, not one
+ * ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): its omega.json5
+ * and the `omega.<environment>.json5` overlay beside it, which wins over its
+ * OWN base and still loses to the layer above (each file keeping the
+ * shared-then-targets[name] split). The environment is envEnvironment()'s
+ * answer, exactly the vocabulary the `.env.<environment>` overlays are suffixed
+ * with (#586), so ONE word names the config overlay, the env overlay and the
+ * runtime's own environment. Only the RUNNING environment's overlay composes,
+ * and a missing overlay is nothing. A file named for anything else
+ * (`omega.staging.json5`) is not a layer at all, so nothing reads it and there
+ * is nothing to warn about. An overlay holds only the OVERRIDES: the validator
+ * judges the merged result, never an overlay on its own.
+ *
+ * Targets are keyed by NAME (#886): the target dir IS the name
+ * (targets/community → the `community` entry), and that entry is the target
+ * layer of the chain. A standalone project has no such dir, so its name is the
+ * single target of that framework's type its own file declares (a deployed
+ * backend staged from `api: { type: 'backend' }` is still the `api` target).
+ * The caller passes the framework TYPE it runs, and a name declared with a
+ * different type fails loud (see targets.js).
  *
  * "shared" = the file minus its `targets` key. A target entry may override
  * ANY shared key — same agnostic deep merge at every step (see merge.js), so
  * a per-surface Sentry DSN or analytics id is just
- * targets.<type>.monitoring.providers.sentry.dsn.
+ * targets.<name>.monitoring.providers.sentry.dsn.
  * Target-section keys land at the TOP LEVEL of the resolved config
- * (targets.desktop.platforms resolves to config.platforms); the merged
+ * (targets.desktop.platforms resolves to config.platforms, for a target NAMED desktop); the merged
  * `targets` map itself is kept on the result purely so enabled-target
  * enumeration survives resolution — settings are never read from it.
  *
@@ -52,12 +67,12 @@ const path = require('node:path');
 const JSON5 = require('json5');
 
 const { deepMerge, isPlainObject } = require('./merge.js');
-const { readCompanyRoot } = require('./company.js');
+const { resolveCompany, recordBrand } = require('./company.js');
 const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
 const { schemaDefaults } = require('./defaults.js');
-const { resolveInstanceEntry, resolveInstanceUrl, instanceIdFromDirName, MAIN_INSTANCE } = require('./instances.js');
+const { targetNameFromDir, targetUrl } = require('./targets.js');
 
 const FILE_NAME = 'omega.json5';
 const CONFIG_LOCATIONS = [
@@ -80,6 +95,48 @@ function resolveConfigPath(projectDir) {
     .find((absolute) => fs.existsSync(absolute));
 
   return hit || null;
+}
+
+/**
+ * The environment an overlay chain composes for. A lane that KNOWS the
+ * environment its artifact is for (a production build, a deploy stage) names it
+ * ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)), exactly the way
+ * composeTargetEnv() already takes one for the `.env.<environment>` overlay
+ * beside it (#586); anything else gets `fallback`. One vocabulary, so a name
+ * outside it is a caller defect and fails loud rather than resolving to no
+ * overlay at all.
+ * @param {string} [environment] - The environment the caller named, or undefined.
+ * @param {string|null} fallback - What an unnamed environment resolves to.
+ * @returns {string|null} The environment whose overlay composes, or null for none.
+ */
+function resolveOverlayEnvironment(environment, fallback) {
+  // lazy require: env.js depends on this module (findBrandRoot)
+  const { ENV_ENVIRONMENTS } = require('./env.js');
+
+  if (environment === undefined || environment === null) return fallback;
+
+  if (!ENV_ENVIRONMENTS.includes(environment)) {
+    throw new Error(`Unknown environment "${environment}": must be one of [${ENV_ENVIRONMENTS.join(', ')}]`);
+  }
+
+  return environment;
+}
+
+/**
+ * ONE layer's environment overlay (#856): the `omega.<environment>.json5`
+ * beside its own base file, the config mirror of the `.env` + `.env.<environment>`
+ * pair (#586). Only ONE environment is ever asked for, so an overlay named for
+ * any other word is not a layer and is never read (nothing to warn about: it is
+ * simply not part of the chain).
+ * @param {string|null} basePath - The layer's omega.json5 path, or null when the layer has none.
+ * @param {string|null} environment - The environment whose overlay composes (one of ENV_ENVIRONMENTS), or null for none.
+ * @returns {string|null} Absolute overlay path, or null when there is no overlay.
+ */
+function resolveOverlayPath(basePath, environment) {
+  if (!basePath || !environment) return null;
+
+  const overlay = path.join(path.dirname(basePath), `${path.basename(FILE_NAME, '.json5')}.${environment}.json5`);
+  return fs.existsSync(overlay) ? overlay : null;
 }
 
 /**
@@ -156,32 +213,22 @@ function findBrandConfigPath(projectDir) {
 }
 
 /**
- * The COMPANY layer of the chain: a brand stamped with `.omega/company.json`
- * (written idempotently by company manage runs) inherits its company root's
- * omega.json5 as the layer between framework defaults and the brand file —
- * company-wide values (a shared monitoring org, an analytics account) are
- * authored once at the company root. The marker sits at the BRAND root, so
- * targets resolve it through their brand; a brand root (or standalone project)
- * reads its own. Same rule as the .env cascade (env.js).
+ * The BRAND ROOT every company question is asked from: a target resolves it
+ * through its brand, a brand root (or standalone project) answers for itself.
+ *
+ * Same normalization as findBrandRoot: the company is named by the brand's own
+ * config, never by anything inside the runtime cwd or the staged build output.
+ * Reading only `functions/` left a STANDALONE project resolving from dist/ (the
+ * view `omega test` loads) looking one level too low, so its company layer
+ * vanished ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
  * @param {string} projectDir - Target dir, brand root, or a TARGET_SUBDIR of one (functions/, dist/).
- * @returns {string|null} Absolute company omega.json5 path, or null.
+ * @returns {string} Absolute brand (or standalone-project) root.
  */
-function findCompanyConfigPath(projectDir) {
+function companyHostRoot(projectDir) {
   let dir = path.resolve(projectDir);
-  // Same normalization as findBrandRoot: a marker is stamped at the target/brand
-  // root, never inside the runtime cwd or the staged build output. Reading
-  // only `functions/` left a STANDALONE project resolving from dist/ (the view
-  // `omega test` loads) looking for the marker inside dist/, so its company
-  // layer vanished ([#257](https://github.com/Omega-JS-Stack/omega/issues/257)).
   if (TARGET_SUBDIRS.includes(path.basename(dir))) dir = path.dirname(dir);
 
-  const markerRoot = findBrandRoot(dir) || dir;
-  const companyRoot = readCompanyRoot(markerRoot);
-
-  // A root stamped at ITSELF would merge its own file in twice.
-  if (!companyRoot || path.resolve(companyRoot) === markerRoot) return null;
-
-  return resolveConfigPath(companyRoot);
+  return findBrandRoot(dir) || dir;
 }
 
 /**
@@ -255,6 +302,28 @@ function stripTargets(config) {
   return shared;
 }
 
+// The `company` keys the LOADER fills (#677): authored, they would be
+// overwritten at every load, so an author hears about it at the file.
+const RESOLVED_COMPANY_KEYS = ['name', 'url', 'images'];
+
+/**
+ * The company keys nobody types, refused where a human writes them: the BRAND
+ * file and the COMPANY file (#677). The local layer is deliberately exempt,
+ * because a target's `config/omega.json5` may be a staged compose output, which
+ * carries the RESOLVED facts on purpose (the deployed runtime has no registry
+ * and no company tree to re-resolve them from).
+ * @param {string|null} file - The layer's path, for the message.
+ * @param {object|null} data - The parsed layer.
+ */
+function assertNoTypedCompany(file, data) {
+  if (!data || !isPlainObject(data.company)) return;
+
+  const typed = RESOLVED_COMPANY_KEYS.filter((key) => data.company[key] !== undefined);
+  if (typed.length) {
+    throw new Error(`${typed.map((key) => `company.${key}`).join(', ')} in ${file} is resolved from the company, delete it (#677): the brand types company: { id: '<parent brand.id>' } (or 'self') and the loader fills the rest`);
+  }
+}
+
 /**
  * Raw-file hard fails, applied BEFORE any merge: secrets anywhere in the
  * file (requested target or not) and the legacy targets ARRAY (it would
@@ -274,6 +343,83 @@ function assertUsableRawFile(file, data) {
 }
 
 /**
+ * Each layer's environment overlay (#856), read beside its own base file, plus
+ * the raw-file gate every one of the six files passes. ONE copy for the two
+ * readers of the chain (`loadConfig` and `composeTargetConfig`), which resolved
+ * the same three paths, read the same three files and ran the same ten asserts
+ * in the same order.
+ *
+ * An overlay is judged by the SAME hard fails as the base beside it: it is the
+ * same authored file, so a secret (or a legacy targets array) in one is the
+ * same defect, with the same message naming the overlay. That is why the bases
+ * come in here too: the gate is one block, not two halves that can drift.
+ *
+ * @param {object} options - Options.
+ * @param {string|null} options.companyPath - The company layer's base file.
+ * @param {object|null} options.company - The parsed company layer.
+ * @param {string|null} options.brandPath - The brand layer's base file.
+ * @param {object|null} options.brand - The parsed brand layer.
+ * @param {string|null} options.localPath - The local layer's base file.
+ * @param {object|null} options.local - The parsed local layer.
+ * @param {string|null} options.environment - The environment the overlays are
+ *   FOR; null reads no overlay at all.
+ * @returns {{ companyOverlay: object|null, brandOverlay: object|null, localOverlay: object|null }}
+ *   Each layer's overlay, or null where that layer has none.
+ */
+function resolveLayerOverlays({ companyPath, company, brandPath, brand, localPath, local, environment }) {
+  const companyOverlayPath = resolveOverlayPath(companyPath, environment);
+  const brandOverlayPath = resolveOverlayPath(brandPath, environment);
+  const localOverlayPath = resolveOverlayPath(localPath, environment);
+
+  const companyOverlay = companyOverlayPath ? readConfigFile(companyOverlayPath) : null;
+  const brandOverlay = brandOverlayPath ? readConfigFile(brandOverlayPath) : null;
+  const localOverlay = localOverlayPath ? readConfigFile(localOverlayPath) : null;
+
+  assertUsableRawFile(companyPath, company);
+  assertUsableRawFile(brandPath, brand);
+  assertUsableRawFile(localPath, local);
+  assertUsableRawFile(companyOverlayPath, companyOverlay);
+  assertUsableRawFile(brandOverlayPath, brandOverlay);
+  assertUsableRawFile(localOverlayPath, localOverlay);
+  assertNoTypedCompany(companyPath, company);
+  assertNoTypedCompany(brandPath, brand);
+  assertNoTypedCompany(companyOverlayPath, companyOverlay);
+  assertNoTypedCompany(brandOverlayPath, brandOverlay);
+
+  return { companyOverlay, brandOverlay, localOverlay };
+}
+
+/**
+ * WHICH target a STANDALONE project is (no brand root above it, so no dir to
+ * read the name off): the single declared target of the framework's type, else
+ * the type word. A deployed backend staged from `api: { type: 'backend' }` is
+ * the `api` target, so its entry is the target layer, `enabled` is true and its
+ * url derives, exactly as it does inside the brand it was staged from. Two
+ * targets of one type have no single answer, so the type word stands.
+ * @param {object} targets - The merged targets map.
+ * @param {string} target - The framework type this project runs.
+ * @returns {string} The target name.
+ */
+function standaloneTargetName(targets, target) {
+  const matches = Object.keys(targets || {})
+    .filter((name) => isPlainObject(targets[name]) && targets[name].type === target);
+
+  return matches.length === 1 ? matches[0] : target;
+}
+
+/**
+ * ONE layer's contribution to a target's config: its `targets.<name>` entry,
+ * or null when that layer says nothing about this target. Every merge chain
+ * (loadConfig and composeTargetConfig alike) folds the layers through this.
+ * @param {object|null} layer - A raw config layer (company, brand, or local).
+ * @param {string|null} name - The resolved target name.
+ * @returns {object|null} The target layer, or null.
+ */
+function targetLayerOf(layer, name) {
+  return layer && layer.targets && isPlainObject(layer.targets[name]) ? layer.targets[name] : null;
+}
+
+/**
  * Enabled targets of a config (raw or resolved): the keys of its `targets`
  * object — key presence IS the enablement signal.
  * @param {object} config
@@ -285,21 +431,45 @@ function getEnabledTargets(config) {
 }
 
 /**
+ * The RESOLVED `company` section: the same keys the consumer typed (`{ id }`,
+ * and `{ webhooks }` when the brand opts out), filled with the company's public
+ * facts (#677). A brand with no company resolves to its OWN name and url under
+ * a null id, so no reader anywhere needs a fallback.
+ * @param {string} hostRoot - The brand root the company is named from.
+ * @param {object} config - The merged config (its `company` and `brand` blocks).
+ * @returns {{ id: string|null, name: string|null, url: string|null, images: object, webhooks: boolean }}
+ */
+function companyFacts(hostRoot, config) {
+  const { id, name, url, images, webhooks } = resolveCompany(hostRoot, config);
+
+  return { id, name, url, images, webhooks };
+}
+
+/**
  * Load + resolve a project's omega.json5.
  * @param {string} projectDir - The project root (target root in a brand monorepo).
- * @param {string} [target] - Canonical target name ('web', 'backend', ...). When
- *   given, the target sections overlay the shared namespace. When omitted, the
- *   brand + local files merge whole (targets map included) — the shape tools like
- *   omega-manager's disperse want.
+ * @param {string} [target] - The framework TYPE this project runs ('web',
+ *   'backend', ...). When given, the target sections overlay the shared
+ *   namespace. When omitted, the brand + local files merge whole (targets map
+ *   included): the shape tools like omega-manager's disperse want.
  * @param {object} [options]
  * @param {object} [options.defaults] - Framework defaults, layered directly on
  *   top of the schema defaults (#478) — only what this framework does differently.
- * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, instance: string, files: { local: string, brand: string|null, company: string|null } }}
- *   `enabled` = whether `target` is listed under `targets` (null when no target
- *   was requested); schema `errors` are returned, not thrown — only secrets and
- *   unusable files throw. `warnings` are advisory findings (e.g. >1 backend
- *   instance); `instance` is the target-dir-resolved instance id ('main' outside
- *   the multi-instance world).
+ * @param {string} [options.environment] - The environment this load is FOR (one
+ *   of ENV_ENVIRONMENTS): which `omega.<environment>.json5` overlay composes
+ *   ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)). Every lane
+ *   that produces a PRODUCTION artifact names it, the way stageFunctions()
+ *   already names one for the `.env` overlay beside it (#586), because the
+ *   ambient answer is the composing machine's and a build from a terminal
+ *   resolves `development`. Omitted (a dev boot, a deployed runtime) = the
+ *   running environment, envEnvironment().
+ * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, name: string|null, files: { local: string, brand: string|null, company: string|null } }}
+ *   `enabled` = whether the resolved NAME is listed under `targets` (null when
+ *   no target was requested); schema `errors` are returned, not thrown; only
+ *   secrets and unusable files throw. `warnings` are advisory findings (e.g. >1
+ *   backend target); `name` is the target-dir-resolved target name (for a
+ *   standalone project, the single declared target of that type, else the type
+ *   word; null when no target was requested).
  */
 function loadConfig(projectDir, target, options) {
   options = options || {};
@@ -319,7 +489,6 @@ function loadConfig(projectDir, target, options) {
     localPath = resolveConfigPath(path.dirname(path.resolve(projectDir)));
   }
   const brandPath = findBrandConfigPath(projectDir);
-  const companyPath = findCompanyConfigPath(projectDir);
 
   // The local-layer file is OPTIONAL inside a brand monorepo (Ian 2026-07-13:
   // the brand file's targets section IS the per-target home) — a target with
@@ -331,80 +500,130 @@ function loadConfig(projectDir, target, options) {
 
   const local = localPath ? readConfigFile(localPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
-  const company = companyPath ? readConfigFile(companyPath) : null;
 
-  assertUsableRawFile(companyPath, company);
-  assertUsableRawFile(brandPath, brand);
-  assertUsableRawFile(localPath, local);
+  // The company layer comes from the brand's typed `company: { id }` through the
+  // ONE resolver (#677), which also answers for a runner that received a
+  // generated layer instead of a machine to resolve on.
+  const company = resolveCompany(companyHostRoot(projectDir), brand || local);
+  const companyPath = company.configFile;
 
-  const inherited = stripCompanyPlumbing(company);
+  // Each layer's environment overlay (#856), found beside its own base file.
+  // The environment is the one the CALLER named when it named one (a lane that
+  // knows what its artifact is FOR), else this machine's ambient answer, which
+  // is what a dev boot and a deployed runtime both want.
+  // lazy require: env.js depends on this module (findBrandRoot)
+  const { envEnvironment } = require('./env.js');
+  const environment = resolveOverlayEnvironment(options.environment, envEnvironment());
+  const { companyOverlay, brandOverlay, localOverlay } = resolveLayerOverlays({
+    companyPath, company: company.config, brandPath, brand, localPath, local, environment,
+  });
+
+  const inherited = stripCompanyPlumbing(company.config);
 
   // ─── Resolve ─────────────────────────────────────────────────────────────
-  const hasTargets = !!((inherited && inherited.targets) || (brand && brand.targets) || local.targets);
-  const targets = deepMerge(inherited ? inherited.targets : null, brand ? brand.targets : null, local.targets);
+  // The chain, weakest first: every layer's base file followed by its own
+  // environment overlay (#856), which beats that base and still loses to the
+  // layer above. Each entry contributes shared, then targets[name], below.
+  const layers = [
+    inherited,
+    stripCompanyPlumbing(companyOverlay),
+    brand,
+    brandOverlay,
+    local,
+    localOverlay,
+  ];
 
-  // Instance dimension (multi-instance targets): WHICH instance this target is
-  // comes from its dir name (targets/website-admin → web/admin; the canonical
-  // dir → main). Only brand-monorepo targets resolve through the walk — a
-  // standalone project's dir name is arbitrary and always means main.
-  let targetRoot = path.resolve(projectDir);
-  if (TARGET_SUBDIRS.includes(path.basename(targetRoot))) {
-    targetRoot = path.dirname(targetRoot);
+  const hasTargets = layers.some((layer) => !!(layer && layer.targets));
+  const targets = deepMerge(...layers.map((layer) => (layer ? layer.targets : null)));
+
+  // WHICH target this is comes from its dir name (#886): targets/community is
+  // the `community` entry. Only brand-monorepo targets resolve through the
+  // walk: a standalone project's dir name is arbitrary, so it is named by what
+  // its own file declares for the framework it runs.
+  const name = target ? (targetNameFromDir(projectDir) || standaloneTargetName(targets, target)) : null;
+
+  // A dir whose entry runs a DIFFERENT framework has no honest resolution: the
+  // caller would silently merge somebody else's target layer.
+  const declared = name ? targets[name] : null;
+  if (target && declared && declared.type && declared.type !== target) {
+    throw new Error(`targets.${name} is type ${declared.type}; this project runs the ${target} framework`);
   }
-  const instance = target && brandPath ? instanceIdFromDirName(path.basename(targetRoot), target) : MAIN_INSTANCE;
 
   const config = target
     ? deepMerge(
         schemaDefaults(target),
         options.defaults,
-        stripTargets(inherited),
-        inherited && inherited.targets ? resolveInstanceEntry(inherited.targets[target], instance) : null,
-        stripTargets(brand),
-        brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
-        stripTargets(local),
-        local.targets ? resolveInstanceEntry(local.targets[target], instance) : null,
+        ...layers.flatMap((layer) => [stripTargets(layer), targetLayerOf(layer, name)]),
       )
-    : deepMerge(schemaDefaults(), options.defaults, inherited, brand, local);
+    : deepMerge(schemaDefaults(), options.defaults, ...layers);
 
   // Keep the merged targets map on the resolved config (presence = enabled)
   if (target && hasTargets) {
     config.targets = targets;
   }
 
-  // The instance's own public URL (#588): an entry's explicit `url` already
-  // merged to the top level above, and a bare `{ id: 'admin' }` derives
-  // https://admin.<brand host> through the ONE resolver, landing in that same
-  // place, so every reader of the resolved config (site-global's site.url, the
-  // web deploy's host + CNAME) sees the instance's url and not the main site's.
-  // `main` derives nothing: brand.url IS its url.
+  // The target's own public URL (#588): an entry's explicit `url` already
+  // merged to the top level above, and a bare `community: { type: 'web' }`
+  // derives https://community.<brand host> through the ONE resolver, landing in
+  // that same place, so every reader of the resolved config (site-global's
+  // site.url, the web deploy's host + CNAME) sees THIS target's url and not the
+  // main site's. A target named for its type derives nothing: brand.url IS its
+  // url.
   //
-  // A brand.url OVERRIDE that reached this instance (the instance entry's own
-  // `brand.url`, an instance target dir's local layer, a dev layer pointing at
-  // localhost) IS the instance url already, never a base to stack the id on:
-  // deriving there gave shop.shop.acme.test and https://admin.localhost:4000.
-  // The test is whether the resolved brand.url still equals the BRAND layer's.
-  if (target && instance !== MAIN_INSTANCE && !config.url) {
-    const brandLayerUrl = (brand && brand.brand && brand.brand.url)
+  // A brand.url OVERRIDE that reached this target (the entry's own `brand.url`,
+  // the target dir's local layer, a dev layer pointing at localhost) IS the
+  // target url already, never a base to stack the name on: deriving there gave
+  // shop.shop.acme.test and https://admin.localhost:4000. The test is whether
+  // the resolved brand.url still equals the BRAND layer's.
+  if (target && name !== target && !config.url) {
+    // A layer's environment overlay IS that layer's statement of brand.url
+    // (#856), so a development brand.url is a brand-layer value like any
+    // other: the targets under it keep deriving their own names off it.
+    const brandLayerUrl = (brandOverlay && brandOverlay.brand && brandOverlay.brand.url)
+      || (brand && brand.brand && brand.brand.url)
+      || (companyOverlay && companyOverlay.brand && companyOverlay.brand.url)
       || (inherited && inherited.brand && inherited.brand.url)
+      // A standalone project has no brand layer above it, so its OWN shared
+      // brand.url IS the brand's: only a target entry below it overrides.
+      || (!brandPath && localOverlay && localOverlay.brand ? localOverlay.brand.url : null)
+      || (!brandPath && local.brand ? local.brand.url : null)
       || null;
     const resolvedUrl = (config.brand && config.brand.url) || null;
 
-    const instanceUrl = resolvedUrl && resolvedUrl !== brandLayerUrl
+    const resolvedTargetUrl = resolvedUrl && resolvedUrl !== brandLayerUrl
       ? resolvedUrl
-      : resolveInstanceUrl(targets ? targets[target] : null, instance, config);
+      : targetUrl(config, name);
 
-    if (instanceUrl) {
-      config.url = instanceUrl;
+    if (resolvedTargetUrl) {
+      config.url = resolvedTargetUrl;
     }
   }
 
   const enabled = target
-    ? hasTargets && Object.prototype.hasOwnProperty.call(targets, target)
+    ? hasTargets && Object.prototype.hasOwnProperty.call(targets, name)
     : null;
 
   const { errors, warnings } = validateConfig(config, { target });
 
-  return { config, errors, warnings, enabled, instance, files: { local: localPath, brand: brandPath, company: companyPath } };
+  // The `company` section is RESOLVED, never typed past its `id` (#677): the
+  // same key the consumer wrote comes back filled, so every reader of a parent
+  // fact (the footer's credit, an email wordmark, the in-house ads api) reads
+  // one shape whether the brand has a company, IS one, or stands alone. Filled
+  // AFTER validation, so a typed name/url/images is still the author's key when
+  // the validator judges it.
+  config.company = companyFacts(companyHostRoot(projectDir), config);
+
+  // Every brand run writes its own line in the machine registry, which is what
+  // makes a sibling brand's `company: { id }` resolvable here without anyone
+  // maintaining a map (#677). Never fails the load.
+  recordBrand({
+    id: config.brand && config.brand.id,
+    root: companyHostRoot(projectDir),
+    name: config.brand && config.brand.name,
+    url: config.brand && config.brand.url,
+  });
+
+  return { config, errors, warnings, enabled, name, files: { local: localPath, brand: brandPath, company: companyPath } };
 }
 
 /**
@@ -415,13 +634,23 @@ function loadConfig(projectDir, target, options) {
  * interleave (company shared ← company targets[target] ← brand shared ← brand
  * targets[target] ← local shared ← local targets[target]) is frozen into the
  * shared namespace: the deployed
- * runtime's own `deepMerge(defaults, shared, targets[target])` then yields
- * EXACTLY the local resolution. `targets` keeps presence-only keys
- * (presence = enabled; every value is already folded in, so nothing
- * re-applies above the frozen interleave — a raw merged targets map would
- * let a brand-target value beat a local-shared one, flipping the chain).
+ * runtime's own `deepMerge(defaults, shared, targets[name])` then yields
+ * EXACTLY the local resolution. `targets` keeps presence-and-type keys
+ * (presence = enabled, and the `type` every entry must declare; every other
+ * value is already folded in, so nothing re-applies above the frozen
+ * interleave: a raw merged targets map would let a brand-target value beat a
+ * local-shared one, flipping the chain).
  * Framework defaults are NOT baked in: the deployed runtime applies its
  * own, so defaults evolve with the shipped package, not the deploy moment.
+ *
+ * Environment overlays (#856) compose only for an environment the CALLER named:
+ * a compose is a BUILD-time op over the authored layers, and the environment an
+ * artifact is FOR is the LANE's answer, never the composing machine's (`omega
+ * deploy` from a terminal resolves `development`, which would bake a
+ * development override into a production upload). So the ambient answer is
+ * never read here, and a compose told nothing freezes the base layers alone.
+ * The knob is the one stageFunctions() already takes for the `.env` overlay
+ * beside it, spelled the same: `options.environment`.
  *
  * The local-layer file is OPTIONAL inside a brand monorepo (same rule as
  * loadConfig since cp121c): a target with no omega.json5 of its own composes
@@ -429,15 +658,24 @@ function loadConfig(projectDir, target, options) {
  *
  * @param {string} projectDir - Target root or one of its TARGET_SUBDIRS (functions/, dist/).
  * @param {string} target - Canonical target the upload serves ('backend').
+ * @param {object} [options]
+ * @param {string} [options.environment] - The environment the upload is FOR (one
+ *   of ENV_ENVIRONMENTS): which `omega.<environment>.json5` overlay is frozen
+ *   into the composed file. Omitted = no overlay at all.
  * @returns {{ config: object, files: { local: string|null, brand: string|null, company: string|null } }}
  *   `files.brand` null = no brand layer above the target (already self-contained);
  *   `files.local` null = the target rides the brand file alone; `files.company`
- *   null = the brand is not stamped into a company workspace.
+ *   null = the brand names no company with a tree on this machine.
  */
-function composeTargetConfig(projectDir, target) {
+function composeTargetConfig(projectDir, target, options) {
+  options = options || {};
+
   if (!TARGETS.includes(target)) {
     throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
   }
+
+  // No fallback: an unnamed environment composes NO overlay (see above).
+  const environment = resolveOverlayEnvironment(options.environment, null);
 
   // Compose is a BUILD-time op over the AUTHORED layers: a TARGET_SUBDIR
   // (functions/, dist/) normalizes up to its target root, so a previously-staged
@@ -450,39 +688,52 @@ function composeTargetConfig(projectDir, target) {
 
   const localPath = resolveConfigPath(targetRoot);
   const brandPath = findBrandConfigPath(targetRoot);
-  const companyPath = findCompanyConfigPath(targetRoot);
   if (!localPath && !brandPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')})`);
   }
 
   const local = localPath ? readConfigFile(localPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
-  const company = companyPath ? readConfigFile(companyPath) : null;
 
-  assertUsableRawFile(companyPath, company);
-  assertUsableRawFile(brandPath, brand);
-  assertUsableRawFile(localPath, local);
+  const company = resolveCompany(companyHostRoot(targetRoot), brand || local);
+  const companyPath = company.configFile;
 
-  const inherited = stripCompanyPlumbing(company);
+  // Each layer's overlay for THIS environment (#856), beside its own base file,
+  // read and gated by the same one helper loadConfig uses.
+  const { companyOverlay, brandOverlay, localOverlay } = resolveLayerOverlays({
+    companyPath, company: company.config, brandPath, brand, localPath, local, environment,
+  });
 
-  // Same instance dimension as loadConfig: the target dir names the instance
-  // whose entry is this compose's target layer (main outside a brand).
-  const instance = brandPath ? instanceIdFromDirName(path.basename(targetRoot), target) : MAIN_INSTANCE;
+  const inherited = stripCompanyPlumbing(company.config);
+  const inheritedOverlay = stripCompanyPlumbing(companyOverlay);
+
+  // The chain, weakest first: every layer's base file followed by its own
+  // environment overlay (#856), exactly the order loadConfig folds them in.
+  const layers = [inherited, inheritedOverlay, brand, brandOverlay, local, localOverlay];
+
+  // Same collapse as loadConfig: the target dir NAMES the entry that is this
+  // compose's target layer (outside a brand, the file's single target of this
+  // framework's type).
+
+  const mergedTargets = deepMerge(...layers.map((layer) => (layer ? layer.targets : null)));
+  const name = targetNameFromDir(targetRoot) || standaloneTargetName(mergedTargets, target);
 
   const config = deepMerge(
-    stripTargets(inherited),
-    inherited && inherited.targets ? resolveInstanceEntry(inherited.targets[target], instance) : null,
-    stripTargets(brand),
-    brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
-    stripTargets(local),
-    local.targets ? resolveInstanceEntry(local.targets[target], instance) : null,
+    ...layers.flatMap((layer) => [stripTargets(layer), targetLayerOf(layer, name)]),
   );
 
-  const hasTargets = !!((inherited && inherited.targets) || (brand && brand.targets) || local.targets);
+  const hasTargets = layers.some((layer) => !!(layer && layer.targets));
   if (hasTargets) {
-    const targets = deepMerge(inherited ? inherited.targets : null, brand ? brand.targets : null, local.targets);
-    config.targets = Object.fromEntries(Object.keys(targets).map((name) => [name, {}]));
+    config.targets = Object.fromEntries(Object.keys(mergedTargets).map((entryName) => {
+      const entry = mergedTargets[entryName];
+      return [entryName, isPlainObject(entry) && entry.type ? { type: entry.type } : {}];
+    }));
   }
+
+  // The resolved company rides the upload like every other layer above it: the
+  // deployed runtime has no registry and no company tree, so the facts have to
+  // be frozen in here (#677).
+  config.company = companyFacts(companyHostRoot(targetRoot), config);
 
   return { config, files: { local: localPath, brand: brandPath, company: companyPath } };
 }

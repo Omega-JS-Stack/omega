@@ -15,9 +15,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  workflowSecretKeys, renderSecretsBlock, bakeKeys, publishSecretKeys,
+  workflowSecretKeys, renderSecretsBlock, bakeKeys, bakeSourceKeys, publishSecretKeys,
   envFileKeys, renderEnvFileKeys, artifactEnvValues,
-  WORKFLOW_OWNED_KEYS, DELIVERY_MODES,
+  WORKFLOW_OWNED_KEYS, DELIVERY_MODES, deliveredKeys,
 } = require('../src/index.js');
 
 // A miniature schema: one entry per rule the renderer applies.
@@ -116,14 +116,18 @@ test('web: the build-step keys, and nothing the backend alone reads', () => {
     'GH_TOKEN',
     'GOOGLE_ANALYTICS_SECRET',
     'OMEGA_LICENSE_KEY',
-    'OMEGA_TEST_FIREBASE_ADMIN_KEY',
-    'OMEGA_TEST_USER_UID',
-    'OPENAI_API_KEY',
-    'RECAPTCHA_SITE_KEY',
   ]);
 
   const block = renderSecretsBlock('web');
-  assert.ok(block.includes('RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}'));
+  // The reCAPTCHA SITE key is config now (#893): a public key the page renders
+  // is not a secret, so no CI line delivers it and the build reads it from
+  // captcha.providers.recaptcha.siteKey
+  assert.ok(!block.includes('RECAPTCHA_SITE_KEY'), 'a public site key rides the config, never the secrets block');
+  assert.ok(block.includes('OMEGA_LICENSE_KEY: ${{ secrets.OMEGA_LICENSE_KEY }}'));
+  // #819: the AI key is `env` on every target it names now, which is the
+  // laptop's composed .env. Translation runs locally and CI reads the
+  // committed cache (#905), so no runner is ever handed the key.
+  assert.ok(!block.includes('OPENAI_API_KEY'), 'an `env` delivery renders no workflow line');
   // The brand's GOOGLE_ANALYTICS_SECRET_WEB reaches CI under its delivered name
   assert.ok(block.includes('GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}'));
   assert.ok(!block.includes('GOOGLE_ANALYTICS_SECRET_WEB'), 'the brand-level name never reaches a runner');
@@ -247,20 +251,33 @@ test('desktop: the signing + publishing set the build workflow injects today', (
 });
 
 test('extension: the three stores plus the baked Measurement Protocol secret', () => {
+  // The store CREDENTIALS ride the runner env; the three listing IDS do not
+  // (#893). An item id is public by design (it is in the listing URL), so it
+  // lives in config at targets.<name>.listings.<browser>.id and reaches a
+  // dispatched run the way every other config value does: on the snapshot.
   assert.deepEqual(workflowSecretKeys('extension'), [
     'CHROME_CLIENT_ID',
     'CHROME_CLIENT_SECRET',
-    'CHROME_EXTENSION_ID',
     'CHROME_REFRESH_TOKEN',
     'EDGE_API_KEY',
     'EDGE_CLIENT_ID',
-    'EDGE_PRODUCT_ID',
     'FIREFOX_API_KEY',
     'FIREFOX_API_SECRET',
-    'FIREFOX_EXTENSION_ID',
+    'GH_TOKEN',
     'GOOGLE_ANALYTICS_SECRET',
     'OMEGA_LICENSE_KEY',
   ]);
+
+  const block = renderSecretsBlock('extension');
+  for (const id of ['CHROME_EXTENSION_ID', 'FIREFOX_EXTENSION_ID', 'EDGE_PRODUCT_ID']) {
+    assert.ok(!block.includes(id), `${id} is a config value now, never a repo secret`);
+  }
+
+  // The extension is a declared GH_TOKEN consumer (#883): its publish uploads
+  // the built zips to `<brand.id>-releases`, a repo the run does not own, so
+  // the extension's OWN push-secrets step has to deliver the brand token
+  // instead of the lane depending on a sibling target having pushed it first.
+  assert.ok(publishSecretKeys('extension').includes('GH_TOKEN'), 'the extension pushes the brand token as its own repo secret');
 
   assert.deepEqual(bakeKeys('extension'), ['GOOGLE_ANALYTICS_SECRET'], 'build.json carries it into the packaged zip');
 });
@@ -290,4 +307,121 @@ test('the license key rides the runner env and NEVER an artifact (#320)', () => 
     { OMEGA_ADMIN_KEY: 'admin' },
     'and the stage strips it out of the composed values',
   );
+});
+
+test('bakeSourceKeys: the brand-level name a human sets, for the guard that names it (#891)', () => {
+  // The bake reads GOOGLE_ANALYTICS_SECRET; the human sets
+  // GOOGLE_ANALYTICS_SECRET_DESKTOP, and the guard has to say the second one.
+  assert.deepEqual(bakeKeys('desktop'), ['GOOGLE_ANALYTICS_SECRET']);
+  assert.deepEqual(bakeSourceKeys('desktop'), ['GOOGLE_ANALYTICS_SECRET_DESKTOP']);
+
+  // A CI-delivered signing credential is not a baked key: the bake guard has no
+  // business refusing a build over a secret only the runner ever reads.
+  assert.equal(bakeSourceKeys('desktop').includes('CSC_LINK'), false);
+});
+
+// ─── The composed half: match families and custom keys (#835, #876) ───
+
+// What a brand's production cascade actually holds: the OAuth family the schema
+// knows only as a PATTERN, a key of the consumer's own the schema does not know
+// at all, a machine-local path, and a key whose only delivery is local.
+const COMPOSED = {
+  CONNECTIONS_GITHUB_CLIENT_ID: 'x',
+  CONNECTIONS_GITHUB_CLIENT_SECRET: 'x',
+  ACME_WEBHOOK_KEY: 'x',
+  OMEGA_FONTAWESOME_ROOT: 'x',
+  OPENAI_API_KEY: 'x',
+};
+
+test('backend: the composed set adds the CONNECTIONS family and the consumer\'s own key (#835, #876)', () => {
+  const keys = workflowSecretKeys('backend', { values: COMPOSED });
+
+  assert.ok(keys.includes('CONNECTIONS_GITHUB_CLIENT_ID'), 'a match-family member travels under its own name');
+  assert.ok(keys.includes('CONNECTIONS_GITHUB_CLIENT_SECRET'));
+  assert.ok(keys.includes('ACME_WEBHOOK_KEY'), 'a key the schema does not know is the consumer\'s own and still reaches CI');
+  assert.ok(!keys.includes('OMEGA_FONTAWESOME_ROOT'), 'a machine-local value never leaves the machine (#454)');
+
+  const block = renderSecretsBlock('backend', { indent: '  ', values: COMPOSED });
+  assert.ok(block.includes('CONNECTIONS_GITHUB_CLIENT_ID: ${{ secrets.CONNECTIONS_GITHUB_CLIENT_ID }}'));
+  assert.ok(block.includes('CONNECTIONS_GITHUB_CLIENT_SECRET: ${{ secrets.CONNECTIONS_GITHUB_CLIENT_SECRET }}'));
+  assert.ok(block.includes('ACME_WEBHOOK_KEY: ${{ secrets.ACME_WEBHOOK_KEY }}'));
+  assert.ok(!block.includes('OMEGA_FONTAWESOME_ROOT'));
+
+  // The two halves read ONE set: what the workflow injects is what its .env
+  // writer names, so a deployed backend can never miss a key CI was handed.
+  const envKeys = envFileKeys('backend', { values: COMPOSED });
+  assert.ok(envKeys.includes('CONNECTIONS_GITHUB_CLIENT_ID'));
+  assert.ok(envKeys.includes('CONNECTIONS_GITHUB_CLIENT_SECRET'));
+  assert.ok(envKeys.includes('ACME_WEBHOOK_KEY'), 'backend delivers a custom key in its FILE mode');
+  assert.ok(!envKeys.includes('OMEGA_FONTAWESOME_ROOT'));
+  assert.deepEqual(JSON.parse(renderEnvFileKeys('backend', { values: COMPOSED })), envKeys);
+});
+
+test('web: a custom key rides the runner env; a local-only and another target\'s family do not', () => {
+  const keys = workflowSecretKeys('web', { values: COMPOSED });
+
+  assert.ok(keys.includes('ACME_WEBHOOK_KEY'), 'every target carries the consumer\'s own key');
+  assert.ok(!keys.includes('OPENAI_API_KEY'), 'an `env` delivery on web is the laptop\'s composed .env, never a runner (#819)');
+  assert.ok(!keys.includes('CONNECTIONS_GITHUB_CLIENT_ID'), 'the OAuth family is delivered to backend only');
+  assert.ok(!keys.includes('OMEGA_FONTAWESOME_ROOT'));
+
+  const block = renderSecretsBlock('web', { values: COMPOSED });
+  assert.ok(block.includes('ACME_WEBHOOK_KEY: ${{ secrets.ACME_WEBHOOK_KEY }}'));
+  for (const absent of ['OPENAI_API_KEY', 'CONNECTIONS_GITHUB_CLIENT_ID', 'CONNECTIONS_GITHUB_CLIENT_SECRET', 'OMEGA_FONTAWESOME_ROOT']) {
+    assert.ok(!block.includes(absent), `${absent} is not delivered to web`);
+  }
+
+  // A site build and a packaged app ship no .env, so a custom key there is a
+  // runner value and no writer names it. (web's `env` deliveries are the
+  // LAPTOP's composed .env, #819: nothing renders them anywhere.)
+  assert.ok(!envFileKeys('web', { values: COMPOSED }).includes('ACME_WEBHOOK_KEY'), 'no file mode on web, so no file line');
+  assert.deepEqual(envFileKeys('desktop', { values: COMPOSED }), []);
+});
+
+test('the composed half never widens the schema half: no values, no additions', () => {
+  assert.deepEqual(workflowSecretKeys('backend', { values: {} }), workflowSecretKeys('backend'));
+  assert.deepEqual(renderSecretsBlock('desktop', { indent: '  ', values: {} }), renderSecretsBlock('desktop', { indent: '  ' }));
+  assert.deepEqual(publishSecretKeys('web', { values: COMPOSED }), workflowSecretKeys('web', { values: COMPOSED }));
+
+  // A workflow declares these itself, so a consumer key of the same name is
+  // never a second mapping line and never a repo secret of its own.
+  const owned = workflowSecretKeys('web', { values: { NODE_ENV: 'x', GITHUB_TOKEN: 'x', ACME_WEBHOOK_KEY: 'x' } });
+  assert.ok(!owned.includes('NODE_ENV'), 'a workflow-owned name is the template\'s, whoever typed it');
+  assert.ok(!owned.includes('GITHUB_TOKEN'), 'GitHub refuses a GITHUB_-prefixed secret: publishing one would fail the precheck');
+  assert.ok(owned.includes('ACME_WEBHOOK_KEY'));
+});
+
+test('a composed custom key GitHub could never hold as a secret fails by name (C2)', () => {
+  // dotenv reads `[\w.-]+` as a key, so a `.env` can carry a name GitHub's
+  // secret API refuses. Naming it here beats a gh call failing three layers on.
+  for (const key of ['ACME.WEBHOOK', 'ACME-KEY']) {
+    assert.throws(
+      () => workflowSecretKeys('web', { values: { [key]: 'x' } }),
+      (e) => e.message.includes(key) && /\[A-Za-z_\]\[A-Za-z0-9_\]\*/.test(e.message),
+      `${key} was composed into the delivered set`,
+    );
+  }
+});
+
+test('deliveredKeys(): the ONE primitive both halves read, fixture schema', () => {
+  const values = { DYNAMIC_THING: 'x', CUSTOM_THING: 'x', MACHINE_PATH: 'x' };
+
+  // backend: `env` is its file mode, so a custom key lands in both halves
+  assert.deepEqual(deliveredKeys('backend', ['env', 'ci', 'bake'], { schema: FIXTURE, values }), [
+    'BACKEND_ONLY', 'BACKEND_RUNNER', 'CUSTOM_THING', 'DYNAMIC_THING',
+  ]);
+  assert.deepEqual(deliveredKeys('backend', ['env'], { schema: FIXTURE, values }), [
+    'BACKEND_ONLY', 'CUSTOM_THING', 'DYNAMIC_THING',
+  ]);
+
+  // web: no file mode, so the custom key is a runner value only
+  assert.deepEqual(deliveredKeys('web', ['ci', 'bake'], { schema: FIXTURE, values }), [
+    'CUSTOM_THING', 'GH_TOKEN', 'STREAM_SECRET', 'WEB_CI',
+  ]);
+  assert.deepEqual(deliveredKeys('web', ['env'], { schema: FIXTURE, values }), []);
+
+  // A family member the schema delivers elsewhere stays there
+  assert.deepEqual(deliveredKeys('web', ['ci', 'bake'], { schema: FIXTURE, values: { DYNAMIC_THING: 'x' } }), [
+    'GH_TOKEN', 'STREAM_SECRET', 'WEB_CI',
+  ]);
 });

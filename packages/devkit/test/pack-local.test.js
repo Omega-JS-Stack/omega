@@ -184,7 +184,7 @@ test('#331: a failing stage restores first and throws, so nothing deploys from a
  * node_modules symlink), a workspace root that links one directly, and a member
  * target that links it at its own depth.
  * @param {string} tmp - The throwaway base dir.
- * @returns {{ brandRoot: string, website: string }} The brand root and its member.
+ * @returns {{ brandRoot: string, web: string }} The brand root and its member.
  */
 function buildBrand(tmp) {
   const libb = path.join(tmp, 'packages', 'libb');
@@ -203,22 +203,22 @@ function buildBrand(tmp) {
     devDependencies: { '@omega.js/liba': 'file:../packages/liba' },
   });
 
-  const website = path.join(brandRoot, 'targets', 'website');
-  writeManifest(website, {
-    name: 'brand-website',
+  const web = path.join(brandRoot, 'targets', 'web');
+  writeManifest(web, {
+    name: 'brand-web',
     version: '0.0.1',
     private: true,
     dependencies: { '@omega.js/liba': 'file:../../../packages/liba' },
   });
 
-  return { brandRoot, website };
+  return { brandRoot, web };
 }
 
 test('a workspace root stages its members too, each spec relative to ITS manifest', async () => {
   const tmp = makeTmp();
-  const { brandRoot, website } = buildBrand(tmp);
+  const { brandRoot, web } = buildBrand(tmp);
   const rootManifest = jetpack.read(path.join(brandRoot, 'package.json'));
-  const memberManifest = jetpack.read(path.join(website, 'package.json'));
+  const memberManifest = jetpack.read(path.join(web, 'package.json'));
 
   const staging = await stageLocalPackages({ dir: brandRoot });
 
@@ -231,7 +231,7 @@ test('a workspace root stages its members too, each spec relative to ITS manifes
   assert.equal(root.overrides['@omega.js/libb'], 'file:omega_modules/omega.js-libb-0.1.0.tgz');
 
   // The member's spec is relative to the MEMBER, never to the staged root
-  const member = read(path.join(website, 'package.json'));
+  const member = read(path.join(web, 'package.json'));
   assert.equal(member.dependencies['@omega.js/liba'], 'file:../../omega_modules/omega.js-liba-1.0.0.tgz');
   assert.equal(member.overrides, undefined, 'overrides belong to the install root only');
 
@@ -242,7 +242,7 @@ test('a workspace root stages its members too, each spec relative to ITS manifes
 
   await staging.restore();
   assert.equal(jetpack.read(path.join(brandRoot, 'package.json')), rootManifest, 'root manifest restored byte-for-byte');
-  assert.equal(jetpack.read(path.join(website, 'package.json')), memberManifest, 'member manifest restored byte-for-byte');
+  assert.equal(jetpack.read(path.join(web, 'package.json')), memberManifest, 'member manifest restored byte-for-byte');
   assert.equal(jetpack.exists(path.join(brandRoot, 'omega_modules')), false, 'staging dir removed');
   assert.equal(jetpack.exists(path.join(brandRoot, 'package-lock.json')), false, 'lockfile absent again');
 
@@ -263,25 +263,25 @@ test('second hop: a member of an already-staged tree COPIES the tarballs and pac
   await first.restore();
   jetpack.remove(path.join(tmp, 'packages'));
 
-  const website = path.join(snapshot, 'targets', 'website');
-  const staging = await stageLocalPackages({ dir: website });
+  const web = path.join(snapshot, 'targets', 'web');
+  const staging = await stageLocalPackages({ dir: web });
 
   assert.deepEqual(staging.staged, ['@omega.js/liba', '@omega.js/libb']);
-  assert.equal(jetpack.exists(path.join(website, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
-  assert.equal(jetpack.exists(path.join(website, 'omega_modules', 'omega.js-libb-0.1.0.tgz')), 'file', 'the ROOT override travelled with the member');
+  assert.equal(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-liba-1.0.0.tgz')), 'file');
+  assert.equal(jetpack.exists(path.join(web, 'omega_modules', 'omega.js-libb-0.1.0.tgz')), 'file', 'the ROOT override travelled with the member');
 
-  const member = read(path.join(website, 'package.json'));
+  const member = read(path.join(web, 'package.json'));
   assert.equal(member.dependencies['@omega.js/liba'], 'file:omega_modules/omega.js-liba-1.0.0.tgz');
   assert.equal(member.overrides['@omega.js/libb'], 'file:omega_modules/omega.js-libb-0.1.0.tgz');
 
-  const lock = read(path.join(website, 'package-lock.json'));
+  const lock = read(path.join(web, 'package-lock.json'));
   assert.ok(lock, 'the member is its own install root now');
   assert.equal(lock.packages['node_modules/@omega.js/liba'].resolved, 'file:omega_modules/omega.js-liba-1.0.0.tgz');
   assert.equal(lock.packages['node_modules/@omega.js/libb'].resolved, 'file:omega_modules/omega.js-libb-0.1.0.tgz');
 
   await staging.restore();
-  assert.equal(read(path.join(website, 'package.json')).dependencies['@omega.js/liba'], 'file:../../omega_modules/omega.js-liba-1.0.0.tgz', 'the first hop\'s spelling is back');
-  assert.equal(jetpack.exists(path.join(website, 'omega_modules')), false, 'staging dir removed');
+  assert.equal(read(path.join(web, 'package.json')).dependencies['@omega.js/liba'], 'file:../../omega_modules/omega.js-liba-1.0.0.tgz', 'the first hop\'s spelling is back');
+  assert.equal(jetpack.exists(path.join(web, 'omega_modules')), false, 'staging dir removed');
 
   jetpack.remove(tmp);
 });

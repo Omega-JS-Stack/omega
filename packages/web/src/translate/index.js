@@ -36,6 +36,7 @@ const {
 } = require('@omega.js/devkit/translate');
 const { collectTextNodes } = require('./collect-text-nodes.js');
 const { defaultExcludedRoutes } = require('./default-routes.js');
+const { routeIncluded, includePatterns, readTranslateStamp } = require('./route-include.js');
 const { packagedLanguages, loadPackaged, resolvePackaged, pageNamespace } = require('./packaged-defaults.js');
 const { updateSitemap } = require('./sitemap.js');
 const { readPathPrefixStamp, stripPathPrefix } = require('../path-prefix.js');
@@ -61,38 +62,19 @@ function routeOf(relPath) {
 }
 
 /**
- * The routes a brand excluded by hand, normalized ('/blog/' → 'blog').
- * @param {object} config - resolved config (translation.exclude)
- * @returns {string[]}
- */
-function userExcludedRoutes(config) {
-  return (config.translation?.exclude || []).map((entry) => String(entry).replace(/^\/+|\/+$/g, ''));
-}
-
-/**
- * Build the route-exclusion test from config + the framework's own sets. Every
- * KNOWN language code is excluded as a folder (not just the configured ones) so
- * copies from a previous run never get re-collected as source pages.
- * `translation.exclude` is for BRAND pages only (#605): the framework's default
- * pages exclude themselves, derived from the defaults tree, and each one guards
- * its subtree too (nothing under /app or /payment is marketing copy). Excluded
- * here means excluded from PROVIDER calls — the framework's own default pages
- * still get copies, from the translations packaged with it (#621, the
- * default-page pass below).
- * @param {object} config - resolved config (translation.exclude, socials)
+ * The routes the FRAMEWORK never sends to a provider, whatever a brand says:
+ * its own default pages (derived from the defaults tree, #605, each guarding
+ * its subtree, since nothing under /app or /payment is marketing copy), the
+ * socials redirects, the system folders, and every KNOWN language code as a
+ * folder (not just the configured ones) so copies from a previous run are
+ * never re-collected as source pages.
+ * @param {object} config - resolved config (socials)
  * @returns {Function} (route: string) → boolean
  */
-function buildExclusionTest(config) {
-  const userExcludes = userExcludedRoutes(config);
+function buildFrameworkExclusionTest(config) {
   const frameworkRoutes = [...defaultExcludedRoutes()];
-
-  const files = new Set([
-    ...frameworkRoutes,
-    ...Object.keys(config.socials || {}),
-    ...userExcludes,
-  ]);
-
-  const folders = [...SYSTEM_EXCLUDED_FOLDERS, ...frameworkRoutes, ...Object.keys(LANGUAGE_NAMES), ...userExcludes];
+  const files = new Set([...frameworkRoutes, ...Object.keys(config.socials || {})]);
+  const folders = [...SYSTEM_EXCLUDED_FOLDERS, ...frameworkRoutes, ...Object.keys(LANGUAGE_NAMES)];
 
   return (route) => {
     if (files.has(route)) {
@@ -101,6 +83,60 @@ function buildExclusionTest(config) {
 
     return folders.some((folder) => route === folder || route.startsWith(`${folder}/`));
   };
+}
+
+/**
+ * Is this route one of the BRAND's own translated pages? The
+ * `translation.include` globs decide (#858), unless the page stamped its own
+ * answer on `<html>`, which wins. Framework routes are not this test's
+ * business: buildExclusionTest asks that first.
+ * @param {object} config - resolved config (translation.include)
+ * @param {Map<string, boolean>} stamps - route → the page's own answer
+ * @returns {Function} (route: string) → boolean
+ */
+function buildIncludeTest(config, stamps) {
+  const patterns = includePatterns(config);
+
+  return (route) => (stamps.has(route) ? stamps.get(route) : routeIncluded(route, patterns));
+}
+
+/**
+ * Build the route-exclusion test from config + the framework's own sets.
+ * `translation.include` is for BRAND pages only (#605): the framework's
+ * default pages exclude themselves, and no list or page stamp puts one back.
+ * Excluded here means excluded from PROVIDER calls: those default pages still
+ * get copies, from the translations packaged with @omega.js/web (#621, the
+ * default-page pass below).
+ * @param {object} config - resolved config (translation.include, socials)
+ * @param {Map<string, boolean>} stamps - route → the page's own answer
+ * @returns {Function} (route: string) → boolean
+ */
+function buildExclusionTest(config, stamps = new Map()) {
+  const frameworkExcluded = buildFrameworkExclusionTest(config);
+  const included = buildIncludeTest(config, stamps);
+
+  return (route) => frameworkExcluded(route) || !included(route);
+}
+
+/**
+ * Every page that stamped its own `translation.include` on `<html>`, by route
+ * (#858). The pass runs post-build over dist/ and `omega translate` runs with
+ * no build at all, so the built page IS where a page's frontmatter answer is
+ * readable, the same seam #355's base path uses. One read of the site's own
+ * HTML, before any provider call.
+ * @param {string} outDir - the build output dir
+ * @param {string[]} files - built pages, relative to outDir
+ * @returns {Map<string, boolean>} route → the page's own answer
+ */
+function readPageStamps(outDir, files) {
+  const stamps = new Map();
+
+  for (const relPath of files) {
+    const stamp = readTranslateStamp(jetpack.read(path.join(outDir, relPath)));
+    if (stamp !== null) stamps.set(routeOf(relPath), stamp);
+  }
+
+  return stamps;
 }
 
 /**
@@ -380,11 +416,16 @@ async function translateSite(options) {
   const baseUrl = (config.url || config.brand?.url || 'http://localhost').replace(/\/+$/, '');
   const brand = config.brand?.name;
   const cacheRoot = path.join(root, 'translations');
-  const isExcluded = buildExclusionTest(config);
 
   // Collect translatable pages
   const allHtml = jetpack.find(outDir, { matching: '**/*.html' })
     .map((file) => path.relative(outDir, file));
+
+  // The per-page overrides (#858), read off the BRAND's own pages: a framework
+  // default page is never in anyone's hands, so its HTML is not read for one.
+  const frameworkExcluded = buildFrameworkExclusionTest(config);
+  const stamps = readPageStamps(outDir, allHtml.filter((relPath) => !frameworkExcluded(routeOf(relPath))));
+  const isExcluded = buildExclusionTest(config, stamps);
 
   const onlyFilter = (relPath) => relPath === options.only || routeOf(relPath) === options.only.replace(/^\/+|\/+$/g, '');
   const allFiles = allHtml.filter((relPath) => !isExcluded(routeOf(relPath)));
@@ -392,10 +433,11 @@ async function translateSite(options) {
 
   // The framework's OWN default pages (#621): excluded above from provider
   // calls, collected here for the packaged-cache pass. A system folder, a
-  // language folder from a previous run, and a route the brand excluded by
-  // hand are all still out — the pass only ever reaches pages the framework
-  // itself wrote.
-  const guardedFolders = [...SYSTEM_EXCLUDED_FOLDERS, ...Object.keys(LANGUAGE_NAMES), ...userExcludedRoutes(config)];
+  // language folder from a previous run and a route collision are out; the
+  // BRAND's include list is not consulted at all, because the framework's
+  // default pages are the framework's and its list scopes its own pages (the
+  // #858 ruling). The chrome is translated once, on the framework side.
+  const guardedFolders = [...SYSTEM_EXCLUDED_FOLDERS, ...Object.keys(LANGUAGE_NAMES)];
   const defaultRoutes = defaultExcludedRoutes();
   const allDefaultFiles = allHtml.filter((relPath) => {
     const route = routeOf(relPath);

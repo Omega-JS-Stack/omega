@@ -138,7 +138,7 @@ These bindings live in Web Manager, not @omega.js/extension — but they're how 
 
 2. **Firebase in service workers requires static imports.** A service worker cannot fetch code at runtime under MV3, so dynamic `import()` is not an option there. @omega.js/extension's background.js uses static `import { initializeApp } from 'firebase/app'`.
 
-3. **Config path is fixed.** The watched host comes from omega.json5's `brand.url` (bridged into the packaged snapshot via the `OMEGA_BUILD_JSON` bake the bundle task puts in every bundle).
+3. **Config path is fixed.** The watched host comes from omega.json5's `brand.url` (bridged into the packaged snapshot via the `OMEGA_BUILD_JSON` file the bundle task writes, `build.js`).
 
 4. **Tabs permission required.** Without it, background.js can't watch for `/token?authToken=…` redirects.
 

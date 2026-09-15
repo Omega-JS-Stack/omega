@@ -12,5 +12,11 @@
   },
   "enabledPlugins": {
     "omega@omega": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx omega:*)",
+      "Bash(cd:*)"
+    ]
   }
 }

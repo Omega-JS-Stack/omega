@@ -33,13 +33,13 @@ const chalk = require('chalk').default;
  *   - `packaged/<browser>/raw/`       — per-browser, strict JSON manifest, Chrome-loadable
  *   - `packaged/<browser>/<name>.zip` — store-upload zip
  *
- * Boot tests run against `packaged/chromium/raw/` because that's the directory a
+ * Boot tests run against `packaged/chrome/raw/` because that's the directory a
  * developer would point Chrome's "Load unpacked" at (and what zips for the Web
  * Store). It's the actual production-equivalent surface.
  *
  * Discovery order:
  *   1. OMEGA_TEST_BOOT_DIR (explicit absolute path) — full override
- *   2. <projectRoot>/packaged/chromium/raw   — default for consumers
+ *   2. <projectRoot>/packaged/chrome/raw   : default for consumers
  *   3. <projectRoot>/dist                    — for non-standard pipelines
  *
  * A directory qualifies only when its manifest is STRICT JSON — what Chrome can
@@ -66,7 +66,7 @@ function resolveBootDir(projectRoot) {
 
   const candidates = [];
   if (override) candidates.push(override);
-  candidates.push(path.join(effectiveRoot, 'packaged', 'chromium', 'raw'));
+  candidates.push(path.join(effectiveRoot, 'packaged', 'chrome', 'raw'));
   candidates.push(path.join(effectiveRoot, 'dist'));
 
   const rejected = [];
@@ -119,7 +119,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
     console.log(chalk.yellow(`    ○ boot tests skipped (no strict-JSON manifest.json found in any of:`));
     for (const c of discovery.candidates) console.log(chalk.yellow(`        ${c}`));
     for (const r of discovery.rejected) console.log(chalk.yellow(`      ${r.manifestPath} exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)`));
-    console.log(chalk.yellow(`      — run \`npm run build\` first to produce packaged/chromium/raw/)`));
+    console.log(chalk.yellow(`      - run \`npm run build\` first to produce packaged/chrome/raw/)`));
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 

@@ -198,7 +198,9 @@ async function main() {
       // Real desktop modules: the bridge whose _fetchCustomToken is the caller
       // under test, and the real mode/url helpers it resolves its URL with. In
       // the testing environment getApiUrl() maps to the local hosting emulator
-      // via the resolved-port env channel (N7).
+      // via the resolved-port env channel (N7). The environment is the one
+      // input `OMEGA_ENVIRONMENT` (#817), named here the way a test lane names it.
+      process.env.OMEGA_ENVIRONMENT = 'testing';
       process.env.OMEGA_TEST_MODE = 'true';
       process.env.OMEGA_HOSTING_PORT = String(ports.hosting);
       // A testing bridge points its own Firebase Auth at the auth emulator on

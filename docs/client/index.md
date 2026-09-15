@@ -51,6 +51,68 @@ The singleton owns thirteen feature modules under `src/modules/`: `storage`, `au
 
 Pages built on this runtime follow the **page paint contract** ([docs/web/page-contract.md](../web/page-contract.md)): the client fills the `auth`, `usage`, `config` and `device` binding roots at auth settle so page code never hides its DOM waiting for a user, `bindings.update()` filters by root key so a spot that must wait for a server answer lives under a root the early paint does not publish, and `FormManager`'s `addGate()` / `resolveGate()` hold a form's submit controls disabled until every async answer it depends on has landed.
 
+### The init contract: one call, one blob, one mapping (#894)
+
+Every surface initializes the singleton with the SAME thing: the browser subset of its
+brand's resolved omega.json5, delivered to every artifact the same way: the ONE `build.js`
+at its web root that each shell loads with its first script tag and each worker with one
+`importScripts` line ([docs/shared/config.md](../shared/config.md) → "The browser subset",
+[#743](https://github.com/Omega-JS-Stack/omega/issues/743)). Nothing reads a bundle-baked
+copy any more; `self.OMEGA_BUILD_JSON` is there before any bundle runs.
+
+| Surface | The call |
+|---|---|
+| web | `runtime/boot.js`: `const configuration = window.OMEGA_BUILD_JSON?.config; await omega.initialize(configuration);` |
+| extension | each page context (`popup.js`, `options.js`, `sidepanel.js`, `page.js`): the same two lines; the service worker `importScripts('/build.js')` on its first line and reads `serviceWorker.OMEGA_BUILD_JSON.config` |
+| desktop | `renderer.js`: `window.OMEGA_BUILD_JSON.config` merged with the runtime overrides, plus the preload's `analyticsBridge` |
+
+The `runtime` fact rides IN that blob, so `omega.utilities().getRuntime()` answers
+`'electron'` in a packaged renderer instead of falling through its sniff to `'web'`
+([#896](https://github.com/Omega-JS-Stack/omega/issues/896)).
+
+`_processConfiguration()` is the ONE place the canonical config shape becomes this
+runtime's contract, so no framework composes a bridge of its own any more:
+
+- the `client` section IS this contract's top level (`auth`, `consent`, `exitPopup`,
+  `serviceWorker`, `env`, …), so `omega.config.consent.config` reads what the brand wrote
+  under `client.consent`
+- `cloud.config` is the Firebase home it boots from (`_resolveFirebaseConfig()`, the
+  nested `firebase.app.config` still answers as the legacy shape)
+- `monitoring.providers.sentry` is the one error-reporting switch: a DSN there turns
+  reporting ON and outranks a legacy `client.sentry` blob, which keeps reporting until a
+  brand migrates ([#485](https://github.com/Omega-JS-Stack/omega/issues/485) part 3)
+
+Defaults fill everything a brand left unsaid (the whole `defaults` object in
+`src/index.js`), so an absent section is a default and never a crash. With ONE
+exception, and it is deliberate: **`environment` has no default**
+([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It used to be
+seeded `'production'` here, which made this runtime a fourth surface quietly
+deciding the answer: a page whose build forgot to bake the fact read as
+production and talked to the LIVE stack. Every OMEGA build bakes it, so its
+absence is a broken artifact. Pinned by `test/config.test.js`.
+
+### The environment (`getEnvironment()` + the three checks)
+
+The singleton answers the same four calls every other OMEGA target answers, from
+the same module: `@omega.js/config`'s `environment.js`, vendored into this
+package at prepare time the way `@omega.js/account` and `@omega.js/monitoring`
+are ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in
+full: [docs/shared/config.md](../shared/config.md)).
+
+- `omega.getEnvironment()`: `'development' | 'testing' | 'production'`, exactly one
+- `omega.isDevelopment()` / `omega.isProduction()` / `omega.isTesting()`: each DERIVES
+  from it, so they can never disagree and `isProduction()` is a real positive check,
+  never `!isDevelopment()`
+
+`isDevelopment()` was the only one of the four this runtime had, as a raw
+`this.config.environment === 'development'` compare; `isProduction()` and
+`isTesting()` are new, and the raw compare is gone. The ONE input in a browser is
+`config.environment`, the build fact `OMEGA_BUILD_JSON` carries, and a config
+without it throws by name rather than reading as "not development".
+`runtime/manager.js` in `@omega.js/web` (the browser Manager that wraps this
+singleton) answers its own four by delegating straight here, so nothing on a page
+carries a fifth copy.
+
 ### The wakeup ping (`omega.request(url, { wakeup: true })`)
 
 A fire-and-forget GET that warms a cold backend and nothing else. @omega.js/backend's middleware sees `wakeup` in the request data and answers it BEFORE it loads a route or authenticates ([docs/backend/index.md](../backend/index.md)), so any route warms the same function at the same cost and none of them runs. The call mints no ID token, reads no response body, and resolves rather than throwing when the network is down, so a caller can fire it and move on:

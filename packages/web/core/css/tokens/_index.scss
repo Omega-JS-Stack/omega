@@ -10,7 +10,7 @@
 //
 // The accent family is a BUILD-TIME override surface: when `brand.color`
 // is set, head.html emits inline `:root` ramps from composeBrandTokens
-// (src/brand-tokens.js) — a light ramp AND a dark-variant ramp stamped with
+// (@omega.js/devkit/brand-tokens): a light ramp AND a dark-variant ramp stamped with
 // this same plumbing — that win the cascade over these placeholders.
 //
 // Theme attribute: `data-bs-theme` is what core/js/core/appearance.js

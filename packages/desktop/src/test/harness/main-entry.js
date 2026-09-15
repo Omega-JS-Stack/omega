@@ -19,7 +19,8 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 // steals keyboard focus app-wide even when no window is ever focused. This file
 // only initializes its Manager after whenReady (too late: activation fires when
 // the app finishes launching), so flip the accessory policy here at require time.
-// This process is always a test run (runners/electron.js sets OMEGA_TEST_MODE), so
+// This process is always a test run (runners/electron.js spawns it naming
+// OMEGA_ENVIRONMENT=testing, the one environment input), so
 // the shared predicate needs no Manager. OMEGA_TEST_SHOW=1 opts back into normal
 // activation along with visible windows.
 if (process.platform === 'darwin' && require('../../utils/test-stealth.js')()) {

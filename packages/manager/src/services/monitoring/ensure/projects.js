@@ -2,16 +2,17 @@
  * Ensure the org, the brand's team, and one Sentry project per enabled
  * target. Org resolution: monitoring.providers.sentry.org from config wins;
  * otherwise the token's single org is used and written back there
- * (self-heal), and a token seeing SEVERAL orgs is asked which one (#635). The team is the brand id; projects are `{brand.id}-{target}`
- * with the target's Sentry platform. Existing projects (matched by slug)
+ * (self-heal), and a token seeing SEVERAL orgs is asked which one (#635). The team is the brand id; projects are `{brand.id}-{name}`
+ * with the platform of the target's TYPE (#886). Existing projects (matched by slug)
  * are converged proof — nothing is renamed or deleted here.
  */
 const chalk = require('chalk').default;
+const { targetEntries } = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 
-// Sentry platform slugs per target type — validated server-side against the
+// Sentry platform slugs per target TYPE, validated server-side against the
 // integration-docs index (Project.is_valid_platform), so only ids that exist
 // there work: Electron's is the top-level 'electron', NOT the frontend-UI
 // alias 'javascript-electron' (400 Invalid platform — cp136b, live find).
@@ -70,7 +71,9 @@ module.exports = async function ensureProjects(context) {
     writeBrandConfig(context, { 'monitoring.providers.sentry.org': org.slug });
   }
 
-  const targets = Object.keys(brandConfig.targets || {}).filter((target) => TARGET_PLATFORMS[target]);
+  // A target is monitorable by its TYPE, and its project is named for the
+  // NAME the brand gave it (#886): a web target called `site` is `<id>-site`
+  const targets = targetEntries(brandConfig).filter((entry) => TARGET_PLATFORMS[entry.type]);
   if (targets.length === 0) {
     console.log(`      ${chalk.dim('⊘ No monitorable targets enabled')}`);
     return { state: { org: org.slug, projectMap: {} } };
@@ -84,14 +87,14 @@ module.exports = async function ensureProjects(context) {
   let synced = 0;
   let teamEnsured = false;
 
-  for (const target of targets) {
-    const slug = `${brandId}-${target}`;
-    console.log(`      ${chalk.dim('•')} ${chalk.cyan(slug)} ${chalk.dim(`(${TARGET_PLATFORMS[target]})`)}`);
+  for (const entry of targets) {
+    const slug = `${brandId}-${entry.name}`;
+    console.log(`      ${chalk.dim('•')} ${chalk.cyan(slug)} ${chalk.dim(`(${TARGET_PLATFORMS[entry.type]})`)}`);
 
     const match = existing.find((project) => project.slug === slug);
     if (match) {
       console.log(`        ${chalk.green('✓')} Exists`);
-      projects[target] = { id: match.id, slug: match.slug };
+      projects[entry.name] = { id: match.id, slug: match.slug };
       synced++;
       continue;
     }
@@ -115,10 +118,10 @@ module.exports = async function ensureProjects(context) {
     const project = await api.createProject(org.slug, brandId, {
       name: slug,
       slug,
-      platform: TARGET_PLATFORMS[target],
+      platform: TARGET_PLATFORMS[entry.type],
     });
     console.log(`        ${chalk.green('✓')} Created`);
-    projects[target] = { id: project.id, slug: project.slug };
+    projects[entry.name] = { id: project.id, slug: project.slug };
     created++;
   }
 

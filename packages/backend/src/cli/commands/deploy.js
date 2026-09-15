@@ -21,10 +21,10 @@ const { stageLocalPackages } = require('@omega.js/devkit/pack-local');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { refuseWhenCustom } = require('../utils/project-type');
-const { loadConfig, loadEnv, resolveSeedMode } = require('@omega.js/config');
+const { loadConfig, loadEnv, targetNameFromDir } = require('@omega.js/config');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
-const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
-const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
+const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
+const { assertBrandVersion } = require('@omega.js/devkit/brand-version');
 const { ensureTarget } = require('../utils/ensure-target');
 const { deployPrecheck } = require('../utils/deploy-precheck');
 
@@ -34,77 +34,144 @@ class DeployCommand extends BaseCommand {
   async execute() {
     const self = this.main;
 
+    // The whole verb goes to the target's own deploy log, from its first line
+    // ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)): the
+    // scaffold, the precheck's refusals and the followed run all land in one
+    // file instead of scrollback, the same `logs/<verb>.log` lane dev, build
+    // and test take and the same name the other three targets deploy to. The
+    // direct lane's `dist/deploy.log` (the firebase transcript) is unchanged.
+    this.attachVerbLog('deploy');
+
     // Custom-server mode has no Cloud Functions to publish (#584) — refuse
     // before staging, so nothing is written for a deploy that cannot happen.
     if (refuseWhenCustom(self.firebaseProjectPath, 'deploy')) return;
 
-    return self.argv?.direct ? this.deployDirect() : this.dispatchDeploy();
-  }
+    // The lane's ONE production config read ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)):
+    // a deploy IS a production run, so the gate below, the dispatch address and
+    // the license verdict all read the same layers, once, instead of each
+    // asking again.
+    const { config } = loadConfig(self.firebaseProjectPath, 'backend', { environment: 'production' });
 
-  /**
-   * The CI lane (the default): deliver the brand to its repo and dispatch the
-   * composed backend workflow, which runs `omega deploy --direct` on a runner.
-   */
-  async dispatchDeploy() {
-    const self = this.main;
-    const dryRun = self.argv?.dryRun || self.argv?.['dry-run'];
+    // A SHARED cloud project is several brands' project
+    // ([#882](https://github.com/Omega-JS-Stack/omega/issues/882)): the manage
+    // cycle already limits itself to the per-brand operations there
+    // (docs/manager/cloud.md), and a deploy would publish THIS brand's
+    // functions and rules over the project all of them run on. So the verb
+    // steps aside, in the shape every intentional skip in this lane takes: one
+    // line, exit 0, nothing run. It sits ahead of the scaffold, the precheck
+    // and the version assert, so nothing is written, pushed or dispatched for a
+    // deploy that will not happen: on the laptop, in the brand-root fan-out
+    // (which reads the exit 0 and moves on) and inside the composed workflow's
+    // `deploy --direct` step alike, which makes a dispatch of it a green no-op.
+    if (config.cloud?.shared === true) {
+      this.log(chalk.gray('  Skipping the backend deploy: cloud.shared is true (config/omega.json5 → cloud), and a shared project is never deployed from a brand'));
+      return;
+    }
 
-    // The local scaffold every verb runs, and the step that COMPOSES the
-    // workflow this dispatch is about to name, so a target whose brand never
-    // had one gets it written on the way past.
+    // The local half of the retired `omega setup` (#675), on EVERY lane, the
+    // way web, desktop and extension run it: idempotent, quiet on a converged
+    // target, and the step that COMPOSES the workflow a dispatch names, so a
+    // `--direct` run scaffolds exactly as the dispatch does rather than
+    // skipping the half of the verb its own header promises.
     ensureTarget({
       projectDir: self.firebaseProjectPath,
       log: (message) => this.log(chalk.gray(`  ${message}`)),
     });
 
-    // The NETWORK half, as a precheck: the runner has no `.env` and no service
-    // account, so the workflow rebuilds both from repo secrets. A dry run sends
-    // nothing, so it prechecks nothing.
-    if (!dryRun) {
-      await deployPrecheck({
-        projectDir: self.firebaseProjectPath,
-        options: self.argv || {},
-        logger: { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`), error: (line) => this.logError(`  ${line}`) },
-      });
-    }
+    // The brand's ONE version ([#869](https://github.com/Omega-JS-Stack/omega/issues/869)):
+    // a target whose version drifted from the brand root's is refused here, before
+    // the precheck, because a drifted target must not push its secrets and
+    // dispatch a build of the wrong number. A read, so every lane reaches it
+    // (`--direct` and `--dry-run` included), which is why it sits ahead of the
+    // lane split rather than inside the dispatch half.
+    assertBrandVersion({ dir: self.firebaseProjectPath });
 
-    // Inside a brand monorepo the target's CI lives in the BRAND ROOT's
-    // workflows dir under a per-target name (#265): dispatch what the scaffold
-    // actually composed.
-    const workflow = composedWorkflowName({
-      targetDir: self.firebaseProjectPath,
-      brandRoot: resolveSeedMode(self.firebaseProjectPath).brandRoot,
-      workflow: 'deploy.yml',
+    return self.argv?.direct ? this.deployDirect(config) : this.dispatchDeploy(config);
+  }
+
+  /**
+   * The CI lane (the default): deliver the brand to its repo and dispatch the
+   * composed backend workflow, which runs `omega deploy --direct` on a runner.
+   *
+   * @param {object} config - The lane's production config, read once in `execute()`.
+   */
+  async dispatchDeploy(config) {
+    const self = this.main;
+    const dryRun = self.argv?.dryRun || self.argv?.['dry-run'];
+
+    // The NETWORK half, as a precheck: the runner has no `.env` and no service
+    // account, so the workflow rebuilds both from repo secrets. A DRY RUN runs
+    // it too ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)):
+    // every step is a read or a plan under `dryRun`, so the preview is real.
+    await deployPrecheck({
+      projectDir: self.firebaseProjectPath,
+      options: self.argv || {},
+      logger: { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`), error: (line) => this.logError(`  ${line}`) },
+      dryRun,
     });
 
-    const { owner, repo } = dispatchRepo(loadConfig(self.firebaseProjectPath, 'backend').config);
-    const { plan, dispatched, lane } = await deployViaDispatch({
+    // The ONE dispatch address helper ([#847](https://github.com/Omega-JS-Stack/omega/issues/847)):
+    // the repo the brand's CONFIG names, and the workflow the target's scaffold
+    // actually composed at the brand root under a per-target name (#265).
+    const { owner, repo, workflow } = dispatchTarget({
+      projectRoot: self.firebaseProjectPath,
+      // A deploy is a PRODUCTION run, so every config read in the lane is the
+      // production one (#856): the address it dispatches to and the artifact
+      // the runner stages read the same layers.
+      config,
+      workflow: 'deploy.yml',
+    });
+    const logger = { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`) };
+    // Read BEFORE the dispatch: it is what tells the follower which run is this
+    // one rather than the run before it (#873).
+    const since = new Date();
+    const { plan, dispatched, lane, sha } = await deployViaDispatch({
       workflow,
       owner,
       repo,
       dir: self.firebaseProjectPath,
       dryRun,
-      sync: self.argv?.sync !== false,
-      logger: { log: (line) => this.log(chalk.gray(`  ${line}`)), warn: (line) => this.logWarning(`  ${line}`) },
+      // The brand root's one snapshot for the whole fan-out, when a brand-root
+      // deploy spawned this verb (#901): the push is done, so this run
+      // dispatches against that sha instead of pushing over it. Nobody types it.
+      snapshot: self.argv?.snapshot,
+      logger,
     });
 
     if (!dispatched) {
-      this.log(chalk.gray(`  DRY RUN (${lane.mode} lane, ref ${lane.ref}), would send:`));
+      this.log(chalk.gray(`  DRY RUN (${laneLabel(lane)}), would send:`));
       this.log(chalk.gray(`    ${plan.method} ${plan.url}`));
       this.log(chalk.gray(`    body: ${JSON.stringify(plan.body)}`));
       return this.log(chalk.gray(`    then watch: ${plan.runsUrl}`));
     }
 
-    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: 'backend', detail: { method: 'dispatch' } });
-    this.log(chalk.gray(`  Dispatched ${workflow} (${lane.mode} lane, ref ${lane.ref}): CI deploys this backend.`));
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: targetNameFromDir(self.firebaseProjectPath) || 'backend', detail: { method: 'dispatch' } });
+    this.log(chalk.gray(`  Dispatched ${workflow} (${laneLabel(lane, sha)}): CI deploys this backend.`));
     this.log(chalk.gray(`  Watch: ${plan.runsUrl}`));
+
+    // Follow the run to its verdict (#873): the jobs' logs stream in here, and
+    // a red run throws, so the verb's exit code is the run's conclusion rather
+    // than "the dispatch was accepted". The run also has to be building the
+    // tree this deploy pushed (#902): a brand with no repo snapshots nothing,
+    // so there is no sha and that check is off.
+    await require('@omega.js/devkit/deploy-follow').followRun({
+      owner,
+      repo,
+      workflow,
+      since,
+      headSha: sha,
+      token: resolveToken(),
+      logger,
+    });
   }
 
   /**
    * The direct lane (`--direct`): the deploy itself, from this machine or from
    * the runner the workflow started. Everything below is unchanged behavior.
+   *
+   * @param {object} config - The lane's production config, read once in `execute()`.
    */
-  async deployDirect() {
+  async deployDirect(config) {
     const self = this.main;
     const only = self.argv?.only ? ` --only ${self.argv.only}` : '';
 
@@ -132,7 +199,10 @@ class DeployCommand extends BaseCommand {
     // provider libraries at runtime. A key that cannot be answered for throws
     // here, which stops the deploy rather than shipping the wrong verdict.
     const licenseStatus = (await resolveLicenseStamp({
-      config: loadConfig(self.firebaseProjectPath, 'backend').config,
+      // The verdict rides the artifact (dist/.env), so it is asked for against
+      // the PRODUCTION config, the same environment the stage below composes
+      // both halves of the upload for (#856).
+      config,
       production: true,
     })).status;
     this.log(chalk.gray(`  License: ${licenseStatus}\n`));
@@ -177,7 +247,7 @@ class DeployCommand extends BaseCommand {
         child.stderr.on('data', (data) => process.stderr.write(data));
       });
 
-      require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: 'backend', detail: { method: 'firebase' } });
+      require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: targetNameFromDir(self.firebaseProjectPath) || 'backend', detail: { method: 'firebase' } });
 
       // After successful deploy, ensure HTTP functions are publicly invocable
       await this.ensurePublicInvoker();

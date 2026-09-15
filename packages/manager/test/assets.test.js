@@ -17,11 +17,18 @@ const os = require('node:os');
 const path = require('node:path');
 const opentype = require('opentype.js');
 
+const { recordBrand } = require('@omega.js/config');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { convertSvgToBlack } = require('../src/services/assets/lib/svg-to-black.js');
 const service = require('../src/services/assets/index.js');
 
 const BRANDMARK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" rx="16" fill="#e63946"/></svg>';
+
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -39,7 +46,7 @@ function brandConfig({ assets = {}, font } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'AB', url: 'https://fixture-brand.test', ...(font ? { font } : {}) },
     assets: assets === false ? false : { ...structuredClone(DEFAULTS.assets), ...assets },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 
@@ -391,18 +398,33 @@ function fixturePsd(width, height, { textLayers = [] } = {}) {
   });
 }
 
-/** A company root with templates + the marker stamped into the brand. */
+/**
+ * The company brand, its `company/` tree carrying the shared templates, and
+ * the brand's ONE key naming it (#677): the seed resolves through the same
+ * `file('assets/templates')` rule every inherited file does.
+ */
 function stageCompany(brandRoot, templates) {
-  const companyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-assets-company-'));
-  fs.mkdirSync(path.join(companyRoot, 'config'));
-  fs.writeFileSync(path.join(companyRoot, 'config', 'omega.json5'), '{ brands: { roots: ["./brands"] } }');
-  fs.mkdirSync(path.join(companyRoot, 'assets', 'templates'), { recursive: true });
+  const companyBrandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-assets-company-'));
+  const templatesDir = path.join(companyBrandRoot, 'company', 'assets', 'templates');
+  fs.mkdirSync(templatesDir, { recursive: true });
   for (const [name, buffer] of Object.entries(templates)) {
-    fs.writeFileSync(path.join(companyRoot, 'assets', 'templates', `${name}.psd`), buffer);
+    fs.writeFileSync(path.join(templatesDir, `${name}.psd`), buffer);
   }
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
-  return companyRoot;
+
+  writeBrandConfig(brandRoot, { company: { id: 'fixture-co' } });
+  // The line the company brand's own run writes, nobody maintains it
+  recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+
+  return companyBrandRoot;
+}
+
+/** The brand's authored config on disk: what the company resolver reads. */
+function writeBrandConfig(brandRoot, extra = {}) {
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(brandRoot, 'config', 'omega.json5'),
+    JSON.stringify({ brand: { id: 'fixture-brand', name: 'AB', url: 'https://fixture-brand.test' }, ...extra }, null, 2),
+  );
 }
 
 function readBrandPsd(root, name) {
@@ -819,9 +841,9 @@ test('reconcile: a removed PSD takes its exports with it, the app icon stays', a
   await runService(root, brandConfig());
   assert.ok(derivedFiles(root).includes('app/macos/icon.png'));
 
-  // Drop the brand's PSD and the company stamp that would re-seed it
+  // Drop the brand's PSD and the company key that would re-seed it
   fs.rmSync(path.join(root, 'assets', 'templates', 'app-macos-icon.psd'));
-  fs.rmSync(path.join(root, '.omega', 'company.json'));
+  writeBrandConfig(root);
 
   const result = await runService(root, brandConfig());
 

@@ -24,6 +24,6 @@
 
   // Key presence = target enabled. One target, zero per-target settings.
   targets: {
-    web: {},
+    web: { type: "web" },
   },
 }

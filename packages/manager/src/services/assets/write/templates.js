@@ -27,10 +27,10 @@ const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const { readPsd, writePsdBuffer, initializeCanvas } = require('ag-psd');
 const canvasModule = require('canvas');
+const { resolveCompany } = require('@omega.js/config');
 const { TEMPLATE_CONFIG } = require('../lib/assets-config.js');
 const { templateExportFiles } = require('../lib/derived.js');
 const { convertSvgToBlack } = require('../lib/svg-to-black.js');
-const { readCompanyMarker } = require('../../../lib/company.js');
 const { isStale } = require('../../../lib/stale.js');
 
 const { createCanvas, loadImage } = canvasModule;
@@ -243,10 +243,9 @@ module.exports = async function writeTemplates(context) {
   const dryRun = options?.dryRun || false;
 
   const brandTemplatesDir = join(brandRoot, 'assets', 'templates');
-  const marker = readCompanyMarker(brandRoot);
-  const companyTemplatesDir = marker && !marker.stale
-    ? join(marker.companyRoot, 'assets', 'templates')
-    : null;
+  // The shared templates resolve by the ONE inheritance rule: the same
+  // relative path inside the company tree, or null (#677).
+  const companyTemplatesDir = resolveCompany(brandRoot).file(join('assets', 'templates'));
 
   let seeded = 0;
   let processed = 0;

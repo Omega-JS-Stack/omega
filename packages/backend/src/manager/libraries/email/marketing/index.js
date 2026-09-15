@@ -548,7 +548,7 @@ function providerFailure(error) {
  */
 async function _sendCampaignSendGrid(Manager, settings, contentHtml) {
   // --- Prepare ---
-  const { brand, brandDomain } = prepare.resolveBrand(Manager);
+  const { brand, brandDomain, company } = prepare.resolveBrand(Manager);
   const { from, groupId } = prepare.resolveSender(
     { sender: settings.sender || 'marketing', from: settings.from, group: settings.group },
     brand,
@@ -565,6 +565,7 @@ async function _sendCampaignSendGrid(Manager, settings, contentHtml) {
 
   const templateData = prepare.buildTemplateData({
     brand,
+    company,
     subject: settings.subject,
     preview: settings.preheader,
     contentHtml,

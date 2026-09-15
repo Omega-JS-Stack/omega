@@ -82,7 +82,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 | `dev.log` | Gulp pipeline output — sass, bundle, html, electron child stdout from `npm start` | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail, harness boot lines) | Truncated each test run |
-| `ci.log` | `npm run release` — streamed GH Actions output during a CI release | Truncated each release |
+| `deploy.log` | `omega deploy` and `npm run release`, the whole deploy: the scaffold, the precheck, the dispatch, then the streamed GH Actions run | Truncated each deploy |
 
 ```bash
 npx omega logs                  # tail last 50 of runtime.log

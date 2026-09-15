@@ -14,17 +14,17 @@
     {
       label: 'Account',
       href: '/dashboard/account',
-      icon: 'user-gear'
+      icon: 'fa-solid fa-user-gear'
     },
     {
       label: 'Pricing',
       href: '/pricing',
-      icon: 'credit-card'
+      icon: 'fa-solid fa-credit-card'
     },
     {
       label: 'Contact support',
       href: '/contact',
-      icon: 'circle-question'
+      icon: 'fa-solid fa-circle-question'
     },
   ],
 

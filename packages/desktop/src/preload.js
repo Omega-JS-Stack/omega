@@ -3,6 +3,7 @@
 // Wires contextBridge so renderer code can call `window.desktop.ipc.invoke(...)` without nodeIntegration.
 
 const LoggerLite = require('./lib/logger-lite.js');
+const { ENVIRONMENT_VAR } = require('@omega.js/config/environment');
 
 function Manager() {
   const self = this;
@@ -27,6 +28,13 @@ Manager.prototype.initialize = async function () {
   // Expose a stable, namespaced surface to the renderer.
   // Real impl in pass 2 will type the channel list and proxy storage through here.
   contextBridge.exposeInMainWorld('desktop', {
+    // The RUNNING environment, for the one context that cannot read it: a page has
+    // no `process`, so its Manager answers `OMEGA_BUILD_JSON.config.environment`,
+    // the word the BUILD was for. A test lane boots a production artifact with
+    // `OMEGA_ENVIRONMENT=testing`, so the two differ there, and a preload is Node
+    // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). The renderer
+    // bootstrap applies this over the baked word, so it answers what main answers.
+    environment: process.env[ENVIRONMENT_VAR] || null,
     ipc: {
       invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
       // Returns an unsubscribe fn (docs/ipc.md contract — same shape as the

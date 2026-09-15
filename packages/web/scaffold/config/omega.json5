@@ -13,8 +13,9 @@
     id: 'classy',
   },
 
-  // Key presence = this project enables this target
+  // Every key is a target NAME (it is also the folder, targets/<name>, in a
+  // brand monorepo) and every entry declares the framework `type` that runs it
   targets: {
-    web: {},
+    web: { type: 'web' },
   },
 }

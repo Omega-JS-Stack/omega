@@ -8,21 +8,21 @@
  *                         entry), registered by @omega.js/client at scope '/'
  *                         (at scope '<prefix>/' when the site is mounted
  *                         under a base path — #360)
- *   /build.js           - `self.OMEGA_BUILD_JSON = {…}` — the SW's config
- *                         transport (importScripts can't consume JSON)
- *   /build.json         - the same meta for page-side consumers
- *                         (@omega.js/client's version check fetches it)
+ *   /build.json         - the build manifest (@omega.js/client's version check
+ *                         fetches it, and the /status page reads it)
  *
- * The meta carries brand id + cacheBreaker, so the SW's cache name
- * (`<brand>-<breaker>`) identifies the owning project+build — the takeover
- * mechanism for one localhost port serving different projects over time.
+ * The SW's own config is NOT here (#743): it importScripts the ONE `/build.js`
+ * the engine writes, the same snapshot every page loads, and reads its brand id
+ * and buildTime off it. That is what names its cache (`<brand>-<buildTime>`),
+ * the takeover mechanism for one localhost port serving different projects over
+ * time.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
 const { bundle } = require('@omega.js/devkit/bundle');
-const { getEnvironment } = require('./mode-helpers.js');
+const { getEnvironment } = require('@omega.js/config/environment');
 
 const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
 
@@ -149,7 +149,12 @@ async function buildServiceWorker(options) {
 }
 
 /**
- * Emit /build.js (JSONP for the SW) + /build.json (page-side) into outDir.
+ * Emit /build.json (the version check + the /status page) into outDir.
+ *
+ * The SW's config transport is NOT here any more (#743): the service worker
+ * importScripts the ONE `/build.js` the engine writes, the same snapshot every
+ * page loads. What stays is this manifest, which describes the BUILD (commit,
+ * packages, assets) for the client's version check and the /status page.
  * @param {object} options
  * @param {object} options.siteData - resolved omega config (brand/cloud)
  * @param {string} options.outDir
@@ -165,12 +170,13 @@ async function buildServiceWorker(options) {
 function writeBuildMeta(options) {
   const site = options.siteData || {};
   const now = new Date();
-  const owner = brandRepoOwner(site);
-  const repo = brandRepoName(site);
+  // The brand's SOURCE monorepo (#883): what the /status page links to is
+  // where the site is AUTHORED, never the website repo the build is pushed to.
+  const source = sourceRepo(site);
   const meta = {
     brand: site.brand?.id || 'default',
     name: site.brand?.name || site.brand?.id || 'default',
-    environment: getEnvironment.call(options),
+    environment: getEnvironment(),
     version: options.version || '0.0.0',
     // `timestamp` is the key @omega.js/client's version check reads
     timestamp: now.toISOString(),
@@ -181,7 +187,7 @@ function writeBuildMeta(options) {
     // from. All derived at build time — nothing here is authored twice.
     theme: site.theme?.id || null,
     packages: packageVersions(options.clientEntry),
-    repo: owner && repo ? { user: owner, name: repo } : null,
+    repo: source ? { user: source.owner, name: source.name } : null,
     commit: resolveCommit(options.consumerDir),
     assets: {
       js: options.manifest?.js?.main || null,
@@ -192,7 +198,6 @@ function writeBuildMeta(options) {
 
   fs.mkdirSync(options.outDir, { recursive: true });
   fs.writeFileSync(path.join(options.outDir, 'build.json'), `${JSON.stringify(meta, null, 2)}\n`);
-  fs.writeFileSync(path.join(options.outDir, 'build.js'), `self.OMEGA_BUILD_JSON = ${JSON.stringify(meta)};\n`);
 
   return meta;
 }

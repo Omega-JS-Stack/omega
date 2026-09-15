@@ -85,7 +85,7 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 
 In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
 
-In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `OMEGA_BUILD_JSON.config`.
+In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `window.OMEGA_BUILD_JSON.config` (the one `build.js` the view's shell loads).
 
 ## Dependency resolution
 
@@ -119,7 +119,7 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
 6. **Every extraction/normalization step is gated**: golden-master where applicable, package test suites, cross-stack e2e, canary consumer.
 - **`docs/` is the SSOT.** Cross-framework contracts live in `docs/shared/`; each framework's guide is `docs/<framework>/index.md` with its deep docs beside it. No line budget applies inside `docs/`.
 - **This file is the ONE agent entry — packages carry no agent docs.** Agents work at this level; the parent walk hands every session this map, and the map plus the plugin's hooks route to `docs/`. Knowledge lives in `docs/`, never in any AGENTS.md.
-  - No `packages/<pkg>/AGENTS.md` or `CLAUDE.md` exists, none — the one lookalike is `packages/manager/docs/AGENTS.md`, a gitignored GENERATED copy of this map the prepare lane vendors for published installs ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)); never read or edit it here.
+  - No `packages/<pkg>/AGENTS.md` or `CLAUDE.md` exists, none. ONE lookalike, never read or edited here: `packages/manager/docs/AGENTS.md`, a gitignored GENERATED copy of this map the prepare lane vendors ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)).
 - **Loading is deterministic, not preloaded.** The omega Claude plugin's hooks detect where the chat is working — a `packages/<framework>/` tree here, or a target's tree in a consumer repo — and inject the relevant docs then. Nobody reads guides "just in case".
 - **Consumer brands read THIS file.** A brand root's `AGENTS.md` line-1 import is `@node_modules/@omega.js/AGENTS.md` — a symlink the manager's workspace service maintains, pointing at this map.
   - It resolves to the LIVE file in a locally linked brand, and to the copy prepare vendors into `@omega.js/manager/docs/AGENTS.md` (links retargeted) on a published install.
@@ -151,7 +151,7 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 |---|---|---|
 | `brands/naked-brand` | "Naked Brand" — the bare fixture: the minimum a brand can declare, so a walkthrough sees every prompt fire from zero; a QA walk may reset it | Offline, `demo-*` only |
 | `brands/sandbox-brand` | Synthetic fixture for the automated corpus/e2e; test runs may mangle and reset it | Offline, `demo-*` only |
-| `brands/playground-omega` | "OMEGA Playground" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
+| `brands/playground-omega` | "OMEGA Playground": the standing LIVE test brand, classy theme; converts to every new shape in the same change (Ian 2026-09-11) | Real-but-throwaway project `omegajs-playground` |
 | `brands/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
 | `../omega-omega` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
 The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand.
@@ -170,18 +170,18 @@ The in-repo brands and the playground project are test-only forever; nothing in 
 Every framework AND `@omega.js/manager` ship `omega` + `omg` + `mgr` — all are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`).
 - The nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct.
 - An `@omega.js/*` package's OWN root dispatches to that package's own CLI, ahead of any framework it merely DEPENDS on — `npx omega test` in `packages/extension` runs the extension's self-test, and a package with no CLI is refused rather than scaffolded into ([#757](https://github.com/Omega-JS-Stack/omega/issues/757)).
-- No target context (fresh dir) → falls back to the HOST package's CLI with a stderr note, which keeps a verb run in a fresh directory on the host CLI — and with the manager as host, keeps `npx omega onboard` working in a fresh brand-template clone ([#276](https://github.com/Omega-JS-Stack/omega/issues/276)).
-- `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
+- No target context (fresh dir) → `@omega.js/manager` when installed, else the HOST package's CLI, each with a stderr note. The contextless verbs are the manager's own, so `npx omega onboard` in a fresh clone reaches it whichever framework won npm's `.bin/omega` link ([#908](https://github.com/Omega-JS-Stack/omega/issues/908)).
+- Those three are the WHOLE bin set: the per-framework `omega-<framework>` bins are gone ([#877](https://github.com/Omega-JS-Stack/omega/issues/877)), so a human types only `omega` (`npx omega` in a target, `omega --target=<name>` at the brand root) and a generated CI workflow runs the framework's own `bin/omega` FILE by path. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 - Every framework-owned package.json script spells the verb BARE (`omega build`), on all four frameworks ([#748](https://github.com/Omega-JS-Stack/omega/issues/748)): npm already puts `node_modules/.bin` on the path inside a script. `npx omega` stays canonical for docs and the terminal.
 Single config format everywhere: shared sections (brand, cloud, analytics, payment, sentry, connections, theme) + a `targets` object (key presence = target enabled; any shared key inside a target entry overrides it). Owned by `@omega.js/config`.
-- Merge chain: `defaults ← company ← brand shared ← brand targets.<type> ← local shared ← local targets.<type>`.
+- Merge chain: `defaults ← company ← brand shared ← brand targets.<name> ← local shared ← local targets.<name>`.
 - Secrets stay in `.env` — the validator hard-fails secret-shaped keys in config.
 - **No dual-read (Ian's call, 2026-07-06)**: frameworks flip to omega.json5 outright; legacy brands convert once via the mapping tables. Full reference: [docs/shared/config.md](docs/shared/config.md).
 `docs/shared/` — cross-framework contracts:
 - [config.md](docs/shared/config.md) — the omega.json5 schema, merge chain, legacy mapping tables
 - [local-dev.md](docs/shared/local-dev.md) — local linking + watch mechanics
 - [testing.md](docs/shared/testing.md) — the tiered verification pipeline (unit → corpus → e2e → verts → journey)
-- [deploys.md](docs/shared/deploys.md) — the deliberate `omega deploy` verb on every target (no push triggers, ever)
+- [deploys.md](docs/shared/deploys.md): the deliberate `omega deploy` verb on every target (no push triggers, ever). **A brand deploy never needs a publish** (Ian 2026-09-12): the snapshot lane packs every `file:`-linked `@omega.js/*` package into tarballs that ride the pushed mirror, so the runner installs the framework code as it sits in this working tree
 - [updates.md](docs/shared/updates.md) — the `omega update` dependency-update contract
 - [publishing.md](docs/shared/publishing.md) — the publish proving-checkpoint runbook (gated, not yet run)
 - [icons.md](docs/shared/icons.md) — the one Font Awesome mechanism on every surface

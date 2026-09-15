@@ -23,6 +23,27 @@ function tmpConsumer() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cli-'));
 }
 
+test('the value-LESS flags are declared, so none of them eats the next token (#920)', () => {
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+  for (const flag of ['apply', 'major', 'force-fresh', 'https']) {
+    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
+  }
+
+  // The pin: the flag is true and the positional survives.
+  const argv = parse(['update', '--apply', 'out']);
+  assert.strictEqual(argv.apply, true);
+  assert.deepStrictEqual(argv._, ['update', 'out']);
+
+  // --https is the negation lane the dev server reads (`options.https !== false`).
+  assert.strictEqual(parse(['dev', '--no-https']).https, false);
+
+  // A value flag needs no declaration at all: the audit gates keep their numbers.
+  assert.strictEqual(parse(['audit', '--max-lcp', '1300']).maxLcp, '1300');
+});
+
 test('dispatch table: every aliased command has a command file', () => {
   const { commandsDir, aliases, defaultCommand } = Main.config;
   assert.strictEqual(defaultCommand, 'help', 'OMEGA convention: bare `omega` prints help (#675)');
@@ -76,9 +97,9 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   assert.ok(!/setup-ruby|bundle install|gem install|RUBY_VERSION|BUNDLER_VERSION/.test(workflow), 'CI workflow has no Ruby steps');
   assert.ok(workflow.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'CI workflow node version templated');
   assert.ok(workflow.includes('${{ secrets.GH_TOKEN }}'), 'GitHub secret syntax survived templating');
-  assert.ok(workflow.includes('npm run build'), 'CI builds through the omega CLI (the build verb scaffolds itself — #675)');
+  assert.ok(workflow.includes('@omega.js/web/bin/omega" deploy --direct'), 'CI builds AND publishes through the framework verb (#883), run by its own bin file (#877): one implementation for both lanes');
+  assert.ok(!workflow.includes('--workspace'), 'a standalone target declares no workspaces, so its install names none (#898)');
   assert.ok(!workflow.includes('omega setup'), 'the retired setup command is gone from CI');
-  assert.ok(workflow.includes('publish_dir: ./dist'), 'CI publishes dist/');
 
   assert.ok(result.written.length >= 6, `first run writes the tree (${result.written.length})`);
   fs.rmSync(root, { recursive: true, force: true });
@@ -107,12 +128,18 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   const second = scaffoldDefaults({ outputDir: root, logger: quiet });
   assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), 'the hand-written .env is never touched');
   assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('/my-custom-dir'), '.gitignore custom preserved');
-  // The CI secrets block is the SCHEMA's set (#627), not this machine's .env:
-  // a hand-written key changes nothing, so the rerun rewrites nothing.
-  assert.deepStrictEqual(second.written, [], 'a .env key is not a workflow change');
+  // The CI secrets block is the schema's set PLUS what only the composed .env
+  // can name (#835): a key the schema never declared is the consumer's own,
+  // their workflow step is the only thing that reads it, and it used to fail
+  // silently. So the rerun rewrites exactly the workflow, with the key NAME.
+  assert.deepStrictEqual(second.written, ['.github/workflows/build.yml'], 'a new .env key re-renders the block, and nothing else');
   assert.ok(
-    !fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('MY_CUSTOM_KEY'),
-    'an undeclared .env key never reaches the workflow env block',
+    fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('MY_CUSTOM_KEY: ${{ secrets.MY_CUSTOM_KEY }}'),
+    "a key the schema does not know is the consumer's own and reaches the workflow env block",
+  );
+  assert.ok(
+    !fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8').includes('hello'),
+    'the block carries key NAMES, never a value',
   );
 
   // omega.json5 stabilizes after one merge cycle: run three, expect the third clean
@@ -142,10 +169,10 @@ test('FILE_MAP: src/ is consumer-owned after seeding', () => {
 
 test('scaffold: a brand target gets NO local-level config, a standalone project keeps its seed (#298)', () => {
   const root = tmpConsumer();
-  const targetDir = path.join(root, 'brand', 'targets', 'website');
+  const targetDir = path.join(root, 'brand', 'targets', 'web');
   const targetConfig = path.join(targetDir, 'config', 'omega.json5');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   fs.mkdirSync(targetDir, { recursive: true });
 
   // Fresh scaffold AND the reruns setup does: the local config never appears
@@ -187,9 +214,9 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   assert.match(standaloneMode[0], /full config template/, 'names the consequence');
 
   // Brand monorepo: the no-target-config lane
-  const targetDir = path.join(root, 'brand', 'targets', 'website');
+  const targetDir = path.join(root, 'brand', 'targets', 'web');
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   fs.mkdirSync(targetDir, { recursive: true });
 
   const brandLines = [];
@@ -205,7 +232,7 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
 
 test('scaffold: inside a brand monorepo the per-target agent docs never scaffold and framework-owned copies sweep (brand doc unification)', () => {
   const root = tmpConsumer();
-  const targetDir = path.join(root, 'brand', 'targets', 'website');
+  const targetDir = path.join(root, 'brand', 'targets', 'web');
   fs.mkdirSync(targetDir, { recursive: true });
 
   // Standalone scaffold first (no brand config yet) — the per-target agent docs land.
@@ -215,7 +242,7 @@ test('scaffold: inside a brand monorepo the per-target agent docs never scaffold
 
   // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   const swept = scaffoldDefaults({ outputDir: targetDir, logger: quiet });
   assert.deepStrictEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CLAUDE.md'], 'framework-owned per-target agent docs are swept');
   assert.ok(!fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'the brand root is the doc home');
@@ -240,9 +267,9 @@ test('scaffold: inside a brand monorepo the per-target agent docs never scaffold
 test('scaffold: a brand target scaffolds NO per-target .github/ — its CI composes into the brand root (#265)', () => {
   const root = tmpConsumer();
   const brandRoot = path.join(root, 'brand');
-  const targetDir = path.join(brandRoot, 'targets', 'website');
+  const targetDir = path.join(brandRoot, 'targets', 'web');
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(path.join(targetDir, '.env'), 'CLOUDFLARE_TOKEN=cf\n');
 
@@ -251,24 +278,24 @@ test('scaffold: a brand target scaffolds NO per-target .github/ — its CI compo
   // GitHub runs workflows from the repo root ONLY — a per-target copy is dead.
   assert.ok(!fs.existsSync(path.join(targetDir, '.github')), 'no per-target .github/ in a brand monorepo');
 
-  const composedPath = path.join(brandRoot, '.github', 'workflows', 'website-build.yml');
+  const composedPath = path.join(brandRoot, '.github', 'workflows', 'web-build.yml');
   assert.ok(fs.existsSync(composedPath), 'the target workflow composed into the brand root');
 
   const composed = fs.readFileSync(composedPath, 'utf8');
   // The scoping MECHANISM is devkit's (`working-directory`, block or per step);
   // what web owes the brand is that CI runs the target, not the repo root.
-  assert.match(composed, /working-directory: targets\/website/, 'run steps execute in the target dir');
-  assert.match(composed, /^name: .+ \(targets\/website\)$/m, 'the Actions list tells the targets apart');
-  assert.match(composed, /^ {2}group: website-\$\{\{ github\.ref \}\}$/m, 'per-target concurrency — one target never cancels another');
+  assert.match(composed, /working-directory: targets\/web/, 'run steps execute in the target dir');
+  assert.match(composed, /^name: .+ \(targets\/web\)$/m, 'the Actions list tells the targets apart');
+  assert.match(composed, /^ {2}group: web-\$\{\{ github\.ref \}\}$/m, 'per-target concurrency: one target never cancels another');
 
   // The scaffold's own token pass still ran: node version + the .env secrets block.
   assert.ok(composed.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'the node version templated');
-  assert.ok(composed.includes('OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}'), "the schema's web delivery set reached the composed env block");
+  assert.ok(composed.includes('OMEGA_LICENSE_KEY: ${{ secrets.OMEGA_LICENSE_KEY }}'), "the schema's web delivery set reached the composed env block");
   assert.ok(!composed.includes('{{ githubSecrets }}'), 'no unrendered token survives');
 
   // Idempotent: a setup rerun rewrites that one file and never adds another.
   scaffoldDefaults({ outputDir: targetDir, logger: quiet });
-  assert.deepStrictEqual(fs.readdirSync(path.join(brandRoot, '.github', 'workflows')), ['website-build.yml'], 'one file per app, rerun-stable');
+  assert.deepStrictEqual(fs.readdirSync(path.join(brandRoot, '.github', 'workflows')), ['web-build.yml'], 'one file per app, rerun-stable');
   assert.strictEqual(fs.readFileSync(composedPath, 'utf8'), composed, 'the rerun composed the same bytes');
 
   fs.rmSync(root, { recursive: true, force: true });

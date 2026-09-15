@@ -11,9 +11,11 @@
 //     which initializes its Manager only after app ready (too late to prevent
 //     the launch activation)
 //
-// Pass the Manager when you have one — its isTesting() is authoritative (honors
-// config.em.environment overrides). Without one (the harness, pre-Manager code),
-// falls back to the standalone mode-helpers check (OMEGA_TEST_MODE=true).
+// Pass the Manager when you have one: its isTesting() reads the environment the
+// Manager's own config was baked with. Without one (the harness, pre-Manager
+// code) the standalone check reads the process's OMEGA_ENVIRONMENT, the one
+// input every lane sets ([#817](https://github.com/Omega-JS-Stack/omega/issues/817));
+// the test runners spawn their children naming `testing`.
 //
 // Usage:
 //   const isTestStealth = require('./utils/test-stealth.js');

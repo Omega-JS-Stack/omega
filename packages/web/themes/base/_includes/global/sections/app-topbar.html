@@ -8,6 +8,10 @@
     actions: [{ type: 'account' } | { type: 'notifications', icon, badge, dropdown }
               | { label, href, icon, class, size, dropdown }]
 
+    An `icon` carries its OWN Font Awesome classes (#619, #850, #903):
+    `icon: 'fa-brands fa-github'`. Every icon site below emits that string
+    verbatim and adds only its size and spacing.
+
     action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else
     renders no size class. NEVER test it for truthiness: Liquid answers `.size`
     on a hash with its KEY COUNT, so every action would "have" a size (#43).
@@ -84,9 +88,9 @@
         <!-- Notifications Dropdown -->
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         <div class="dropdown">
-          {% capture notif_icon %}{{ action.icon | default: "bell" }}{% endcapture %}
+          {% capture notif_icon %}{{ action.icon | default: "fa-solid fa-bell" }}{% endcapture %}
           <button class="btn-icon position-relative" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false" aria-label="{{ action.label | default: 'Notifications' }}">
-            <i class="fa-solid fa-{{ notif_icon }} fa-sm"></i>
+            <i class="{{ notif_icon }} fa-sm" aria-hidden="true"></i>
             {% if action.badge %}
               <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill {{ action.badge.class | default: 'bg-danger' }}">
                 {{ action.badge.text }}
@@ -116,7 +120,7 @@
                       <div class="d-flex">
                         {% if notification.icon %}
                           <span class="omega-icon-chip omega-icon-chip--neutral me-3 flex-shrink-0">
-                            <i class="fa-solid fa-{{ notification.icon }} fa-sm"></i>
+                            <i class="{{ notification.icon }} fa-sm" aria-hidden="true"></i>
                           </span>
                         {% endif %}
                         <div class="flex-fill">
@@ -165,7 +169,7 @@
         <div class="dropdown">
           <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
             {% if action.icon %}
-              <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+              <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
             {% endif %}
             <span>{{ action.label }}</span>
           </button>
@@ -176,7 +180,7 @@
               {% capture child_class %}dropdown-item {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
               {% capture child_content %}
                 {% if child.icon %}
-                  <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
+                  <i class="{{ child.icon }} fa-sm me-2" aria-hidden="true"></i>
                 {% endif %}
                 <span>{{ child.label }}</span>
               {% endcapture %}
@@ -208,7 +212,7 @@
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         {% capture action_content %}
           {% if action.icon %}
-            <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+            <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
           {% endif %}
           <span>{{ action.label }}</span>
         {% endcapture %}

@@ -25,6 +25,7 @@
  *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
+const { hasTargetOfType } = require('@omega.js/config');
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
@@ -51,7 +52,7 @@ module.exports.run = createServiceRunner({
     }
 
     // The agent answers the brand's support email, which the backend serves
-    if (!context.brandConfig.targets?.backend) {
+    if (!hasTargetOfType(context.brandConfig, 'backend')) {
       return { skip: true, reason: 'no backend target' };
     }
 

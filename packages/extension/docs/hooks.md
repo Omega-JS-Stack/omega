@@ -31,7 +31,7 @@ Hooks take the ONE hook-argument shape every OMEGA framework passes — the same
 
 - `ctx.manager` — the build `Manager` instance (`@omega.js/extension/build`)
 - `ctx.projectRoot` — the consumer project root, absolute
-- `ctx.mode` — `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`
+- `ctx.mode`: `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`. The deploy hook (`hooks/deploy/pre.js`, run by `omega deploy`) always reads `'production'`: the verb runs outside a build, and what it is about to publish is a release
 
 Everything else a build hook needs comes off `ctx.manager`:
 

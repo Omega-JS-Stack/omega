@@ -23,8 +23,8 @@
  * bare (scope.js parity).
  *
  * `--target=<a,b>` is the TARGET picker, and it composes with every scope
- * above rather than replacing any of them: a comma list of target keys ('web')
- * or dir names ('website') narrowing which targets the run reaches. A
+ * above rather than replacing any of them: a comma list of target NAMES
+ * ('web', 'admin') narrowing which targets the run reaches. A
  * per-framework id already names its target, so an id whose owner the picker
  * excludes is a contradiction, not a narrowing — it refuses by name instead of
  * running the empty intersection.
@@ -127,9 +127,9 @@ function namedScope(rawTargets) {
 
 /**
  * The `--target=` picker: which discovered targets a run may reach.
- * Tokens match a target's key ('web') or its dir name ('website') through the
- * shared matcher every brand-root picker uses (lib/target-selection.js,
- * which also names the flag: ONE `--target=` on every verb, #780).
+ * Tokens match a target's NAME through the shared matcher every brand-root
+ * picker uses (lib/target-selection.js, which also names the flag: ONE
+ * `--target=` on every verb, #780).
  *
  * @param {Array} targets - the discovered target entries
  * @param {string} [picker] - the raw --target value (comma list)
@@ -144,7 +144,7 @@ function pickTargets(targets, picker) {
 
   assertKnownTargets(
     tokens.filter((token) => !targets.some((entry) => targetMatches(entry, token))),
-    targets.map((entry) => entry.target || entry.name),
+    targets.map((entry) => entry.name),
   );
   const selected = targets.filter((entry) => tokens.some((token) => targetMatches(entry, token)));
 

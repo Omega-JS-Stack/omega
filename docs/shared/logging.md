@@ -106,7 +106,9 @@ surface attaches it at its entry point.
   rotation (the ruled retention, see below).
 - **Stackable.** `createTee()` returns an independent tee; an attach captures the
   CURRENT writers, so tees nest and each detach restores exactly what it found (LIFO).
-  The default export is the process-wide singleton, which is what a CLI verb wants.
+  The default export is the process-wide singleton, which is what a CLI verb wants; two
+  attaches of different paths on the singleton stack the same way (a verb run inside
+  another verb's process), and its `detach()` pops the newest.
 - **`createChildLog()` for spawned children.** A child's stdout/stderr never pass
   through this process' writers; the caller mirrors each buffer to the terminal —
   which the verb's own tee then catches, making the verb log a SUPERSET of the child
@@ -120,7 +122,7 @@ surface attaches it at its entry point.
 
 ## Where every log lives
 
-`<targetRoot>` is a target dir in a brand (`targets/website`, `targets/backend`, …);
+`<targetRoot>` is a target dir in a brand (`targets/web`, `targets/backend`, …);
 `<brandRoot>` is the brand monorepo root.
 
 | Surface | File | What's in it |
@@ -129,23 +131,24 @@ surface attaches it at its entry point.
 | `omega dev` (web) · `omega serve` / `omega emulator` (backend) · `npm start` (desktop, extension) | `<targetRoot>/logs/dev.log` | the whole dev run: boot, ports, watcher rebuilds, the crash — plus every child chunk the verb mirrored (see below) |
 | `omega build` (web, backend) · production gulp build (desktop, extension) | `<targetRoot>/logs/build.log` | the whole production build |
 | `omega test` | `<targetRoot>/logs/test.log` | suite names, pass/fail, harness boot lines |
+| `omega deploy` (web, backend, extension, desktop) | `<targetRoot>/logs/deploy.log` | the whole deploy: the scaffold, the precheck and its refusals, the dispatch, then the followed run's job logs and its verdict ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)) |
 | **Backend children** — firebase's own processes, beside firebase-tools' debug logs. The verb mirrors every child chunk to its own terminal, so the `logs/<verb>.log` above is a SUPERSET of these; a child file is the child-ONLY view (and the one that `roll()`s mid-run) | | |
 | the firebase emulator child | `<targetRoot>/dist/emulator.log` | emulator traffic: function invocations, Firestore/auth calls |
 | the `firebase serve` child | `<targetRoot>/dist/dev.log` | serve output; rolls on each reload |
 | the test runner child | `<targetRoot>/dist/test.log` | the runner's own output under `omega test` |
-| `omega deploy` | `<targetRoot>/dist/deploy.log` | the deploy transcript |
+| `omega deploy --direct` (the firebase child) | `<targetRoot>/dist/deploy.log` | the `firebase deploy` transcript (the verb's own record is `logs/deploy.log`, one row up) |
 | `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
 | firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
 | **Desktop extras** | | |
 | the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; kept across boots, rotating at 10 MB — `packages/desktop/docs/logging.md` |
 | `npx omega logs [runtime\|dev\|build\|test]` (desktop's own verb — read, not write) | tails whichever of the four `<targetRoot>/logs/` files was named, `runtime` by default | the print/follow/open surface for all of the above; backend's `omega logs` is a different verb (the Cloud Logging tail, one row up) |
-| `npm run release` | `<targetRoot>/logs/ci.log` | the GH Actions release run, streamed locally |
+| `npm run release` (the same dispatch `omega deploy` delegates to) | `<targetRoot>/logs/deploy.log` | the GH Actions release run, streamed locally: one name for every target's deploy ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), where this was `logs/ci.log` |
 | Windows code-signing | `<targetRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |
 | **Brand root** — every verb tees to its OWN `logs/<verb>.log` ([#623](https://github.com/Omega-JS-Stack/omega/issues/623)), so one verb never truncates another's record. A FAN-OUT log holds the walk's own verdict — its header, its loud skips, its summary — because `runCommand` spawns each target with stdio inherit, so a target's output goes past the tee into that target's own log above | | |
 | `omega manage` (the service walk) | `<brandRoot>/logs/manage.log` | the whole service walk |
 | `omega dev` (the fan-out) | `<brandRoot>/logs/dev.log` | the boot walk, then every dev leg's prefixed output (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
 | `omega build` / `omega clean` (the fan-outs) | `<brandRoot>/logs/build.log` · `<brandRoot>/logs/clean.log` | the walk order, every loud skip, the per-target summary |
-| `omega deploy` (the fan-out) | `<brandRoot>/logs/deploy.log` | the delivery lane, then which target published in which order and the summary — the backend's own transcript additionally lands in `targets/backend/dist/deploy.log` (the other targets keep no per-target deploy log) |
+| `omega deploy` (the fan-out) | `<brandRoot>/logs/deploy.log` | the delivery lane, then which target published in which order and the summary. Every target additionally keeps its own `<targetRoot>/logs/deploy.log` ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), and the backend its firebase transcript `targets/backend/dist/deploy.log` |
 | `omega update` (the fan-out) | `<brandRoot>/logs/update.log` | which target was checked and what it reported/applied |
 | `omega test` (the fan-out) | `<brandRoot>/logs/test.log` | which target ran which scope, and the aggregate verdict |
 | `omega pipeline` (the live full-cycle test) | `<brandRoot>/logs/pipeline.log` | the child invocation, the deploy/verify legs, the scorecard and the PASS/FAIL verdict |
@@ -195,7 +198,7 @@ emulator or watcher belongs to the user: never restart one, and never re-run a s
 just to see output.
 
 ```bash
-tail -50 targets/website/logs/dev.log            # is the dev server up, what did it last build
+tail -50 targets/web/logs/dev.log                # is the dev server up, what did it last build
 grep -i error targets/backend/dist/emulator.log  # what the emulator actually served
 grep '^FAIL' .temp/*/steps.log                # which e2e step broke
 tail -100 .temp/logs/test-packages.log        # what the last lane printed

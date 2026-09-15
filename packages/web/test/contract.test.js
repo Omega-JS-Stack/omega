@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
 const { buildTheme, themeOutDir, FIXTURE_VERSION } = require('./lib/contract-build.js');
+const { readBuildJsFile } = require('./lib/build.js');
 
 const PKG = path.resolve(__dirname, '..');
 
@@ -157,33 +158,36 @@ test('#86: no stock page ships a missing-icon marker', () => {
   }
 });
 
-test('manifest-injected assets on every theme (hashed main css/js, valid Configuration)', () => {
+test('manifest-injected assets on every theme (hashed main css/js, valid build bake)', () => {
   for (const theme of THEMES) {
     const html = page(theme, 'pricing.html');
     assert.match(html, /href="\/assets\/css\/main-[a-f0-9]{8}\.css"/, `${theme}: hashed main css linked`);
     assert.match(html, /<script type="module" src="\/assets\/js\/main-[A-Z0-9]{8}\.js"><\/script>/, `${theme}: hashed main js linked as an ESM module`);
-    assert.ok(html.includes('brand: {"id":"contract","name":"Contract"}'), `${theme}: Configuration brand`);
+    assert.ok(html.includes('<script src="/build.js?cb='), `${theme}: the one build snapshot is loaded`);
     assert.ok(html.includes(`data-theme-id="${theme}"`), `${theme}: active theme id in chrome`);
   }
 });
 
-// #380: the ONE place web hands the client its error-reporting config. Evaluated,
-// not string-matched, so a Liquid slip that renders unparseable JS fails HERE
-// rather than as a blank page in a browser.
-test('#380: omega.json5 `monitoring` reaches the client as its sentry contract', () => {
+// #380: the ONE place web hands the client its error-reporting config. Parsed,
+// not string-matched, so a Liquid slip that renders an unparseable literal fails
+// HERE rather than as a blank page in a browser.
+test('#380: omega.json5 `monitoring` reaches the client at its canonical home', () => {
   for (const theme of THEMES) {
-    const html = page(theme, 'pricing.html');
-    const source = html.match(/var Configuration = (\{[\s\S]*?\});\s*<\/script>/);
-    assert.ok(source, `${theme}: the Configuration block is present`);
+    const buildJson = readBuildJsFile(path.join(themeOutDir(theme), 'build.js'));
+    assert.ok(buildJson, `${theme}: the OMEGA_BUILD_JSON snapshot is present`);
 
-    const config = new Function(`return ${source[1]}`)();
-    assert.strictEqual(config.sentry.enabled, true, `${theme}: a configured DSN is the enable signal`);
-    assert.strictEqual(config.sentry.config.dsn, 'https://key@o1.ingest.sentry.io/1', `${theme}: the DSN rides`);
-    assert.strictEqual(config.sentry.config.org, 'contract-org', `${theme}: the whole sentry PROVIDER block rides (#425), never the role level around it`);
-    assert.strictEqual(config.sentry.config.providers, undefined, `${theme}: and the providers wrapper never does`);
+    const config = buildJson.config;
+    // The whole sentry PROVIDER block rides (#425); @omega.js/client turns a
+    // DSN's presence into its own `sentry` contract (#894), so the page no
+    // longer composes one.
+    assert.strictEqual(config.monitoring.providers.sentry.dsn, 'https://key@o1.ingest.sentry.io/1', `${theme}: the DSN rides`);
+    assert.strictEqual(config.monitoring.providers.sentry.org, 'contract-org', `${theme}: the whole provider block rides`);
+    assert.strictEqual(config.sentry, undefined, `${theme}: and the page composes no second home for it`);
     // The release tag's version half: the WEBSITE APP's own package version, so
     // every host tags `brand.id@version` instead of falling back to buildTime.
-    assert.strictEqual(config.version, FIXTURE_VERSION, `${theme}: the target's own version rides the Configuration block`);
+    assert.strictEqual(config.version, FIXTURE_VERSION, `${theme}: the target's own version rides the snapshot`);
+    // The wrapper is the same five keys on every OMEGA browser surface (#894)
+    assert.deepStrictEqual(Object.keys(buildJson).sort(), ['builtAt', 'config', 'license', 'mode', 'package'], `${theme}: the one wrapper`);
   }
 });
 

@@ -63,15 +63,20 @@ module.exports = defineCases({
       // in the sibling `package` key.
       name: 'the bundle bake folds the app version into the config the renderer hands the client',
       run: (ctx) => {
-        const { composeBuildConfig } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'));
+        const { composeBuildConfig, buildFacts } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'));
 
-        const packaged = composeBuildConfig({ brand: { id: 'paperloom' } }, null, { version: '3.1.4' });
+        const pkg = { version: '3.1.4' };
+        const mode = { environment: 'production', build: true, publish: false };
+        const packaged = composeBuildConfig({ brand: { id: 'paperloom' } }, buildFacts({ pkg, mode, dev: null }));
         ctx.expect(packaged.version).toBe('3.1.4');
         ctx.expect(packaged.brand.id).toBe('paperloom');
         ctx.expect(packaged.dev).toBeUndefined();
 
         // A dev build carries the resolved local-stack map beside it (#300).
-        const local = composeBuildConfig({ brand: { id: 'paperloom' } }, { ports: { auth: 9099 } }, { version: '3.1.4' });
+        const local = composeBuildConfig(
+          { brand: { id: 'paperloom' } },
+          buildFacts({ pkg, mode: { ...mode, environment: 'development', build: false }, dev: { ports: { auth: 9099 } } }),
+        );
         ctx.expect(local.version).toBe('3.1.4');
         ctx.expect(local.dev.ports.auth).toBe(9099);
       },

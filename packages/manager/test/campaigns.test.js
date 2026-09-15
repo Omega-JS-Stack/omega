@@ -76,7 +76,9 @@ const VALIDATION_PENDING = { validation_results: { mail_cname: { valid: false },
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADDRESS, person = PERSON, listId = null, groups = null, campaigns = {} } = {}) {
+// `company` is the RESOLVED section (#677): a brand with no company of its own
+// resolves to its OWN url, which is what the retired `parent: 'self'` said.
+function brandConfig({ url = `https://${DOMAIN}`, company = null, webhooks = true, address = ADDRESS, person = PERSON, listId = null, groups = null, campaigns = {} } = {}) {
   return {
     brand: {
       id: 'fixture-brand',
@@ -85,7 +87,7 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
       contact: { email: `support@${DOMAIN}`, ...(person ? { person } : {}) },
       ...(address ? { address } : {}),
     },
-    parent,
+    company: { ...(company || { id: null, url, images: {} }), webhooks },
     marketing: {
       campaigns: {
         ...structuredClone(DEFAULTS.marketing.campaigns),
@@ -93,7 +95,7 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', address = ADD
         ...campaigns,
       },
     },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 
@@ -288,8 +290,9 @@ test('campaigns: skips without brand.url', async () => {
 
 test('campaigns: the defaults carry no company parent URL', () => {
   // omega-manager defaulted parent to the company's brand URL — the manager
-  // defaults layer must leave the choice to config
-  assert.equal(DEFAULTS.parent, null);
+  // defaults layer must leave the choice to config. Since #677 the parent IS
+  // the resolved company, and `parent` is retired outright.
+  assert.equal('parent' in DEFAULTS, false);
   assert.equal(DEFAULTS.marketing.campaigns.providers.sendgrid.listId, null);
 });
 
@@ -513,9 +516,9 @@ test('campaigns: a subdomain project leaves link branding to the parent brand', 
   });
   const cf = fakeCf();
 
-  // parent: null keeps the run to the operations under test — the webhook op
-  // has nothing to point at, exactly as its own test pins.
-  const result = await runService(brandConfig({ url: `https://app.${DOMAIN}`, parent: null }), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+  // An unresolved company keeps the run to the operations under test: the
+  // webhook op has nothing to point at, exactly as its own test pins.
+  const result = await runService(brandConfig({ url: `https://app.${DOMAIN}`, company: { id: 'parent-brand', url: null, images: {} } }), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
 
   assert.equal(result.status, 'success');
   assert.equal(api.callsTo('getBrandedLinks').length, 0, 'the operation steps aside before it reads');
@@ -914,10 +917,22 @@ test('campaigns: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook 
   ]);
 });
 
-test('campaigns: no parent configured → nothing to point the webhook at', async () => {
+test('campaigns: a company that resolved no url → nothing to point the webhook at', async () => {
   const api = fakeSendgrid(convergedResponses());
 
-  const result = await runService(brandConfig({ parent: null }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+  const result = await runService(brandConfig({ company: { id: 'parent-brand', url: null, images: {} } }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.equal(api.callsTo('getEventWebhookSettings').length, 0);
+  assert.equal(result.output.eventWebhook, undefined);
+});
+
+test('campaigns: company.webhooks = false is the deliberate account opt-out (#677)', async () => {
+  // The playground's real state: the SendGrid ACCOUNT is shared with brands
+  // this walk does not own, and its one account-level webhook is theirs.
+  const api = fakeSendgrid(convergedResponses());
+
+  const result = await runService(brandConfig({ webhooks: false }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
 
   assert.equal(result.status, 'success');
   assert.equal(api.callsTo('getEventWebhookSettings').length, 0);
@@ -935,7 +950,7 @@ test('campaigns: webhook drift is patched with the minimum diff against the pare
     updateEventWebhookSettings: {},
   });
 
-  const result = await runService(brandConfig({ parent: 'https://parent-brand.test' }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+  const result = await runService(brandConfig({ company: { id: 'parent-brand', url: 'https://parent-brand.test', images: {} } }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.callsTo('updateEventWebhookSettings')[0].args[0], { url: parentUrl, dropped: true });

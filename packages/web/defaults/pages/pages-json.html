@@ -9,9 +9,10 @@ meta:
     {%- unless item.url -%}{%- continue -%}{%- endunless -%}
     {%- comment -%}#564: the ONE resolved flag, the only test this file makes. A page
     the site tells crawlers to skip is not a site-search hit either. The rule and its
-    rationale live in sitemap.html. `search.include` is the separate opt-out for a page
-    that IS indexed and simply should not answer the site's own search.{%- endcomment -%}
-    {%- if item.data.search.include == false -%}{%- continue -%}{%- endif -%}
+    rationale live in sitemap.html. `catalog.include` is the separate opt-out for a page
+    that IS indexed and simply should not answer the site's own search. THIS file is the
+    catalog the search box reads, which is why the key is named for it (#858).{%- endcomment -%}
+    {%- if item.data.catalog.include == false -%}{%- continue -%}{%- endif -%}
     {%- if item.data.resolved.meta.index == false -%}{%- continue -%}{%- endif -%}
     {%- if item.data.post.id -%}
       {%- assign page_type = 'post' -%}
@@ -28,7 +29,7 @@ meta:
     {%- assign entry_desc = item | omega_rendered: 'post.description' | default: meta_desc -%}
     {%- assign entry_breadcrumb = item | omega_rendered: 'meta.breadcrumb' -%}
     {%- assign post_category = item | omega_rendered: 'post.category' -%}
-    {%- assign entry_category = item | omega_rendered: 'search.category' | default: post_category -%}
+    {%- assign entry_category = item | omega_rendered: 'catalog.category' | default: post_category -%}
     {%- unless first %},{% endunless -%}{%- assign first = false %}
   {
     "url": "{{ resolved.config.url }}{{ item.url }}",

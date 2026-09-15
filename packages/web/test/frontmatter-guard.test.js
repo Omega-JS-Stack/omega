@@ -80,7 +80,8 @@ test('a page may set `client` under `config:` — it reaches resolved.config.cli
     const html = pages.get('/');
     assert.ok(html, 'page built');
 
-    // The Configuration blob in core/foot.html is the emitted view of resolved.client.
+    // The page's own `config:` delta after the loader tag is the emitted view
+    // of resolved.config for this page (#607, #743).
     assert.ok(/"policy":\s*"authenticated"/.test(html), 'page frontmatter client.auth.config.policy wins');
     assert.ok(!/"policy":\s*"unauthenticated"/.test(html), 'the layout value is overridden, not appended');
 

@@ -1,7 +1,7 @@
 /**
- * Beehiiv segment creation via the companion Chrome extension — Beehiiv
+ * Beehiiv segment creation via the OMEGA Companion extension. Beehiiv
  * has NO segment-create API, so the manager drives the dashboard UI
- * itself through trusted CDP events (AutomationClient ↔ extension/).
+ * itself through trusted CDP events (AutomationClient ↔ the OMEGA Companion).
  * The evaluate() bodies are the battle-tested omega-manager selectors:
  * Beehiiv duplicates IDs across condition rows, so every lookup targets
  * the LAST matching element; React inputs are set through the native

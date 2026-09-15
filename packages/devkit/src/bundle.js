@@ -13,6 +13,8 @@
  *   - the `@dev-only` strip (#18), registered for PRODUCTION builds only
  *   - minify / sourcemap by mode, and `bundle` + `metafile` on
  *   - one timing line per build, watch rebuilds included
+ *   - `import.meta.url`, kept answering in CommonJS output (#906), so an
+ *     ESM-only dependency runs bundled
  *
  * esbuild is REQUIRED LAZILY, from the CALLING FRAMEWORK's installation rather
  * than devkit's. Devkit is vendored into each framework's dist at prepare time
@@ -51,6 +53,24 @@ const RESERVED_OPTIONS = ['bundle', 'metafile', 'minify', 'sourcemap', 'plugins'
 // hand back a result with no `dispose`, which a watch caller only discovers
 // when it tries to shut down.
 const MODES = ['build', 'watch'];
+
+// The `import.meta.url` a CommonJS bundle keeps
+// ([#906](https://github.com/Omega-JS-Stack/omega/issues/906)). esbuild rewrites
+// `import.meta` to `{}` in `format: 'cjs'` output (its documented limitation:
+// `import.meta` only exists in an ES module), so an ESM-only dependency that
+// opens a require of its own with `createRequire(import.meta.url)`, which
+// yargs-parser and a growing share of the registry do, is handed `undefined`
+// and throws ERR_INVALID_ARG_VALUE the moment the app boots. Node's own answer
+// for a CommonJS file is `pathToFileURL(__filename)`, so that is what the
+// reference becomes.
+//
+// It is a define onto an IDENTIFIER plus a banner declaring it, rather than one
+// define carrying the expression, because esbuild refuses an expression as a
+// define value ("must be an entity name or JS literal"). The banner rides every
+// emitted file, so each answers with its OWN path.
+const IMPORT_META_URL = 'import.meta.url';
+const IMPORT_META_URL_NAME = '__omegaImportMetaUrl';
+const IMPORT_META_URL_SHIM = `var ${IMPORT_META_URL_NAME} = require('url').pathToFileURL(__filename).href;`;
 
 /**
  * esbuild as the CALLING FRAMEWORK resolves it (see the header).
@@ -127,6 +147,32 @@ function timingPlugin(destination, entryCount, watching) {
         if (watching) result.errors.forEach((error) => logger.error(describe(error)));
       });
     },
+  };
+}
+
+/**
+ * Keep `import.meta.url` answering in a CommonJS bundle (see IMPORT_META_URL).
+ * Composed from the OUTPUT SHAPE rather than wired per caller: every cjs+node
+ * build has the hole, and no other output format has it (a browser bundle is
+ * iife or esm, and esm keeps `import.meta` natively).
+ * @param {object} config - the composed esbuild options, edited in place
+ * @throws {Error} when the caller defines the same key, the RESERVED_OPTIONS rule:
+ *   two answers for one reference is a programmer error, not a merge
+ */
+function keepImportMetaUrl(config) {
+  if (config.format !== 'cjs' || config.platform !== 'node') return;
+
+  if (config.define && IMPORT_META_URL in config.define) {
+    throw new Error(`[devkit bundle] \`${IMPORT_META_URL}\` is composed by bundle() for CommonJS output and cannot be defined by a caller: a cjs+node build always gets \`pathToFileURL(__filename)\`, so a second answer would silently win or lose depending on merge order`);
+  }
+
+  config.define = { ...config.define, [IMPORT_META_URL]: IMPORT_META_URL_NAME };
+  // The shim is declared FIRST and the caller's banner rides below it,
+  // unchanged: anything the banner itself does could read the reference, and a
+  // declaration has to come before its readers.
+  config.banner = {
+    ...config.banner,
+    js: [IMPORT_META_URL_SHIM, config.banner && config.banner.js].filter(Boolean).join('\n'),
   };
 }
 
@@ -247,6 +293,8 @@ async function bundle(options) {
   for (const [key, value] of Object.entries({ outdir, outfile, target, format, splitting, define })) {
     if (value != null) config[key] = value;
   }
+
+  keepImportMetaUrl(config);
 
   if (mode !== 'watch') {
     return esbuild.build(config);

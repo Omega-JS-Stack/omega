@@ -3,19 +3,24 @@
  *
  * The rule walker (runSchema) is electron-manager's proven validate-config
  * engine ported verbatim: required/type/match/enum semantics, where match +
- * enum only run on PRESENT values and a conditional `required` function
+ * enum (and itemEnum, the same check per member of an array value) only run on
+ * PRESENT values and a conditional `required` function
  * receives the full config. See schema.js for the rule format.
  *
  * validateConfig() layers on top of the walker:
  *   - SHARED_SCHEMA always runs; TARGET_SCHEMAS[options.target] adds that
  *     target's refinements against the same resolved top-level namespace
- *   - `targets` sanity: unknown target names are errors (typo protection —
- *     targets.website is a mistake, the canonical name is web) and each
- *     present entry must be an object ({} = enabled with defaults) OR an
- *     array of id'd instance entries (multi-instance targets: ids required,
- *     dir-safe, unique per type; >1 backend instance is a WARNING)
+ *   - `targets` sanity (#886): every key is a target NAME, so it must be a
+ *     dir-safe slug, and every entry must be an object declaring a `type` the
+ *     framework list knows (an ARRAY is the retired multi-instance form, whose
+ *     replacement is a sibling key; >1 backend target is a WARNING)
+ *   - the `repo` block (#883): one `provider` from REPO_PROVIDERS, and an `org`
+ *     that is a real non-empty string whenever the block is there, because the
+ *     org is the owner of every repo the brand's names derive under
+ *   - `hosting` (#883) is a WEB target's key: a non-web target carrying it says
+ *     something nothing serves, and its provider comes from HOSTING_PROVIDERS
  *   - `cloud.config.authDomain`, when set, must be the brand's OWN host (the
- *     resolved instance url, else brand.url): a firebaseapp.com value or a
+ *     resolved target url, else brand.url): a firebaseapp.com value or a
  *     mismatch is an error, and demo-* (emulator-only) projects are exempt
  *   - retired keys are always errors (see retired-keys.js) — a name that was
  *     renamed outright reads as nothing at all, so it fails loudly instead of
@@ -27,11 +32,12 @@
  *     used to pass in silence
  */
 
-const { TARGETS, isCustomTargetEntry, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
+const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
 const { findRetiredKeys } = require('./retired-keys.js');
 const { isPlainObject } = require('./merge.js');
-const { INSTANCE_ID_PATTERN } = require('./instances.js');
+const { TARGET_NAME_PATTERN, TARGET_TYPES } = require('./targets.js');
+const { REPO_PROVIDERS, HOSTING_PROVIDERS } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { isCountedFeature } = require('@omega.js/account/features');
 
@@ -142,6 +148,18 @@ function runSchema(config, schema) {
     if (rule.enum && !rule.enum.includes(value)) {
       errors.push(`config.${rule.path} "${value}" is not allowed — must be one of [${rule.enum.join(', ')}]`);
     }
+
+    // ─── Item enum check (arrays) ───────────────────────────────────────────
+    // A LIST of allowed values (the extension's AMO categories): every member
+    // is named on its own line, so one bad slug in a good list is the one the
+    // error points at.
+    if (rule.itemEnum && Array.isArray(value)) {
+      for (const item of value) {
+        if (!rule.itemEnum.includes(item)) {
+          errors.push(`config.${rule.path} "${item}" is not allowed: must be one of [${rule.itemEnum.join(', ')}]`);
+        }
+      }
+    }
   }
 
   return errors;
@@ -149,13 +167,13 @@ function runSchema(config, schema) {
 
 /**
  * The host this (resolved) config's BRAND lives on, which is a brand-level
- * fact and never an instance one (#588, Ian 2026-09-01): one Firebase project,
- * one backend, one persona domain, shared by every instance a brand runs. So
- * `brand.url` answers first and the top-level `url` (the instance's own public
- * url, derived from its id or declared on its entry) is only the fallback for
+ * fact and never a per-target one (#588, Ian 2026-09-01): one Firebase project,
+ * one backend, one persona domain, shared by every target a brand runs. So
+ * `brand.url` answers first and the top-level `url` (the target's own public
+ * url, derived from its name or declared on its entry) is only the fallback for
  * a config that carries no brand.url at all. Reading them the other way round
- * made a `targets/website-admin` load fail its own brand's authDomain check
- * and seeded personas at a different domain than the backend's.
+ * made a `targets/admin` load fail its own brand's authDomain check and seeded
+ * personas at a different domain than the backend's.
  * @param {object} config - The resolved config object.
  * @returns {string} The lowercase hostname, or '' when no URL is known.
  */
@@ -171,6 +189,60 @@ function resolvedBrandHost(config) {
   } catch (e) {
     return '';
   }
+}
+
+/**
+ * The repo block and the hosting key (#883).
+ *
+ * `repo` is `{ provider, org }` and nothing else: its PRESENCE enables the repo
+ * service, and every repo name derives from `<brand.id>-<role>`, so the org is
+ * the whole address. A block with no usable org is the failure this catches
+ * loudly, because every derivation would otherwise answer null and each reader
+ * would skip in its own quiet way.
+ *
+ * `hosting` says where a WEB target is served from. Only a web target has a
+ * built site to serve, so the key on any other type is a statement nothing
+ * reads. The targets map rides every resolved config, so this check answers the
+ * same on a raw config and on a target-resolved one.
+ *
+ * @param {object} config - The resolved config object.
+ * @returns {string[]} Errors; empty when the config passes.
+ */
+function validateRepo(config) {
+  const errors = [];
+  const repo = config ? config.repo : undefined;
+
+  if (isPlainObject(repo)) {
+    if (repo.provider !== undefined && !REPO_PROVIDERS.includes(repo.provider)) {
+      errors.push(`config.repo.provider ${JSON.stringify(repo.provider)} is not a host OMEGA builds for: one of [${REPO_PROVIDERS.join(', ')}]`);
+    }
+
+    if (typeof repo.org !== 'string' || !repo.org.trim()) {
+      errors.push(
+        'config.repo.org is required when the repo block is present: it is the org every repo the brand owns lives in '
+        + '(`<brand.id>-omega`, `<brand.id>-releases`, `<brand.id>-<web target>`), and no repo name is configurable anywhere',
+      );
+    }
+  }
+
+  const targets = config ? config.targets : undefined;
+  if (!isPlainObject(targets)) return errors;
+
+  Object.entries(targets).forEach(([name, entry]) => {
+    if (!isPlainObject(entry) || entry.hosting === undefined) return;
+
+    if (entry.type !== 'web') {
+      errors.push(`config.targets.${name}.hosting is a web-target key: a ${JSON.stringify(entry.type)} target has no built site to serve`);
+      return;
+    }
+
+    const provider = isPlainObject(entry.hosting) ? entry.hosting.provider : undefined;
+    if (provider !== undefined && !HOSTING_PROVIDERS.includes(provider)) {
+      errors.push(`config.targets.${name}.hosting.provider ${JSON.stringify(provider)} is not a host OMEGA builds for: one of [${HOSTING_PROVIDERS.join(', ')}]`);
+    }
+  });
+
+  return errors;
 }
 
 /**
@@ -410,63 +482,51 @@ function validateConfig(config, options) {
   // ─── targets sanity ────────────────────────────────────────────────────
   const targets = config ? config.targets : undefined;
   if (isPlainObject(targets)) {
+    const backends = [];
+
     Object.keys(targets).forEach((key) => {
       const entry = targets[key];
-      const framework = TARGETS.includes(key);
 
-      // A key no framework owns is legal ONLY as a declared custom target
-      // (#603) — that declaration is what separates a deliberate Render API or
-      // worker from a typo'd framework name. The framework keys are the
-      // inverse: they may never claim the custom type, since their verbs come
-      // from their framework, not from package.json scripts.
-      if (!framework && !isCustomTargetEntry(entry)) {
-        errors.push(
-          `config.targets.${key} is not a known target — must be one of [${TARGETS.join(', ')}], `
-          + `or declare \`type: 'custom'\` (every instance of the array form) to run through its own package.json scripts`,
-        );
-        return;
-      }
-      if (framework && isCustomTargetEntry(entry)) {
-        errors.push(`config.targets.${key} is a framework target — it cannot declare \`type: 'custom'\``);
+      // The key is a NAME, and the name is the folder (targets/<name>), so it
+      // has to be a dir-safe slug (#886).
+      if (!TARGET_NAME_PATTERN.test(key)) {
+        errors.push(`config.targets.${key} is not a usable target name (lowercase, starts with a letter, alnum/-): the name IS the folder targets/${key}`);
         return;
       }
 
-      // Multi-instance array form: every entry MUST carry a unique dir-safe
-      // id (it names the targets/<canonical>-<id> dir). Backend stays single-
-      // instance in practice — >1 is a warning, not an error (spec v1).
       if (Array.isArray(entry)) {
-        if (entry.length === 0) {
-          errors.push(`config.targets.${key} instance array must not be empty — use {} for a single default instance`);
-          return;
-        }
-
-        const seen = new Set();
-        entry.forEach((instance, index) => {
-          if (!isPlainObject(instance)) {
-            errors.push(`config.targets.${key}[${index}] must be an instance object — got ${Array.isArray(instance) ? 'array' : typeof instance}`);
-            return;
-          }
-          if (typeof instance.id !== 'string' || !INSTANCE_ID_PATTERN.test(instance.id)) {
-            errors.push(`config.targets.${key}[${index}] must carry a dir-safe id (lowercase, starts with a letter, alnum/-) — it names targets/<dir>-<id>`);
-            return;
-          }
-          if (seen.has(instance.id)) {
-            errors.push(`config.targets.${key} instance id "${instance.id}" is not unique — ids must be unique per target type`);
-          }
-          seen.add(instance.id);
-        });
-
-        if (key === 'backend' && entry.length > 1) {
-          warnings.push(`config.targets.backend has ${entry.length} instances — multi-instance backend is unsupported for now (Cloud Functions = one project surface per brand)`);
-        }
+        errors.push(`config.targets.${key} is an array; a second instance is a sibling key, see docs/shared/breaking-changes.md 2026-09-11`);
         return;
       }
 
       if (!isPlainObject(entry)) {
-        errors.push(`config.targets.${key} must be an object ({} = enabled with defaults) or an array of id'd instances — got ${typeof entry}`);
+        errors.push(`config.targets.${key} must be an object declaring its type, got ${typeof entry}`);
+        return;
       }
+
+      // The TYPE says which framework runs there, and nothing else does: a
+      // name no framework owns is a deliberate brand choice, never a typo to
+      // guess at, so the type is what every reader keys off.
+      if (!TARGET_TYPES.includes(entry.type)) {
+        errors.push(
+          `config.targets.${key} must declare \`type\`, one of [${TARGET_TYPES.join(', ')}]`
+          + `${entry.type === undefined ? '' : ` (got ${JSON.stringify(entry.type)})`}`,
+        );
+        return;
+      }
+
+      if (entry.type === 'backend') backends.push(key);
     });
+
+    // Backend stays single-target in practice (one Cloud Functions surface per
+    // brand), so more than one is a warning, not an error.
+    if (backends.length > 1) {
+      warnings.push(`config.targets declares ${backends.length} backend targets (${backends.join(', ')}): multiple backends are unsupported for now (Cloud Functions = one project surface per brand)`);
+    }
   }
+
+  // ─── the repo block, and where a web target is hosted (#883) ───────────
+  validateRepo(config).forEach((error) => errors.push(error));
 
   // ─── authDomain is the brand's own host (cp268) ────────────────────────
   validateAuthDomain(config).forEach((error) => errors.push(error));

@@ -43,7 +43,7 @@ function loadModuleWithMock() {
 
 const MOCK_BRAND = {
   brand: { url: 'https://example.com', name: 'TestBrand', id: 'test' },
-  github: { user: 'test-user', repo: 'test-repo' },
+  repo: { provider: 'github', org: 'test-user' },
 };
 
 module.exports = defineCases({

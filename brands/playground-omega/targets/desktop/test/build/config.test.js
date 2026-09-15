@@ -15,7 +15,7 @@
  */
 
 const Manager = require('@omega.js/desktop/build');
-const { brandRepo, releasesRepo } = require('@omega.js/desktop/config');
+const { sourceRepo, releasesRepo } = require('@omega.js/desktop/config');
 
 module.exports = {
   type: 'suite',
@@ -47,18 +47,19 @@ module.exports = {
     },
 
     {
-      name: 'derives the releases repo and the brand repo this target publishes to',
+      name: 'derives the releases repo and the source repo this target publishes to',
       run: (ctx) => {
         const config = Manager.getConfig();
 
-        // Nothing declares a releases repo, so the `<brand.id>-releases` default
-        // under the brand repo's owner is the address every release verb uses.
+        // No repo NAME is ever configured (#883): the one `repo.org` block plus
+        // brand.id derive `<brand.id>-releases`, the address every release verb
+        // uses and the feed a shipped app polls.
         ctx.expect(releasesRepo(config).name).toBe('playground-releases');
-        ctx.expect(releasesRepo(config).repo).toBe('Omega-JS-Stack/playground-releases');
+        ctx.expect(releasesRepo(config).slug).toBe('Omega-JS-Stack/playground-releases');
 
-        // Nothing declares a brand repo either, so the `<brand.id>-omega` default
-        // of the `<brand.id>-<role>` rule resolves the source repo.
-        ctx.expect(brandRepo(config).repo).toBe('Omega-JS-Stack/playground-omega');
+        // And `<brand.id>-omega` is the SOURCE repo: where the workflows live
+        // and where a release dispatch is sent.
+        ctx.expect(sourceRepo(config).slug).toBe('Omega-JS-Stack/playground-omega');
       },
     },
   ],

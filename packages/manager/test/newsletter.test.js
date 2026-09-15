@@ -38,10 +38,12 @@ const KIND_MAP = { text: 'string', number: 'integer', date: 'datetime' };
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', publicationId = null, newsletter = {} } = {}) {
+// `company` is the RESOLVED section (#677): a brand with no company of its own
+// resolves to its OWN url, which is what the retired `parent: 'self'` said.
+function brandConfig({ url = `https://${DOMAIN}`, company = { id: null, url, images: {} }, webhooks = true, publicationId = null, newsletter = {} } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url, description: 'A fixture brand' },
-    parent,
+    company: { ...company, webhooks },
     marketing: {
       newsletter: {
         ...structuredClone(DEFAULTS.marketing.newsletter),
@@ -49,7 +51,7 @@ function brandConfig({ url = `https://${DOMAIN}`, parent = 'self', publicationId
         ...newsletter,
       },
     },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 
@@ -416,7 +418,7 @@ test('newsletter: no webhook yet → created with the exact consent-pipeline pay
     createWebhook: { data: { id: 'wh_new' } },
   });
 
-  const result = await runService(brandConfig({ publicationId: PUB_ID, parent: 'https://parent-brand.test' }), { beehiiv: api });
+  const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: 'https://parent-brand.test', images: {} } }), { beehiiv: api });
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.callsTo('createWebhook')[0].args, [PUB_ID, {
@@ -442,10 +444,20 @@ test('newsletter: a missing OMEGA_WEBHOOK_KEY is MINTED in place — the webhook
   ]);
 });
 
-test('newsletter: no parent configured → nothing to point the webhook at', async () => {
+test('newsletter: a company that resolved no url → nothing to point the webhook at', async () => {
   const api = fakeBeehiiv(convergedResponses());
 
-  const result = await runService(brandConfig({ publicationId: PUB_ID, parent: null }), { beehiiv: api });
+  const result = await runService(brandConfig({ publicationId: PUB_ID, company: { id: 'parent-brand', url: null, images: {} } }), { beehiiv: api });
+
+  assert.equal(result.status, 'success');
+  assert.equal(api.callsTo('listWebhooks').length, 0);
+  assert.equal(result.output.webhook, undefined);
+});
+
+test('newsletter: company.webhooks = false is the deliberate account opt-out (#677)', async () => {
+  const api = fakeBeehiiv(convergedResponses());
+
+  const result = await runService(brandConfig({ publicationId: PUB_ID, webhooks: false }), { beehiiv: api });
 
   assert.equal(result.status, 'success');
   assert.equal(api.callsTo('listWebhooks').length, 0);

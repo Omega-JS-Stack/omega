@@ -1,6 +1,6 @@
 # CLI
 
-`npx omega <command>` — bins `omega`, `omg`, `mgr`, `omega-extension` (all the same context-aware dispatcher; `omega-extension` runs this framework's CLI directly).
+`npx omega <command>`: bins `omega`, `omg`, `mgr` (all the same context-aware dispatcher; the per-framework `omega-extension` bin is gone, [#877](https://github.com/Omega-JS-Stack/omega/issues/877)).
 
 ## Commands
 
@@ -17,7 +17,7 @@
 
 ## Entry point
 
-[bin/omega-extension](../bin/omega-extension) — yargs-based shim that loads [src/cli.js](../src/cli.js).
+[bin/omega](../bin/omega): the devkit `omega-bin` dispatcher, which runs [src/cli-run.js](../src/cli-run.js), the argv shim (`@omega.js/devkit/argv`) that loads [src/cli.js](../src/cli.js).
 
 [src/cli.js](../src/cli.js) owns only the alias table and the commands directory — dispatch (positional/flag alias resolution, command loading, error surfacing) is the shared devkit router (`createCliRouter`, vendored into `dist/vendor/devkit/cli-router.js` at prepare time). The returned Main class exposes the resolved dispatch table as `Main.config` for structure tests.
 

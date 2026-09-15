@@ -80,9 +80,16 @@ export default class CalendarRenderer {
     });
   }
 
+  // The map carries the FULL class string (#929) and the emit adds only the size.
   _getViewIcon(mode) {
-    const icons = { day: 'calendar-day', week: 'calendar-week', month: 'calendar', year: 'grid-2', list: 'table-list' };
-    return `<i class="fa-solid fa-${icons[mode]} fa-sm"></i>`;
+    const icons = {
+      day: 'fa-solid fa-calendar-day',
+      week: 'fa-solid fa-calendar-week',
+      month: 'fa-solid fa-calendar',
+      year: 'fa-solid fa-grid-2',
+      list: 'fa-solid fa-table-list',
+    };
+    return `<i class="${icons[mode]} fa-sm"></i>`;
   }
 
   // ============================================
@@ -402,7 +409,7 @@ export default class CalendarRenderer {
     const name = (campaign.settings && campaign.settings.name) || 'Untitled';
     const isDraggable = core.isEditable(campaign) || campaign._virtual;
     const isRecurring = core.isRecurring(campaign);
-    const statusIcon = statusStyle.icon ? `<i class="fa-solid fa-${statusStyle.icon} fa-xs"></i>` : '';
+    const statusIcon = statusStyle.icon ? `<i class="${statusStyle.icon} fa-xs"></i>` : '';
     const typeIcon = campaign.type === 'email'
       ? '<i class="fa-solid fa-envelope fa-xs"></i>'
       : '<i class="fa-solid fa-bell fa-xs"></i>';
@@ -442,7 +449,7 @@ export default class CalendarRenderer {
     const name = (campaign.settings && campaign.settings.name) || 'Untitled';
     const isDraggable = core.isEditable(campaign) || campaign._virtual;
     const isRecurring = core.isRecurring(campaign);
-    const statusIcon = statusStyle.icon ? `<i class="fa-solid fa-${statusStyle.icon} fa-xs me-1"></i>` : '';
+    const statusIcon = statusStyle.icon ? `<i class="${statusStyle.icon} fa-xs me-1"></i>` : '';
     const recurringIcon = isRecurring ? '<i class="fa-solid fa-repeat fa-xs me-1"></i>' : '';
 
     const col = layout ? layout.col : 0;
@@ -626,7 +633,7 @@ export default class CalendarRenderer {
         const date = $slot.dataset.date;
         if (!date) { return; }
         const time = $slot.dataset.hour != null
-          ? String($slot.dataset.hour).padStart(2, '0') + ':00'
+          ? `${String($slot.dataset.hour).padStart(2, '0')}:00`
           : null;
         core.eventsManager.openCreateModal(date, time);
       });
@@ -792,7 +799,7 @@ export default class CalendarRenderer {
     const [h, m] = timeStr.split(':').map(Number);
     const period = h >= 12 ? 'p' : 'a';
     const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${display}${m > 0 ? ':' + String(m).padStart(2, '0') : ''}${period}`;
+    return `${display}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''}${period}`;
   }
 
   _formatLocalTime(sendAt) {
@@ -801,7 +808,7 @@ export default class CalendarRenderer {
     const m = d.getMinutes();
     const period = h >= 12 ? 'p' : 'a';
     const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${display}${m > 0 ? ':' + String(m).padStart(2, '0') : ''}${period}`;
+    return `${display}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''}${period}`;
   }
 }
 

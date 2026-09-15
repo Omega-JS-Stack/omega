@@ -11,14 +11,10 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const TEST_BRAND = {
   id: 'testco',
   name: 'TestCo',
-  // Deliberately different from brand.name so the footer assertions prove the parent
-  // identity is read from config rather than defaulted.
-  company: 'TestCo Holdings Inc',
   url: 'https://testco.example',
   contact: { email: 'hello@testco.example' },
   images: {
     brandmark: 'https://cdn.example.com/brandmark-1024.png',
-    companyWordmark: 'https://cdn.example.com/company-wordmark.png',
   },
   address: {
     line1: '123 Main St',
@@ -28,11 +24,22 @@ const TEST_BRAND = {
   },
 };
 
+// The RESOLVED company (#677), deliberately different from brand.name so the
+// footer assertions prove the parent identity is read from the resolved
+// section rather than defaulted.
+const TEST_COMPANY = {
+  id: 'testco-holdings',
+  name: 'TestCo Holdings Inc',
+  url: 'https://testcoholdings.example',
+  images: { wordmark: 'https://cdn.example.com/company-wordmark.png' },
+};
+
 const TEMPLATES = ['card', 'plain', 'order', 'feedback'];
 
 async function render(templateName, dataOverrides = {}) {
   const data = {
     brand: TEST_BRAND,
+    company: TEST_COMPANY,
     content: {
       title: 'Test Title',
       message: '<p>Hello <strong>world</strong></p>',

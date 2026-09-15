@@ -48,8 +48,8 @@ Nothing in the email path carries a built-in human or company identity. Every na
 |---|---|---|
 | Personal signoff (name, headshot, link) | `brand.contact.person.{name,image,url,urlText}` | `prepare.resolvePerson()` **throws 400** when `name` is unset and a `personal` signoff was requested |
 | Personal copy in email bodies ("I'm Jane, the founder…") | `brand.contact.person.firstName` | Defaults to the first word of the configured `person.name` — derived from the brand's own value, never a framework one |
-| Email footer parent entity | `brand.company` | Falls back to `brand.name` (the documented schema chain) |
-| Email footer parent wordmark | `brand.images.companyWordmark` | The wordmark block is **omitted** — never another company's logo |
+| Email footer parent entity | `company.name` (RESOLVED from `company: { id }`, [#677](https://github.com/Omega-JS-Stack/omega/issues/677)) | Falls back to `brand.name`, and a brand with no company resolves to its own name anyway |
+| Email footer parent wordmark | `company.images.wordmark` (RESOLVED from the parent's own `brand.images.wordmark`) | The wordmark block is **omitted**: never another company's logo |
 | Audit BCCs on `copy: true` sends | `brand.contact.carbonCopy` (`[{ email, name }]`) | No BCCs. A listed entry missing `email` throws 400 |
 
 `copy: true` still CCs the brand's own `brand.contact.email` — that is the brand copying itself and needs no extra config.

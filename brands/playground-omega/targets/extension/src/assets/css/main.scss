@@ -2,12 +2,17 @@
 // Theme Configuration
 // ============================================
 
+// The brand accent, generated from `brand.color` in config/omega.json5 by the
+// sass task. Deliberate divergence? Put a literal in its place below:
+//   $primary: #2563EB,      // in place of `brand.$primary`
+@use 'brand';
+
 // Customize OMEGA Extension theme variables here
 @use 'omega-extension' as * with (
   // ============================================
   // Brand Colors
   // ============================================
-  $primary: #2563EB,
+  $primary: brand.$primary,
   // $secondary: #6C757D,
 
   // ============================================
@@ -25,6 +30,11 @@
   // See theme.scss for all customizable variables
   // ============================================
 );
+
+// The runtime --omega-accent ramp, the same light and dark families the web
+// target inlines into its <head>. It goes AFTER the framework import so it wins
+// the cascade over the token sheet's placeholders.
+@include brand.ramp;
 
 // ============================================
 // Custom Global Styles

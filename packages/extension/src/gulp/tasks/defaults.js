@@ -9,7 +9,7 @@ const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
-const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -142,7 +142,7 @@ function escapeSingleQuoted(value) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
 }
 
-function siteTokenTransform(contents, item) {
+function siteTokenTransform(contents, item, composed) {
   const ext = path.extname(item.name).toLowerCase().slice(1);
   if (!TEMPLATE_EXTENSIONS.includes(ext)) {
     return contents;
@@ -166,7 +166,11 @@ function siteTokenTransform(contents, item) {
       // `KEY: ${{ secrets.KEY }}` line per key the schema delivers to the
       // extension, at the token's two-space indent. The workflow scaffolds with
       // overwrite: true, so every verb re-renders it from the current schema.
-      githubSecrets: renderSecretsBlock('extension', { indent: '  ' }),
+      // The brand's COMPOSED production values ride along
+      // ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)): they name
+      // the keys the schema cannot, which here is the consumer's own `.env`
+      // lines. NAMES only, never a value.
+      githubSecrets: renderSecretsBlock('extension', { indent: '  ', values: composed }),
     }, {
       brackets: ['[', ']'],
     }));
@@ -189,8 +193,11 @@ function scaffoldDefaults(options) {
   // monorepo the template's config must not scaffold at all (the old
   // targets-only seed kept resurrecting deleted local files on every setup).
   const fileMap = { ...FILE_MAP };
-  const { resolveSeedMode } = require('@omega.js/config');
+  const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
   const seed = resolveSeedMode(outputDir);
+  // The composed half both lanes render with (#835): the brand's PRODUCTION
+  // values, whose NAMES are the consumer's own keys the schema never declared.
+  const { values: composed } = composeTargetEnv({ targetDir: outputDir, target: 'extension', environment: 'production' });
   if (!seed.standalone) {
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
@@ -213,7 +220,15 @@ function scaffoldDefaults(options) {
     outputDir,
     files: options.files || null,
     fileMap,
-    transform: siteTokenTransform,
+    // The workspace flag is devkit's, rendered wherever a workflow is WRITTEN
+    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872),
+    // [#898](https://github.com/Omega-JS-Stack/omega/issues/898)): this pass
+    // writes a STANDALONE target's own copy, which is its own repo root and
+    // declares no workspaces, so the token renders to nothing. The brand-root
+    // copy gets the flag inside composeWorkflow below, which is why this
+    // render sits HERE and not in siteTokenTransform, the transform both lanes
+    // share.
+    transform: (contents, item) => renderInstallWorkspace(siteTokenTransform(contents, item, composed)),
     logger,
   });
 
@@ -222,7 +237,7 @@ function scaffoldDefaults(options) {
       sourceDir: path.join(rootPathPackage, 'dist', 'defaults', '.github', 'workflows'),
       targetDir: outputDir,
       brandRoot: seed.brandRoot,
-      transform: (contents, name) => siteTokenTransform(contents, { name }),
+      transform: (contents, name) => siteTokenTransform(contents, { name }, composed),
       logger: workflowLogger,
     });
   }

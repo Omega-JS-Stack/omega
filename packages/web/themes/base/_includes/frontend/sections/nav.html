@@ -1,4 +1,6 @@
 {% comment %} Section data: json-in-_includes (a consumer src/_includes/frontend/sections/nav.json overrides the packaged one) — same binding pattern as admin/sections/sidebar {% endcomment %}
+{% comment %} A link's `icon` carries its OWN Font Awesome classes (#619, #850, #903): `icon: 'fa-brands fa-github'`.
+  Every icon site below emits that string verbatim and adds only its size and spacing. {% endcomment %}
 {% assign data = site.data._includes.frontend.sections.nav %}
 
 <!-- Shared base marketing nav: transparent over the hero, glassy after scroll.
@@ -60,7 +62,7 @@
                 <button class="{{ link_class }}" type="button" data-bs-toggle="dropdown" {{ link_attributes }}>
                   <span class="d-inline-flex align-items-center">
                     {% if link.icon %}
-                      <i class="fa-solid fa-{{ link.icon }} fa-sm me-2"></i>
+                      <i class="{{ link.icon }} fa-sm me-2" aria-hidden="true"></i>
                     {% endif %}
                     <span>{{ link.label }}</span>
                   </span>
@@ -73,7 +75,7 @@
                     {% capture child_content %}
                       <span class="d-inline-flex align-items-center">
                         {% if child.icon %}
-                          <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
+                          <i class="{{ child.icon }} fa-sm me-2" aria-hidden="true"></i>
                         {% endif %}
                         <span>{{ child.label }}</span>
                       </span>
@@ -105,7 +107,7 @@
               {% capture link_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if link.icon %}
-                    <i class="fa-solid fa-{{ link.icon }} fa-sm me-2"></i>
+                    <i class="{{ link.icon }} fa-sm me-2" aria-hidden="true"></i>
                   {% endif %}
                   <span>{{ link.label }}</span>
                 </span>
@@ -140,7 +142,7 @@
                 <button class="{{ action_class }}" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
                   <span class="d-inline-flex align-items-center">
                     {% if action.icon %}
-                      <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+                      <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
                     {% endif %}
                     <span>{{ action.label }}</span>
                   </span>
@@ -153,7 +155,7 @@
                     {% capture child_content %}
                       <span class="d-inline-flex align-items-center">
                         {% if child.icon %}
-                          <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
+                          <i class="{{ child.icon }} fa-sm me-2" aria-hidden="true"></i>
                         {% endif %}
                         <span>{{ child.label }}</span>
                       </span>
@@ -184,7 +186,7 @@
               {% capture action_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if action.icon %}
-                    <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+                    <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
                   {% endif %}
                   <span>{{ action.label }}</span>
                 </span>
@@ -212,7 +214,7 @@
               {% capture action_content %}
                 <span class="d-inline-flex align-items-center">
                   {% if action.icon %}
-                    <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+                    <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
                   {% endif %}
                   <span>{{ action.label }}</span>
                 </span>
@@ -230,7 +232,7 @@
                       {% capture child_content %}
                         <span class="d-inline-flex align-items-center">
                           {% if child.icon %}
-                            <i class="fa-solid fa-{{ child.icon }} fa-sm me-2"></i>
+                            <i class="{{ child.icon }} fa-sm me-2" aria-hidden="true"></i>
                           {% endif %}
                           <span>{{ child.label }}</span>
                         </span>

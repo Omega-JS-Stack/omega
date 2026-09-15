@@ -14,14 +14,13 @@
 // discovery, the browser syntax floor, the asset/theme aliases, the Node-builtin
 // shim, the `%%%key%%%` substitution, and the OMEGA_BUILD_JSON bake.
 //
-// The bake ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)) is
-// @omega.js/desktop's, key for key: `define` replaces the bare identifier at
-// compile time and `banner` prepends the global assignment, so every emitted
-// bundle carries its own copy. package.js used to write the snapshot as a
-// `packaged/<target>/raw/build.js` JSONP file (plus a `build.json` sidecar
-// nothing read) that the service worker importScripts()'d and every page loaded
-// with its own <script> tag — one baked config, two techniques on sibling
-// frameworks. Neither file is written any more.
+// The bake ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)) is ONE
+// file: @omega.js/devkit composes the snapshot and writes `dist/build.js`, the
+// page template loads it with one script tag and background.js with one
+// importScripts line, and package.js copies it into every packaged raw dir with
+// the rest of dist. It rode in every bundle as a `define` plus a `banner` for a
+// while, which put one config into 21 files; one file, one shape and one
+// consumption is what every OMEGA browser surface does now (Ian 2026-09-12).
 //
 // ONE call covers every lane. webpack needed three configs because code
 // SPLITTING had to be switched off per lane (a service worker and a content
@@ -42,14 +41,14 @@ const version = require('wonderful-version');
 const { bundle, formatBytes } = require('@omega.js/devkit/bundle');
 const { emptyModulesPlugin } = require('@omega.js/devkit/empty-modules-plugin');
 const { resolveThemeId } = require('../../lib/theme.js');
-const { readSiblingPorts, envPorts } = require('@omega.js/config');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, envPorts, clientConfig, targetNameFromDir } = require('@omega.js/config');
 const { bakeKeys } = require('@omega.js/config/env-delivery');
 const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
+const buildJsonKit = require('@omega.js/devkit/build-json');
 
 // Load package
 const project = Manager.getPackage('project');
-const frameworkPackage = Manager.getPackage('main');
 const manifest = Manager.getManifest();
 const config = Manager.getConfig();
 const rootPathPackage = Manager.getRootPath('main');
@@ -177,9 +176,12 @@ async function runBundle() {
     return null;
   }
 
-  // OMEGA_BUILD_JSON — frozen at build time and carried by EVERY emitted bundle,
-  // the service worker and the pages alike ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
+  // OMEGA_BUILD_JSON: frozen at build time and written ONCE, as `dist/build.js`
+  // at the extension's own root: the page template loads it with a script tag,
+  // background.js with importScripts, and package.js copies it into every
+  // packaged raw dir ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
   const buildJson = await composeBuildJson();
+  buildJsonKit.writeBuildJs(path.resolve(process.cwd(), 'dist'), buildJson);
 
   const result = await bundle({
     frameworkRoot: rootPathPackage,
@@ -203,8 +205,7 @@ async function runBundle() {
       // For importing the theme
       '__theme__': path.resolve(themesDir, themeId),
     },
-    define: buildJsonDefines(buildJson),
-    banner: buildJsonBanner(buildJson),
+    define: bundleDefines(),
     plugins: [emptyModulesPlugin(BROWSER_EMPTY_MODULES)],
   });
 
@@ -252,165 +253,112 @@ function substituteTemplates(files, replacements) {
   return changed;
 }
 
-// The blob every bundle reads as `OMEGA_BUILD_JSON.config` — and the ONLY thing
-// the extension contexts hand @omega.js/client. An extension page and a service
-// worker have no env and no filesystem walk of their own, so the bake is their
-// one channel; it lived in package.js as a `build.js` JSONP file the SW
-// importScripts()'d and every page loaded with its own <script> tag until
-// [#743](https://github.com/Omega-JS-Stack/omega/issues/743) moved it into the
-// bundles themselves, the shape @omega.js/desktop has always used.
-function composeBuildConfig() {
-  // omega.json5 `monitoring.providers.sentry` → the client's sentry contract
-  // (#425). The provider block feeds Sentry.init directly; the role level
-  // (`enabled`) never rides along.
-  const sentryConfig = { ...(config.monitoring?.providers?.sentry || {}) };
+// The build FACTS that ride on the resolved config, the input half of the ONE
+// snapshot an extension context reads. An extension page and a service worker
+// have no env and no filesystem walk of their own, so `dist/build.js` is their
+// one channel; WHAT of the config goes in is @omega.js/config's call
+// (clientConfig, off the schema's own `client` flag), and the wrapper around it
+// is @omega.js/devkit's ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
+function buildFacts() {
+  const environment = Manager.getEnvironment();
 
   // The live sibling website's published origin, or null when none is up (#262)
   const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
 
-  // The Measurement Protocol secret (.env — secrets never live in omega.json5).
-  const googleAnalyticsId = config.analytics?.providers?.google?.id || '';
-  const googleAnalyticsSecret = readBakedEnv(process.env, { config }).GOOGLE_ANALYTICS_SECRET;
+  // The local stack's resolved facts (N7): the sibling backend's published map
+  // plus anything a parent injected on the env channel, the sibling WEBSITE's
+  // published origin ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)),
+  // and the live-reload port the serve task allocated, resolved per build so a
+  // rebuild follows a restarted emulator
+  // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). Production
+  // packages carry none: there is no local stack to reach. A key present is a
+  // resolved fact; absent, @omega.js/client assumes the classic and warns, so
+  // an unpublished origin ships no origin at all.
+  const dev = environment === 'production' ? null : {
+    // The classic map is the FLOOR, from @omega.js/config, the one place the
+    // numbers are defined ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
+    // A live stack's resolved (possibly bumped) numbers land on top of it, so a
+    // dev artifact always carries a COMPLETE map and no browser-side code needs
+    // a second copy of the defaults to fall back to. Same floor under the
+    // origin: the classic one is `omega dev`'s own default, and a live
+    // website's published origin wins over it.
+    ports: { ...CLASSIC_PORTS, ...readSiblingPorts(rootPathProject), ...envPorts() },
+    origin: devWebsiteOrigin || CLASSIC_DEV_ORIGIN,
+    // A local-stack number like every other one here, so it rides the local
+    // stack's own map and never a second legacy fact beside it
+    // ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)).
+    liveReloadPort: config.liveReloadPort || Manager.getLiveReloadPort(),
+  };
 
   return {
-    // Core metadata
+    // The build facts, spelled the way desktop and web spell them
     runtime: 'browser-extension',
+    environment,
     version: project.version,
-    environment: Manager.getEnvironment(),
     buildTime: Date.now(),
-
-    // Brand configuration (from config/omega.json5 or manifest)
-    brand: config.brand || {},
-
-    // The local stack's resolved facts (N7). An extension context has no
-    // env and no filesystem, so this bake is its ONLY channel: the sibling
-    // backend's published map plus anything a parent injected on the env
-    // channel, and the sibling WEBSITE's published origin
-    // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)) —
-    // resolved per build so a rebuild follows a restarted emulator
-    // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
-    // Production packages carry none — there is no local stack to reach.
-    // A key present is a resolved fact; absent, @omega.js/client assumes the
-    // classic and warns — so an unpublished origin ships no origin at all.
-    ...(Manager.getEnvironment() === 'production'
-      ? {}
-      : { dev: {
-        ports: { ...readSiblingPorts(rootPathProject), ...envPorts() },
-        ...(devWebsiteOrigin ? { origin: devWebsiteOrigin } : {}),
-      } }),
-
-    // Cloud (firebase) config in the CANONICAL `cloud.config` shape —
-    // what @omega.js/client prefers and the only shape background.js
-    // reads. Without it the SW's Firebase auth never initializes (#46).
-    cloud: config.cloud || {},
-
-    // OMEGA build metadata
-    omega: {
-      environment: Manager.getEnvironment(),
-      cache_breaker: Math.round(new Date().getTime() / 1000),
-      // Resolved at serve time (N7) — the getter reads the allocator's
-      // OMEGA_LIVERELOAD_PORT, so a bumped server and the baked client
-      // agree. Packaged (non-serve) builds bake the classic default.
-      liveReloadPort: config.liveReloadPort || Manager.getLiveReloadPort(),
-    },
-
-    // Web-manager features (matching expected structure)
-    auth: { enabled: true, config: {} },
-
-    firebase: {
-      app: {
-        enabled: !!(config.cloud?.config?.apiKey),
-        config: config.cloud?.config || {},
-      },
-      appCheck: { enabled: false, config: {} },
-    },
-
-    consent: { enabled: true, config: {} },
-    inbound: (() => {
-      // Curated to the leaves the client runtime reads (#23) — the provisioning-only
-      // siblings (template ids, plan, update flags) never ship in the bundle
-      const chatsy = config.inbound?.chat?.providers?.chatsy;
-      return { chat: { providers: { chatsy: chatsy
-        ? { enabled: chatsy.enabled, agentId: chatsy.agentId, settings: chatsy.settings }
-        : { enabled: false } } } };
-    })(),
-    sentry: {
-      enabled: !!(sentryConfig.dsn),
-      config: sentryConfig,
-    },
-    exitPopup: { enabled: false, config: {} },
-    lazyLoading: { enabled: true, config: {} },
-    socialSharing: { enabled: false, config: {} },
-    pushNotifications: { enabled: false, config: {} },
-    validRedirectHosts: [],
-    refreshNewVersion: { enabled: true, config: {} },
-    serviceWorker: { enabled: false, config: {} },
-
-    // Analytics (canonical providers shape — C4 cp106a). The Measurement
-    // Protocol API secret comes from .env (GOOGLE_ANALYTICS_SECRET —
-    // matches @omega.js/backend/EM convention; secrets never live in
-    // omega.json5) and is baked into the snapshot here at build time.
-    analytics: {
-      providers: {
-        google: {
-          id: googleAnalyticsId,
-          secret: googleAnalyticsSecret,
-        },
-      },
-    },
-
-    // Theme config
-    theme: config.theme || {},
-
-    // Advertising (ads-system phase 4) — feeds the client verts module's
-    // house/company lane (extension surfaces never run AdSense; lib/verts.js
-    // pins the house type). company carries the parent's url so the
-    // inhouse source 'company' can resolve.
-    advertising: config.advertising || {},
-    company: config.company || {},
+    // WHICH target this artifact IS, by name (#887)
+    target: targetNameFromDir(rootPathProject) || 'extension',
+    ...(dev ? { dev } : {}),
   };
 }
 
-// OMEGA_BUILD_JSON itself — the build's own record of what it produced. The
-// `license` stamp ([#320](https://github.com/Omega-JS-Stack/omega/issues/320))
-// rides HERE and not inside `config`: it is a fact about the BUILD, not part of
-// the client contract the extension contexts hand @omega.js/client. A packaged
+/**
+ * The Measurement Protocol API secret, the ONE .env value sanctioned into a
+ * browser artifact (`publicAtRest`, #626): the service worker sends GA4 events
+ * itself, and a packaged extension ships no .env. It is added AFTER the subset
+ * gate, which refuses secret-shaped keys outright, and only when the build env
+ * carries it.
+ * @param {object} client - the composed `OMEGA_BUILD_JSON.config`, mutated in place.
+ */
+function bakeAnalyticsSecret(client) {
+  const googleAnalyticsSecret = readBakedEnv(process.env, { config }).GOOGLE_ANALYTICS_SECRET;
+  if (!googleAnalyticsSecret) return;
+
+  const providers = client.analytics?.providers || {};
+  client.analytics = {
+    ...client.analytics,
+    providers: { ...providers, google: { ...providers.google, secret: googleAnalyticsSecret } },
+  };
+}
+
+// OMEGA_BUILD_JSON itself: the build's own record of what it produced, in the
+// ONE wrapper every browser surface carries (#894):
+// `{ config, package, mode, license, builtAt }`. The `license` stamp
+// ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)) rides HERE and
+// not inside `config`, because it is a fact about the BUILD, not part of the
+// client contract the extension contexts hand @omega.js/client. A packaged
 // extension has no attribution surface and its payments ride the backend's own
-// gate — this is the artifact's record of what it was packaged as.
+// gate: this is the artifact's record of what it was packaged as.
 async function composeBuildJson() {
   // Resolved ONCE per build: a PRODUCTION build asks the license server (a key
   // that cannot be answered THROWS, which is what gates a bad-key publish), and
-  // a dev build is keyless by definition and never phones home. It used to be
-  // memoized because packageRaw ran per browser target; one bundle pass bakes
-  // the one snapshot every target then copies, so one call is the whole run.
+  // a dev build is keyless by definition and never phones home.
   const license = await resolveLicenseStamp({ config, production: Manager.getEnvironment() === 'production' });
 
   // The verdict a run built under, said ONCE — web/backend/desktop all print theirs.
   logger.log(`bundling — environment=${Manager.getEnvironment()}, license=${license.status}`);
 
-  return {
-    timestamp: new Date().toISOString(),
-    repo: getGitInfo(),
-    environment: Manager.getEnvironment(),
+  const buildJson = buildJsonKit.composeBuildJson({
+    config,
+    pkg: project,
+    mode: Manager.getMode(),
     license,
-    packages: {
-      [frameworkPackage.name]: frameworkPackage.version,
-      '@omega.js/client': getPackageVersion('@omega.js/client'),
-    },
-    config: composeBuildConfig(),
-  };
+    facts: buildFacts(),
+  });
+
+  bakeAnalyticsSecret(buildJson.config);
+
+  return buildJson;
 }
 
 /**
- * The compile-time replacement: a bare `OMEGA_BUILD_JSON` identifier becomes the
- * literal, so framework and consumer code can reference the snapshot without
- * reaching for a global.
- * @param {object} buildJson - The blob every bundle bakes.
+ * The compile-time replacements every bundle carries. OMEGA_BUILD_JSON is NOT
+ * one of them any more (#743): the snapshot is `dist/build.js`, loaded once per
+ * context, and framework and consumer code reads it off `self`.
  * @returns {object} an esbuild define map
  */
-function buildJsonDefines(buildJson) {
+function bundleDefines() {
   return {
-    OMEGA_BUILD_JSON: JSON.stringify(buildJson),
     // webpack derived this from its `mode`; esbuild has no modes, so the
     // switch every bundled library reads is stated here instead. Dropping it
     // would ship every library's DEVELOPMENT branch to a store.
@@ -418,23 +366,6 @@ function buildJsonDefines(buildJson) {
     // Libraries like lodash/@firebase/util reference the Node-ism `global`;
     // a browser bundle leaves it undefined, so it is rewritten textually.
     global: 'globalThis',
-  };
-}
-
-/**
- * The global assignment every bundle carries, prepended ahead of its own code so
- * the snapshot is there before anything reads it — the load order the SW's
- * `importScripts('/build.js')` and the page template's `<script src="/build.js">`
- * used to buy. All three scopes are assigned because all three are read:
- * `serviceWorker.OMEGA_BUILD_JSON` in background.js, `window.OMEGA_BUILD_JSON`
- * in every page context, and `globalThis` from DevTools and consumer code.
- * @param {object} buildJson - The blob every bundle bakes.
- * @returns {object} an esbuild banner
- */
-function buildJsonBanner(buildJson) {
-  const literal = JSON.stringify(buildJson);
-  return {
-    js: `(function(){var __omegaBuildJson=${literal};if(typeof globalThis!=='undefined'){globalThis.OMEGA_BUILD_JSON=__omegaBuildJson;}if(typeof self!=='undefined'){self.OMEGA_BUILD_JSON=__omegaBuildJson;}if(typeof window!=='undefined'){window.OMEGA_BUILD_JSON=__omegaBuildJson;}})();`,
   };
 }
 
@@ -503,34 +434,6 @@ function readBakedEnv(env, options) {
   }
 
   return Object.fromEntries(BAKED_KEYS.map((key) => [key, env[key] || '']));
-}
-
-// Get git info
-function getGitInfo() {
-  try {
-    const { execSync } = require('child_process');
-    const user = execSync('git config user.name', { encoding: 'utf8' }).trim();
-    const repo = execSync('git config --get remote.origin.url', { encoding: 'utf8' })
-      .trim()
-      .replace(/.*[\/:]([\w-]+)\/([\w-]+)(\.git)?$/, '$2');
-
-    return { user, name: repo };
-  } catch (e) {
-    return { user: 'unknown', name: 'unknown' };
-  }
-}
-
-// Get package version
-function getPackageVersion(packageName) {
-  try {
-    const pkgPath = require.resolve(`${packageName}/package.json`, {
-      paths: [process.cwd()]
-    });
-    const pkg = require(pkgPath);
-    return pkg.version;
-  } catch (e) {
-    return 'unknown';
-  }
 }
 
 // Task
@@ -675,13 +578,12 @@ module.exports.substituteTemplates = substituteTemplates;
 module.exports.getTemplateReplaceOptions = getTemplateReplaceOptions;
 // The OMEGA_BUILD_JSON bake (#743) — pinned by
 // src/test/suites/build/build-json-bake.test.js and auth-emulator-gate.test.js.
-// `bundleTask` is exported so that suite can drive the REAL build and read the
-// bake back out of the files it emitted, rather than a stand-in esbuild call.
+// `bundleTask` is exported so that suite can drive the REAL build and read
+// dist/build.js back out of what it emitted, rather than a stand-in esbuild call.
 module.exports.bundleTask = bundleTask;
-module.exports.composeBuildConfig = composeBuildConfig;
+module.exports.buildFacts = buildFacts;
 module.exports.composeBuildJson = composeBuildJson;
-module.exports.buildJsonDefines = buildJsonDefines;
-module.exports.buildJsonBanner = buildJsonBanner;
+module.exports.bundleDefines = bundleDefines;
 // The schema-derived bake set and its reader (#627).
 module.exports.BAKED_KEYS = BAKED_KEYS;
 module.exports.readBakedEnv = readBakedEnv;

@@ -22,13 +22,15 @@ module.exports = defineCases({
     {
       name: 'the stamp rides the build blob, never the client config',
       run: (ctx) => {
-        const { composeBuildJson } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'));
+        const { composeBuildJson, buildFacts } = require(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'));
 
+        const pkg = { version: '3.1.4' };
+        const mode = { environment: 'production', build: true, publish: false };
         const buildJson = composeBuildJson({
           config: { brand: { id: 'paperloom' } },
-          dev: null,
-          pkg: { version: '3.1.4' },
-          mode: { environment: 'production' },
+          facts: buildFacts({ pkg, mode, dev: null }),
+          pkg,
+          mode,
           license: { status: 'licensed', payments: 'live', attribution: 'removed' },
         });
 

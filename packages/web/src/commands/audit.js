@@ -131,7 +131,7 @@ module.exports = async function (options) {
 
 /**
  * The armed thresholds: `--min-<category>` for each Lighthouse category, in
- * both the dashed and yargs' camelized form. An absent flag leaves its
+ * both the dashed and the camelized form the parse mints. An absent flag leaves its
  * category ungated (report-only is the default, legacy UJM parity).
  * @param {object} options - the parsed CLI options
  * @returns {Object<string, number>} category id → minimum score
@@ -160,7 +160,7 @@ function parseThresholds(options) {
 }
 
 /**
- * The perceived-usability bar: `--max-lcp=<ms>` in both the dashed and yargs'
+ * The perceived-usability bar: `--max-lcp=<ms>` in both the dashed and the
  * camelized form, null when the flag is absent (report-only, same default as
  * the category thresholds). Ian's bar is 1s to usable (#467).
  * @param {object} options - the parsed CLI options

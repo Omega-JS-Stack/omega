@@ -14,14 +14,23 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const reads = require('@omega.js/devkit/reads');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { createDecisions } = require('../src/decisions.js');
 
 // A consumer tree ({ 'relative/path': contents }) inside an open capture scope
 // — the shape configureOmega builds these in.
+//
+// The lane NAMES the environment (#817): `omega build` names production for the
+// whole process and `omega dev` names development, so the collision gate reads
+// the one input rather than a loose `options.environment` of its own.
 function consumer(t, files, options) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-decisions-')));
+  const savedEnvironment = process.env.OMEGA_ENVIRONMENT;
+  setEnvironment((options && options.environment) || 'development');
   t.after(() => {
     reads.closeScope();
+    if (savedEnvironment === undefined) delete process.env.OMEGA_ENVIRONMENT;
+    else process.env.OMEGA_ENVIRONMENT = savedEnvironment;
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -36,7 +45,6 @@ function consumer(t, files, options) {
   const decisions = createDecisions({
     consumerDir: root,
     collectionDirs: ['_posts'],
-    environment: (options && options.environment) || 'development',
     log: (message) => logged.push(message),
   });
   return { root, decisions, logged, write: (rel, contents) => {

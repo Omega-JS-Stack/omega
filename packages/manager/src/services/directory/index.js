@@ -16,8 +16,9 @@
  *      declares the collection world-readable in its own rules (the operator
  *      step in docs/manager/directory.md), so participation is explicit or
  *      nothing.
- *   2. `parent` names the relationship. No parent (or `parent: false`) means
- *      there is no directory to push INTO.
+ *   2. `company: { id }` names the relationship (#677): a standalone brand has
+ *      no directory to push INTO. The company brand itself (`id: 'self'`) does
+ *      participate, in its own directory.
  *   3. Not a demo-* (emulator-only) brand — the cloud service's gate, for the
  *      same reason: an offline fixture must never reach a live project.
  *
@@ -40,8 +41,8 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'directory.enabled is not true (the brand does not participate in a directory)' };
     }
 
-    if (!brandConfig.parent) {
-      return { skip: true, reason: 'no parent configured — there is no parent directory to push into' };
+    if (!brandConfig.company?.id) {
+      return { skip: true, reason: 'the brand names no company (#677): there is no parent directory to push into' };
     }
 
     const projectId = brandConfig.cloud?.config?.projectId;

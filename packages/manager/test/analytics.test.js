@@ -83,12 +83,12 @@ const FIXTURE_CONFIG = `{
   // Fixture Brand — analytics writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   cloud: { config: { projectId: 'fixture-proj' } },
-  targets: { web: {}, backend: {} },
+  targets: { web: { type: 'web' }, backend: { type: 'backend' } },
 }
 `;
 
 function brandConfig({
-  url = `https://${DOMAIN}`, targets = { web: {}, backend: {} }, google = true,
+  url = `https://${DOMAIN}`, targets = { web: { type: 'web' }, backend: { type: 'backend' } }, google = true,
   metaId = null, tiktokId = null, metaAccount = null, tiktokAccount = null,
   metaDisabled = false, firebase = true,
 } = {}) {
@@ -294,13 +294,50 @@ test('analytics: missing streams are created with the per-target URI and display
   assert.equal(api.callsTo('updateDataStream').length, 0);
 });
 
+test('analytics: streams follow the NAMES a brand declares, typed by their own type (#886)', async () => {
+  let nextId = 300;
+  const api = fakeAnalytics({
+    ...convergedResponses(),
+    listDataStreams: [],
+    listFirebaseLinks: [{ name: `properties/${PROPERTY}/firebaseLinks/fl1`, project: `projects/${PROJECT}` }],
+    createWebDataStream: (propertyId, { defaultUri, displayName }) => ({
+      name: `properties/${PROPERTY}/dataStreams/${++nextId}`,
+      type: 'WEB_DATA_STREAM',
+      displayName,
+      webStreamData: { defaultUri, measurementId: `G-NEW${nextId}` },
+    }),
+  });
+
+  const config = brandConfig({
+    targets: {
+      web: { type: 'web' },
+      community: { type: 'web' },
+      api: { type: 'backend' },
+    },
+  });
+  const result = await runService(config, { analytics: api });
+
+  const creates = api.callsTo('createWebDataStream').map((call) => call.args[1]);
+  assert.deepEqual(creates, [
+    // The type-named web target is the brand url; the second web target is its
+    // own subdomain, resolved by targetUrl, never a second root-domain stream
+    { defaultUri: `https://${DOMAIN}`, displayName: 'Fixture Brand - Website' },
+    { defaultUri: `https://community.${DOMAIN}`, displayName: 'Fixture Brand - Website' },
+    // A backend NAMED api keeps the backend's virtual subdomain + display name
+    { defaultUri: `https://api.${DOMAIN}`, displayName: 'Fixture Brand - Backend' },
+  ]);
+
+  // Everything downstream is keyed by the NAME the brand declared
+  assert.deepEqual(Object.keys(result.output.streams.resolved), ['web', 'community', 'api']);
+});
+
 // ─── Measurement id → config (#417) ──────────────────────────────────────────
 // Before this, stream ids only ever reached .omega/state.json, so a brand's
 // configured `analytics.providers.google.id` stayed null (the playground's
 // still was, months after its property was created) and each target's
 // Measurement Protocol secret had no stream id of its own to pair with.
 
-test('analytics: each target measurement id lands in targets.<type>.analytics.providers.google.id', async () => {
+test('analytics: each target measurement id lands in targets.<name>.analytics.providers.google.id', async () => {
   const brandRoot = makeBrandRoot(FIXTURE_CONFIG);
   const api = fakeAnalytics(convergedResponses());
 
@@ -309,8 +346,9 @@ test('analytics: each target measurement id lands in targets.<type>.analytics.pr
   const written = readConfigSource(brandRoot);
   assert.match(written, /targets:[\s\S]*web:[\s\S]*analytics:[\s\S]*google:[\s\S]*id: "G-WEB1"/);
   assert.match(written, /backend:[\s\S]*analytics:[\s\S]*google:[\s\S]*id: "G-BACK1"/);
-  // The per-surface override never touches the shared block
-  assert.ok(!written.includes('providers: { google: { id:'), 'shared analytics block untouched');
+  // The per-surface override never touches the shared block: nothing lands at
+  // the config's TOP level, only inside each target's entry
+  assert.doesNotMatch(written, /^ {2}analytics:/m, 'shared analytics block untouched');
   assert.ok(written.includes('// Fixture Brand — analytics writeback target'), 'comments survive');
 });
 
@@ -322,8 +360,8 @@ test('analytics: a config already carrying the measurement ids is left byte-iden
   const landed = readConfigSource(brandRoot);
   const config = brandConfig();
   config.targets = {
-    web: { analytics: { providers: { google: { id: 'G-WEB1' } } } },
-    backend: { analytics: { providers: { google: { id: 'G-BACK1' } } } },
+    web: { type: 'web', analytics: { providers: { google: { id: 'G-WEB1' } } } },
+    backend: { type: 'backend', analytics: { providers: { google: { id: 'G-BACK1' } } } },
   };
 
   const second = fakeAnalytics(convergedResponses());
@@ -342,7 +380,7 @@ test('analytics: displayName drift renames the stream without creating', async (
     updateDataStream: {},
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -363,7 +401,7 @@ test('analytics: enhanced measurement is patched only on drift (omega-manager pa
     updateEnhancedMeasurementSettings: {},
   });
 
-  await runService(brandConfig({ targets: { web: {} } }), {
+  await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -390,7 +428,7 @@ test('analytics: an unclean secret is regenerated until clean', async () => {
   });
 
   const brandRoot = makeBrandRoot(FIXTURE_CONFIG);
-  await runService(brandConfig({ targets: { web: {} } }), { analytics: api, brandRoot });
+  await runService(brandConfig({ targets: { web: { type: 'web' } } }), { analytics: api, brandRoot });
 
   // Original unclean + first regeneration deleted; two creates until clean
   assert.equal(api.callsTo('deleteMeasurementProtocolSecret').length, 2);
@@ -410,7 +448,7 @@ test('analytics: the data-collection acknowledgement gate warns instead of faili
   });
 
   const brandRoot = makeBrandRoot(FIXTURE_CONFIG);
-  const result = await runService(brandConfig({ targets: { web: {} } }), { analytics: api, brandRoot });
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), { analytics: api, brandRoot });
 
   assert.equal(result.status, 'warned');
   assert.equal(readEnv(brandRoot), ''); // no secret resolved, nothing written
@@ -438,7 +476,7 @@ test('analytics: interactive acknowledgement — Enter-gated open, retry poll la
   const tty = openTtyPrompt();
   const brandRoot = makeBrandRoot(FIXTURE_CONFIG);
   try {
-    const run = runService(brandConfig({ targets: { web: {} }, metaDisabled: true }), {
+    const run = runService(brandConfig({ targets: { web: { type: 'web' } }, metaDisabled: true }), {
       analytics: api, brandRoot,
       });
 
@@ -456,7 +494,7 @@ test('analytics: interactive acknowledgement — Enter-gated open, retry poll la
 });
 
 test('analytics: firebase-link derives the project from cloud.config — its ONE home (#23)', async () => {
-  const config = brandConfig({ targets: { web: {} } });
+  const config = brandConfig({ targets: { web: { type: 'web' } } });
   // BOTH halves come from cloud.config now: the id, and the project NUMBER
   // the link may reference instead (#434 moved it off state)
   config.cloud = { provider: 'firebase', config: { projectId: PROJECT, ...FIREBASE_SDK_CONFIG } };
@@ -476,7 +514,7 @@ test('analytics: a configured propertyId that does not exist warns', async () =>
     listDataStreams: [FIREBASE_STREAM],
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -491,7 +529,7 @@ test('analytics: firebase measurementId missing from the property warns of a cro
     listDataStreams: [WEB_STREAM],
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -514,7 +552,7 @@ test('analytics: a link on the wrong property is moved to the configured one', a
     createFirebaseLink: { name: `properties/${PROPERTY}/firebaseLinks/fl2` },
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -552,7 +590,7 @@ test('analytics: the create waits out GA\'s hold on the just-deleted link and li
 
   const tty = openTtyPrompt();
   try {
-    const run = runService(brandConfig({ targets: { web: {} }, metaDisabled: true }), { analytics: api });
+    const run = runService(brandConfig({ targets: { web: { type: 'web' } }, metaDisabled: true }), { analytics: api });
 
     await tty.answer('(enter)=check now, (s)=skip', '\r');
     const result = await run;
@@ -582,7 +620,7 @@ test('analytics: skipping the link wait warns with the reason the summary prints
 
   const tty = openTtyPrompt();
   try {
-    const run = runService(brandConfig({ targets: { web: {} }, metaDisabled: true }), { analytics: api });
+    const run = runService(brandConfig({ targets: { web: { type: 'web' } }, metaDisabled: true }), { analytics: api });
 
     await tty.answer('(enter)=check now, (s)=skip', 's');
     const result = await run;
@@ -601,7 +639,7 @@ test('analytics: a property linked to a DIFFERENT firebase project warns (not ou
     listFirebaseLinks: [{ name: `properties/${PROPERTY}/firebaseLinks/fl3`, project: 'projects/someone-elses-project' }],
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 
@@ -624,7 +662,7 @@ test('analytics: the Firebase auto-stream ("Web App", no URI) is normalized afte
     updateDataStream: {},
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), {
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), {
     analytics: api,
   });
 

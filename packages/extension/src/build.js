@@ -3,9 +3,10 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const fs = require('fs');
 const JSON5 = require('json5');
-const argv = require('yargs')(process.argv.slice(2)).parseSync();
+const { parseArgv } = require('@omega.js/devkit/argv');
 const { spawn } = require('child_process');
 const { force } = require('node-powertools');
+const { setEnvironment, buildLaneEnvironment } = require('@omega.js/config/environment');
 
 // Class
 function Manager() {
@@ -39,12 +40,12 @@ Manager.prototype.logger = function (name) {
   return this._logger;
 };
 
-// argv
+// argv: the gulp lane's own parse. `--debug` is value-less; `--browser
+// chrome,firefox` carries its value by the parse's own rule.
 Manager.getArguments = function () {
-  const options = argv || {};
+  const options = parseArgv(process.argv.slice(2), { booleans: ['debug'] });
 
   // Fix
-  options._ = options._ || [];
   // browser can be: true (all), false (none), or a string like 'chrome' or 'chrome,firefox'
   options.browser = options.browser === undefined ? true : options.browser;
   options.debug = force(options.debug === undefined ? false : options.debug, 'boolean');
@@ -110,14 +111,40 @@ Manager.isBuildMode = function () {
 }
 Manager.prototype.isBuildMode = Manager.isBuildMode;
 
+// getMode: the build's own verdict, in the shape every OMEGA framework's
+// OMEGA_BUILD_JSON wrapper records it under `mode`
+// ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
+Manager.getMode = function () {
+  return {
+    build:   Manager.isBuildMode(),
+    publish: process.env.OMEGA_IS_PUBLISH === 'true',
+    environment: Manager.getEnvironment(),
+  };
+}
+Manager.prototype.getMode = Manager.getMode;
+
 // actLikeProduction - determines if we should act like production mode
 Manager.actLikeProduction = function () {
   return Boolean(Manager.isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
 }
 Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
-// getEnvironment() is the SSOT and lives in src/utils/mode-helpers.js (alongside the is*()
-// family). It's mixed onto the Manager via the attachTo() call below, same as in EM/UJM.
+// The environment is the ONE module's (@omega.js/config's environment.js,
+// [#817](https://github.com/Omega-JS-Stack/omega/issues/817)), mixed onto the
+// Manager via the attachTo() call below alongside the is*() family, exactly as
+// @omega.js/desktop and @omega.js/web reach it. It reads ONE input and never
+// guesses.
+//
+// THIS FILE IS THE BUILD LANE'S ONE SETTER, and it runs at load, before any
+// gulp task, verb or getConfig() asks. Two rules, no sniffing:
+//   1. OMEGA_BUILD_MODE is the lane saying it is producing a PRODUCTION
+//      artifact (`omega build` sets it). It WINS over an inherited variable, so
+//      a production build spawned from a test run still bakes production.
+//   2. Otherwise a lane that already named one keeps it (the test command names
+//      `testing`), and a bare dev boot is `development`.
+// The word set here is baked into every bundle as `config.environment`, which
+// is what an extension context (no process.env) answers from.
+setEnvironment(buildLaneEnvironment(Manager.isBuildMode()));
 
 // getManifest: requires and parses config.yml
 Manager.getManifest = function () {
@@ -132,6 +159,16 @@ Manager.prototype.getManifest = Manager.getManifest;
 Manager.getConfig = function () {
   const { hasOmegaConfig, loadConfig, formatErrors } = require('@omega.js/config');
 
+  // WHICH environment overlay composes
+  // ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): a build bakes
+  // a PRODUCTION artifact, so it names production rather than asking the
+  // machine, which answers `development` in a terminal. That decision is made
+  // ONCE, at the top of this file, and lands in the one input (#817) every
+  // other read in the process answers from, so the overlay that composes and
+  // the environment the bundles bake can never be two different words. Same
+  // rule, same shape, in @omega.js/desktop's getConfig.
+  const environment = Manager.getEnvironment();
+
   // No config at all (fresh dir, non-consumer cwd) → empty shape; callers
   // optional-chain and the defaults task scaffolds the real file on setup.
   const cwd = process.cwd();
@@ -139,7 +176,7 @@ Manager.getConfig = function () {
     return {};
   }
 
-  const { config, errors } = loadConfig(cwd, 'extension');
+  const { config, errors } = loadConfig(cwd, 'extension', { environment });
 
   // Validation findings are FATAL at build time — same contract as the web
   // build's loadSiteData ([#426](https://github.com/Omega-JS-Stack/omega/issues/426)).

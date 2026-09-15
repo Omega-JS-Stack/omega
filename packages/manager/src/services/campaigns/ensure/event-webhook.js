@@ -3,15 +3,17 @@
  * @omega.js/backend's forwarder with the consent-pipeline events enabled.
  *
  * SendGrid supports ONE Event Webhook per account, so it always targets the
- * parent brand (`parent` in omega.json5 — 'self' when this brand IS the
- * parent); the parent fans events out to each brand's own
- * /marketing/webhook endpoint. Sibling brands sharing the account all
- * converge on the same URL + toggle set. Only the consent toggles are
- * managed — tracking toggles (open/click/delivered/…) are not ours to touch.
- * Drift is patched with the minimum diff.
+ * parent brand: the RESOLVED `company.url`
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)), which is this
+ * brand's own url when it names no company or names itself as one. The parent
+ * fans events out to each brand's own /marketing/webhook endpoint. Sibling
+ * brands sharing the account all converge on the same URL + toggle set. Only
+ * the consent toggles are managed: tracking toggles (open/click/delivered/…)
+ * are not ours to touch. Drift is patched with the minimum diff.
  */
 const chalk = require('chalk').default;
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { resolveParentHost } = require('../../../lib/company-webhook.js');
 
 // The consent-pipeline events @omega.js/backend must receive
 const DESIRED_TOGGLES = {
@@ -23,17 +25,12 @@ const DESIRED_TOGGLES = {
 };
 
 module.exports = async function ensureEventWebhook(context) {
-  const { sendgridApi: api, brandConfig, domain, options = {} } = context;
+  const { sendgridApi: api, brandConfig, options = {} } = context;
 
-  const parent = brandConfig.parent;
-  if (parent === false) {
-    // Tri-state: explicit false = deliberate opt-out, no nudge
-    console.log(chalk.dim('      ⊘ parent = false — Event Webhook opted out'));
-    return {};
-  }
-  if (!parent) {
-    console.log(chalk.dim('      ⊘ No parent configured — nothing to point the Event Webhook at'));
-    console.log(chalk.dim("      → Set parent in omega.json5 ('self' when this brand runs the central backend)"));
+  // The opt-out, the no-parent refusal and the host are the shared helper's
+  // (#677): the newsletter service's webhook answers all three identically.
+  const parent = resolveParentHost(brandConfig.company, 'Event Webhook');
+  if (parent.skip) {
     return {};
   }
 
@@ -44,9 +41,7 @@ module.exports = async function ensureEventWebhook(context) {
     throw new Error('OMEGA_WEBHOOK_KEY absent after the campaigns setup ran — its REQUIRES entry or its requestServiceInput call is missing');
   }
 
-  const parentHost = parent === 'self'
-    ? domain
-    : parent.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const { parentHost } = parent;
   const desiredUrl = `https://api.${parentHost}/omega/marketing/webhook/forward?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 
   const current = await api.getEventWebhookSettings();

@@ -21,14 +21,31 @@
  *     ([#454](https://github.com/Omega-JS-Stack/omega/issues/454)), so they
  *     drop out of every rendered and published set.
  *
- * Pattern families (`match`, no `name`) carry a delivery like anything else,
- * but have no fixed name to render, so nothing here can list them.
+ * The schema NAMES most of what travels, and two kinds of key it cannot name
+ * ride the same pipeline through the target's COMPOSED production values
+ * (`values`, from composeTargetEnv), which every list here takes as an option:
  *
- * Every function takes an optional `schema` so a caller — the tests — can
+ *   - a PATTERN family member (`match`, no `name`): the schema knows
+ *     `CONNECTIONS_<PROVIDER>_CLIENT_ID` as a shape, so only a composed set can
+ *     say which providers this brand actually configured
+ *     ([#876](https://github.com/Omega-JS-Stack/omega/issues/876)).
+ *   - a CUSTOM key the schema does not know at all: a consumer's own line in
+ *     the brand `.env`, which used to reach no runner and fail the consumer's
+ *     own workflow step silently
+ *     ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)). It travels
+ *     in the target's FILE mode: written into the `.env` the runner builds on
+ *     the backend, the runner env alone everywhere else.
+ *
+ * Both halves come out of ONE primitive (`deliveredKeys`), so what a workflow
+ * injects, what push-secrets publishes, and what the backend's `.env` writer
+ * names can never disagree inside a run. No `values` = the schema half alone,
+ * which is what a lane with no brand to compose from gets.
+ *
+ * Every function takes an optional `schema` so a caller (the tests) can
  * exercise the rules against a fixture; the default is the real one.
  */
 
-const { ENV_SCHEMA } = require('./env-schema.js');
+const { ENV_SCHEMA, envSchemaEntry } = require('./env-schema.js');
 
 // Keys a generated workflow's own `env:` block already declares. The generated
 // block never restates one (a repeated YAML mapping key is invalid) — they are
@@ -55,6 +72,22 @@ const WORKFLOW_MODES = {
 };
 
 const DEFAULT_WORKFLOW_MODES = ['ci', 'bake'];
+
+/**
+ * The mode a key the schema does not declare travels in, per target: the
+ * target's own FILE mode where it has one (backend, whose workflow writes the
+ * `.env` its upload ships with), the runner env everywhere else (#835).
+ *
+ * A custom key declares no delivery, so it takes the channel its target
+ * already uses for the keys it composes. A packaged app carries no `.env`, so
+ * there is nothing on web, desktop or the extension for a file mode to mean.
+ *
+ * @param {string} target - Target name.
+ * @returns {string} `'env'` or `'ci'`.
+ */
+function customDeliveryMode(target) {
+  return (WORKFLOW_MODES[target] || DEFAULT_WORKFLOW_MODES).includes('env') ? 'env' : 'ci';
+}
 
 /**
  * The delivered names a target receives in the given modes, sorted and
@@ -91,6 +124,79 @@ function deliveredNames(target, modes, schema) {
   return [...names].sort();
 }
 
+// GitHub's own rule for a secret name: letters, digits and underscores, never
+// leading with a digit. A composed key that breaks it is refused by name.
+const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The ONE delivered key set (#835, #876): the schema's named deliveries for
+ * this target in these modes, plus what only the target's COMPOSED production
+ * values can name.
+ *
+ * Every list in this file derives from here, so the workflow block, the
+ * published secrets and the backend's `.env` key list are three renderings of
+ * one set rather than three sets that have to agree.
+ *
+ * A composed key is added when it is a `match` family member this target
+ * delivers in these modes, or when the schema does not know it at all and the
+ * target's custom mode is one of them. It is NOT added when the schema names
+ * it: the walk above already ruled on every fixed name, so a `machineLocal`
+ * path and a key whose only delivery here is the local `.env` stay home
+ * exactly as they did before a composed set existed. A WORKFLOW_OWNED name is
+ * never taken from a composed set either: those belong to the template, and
+ * neither is a `GITHUB_`-prefixed name, which GitHub refuses as a secret. A
+ * composed name GitHub could not hold as a secret at all throws, naming the key
+ * and the rule.
+ *
+ * @param {string} target - Target name ('web', 'backend', …).
+ * @param {string[]} modes - The delivery modes to collect.
+ * @param {object} [options]
+ * @param {object[]} [options.schema] - Env schema entries (default: the real schema).
+ * @param {Object<string, string>} [options.values] - The target's composed
+ *   production values (names are read, values never are).
+ * @returns {string[]} Delivered env var names, sorted.
+ */
+function deliveredKeys(target, modes, { schema = ENV_SCHEMA, values = null } = {}) {
+  const names = new Set(deliveredNames(target, modes, schema));
+  if (!values) return [...names].sort();
+
+  const customMode = customDeliveryMode(target);
+
+  for (const key of Object.keys(values)) {
+    if (names.has(key)) continue;
+
+    const entry = envSchemaEntry(key, schema);
+
+    if (entry) {
+      // A fixed name is the walk above's business, whatever it decided.
+      if (entry.name) continue;
+      if (entry.machineLocal) continue;
+      if (!modes.includes(entry.delivery && entry.delivery[target])) continue;
+      names.add(key);
+      continue;
+    }
+
+    if (!modes.includes(customMode)) continue;
+    if (WORKFLOW_OWNED_KEYS.includes(key)) continue;
+    // GitHub REFUSES an Actions secret whose name starts with GITHUB_ (the
+    // prefix is the runner's own), so publishing one would fail the deploy
+    // precheck outright. A brand .env carrying GITHUB_TOKEN is a plausible
+    // typo for GH_TOKEN, and the workflow reads its own `secrets.GITHUB_TOKEN`
+    // either way.
+    if (key.startsWith('GITHUB_')) continue;
+    // dotenv reads `[\w.-]+` as a key, so a brand `.env` can carry a name
+    // GitHub's secret API refuses outright (`ACME.WEBHOOK`). Delivering it
+    // would render a workflow line nothing can resolve and fail the publish
+    // three layers from the typo, so it fails HERE, by name.
+    if (!SECRET_NAME.test(key)) {
+      throw new Error(`${key}: a delivered env key must be a GitHub secret name (${SECRET_NAME.source.replace(/^\^|\$$/g, '')}), so rename it in the target's .env`);
+    }
+    names.add(key);
+  }
+
+  return [...names].sort();
+}
+
 /**
  * The keys a target's generated workflow needs in the runner env: every `ci`
  * delivery, plus every `bake` (a bake is injected before it is baked).
@@ -100,8 +206,8 @@ function deliveredNames(target, modes, schema) {
  * @param {object[]} [options.schema] - Env schema entries (default: the real schema).
  * @returns {string[]} Delivered env var names, sorted.
  */
-function workflowSecretKeys(target, { schema = ENV_SCHEMA } = {}) {
-  return deliveredNames(target, WORKFLOW_MODES[target] || DEFAULT_WORKFLOW_MODES, schema);
+function workflowSecretKeys(target, { schema = ENV_SCHEMA, values = null } = {}) {
+  return deliveredKeys(target, WORKFLOW_MODES[target] || DEFAULT_WORKFLOW_MODES, { schema, values });
 }
 
 /**
@@ -121,8 +227,8 @@ function workflowSecretKeys(target, { schema = ENV_SCHEMA } = {}) {
  * @param {object[]} [options.schema] - Env schema entries.
  * @returns {string[]} Delivered env var names, sorted.
  */
-function envFileKeys(target, { schema = ENV_SCHEMA } = {}) {
-  return deliveredNames(target, ['env'], schema);
+function envFileKeys(target, { schema = ENV_SCHEMA, values = null } = {}) {
+  return deliveredKeys(target, ['env'], { schema, values });
 }
 
 /**
@@ -145,7 +251,7 @@ function envFileKeys(target, { schema = ENV_SCHEMA } = {}) {
  * @returns {Object<string, string>} A new map, runner-only keys removed.
  */
 function artifactEnvValues(target, values, { schema = ENV_SCHEMA } = {}) {
-  const runnerOnly = new Set(deliveredNames(target, ['ci'], schema));
+  const runnerOnly = new Set(deliveredKeys(target, ['ci'], { schema }));
   const shipped = {};
 
   for (const [key, value] of Object.entries(values)) {
@@ -166,7 +272,27 @@ function artifactEnvValues(target, values, { schema = ENV_SCHEMA } = {}) {
  * @returns {string[]} Delivered env var names, sorted.
  */
 function bakeKeys(target, { schema = ENV_SCHEMA } = {}) {
-  return deliveredNames(target, ['bake'], schema);
+  return deliveredKeys(target, ['bake'], { schema });
+}
+
+/**
+ * The SOURCE names of a target's baked keys: the brand-level name a human sets
+ * (`GOOGLE_ANALYTICS_SECRET_DESKTOP`), not the `deliverAs` name the build reads
+ * it under. The bake GUARD names keys at the level a human can fix them, and it
+ * must not judge a target on keys it never bakes
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891): the desktop's
+ * other rules are CI-delivered signing credentials, which the deploy lane owns).
+ *
+ * @param {string} target - Target name.
+ * @param {object} [options]
+ * @param {object[]} [options.schema] - Env schema entries.
+ * @returns {string[]} Brand-level env var names, sorted.
+ */
+function bakeSourceKeys(target, { schema = ENV_SCHEMA } = {}) {
+  return schema
+    .filter((entry) => entry.name && !entry.machineLocal && entry.delivery && entry.delivery[target] === 'bake')
+    .map((entry) => entry.name)
+    .sort();
 }
 
 /**
@@ -197,8 +323,8 @@ function publishSecretKeys(target, options) {
  * @param {string} [options.indent] - The token's indent (default two spaces).
  * @returns {string} The block body (no leading indent).
  */
-function renderSecretsBlock(target, { schema = ENV_SCHEMA, indent = '  ' } = {}) {
-  const lines = workflowSecretKeys(target, { schema })
+function renderSecretsBlock(target, { schema = ENV_SCHEMA, indent = '  ', values = null } = {}) {
+  const lines = workflowSecretKeys(target, { schema, values })
     .filter((key) => !WORKFLOW_OWNED_KEYS.includes(key))
     .map((key) => `${key}: \${{ secrets.${key} }}`);
 
@@ -223,16 +349,18 @@ function renderSecretsBlock(target, { schema = ENV_SCHEMA, indent = '  ' } = {})
  * @param {object[]} [options.schema] - Env schema entries.
  * @returns {string} A JSON array of names, sorted (`[]` when the target ships no .env).
  */
-function renderEnvFileKeys(target, { schema = ENV_SCHEMA } = {}) {
-  return JSON.stringify(envFileKeys(target, { schema }));
+function renderEnvFileKeys(target, { schema = ENV_SCHEMA, values = null } = {}) {
+  return JSON.stringify(envFileKeys(target, { schema, values }));
 }
 
 module.exports = {
   WORKFLOW_OWNED_KEYS,
+  deliveredKeys,
   workflowSecretKeys,
   envFileKeys,
   artifactEnvValues,
   bakeKeys,
+  bakeSourceKeys,
   publishSecretKeys,
   renderSecretsBlock,
   renderEnvFileKeys,

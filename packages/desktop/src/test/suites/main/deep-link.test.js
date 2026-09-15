@@ -271,6 +271,60 @@ module.exports = defineCases({
       },
     },
     {
+      // #921: Electron re-serializes the duplicate's command line before second-instance
+      // fires (switches first, values detached at the end), so the duplicate's REAL argv
+      // rides along in additionalData. The event list below carries no url on purpose, so
+      // the case can only pass by reading the fourth argument.
+      name: 'second-instance reads argv/cwd from additionalData when it rides along',
+      run: (ctx) => {
+        const brandId = ctx.manager.config.brand.id;
+        const url = `${brandId}://dup/launch?k=v`;
+        let received;
+        const off = ctx.manager.deepLink.on('dup/launch', (c) => { received = c; });
+
+        try {
+          ctx.manager.protocol._electron.app.emit(
+            'second-instance',
+            {},
+            ['/bin/app', '--title', '--message', '--allow-file-access-from-files', 'B', 'two'],
+            '/x',
+            { argv: ['/bin/app', '--title', 'B', url], cwd: '/y' },
+          );
+
+          ctx.expect(received).toBeTruthy();
+          ctx.expect(received.url).toBe(url);
+          ctx.expect(received.route).toBe('dup/launch');
+          ctx.expect(received.query).toEqual({ k: 'v' });
+          ctx.expect(received.source).toBe('warm-start');
+          ctx.expect(received.argv).toEqual(['/bin/app', '--title', 'B', url]);
+          ctx.expect(received.cwd).toBe('/y');
+        } finally {
+          off();
+        }
+      },
+    },
+    {
+      // A duplicate built before #921 passes no object, so the event's own argv still dispatches.
+      name: 'second-instance falls back to the event argv when no additionalData rides along',
+      run: (ctx) => {
+        const brandId = ctx.manager.config.brand.id;
+        const url = `${brandId}://dup/fallback?k=v`;
+        let received;
+        const off = ctx.manager.deepLink.on('dup/fallback', (c) => { received = c; });
+
+        try {
+          ctx.manager.protocol._electron.app.emit('second-instance', {}, ['/bin/app', url], '/z');
+
+          ctx.expect(received).toBeTruthy();
+          ctx.expect(received.url).toBe(url);
+          ctx.expect(received.argv).toEqual(['/bin/app', url]);
+          ctx.expect(received.cwd).toBe('/z');
+        } finally {
+          off();
+        }
+      },
+    },
+    {
       name: 'handler errors do not stop subsequent handlers',
       run: (ctx) => {
         const calls = [];

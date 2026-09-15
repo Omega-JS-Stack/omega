@@ -34,7 +34,8 @@ const frameworkPackage = require('../../../package.json');
 const PROJECT_SCRIPTS = frameworkPackage.projectScripts;
 
 /**
- * Sync the consumer manifest's omega scripts + engines floor. A manifest that
+ * Sync the consumer manifest's omega scripts, engines floor + license (#884,
+ * seeded only when the manifest states none). A manifest that
  * already says all of it is not rewritten (#590 parity: identical content is
  * not a write).
  *
@@ -51,11 +52,15 @@ function scaffoldPackageJson(projectDir, result) {
   const before = JSON.stringify(manifest);
   manifest.scripts = { ...manifest.scripts, ...PROJECT_SCRIPTS };
   manifest.engines = { ...manifest.engines, node: `>=${NODE_VERSION}` };
+  // The license every OMEGA target states when it states none of its own
+  // ([#884](https://github.com/Omega-JS-Stack/omega/issues/884)): UNLICENSED is
+  // npm's word for closed-source commercial code. A brand's own license stands.
+  manifest.license = manifest.license || 'UNLICENSED';
 
   if (JSON.stringify(manifest) === before && exists) return;
 
   jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  result.changed.push('package.json (scripts + engines.node)');
+  result.changed.push('package.json (scripts + engines.node + license)');
 }
 
 /**

@@ -1,0 +1,2 @@
+self.OMEGA_BUILD_JSON = {"config":{"runtime":"web","environment":"development","version":null,"buildTime":1789258046665,"target":null,"url":"https://mini.example.com","brand":{"id":"mini","name":"MiniCo","description":"Mini test brand"},"theme":{"id":"classy"}},"package":{"name":null,"version":null},"mode":{"environment":"development","build":true,"publish":false},"license":{"status":"keyless","payments":"gated","attribution":"shown"},"builtAt":"2026-09-13T00:07:26.847Z"};
+self.OMEGA_BUILD_JSON.config.dev = null;

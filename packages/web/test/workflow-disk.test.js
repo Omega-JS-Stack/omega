@@ -41,10 +41,18 @@ test('#568: the checkout is shallow — nothing in the build reads history', () 
   assert.ok(!workflow.includes('fetch-depth: 0'), 'no full-history checkout anywhere');
 });
 
-test('#568: the gh-pages branch stays ONE commit', () => {
-  assert.ok(workflow.includes('peaceiris/actions-gh-pages@v4'), 'the deploy action is unchanged');
-  assert.ok(/peaceiris\/actions-gh-pages@v4[\s\S]*?force_orphan: true/.test(workflow),
-    'force_orphan on the deploy step, so the published branch stops growing by a site per deploy');
+// #883: the third-party action is gone, CI runs the framework's OWN
+// `deploy --direct`, which is where the orphan push, the CNAME, the .nojekyll
+// and the Pages call live. One implementation, so the branch cannot start
+// growing again in one lane and not the other.
+test('#568/#883: the gh-pages push is the framework verb, one orphan commit', () => {
+  assert.ok(!workflow.includes('peaceiris'), 'no third-party deploy action publishes this site any more');
+  assert.ok(workflow.includes('node "${{ github.workspace }}/node_modules/@omega.js/web/bin/omega" deploy --direct'), 'the framework verb does the build and the push, run by path (#877)');
+  assert.ok(/name: Build and deploy to gh-pages[\s\S]{0,200}GH_TOKEN: \$\{\{ secrets\.GH_TOKEN \}\}/.test(workflow),
+    'with the brand cross-repo token in the step env: the website repo is not the repo this workflow lives in');
+
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'commands', 'deploy.js'), 'utf8');
+  assert.match(source, /'push', '-q', '-f', plan\.pushUrl, plan\.branch/, 'and the verb force-pushes the freshly inited repo in dist: one commit, forever');
 });
 
 test('#568: disk is reported before the build AND after it, even when the build dies', () => {

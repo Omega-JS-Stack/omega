@@ -264,7 +264,7 @@ function stageLinkedBrand(link) {
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-linked-brand-')));
   const monorepoRoot = path.join(scratch, 'omega');
   const brandRoot = path.join(scratch, 'brand');
-  const target = path.join(brandRoot, 'targets', 'website');
+  const target = path.join(brandRoot, 'targets', 'web');
   const installed = path.join(brandRoot, 'node_modules', '@omega.js', 'web');
 
   fs.mkdirSync(path.join(monorepoRoot, 'packages', 'devkit'), { recursive: true });

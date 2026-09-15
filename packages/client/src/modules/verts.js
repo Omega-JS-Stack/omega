@@ -49,9 +49,9 @@
  *
  * Source resolution (advertising.providers.inhouse.source):
  *   'self'    → this brand's api URL (manager.getApiUrl())
- *   'company' → the parent company's api URL (config.company.url through the
- *               same api-URL derivation — the config company layer supplies
- *               company.url to every sub-brand)
+ *   'company' → the parent company's api URL (the RESOLVED config.company.url
+ *               through the same api-URL derivation: the brand types
+ *               `company: { id }` and the loader fills the url, #677)
  *   full URL  → used verbatim (trailing slashes stripped)
  */
 
@@ -739,7 +739,7 @@ class Verts {
     if (configured === 'company') {
       const companyUrl = this.manager.config.company?.url;
       if (!companyUrl) {
-        logger.warn('inhouse source is "company" but config.company.url is not set');
+        logger.warn('inhouse source is "company" but no company url resolved (the brand names none, or its company is not reachable)');
         return null;
       }
       return this.manager.getApiUrl(null, companyUrl);

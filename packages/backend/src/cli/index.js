@@ -1,16 +1,14 @@
 const os = require('os');
 const path = require('path');
-// Universal boolean flags live in ONE exported list (./flags.js) so the parse
-// and its regression test cannot drift.
-// yargs' built-in --help/--version are disabled — they fired at this module-
-// level parse (printing an empty stub / "0.0.0") before process() could ever
-// reach the real help/version branches. Mirrors the router frameworks' cli-run.
-const { BOOLEAN_FLAGS } = require('./flags');
-const argv = require('yargs')(process.argv.slice(2))
-  .boolean(BOOLEAN_FLAGS)
-  .version(false)
-  .help(false)
-  .argv;
+// The universal flag declarations live in ONE exported set (./flags.js) so the
+// parse and its regression test cannot drift. The command table owns
+// --help/--version, so this module-level parse claims neither. Mirrors the
+// router frameworks' cli-run.
+const { BOOLEAN_FLAGS, MULTIPLE_FLAGS } = require('./flags');
+const argv = require('@omega.js/devkit/argv').parseArgv(process.argv.slice(2), {
+  booleans: BOOLEAN_FLAGS,
+  multiples: MULTIPLE_FLAGS,
+});
 const _ = require('lodash');
 
 // Abort if running from ~/node_modules (accidental home directory install)

@@ -72,6 +72,9 @@ module.exports = defineCases({
             const written = JSON.parse(contents);
             ctx.expect(written.scripts.build).toBe('omega build');
             ctx.expect(written.private).toBe(true);
+            // Every OMEGA target states its license when it states none of its
+            // own (#884): npm's word for closed-source commercial code
+            ctx.expect(written.license).toBe('UNLICENSED');
             ctx.expect(written.main).toBe('dist/main.bundle.js');
             ctx.expect(contents).toContain('\n  "name": "staged-app"');
           });

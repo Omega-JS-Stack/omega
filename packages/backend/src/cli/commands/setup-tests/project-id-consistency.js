@@ -1,8 +1,10 @@
 const BaseTest = require('./base-test');
+const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const chalk = require('chalk').default;
 const { hasOmegaConfig, loadConfig, writeConfigValues, findBrandRoot } = require('@omega.js/config');
+const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
 const { buildDemoServiceAccount } = require('./service-account');
 
 /**
@@ -112,11 +114,12 @@ class ProjectIdConsistencyTest extends BaseTest {
     }
 
     // service-account.json — source chain: target root (standalone) → brand
-    // .omega/secrets/ (src/dist pillar; the stage step reads the same chain)
+    // secrets (the path SERVICE_ACCOUNT_REL names; src/dist pillar, the stage
+    // step reads the same chain)
     const brandRoot = findBrandRoot(projectPath);
     const serviceAccountPath = [
       `${projectPath}/service-account.json`,
-      brandRoot ? `${brandRoot}/.omega/secrets/service-account.json` : null,
+      brandRoot ? path.join(brandRoot, SERVICE_ACCOUNT_REL) : null,
     ].filter(Boolean).find((candidate) => jetpack.exists(candidate)) || `${projectPath}/service-account.json`;
     const serviceAccountContent = jetpack.read(serviceAccountPath);
     const serviceAccountData = serviceAccountContent ? JSON5.parse(serviceAccountContent) : null;

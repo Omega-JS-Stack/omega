@@ -18,6 +18,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { configureOmega } = require('../src/index.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -29,6 +34,7 @@ const siteData = JSON.parse(fs.readFileSync(path.join(PORTS, 'site-data.json'), 
  * @returns {Promise<Map<string, string>>}
  */
 async function buildPorts() {
+  setEnvironment('development');
   const Eleventy = require('@11ty/eleventy').default;
   const elev = new Eleventy(PORTS, path.join(PKG, '.omega', 'test-out-ports'), {
     quietMode: true,

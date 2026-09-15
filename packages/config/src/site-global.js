@@ -33,17 +33,19 @@
  * declaring a desktop target derives nothing, since the release may not
  * exist yet. WHICH repo those links address is not decided here: it is
  * [repo.js](repo.js)'s `releasesRepo`, the one home of the brand's public
- * releases repo (#799).
+ * releases repo (#799/#883): `<brand.id>-releases` under the brand's one
+ * `repo.org`, with no override key anywhere.
  *
  * Beside the hub sits `downloads` ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)):
- * one DIRECT-download URL per artifact, so a download button hands over a file
- * instead of a GitHub page. The filenames are
- * [desktop-artifacts.js](desktop-artifacts.js)'s — the same rule
- * @omega.js/desktop packages under — and they carry no version, so releasing a
- * desktop build never touches the website.
+ * one DIRECT-download URL per FORMAT, so a download button hands over a file
+ * instead of a GitHub page. Both the format keys and the filenames are
+ * [platforms.js](platforms.js)'s, the same table @omega.js/desktop packages
+ * under, and they carry no version, so releasing a desktop build never touches
+ * the website. A `store` format (the snap) has no file: its URL is the store
+ * page itself ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)).
  */
 
-const { desktopProductName, desktopArtifactNames } = require('./desktop-artifacts.js');
+const { enabledFormats, desktopProductName, desktopArtifactNames, sanitizeProductName } = require('./platforms.js');
 const { releasesRepo } = require('./repo.js');
 
 // Keys that are resolution machinery, not site content
@@ -56,11 +58,10 @@ const MACHINERY_KEYS = ['targets', 'enabled'];
  * `releases.enabled: false` always suppresses. On the pipeline's second
  * toSiteGlobal pass the raw block is gone, so a curated `releasesUrl` is
  * itself the opt-in (idempotence).
- * @param {object} config - resolved config object
+ * @param {object} desktop - the desktop target's entry
  * @returns {boolean}
  */
-function desktopReleasesEnabled(config) {
-  const desktop = targetEntry(config, 'desktop');
+function desktopReleasesEnabled(desktop) {
   if (!desktop) return false;
   if (desktop.releases) return desktop.releases.enabled !== false;
 
@@ -72,92 +73,101 @@ function desktopReleasesEnabled(config) {
  * public releases repo, whose address `@omega.js/config`'s `releasesRepo` owns
  * (#799). Nothing is derived here; a repo the derivation cannot address (no
  * owner, no brand.id) yields no URL.
+ * @param {object} desktop - the desktop target's entry
  * @param {object} config - resolved config object
  * @returns {string|undefined}
  */
-function desktopReleasesUrl(config) {
-  const desktop = targetEntry(config, 'desktop');
-
+function desktopReleasesUrl(desktop, config) {
   // Idempotence: the build pipeline applies toSiteGlobal more than once
   // (consumer.js loadSiteData, then engine.js configureOmega). On a second pass
   // the raw releases block is gone, so the curated view's own URL is the
-  // authority: re-deriving would rename a brand's explicit releases.repo to the
-  // `<brand.id>-releases` default behind its back.
+  // authority: re-deriving off a config that no longer carries the block would
+  // drop the links a brand already has.
   if (!desktop?.releases && desktop?.releasesUrl) return desktop.releasesUrl;
 
-  const { repo } = releasesRepo(config);
+  const releases = releasesRepo(config);
 
-  return repo ? `https://github.com/${repo}/releases/latest` : undefined;
+  return releases ? `https://github.com/${releases.slug}/releases/latest` : undefined;
 }
 
 /**
- * The direct-download URL of every desktop artifact, keyed platform → artifact
- * (#620). GitHub's `/releases/latest/download/<asset>` serves the newest
- * release's asset by name, which only holds because the names are versionless.
+ * The download URL of every desktop FORMAT, keyed platform then format (#620,
+ * #867). An `asset` format links the file itself: GitHub's
+ * `/releases/latest/download/<asset>` serves the newest release's asset by
+ * name, which only holds because the names are versionless. A `store` format
+ * links the store page, because the store holds the file.
+ * @param {object} desktop - the desktop target's entry
  * @param {object} config - resolved config object
  * @param {string} releasesUrl - the derived releases hub URL
  * @returns {object|undefined}
  */
-function desktopDownloads(config, releasesUrl) {
-  const desktop = targetEntry(config, 'desktop');
-
+function desktopDownloads(desktop, config, releasesUrl) {
   // Idempotence, same trap as the URL above: the second toSiteGlobal pass sees
   // the curated view, which carries no app block and no brand-derived product
-  // name — the curated URLs are the authority by then.
+  // name, so the curated URLs are the authority by then.
   if (desktop?.downloads) return desktop.downloads;
 
-  // No product name (an invalid config — brand.name is required) derives
-  // nothing: a guessed filename is a download button that 404s.
-  const names = desktopArtifactNames(desktopProductName({ app: desktop?.app, brand: config?.brand }));
+  // No product name (an invalid config: brand.name is required) derives
+  // nothing, because a guessed filename is a download button that 404s.
+  const productName = desktopProductName({ app: desktop?.app, brand: config?.brand });
+  const names = desktopArtifactNames(productName);
   if (!Object.keys(names).length) return undefined;
 
+  // Only what this brand SHIPS gets a link: a dropped platform or format must
+  // not render a button that 404s (#867).
   const downloads = {};
-  for (const [platform, artifacts] of Object.entries(names)) {
-    downloads[platform] = {};
-    for (const [artifact, filename] of Object.entries(artifacts)) {
-      downloads[platform][artifact] = `${releasesUrl}/download/${filename}`;
-    }
+  for (const { platform, format } of enabledFormats(desktop, 'desktop')) {
+    // An asset links its file; the one store format (the snap) links the Snap
+    // Store listing, whose slug is the snap's own name, which electron-builder
+    // derives from the executable name: the sanitized product name, lowercased.
+    const filename = names[platform]?.[format];
+    const url = filename
+      ? `${releasesUrl}/download/${filename}`
+      : `https://snapcraft.io/${sanitizeProductName(productName).toLowerCase()}`;
+
+    downloads[platform] = downloads[platform] || {};
+    downloads[platform][format] = url;
   }
 
-  return downloads;
+  return Object.keys(downloads).length ? downloads : undefined;
 }
 
 /**
- * A target's config entry when it is the plain-object form. Array-form
- * (multi-instance) targets return undefined: which instance's facts belong
- * on the site is ambiguous, so instance-form brands supply explicit page
- * maps instead of getting a silently wrong derivation.
- * @param {object} config - resolved config object
- * @param {string} name - target key
- * @returns {object|undefined}
+ * Whether an entry is a target of this TYPE (#886): the declared `type`, or,
+ * on the second toSiteGlobal pass, the curated fact only that type derives.
+ * The NAME is never the test, so a brand that names its desktop target `app`
+ * still gets `site.targets.app.downloads`.
+ * @param {object} entry - a raw or curated targets entry
+ * @param {string} type - 'desktop' | 'extension'
+ * @param {string} curatedKey - the curated key that type alone produces
+ * @returns {boolean}
  */
-function targetEntry(config, name) {
-  const entry = config?.targets?.[name];
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return undefined;
-  return entry;
+function isTargetOfType(entry, type, curatedKey) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+  return entry.type === type || entry[curatedKey] !== undefined;
 }
 
 /**
  * Curate one target's display-safe view. Presence = enabled; per-type
  * extras are allow-listed here, never spread from the raw entry.
- * @param {string} name - target key (web, backend, desktop, extension, …)
+ * @param {object} entry - the target's own config entry
  * @param {object} config - resolved config object
  * @returns {object}
  */
-function curateTarget(name, config) {
+function curateTarget(entry, config) {
   const view = { enabled: true };
 
-  if (name === 'desktop' && desktopReleasesEnabled(config)) {
-    const releasesUrl = desktopReleasesUrl(config);
+  if (isTargetOfType(entry, 'desktop', 'releasesUrl') && desktopReleasesEnabled(entry)) {
+    const releasesUrl = desktopReleasesUrl(entry, config);
     if (releasesUrl) {
       view.releasesUrl = releasesUrl;
-      const downloads = desktopDownloads(config, releasesUrl);
+      const downloads = desktopDownloads(entry, config, releasesUrl);
       if (downloads) view.downloads = downloads;
     }
   }
 
-  if (name === 'extension') {
-    const listings = targetEntry(config, 'extension')?.listings;
+  if (isTargetOfType(entry, 'extension', 'listings')) {
+    const { listings } = entry;
     if (listings) {
       const curated = {};
       for (const [store, entry] of Object.entries(listings)) {
@@ -194,8 +204,8 @@ function toSiteGlobal(config) {
   const targets = config?.targets;
   if (targets && typeof targets === 'object') {
     site.targets = {};
-    for (const name of Object.keys(targets)) {
-      site.targets[name] = curateTarget(name, config);
+    for (const [name, entry] of Object.entries(targets)) {
+      site.targets[name] = curateTarget(entry, config);
     }
   }
 

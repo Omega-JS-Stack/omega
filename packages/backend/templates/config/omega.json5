@@ -161,6 +161,17 @@
       // Add more products/tiers here
     ],
   },
+
+  // Where this brand's code lives (#883): ONE org, and every repo derives from
+  // `<brand.id>-<role>`. The content routes (the admin/post CMS, content/post)
+  // commit to the SOURCE repo, `<brand.id>-omega` under this org. No repo name
+  // is ever typed here. Left out by default, so the routes' "not configured"
+  // guard fires instead of aiming a real GH_TOKEN at a placeholder repo.
+  // repo: {
+  //   provider: 'github',
+  //   org: 'MyOrg',
+  // },
+
   cloud: {
     provider: 'firebase',
     config: {
@@ -175,25 +186,17 @@
   },
 
   // ─── Backend target ────────────────────────────────────────────────────────
-  // Key presence = this project supports the backend target. Any shared key may
-  // also appear here as a backend-only override (e.g. a per-surface
+  // Every key is a target NAME (the folder targets/<name> in a brand monorepo)
+  // and every entry declares the framework `type` that runs it. Any shared key
+  // may also appear here as a target-only override (e.g. a per-surface
   // monitoring.providers.sentry.dsn).
   targets: {
     backend: {
+      type: 'backend',
       // 'self' = this @omega.js/backend is the parent (newsletter-sources provider);
       // a URL = external parent (e.g. 'https://api.itwcreativeworks.com') —
       // used by the newsletter generator to pull sources; '' = no parent
       parent: '',
-      // The brand repo the content routes (admin/post CMS, content/post)
-      // commit to. `repo` is optional — "owner/name" slug or bare name;
-      // name defaults to brand.id, owner to repo.providers.github.org (shared derivation:
-      // @omega.js/config brandRepoName/brandRepoOwner). Deliberately empty
-      // by default so the routes' "not configured" guard fires instead of
-      // aiming a real GH_TOKEN at a placeholder repo.
-      github: {
-        user: '',
-        repo: '',
-      },
       auth: {
         signup: {
           // Signups allowed per client IP per day. The beforeUserCreated guard

@@ -10,7 +10,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { resolveBrandRoot, loadBrand, discoverTargets, targetFromDirName } = require('../src/lib/brand.js');
+const { recordBrand } = require('@omega.js/config');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
+const { resolveBrandRoot, loadBrand, discoverTargets } = require('../src/lib/brand.js');
 const { runManage } = require('../src/manage.js');
 const { CONSENT_REQUIRED } = require('../src/lib/google-auth.js');
 const { SERVICE_ORDER, BOOT_SERVICES } = require('../src/config.js');
@@ -52,7 +58,7 @@ const BRAND_CONFIG = `{
     url: 'https://fixture-brand.test',
   },
   targets: {
-    web: {},
+    web: { type: 'web' },
   },
 }`;
 
@@ -83,10 +89,10 @@ function stageBrand({ config = BRAND_CONFIG, targets = true } = {}) {
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), config);
 
   if (targets) {
-    const website = path.join(root, 'targets', 'website');
-    fs.mkdirSync(website, { recursive: true });
-    fs.writeFileSync(path.join(website, 'package.json'), WEBSITE_PKG);
-    fs.writeFileSync(path.join(website, 'build.js'), WEBSITE_BUILD);
+    const web = path.join(root, 'targets', 'web');
+    fs.mkdirSync(web, { recursive: true });
+    fs.writeFileSync(path.join(web, 'package.json'), WEBSITE_PKG);
+    fs.writeFileSync(path.join(web, 'build.js'), WEBSITE_BUILD);
   }
 
   return root;
@@ -96,11 +102,11 @@ function stageBrand({ config = BRAND_CONFIG, targets = true } = {}) {
 
 test('resolveBrandRoot: from the root, from inside a target, from a nested dir', () => {
   const root = stageBrand();
-  const nested = path.join(root, 'targets', 'website', 'src', 'deep');
+  const nested = path.join(root, 'targets', 'web', 'src', 'deep');
   fs.mkdirSync(nested, { recursive: true });
 
   assert.equal(resolveBrandRoot(root), root);
-  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'website')), root);
+  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'web')), root);
   assert.equal(resolveBrandRoot(nested), root);
 });
 
@@ -108,25 +114,25 @@ test('resolveBrandRoot: a target\'s own config dir never masquerades as the bran
   const root = stageBrand();
   // Give the target its own config/omega.json5 — resolution from inside it must
   // still climb to the BRAND root
-  const targetConfig = path.join(root, 'targets', 'website', 'config');
+  const targetConfig = path.join(root, 'targets', 'web', 'config');
   fs.mkdirSync(targetConfig, { recursive: true });
-  fs.writeFileSync(path.join(targetConfig, 'omega.json5'), `{ targets: { web: {} } }`);
+  fs.writeFileSync(path.join(targetConfig, 'omega.json5'), `{ targets: { web: { type: 'web' } } }`);
 
-  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'website')), root);
+  assert.equal(resolveBrandRoot(path.join(root, 'targets', 'web')), root);
 });
 
 test('resolveBrandRoot: a brand nested in a parent workspace\'s targets/ dir still resolves (sandbox-brand case)', () => {
-  // {outer}/targets/my-brand/{config,targets/website} — no config above my-brand,
+  // {outer}/targets/my-brand/{config,targets/web}: no config above my-brand,
   // so my-brand is the brand root even though it sits under a targets/ dir
   const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-outer-'));
   const brandRoot = path.join(outer, 'targets', 'my-brand');
   fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), BRAND_CONFIG);
-  const website = path.join(brandRoot, 'targets', 'website');
-  fs.mkdirSync(website, { recursive: true });
+  const web = path.join(brandRoot, 'targets', 'web');
+  fs.mkdirSync(web, { recursive: true });
 
   assert.equal(resolveBrandRoot(brandRoot), brandRoot);
-  assert.equal(resolveBrandRoot(website), brandRoot);
+  assert.equal(resolveBrandRoot(web), brandRoot);
 });
 
 test('resolveBrandRoot: null outside any brand', () => {
@@ -136,36 +142,42 @@ test('resolveBrandRoot: null outside any brand', () => {
 
 // ─── Target dir → target mapping ─────────────────────────────────────────────
 
-test('targetFromDirName: exact and prefixed conventions', () => {
-  assert.equal(targetFromDirName('website'), 'web');
-  assert.equal(targetFromDirName('website-docs'), 'web');
-  assert.equal(targetFromDirName('backend'), 'backend');
-  assert.equal(targetFromDirName('extension'), 'extension');
-  assert.equal(targetFromDirName('totally-custom'), null);
+test('discoverTargets: the brand\'s own declaration types the dir, whatever the dir is named (#886)', () => {
+  const root = stageBrand({
+    config: `{
+      brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
+      targets: { web: { type: 'web' }, docs: { type: 'web' } },
+    }`,
+  });
+  fs.mkdirSync(path.join(root, 'targets', 'docs'), { recursive: true });
+
+  const byName = Object.fromEntries(discoverTargets(root).map((entry) => [entry.name, entry.target]));
+  assert.equal(byName.web, 'web');
+  assert.equal(byName.docs, 'web', 'a second web-typed target needs no naming convention');
 });
 
-test('loadBrand: declared target beats naming; unconventional dirs map via their config', () => {
+test('loadBrand: a dir the brand never declares maps via its own config, and nothing else is unmapped', () => {
   const root = stageBrand();
 
   // targets/api declares targets.backend in its target-root config/omega.json5
   // (ONE authored location for every target since the src/dist pillar —
-  // functions/config is staged output now) and "api" matches no convention
+  // functions/config is staged output now) and the brand file never names it
   const apiConfig = path.join(root, 'targets', 'api', 'config');
   fs.mkdirSync(apiConfig, { recursive: true });
-  fs.writeFileSync(path.join(apiConfig, 'omega.json5'), `{ targets: { backend: {} } }`);
+  fs.writeFileSync(path.join(apiConfig, 'omega.json5'), `{ targets: { backend: { type: 'backend' } } }`);
 
   const brand = loadBrand(root);
   assert.equal(brand.id, 'fixture-brand');
   assert.deepEqual(brand.enabledTargets, ['web']);
 
   const byName = Object.fromEntries(brand.targets.map((entry) => [entry.name, entry.target]));
-  assert.equal(byName.website, 'web');
+  assert.equal(byName.web, 'web');
   assert.equal(byName.api, 'backend');
 });
 
 test('loadBrand: config load failure lands in configError, never throws', () => {
   const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: {} } }`,
+    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
   });
 
   const brand = loadBrand(root);
@@ -177,7 +189,7 @@ test('loadBrand: templates { domain } from brand.url', () => {
   const root = stageBrand({
     config: `{
       brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test', contact: { email: 'support@{ domain }' } },
-      targets: { web: {} },
+      targets: { web: { type: 'web' } },
     }`,
   });
 
@@ -214,7 +226,7 @@ test('runManage: --migration=targets-rename runs the rename ALONE — the one br
   const audit = await runManage(root, { migration: 'targets-rename' });
   assert.equal(audit.hasErrors, false);
   assert.equal(audit.results.migrations.output.targetsRename.audit, true);
-  assert.ok(fs.existsSync(path.join(root, 'apps', 'website')), 'the default run moved nothing');
+  assert.ok(fs.existsSync(path.join(root, 'apps', 'web')), 'the default run moved nothing');
 
   const report = await runManage(root, { migration: 'targets-rename', execute: true });
   assert.equal(report.hasErrors, false);
@@ -225,7 +237,7 @@ test('runManage: --migration=targets-rename runs the rename ALONE — the one br
   );
 
   // …and the brand the migration fixed now loads like any other
-  assert.deepEqual(loadBrand(root).targets.map((entry) => entry.name), ['website']);
+  assert.deepEqual(loadBrand(root).targets.map((entry) => entry.name), ['web']);
 });
 
 // ─── End-to-end manage ───────────────────────────────────────────────────────
@@ -276,9 +288,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
 
   assert.equal(report.hasErrors, false);
   assert.equal(report.results.workspace.status, 'success');
-  // No repo.providers.github.org configured (manager defaults alone don't enable it) → clean skip
+  // No repo block configured (its presence is the switch, #883) → clean skip
   assert.equal(report.results.repo.status, 'skipped');
-  assert.match(report.results.repo.reason, /github\.org/);
+  assert.match(report.results.repo.reason, /repo\.org/);
   // No CLOUDFLARE_TOKEN in the environment → clean skip
   assert.equal(report.results.edge.status, 'skipped');
   assert.match(report.results.edge.reason, /CLOUDFLARE_TOKEN/);
@@ -288,9 +300,10 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No cloud.config.projectId configured → clean skip
   assert.equal(report.results.cloud.status, 'skipped');
   assert.match(report.results.cloud.reason, /cloud\.config\.projectId/);
-  // No shared reCAPTCHA keys in the environment → clean skip
+  // No reCAPTCHA secret in the environment → clean skip (the site key is
+  // config now, #893, so the env skip names the secret half alone)
   assert.equal(report.results.captcha.status, 'skipped');
-  assert.match(report.results.captcha.reason, /RECAPTCHA_SITE_KEY/);
+  assert.match(report.results.captcha.reason, /RECAPTCHA_SECRET_KEY/);
   // No analytics providers configured → clean skip
   assert.equal(report.results.analytics.status, 'skipped');
   assert.match(report.results.analytics.reason, /no analytics providers/);
@@ -350,7 +363,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(report.results.testing.status, 'success');
 
   // The build actually produced the site
-  assert.ok(fs.existsSync(path.join(root, 'targets', 'website', 'dist', 'index.html')));
+  assert.ok(fs.existsSync(path.join(root, 'targets', 'web', 'dist', 'index.html')));
 
   // Install was resolution-gated and skipped (fixture has no deps) — no stray
   // node_modules materialized
@@ -364,7 +377,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'ai', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'repo', 'edge', 'domain', 'cloud', 'captcha', 'analytics', 'search', 'advertising', 'monitoring', 'campaigns', 'newsletter', 'payment', 'forms', 'chat', 'email', 'server', 'directory', 'assets', 'certificates', 'publishing', 'ai', 'disperse', 'seo', 'update', 'account', 'migrations', 'bookmark', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
@@ -502,7 +515,7 @@ test('runManage: on a boot lane, preflight still names what MANAGE owes — with
 
 test('runManage: unloadable brand config fails the workspace service and stops the run', async () => {
   const root = stageBrand({
-    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: {} } }`,
+    config: `{ brand: { id: 'x', name: 'X' }, connections: { clientSecret: 'oops' }, targets: { web: { type: 'web' } } }`,
   });
 
   const report = await runManage(root, {});
@@ -519,7 +532,7 @@ test('runManage: enabled target with no dir is a structure error naming the dir 
   const root = stageBrand({
     config: `{
       brand: { id: 'fixture-brand', name: 'Fixture', url: 'https://fixture-brand.test' },
-      targets: { web: {}, backend: {} },
+      targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     }`,
   });
 
@@ -529,9 +542,40 @@ test('runManage: enabled target with no dir is a structure error naming the dir 
   assert.match(report.results.workspace.error, /create targets\/backend\//);
 });
 
+// #677: membership is a fact of the brand, so the header states it on EVERY
+// run: the id and where the company is, or that there is none.
+test('runManage: the header always states the company: none, here, or not on this machine', async () => {
+  const lines = [];
+  const log = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  const companyLine = () => lines.filter((line) => line.includes('Company:')).pop();
+
+  try {
+    const standalone = stageBrand();
+    await runManage(standalone, { service: 'workspace' });
+    assert.match(companyLine(), /Company:\s+none$/);
+
+    const orphan = stageBrand({
+      config: `{ brand: { id: 'fixture-brand' }, company: { id: 'nowhere-co' }, targets: { web: { type: 'web' } } }`,
+    });
+    await runManage(orphan, { service: 'workspace' });
+    assert.match(companyLine(), /Company:\s+nowhere-co \(not on this machine\)$/);
+
+    const parent = stageBrand();
+    recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.test' });
+    const child = stageBrand({
+      config: `{ brand: { id: 'fixture-brand' }, company: { id: 'fixture-co' }, targets: { web: { type: 'web' } } }`,
+    });
+    await runManage(child, { service: 'workspace' });
+    assert.match(companyLine(), new RegExp(`Company:\\s+fixture-co \\(${parent.replace(/\//g, '\\/')}\\)$`));
+  } finally {
+    console.log = log;
+  }
+});
+
 test('runManage: disabled brand is skipped whole', async () => {
   const root = stageBrand({
-    config: `{ enabled: false, brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: {} } }`,
+    config: `{ enabled: false, brand: { id: 'fixture-brand', name: 'Fixture' }, targets: { web: { type: 'web' } } }`,
   });
 
   const report = await runManage(root, {});
@@ -554,9 +598,9 @@ test('runManage: dry-run reports what update would do without building', async (
   const report = await runManage(root, { dryRun: true });
 
   assert.equal(report.results.update.status, 'success');
-  const websiteSteps = report.results.update.output.results.website.steps;
-  assert.equal(websiteSteps[0].skipped, true);
-  assert.ok(!fs.existsSync(path.join(root, 'targets', 'website', 'dist')));
+  const webSteps = report.results.update.output.results.web.steps;
+  assert.equal(webSteps[0].skipped, true);
+  assert.ok(!fs.existsSync(path.join(root, 'targets', 'web', 'dist')));
   // testing then honestly reports the missing build output
   assert.equal(report.results.testing.status, 'error');
 });

@@ -16,11 +16,12 @@
  * notifications onto the two payment collections. payment-provider is native
  * too — the #428 word rename's data half, sweeping the stored `processor`
  * field to `provider` across all five payment-touching collections.
- * Two are `local: true` — they work on the brand's own files, so they need
+ * Three are `local: true`: they work on the brand's own files, so they need
  * neither a backend target nor a service account: state-retirement moves the
  * retired .omega/state.json CONTENT into config + .env and leaves the file's
- * machine records untouched (#434, #479), and targets-rename
- * moves a pre-#443 brand's apps/ folder to targets/. The rename is also the
+ * machine records untouched (#434, #479), targets-rename
+ * moves a pre-#443 brand's apps/ folder to targets/, and platform-names
+ * rewrites a brand's retired platform keys onto the one vocabulary (#867). The rename is also the
  * one migration a walk never reaches on the brand it fixes (discovery fails
  * loud on the old shape), so `--migration=targets-rename` runs it alone from
  * runManage; here it only ever re-checks a converged brand.
@@ -31,12 +32,12 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { hasTargetOfType } = require('@omega.js/config');
+const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
-
-const SERVICE_ACCOUNT_PATH = join('.omega', 'secrets', 'service-account.json');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -71,8 +72,7 @@ module.exports.run = createServiceRunner({
     // a brand with no backend at all
     const needsFirestore = filteredOperations.some((op) => !op.local);
 
-    const targets = context.brandConfig.targets || {};
-    if (needsFirestore && !targets.backend) {
+    if (needsFirestore && !hasTargetOfType(context.brandConfig, 'backend')) {
       return { skip: true, reason: 'no backend target' };
     }
 
@@ -87,11 +87,11 @@ module.exports.run = createServiceRunner({
     let authAdmin = context.authAdmin;
     let firestore = context.firestore;
     if (needsFirestore && !authAdmin) {
-      if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_PATH))) {
-        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the cloud service first)` };
+      if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_REL))) {
+        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_REL} (run the cloud service first)` };
       }
 
-      const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_PATH, context.brandRoot);
+      const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_REL, context.brandRoot);
       authAdmin = createAuthAdmin(serviceAccount);
       firestore = new FirestoreREST(serviceAccount);
     }

@@ -14,7 +14,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { ENV_SCHEMA, envFileGroups, generatedEnvKeys } = require('@omega.js/config/env-schema');
+const { ENV_SCHEMA, envFileGroups, generatedEnvKeys, envSchemaEntry, isMachineLocal } = require('@omega.js/config/env-schema');
+const { FORMATS } = require('@omega.js/config');
 const { REQUIRES, SERVICE_ORDER, serviceInputSpec } = require('../src/config.js');
 const { requestServiceInput } = require('../src/lib/service-input.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
@@ -475,6 +476,72 @@ test('sweep: the mint has exactly ONE home', () => {
     .map(([file]) => file);
 
   assert.deepEqual(homes, ['lib/env-secret.js'], 'the mint is mintGeneratedKey — never a second copy');
+});
+
+test('sweep: the human half of every input comes from the env SCHEMA, not the registry (#867)', () => {
+  // One home for what a key is and where it is minted. The registry keeps the
+  // manager's own fields; a label/url/hint typed here again is the drift that
+  // left every desktop signing key and every store key with a mint page in
+  // NEITHER place.
+  const inRegistry = [];
+  for (const [service, declaration] of Object.entries(REQUIRES)) {
+    for (const input of declaration.env) {
+      for (const field of ['label', 'url', 'hint']) {
+        if (field in input) inRegistry.push(`${service}.${input.name}.${field}`);
+      }
+    }
+  }
+  assert.deepEqual(inRegistry, [], 'move these into the matching env-schema.js entry');
+
+  // ...and every name the registry declares HAS a schema entry to fill from
+  const unknown = [];
+  for (const [service, declaration] of Object.entries(REQUIRES)) {
+    for (const input of declaration.env) {
+      if (!ENV_SCHEMA.some((entry) => entry.name === input.name)) unknown.push(`${service}: ${input.name}`);
+    }
+  }
+  assert.deepEqual(unknown, [], 'declare these in @omega.js/config env-schema.js');
+});
+
+test('sweep: every pasted key says what it is and where to get it (#867)', () => {
+  // The walk opens a gate with the label and walks to the url; a prompted key
+  // with neither is a prompt that says "paste CHROME_REFRESH_TOKEN" and stops.
+  // `url: null` is a legitimate answer (no page mints this value), and it owes
+  // a hint that says where the value does come from.
+  const prompted = Object.values(REQUIRES)
+    .flatMap((declaration) => declaration.env)
+    .filter((input) => input.prompted)
+    .map((input) => envSchemaEntry(input.name));
+
+  assert.ok(prompted.length > 10, `expected many pasted keys, found ${prompted.length}`);
+
+  const unlabelled = prompted.filter((entry) => !entry.label).map((entry) => entry.name);
+  assert.deepEqual(unlabelled, [], 'give each one a `label` in env-schema.js');
+
+  const homeless = prompted.filter((entry) => !isMachineLocal(entry.name) && !entry.url && !('url' in entry && entry.hint))
+    .map((entry) => entry.name);
+  assert.deepEqual(homeless, [], 'give each one a `url` (the page that mints it), or `url: null` plus a hint saying where it comes from');
+});
+
+test('sweep: every ship credential a format needs is askable (#867)', () => {
+  // The format table names the keys a platform cannot ship without. Each one
+  // needs its mint page in the schema, or the publish that refuses on it has
+  // nowhere to send the developer.
+  const shipKeys = new Set();
+  for (const platforms of Object.values(FORMATS)) {
+    for (const formats of Object.values(platforms)) {
+      for (const spec of Object.values(formats)) {
+        for (const key of spec.requires) shipKeys.add(key);
+      }
+    }
+  }
+
+  const unaskable = [...shipKeys]
+    .map((key) => envSchemaEntry(key))
+    .filter((entry) => !entry.label || (!entry.url && !entry.hint))
+    .map((entry) => entry.name);
+
+  assert.deepEqual(unaskable, [], 'give each ship credential a label plus a url or a hint in env-schema.js');
 });
 
 test('sweep: every REQUIRES entry can run the three-outcome gate', () => {

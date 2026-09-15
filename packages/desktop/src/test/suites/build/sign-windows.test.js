@@ -14,7 +14,7 @@ module.exports = defineCases({
   description: 'sign-windows — signtool command construction + retry policy',
   tests: [
     {
-      name: 'this suite can never sign for real: every signWithRetry call injects its exec',
+      name: 'this suite can never sign for real: every call that reaches signtool injects its exec',
       run: (ctx) => {
         // The box runs this lane too. `signWithRetry` shells out to signtool by
         // DEFAULT, so a case that forgets `exec:` would drive the real EV token
@@ -22,13 +22,17 @@ module.exports = defineCases({
         // lives in sign-windows-e2e.test.js, gated. This pins the invariant.
         const fs = require('fs');
         const source = fs.readFileSync(__filename, 'utf8');
-        // The needle is assembled so this case's own text is not one of its hits.
-        const calls = source.split(`signWithRetry${'('}`).slice(1);
-        ctx.expect(calls.length).toBeGreaterThan(0);
-        for (const call of calls) {
-          const body = call.slice(0, call.indexOf('});'));
-          if (!body.includes('exec:')) {
-            throw new Error(`a signWithRetry call in this suite does not inject exec — it would run the real signtool:\n${body.slice(0, 200)}`);
+        // Both entry points reach signtool: the retry wrapper directly, and the
+        // signing loop through it plus its own verify call.
+        for (const entry of ['signWithRetry', 'signWithSigntool']) {
+          // The needle is assembled so this case's own text is not one of its hits.
+          const calls = source.split(`${entry}${'('}`).slice(1);
+          ctx.expect(calls.length).toBeGreaterThan(0);
+          for (const call of calls) {
+            const body = call.slice(0, call.indexOf('});'));
+            if (!body.includes('exec:')) {
+              throw new Error(`a ${entry} call in this suite does not inject exec, it would run the real signtool:\n${body.slice(0, 200)}`);
+            }
           }
         }
       },
@@ -141,6 +145,59 @@ module.exports = defineCases({
       run: (ctx) => {
         ctx.expect(signWindows.buildVerifyCommand({ signtool: 'signtool', outPath: 'C:\\out\\App.exe' }))
           .toBe('"signtool" verify /pa "C:\\out\\App.exe"');
+      },
+    },
+    {
+      name: 'a signed artifact prints the proof line in the mac shape, after verify passes (#918)',
+      run: async (ctx) => {
+        // The mac lane ends with `Stapled and verified: ...` (hooks/notarize.js).
+        // Windows runs the same kind of proof (`signtool verify /pa`, a failure
+        // aborts the job), so it says so in the same shape, naming the check it
+        // ran. Driven here through the injected signtool: the ORDER (sign, then
+        // verify, THEN the line) is what makes the line true.
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sign-proof-'));
+        const inDir = path.join(tmp, 'release');
+        const outDir = path.join(inDir, 'signed');
+        const target = path.join(inDir, 'App-windows.msi');
+        // .msi on purpose: it needs no latest.yml, so the loop is the whole test.
+        jetpack.write(target, 'unsigned bytes');
+
+        const commands = [];
+        const lines = [];
+        const fakeLogger = {
+          log:   (m) => lines.push(String(m)),
+          warn:  (m) => lines.push(String(m)),
+          error: (m) => lines.push(String(m)),
+        };
+
+        const origToken = process.env.WIN_EV_TOKEN_PATH;
+        const origPassword = process.env.WIN_CSC_KEY_PASSWORD;
+        try {
+          // Thumbprint mode with no PIN: SafeNet owns it, so no console-lock check.
+          process.env.WIN_EV_TOKEN_PATH = 'f'.repeat(40);
+          delete process.env.WIN_CSC_KEY_PASSWORD;
+
+          await signWindows.signWithSigntool([target], inDir, outDir, {
+            exec:   (cmd) => { commands.push(cmd); return Promise.resolve('Successfully signed'); },
+            logger: fakeLogger,
+          });
+        } finally {
+          if (origToken === undefined) delete process.env.WIN_EV_TOKEN_PATH; else process.env.WIN_EV_TOKEN_PATH = origToken;
+          if (origPassword === undefined) delete process.env.WIN_CSC_KEY_PASSWORD; else process.env.WIN_CSC_KEY_PASSWORD = origPassword;
+          jetpack.remove(tmp);
+        }
+
+        ctx.expect(commands.length).toBe(2);
+        ctx.expect(commands[0]).toContain(' sign /sha1 ');
+        ctx.expect(commands[1]).toContain('verify /pa');
+        // The proof line is the LAST thing this file's turn prints, and it names
+        // the check as well as the artifact: mac punctuation, basename, period.
+        ctx.expect(lines[lines.length - 1]).toBe('Signed and verified: signtool verify /pa accepts App-windows.msi.');
+        // The old line claimed only a signature, which is what sent the owner asking.
+        ctx.expect(lines.some((line) => line.includes('Signed: '))).toBe(false);
       },
     },
     {

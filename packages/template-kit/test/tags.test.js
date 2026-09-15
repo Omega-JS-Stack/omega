@@ -157,9 +157,13 @@ test('omega_language resolves english/native names, echoes unknown codes', () =>
   assert.strictEqual(TAGS.omega_language.render(ctx, '"xx"'), 'xx');
 });
 
-test('omega_translation_url prefixes languages, honors default + excludes + blog normalization', () => {
+// #858: the tag prefixes, and that is all it does. Exclusion left with
+// `translation.exclude`: the include list that replaced it is glob-matched
+// against the framework's derived exclusions and each page's own stamp, which
+// only the build's link rewriter can see.
+test('omega_translation_url prefixes languages, honors default + blog normalization', () => {
   const siteConfig = {
-    translation: { default: 'en', languages: ['en', 'es', 'fr'], exclude: ['admin'] },
+    translation: { default: 'en', languages: ['en', 'es', 'fr'] },
   };
   const ctx = makeCtx({ lang: 'es', pageUrl: '/pricing' }, { siteConfig });
 
@@ -167,7 +171,6 @@ test('omega_translation_url prefixes languages, honors default + excludes + blog
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"en", "/pricing"'), '/pricing');
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"es", "/"'), '/es');
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"de", "/pricing"'), '/pricing'); // unavailable -> default
-  assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"es", "/admin/panel"'), '/admin/panel'); // excluded
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"es", "/blog/index.html"'), '/es/blog');
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, '"es", "/blog/page/2.html"'), '/es/blog/page/2');
   assert.strictEqual(TAGS.omega_translation_url.render(ctx, 'lang, pageUrl'), '/es/pricing');

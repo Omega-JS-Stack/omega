@@ -77,6 +77,32 @@ module.exports = defineCases({
     },
 
     {
+      name: 'the-license-is-stated-once-and-never-overwritten',
+      auth: 'none',
+
+      async run({ assert }) {
+        // #884: UNLICENSED is npm's word for closed-source commercial code, and
+        // every framework's ensure-target seeds it the same way, so a target
+        // manifest never ships the "no license field" npm warning. A brand that
+        // authored its own keeps it: licensing is the brand's call.
+        const fresh = seedTarget();
+        const authored = seedTarget();
+
+        try {
+          run(fresh);
+          assert.equal(manifestOf(fresh).license, 'UNLICENSED', 'a manifest stating no license gets the default');
+
+          jetpack.write(path.join(authored, 'package.json'), JSON.stringify({ name: 'fixture-backend', license: 'MIT' }, null, 2));
+          run(authored);
+          assert.equal(manifestOf(authored).license, 'MIT', 'an authored license survives every verb run');
+        } finally {
+          jetpack.remove(fresh);
+          jetpack.remove(authored);
+        }
+      },
+    },
+
+    {
       name: 'a-second-run-is-a-silent-no-op',
       auth: 'none',
 
@@ -216,7 +242,7 @@ module.exports = defineCases({
         try {
           jetpack.write(path.join(dir, 'config', 'omega.json5'), JSON.stringify({
             brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-            targets: { backend: { projectType: 'custom' } },
+            targets: { backend: { type: 'backend', projectType: 'custom' } },
           }));
           const seeded = manifestOf(dir);
           seeded.scripts = { start: 'node server.js' };

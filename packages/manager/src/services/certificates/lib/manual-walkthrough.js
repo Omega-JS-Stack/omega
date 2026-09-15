@@ -105,25 +105,25 @@ function findIssuedCert({ certPath, downloadsDir, keyPath, portalLabel, startedA
  * @param {Object} options
  * @param {string} options.type - Certificate type (e.g. DEVELOPER_ID_INSTALLER_G2)
  * @param {string} options.certPath - Where the .cer must land
- * @param {string} options.appleDir - The brand's .omega/certificates/apple dir
+ * @param {object} options.tree - The brand's signing tree (company tier first, #892)
  * @param {string} options.teamId - Apple team ID (CSR subject)
  * @param {string} [options.downloadsDir] - Where downloads land (test seam)
  * @returns {Promise<{ installed: boolean }>}
  */
-async function runManualCertWalkthrough({ type, certPath, appleDir, teamId, downloadsDir = join(homedir(), 'Downloads') }) {
+async function runManualCertWalkthrough({ type, certPath, tree, teamId, downloadsDir = join(homedir(), 'Downloads') }) {
   const portalLabel = portalLabelOf(type);
   const startedAt = Date.now();
 
   // The same CSR machinery as the automatable types: key + CSR generated
   // once, reused forever — the issued cert must pair with this key or the
   // .p12 export (and CI signing) has nothing to pair with.
-  getCSRContent(type, appleDir, teamId);
-  const keyPath = join(appleDir, 'csr', type, 'private.key');
+  getCSRContent(type, tree, teamId);
+  const keyPath = tree.find(`csr/${type}/private.key`)?.path || tree.path(`csr/${type}/private.key`);
 
   // Picker-friendly copy: the portal's file dialog starts in Downloads, and
   // some browsers filter for the .certSigningRequest extension.
   const uploadName = `omega-${type}.certSigningRequest`;
-  jetpack.copy(join(appleDir, 'csr', type, 'request.csr'), join(downloadsDir, uploadName), { overwrite: true });
+  jetpack.copy(tree.find(`csr/${type}/request.csr`).path, join(downloadsDir, uploadName), { overwrite: true });
 
   const g2Note = type.endsWith('_G2')
     ? `\n           ${chalk.dim('(asked for a profile type? choose "G2 Sub-CA")')}`

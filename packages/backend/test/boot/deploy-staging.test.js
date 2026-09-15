@@ -23,7 +23,7 @@ const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const { loadConfig } = require('../helpers/_shared-config.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const BACKEND_BIN = path.resolve(__dirname, '../../bin/omega-backend');
+const BACKEND_BIN = path.resolve(__dirname, '../../bin/omega');
 
 function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-stage-'));
@@ -53,7 +53,7 @@ module.exports = defineCases({
           dependencies: { '@omega.js/brokenpkg': 'file:../brokenpkg' },
         }, null, 2));
         jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');
-        jetpack.write(path.join(targetRoot, 'config', 'omega.json5'), '{ brand: { id: \'exit-code\', name: \'Exit Code\' }, targets: { backend: {} } }');
+        jetpack.write(path.join(targetRoot, 'config', 'omega.json5'), '{ brand: { id: \'exit-code\', name: \'Exit Code\' }, targets: { backend: { type: "backend" } } }');
         jetpack.write(path.join(targetRoot, 'firebase.json'), JSON.stringify({ functions: { source: 'dist' } }, null, 2));
         jetpack.dir(path.join(tmp, 'brokenpkg'));
 
@@ -85,11 +85,12 @@ module.exports = defineCases({
         jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{
           // brand layer — must cross the upload boundary
           brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
-          targets: { backend: { flavor: 'api' }, web: {} },
+          targets: { backend: { type: 'backend', flavor: 'api' }, web: { type: 'web' } },
         }`);
         jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({
           name: 'acme-backend',
           private: true,
+          license: 'UNLICENSED',
           engines: { node: '22' },
           // The relative file: dep is spelled from the TARGET ROOT — the staged
           // manifest must respell it one level deeper (dist/)
@@ -124,6 +125,9 @@ module.exports = defineCases({
         assert.equal(manifest.name, 'acme-backend-functions');
         assert.equal(manifest.main, 'index.js');
         assert.equal(manifest.engines.node, '22');
+        // #884: the target's license rides into the artifact, so the uploaded
+        // package states the same thing the target does
+        assert.equal(manifest.license, 'UNLICENSED', "the target manifest's license carries into the staged one");
         assert.deepEqual(manifest.dependencies, {
           'firebase-admin': '^13.0.0',
           '@acme/lib': 'file:../../../libs/lib', // target-root-relative → dist-relative
@@ -146,7 +150,7 @@ module.exports = defineCases({
         // as a local layer (the wipe runs before the compose) — no staleness
         jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{
           brand: { id: 'acme', name: 'Acme Corp RENAMED', url: 'https://acme.test' },
-          targets: { backend: { flavor: 'api' }, web: {} },
+          targets: { backend: { type: 'backend', flavor: 'api' }, web: { type: 'web' } },
         }`);
         stageFunctions({ projectDir: targetRoot });
         const restaged = loadConfig(distDir, 'backend');
@@ -164,7 +168,7 @@ module.exports = defineCases({
 
         jetpack.write(path.join(tmp, 'config', 'omega.json5'), `{
           brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
-          targets: { backend: {} },
+          targets: { backend: { type: 'backend' } },
         }`);
         jetpack.write(path.join(targetRoot, 'package.json'), JSON.stringify({ name: 'acme-backend', private: true }));
         jetpack.write(path.join(targetRoot, 'src', 'index.js'), 'module.exports = 1;\n');

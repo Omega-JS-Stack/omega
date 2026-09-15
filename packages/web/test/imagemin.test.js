@@ -21,6 +21,11 @@ const path = require('node:path');
 const { test, before } = require('node:test');
 const sharp = require('sharp');
 const jetpack = require('fs-jetpack');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { processImages, devImageFallback } = require('../src/imagemin.js');
 
 let sourceDir; // pristine sources (simulates src/assets/images post-copy)
@@ -168,6 +173,7 @@ test('buildSite: imagemin phase processes the shipped images and reports back', 
     .jpeg().toFile(path.join(jetpack.dir(path.join(consumerAssets, 'images')).path(), 'photo.jpg'));
 
   const outDir = path.join(PKG, '.omega', 'imagemin-build');
+  setEnvironment('development');
   const result = await buildSite({
     consumerDir: SITE,
     siteData,

@@ -13,17 +13,28 @@
  * ONE declaration to read: the curated `site.targets` view — the same facts
  * `/download` and `/extension` render from.
  *
- *   site.targets.desktop.downloads[platform][artifact] → every desktop shortlink
- *   site.targets.extension.listings[store]             → /extension/<store>
+ *   <the desktop target>.downloads[platform][format] → every desktop shortlink
+ *   <the extension target>.listings[store]            → /extension/<store>
+ *
+ * The view is keyed by target NAME ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)),
+ * so neither target is looked up by a key spelled for its type: a desktop
+ * target named `app` declares its download shortlinks like any other.
  *
  * A download shortlink hands over the FILE, never the releases page
  * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620)): the curated
  * view's per-artifact URLs are versionless, so a desktop release never touches
  * the website and these links never change.
  *
- * Legacy parity that matters: `/download/<platform>` with no artifact points at
- * the platform's FIRST artifact — UJM's own pages sent /download/mac to
- * mac.universal and /download/linux to linux.debian.
+ * Legacy parity that matters: `/download/<platform>` with no format points at
+ * the platform's FIRST format, the way UJM's own pages sent /download/mac to
+ * the dmg and /download/linux to the .deb.
+ *
+ * The URL segments are FORMATS now, the one vocabulary
+ * ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)):
+ * `/download/mac/dmg`, `/download/windows/nsis`, `/download/linux/deb`. The
+ * words those three replaced (`mac/universal`, `windows/universal`,
+ * `linux/debian`) keep their pages as REDIRECTS to the same file: a link on a
+ * third-party listing outlives our vocabulary, and a 404 is a lost download.
  */
 const { redirectPage } = require('./redirect-page.js');
 
@@ -34,11 +45,21 @@ const KEY_PATTERN = /^[a-z][a-z0-9-]*$/;
 /** How a bad key prints in an error — readable when it is legal, quoted when not. */
 const at = (key) => (KEY_PATTERN.test(key) ? key : JSON.stringify(key));
 
+// The URL segments the format vocabulary replaced (#867), each pointing at the
+// same file its successor does. Not a dual read of anything: these are two
+// PAGES, the live one and the one an old link still asks for.
+const LEGACY_SEGMENTS = {
+  'mac/dmg': 'mac/universal',
+  'windows/nsis': 'windows/universal',
+  'linux/deb': 'linux/debian',
+};
+
 /**
- * The desktop shortlinks: one per platform (its first artifact) and one per
- * artifact, each pointing straight at that artifact's file. The platform and
- * artifact keys — and their order — are the curated view's own, which is
- * @omega.js/config's artifact catalog. A desktop target that did not opt into
+ * The desktop shortlinks: one per platform (its first format), one per format,
+ * and one per retired segment. Each points straight at that format's file, or
+ * at its store page for a format a store publishes (the snap). The platform and
+ * format keys (and their order) are the curatedview's own, which is
+ * @omega.js/config's format table. A desktop target that did not opt into
  * releases (#124) carries no `downloads` and declares nothing.
  * @param {object} [desktop] - the curated site.targets.desktop view
  * @returns {Array<{ label: string, url: string, redirect: string }>}
@@ -49,14 +70,17 @@ function readDownloads(desktop) {
 
   const entries = [];
 
-  for (const [platform, artifacts] of Object.entries(downloads)) {
-    const urls = Object.entries(artifacts || {});
+  for (const [platform, formats] of Object.entries(downloads)) {
+    const urls = Object.entries(formats || {});
     if (!urls.length) continue;
 
-    // The bare platform URL leads with the first artifact (legacy parity).
+    // The bare platform URL leads with the first format (legacy parity).
     entries.push({ label: `download.${platform}`, url: `/download/${platform}`, redirect: urls[0][1] });
-    for (const [artifact, url] of urls) {
-      entries.push({ label: `download.${platform}.${artifact}`, url: `/download/${platform}/${artifact}`, redirect: url });
+    for (const [format, url] of urls) {
+      entries.push({ label: `download.${platform}.${format}`, url: `/download/${platform}/${format}`, redirect: url });
+
+      const legacy = LEGACY_SEGMENTS[`${platform}/${format}`];
+      if (legacy) entries.push({ label: `download.${legacy.replace('/', '.')}`, url: `/download/${legacy}`, redirect: url });
     }
   }
 
@@ -101,8 +125,17 @@ function readListings(extension) {
  * @returns {Array<{ label: string, url: string, redirect: string }>}
  */
 function readTargetShortlinks(site) {
-  const targets = site && site.targets;
-  return [...readDownloads(targets && targets.desktop), ...readListings(targets && targets.extension)];
+  const entries = Object.values((site && site.targets) || {});
+
+  // The curated view carries the facts, not the raw `type`, so a target is
+  // desktop or extension by the fact ONLY that type derives (the same test
+  // @omega.js/config's site-global applies when it curates them). The first
+  // target of each kind owns the shortlink namespace: /download/<platform>
+  // and /extension/<store> are one URL space per brand.
+  return [
+    ...readDownloads(entries.find((entry) => entry && entry.downloads)),
+    ...readListings(entries.find((entry) => entry && entry.listings)),
+  ];
 }
 
 /**

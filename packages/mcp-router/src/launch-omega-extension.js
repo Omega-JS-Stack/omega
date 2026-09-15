@@ -2,11 +2,15 @@
 /**
  * The `omega-extension` upstream's launcher.
  *
- * The extension MCP server lives inside @omega.js/manager, at
- * `extension/mcp-server/index.js`. This resolves the manager's package root
- * from its main export — the exports map deliberately has no `./package.json`
- * entry, so the root is the main file's directory's parent — and runs the
- * server with stdio forwarded to the router.
+ * The extension MCP server ships INSIDE this package, at
+ * `servers/omega-extension/index.js`
+ * ([#927](https://github.com/Omega-JS-Stack/omega/issues/927)). It used to live
+ * in `@omega.js/manager`'s `extension/` tree, which that package never
+ * publishes, so the upstream could not start on any install but a monorepo
+ * checkout. There is nothing to resolve any more: the server is a file this
+ * package ships, and everything it imports (the MCP SDK, `ws`) is a dependency
+ * of this package. So the launcher runs it on this node with stdio forwarded to
+ * the router.
  */
 
 const fs = require('node:fs');
@@ -15,49 +19,28 @@ const { spawn } = require('node:child_process');
 
 const { log } = require('./lib/log.js');
 
-const MANAGER_PACKAGE = '@omega.js/manager';
-const SERVER_RELATIVE = path.join('extension', 'mcp-server', 'index.js');
+const SERVER = path.join(__dirname, '..', 'servers', 'omega-extension', 'index.js');
 
 /**
- * The installed @omega.js/manager package root.
+ * The extension MCP server this package ships.
  *
- * @param {object} [options] - `{ resolve }` — the resolver seam (defaults to require.resolve)
- * @returns {string|null} Absolute package root, or null when the manager is not installed
- */
-function resolveManagerRoot(options = {}) {
-  const resolve = options.resolve || require.resolve;
-  const exists = options.exists || fs.existsSync;
-  try {
-    // main is dist/index.js — two dirnames up from it is the package root.
-    return path.dirname(path.dirname(resolve(MANAGER_PACKAGE)));
-  } catch {
-    // A bare checkout has no workspace links, but the manager package sits
-    // beside this one in the monorepo.
-    const sibling = path.join(__dirname, '..', '..', 'manager');
-    return exists(path.join(sibling, 'package.json')) ? sibling : null;
-  }
-}
-
-/**
- * The extension MCP server entry inside an installed manager.
- *
- * @param {object} [options] - `{ resolve, exists }` seams for tests
+ * @param {object} [options] - `{ exists }`, the existence seam (defaults to fs.existsSync)
  * @returns {{server: string}|{error: string}} The entry path, or why there is none
  */
 function resolveServerPath(options = {}) {
   const exists = options.exists || fs.existsSync;
-  const root = resolveManagerRoot(options);
-  if (!root) return { error: `${MANAGER_PACKAGE} is not installed — the omega-extension upstream needs it on disk.` };
 
-  const server = path.join(root, SERVER_RELATIVE);
-  if (!exists(server)) return { error: `${MANAGER_PACKAGE} is installed at ${root} but ${SERVER_RELATIVE} is missing.` };
-  return { server };
+  // The only way this misses is a broken install of this package, so it says so
+  // rather than pointing at anything the user could install.
+  if (!exists(SERVER)) return { error: `${SERVER} is missing: @omega.js/mcp-router ships the omega-extension server itself, so this install is incomplete.` };
+
+  return { server: SERVER };
 }
 
 /**
  * Resolve the server and run it.
  *
- * @param {object} [options] - `{ resolve, exists, spawn, exit, execPath }` seams for tests
+ * @param {object} [options] - `{ exists, spawn, exit, execPath }` seams for tests
  * @returns {void}
  */
 function main(options = {}) {
@@ -70,21 +53,11 @@ function main(options = {}) {
     return exit(1);
   }
 
-  // NODE_PATH carries this package's node_modules to the server: in a bare
-  // checkout the manager tree has none of its own, and the server's imports
-  // (the MCP SDK, ws) are declared here for exactly this launch. Ancestor
-  // node_modules still win wherever the monorepo is installed.
-  const nodePath = [path.join(__dirname, '..', 'node_modules'), process.env.NODE_PATH]
-    .filter(Boolean)
-    .join(path.delimiter);
-  const child = spawnFn(options.execPath || process.execPath, [resolved.server], {
-    stdio: 'inherit',
-    env: { ...process.env, NODE_PATH: nodePath },
-  });
+  const child = spawnFn(options.execPath || process.execPath, [resolved.server], { stdio: 'inherit' });
   child.on('exit', (code, signal) => exit(signal ? 1 : code ?? 0));
   return undefined;
 }
 
-module.exports = { resolveManagerRoot, resolveServerPath, main };
+module.exports = { SERVER, resolveServerPath, main };
 
 if (require.main === module) main();

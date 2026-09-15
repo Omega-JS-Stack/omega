@@ -61,15 +61,25 @@ omega_brand_root() {
   done
 }
 
-# omega_config_target_keys <config/omega.json5>
-# The immediate child keys of the config's `targets` block, one per line. The
-# config is JSON5 (comments, unquoted keys, trailing commas), so jq cannot read
-# it and a key scan is the whole job: brace-depth tracking from the `targets:`
-# line, printing keys at depth 1. Nothing here is load-bearing — a miss just
-# means the key's skill has to come from the target's own manifest.
-omega_config_target_keys() {
+# omega_config_target_types <config/omega.json5>
+# The `type` every entry of the config's `targets` block declares, one per
+# line. A target's KEY is its NAME now (#886), so the key says nothing about
+# which framework runs there and only `type` does. The config is JSON5
+# (comments, unquoted keys, trailing commas), so jq cannot read it and a scan
+# is the whole job: brace-depth tracking from the `targets:` line, reading each
+# entry's type, inline (`web: { type: 'web' }`) or on its own line one level
+# in. Nothing here is load-bearing: a miss just means the target's skill has to
+# come from the target's own manifest.
+omega_config_target_types() {
   [ -r "$1" ] || return 0
   awk '
+    function type_of(text,   value) {
+      if (match(text, /["'"'"']?type["'"'"']?[[:space:]]*:[[:space:]]*["'"'"']?[A-Za-z][A-Za-z0-9_-]*/) == 0) return ""
+      value = substr(text, RSTART, RLENGTH)
+      sub(/^.*:[[:space:]]*/, "", value)
+      gsub(/["'"'"']/, "", value)
+      return value
+    }
     BEGIN { started = 0; depth = 0 }
     {
       line = $0
@@ -83,12 +93,11 @@ omega_config_target_keys() {
       next
     }
     {
-      if (depth == 1 && line ~ /^[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_-]*["'"'"']?[[:space:]]*:/) {
-        key = line
-        sub(/^[[:space:]]*/, "", key)
-        sub(/[[:space:]]*:.*$/, "", key)
-        gsub(/["'"'"']/, "", key)
-        print key
+      # Depth 1 is an entry KEY line, where an INLINE entry carries its type;
+      # depth 2 is the keys of that entry, where a multi-line entry spells it.
+      if (depth == 1 || depth == 2) {
+        found = type_of(line)
+        if (found != "") print found
       }
       depth += gsub(/\{/, "{", line) - gsub(/\}/, "}", line)
       if (depth <= 0) exit
@@ -100,11 +109,12 @@ omega_config_target_keys() {
 # Every skill a brand session needs, one per line, unsorted and possibly
 # repeated: omega:main and omega:manager (always, in a brand), plus one skill
 # per target — read from every targets/*/package.json (and the functions/
-# manifest a Firebase backend keeps its framework in) AND from the config's
-# own target keys, so a target declared before its directory exists still
-# counts. A target no framework owns contributes nothing.
+# manifest a Firebase backend keeps its framework in) AND from the `type` each
+# config target declares, so a target declared before its directory exists
+# still counts, whatever the brand NAMED it (#886). A target no framework owns
+# contributes nothing.
 omega_brand_skills() {
-  local root="$1" manifest dep key
+  local root="$1" manifest dep declared
   echo 'omega:main'
   echo 'omega:manager'
 
@@ -116,10 +126,10 @@ omega_brand_skills() {
     done < <(omega_manifest_deps "$manifest")
   done
 
-  while read -r key; do
-    [ -n "$key" ] || continue
-    omega_skill_for "$key"
-  done < <(omega_config_target_keys "$root/config/omega.json5")
+  while read -r declared; do
+    [ -n "$declared" ] || continue
+    omega_skill_for "$declared"
+  done < <(omega_config_target_types "$root/config/omega.json5")
 }
 
 # omega_theme_surface <path-relative-to-a-package-or-target-root>

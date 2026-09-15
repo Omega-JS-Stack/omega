@@ -51,7 +51,7 @@ function stageBrand() {
 function brandConfig(overrides = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     cloud: { shared: false },
     ...overrides,
   };
@@ -189,10 +189,10 @@ test('migrations: registered after account, before bookmark, with every collecti
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('account') + 1], 'migrations');
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('migrations') + 1], 'bookmark');
   assert.deepEqual(OPERATIONS.migrations.map((o) => o.name),
-    ['targets-rename', 'notifications', 'users', 'orders', 'payments-intents', 'payment-provider', 'state-retirement']);
-  // the two LOCAL migrations — the brand's own files, not Firestore
+    ['targets-rename', 'platform-names', 'notifications', 'users', 'orders', 'payments-intents', 'payment-provider', 'state-retirement']);
+  // the three LOCAL migrations: the brand's own files, not Firestore
   assert.deepEqual(OPERATIONS.migrations.filter((o) => o.local).map((o) => o.name),
-    ['targets-rename', 'state-retirement']);
+    ['targets-rename', 'platform-names', 'state-retirement']);
 });
 
 test('migrations: FieldValue.delete() is a stable identity sentinel', () => {
@@ -1164,8 +1164,9 @@ test('migrations: bare --migration runs every registered migration in order', as
   ]);
   assert.deepEqual(firestore.mutations(), []);
   assert.deepEqual(Object.keys(result.output), [
-    // The folder shape comes first: nothing to rename under the fixture root
-    'targetsRename',
+    // The folder shape comes first: nothing to rename under the fixture root,
+    // and no retired platform key in its config either
+    'targetsRename', 'platformNames',
     'notifications', 'users', 'payments-orders', 'payments-intents',
     'payment-provider:users', 'payment-provider:payments-orders', 'payment-provider:payments-intents',
     'payment-provider:payments-webhooks', 'payment-provider:payments-disputes',
@@ -1203,6 +1204,25 @@ test('migrations: --limit caps processed docs and the page size', async () => {
   assert.deepEqual(firestore.of('listDocs').map((c) => c.args),
     [['notifications', { pageSize: 2, pageToken: null }]]);
   assert.equal(result.output.notifications.totalDocs, 2);
+});
+
+test('migrations: --limit arrives from the CLI as a STRING, and "0" is no limit (#920)', async () => {
+  const docs = [convergedNotification('n1'), convergedNotification('n2'), convergedNotification('n3')];
+
+  // The parse hands a value flag through as text, so the cap has to be read as
+  // a number: `'0' || 0` is truthy, which capped the batch at zero documents.
+  const capped = await runService(brandConfig(), {
+    auth: fakeAuth({}), firestore: collectionOf(docs), options: { migration: 'notifications', limit: '2' },
+  });
+  assert.equal(capped.output.notifications.totalDocs, 2);
+
+  const firestore = collectionOf(docs);
+  const unlimited = await runService(brandConfig(), {
+    auth: fakeAuth({}), firestore, options: { migration: 'notifications', limit: '0' },
+  });
+  assert.equal(unlimited.output.notifications.totalDocs, 3, '--limit 0 processes everything');
+  assert.deepEqual(firestore.of('listDocs').map((c) => c.args),
+    [['notifications', { pageSize: 500, pageToken: null }]]);
 });
 
 test('migrations: pagination follows nextPageToken across pages', async () => {
@@ -1333,7 +1353,7 @@ test('state-retirement: every state key is either moved to a named home or expli
 
 test('state-retirement: a legacy `website` stream key lands on the web target (#505)', () => {
   // omega-manager-era state files key the web stream by its DIR name — passed
-  // through it composes `targets.website`, a target validateConfig rejects
+  // through it composes `targets.website`, a target the brand never declares
   const moves = stateRetirement.planMoves({
     analytics: { streams: { website: { measurementId: 'G-LEGACY', apiSecret: 'legacy-secret' } } },
   }, RETIREMENT_CONFIG);
@@ -1342,6 +1362,20 @@ test('state-retirement: a legacy `website` stream key lands on the web target (#
   assert.equal(by('analytics.streams.website.measurementId').config, 'targets.web.analytics.providers.google.id');
   assert.equal(by('analytics.streams.website.apiSecret').env, 'GOOGLE_ANALYTICS_SECRET_WEB');
   assert.ok(moves.every((move) => !(move.config || '').startsWith('targets.website')), 'no move composes targets.website');
+});
+
+test('state-retirement: a brand that DECLARES `website` keeps its own name (#886)', () => {
+  // `website: { type: 'web' }` is a legal target name now, so the legacy
+  // remap must not rewrite a key the brand is actually using
+  const moves = stateRetirement.planMoves({
+    analytics: { streams: { website: { measurementId: 'G-OWN', apiSecret: 'own-secret' } } },
+  }, { targets: { website: { type: 'web' } } });
+
+  const by = (from) => moves.find((move) => move.from === from);
+  assert.equal(by('analytics.streams.website.measurementId').config, 'targets.website.analytics.providers.google.id');
+  // The .env key is the env schema's, spelled per TYPE (#678): only
+  // GOOGLE_ANALYTICS_SECRET_WEB is declared for a web stream
+  assert.equal(by('analytics.streams.website.apiSecret').env, 'GOOGLE_ANALYTICS_SECRET_WEB');
 });
 
 test('state-retirement: an audit run reports the plan and writes nothing', async () => {
@@ -1529,4 +1563,100 @@ test('targets-rename: BOTH folders fails loudly instead of guessing', async () =
 
   assert.equal(jetpack.exists(join(root, 'apps', 'website')), 'dir', 'nothing is moved');
   assert.deepEqual(readManifest(root).workspaces, ['apps/*'], 'nothing is rewritten');
+});
+
+// ─── platform-names (#867): the third LOCAL migration ────────────────────────
+
+const platformNames = require('../src/services/migrations/ensure/platform-names.js');
+
+const runPlatformNames = (root, options = {}) => platformNames({ brandRoot: root, options });
+
+/** A brand whose config (and optionally a target's own) still says `win`/`snap`. */
+function stagePlatformBrand({ brand = null, target = null, icons = [] } = {}) {
+  const root = stageBrand();
+
+  if (brand) jetpack.write(join(root, 'config', 'omega.json5'), brand);
+  if (target) jetpack.write(join(root, 'targets', 'desktop', 'config', 'omega.json5'), target);
+  for (const dir of icons) jetpack.write(join(root, dir, 'config', 'icons', 'macos', 'icon.png'), 'png-bytes');
+
+  return root;
+}
+
+const readJson5 = (file) => require('json5').parse(jetpack.read(file));
+
+test('platform-names: a converged brand is a clean no-op', async () => {
+  const root = stagePlatformBrand({
+    brand: '{\n  brand: { id: "b" },\n  targets: {\n    desktop: { type: "desktop", platforms: { windows: { arch: ["x64"] }, linux: { formats: { snap: {} } } } },\n  },\n}\n',
+  });
+
+  const result = await runPlatformNames(root, { execute: true });
+
+  assert.deepEqual(result.output.platformNames, { migrated: false });
+});
+
+test('platform-names: the default run audits, naming every key, writing nothing', async () => {
+  const brand = '{\n  brand: { id: "b" },\n  targets: {\n    desktop: {\n      type: "desktop",\n      platforms: {\n        win: { arch: ["x64"], oneClick: false },\n        linux: { snap: { enabled: true, channels: ["edge"] } },\n      },\n    },\n  },\n}\n';
+  const root = stagePlatformBrand({ brand, icons: ['.'] });
+  const before = jetpack.read(join(root, 'config', 'omega.json5'));
+
+  const result = await runPlatformNames(root);
+
+  assert.equal(result.output.platformNames.audit, true);
+  assert.deepEqual(result.output.platformNames.keys, ['targets.desktop.platforms.win', 'targets.desktop.platforms.linux.snap']);
+  assert.deepEqual(result.output.platformNames.icons, [root]);
+  assert.equal(jetpack.read(join(root, 'config', 'omega.json5')), before, 'the file is byte-identical');
+  assert.equal(jetpack.exists(join(root, 'config', 'icons', 'macos')), 'dir', 'the icon dir is untouched');
+});
+
+test('platform-names: --execute rewrites the keys, keeps the settings, and renames the icon dir', async () => {
+  const brand = '{\n  brand: { id: "b" },\n  targets: {\n    desktop: {\n      type: "desktop",\n      platforms: {\n        win: { arch: ["x64"], oneClick: false },\n        linux: { arch: ["x64"], snap: { enabled: true, channels: ["edge"], grade: "devel" } },\n      },\n    },\n  },\n}\n';
+  const root = stagePlatformBrand({ brand, icons: ['.', join('targets', 'desktop')] });
+
+  const result = await runPlatformNames(root, { execute: true });
+
+  assert.equal(result.output.platformNames.migrated, true);
+
+  const config = readJson5(join(root, 'config', 'omega.json5'));
+  const platforms = config.targets.desktop.platforms;
+  assert.equal(platforms.win, undefined, 'the retired key is gone: there is no dual read');
+  assert.deepEqual(platforms.windows, { arch: ['x64'], oneClick: false }, 'every setting travels');
+  assert.equal(platforms.linux.snap, undefined);
+  assert.deepEqual(platforms.linux.formats.snap, { channels: ['edge'], grade: 'devel' },
+    'the snap settings move INSIDE the format, and the `enabled` flag is dropped');
+  assert.deepEqual(platforms.linux.arch, ['x64'], 'the platform keeps its own install knobs');
+
+  for (const dir of [root, join(root, 'targets', 'desktop')]) {
+    assert.equal(jetpack.exists(join(dir, 'config', 'icons', 'macos')), false);
+    assert.equal(jetpack.read(join(dir, 'config', 'icons', 'mac', 'icon.png')), 'png-bytes');
+  }
+
+  // Idempotent: the rerun finds nothing left to move
+  const again = await runPlatformNames(root, { execute: true });
+  assert.deepEqual(again.output.platformNames, { migrated: false });
+});
+
+test('platform-names: a disabled snap becomes the `false` that drops the format', async () => {
+  const root = stagePlatformBrand({
+    target: '{\n  platforms: {\n    linux: { snap: { enabled: false, channels: ["stable"] } },\n  },\n}\n',
+  });
+
+  const result = await runPlatformNames(root, { execute: true });
+
+  assert.deepEqual(result.output.platformNames.keys, ['platforms.linux.snap']);
+  const config = readJson5(join(root, 'targets', 'desktop', 'config', 'omega.json5'));
+  assert.equal(config.platforms.linux.formats.snap, false, 'presence is the switch, so `false` is the whole statement');
+});
+
+test('platform-names: the keys are swept in EVERY file a brand owns, target files included', async () => {
+  const root = stagePlatformBrand({
+    brand: '{\n  brand: { id: "b" },\n  targets: {\n    app: { type: "desktop", platforms: { win: { arch: ["x64"] } } },\n  },\n}\n',
+    target: '{\n  platforms: {\n    win: { oneClick: true },\n  },\n}\n',
+  });
+
+  const result = await runPlatformNames(root, { execute: true });
+
+  assert.deepEqual(result.output.platformNames.keys, ['targets.app.platforms.win', 'platforms.win'],
+    'the brand file names the key under its target, the target file at the top level');
+  assert.deepEqual(readJson5(join(root, 'config', 'omega.json5')).targets.app.platforms.windows, { arch: ['x64'] });
+  assert.deepEqual(readJson5(join(root, 'targets', 'desktop', 'config', 'omega.json5')).platforms.windows, { oneClick: true });
 });

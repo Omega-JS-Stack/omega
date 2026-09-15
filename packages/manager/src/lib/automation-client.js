@@ -1,6 +1,7 @@
 /**
- * Automation client — drives the companion Chrome extension (extension/)
- * over its WebSocket protocol. The manager side is the SERVER: it listens
+ * Automation client: drives the OMEGA Companion extension (the OMEGA brand's
+ * own extension target since #927, installed from the Chrome Web Store or
+ * loaded unpacked) over its WebSocket protocol. The manager side is the SERVER: it listens
  * on the port the extension auto-connects to (ws://localhost:9876,
  * reconnecting every 5s), then sends OMEGA_AUTOMATE commands and awaits
  * OMEGA_AUTOMATE_RESULT responses by correlation id. The extension turns

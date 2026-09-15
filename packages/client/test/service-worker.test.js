@@ -142,3 +142,29 @@ describe('Service Worker under a URL-path mount', () => {
     }]);
   });
 });
+
+// #817: the worker payload's `environment` is read through the ONE
+// environment surface, the same module every OMEGA target answers from, never
+// off `config.environment` by hand: an artifact that baked no environment fails
+// the registration by name instead of handing the worker `undefined`.
+describe('Service Worker environment fact', () => {
+  let container;
+
+  afterEach(() => {
+    container?.restore();
+    container = null;
+  });
+
+  it('should fail registration by name when the artifact baked no environment', async () => {
+    const manager = getManager();
+    const { environment, ...withoutEnvironment } = TEST_CONFIG;
+
+    // Registered by hand, off a boot whose own SW branch is disabled, so the
+    // rejection under test is this call's and not the boot's.
+    await manager.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
+    container = instrumentContainer();
+
+    await assert.rejects(() => manager.serviceWorker().register({}), /OMEGA_ENVIRONMENT/);
+    assert.strictEqual(container.calls.register, 0, 'nothing was registered on a broken artifact');
+  });
+});

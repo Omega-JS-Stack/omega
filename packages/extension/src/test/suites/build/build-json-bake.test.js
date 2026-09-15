@@ -1,14 +1,12 @@
 // The OMEGA_BUILD_JSON bake, bundle lane
 // ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
 //
-// The snapshot an extension context reads is composed here and BAKED into every
-// emitted bundle two ways — `define` replaces the bare identifier at compile
-// time, `banner` prepends the globalThis/self/window assignment — which is the
-// shape @omega.js/desktop has always used. It used to be a
-// `packaged/<target>/raw/build.js` JSONP file the service worker
-// importScripts()'d and every page loaded with its own <script> tag, plus a
-// `build.json` sidecar nothing read; both files are gone, so what this suite
-// pins is that the artifact still carries the same facts.
+// The snapshot an extension context reads is composed here and written ONCE, as
+// `dist/build.js`: the page template loads it with a script tag, background.js
+// with importScripts, and package.js copies it into every packaged raw dir. It
+// rode in every emitted bundle as an esbuild `define` plus a `banner` for a
+// while, one config copied into 21 files; what this suite pins is the one file,
+// the bundles carrying no copy of their own, and the facts inside it.
 //
 // The composition cases moved here from package-task.test.js with the code:
 // `cloud` reaching the snapshot is what the SW's Firebase auth lives or dies by
@@ -73,31 +71,28 @@ async function inProject(dir, fn) {
   }
 }
 
-// An entry that reads the snapshot BOTH ways the bake delivers it: the bare
-// identifier the `define` replaces at compile time, and the globals the `banner`
-// assigns at load time (`self` is what background.js reads, `window`/`globalThis`
-// what every page context reads). The global reads are guarded so the body can
-// also be run on its OWN, with no banner in scope — that run is what tells the
-// two mechanisms apart.
+// An entry that reads the snapshot the way every extension context reads it:
+// off the globals `/build.js` assigned (`self` is what background.js reads,
+// `window`/`globalThis` what every page context reads). Guarded, so the same
+// bundle can be run with NO build.js loaded first: that run is what proves the
+// bundle carries no copy of its own any more.
 const PROBE_ENTRY = [
-  'globalThis.__fromDefine = OMEGA_BUILD_JSON.config.brand.id;',
   'try { globalThis.__fromGlobal = globalThis.OMEGA_BUILD_JSON.config.brand.id; } catch (e) { globalThis.__fromGlobal = null; }',
   'try { globalThis.__fromSelf = self.OMEGA_BUILD_JSON.config.brand.id; } catch (e) { globalThis.__fromSelf = null; }',
   '',
 ].join('\n');
 
-// Run an emitted bundle the way a browser would — it is a self-contained iife
-// with no imports and no chrome APIs — and hand back what it set.
+// Run an emitted bundle the way a browser would (it is a self-contained iife
+// with no imports and no chrome APIs) and hand back what it set.
 //
-// `banner: false` runs everything BUT the first line, in a scope where nothing
-// has assigned OMEGA_BUILD_JSON. Only the compile-time `define` can answer there,
-// so this is what proves the define is doing work rather than the banner's global
-// quietly covering for it.
+// `loader` is the build.js the context loaded first, exactly as a page's script
+// tag or the worker's importScripts does; without it the scope has no snapshot
+// at all, which is what a bundle that still carried its own copy would hide.
 function runBundleFile(file, options = {}) {
-  const source = fs.readFileSync(file, 'utf8');
   const scope = {};
   scope.self = scope;
-  vm.runInNewContext(options.banner === false ? source.slice(source.indexOf('\n') + 1) : source, scope);
+  if (options.loader) vm.runInNewContext(fs.readFileSync(options.loader, 'utf8'), scope);
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), scope);
   return scope;
 }
 
@@ -108,12 +103,12 @@ module.exports = defineCases({
   timeout: 120000,
   tests: [
     {
-      name: 'every emitted bundle carries the snapshot as a define AND as the global (#743)',
+      name: 'the build writes ONE dist/build.js, and the bundles carry no copy (#743)',
       run: async (ctx) => {
         const tmp = stageProject({
           config: `{
             brand: { id: 'staged', name: 'Staged' },
-            targets: { extension: {} },
+            targets: { extension: { type: 'extension' } },
           }`,
           files: {
             // The service worker's entry and a page entry — the two contexts the
@@ -127,28 +122,29 @@ module.exports = defineCases({
             const failure = await new Promise((resolve) => task.bundleTask(resolve));
             ctx.expect(failure).toBe(undefined);
 
+            // ONE file, at the root a page's `/build.js` and the worker's
+            // importScripts both resolve against.
+            const loader = path.join(tmp, 'dist', 'build.js');
+            ctx.expect(fs.existsSync(loader)).toBe(true);
+            ctx.expect(readBakedBuildJson(loader).config.brand.id).toBe('staged');
+
             for (const name of ['background', 'popup']) {
               const emitted = path.join(tmp, 'dist', 'assets', 'js', 'components', `${name}.bundle.js`);
               ctx.expect(fs.existsSync(emitted)).toBe(true);
 
-              // The banner IS the first line — it has to land ahead of the
-              // bundle's own code, which is the load order the SW's
-              // importScripts('/build.js') used to buy.
-              ctx.expect(readBakedBuildJson(emitted).config.brand.id).toBe('staged');
-
-              // banner: globalThis and self both answer, the two names the
-              // page contexts and the service worker read (#743)
-              const ran = runBundleFile(emitted);
+              // Loaded the way the artifact loads it: build.js first, then the
+              // bundle. `self` and `globalThis` both answer, the two names the
+              // service worker and every page context read.
+              const ran = runBundleFile(emitted, { loader });
               ctx.expect(ran.__fromGlobal).toBe('staged');
               ctx.expect(ran.__fromSelf).toBe('staged');
 
-              // define: the bare identifier became the literal at compile time —
-              // it still answers with the banner line withheld, where nothing
-              // has assigned the global at all.
-              const bare = runBundleFile(emitted, { banner: false });
-              ctx.expect(bare.__fromDefine).toBe('staged');
-              ctx.expect(bare.__fromGlobal).toBe(null);
-              ctx.expect(bare.__fromSelf).toBe(null);
+              // With no build.js loaded, the bundle has nothing: no banner, no
+              // define, no second copy of the config in the file a store reads.
+              const alone = runBundleFile(emitted);
+              ctx.expect(alone.__fromGlobal).toBe(null);
+              ctx.expect(alone.__fromSelf).toBe(null);
+              ctx.expect(fs.readFileSync(emitted, 'utf8').includes('OMEGA_BUILD_JSON = {')).toBe(false);
             }
           });
         } finally {
@@ -157,23 +153,29 @@ module.exports = defineCases({
       },
     },
     {
-      // The boot lane is what proves a BROWSER resolves the bake, and it runs
-      // against the checked-in fixture rather than a build. That only means
-      // anything while the fixture carries the banner this generator emits — so
-      // the shape (the IIFE, the three scopes it assigns) is pinned here against
-      // the live function. Change buildJsonBanner and this fails until the
-      // fixture is regenerated.
-      name: 'the boot fixture carries the banner buildJsonBanner emits, per bundle (#743)',
+      // The boot lane is what proves a BROWSER resolves the snapshot, and it
+      // runs against the checked-in fixture rather than a build. That only means
+      // anything while the fixture is shaped like a real artifact: one build.js
+      // at its root, the worker loading it with importScripts and the page with
+      // a script tag, and neither bundle carrying a copy of its own.
+      name: 'the boot fixture is a real artifact: one build.js, loaded by both contexts (#743)',
       run: async (ctx) => {
-        const task = require(TASK_PATH);
+        const loader = path.join(FIXTURE, 'build.js');
+        const source = fs.readFileSync(loader, 'utf8');
+
+        // The same two statements devkit writes (@omega.js/devkit/build-json)
+        ctx.expect(source.startsWith('self.OMEGA_BUILD_JSON = {')).toBe(true);
+        ctx.expect(source.includes('\nself.OMEGA_BUILD_JSON.config.dev = ')).toBe(true);
+        ctx.expect(readBakedBuildJson(loader).config.brand.id).toBe('bxm-fixture');
+
+        // The worker's first line, and the page's first script
+        ctx.expect(fs.readFileSync(path.join(FIXTURE, 'background.js'), 'utf8').split('\n', 1)[0])
+          .toBe("importScripts('/build.js');");
+        const popup = fs.readFileSync(path.join(FIXTURE, 'popup.html'), 'utf8');
+        ctx.expect(popup.indexOf('src="/build.js"') < popup.indexOf('src="popup.bundle.js"')).toBe(true);
 
         for (const file of ['background.js', 'popup.bundle.js']) {
-          const full = path.join(FIXTURE, file);
-          const firstLine = fs.readFileSync(full, 'utf8').split('\n', 1)[0];
-
-          ctx.expect(firstLine).toBe(task.buildJsonBanner(readBakedBuildJson(full)).js);
-          // Every bundle carries its OWN copy — that is what replaced the single file.
-          ctx.expect(readBakedBuildJson(full).config.brand.id).toBe('bxm-fixture');
+          ctx.expect(fs.readFileSync(path.join(FIXTURE, file), 'utf8').includes('OMEGA_BUILD_JSON = {')).toBe(false);
         }
       },
     },
@@ -184,7 +186,7 @@ module.exports = defineCases({
           config: `{
             brand: { id: 'staged', name: 'Staged' },
             cloud: { config: { apiKey: 'AIza-staged', projectId: 'demo-staged', appId: '1:2:web:3' } },
-            targets: { extension: {} },
+            targets: { extension: { type: 'extension' } },
           }`,
         });
         try {
@@ -193,8 +195,10 @@ module.exports = defineCases({
 
             ctx.expect(buildJson.config.cloud.config.apiKey).toBe('AIza-staged');
             ctx.expect(buildJson.config.cloud.config.projectId).toBe('demo-staged');
-            // Without it the service worker's Firebase auth never initializes
-            ctx.expect(buildJson.config.firebase.app.enabled).toBe(true);
+            // Without it the service worker's Firebase auth never initializes.
+            // `cloud.config` is the CANONICAL home @omega.js/client boots from,
+            // so the bake no longer mirrors it into a `firebase` blob (#894).
+            ctx.expect(buildJson.config.firebase).toBeUndefined();
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -205,7 +209,7 @@ module.exports = defineCases({
       name: 'the snapshot records the build\'s license verdict, outside the client config (#320)',
       run: async (ctx) => {
         const tmp = stageProject({
-          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: {} } }`,
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
         });
         try {
           await inProject(tmp, async (task) => {
@@ -223,16 +227,117 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'cloud is an empty object when config/omega.json5 declares none',
+      name: 'a brand that declares no cloud bakes no cloud at all',
       run: async (ctx) => {
         const tmp = stageProject({});
         try {
           await inProject(tmp, async (task) => {
             const buildJson = await task.composeBuildJson();
-            ctx.expect(buildJson.config.cloud).toEqual({});
-            ctx.expect(buildJson.config.firebase.app.enabled).toBe(false);
+            // An absent section is absent, never an empty blob the client has
+            // to tell apart from a real one (#894).
+            ctx.expect(buildJson.config.cloud).toBeUndefined();
+            ctx.expect(buildJson.config.firebase).toBeUndefined();
           });
         } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    // #894: the wrapper and the subset are the SAME on every browser surface.
+    // The hand-written allow list this replaced is what made the extension's
+    // snapshot a third shape: a value went public here, in web's engine and in
+    // desktop's bundle task, three times, and every one of them could be the
+    // place it leaked.
+    {
+      name: 'the wrapper is { config, package, mode, license, builtAt }, desktop\'s shape (#894)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            const buildJson = await task.composeBuildJson();
+
+            ctx.expect(Object.keys(buildJson).sort()).toEqual(['builtAt', 'config', 'license', 'mode', 'package']);
+            ctx.expect(buildJson.package.name).toBe('staged-ext');
+            ctx.expect(buildJson.package.version).toBe('3.1.4');
+            ctx.expect(buildJson.mode.environment).toBe('testing');
+            ctx.expect(typeof buildJson.builtAt).toBe('string');
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the snapshot carries the client sections and NO credential section (#894)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{
+            brand: { id: 'staged', name: 'Staged' },
+            theme: { id: 'classy' },
+            analytics: { providers: { google: { id: 'G-STAGED' } } },
+            cloud: { config: { apiKey: 'AIza-staged' }, billingAccount: '01ABCD-234567-89EFGH' },
+            certificates: { providers: { apple: { teamId: 'TEAM' } } },
+            account: { admins: [{ email: 'root@staged.com' }] },
+            repo: { provider: 'github', org: 'Staged-Org' },
+            targets: { extension: { type: 'extension', listings: { chrome: { id: 'abcdefghijklmnopqrstuvwxyzabcdef' } } } },
+          }`,
+        });
+        try {
+          await inProject(tmp, async (task) => {
+            const config = (await task.composeBuildJson()).config;
+
+            ctx.expect(config.brand.id).toBe('staged');
+            ctx.expect(config.theme.id).toBe('classy');
+            ctx.expect(config.analytics.providers.google.id).toBe('G-STAGED');
+            ctx.expect(config.listings.chrome.id).toBe('abcdefghijklmnopqrstuvwxyzabcdef');
+            // The build facts every surface spells the same way
+            ctx.expect(config.runtime).toBe('browser-extension');
+            ctx.expect(config.version).toBe('3.1.4');
+            ctx.expect(typeof config.buildTime).toBe('number');
+            // The live-reload port rides the local stack's own map (#896)
+            ctx.expect(config.dev.liveReloadPort).toBeGreaterThan(0);
+            ctx.expect(config.omega).toBeUndefined();
+
+            // A store artifact is public: nothing that provisions the brand
+            // rides in it.
+            ctx.expect(config.certificates).toBeUndefined();
+            ctx.expect(config.account).toBeUndefined();
+            ctx.expect(config.repo).toBeUndefined();
+            ctx.expect(config.cloud.billingAccount).toBeUndefined();
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the Measurement Protocol secret is baked AFTER the subset gate, the one sanctioned .env value (#626)',
+      run: async (ctx) => {
+        const tmp = stageProject({
+          config: `{
+            brand: { id: 'staged', name: 'Staged' },
+            analytics: { providers: { google: { id: 'G-STAGED' } } },
+            targets: { extension: { type: 'extension' } },
+          }`,
+        });
+        const previous = process.env.GOOGLE_ANALYTICS_SECRET;
+        process.env.GOOGLE_ANALYTICS_SECRET = 'mp-secret';
+        try {
+          await inProject(tmp, async (task) => {
+            const config = (await task.composeBuildJson()).config;
+
+            // publicAtRest (docs/shared/config.md): the SW sends Measurement
+            // Protocol events itself, so this one value is sanctioned into the
+            // artifact. It never travels through clientConfig, which refuses
+            // secret-shaped keys outright.
+            ctx.expect(config.analytics.providers.google.id).toBe('G-STAGED');
+            ctx.expect(config.analytics.providers.google.secret).toBe('mp-secret');
+          });
+        } finally {
+          if (previous === undefined) delete process.env.GOOGLE_ANALYTICS_SECRET;
+          else process.env.GOOGLE_ANALYTICS_SECRET = previous;
           fs.rmSync(tmp, { recursive: true, force: true });
         }
       },
@@ -253,8 +358,8 @@ module.exports = defineCases({
 
         // …and a live WEBSITE publishing its resolved origin beside its port —
         // bumped AND https, the pair a port number alone can never express (#262)
-        fs.mkdirSync(path.join(brand, 'targets', 'website', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'website', '.temp', 'ports.json'), JSON.stringify({
+        fs.mkdirSync(path.join(brand, 'targets', 'web', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'targets', 'web', '.temp', 'ports.json'), JSON.stringify({
           ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
         }));
 
@@ -262,13 +367,15 @@ module.exports = defineCases({
         fs.mkdirSync(app, { recursive: true });
         fs.writeFileSync(path.join(app, 'package.json'), `{ "name": "staged-ext", "version": "3.1.4" }`);
 
-        // The runner itself exports OMEGA_TEST_MODE, and getEnvironment() reads
-        // it BEFORE OMEGA_BUILD_MODE — a "production" bake under omega test is
-        // otherwise a testing bake (the auth-emulator-gate bakeConfig idiom).
+        // OMEGA_ENVIRONMENT is the ONE environment input
+        // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)) and
+        // src/build.js WRITES it at load from the lane, so a helper that
+        // simulates a second lane in one process must clear and restore it or
+        // the first lane's word outlives the case (and the next suite's).
         // OMEGA_LICENSE_KEY rides the list because a production bake runs the
         // license check (#320): the suite stays offline on a machine that has
         // a real key exported.
-        const ENV_KEYS = ['OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV', 'OMEGA_LICENSE_KEY'];
+        const ENV_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE', 'OMEGA_TEST_MODE', 'NODE_ENV', 'OMEGA_LICENSE_KEY'];
         const bake = async (mode) => {
           const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
           ENV_KEYS.forEach((key) => delete process.env[key]);

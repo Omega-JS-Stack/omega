@@ -15,6 +15,10 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const { SERVICE_ORDER, OPERATIONS, TARGET_FRAMEWORKS } = require('../src/config.js');
 const { compareVersions, installedVersion, parseWorkingTree } = require('../src/services/testing/lib/checks.js');
 const service = require('../src/services/testing/index.js');
@@ -43,16 +47,16 @@ function seedDeployRecord(root, ...targets) {
 function brandConfig(overrides = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: HOMEPAGE },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     ...overrides,
   };
 }
 
-/** Stage targets/website — optionally with a built dist and a framework dep. */
+/** Stage targets/web, optionally with a built dist and a framework dep. */
 function stageWebTarget(root, { dist = true, declared = null, installed = null } = {}) {
-  const targetPath = join(root, 'targets', 'website');
+  const targetPath = join(root, 'targets', 'web');
   jetpack.write(join(targetPath, 'package.json'), {
-    name: 'fixture-website',
+    name: 'fixture-web',
     private: true,
     ...(declared ? { dependencies: { '@omega.js/web': declared } } : {}),
   });
@@ -65,7 +69,7 @@ function stageWebTarget(root, { dist = true, declared = null, installed = null }
       version: installed,
     });
   }
-  return { name: 'website', dir: 'targets/website', path: targetPath, target: 'web' };
+  return { name: 'web', dir: 'targets/web', path: targetPath, target: 'web' };
 }
 
 /** Stage targets/backend — src/dist pillar shape: framework dep on the ONE target
@@ -205,10 +209,10 @@ test('testing: web + backend all green — exact pass set, single npm view per p
   assert.deepEqual(report.output, {
     results: {
       passed: [
-        'website: package.json',
-        'website: build output',
-        'website: @omega.js/web',
-        'website: homepage',
+        'web: package.json',
+        'web: build output',
+        'web: @omega.js/web',
+        'web: homepage',
         'backend: package.json',
         'backend: firebase.json',
         'backend: staged dist/',
@@ -245,7 +249,7 @@ test('testing: outdated framework → warned with the version delta', async () =
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
-    { name: 'website: @omega.js/web', warning: 'outdated (1.0.0 → 1.2.0)' },
+    { name: 'web: @omega.js/web', warning: 'outdated (1.0.0 → 1.2.0)' },
   ]);
 });
 
@@ -261,7 +265,7 @@ test('testing: unpublished framework (npm view fails) dims out — no warning, n
   const report = await runService(brandConfig(), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
-  assert.ok(!report.output.results.passed.includes('website: @omega.js/web'));
+  assert.ok(!report.output.results.passed.includes('web: @omega.js/web'));
   assert.deepEqual(report.output.results.warned, []);
 });
 
@@ -291,9 +295,9 @@ test('testing: homepage network error on a DEPLOYED brand retries 3× then fails
   assert.equal(report.status, 'error');
   assert.deepEqual(fetch.calls, [HOMEPAGE, HOMEPAGE, HOMEPAGE]);
   assert.deepEqual(report.output.results.failed, [
-    { name: 'website: homepage', error: `${HOMEPAGE} → getaddrinfo ENOTFOUND fixture-brand.test` },
+    { name: 'web: homepage', error: `${HOMEPAGE} → getaddrinfo ENOTFOUND fixture-brand.test` },
   ]);
-  assert.match(report.error, /website: homepage/);
+  assert.match(report.error, /web: homepage/);
 });
 
 test('testing: homepage 500 then 200 — non-2xx retries and recovers', async () => {
@@ -306,7 +310,7 @@ test('testing: homepage 500 then 200 — non-2xx retries and recovers', async ()
 
   assert.equal(report.status, 'success');
   assert.deepEqual(fetch.calls, [HOMEPAGE, HOMEPAGE]);
-  assert.ok(report.output.results.passed.includes('website: homepage'));
+  assert.ok(report.output.results.passed.includes('web: homepage'));
 });
 
 // ─── API health ──────────────────────────────────────────────────────────────
@@ -317,7 +321,7 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
   const fetch = fakeFetch({});
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ cloud: { shared: true }, targets: { backend: {} } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ cloud: { shared: true }, targets: { backend: { type: 'backend' } } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.deepEqual(fetch.calls, []);
@@ -329,7 +333,7 @@ test('testing: deployed backend older than npm latest → warned', async () => {
   const fetch = fakeFetch({ [API_URL]: { status: 200, body: { backendVersion: '5.0.0' } } });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
@@ -344,7 +348,7 @@ test('testing: API returning 503 on a DEPLOYED brand retries 3× then fails', as
   const fetch = fakeFetch({ [API_URL]: { status: 503 } });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
-  const report = await runService(brandConfig({ targets: { backend: {} } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(fetch.calls, [API_URL, API_URL, API_URL]);
@@ -369,7 +373,7 @@ test('testing: never-deployed brand — live misses NUDGE (warned), never error'
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.failed, []);
   const nudges = report.output.results.warned.filter((w) => /not deployed yet/.test(w.warning));
-  assert.deepEqual(nudges.map((w) => w.name), ['website: homepage', 'backend: API health']);
+  assert.deepEqual(nudges.map((w) => w.name), ['web: homepage', 'backend: API health']);
   assert.match(nudges[0].warning, /omega deploy/);
 });
 
@@ -399,7 +403,7 @@ test('testing: no brand.url → homepage and API health warn, zero fetches', asy
   assert.equal(report.status, 'warned');
   assert.deepEqual(fetch.calls, []);
   assert.deepEqual(report.output.results.warned.map((w) => w.name), [
-    'website: homepage',
+    'web: homepage',
     'backend: API health',
   ]);
 });
@@ -450,7 +454,7 @@ test('testing: not a git repository → working tree check silently absent', asy
   assert.ok(!names.includes('working tree'));
 });
 
-test('testing: GitHub Actions success — exact gh command, repo defaults to `<brand.id>-omega`', async () => {
+test('testing: GitHub Actions success, the exact gh command on `<brand.id>-omega`', async () => {
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
@@ -459,46 +463,25 @@ test('testing: GitHub Actions success — exact gh command, repo defaults to `<b
     [GH_CMD]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'success');
   assert.ok(report.output.results.passed.includes('GitHub Actions'));
   assert.ok(exec.calls.some(([cmd]) => cmd === GH_CMD));
 });
 
-test('testing: github.repo overrides the repo name in the gh command', async () => {
+test('testing: the run list reads the brand\'s OWN org, whichever it is (#883)', async () => {
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
-  const cmd = 'gh run list --repo sandbox-org/custom-repo --limit 1 --json status,conclusion,name';
+  const cmd = 'gh run list --repo Acme-Org/fixture-brand-omega --limit 1 --json status,conclusion,name';
   const exec = fakeExec({
     [GIT_CMD]: '',
     [cmd]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
   });
 
   const report = await runService(
-    brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'custom-repo' } } } }),
-    { root, targets, fetch, exec },
-  );
-
-  assert.equal(report.status, 'success');
-  assert.ok(exec.calls.some(([c]) => c === cmd));
-});
-
-test('testing: an owner/name slug carries its OWN owner into the gh command', async () => {
-  const root = stageBrand();
-  const targets = [stageWebTarget(root)];
-  const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
-  // ../omega-omega's real shape: the repo sits under the paid company org while
-  // `org` still names the brand's own org.
-  const cmd = 'gh run list --repo itw-creative-works/acme-app --limit 1 --json status,conclusion,name';
-  const exec = fakeExec({
-    [GIT_CMD]: '',
-    [cmd]: '[{"status":"completed","conclusion":"success","name":"Build"}]',
-  });
-
-  const report = await runService(
-    brandConfig({ repo: { providers: { github: { org: 'sandbox-org', repo: 'itw-creative-works/acme-app' } } } }),
+    brandConfig({ repo: { provider: 'github', org: 'Acme-Org' } }),
     { root, targets, fetch, exec },
   );
 
@@ -515,7 +498,7 @@ test('testing: failed GitHub Actions run → error', async () => {
     [GH_CMD]: '[{"status":"completed","conclusion":"failure","name":"Build"}]',
   });
 
-  const report = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), { root, targets, fetch, exec });
+  const report = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), { root, targets, fetch, exec });
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [
@@ -527,7 +510,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
   const root = stageBrand();
   const targets = [stageWebTarget(root)];
 
-  const inProgress = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
+  const inProgress = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), {
     root,
     targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -538,7 +521,7 @@ test('testing: in-progress GitHub Actions run → warned; gh unavailable → dim
     { name: 'GitHub Actions', warning: 'Build → in progress' },
   ]);
 
-  const unavailable = await runService(brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }), {
+  const unavailable = await runService(brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }), {
     root,
     targets,
     fetch: fakeFetch({ [HOMEPAGE]: { status: 200 } }),
@@ -559,7 +542,7 @@ test('testing: dry-run — zero network, local checks still run', async () => {
   const exec = fakeExec({ [GIT_CMD]: '' });
 
   const report = await runService(
-    brandConfig({ repo: { providers: { github: { org: 'sandbox-org' } } } }),
+    brandConfig({ repo: { provider: 'github', org: 'sandbox-org' } }),
     { root, targets, fetch, exec, options: { dryRun: true } },
   );
 
@@ -568,8 +551,8 @@ test('testing: dry-run — zero network, local checks still run', async () => {
   assert.deepEqual(fetch.calls, []);
   assert.deepEqual(exec.calls, [[GIT_CMD, root]]);
   assert.deepEqual(report.output.results.passed, [
-    'website: package.json',
-    'website: build output',
+    'web: package.json',
+    'web: build output',
     'backend: package.json',
     'backend: firebase.json',
     'backend: staged dist/',
@@ -587,7 +570,7 @@ test('testing: missing build output → honest error naming the update service',
 
   assert.equal(report.status, 'error');
   assert.deepEqual(report.output.results.failed, [
-    { name: 'website: build output', error: 'dist/index.html missing — run the update service' },
+    { name: 'web: build output', error: 'dist/index.html missing — run the update service' },
   ]);
 });
 
@@ -608,7 +591,7 @@ test('testing: the recorded reason carries every warned check\'s name AND its wa
   assert.deepEqual(report.warned, [
     {
       operation: 'target-checks',
-      reason: 'website: @omega.js/web: outdated (1.0.0 → 1.2.0); working tree: 2 uncommitted files',
+      reason: 'web: @omega.js/web: outdated (1.0.0 → 1.2.0); working tree: 2 uncommitted files',
     },
   ]);
 });

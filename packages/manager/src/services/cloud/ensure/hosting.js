@@ -5,7 +5,7 @@
  * public endpoint via Firebase Hosting rewrites; a brand whose api domain
  * fronts a dedicated non-Firebase backend routes /omega through the
  * cloudflare omega-api-proxy worker instead). ONE api domain, shared by every
- * web instance the brand runs (#588). The main domain is NOT added — the
+ * web target the brand runs (#588). The main domain is NOT added: the
  * website hosts elsewhere (GitHub Pages).
  *
  * Per domain, one reconciliation pass:

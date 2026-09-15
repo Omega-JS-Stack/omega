@@ -8,6 +8,7 @@
  * web target have no sitemap to serve and are skipped.
  */
 const chalk = require('chalk').default;
+const { hasTargetOfType } = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureSitemaps(context) {
@@ -18,7 +19,7 @@ module.exports = async function ensureSitemaps(context) {
     return {};
   }
 
-  if (!brand.enabledTargets.includes('web')) {
+  if (!hasTargetOfType(brand.config, 'web')) {
     console.log(chalk.dim('      ⊘ No web target — no sitemap to submit'));
     return {};
   }

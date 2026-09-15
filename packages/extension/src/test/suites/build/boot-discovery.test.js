@@ -91,14 +91,14 @@ module.exports = defineCases({
       name: 'the packaged strict-JSON manifest wins, and a strict-JSON dist/ still qualifies (#575)',
       run: async (ctx) => {
         const { resolveBootDir } = require(BOOT_RUNNER);
-        const both = stageConsumer({ 'packaged/chromium/raw': STRICT_MANIFEST, dist: JSON5_MANIFEST });
+        const both = stageConsumer({ 'packaged/chrome/raw': STRICT_MANIFEST, dist: JSON5_MANIFEST });
         // The framework's own fixture extension has no `packaged/` step — its
         // dist/ is already strict JSON, and it must keep booting.
         const fixtureShape = stageConsumer({ dist: STRICT_MANIFEST });
 
         try {
           await withBootEnv({}, async () => {
-            ctx.expect(resolveBootDir(both).dir).toBe(path.join(both, 'packaged', 'chromium', 'raw'));
+            ctx.expect(resolveBootDir(both).dir).toBe(path.join(both, 'packaged', 'chrome', 'raw'));
             ctx.expect(resolveBootDir(fixtureShape).dir).toBe(path.join(fixtureShape, 'dist'));
           });
         } finally {

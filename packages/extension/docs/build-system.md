@@ -27,13 +27,12 @@ dist/
 └── _locales/<lang>/messages.json            # auto-translated (see docs/translations.md)
         ↓ packaging step
 packaged/
-├── chromium/
+├── chrome/
 │   ├── raw/                                 # strict-JSON manifest, Chrome-loadable
 │   │   ├── manifest.json                    # comments stripped, valid JSON
 │   │   └── ...                              # everything from dist/
 │   └── <ExtensionName>.zip                  # store upload
-├── firefox/raw/ + .zip
-└── opera/raw/ + .zip
+└── firefox/raw/ + .zip
 ```
 
 ## Gulp tasks
@@ -65,7 +64,7 @@ The bundler is esbuild through @omega.js/devkit's ONE `bundle()` wrapper ([#738]
 
 ### One call, every lane
 
-Background service worker, content scripts, popup / options / sidepanel / pages all take the same options: `format: 'iife'`, `platform: 'browser'`, no code splitting. webpack needed three configs precisely to switch splitting OFF per lane (MV3's CSP lets neither a service worker nor a content script fetch a chunk); esbuild's iife format has no splitting at all, so each bundle is one self-contained file. Every bundle carries its own `OMEGA_BUILD_JSON` snapshot, content scripts included: in the default isolated world that is invisible to the host page, but a consumer that registers a content script with `world: 'MAIN'` publishes the whole config object onto the page's `window`, readable by any script there. Keep MAIN-world scripts free of anything you would not put in page source.
+Background service worker, content scripts, popup / options / sidepanel / pages all take the same options: `format: 'iife'`, `platform: 'browser'`, no code splitting. webpack needed three configs precisely to switch splitting OFF per lane (MV3's CSP lets neither a service worker nor a content script fetch a chunk); esbuild's iife format has no splitting at all, so each bundle is one self-contained file. No bundle carries a config copy any more (#743): the snapshot is the one `build.js` the pages and the service worker load, so a content script (which loads neither) never publishes the config onto a host page, `world: 'MAIN'` included.
 
 ### Syntax floor — the manifest answers it
 
@@ -75,16 +74,20 @@ esbuild's `target` replaces preset-env's browserslist guess, and it is READ from
 
 Browser bundles answer `fs` / `path` / `crypto` / `os` / `util` / `assert` / `stream` / `buffer` / `process` with an empty module (@omega.js/devkit's `emptyModulesPlugin`, the esbuild answer to webpack's `resolve.fallback`): libraries bundled through @omega.js/client import them on code paths their browser builds never take.
 
-### The build snapshot — `OMEGA_BUILD_JSON`, baked into every bundle
+### The build snapshot: `OMEGA_BUILD_JSON`, one `build.js`
 
-Every emitted bundle carries its own copy of the build snapshot. It is not a file: `bundle.js` composes it once per build (`composeBuildJson()`) and esbuild bakes it in two ways, which is the same shape @omega.js/desktop uses ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)):
+The snapshot is ONE file at the artifact's root. `bundle.js` composes it once per build (`composeBuildJson()`) and writes `dist/build.js` through `@omega.js/devkit/build-json`, the same writer web and @omega.js/desktop use ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)); `package.js` copies it into every `packaged/<browser>/raw/` with the rest of `dist`. Two plain statements, `self.OMEGA_BUILD_JSON = {…};` and `self.OMEGA_BUILD_JSON.config.dev = {…}|null;`, and two consumers:
 
-- **`define`** replaces the bare identifier `OMEGA_BUILD_JSON` with the literal at compile time, so framework and consumer code can read the snapshot without reaching for a global.
-- **`banner`** prepends a one-line IIFE that assigns the same value onto `globalThis`, `self` and `window`. That is what `background.js` reads as `self.OMEGA_BUILD_JSON` and what every page context reads as `window.OMEGA_BUILD_JSON`, and it lands ahead of the bundle's own code so the snapshot is always already there.
+- **every page context** loads it with `<script src="/build.js">`, the page template's FIRST script, ahead of the page's own bundle, and reads `window.OMEGA_BUILD_JSON`.
+- **the service worker** loads it with `importScripts('/build.js')` on `background.js`'s first line (the manifest declares a classic service worker, so importScripts is legal) and reads `self.OMEGA_BUILD_JSON`.
 
-What it holds: `timestamp`, `repo`, `environment`, `license` (the build's verdict — a fact about the BUILD, never inside `config`), `packages`, and `config` — the blob the contexts hand @omega.js/client (brand, cloud, theme, analytics with the baked `GOOGLE_ANALYTICS_SECRET`, advertising, and in non-production builds the resolved `dev.ports` / `dev.origin` map, the only channel a browser context has to a bumped local stack).
+An extension's own pages fetch their own origin, so no `web_accessible_resources` entry is needed for either.
 
-Before #743 the same blob was written as `packaged/<browser>/raw/build.js` — a JSONP file the service worker loaded with `importScripts('/build.js')` and every page loaded with its own `<script src="/build.js">` tag — plus a `build.json` sidecar nothing read. **Neither file is written any more.** Inspecting a built artifact means reading the bake back out of a bundle (`src/gulp/tasks/utils/build-json.js` `readBakedBuildJson()` runs the banner the way a browser would).
+What it holds is the ONE wrapper every OMEGA browser surface bakes ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)), desktop's names: `{ config, package, mode, license, builtAt }`. `package` is the project's own manifest, `mode` the build's verdict (`{ build, publish, environment }`), `license` the license check's answer and `builtAt` the stamp, all facts about the BUILD, never inside `config`.
+
+`config` is `clientConfig(resolved)` from `@omega.js/config` ([docs/shared/config.md](../../../docs/shared/config.md) → "The browser subset"): the sections the schema's per-section `client` flag marks browser-visible (brand, cloud's public half, theme, analytics, advertising, company, listings, …) plus this build's facts (`runtime`, `environment`, `version`, `buildTime`, `target`, and in non-production builds the resolved `dev` map, `ports` / `origin` / `liveReloadPort`, the only channel a browser context has to a bumped local stack). The legacy `omega` block is gone ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)): its three readers take `config.environment`, `config.buildTime` and `config.dev.liveReloadPort`. The hand-written allow list this task used to keep is gone: what goes public is one schema row, shared with web and desktop. The Measurement Protocol secret (`GOOGLE_ANALYTICS_SECRET`) is added to `analytics.providers.google.secret` AFTER that gate, the one `.env` value sanctioned into the artifact (`publicAtRest`) and the one the gate itself would refuse.
+
+Between #743's first pass and its rework the blob rode INSIDE every bundle (an esbuild `define` plus a banner), which put one config into 21 files; that is retired, and so is the `build.json` sidecar nothing read. Inspecting a built artifact means running its `build.js` the way a browser does (`src/gulp/tasks/utils/build-json.js` `readBakedBuildJson()`).
 
 ### Template replacement
 
@@ -126,7 +129,7 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 
 1. **Pre-hook** — runs `hooks/build/pre.js` if present (the flat `hooks/build:pre.js` still resolves as a transition fallback)
 2. **Per-browser manifest normalization** — converts JSON5 → strict JSON for Chrome/Edge/Opera (Firefox tolerates JSON5 but normalized anyway)
-3. **Per-browser asset copy** to `packaged/<browser>/raw/` — the bundles arrive with the snapshot already baked in, so the package lane writes no `build.js` / `build.json` of its own ([#743](https://github.com/Omega-JS-Stack/omega/issues/743))
+3. **Per-browser asset copy** to `packaged/<browser>/raw/`: `dist/build.js` rides along with everything else, so the package lane composes no snapshot of its own and writes no `build.json` sidecar ([#743](https://github.com/Omega-JS-Stack/omega/issues/743))
 4. **Zip** to `packaged/<browser>/<name>.zip`
 5. **Post-hook** — runs `hooks/build/post.js`
 6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
@@ -139,7 +142,7 @@ The compiled manifest is the source manifest merged with the framework defaults 
 - **`externally_connectable` defaults to your BRAND origin.** The default `matches` is `<brand.url origin>/*`, plus the resolved dev-website origin in a dev build only. A packaged build used to ship the localhost dev origin alone, so the live brand site could not message the published extension ([#583](https://github.com/Omega-JS-Stack/omega/issues/583)). With no `brand.url`, a build-mode build declares no origin and says so. The scaffolded boot test `test/boot/externally-connectable.test.js` asserts the brand origin against the real packaged manifest.
 - **`homepage_url` is baked from `brand.url`** on every target — the store listing's developer-site link, which nothing emitted before ([#576](https://github.com/Omega-JS-Stack/omega/issues/576)). A value you declare wins; with no `brand.url` the key ships absent.
 - **Icons are pruned to what the build minted** — a manifest pointing at an icon that isn't there is an extension Chrome refuses to load.
-- **chromium / opera** — `background.scripts` dropped (MV3 service worker).
+- **chrome**: `background.scripts` dropped (MV3 service worker). Edge and every other Chromium browser installs this build.
 - **firefox** — `background.service_worker` becomes `background.scripts`; `side_panel` becomes `sidebar_action` (Firefox has no side panel key) and the `sidePanel` permission is dropped; `browser_specific_settings.gecko.id` is DERIVED when you declare none — `extension@<brand.url host>`, or `extension@<brand.id>.extension` with no url, and packaging fails only when there are no brand facts at all to derive from ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)). Firefox cannot identify, sign, or update an add-on without an id, so a fresh scaffold builds out of the box — but **declare your own id before the first publish** ([#574](https://github.com/Omega-JS-Stack/omega/issues/574)): it must stay stable across every release, and `brand.url` can change.
 
 ## Build modes
@@ -162,7 +165,7 @@ The gulp pipeline tees all output to `logs/dev.log` (`npm start`) / `logs/build.
 
 ## Output for Chrome's "Load unpacked"
 
-Point Chrome at `packaged/chromium/raw/` — that's the strict-JSON, fully-assembled Chrome-loadable build. NOT `dist/` (which has JSON5 manifest mid-pipeline). The test framework's boot layer auto-targets `packaged/chromium/raw/` for the same reason — see [test-boot-layer.md](test-boot-layer.md).
+Point Chrome at `packaged/chrome/raw/`: that's the strict-JSON, fully-assembled Chrome-loadable build. NOT `dist/` (which has JSON5 manifest mid-pipeline). The test framework's boot layer auto-targets `packaged/chrome/raw/` for the same reason, see [test-boot-layer.md](test-boot-layer.md).
 
 ## See also
 

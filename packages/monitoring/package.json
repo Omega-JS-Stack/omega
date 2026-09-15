@@ -15,6 +15,9 @@
     "./preload": "./src/preload.js",
     "./logger": "./src/logger.js"
   },
+  "dependencies": {
+    "@omega.js/config": "*"
+  },
   "scripts": {
     "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js"
   },

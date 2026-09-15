@@ -41,7 +41,8 @@ const KEY_GROUPS = {
     'NAMECHEAP_USERNAME',
     'SENDGRID_API_KEY',
     'BEEHIIV_API_KEY',
-    'RECAPTCHA_SITE_KEY',
+    // The reCAPTCHA SITE key is config now, not a .env line (#893): only the
+    // secret half can be copied between .env files
     'RECAPTCHA_SECRET_KEY',
   ],
   signing: [

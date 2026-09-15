@@ -23,7 +23,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { requiredEnvKeys, envEnvironment } = require('../../dist/vendor/config/index.js');
+const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
+const { getEnvironment } = require('../../dist/vendor/config/environment.js');
 
 const env = require('../../dist/manager/libraries/env.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -49,7 +50,7 @@ function projectDir({ consumerConfig }) {
     fs.mkdirSync(path.join(dir, 'config'));
     fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), JSON.stringify({
       brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-      targets: { backend: {} },
+      targets: { backend: { type: 'backend' } },
     }));
   }
 
@@ -79,11 +80,12 @@ function withEnv(vars, thunk) {
   }
 }
 
-// The two environment signals getEnvironment() reads, spelled as env vars:
-// testing wins over everything, so a production case has to silence the
-// runner's own OMEGA_TEST_MODE
-const PRODUCTION = { OMEGA_TEST_MODE: null, ENVIRONMENT: 'production' };
-const DEVELOPMENT = { OMEGA_TEST_MODE: null, ENVIRONMENT: 'development' };
+// The ONE input getEnvironment() reads
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), spelled as the
+// env var it is: a case that wants an environment NAMES it, and the ambient
+// signals the runner's own process carries no longer override it.
+const PRODUCTION = { OMEGA_ENVIRONMENT: 'production' };
+const DEVELOPMENT = { OMEGA_ENVIRONMENT: 'development' };
 
 /**
  * Boot a real Manager in `development` with every required key absent,
@@ -91,17 +93,15 @@ const DEVELOPMENT = { OMEGA_TEST_MODE: null, ENVIRONMENT: 'development' };
  * later test in the run.
  */
 function bootWithoutRequiredKeys({ consumerConfig }) {
-  const saved = { OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT };
+  const saved = { OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT };
   for (const name of REQUIRED) {
     saved[name] = process.env[name];
     delete process.env[name];
   }
 
-  // getEnvironment() reads these live on every call: testing wins over
-  // everything, so the runner's own OMEGA_TEST_MODE has to step aside for
-  // this boot to BE a development boot
-  delete process.env.OMEGA_TEST_MODE;
-  process.env.ENVIRONMENT = 'development';
+  // The boot leaves a named input exactly as it is (#817), so naming
+  // development here is what makes this boot a development boot
+  process.env.OMEGA_ENVIRONMENT = 'development';
 
   const dir = projectDir({ consumerConfig: consumerConfig });
   const warnings = [];
@@ -113,8 +113,8 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
     const manager = new FreshManager();
     manager.init(null, { cwd: dir, log: false });
 
-    // Resolved INSIDE the boot's env: getEnvironment() reads live, and the
-    // finally below puts the runner's own test-mode signal back
+    // Read INSIDE the boot's env: the finally below puts the runner's own
+    // input back, and this boot's answer is the one it named
     return { manager, warnings, environment: manager.getEnvironment() };
   } finally {
     console.warn = originalWarn;
@@ -132,7 +132,7 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
  * on disk, and the given environment. Restores the process env afterwards.
  */
 function bootWithConfig({ config, environment }) {
-  const saved = { OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT };
+  const saved = { OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT };
   for (const name of REQUIRED) {
     saved[name] = process.env[name];
     process.env[name] = 'fixture-value';
@@ -140,8 +140,8 @@ function bootWithConfig({ config, environment }) {
   saved.RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
   delete process.env.RECAPTCHA_SECRET_KEY;
 
-  delete process.env.OMEGA_TEST_MODE;
-  process.env.ENVIRONMENT = environment;
+  // The one input again: this boot IS the environment it names (#817)
+  process.env.OMEGA_ENVIRONMENT = environment;
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-env-rules-'));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
@@ -172,7 +172,7 @@ function bootWithConfig({ config, environment }) {
 const HALF_KEYED_CAPTCHA = {
   brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
   captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } },
-  targets: { backend: {} },
+  targets: { backend: { type: 'backend' } },
 };
 
 module.exports = defineCases({
@@ -263,7 +263,7 @@ module.exports = defineCases({
         // The reader no longer decides WHICH name to read — the cascade has
         // already resolved the one name by the time anything reaches here, so
         // a read returns the same value in every environment.
-        for (const vars of [DEVELOPMENT, PRODUCTION, { ...DEVELOPMENT, OMEGA_TEST_MODE: 'true' }]) {
+        for (const vars of [DEVELOPMENT, PRODUCTION, { OMEGA_ENVIRONMENT: 'testing' }]) {
           withEnv({ ...vars, STRIPE_SECRET_KEY: 'sk_from_the_cascade' }, () => {
             assert.strictEqual(env.get('STRIPE_SECRET_KEY'), 'sk_from_the_cascade');
           });
@@ -287,14 +287,19 @@ module.exports = defineCases({
     },
 
     {
-      name: 'env.environment() IS the one vocabulary the overlay files are named with (#586)',
+      name: 'env.getEnvironment() IS the one vocabulary the overlay files are named with (#586)',
 
       run() {
-        assert.strictEqual(env.environment, envEnvironment, "the reader re-exports @omega.js/config's resolver, never a second copy");
+        // The reader re-exports the ONE environment module's function
+        // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), under the
+        // same name every other OMEGA surface calls it by: the bare
+        // `environment()` alias it used to add is gone, and so is any second copy.
+        assert.strictEqual(env.getEnvironment, getEnvironment, "the reader re-exports @omega.js/config's module, never a second copy");
+        assert.strictEqual(env.environment, undefined, 'the bare alias is gone');
 
-        withEnv(DEVELOPMENT, () => assert.strictEqual(env.environment(), 'development'));
-        withEnv(PRODUCTION, () => assert.strictEqual(env.environment(), 'production'));
-        withEnv({ ...DEVELOPMENT, OMEGA_TEST_MODE: 'true' }, () => assert.strictEqual(env.environment(), 'testing'));
+        withEnv(DEVELOPMENT, () => assert.strictEqual(env.getEnvironment(), 'development'));
+        withEnv(PRODUCTION, () => assert.strictEqual(env.getEnvironment(), 'production'));
+        withEnv({ OMEGA_ENVIRONMENT: 'testing' }, () => assert.strictEqual(env.getEnvironment(), 'testing'));
       },
     },
 

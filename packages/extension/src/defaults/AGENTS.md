@@ -7,7 +7,7 @@
 
 ## Framework
 
-This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave).
+This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge; a Chromium browser like Brave installs the Chrome build).
 - The framework provides one-line bootstrap per extension context, a component-based architecture (view + styles + script per context), and a multi-browser build/release pipeline that produces store-uploadable zips.
 - It also carries cross-context auth synchronization and a built-in four-layer test framework.
 
@@ -49,11 +49,12 @@ npx omega install live        # restore the published @omega.js/extension from n
 
 > Editing the framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/extension`). Run `npx omega install live` to switch back.
 
-Load the unpacked extension in Chrome: point chrome://extensions → "Load unpacked" at `packaged/chromium/raw/`.
+Load the unpacked extension in Chrome: point chrome://extensions → "Load unpacked" at `packaged/chrome/raw/`.
 
 ## Where things live
 
 - `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here; they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
+  - What the extension SHIPS is one declaration: `platforms.<chrome|firefox|edge>.formats.<zip|store>`. Presence = enabled, every browser and format is on by default, and `false` drops one (`edge: false`). Edge ships the chrome build.
 - `config/messages.json`: i18n source. Auto-translated at build time to the languages in `translation.languages` (omega.json5); only missing keys regenerated, cache committed under `translations/`.
 - `config/description.md`: store-listing description (used by the publish step).
 - `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension.

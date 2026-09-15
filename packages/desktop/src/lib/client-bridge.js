@@ -18,7 +18,7 @@
 
 const LoggerLite = require('./logger-lite.js');
 const authPersistence = require('./auth-persistence.js');
-const { localPort } = require('../utils/url-helpers.js');
+const { requiredPort } = require('../utils/url-helpers.js');
 
 const logger = new LoggerLite('client-bridge');
 
@@ -117,8 +117,8 @@ const bridge = {
 
     // A TESTING run talks to the LOCAL stack, never real auth — the same move
     // getApiUrl() makes when it maps testing to localhost, and the same one
-    // @omega.js/extension's background SW makes for its emulator runs. Only
-    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
+    // @omega.js/extension's background SW makes for its emulator runs. Only an
+    // OMEGA_ENVIRONMENT=testing run reaches here; dev and production are untouched.
     if (bridge._manager.isTesting()) {
       const { connectAuthEmulator } = bridge._firebaseModule;
       const port = bridge._authEmulatorPort();
@@ -129,12 +129,15 @@ const bridge = {
     return bridge._firebaseAuth;
   },
 
-  // The auth emulator's port, on the same three-step chain getApiUrl() walks:
-  // the resolved-port env channel (N7), then the `dev.ports` map the bundle
-  // baked into OMEGA_BUILD_JSON, then the classic 9099
-  // ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)).
+  // The auth emulator's port, on the same chain getApiUrl() walks: the
+  // resolved-port env channel (N7), then the `dev.ports` map the bundle baked
+  // into OMEGA_BUILD_JSON
+  // ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)). The classic
+  // 9099 used to sit under those two as a last resort; it is gone (#834),
+  // because nothing identity-checks what answers on it and a neighbouring
+  // project's emulator reads as an auth mystery rather than a port problem.
   _authEmulatorPort() {
-    return localPort(bridge._manager, 'OMEGA_AUTH_PORT', 'auth') || 9099;
+    return requiredPort(bridge._manager, 'OMEGA_AUTH_PORT', 'auth');
   },
 
   _registerIpc() {

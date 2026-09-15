@@ -22,6 +22,16 @@
     },
   },
 
+  // Where this brand's code and artifacts live (#883): ONE org, and every repo
+  // derives from `<brand.id>-<role>`: `<brand.id>-omega` (source),
+  // `<brand.id>-releases` (the public artifact channel this app's updater
+  // polls), `<brand.id>-<web target>` (a built site). No repo NAME is ever
+  // typed. Uncomment and name the org to address them.
+  // repo: {
+  //   provider: 'github',
+  //   org: 'MyOrg',
+  // },
+
   monitoring: {
     providers: {
       sentry: {
@@ -84,13 +94,19 @@
     appearance: 'system',
   },
 
-  // ── Target-scoped config. Key presence = "this brand enables this target". ──
-  // For a standalone desktop repo only the `desktop` entry exists; in a brand
-  // monorepo the brand-level omega.json5 lists every enabled target.
+  // ── Target-scoped config. Every key is a target NAME (the folder
+  // targets/<name> in a brand monorepo) and every entry declares its framework
+  // `type`. For a standalone desktop repo only the `desktop` entry exists; in a
+  // brand monorepo the brand-level omega.json5 lists every declared target.
   targets: {
     desktop: {
+      type: 'desktop',
+
       // App-level metadata — universal cross-platform fields. @omega.js/desktop auto-derives sensible
-      // defaults from the BRAND: `appId` ← reverse-domain of `brand.url`
+      // defaults from the BRAND: `appId` ← `certificates.providers.apple.bundleIdPrefix`
+      // plus `brand.id` with its dashes as dots (`com.example` + `my-app` →
+      // `com.example.my.app`), the same id the certificates service registers.
+      // No prefix declared → reverse-domain of `brand.url`
       // (`https://foo.example.com` → `com.example.foo`; no url → `app.<brand.id>`),
       // `productName` ← `brand.name`, `copyright` ← `© <year>, <brand.name>`.
       // Override any of these explicitly only if you must.
@@ -112,7 +128,7 @@
         darkModeSupport: true,                // mac honors via NSRequiresAquaSystemAppearance; win/linux ignore
         // Icons are convention-only. Drop PNGs at:
         //   config/icons/global/<slot>.png       — universal default for all platforms
-        //   config/icons/macos/<slot>.png        — macOS override (beats global)
+        //   config/icons/mac/<slot>.png          : macOS override (beats global)
         //   config/icons/windows/<slot>.png      — Windows override
         //   config/icons/linux/<slot>.png        — Linux override (otherwise falls back to global → windows)
         // Slots: icon, tray (mac+win+linux); dmg (mac-only).
@@ -120,14 +136,26 @@
         // macOS tray must be 32×32; @omega.js/desktop renames the dist output to trayTemplate.png for the
         // OS dark-mode auto-inversion magic.
       },
-      // Per-platform install/distribution config. The keys here map directly to the same
-      // electron-builder concepts (`mac.target`, `win.target`, `linux.target`) but @omega.js/desktop owns
-      // the actual target list (dmg+zip on mac, nsis on win, deb+AppImage on linux) so
-      // auto-update keeps working — see docs/installer-options.md for why. Each block
-      // exposes only the knobs that exist for that platform — no cross-platform analog
-      // for any of these.
+      // What this app SHIPS, plus each platform's install knobs (#867). The
+      // vocabulary is the client's: mac, windows, linux (never macos, never win).
+      //
+      // `formats` is the declaration: presence = enabled, every format below is
+      // ON by default, and the only way to drop one is `false` (e.g.
+      // `snap: false`). Per-format settings live inside the format. The keys
+      // beside `formats` are install knobs that map onto the same
+      // electron-builder concepts (`mac.target`, `win.target`, `linux.target`),
+      // but @omega.js/desktop owns the actual target list so auto-update keeps
+      // working (see docs/installer-options.md for why). Each block exposes only
+      // the knobs that exist for that platform: there is no cross-platform
+      // analog for any of these.
       platforms: {
         mac: {
+          // The disk image the site's /download/mac/dmg hands over. The
+          // auto-update zip is not a format: electron-updater fetches it from
+          // the feed and nobody links it, so the mac leg always builds it.
+          formats: {
+            dmg: {},
+          },
           arch: ['universal'],   // universal binary (x64 + arm64 lipo'd) — one .dmg/.zip for both
           // Entitlements override map. @omega.js/desktop ships sensible defaults (allow-jit,
           // allow-unsigned-executable-memory, disable-library-validation, network.client/server,
@@ -148,7 +176,12 @@
             entitlementsInherit: null,
           },
         },
-        win: {
+        windows: {
+          // The one installer, at /download/windows/nsis. NSIS merges every
+          // arch below into a single .exe.
+          formats: {
+            nsis: {},
+          },
           arch: ['x64', 'ia32'],          // 64-bit + 32-bit (single multi-arch NSIS installer)
           oneClick:           true,        // no installer wizard, just installs immediately
           desktopShortcut:    true,
@@ -168,25 +201,28 @@
           },
         },
         linux: {
-          arch: ['x64'],                   // amd64; ia32 is essentially extinct on Linux
-          // Snap publishing — enabled by default. Adds a `snap` target to the linux build
-          // and auto-publishes to the Snap Store on release. Requires SNAPCRAFT_STORE_CREDENTIALS
-          // in your `.env` (run `snapcraft export-login -` locally to mint, then `mgr push-secrets`
-          // flows it to GH Actions). Set enabled:false here to skip the snap target entirely.
-          snap: {
-            enabled:     true,
-            confinement: 'strict',
-            grade:       'stable',
-            autoStart:   true,
-            channels:    ['stable'],
+          formats: {
+            deb: {},                       // /download/linux/deb (needs brand.url + brand.contact.email)
+            appimage: {},                  // /download/linux/appimage
+            // Snap publishing, on by default: adds a `snap` target to the linux
+            // build and publishes to the Snap Store on release. Needs
+            // SNAPCRAFT_STORE_CREDENTIALS in your `.env` (the manage walk asks
+            // for it; `snapcraft export-login -` mints it, then `omega deploy`
+            // flows it to GH Actions). `snap: false` drops it.
+            snap: {
+              confinement: 'strict',
+              grade:       'stable',
+              autoStart:   true,
+              channels:    ['stable'],
+            },
           },
+          arch: ['x64'],                   // amd64; ia32 is essentially extinct on Linux
         },
       },
       // Auto-updater (electron-updater wrapper). Feed URL is auto-derived from `releases` (below).
       // Set `OMEGA_DEV_UPDATE=available|unavailable|error` to simulate updates in dev.
       autoUpdate: {
         enabled:        true,
-        channel:        'latest',
         autoDownload:   true,
         startupDelayMs:      10000,      // 10s after whenReady → first check
         feedCheckIntervalMs: 3600000,    // 1h between feed polls (HTTP — keep slow)
@@ -234,17 +270,15 @@
       // Add a `windows: {}` block here only if you want to override defaults persistently.
 
       // Releases: the ONE public repo where built artifacts (and the auto-update feed) live.
-      // The app repo can stay private; this one MUST be public for unauthenticated downloads + auto-updates.
-      // Both keys default: repo is `<brand.id>-releases` and owner is the brand repo's owner, so the whole
-      // block can stay empty (`releases: {}`) and still address a repo.
+      // The source repo can stay private; this one is always public, for unauthenticated downloads + auto-updates.
+      // Nothing names it: it is always `<brand.id>-releases` under the top-level `repo.org`, so this block is
+      // a presence switch and nothing more (#883). An empty `releases: {}` addresses the repo in full.
       // `npx omega deploy`'s precheck auto-creates it if it doesn't exist (uses GH_TOKEN).
-      // Artifact names carry NO version (MyApp-mac-universal.dmg), so this repo also serves the marketing
-      // site: https://github.com/<owner>/<repo>/releases/latest/download/<asset> never changes across
-      // versions, and the website derives its download buttons from it. See docs/releasing.md.
+      // Artifact names carry NO version (MyApp-mac-dmg.dmg), so this repo also serves the marketing
+      // site: https://github.com/<org>/<brand.id>-releases/releases/latest/download/<asset> never changes
+      // across versions, and the website derives its download buttons from it. See docs/releasing.md.
       releases: {
         enabled: true,
-        // owner: null,             // null = the brand repo's owner
-        // repo:  'myapp-releases', // default: `<brand.id>-releases`
       },
       // Deep links: scheme is automatically `<brand.id>://...`. Built-in routes:
       //   auth/token  → @omega.js/client auth token handoff

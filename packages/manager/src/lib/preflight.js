@@ -32,7 +32,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk').default;
 
-const { REQUIRES, TARGET_FRAMEWORKS } = require('../config.js');
+const { REQUIRES, TARGET_FRAMEWORKS, describeServiceInputs } = require('../config.js');
 const { canPrompt } = require('./run-gates.js');
 const { googleTokenStorePath } = require('./google-auth.js');
 
@@ -94,7 +94,11 @@ function checkService(serviceName, declaration, brandConfig, tokenStore) {
   // `gates: false` entries are OPTIONAL inputs (#608): the service runs
   // without them, so their absence is not a preflight finding — the operation
   // that needs one asks for it in place, through the shared setup contract.
-  const envEntries = (declaration.env || [])
+  //
+  // The inputs go through describeServiceInputs, the ONE place a registry entry
+  // is joined to its env-schema entry (#867), so this walkthrough prints the
+  // same label, mint page and hint the interactive gate would show.
+  const envEntries = describeServiceInputs(serviceName, declaration.env, { strict: false })
     .filter((entry) => entry.gates !== false)
     .filter((entry) => !entry.when || entry.when(brandConfig));
   const missingEnv = envEntries.filter((entry) => !process.env[entry.name]);
@@ -125,15 +129,42 @@ function checkService(serviceName, declaration, brandConfig, tokenStore) {
 }
 
 /**
+ * WHERE a missing key belongs, in ONE shape for every entry this file prints
+ * ([#910](https://github.com/Omega-JS-Stack/omega/issues/910)). A brand of a
+ * company inherits that company's `.env` tier, so the Apple trio (and every
+ * other credential a company shares) is added ONCE, in the company file, and
+ * every sibling brand gets it; the brand file stays the per-brand override.
+ * A standalone brand has only its own file, and the line is unchanged.
+ *
+ * @param {object|null} company - The resolved company (@omega.js/config's
+ *   resolveCompany), or nothing when the caller resolved none.
+ * @returns {string} The place a fix line names.
+ */
+function envHome(company) {
+  // A company named but not on this machine, or a parent carrying no company
+  // tree, can name no file: inheritance is off for this run, so the brand's own
+  // .env is the only home there is.
+  if (!company || !company.id || !company.root || !company.dir) {
+    return 'the brand .env';
+  }
+
+  // `dir` is the resolver's own `<root>/company` (@omega.js/config's
+  // COMPANY_DIR), never that path spelled again here.
+  const file = company.file('.env') || path.join(company.dir, '.env');
+
+  return `the company .env (${file}); the brand .env overrides it`;
+}
+
+/**
  * Build the machine-readable skip/error reason for a finding — always names
  * the exact vars/scopes (never values) so run records and the 🔑 aggregate
  * say precisely what to add where.
  */
-function buildReason(finding) {
+function buildReason(finding, company) {
   const parts = [];
 
   if (finding.missingEnv.length > 0) {
-    parts.push(`missing ${finding.missingEnv.map((entry) => entry.name).join(', ')} — add to the brand .env, or rerun interactively to paste`);
+    parts.push(`missing ${finding.missingEnv.map((entry) => entry.name).join(', ')}: add to ${envHome(company)}, or rerun interactively to paste`);
   }
   parts.push(...consentParts(finding));
 
@@ -173,7 +204,7 @@ function buildPending(finding) {
  * service: what's missing, why the service needs it, the exact fix, then
  * the rerun verb. Env VALUES never appear — names, labels, and mint URLs only.
  */
-function printWalkthrough(findings, gates, tokenStore, strict) {
+function printWalkthrough(findings, gates, tokenStore, strict, company) {
   console.log('');
   console.log(`  ${chalk.yellow('⚑ Preflight')} — ${findings.length} service${findings.length === 1 ? ' is' : 's are'} missing requirements${strict ? chalk.red(' (--strict: failing hard)') : ''}:`);
 
@@ -192,7 +223,7 @@ function printWalkthrough(findings, gates, tokenStore, strict) {
     }
 
     for (const entry of finding.missingEnv) {
-      console.log(`      ${chalk.dim('fix:')}    add ${chalk.bold(`${entry.name}=<value>`)} to the brand .env${entry.label ? chalk.dim(` — ${entry.label}`) : ''}`);
+      console.log(`      ${chalk.dim('fix:')}    add ${chalk.bold(`${entry.name}=<value>`)} to ${envHome(company)}${entry.label ? chalk.dim(` (${entry.label})`) : ''}`);
       if (entry.url) {
         console.log(`              ${chalk.dim(`→ mint it at ${entry.url}`)}`);
       }
@@ -224,6 +255,8 @@ function printWalkthrough(findings, gates, tokenStore, strict) {
  * @param {string[]} params.services - Services this manage run will walk
  * @param {object} params.brandConfig - Merged brand config
  * @param {string} params.brandRoot - Brand monorepo root
+ * @param {object} [params.company] - The resolved company (#910), which names
+ *   the `.env` tier every fix line sends a shared credential to
  * @param {object} params.options - Run options ({ strict?, dryRun?, … })
  * @param {object} [deps] - Test seams: { requires } replaces the REQUIRES
  *   registry, { canPrompt } the interactivity gate
@@ -231,7 +264,7 @@ function printWalkthrough(findings, gates, tokenStore, strict) {
  *   gates only contains entries for services with findings — everything
  *   else runs untouched
  */
-function runPreflight({ services, brandConfig, brandRoot, options = {} }, deps = {}) {
+function runPreflight({ services, brandConfig, brandRoot, company = null, options = {} }, deps = {}) {
   const requires = deps.requires || REQUIRES;
   const interactive = (deps.canPrompt || canPrompt)(options);
   const strict = Boolean(options.strict);
@@ -261,14 +294,14 @@ function runPreflight({ services, brandConfig, brandRoot, options = {} }, deps =
 
     gates[finding.service] = {
       action,
-      reason: buildReason(finding),
+      reason: buildReason(finding, company),
       missingEnv: finding.missingEnv.map((entry) => entry.name),
       ...(pending ? { needsInteractive: pending } : {}),
     };
   }
 
   if (findings.length > 0) {
-    printWalkthrough(findings, gates, tokenStore, strict);
+    printWalkthrough(findings, gates, tokenStore, strict, company);
   }
 
   return { findings, gates };

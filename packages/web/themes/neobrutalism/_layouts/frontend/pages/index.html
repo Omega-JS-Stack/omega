@@ -10,11 +10,11 @@ hero:
   description: "AI automation for modern businesses made simple"
   primary_button:
     text: "Get started free"
-    icon: "rocket"
+    icon: "fa-solid fa-rocket"
     href: "/dashboard"
   secondary_button:
     text: "See pricing"
-    icon: "book-open"
+    icon: "fa-solid fa-book-open"
     href: "/pricing"
 
 # Trusted By Section (base marketing/trusted-by, restyled)
@@ -61,18 +61,18 @@ highlights:
   subheadline: "Get unlimited design requests delivered fast with our streamlined process."
   cta_button:
     text: "Get started"
-    icon: "rocket"
+    icon: "fa-solid fa-rocket"
     href: "/dashboard"
   items:
     - title: "Subscribe"
       description: "Choose your plan and submit unlimited design requests."
-      icon: "rotate"
+      icon: "fa-solid fa-rotate"
     - title: "Receive"
       description: "Get your designs delivered in as fast as two business days."
-      icon: "bolt"
+      icon: "fa-solid fa-bolt"
     - title: "Revise"
       description: "Request unlimited revisions until it's perfect."
-      icon: "thumbs-up"
+      icon: "fa-solid fa-thumbs-up"
 
 # Testimonials Section
 testimonials:
@@ -163,10 +163,10 @@ config:
       <div class="col-lg-5">
         <div class="d-grid gap-3 neo-hero__actions">
           <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-dark btn-lg">
-            <i class="fa-solid fa-{{ resolved.hero.primary_button.icon }} me-2"></i>{{ resolved.hero.primary_button.text }}
+            <i class="{{ resolved.hero.primary_button.icon }} me-2" aria-hidden="true"></i>{{ resolved.hero.primary_button.text }}
           </a>
           <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-light btn-lg">
-            <i class="fa-solid fa-{{ resolved.hero.secondary_button.icon }} me-2"></i>{{ resolved.hero.secondary_button.text }}
+            <i class="{{ resolved.hero.secondary_button.icon }} me-2" aria-hidden="true"></i>{{ resolved.hero.secondary_button.text }}
           </a>
         </div>
       </div>
@@ -240,7 +240,7 @@ config:
             <div class="card-body">
               <div class="neo-step-card__top">
                 <span class="neo-step-card__num">{{ forloop.index }}</span>
-                <span class="neo-step-card__icon"><i class="fa-solid fa-{{ feature.icon }}"></i></span>
+                <span class="neo-step-card__icon"><i class="{{ feature.icon }}" aria-hidden="true"></i></span>
               </div>
               <h3 class="neo-step-card__title">{{ feature.title }}</h3>
               <p class="neo-step-card__desc">{{ feature.description }}</p>
@@ -253,7 +253,7 @@ config:
     {% iftruthy resolved.highlights.cta_button %}
       <div class="text-center mt-5">
         <a href="{{ resolved.highlights.cta_button.href }}" class="btn btn-warning btn-lg">
-          <i class="fa-solid fa-{{ resolved.highlights.cta_button.icon }} me-2"></i>{{ resolved.highlights.cta_button.text }}
+          <i class="{{ resolved.highlights.cta_button.icon }} me-2" aria-hidden="true"></i>{{ resolved.highlights.cta_button.text }}
         </a>
       </div>
     {% endiftruthy %}

@@ -12,13 +12,15 @@
  * is the one kind of reconcile flag config keeps (#434): it lands at
  * `cloud.oauthRedirectsConfigured`. Non-interactive runs warn.
  *
- * OAuth client credentials land in the brand's gitignored
- * .omega/secrets/google-oauth.json (never in omega.json5).
+ * OAuth client credentials land in the brand's gitignored secrets folder, at
+ * the path `GOOGLE_OAUTH_REL` names (@omega.js/devkit/service-account owns
+ * every brand secrets path), never in omega.json5.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { GOOGLE_OAUTH_REL } = require('@omega.js/devkit/service-account');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -148,7 +150,7 @@ module.exports = async function ensureAuthentication(context) {
       // Read-compare first (#590's idiom, #623): the console's credentials
       // barely ever move, and a manage run that rewrites an identical secret
       // file on every pass churns the mtime every watcher and backup sees.
-      const secretsPath = join(brandRoot, '.omega', 'secrets', 'google-oauth.json');
+      const secretsPath = join(brandRoot, GOOGLE_OAUTH_REL);
       const secrets = {
         clientId: googleConfig.clientId,
         clientSecret: googleConfig.clientSecret,

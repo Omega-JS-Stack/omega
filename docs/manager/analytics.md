@@ -23,7 +23,7 @@ The cross-framework event contract — the catalog, the placement rule, consent 
 - `analytics.providers.google.propertyId` / `.accountId` — the GA4 property. Missing, with
   credentials available, an interactive run offers the account + property selection/creation
   flow and lands both ids; without a propertyId the two google operations are filtered out.
-- `targets.<type>.analytics.providers.google.id` — where each stream's measurement ID lands
+- `targets.<name>.analytics.providers.google.id`, where each stream's measurement ID lands
   ([#417](https://github.com/Omega-JS-Stack/omega/issues/417)): the per-surface override every
   framework reads through the merge chain, the same shape monitoring uses for DSNs.
 - `analytics.providers.meta.{id,accountId}` and `analytics.providers.tiktok.{id,accountId}` —

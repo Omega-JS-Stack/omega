@@ -2,7 +2,7 @@
  * Test: PUT /admin/post
  * Tests the admin edit post endpoint
  * Edits blog post content in a GitHub repository
- * Requires admin/blogger role, GitHub API key, and a resolvable github repo (targets.backend.github.repo slug or repo.providers.github.org + brand.id)
+ * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
  *
  * This is a suite because we need to:
  * 1. Create a test post file via Octokit
@@ -117,16 +117,17 @@ module.exports = defineCases({
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
       async run({ assert, state, config }) {
-        const { brandRepoOwner, brandRepoName } = require('../../helpers/_shared-config.js');
-        if (!brandRepoOwner(config) || !brandRepoName(config)) {
-          assert.fail('github repo not resolvable (targets.backend.github.repo slug or repo.providers.github.org + brand.id)');
+        const { sourceRepo } = require('../../helpers/_shared-config.js');
+        const source = sourceRepo(config);
+        if (!source) {
+          assert.fail('source repo not resolvable (set repo.org + brand.id)');
           return;
         }
 
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
 
         // Owner/repo from the shared brand-repo derivation
-        const repoMatch = [null, brandRepoOwner(config), brandRepoName(config)];
+        const repoMatch = [null, source.owner, source.name];
 
         state.owner = repoMatch[1];
         state.repo = repoMatch[2];

@@ -55,9 +55,33 @@ execSync(
   `openssl req -new -key "${FIXTURE_DIR}/private.key" -out "${FIXTURE_DIR}/request.csr" -subj "/emailAddress=TEAMTEST12@apple.com/CN=Fixture CSR/C=US"`,
   { stdio: 'pipe' },
 );
+// The same key, certificates with chosen lifetimes: the three validity rungs
+// (#892) are measured from the FILE, so each rung needs a real one.
+execSync(
+  `openssl req -x509 -key "${FIXTURE_DIR}/private.key" -out "${FIXTURE_DIR}/soon.cer" -days 10 -subj "/CN=Fixture Soon/C=US" -outform DER`,
+  { stdio: 'pipe' },
+);
+const asn1 = (days) => `${new Date(Date.now() + days * 86400000).toISOString().replace(/[-:T]/g, '').split('.')[0]}Z`;
+execSync(
+  `openssl req -x509 -key "${FIXTURE_DIR}/private.key" -out "${FIXTURE_DIR}/expired.cer" -not_before ${asn1(-400)} -not_after ${asn1(-5)} -subj "/CN=Fixture Expired/C=US" -outform DER`,
+  { stdio: 'pipe' },
+);
+
 const FIXTURE_KEY = jetpack.read(join(FIXTURE_DIR, 'private.key'));
 const FIXTURE_CSR = jetpack.read(join(FIXTURE_DIR, 'request.csr'));
 const FIXTURE_CERT_DER = jetpack.read(join(FIXTURE_DIR, 'cert.cer'), 'buffer');
+const FIXTURE_CERT_SOON_DER = jetpack.read(join(FIXTURE_DIR, 'soon.cer'), 'buffer');
+const FIXTURE_CERT_EXPIRED_DER = jetpack.read(join(FIXTURE_DIR, 'expired.cer'), 'buffer');
+
+/** Play Apple: issue a certificate from the key whose CSR was submitted. */
+function issueFrom(keyPath) {
+  const out = join(FIXTURE_DIR, `issued-${Math.random().toString(36).slice(2)}.cer`);
+  execSync(
+    `openssl req -x509 -key "${keyPath}" -out "${out}" -days 365 -subj "/CN=Fixture Issued/C=US" -outform DER`,
+    { stdio: 'pipe' },
+  );
+  return jetpack.read(out, 'buffer');
+}
 
 function cleanCSR(csr) {
   return csr
@@ -76,7 +100,7 @@ function appleDirOf(root) {
   return join(root, '.omega', 'certificates', 'apple');
 }
 
-function brandConfig({ certificates = {}, apple = {}, targets = { desktop: {} } } = {}) {
+function brandConfig({ certificates = {}, apple = {}, targets = { desktop: { type: 'desktop' } } } = {}) {
   return {
     brand: { id: BRAND_ID, name: BRAND_NAME, url: 'https://fixture-brand.test' },
     targets,
@@ -156,9 +180,9 @@ function profileRecord(profileType, name, id = `profile-${profileType}`) {
 }
 
 /** Stage a local .cer (+ paired key, + fresh .p12) as a converged brand has. */
-function stageLocalCert(root, type, { key = true, p12 = true } = {}) {
+function stageLocalCert(root, type, { key = true, p12 = true, cert = FIXTURE_CERT_DER } = {}) {
   const dir = appleDirOf(root);
-  jetpack.write(join(dir, 'certificates', `${type}.cer`), FIXTURE_CERT_DER);
+  jetpack.write(join(dir, 'certificates', `${type}.cer`), cert);
   if (key) {
     jetpack.write(join(dir, 'csr', type, 'private.key'), FIXTURE_KEY);
   }
@@ -227,7 +251,7 @@ test('certificates: scalar certificates: false skips the service', async () => {
 });
 
 test('certificates: skips without a desktop or mobile target', async () => {
-  const result = await runService(brandConfig({ targets: { web: {}, backend: {} } }), { root: stageBrand() });
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' }, backend: { type: 'backend' } } }), { root: stageBrand() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /no desktop or mobile target/);
 });
@@ -305,8 +329,9 @@ test('certificates: a fully converged brand is a zero-mutation no-op across all 
     stageLocalCert(root, type);
   }
   const dir = appleDirOf(root);
+  // Developer ID needs NO profile (#891), so the converged set is the App
+  // Store one alone.
   jetpack.write(join(dir, 'profiles', BRAND_ID, 'MAC_APP_DISTRIBUTION', 'MACOS.mobileprovision'), 'staged');
-  jetpack.write(join(dir, 'profiles', BRAND_ID, 'DEVELOPER_ID_APPLICATION_G2', 'MACOS.mobileprovision'), 'staged');
 
   const client = fakeApple({
     certificates: ALL_TYPES.map((type) => certRecord(type)),
@@ -314,7 +339,6 @@ test('certificates: a fully converged brand is a zero-mutation no-op across all 
     'bundleIds/bundle-1/bundleIdCapabilities': [{ id: 'cap-1', attributes: { capabilityType: 'APPLE_ID_AUTH' } }],
     profiles: [
       profileRecord('MAC_APP_STORE', `${BRAND_NAME} - MAC_APP_DISTRIBUTION (MACOS)`),
-      profileRecord('MAC_APP_DIRECT', `${BRAND_NAME} - DEVELOPER_ID_APPLICATION_G2 (MACOS)`),
     ],
   });
   const keychain = fakeKeychain();
@@ -325,7 +349,7 @@ test('certificates: a fully converged brand is a zero-mutation no-op across all 
   assert.deepEqual(client.mutations(), []);
   assert.deepEqual(result.output.certificates, { synced: 6, downloaded: 0, created: 0 });
   assert.deepEqual(result.output.bundleIds, { synced: true });
-  assert.deepEqual(result.output.profiles, { synced: 2, downloaded: 0, created: 0 });
+  assert.deepEqual(result.output.profiles, { synced: 1, downloaded: 0, created: 0 });
 
   // Durable state: trimmed cert records + the resolved bundle ID + profiles
   assert.deepEqual(Object.keys(result.state.certificateMap).sort(), [...ALL_TYPES].sort());
@@ -333,9 +357,7 @@ test('certificates: a fully converged brand is a zero-mutation no-op across all 
     id: 'cert-DEVELOPMENT', certificateType: 'DEVELOPMENT', expirationDate: FUTURE,
   });
   assert.deepEqual(result.state.bundleId, { identifier: BUNDLE_IDENTIFIER, id: 'bundle-1', platforms: ['MACOS'] });
-  assert.deepEqual(Object.keys(result.state.profiles).sort(), [
-    'developer_id_application_g2-macos', 'mac_app_distribution-macos',
-  ]);
+  assert.deepEqual(Object.keys(result.state.profiles).sort(), ['mac_app_distribution-macos']);
 
   // Keychain import ran once, restricted to the config-listed types
   assert.equal(keychain.calls.length, 1);
@@ -391,10 +413,14 @@ test('certificates: a first-time cert generates a fresh CSR whose content matche
     stageLocalCert(root, type);
   }
 
+  // Apple issues FROM the submitted CSR, so the issued cert pairs with the key
+  // the service just generated: the .p12 export has its pair (#892).
   const client = fakeApple({
     certificates: ALL_TYPES.filter((t) => t !== 'DEVELOPMENT').map((t) => certRecord(t)),
     'POST certificates': { data: certRecord('DEVELOPMENT', 'cert-dev') },
-    'GET certificates/cert-dev': { data: { attributes: { certificateContent: FIXTURE_CERT_DER.toString('base64') } } },
+    'GET certificates/cert-dev': () => ({
+      data: { attributes: { certificateContent: issueFrom(join(dir, 'csr', 'DEVELOPMENT', 'private.key')).toString('base64') } },
+    }),
   });
 
   const result = await runService(brandConfig(), { root, client, operations: ONLY('certificates') });
@@ -407,13 +433,13 @@ test('certificates: a first-time cert generates a fresh CSR whose content matche
 });
 
 // ─── Company-shared signing tree ─────────────────────────────────────────────
-// One Apple account signs everything a company ships: a company-managed
-// brand (context.companyRoot from the .omega/company.json marker) resolves
-// the WHOLE signing tree — CSRs, certs, .p12s, the .p8, CSC_KEY_PASSWORD —
-// at the company workspace; standalone brands stay brand-local (every other
-// test in this file, which passes no companyRoot).
+// One Apple account signs everything a company ships: a brand of a company
+// (context.companyRoot: the company TREE the walk resolved from its
+// `company: { id }`, #677) resolves the WHOLE signing tree: CSRs, certs,
+// .p12s, the .p8, CSC_KEY_PASSWORD, there; standalone brands stay brand-local
+// (every other test in this file, which passes no companyRoot).
 
-test('certificates: a company-managed brand signs from the COMPANY workspace tree', async () => {
+test('certificates: a brand of a company signs from the COMPANY tree', async () => {
   const root = stageBrand();
   const companyRoot = mkdtempSync(join(tmpdir(), 'omega-certs-company-'));
   const companyDir = appleDirOf(companyRoot);
@@ -482,6 +508,110 @@ test('certificates: interactive p8 rescue files the download into the signing tr
   }
 });
 
+// ─── Reuse, never mint over a valid cert (#892) ──────────────────────────────
+// Apple only issues so many certificates: a valid cert on the account is REUSED
+// by pairing it with a local key, and a type that cannot produce its .p12 is an
+// ERROR with the fix in it (#891), never a warning that counts as synced.
+
+test('certificates: a valid cert pairs with the COMPANY key and is reused, with no create call', async () => {
+  const root = stageBrand();
+  const companyRoot = mkdtempSync(join(tmpdir(), 'omega-certs-company-'));
+  const companyDir = appleDirOf(companyRoot);
+
+  // The company tree holds the cert AND the key it was issued from: the brand
+  // tree holds nothing at all
+  jetpack.write(join(companyDir, 'certificates', 'DEVELOPER_ID_APPLICATION_G2.cer'), FIXTURE_CERT_DER);
+  jetpack.write(join(companyDir, 'csr', 'DEVELOPER_ID_APPLICATION_G2', 'private.key'), FIXTURE_KEY);
+
+  const client = fakeApple({ certificates: [certRecord('DEVELOPER_ID_APPLICATION_G2')] });
+  const config = brandConfig({ apple: { certificates: [{ type: 'DEVELOPER_ID_APPLICATION_G2', manual: true }] } });
+
+  const result = await runService(config, { root, client, operations: ONLY('certificates'), companyRoot });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(client.mutations(), [], 'a valid cert is never minted over');
+  assert.deepEqual(result.output.certificates, { synced: 1, downloaded: 0, created: 0 });
+  // The .p12 was exported from the COMPANY key, into the COMPANY tree
+  const p12 = jetpack.read(join(companyDir, 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12'), 'buffer');
+  assert.equal(p12[0], 0x30);
+  assert.equal(jetpack.exists(appleDirOf(root)), false);
+});
+
+test('certificates: a valid cert with no paired key ERRORS, naming the key path and the fix, and never POSTs', async () => {
+  // The live failure (#891 proof run one): the .cer downloaded into the brand
+  // tree, no key anywhere, the type counted as synced and the mac build shipped
+  // unsigned.
+  const root = stageBrand();
+  const companyRoot = mkdtempSync(join(tmpdir(), 'omega-certs-company-'));
+  jetpack.write(join(appleDirOf(companyRoot), 'certificates', 'DEVELOPER_ID_APPLICATION_G2.cer'), FIXTURE_CERT_DER);
+
+  const client = fakeApple({ certificates: [certRecord('DEVELOPER_ID_APPLICATION_G2')] });
+  const config = brandConfig({ apple: { certificates: [{ type: 'DEVELOPER_ID_APPLICATION_G2', manual: true }] } });
+
+  const result = await runService(config, { root, client, operations: ONLY('certificates'), companyRoot });
+
+  assert.equal(result.status, 'error');
+  assert.deepEqual(client.mutations(), [], 'no create call happens on the unpaired path');
+  assert.match(result.error, /DEVELOPER_ID_APPLICATION_G2/);
+  assert.match(result.error, /csr\/DEVELOPER_ID_APPLICATION_G2\/private\.key/);
+  assert.match(result.error, new RegExp(appleDirOf(companyRoot).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(result.error, /revoke the certificate/);
+  assert.equal(result.output.certificates.failed, 1);
+  assert.equal(jetpack.exists(join(appleDirOf(companyRoot), 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12')), false);
+});
+
+test('certificates: an unpaired key that is merely PRESENT does not count as paired', async () => {
+  const root = stageBrand();
+  // A key from a different CSR: present, and unable to sign this certificate
+  const strangerDir = mkdtempSync(join(tmpdir(), 'omega-certs-stranger-'));
+  execSync(`openssl req -x509 -nodes -newkey rsa:2048 -keyout "${strangerDir}/private.key" -out "${strangerDir}/cert.cer" -days 365 -subj "/CN=Stranger/C=US" -outform DER`, { stdio: 'pipe' });
+  jetpack.write(join(appleDirOf(root), 'certificates', 'DEVELOPER_ID_APPLICATION_G2.cer'), FIXTURE_CERT_DER);
+  jetpack.copy(join(strangerDir, 'private.key'), join(appleDirOf(root), 'csr', 'DEVELOPER_ID_APPLICATION_G2', 'private.key'));
+
+  const client = fakeApple({ certificates: [certRecord('DEVELOPER_ID_APPLICATION_G2')] });
+  const config = brandConfig({ apple: { certificates: [{ type: 'DEVELOPER_ID_APPLICATION_G2', manual: true }] } });
+
+  const result = await runService(config, { root, client, operations: ONLY('certificates') });
+
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /no private key in the signing tree pairs with it/);
+});
+
+// ─── The three validity rungs (#892) ────────────────────────────────────────
+// One expiry function (@omega.js/devkit/certs) answers for the walk and for the
+// desktop's validate-certs step: fine, under 30 days warns, expired errors.
+
+test('certificates: a cert expiring within 30 days WARNS, and an expired one ERRORS', async () => {
+  const soonRoot = stageBrand();
+  stageLocalCert(soonRoot, 'DEVELOPER_ID_APPLICATION_G2', { cert: FIXTURE_CERT_SOON_DER, p12: false });
+  const config = brandConfig({ apple: { certificates: [{ type: 'DEVELOPER_ID_APPLICATION_G2', manual: true }] } });
+
+  const soon = await runService(config, {
+    root: soonRoot,
+    client: fakeApple({ certificates: [certRecord('DEVELOPER_ID_APPLICATION_G2')] }),
+    operations: ONLY('certificates'),
+  });
+
+  assert.equal(soon.status, 'warned');
+  assert.equal(soon.output.certificates.expiringSoon, 1);
+  assert.match(soon.warned[0].reason, /expire within 30 days/);
+  // It still SIGNS: a cert with days left is delivered, it is only a warning
+  assert.ok(jetpack.exists(join(appleDirOf(soonRoot), 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12')));
+
+  const expiredRoot = stageBrand();
+  stageLocalCert(expiredRoot, 'DEVELOPER_ID_APPLICATION_G2', { cert: FIXTURE_CERT_EXPIRED_DER, p12: false });
+
+  const expired = await runService(config, {
+    root: expiredRoot,
+    client: fakeApple({ certificates: [certRecord('DEVELOPER_ID_APPLICATION_G2')] }),
+    operations: ONLY('certificates'),
+  });
+
+  assert.equal(expired.status, 'error');
+  assert.match(expired.error, /EXPIRED/);
+  assert.equal(expired.output.certificates.failed, 1);
+});
+
 // ─── Manual certificates ─────────────────────────────────────────────────────
 
 test('certificates: missing manual certs warn with portal guidance and never POST', async () => {
@@ -508,9 +638,10 @@ test('certificates: a valid local manual cert passes openssl validation and sync
   for (const type of AUTOMATED_TYPES) {
     stageLocalCert(root, type);
   }
-  // Manual G2 certs exist locally only (no API record, no private key)
-  stageLocalCert(root, 'DEVELOPER_ID_APPLICATION_G2', { key: false, p12: false });
-  stageLocalCert(root, 'DEVELOPER_ID_INSTALLER_G2', { key: false, p12: false });
+  // Manual G2 certs exist locally only (no API record): the paired key is what
+  // makes them signing material, so the .p12 exports for real from it
+  stageLocalCert(root, 'DEVELOPER_ID_APPLICATION_G2', { p12: false });
+  stageLocalCert(root, 'DEVELOPER_ID_INSTALLER_G2', { p12: false });
 
   const client = fakeApple({
     certificates: AUTOMATED_TYPES.map((t) => certRecord(t)),
@@ -746,24 +877,16 @@ test('certificates: mobile + desktop targets derive both platforms', async () =>
   });
 
   const result = await runService(
-    brandConfig({ targets: { desktop: {}, mobile: {} } }),
+    brandConfig({ targets: { desktop: { type: 'desktop' }, mobile: { type: 'mobile' } } }),
     { root: stageBrand(), client, operations: ONLY('bundle-ids') },
   );
 
   assert.deepEqual(result.state.bundleId.platforms, ['IOS', 'MACOS']);
 });
 
-test('certificates: bundle-id policy — reverse-DNS derivation + dash-to-dot composition', () => {
-  const { deriveBundleIdPrefix, composeBundleId } = require('../src/lib/bundle-id.js');
-
-  assert.equal(deriveBundleIdPrefix('https://itwcreativeworks.com'), 'com.itwcreativeworks');
-  assert.equal(deriveBundleIdPrefix('https://www.acme.io/some/path'), 'io.acme');
-  assert.equal(deriveBundleIdPrefix('https://playground.omegajs.dev'), 'dev.omegajs.playground');
-  assert.equal(deriveBundleIdPrefix('not a url'), null);
-
-  assert.equal(composeBundleId('com.itwcreativeworks', 'omega-playground'), 'com.itwcreativeworks.omega.playground');
-  assert.equal(composeBundleId(PREFIX, BRAND_ID), BUNDLE_IDENTIFIER);
-});
+// The bundle-id policy itself is @omega.js/config's now (#909), pinned by
+// packages/config/test/bundle-id.test.js: one derivation for the id this
+// service registers and the id the desktop build signs under.
 
 // ─── Profiles ────────────────────────────────────────────────────────────────
 
@@ -773,7 +896,7 @@ const CERT_STATE = {
 };
 const BUNDLE_STATE = { identifier: BUNDLE_IDENTIFIER, id: 'bundle-1', platforms: ['MACOS'] };
 
-test('certificates: missing profiles are created against the bundle ID + cert and downloaded', async () => {
+test('certificates: a missing profile is created against the bundle ID + cert and downloaded; Developer ID asks for none (#891)', async () => {
   const root = stageBrand();
   const client = fakeApple({
     profiles: [],
@@ -782,7 +905,6 @@ test('certificates: missing profiles are created against the bundle ID + cert an
       return { data: profileRecord(body.data.attributes.profileType, body.data.attributes.name, `new-${body.data.attributes.profileType}`) };
     },
     'GET profiles/new-MAC_APP_STORE': { data: { attributes: { profileContent: Buffer.from('fixture-profile').toString('base64') } } },
-    'GET profiles/new-MAC_APP_DIRECT': { data: { attributes: { profileContent: Buffer.from('fixture-profile').toString('base64') } } },
   });
 
   const result = await runService(brandConfig(), {
@@ -791,14 +913,16 @@ test('certificates: missing profiles are created against the bundle ID + cert an
   });
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(result.output.profiles, { synced: 0, downloaded: 0, created: 2 });
+  // Developer ID is DIRECT distribution: signed, notarized, no profile (#891),
+  // so the App Store profile is the ONLY one created.
+  assert.deepEqual(result.output.profiles, { synced: 0, downloaded: 0, created: 1 });
 
-  const [storePost, directPost] = client.mutations();
+  const [storePost, ...rest] = client.mutations();
+  assert.deepEqual(rest, [], 'nothing is requested for DEVELOPER_ID_APPLICATION_G2');
   assert.deepEqual(storePost.body.data.attributes, { name: `${BRAND_NAME} - MAC_APP_DISTRIBUTION (MACOS)`, profileType: 'MAC_APP_STORE' });
   assert.equal(storePost.body.data.relationships.bundleId.data.id, 'bundle-1');
   assert.deepEqual(storePost.body.data.relationships.certificates.data, [{ type: 'certificates', id: 'cert-mad' }]);
   assert.equal(storePost.body.data.relationships.devices, undefined);
-  assert.deepEqual(directPost.body.data.relationships.certificates.data, [{ type: 'certificates', id: 'cert-devid' }]);
 
   // Distribution profiles never fetch the device list
   assert.equal(client.calls.some((c) => c.path === 'devices'), false);
@@ -814,7 +938,7 @@ test('certificates: a cert known only from its local file cannot back a new prof
     operations: ONLY('profiles'),
     serviceData: {
       bundleId: BUNDLE_STATE,
-      certificateMap: { DEVELOPER_ID_APPLICATION_G2: { id: 'manual', certificateType: 'DEVELOPER_ID_APPLICATION_G2', expirationDate: FUTURE } },
+      certificateMap: { MAC_APP_DISTRIBUTION: { id: 'manual', certificateType: 'MAC_APP_DISTRIBUTION', expirationDate: FUTURE } },
     },
   });
 

@@ -67,10 +67,19 @@ try {
     ? require(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH)
     : require('@omega.js/desktop/renderer');
   testManager = new RendererManager();
-  // Seed config so getApiUrl / getFunctionsUrl / getWebsiteUrl have something to
-  // read in their prod branches. Tests can mutate this via __emTestManager.config.set().
+  // Seed config the way a real BUILD bakes it, so the URL helpers have the same
+  // inputs here that they have in a shipped renderer. Tests can mutate this via
+  // __emTestManager.config.set().
+  //   `environment` is the build fact every OMEGA surface bakes
+  //   ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), which is
+  //   what a real renderer (no process.env) answers from.
+  //   `dev.ports` is the resolved local map, whose floor is @omega.js/config's
+  //   classic numbers ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)):
+  //   nothing carries a browser-side copy of them any more, so an artifact
+  //   without the map cannot reach a localhost port at all.
   testManager.config = {
-    em:    { environment: 'production' },
+    environment: 'production',
+    dev:   { ports: { ...require('@omega.js/config').CLASSIC_PORTS } },
     brand: { url: 'https://example.com' },
     cloud: { provider: 'firebase', config: { projectId: 'demo-app', authDomain: 'demo-app.firebaseapp.com' } },
   };

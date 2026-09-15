@@ -10,26 +10,85 @@
  *   omega deploy --target=web,backend  → explicit set
  *   omega deploy --dry-run             → forwarded — each target prints its plan
  *
- * ORDER: the DELIVERY lane first (#678) — the same `BOOT_SERVICES` walk an
- * `omega dev` boot runs, so config, assets and certs reach the targets before
- * anything publishes them — then backend, then web, then the rest: the API
- * must be live before the site that points at it. Every flag but --target=
- * forwards verbatim to each target's framework deploy (--dry-run, --no-sync,
- * --direct, --platforms, …); targets run sequentially with streamed output. A
- * failing target STOPS the run (a broken API is no base for the site) unless
- * --continue-on-error; any failure → exit 1. A --target= token matching
- * nothing is an error, never a deploy-everything fallback — and deploys stay deliberate:
- * nothing invokes this command but the human-typed verb (D13).
+ * ORDER (#901): the DELIVERY lane first (#678), the same `BOOT_SERVICES` walk
+ * an `omega dev` boot runs, so config, assets and certs reach the targets
+ * before anything publishes them; then every selected target's own scaffold,
+ * called in-process (the workflows it composes have to exist before the
+ * snapshot carries them); then the run's ONE delivery; then
+ * BACKEND alone; then web, desktop, extension and any custom target
+ * CONCURRENTLY. Backend is the only dependency anything has (the site points at
+ * its API), and the rest depend on nothing, so they publish together. Every
+ * flag but --target= forwards verbatim to each target's framework deploy
+ * (--dry-run, --direct, --platforms, …). A failing BACKEND stops the
+ * run before the group unless --continue-on-error; inside the group every
+ * target runs to completion and the run then exits 1 naming the failed ones. A
+ * --target= token matching nothing is an error, never a deploy-everything
+ * fallback, and deploys stay deliberate: nothing invokes this command but the
+ * human-typed verb (D13).
+ *
+ * ONE DELIVERY per run (#901): a lane's delivery used to run once per TARGET,
+ * which is what kept the targets in single file. It runs HERE now, once: the
+ * one lane (#915) force-pushes the brand folder to `omega-deploy` and every
+ * target verb is handed `--snapshot=<sha>` so it dispatches against that very
+ * commit instead of overwriting it under its siblings.
  */
 const path = require('node:path');
 const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { resolveDeployLane, dispatchRepo, resolveToken, deliverLane } = require('@omega.js/devkit/deploy');
+const { shortSha } = require('@omega.js/devkit/deploy-snapshot');
 
 const { runManage } = require('../manage.js');
-const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
-const { resolveTargetRun } = require('../lib/framework-bin.js');
+const { resolveBrandRoot, discoverTargets, loadBrand } = require('../lib/brand.js');
+const { resolveTargetRun, resolveTargetScaffold } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 const { DEPLOY_ORDER, PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('../lib/target-selection.js');
+
+/**
+ * The run's ONE delivery (#901): the lane resolved once at the brand root, and
+ * devkit's `deliverLane` run once for the whole fan-out.
+ *
+ * It refuses a checkout behind the repo's default branch, pushes the composed
+ * workflow files there when they differ, packs the brand's linked frameworks,
+ * force-pushes the brand folder to `omega-deploy` and puts the tree back
+ * ([#915](https://github.com/Omega-JS-Stack/omega/issues/915)); the sha it
+ * returns is what every target verb of this run dispatches against.
+ *
+ * @param {object} options - Options.
+ * @param {string} options.brandRoot - The brand root being deployed.
+ * @param {string} options.dir - A selected target's dir: the lane is the
+ *   brand's, and this is where the resolution starts from.
+ * @returns {Promise<{ lane: object, sha: string|null }>} the lane this run took
+ *   and the sha it snapshotted to, null when the brand has no repo to snapshot
+ */
+async function deliverRunLane({ brandRoot, dir }) {
+  const lane = resolveDeployLane({ dir });
+  const logger = { log: (line) => console.log(chalk.dim(`  ${line}`)) };
+
+  // The snapshot's address is the BRAND's repo, from its config; a brand
+  // outside git delivers nothing at all, so it needs neither address nor token.
+  //
+  // Read for PRODUCTION (#856), like every target's dispatch: the snapshot is a
+  // production artifact, and composing this machine's environment instead would
+  // push it at whatever repo a `development` overlay names.
+  const snapshot = lane.mode === 'snapshot';
+  const { owner, repo } = snapshot ? dispatchRepo(loadBrand(brandRoot, { environment: 'production' }).config) : {};
+
+  const { sha } = await deliverLane({
+    lane,
+    owner,
+    repo,
+    ref: lane.ref,
+    token: snapshot ? resolveToken() : undefined,
+    logger,
+  });
+
+  if (sha) {
+    console.log(chalk.dim(`  Snapshot pushed: ${owner}/${repo} ${lane.ref} @ ${shortSha(sha)}`));
+  }
+
+  return { lane, sha };
+}
 
 module.exports = async (options = {}) => {
   assertPickerFlags(options);
@@ -61,7 +120,7 @@ module.exports = async (options = {}) => {
   const continueOnError = !!(options['continue-on-error'] || options.continueOnError);
   const dryRun = !!(options['dry-run'] || options.dryRun);
 
-  console.log(chalk.bold(`\nOMEGA brand deploy — ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.target || entry.name).join(' → ')})`)}`));
+  console.log(chalk.bold(`\nOMEGA brand deploy: ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.name).join(' → ')})`)}`));
 
   // ─── Delivery lane, once, before the fan-out ───────────────────────────────
   // Brand inputs (config, assets, certs) reach a target through ONE step
@@ -77,45 +136,149 @@ module.exports = async (options = {}) => {
     return;
   }
 
-  // ─── Execute in order, streaming each target's output ──────────────────────
+  // ─── Scaffold every selected target, before the delivery (#901) ───────────
+  // A target's scaffold (its framework's `ensureTarget`, called HERE in-process
+  // through the `./ensure-target` subpath every framework exposes) is what
+  // COMPOSES that target's workflow into the brand root, and the snapshot below
+  // is what carries the brand folder to the runner. Scaffolding only inside
+  // each target's own deploy verb put it after the push: a workflow re-rendered
+  // this run would not ride this run's snapshot, and a target's FIRST deploy
+  // would find no workflow on the mirror at all. There is no verb and no flag
+  // for it: a deploy always scaffolds first. Sequential, in DEPLOY_ORDER, and
+  // short. The target verbs scaffold again on their way past (idempotent),
+  // which is why the push lane takes this same flow rather than a branch of its
+  // own.
+  console.log(chalk.cyan(`\n─── scaffold ${chalk.dim('(targets → brand root)')} ───`));
+  for (const entry of selected) {
+    const run = resolveTargetScaffold(entry);
+
+    // A custom target has no framework scaffold: not a failure, and no reason
+    // to hold up the push.
+    if (run.kind === 'skip') {
+      console.log(chalk.dim(`⊘ ${entry.name}: ${run.detail}`));
+      continue;
+    }
+
+    // A dry run scaffolds for real: every verb does, and the scaffold writes
+    // nothing a deploy would not have written anyway.
+    let result;
+    try {
+      if (run.kind === 'error') throw new Error(run.detail);
+
+      result = await run.ensureTarget({
+        projectDir: entry.path,
+        log: (line) => console.log(chalk.dim(`  [${entry.name}] ${line}`)),
+        warn: (line) => console.warn(chalk.yellow(`  [${entry.name}] ${line}`)),
+      });
+    } catch (error) {
+      console.error(chalk.red(`\n✗ ${entry.name} scaffold failed (${error.message}): nothing was pushed and nothing deployed.`));
+      process.exitCode = 1;
+      return;
+    }
+
+    // The ensure prints what it healed, so a run that healed something has said
+    // it already; a run that changed nothing would otherwise print nothing.
+    if (result.written.length + result.merged.length + result.changed.length === 0) {
+      console.log(chalk.dim(`  [${entry.name}] scaffold up to date`));
+    }
+  }
+
+  // ─── The run's ONE delivery, before any target (#901) ──────────────────
+  // A dry run and a --direct run both deliver nothing: the first promises to
+  // send nothing at all, and the second publishes from this machine without
+  // ever dispatching, so neither has code to carry to GitHub for the targets.
+  const runDelivery = dryRun || options.direct
+    ? { lane: null, sha: null }
+    : await deliverRunLane({ brandRoot, dir: selected[0].path });
+
+  const targetFlags = [...forwarded];
+  if (runDelivery.sha) {
+    // The delivery just ran, once, above. `--snapshot=<sha>` is the root's word
+    // to each target verb that the push is done: left to themselves the group's
+    // targets would each force-push the same brand folder over the ref their
+    // siblings are dispatching against. Nobody types it.
+    targetFlags.push(`--snapshot=${runDelivery.sha}`);
+  }
+
+  // ─── Execute: backend alone, then the rest together ────────────────────
   const summary = [];
   let failed = false;
 
-  for (const [index, entry] of selected.entries()) {
-    const label = `[${index + 1}/${selected.length}] ${entry.name}`;
-    const run = resolveTargetRun(entry, 'deploy', forwarded, { dryRun });
+  /**
+   * Run one target's deploy and report what it did. A prefixed run pipes the
+   * child's output behind `[<target>] `, which is how the concurrent group
+   * stays readable.
+   *
+   * @param {object} entry - The discovered target.
+   * @param {boolean} prefixed - Whether this run is part of the group.
+   * @returns {Promise<object|null>} its summary row, or null when it stepped aside
+   */
+  const runTarget = async (entry, prefixed) => {
+    const label = `[${selected.indexOf(entry) + 1}/${selected.length}] ${entry.name}`;
+    const run = resolveTargetRun(entry, 'deploy', targetFlags, { dryRun });
 
     // A custom target that declares no deploy script steps aside loudly —
     // there is nothing to publish and nothing broken (#603)
     if (run.kind === 'skip') {
       console.log(chalk.dim(`\n⊘ ${label}: ${run.detail} — skipped`));
-      continue;
+      return null;
     }
 
     // Its script cannot be handed --dry-run, so the dry run stops at the plan
     if (run.kind === 'plan') {
       console.log(chalk.dim(`\n⊘ ${label}: dry run — ${run.detail}`));
-      continue;
+      return null;
     }
 
     if (run.kind === 'error') {
       console.log(chalk.red(`\n✗ ${label}: ${run.detail}`));
-      summary.push({ name: entry.name, ok: false, detail: run.detail });
-      failed = true;
-      if (!continueOnError) break;
-      continue;
+      return { name: entry.name, ok: false, detail: run.detail };
     }
 
     console.log(chalk.cyan(`${`\n─── ${label} ${chalk.dim(`(${run.framework || 'custom'})`)} — ${run.label}`.trimEnd()} ───`));
-    const result = await runCommand(run.command, run.args, entry.path);
+    const result = await runCommand(run.command, run.args, entry.path, undefined, prefixed ? { prefix: entry.name } : {});
 
-    summary.push({ name: entry.name, ok: result.success, detail: result.error });
-    if (!result.success) {
+    return { name: entry.name, ok: result.success, detail: result.error };
+  };
+
+  // The API goes live before the surfaces that call it, and a broken one is no
+  // base for them: a failing backend stops the run before the group.
+  const gate = selected.filter((entry) => entry.target === 'backend');
+  const group = selected.filter((entry) => entry.target !== 'backend');
+  let stopped = false;
+
+  for (const entry of gate) {
+    const record = await runTarget(entry, false);
+    if (!record) continue;
+
+    summary.push(record);
+    if (!record.ok) {
       failed = true;
       if (!continueOnError) {
-        console.error(chalk.red(`\n✗ ${entry.name} deploy failed — stopping (later targets depend on it; --continue-on-error overrides)`));
+        console.error(chalk.red(`\n✗ ${entry.name} deploy failed: stopping before the rest (the surfaces point at this API; --continue-on-error overrides)`));
+        stopped = true;
         break;
       }
+    }
+  }
+
+  // Web, desktop, extension and any custom target depend on nothing but the
+  // backend, so they publish TOGETHER (#901), each line of their output behind
+  // the name of the target it came from. Every one of them runs to completion:
+  // a sibling's failure never leaves another target half published.
+  if (!stopped && group.length > 0) {
+    console.log(chalk.cyan(`\n─── ${group.length > 1 ? `${group.map((entry) => entry.name).join(', ')} deploy together` : `${group[0].name} deploys`} ───`));
+    const records = await Promise.all(group.map((entry) => runTarget(entry, true)));
+
+    for (const record of records) {
+      if (!record) continue;
+      summary.push(record);
+      if (!record.ok) failed = true;
+    }
+
+    const fell = records.filter((record) => record && !record.ok).map((record) => record.name);
+    if (fell.length > 0) {
+      console.error(chalk.red(`\n✗ ${fell.join(', ')} failed: every other target of the group still ran to the end`));
     }
   }
 

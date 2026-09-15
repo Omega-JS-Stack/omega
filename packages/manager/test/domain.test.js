@@ -32,7 +32,7 @@ function brandConfig({ url = `https://${DOMAIN}`, provider = 'namecheap' } = {})
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     domain: structuredClone(DEFAULTS.domain),
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
   config.domain.providers = provider ? { [provider]: {} } : {};
   return config;

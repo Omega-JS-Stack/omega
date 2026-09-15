@@ -33,6 +33,7 @@ const { startChild, stopChild } = require('./boot-child.js');
 const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('./port-hold.js');
 const { launchBrowser } = require('./browser.js');
 const { createStepsLog } = require('./steps-log.js');
+const { targetOfType } = require('./target-of-type.js');
 
 // Covers emulator boot AND persona seeding (~55 accounts) — the ready marker
 // fires after both.
@@ -50,21 +51,20 @@ const EMULATOR_READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
 
 /**
- * Discover the brand's targets by directory naming convention.
- * Returns { backend, website } with the paths that exist.
+ * Discover the two target dirs this lane boots, by TYPE: a brand NAMES its
+ * targets ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)), so the
+ * web leg is whichever name carries `type: 'web'`, never the literal folder a
+ * template happened to scaffold.
+ *
+ * @param {string} brandRoot - The brand (repo) root
+ * @returns {{ backend: string|null, web: string|null }} The paths that exist
  */
 function discoverTargets(brandRoot) {
-  const targetsDir = path.join(brandRoot, 'targets');
-  const targets = { backend: null, website: null };
+  const targets = { backend: null, web: null };
 
-  if (!fs.existsSync(targetsDir)) {
-    return targets;
-  }
-
-  for (const entry of fs.readdirSync(targetsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    if (entry.name === 'backend') targets.backend = path.join(targetsDir, entry.name);
-    if (entry.name === 'website') targets.website = path.join(targetsDir, entry.name);
+  for (const type of Object.keys(targets)) {
+    const found = targetOfType(brandRoot, type);
+    if (found) targets[type] = found.dir;
   }
 
   return targets;
@@ -187,14 +187,14 @@ class E2eHarness {
       });
     }
 
-    if (this.targets.website) {
+    if (this.targets.web) {
       await this.step('the website serves through the REAL `omega dev`', async () => {
-        resolveDevTarget(this.targets.website, this.brandRoot);
+        resolveDevTarget(this.targets.web, this.brandRoot);
 
         this.dev = startChild({
-          bin: resolveLocalBin('omega', this.targets.website),
+          bin: resolveLocalBin('omega', this.targets.web),
           args: ['dev', `--port=${this.sitePort}`],
-          cwd: this.targets.website,
+          cwd: this.targets.web,
           env: this.childEnv,
           logFile: path.join(this.logDir, 'dev.log'),
           marker: DEV_READY_MARKER,

@@ -6,10 +6,11 @@
  * artifact channel).
  *
  * ONE lane, the same one every target takes
- * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the executor
- * resolves it from the brand: a nested or linked brand packs its local
- * frameworks and force-pushes a SNAPSHOT of the brand folder, an ordinary
- * brand commits and pushes, and then it waits for the workflow and dispatches. A
+ * ([#872](https://github.com/Omega-JS-Stack/omega/issues/872),
+ * [#915](https://github.com/Omega-JS-Stack/omega/issues/915)): the executor
+ * resolves it from the brand, packs any local frameworks and force-pushes a
+ * SNAPSHOT of the brand folder to `omega-deploy`, the one branch CI ever
+ * builds, and then it waits for the workflow and dispatches. A
  * linked tree no longer switches itself to the direct lane; `--direct` is how a
  * human asks for that.
  *
@@ -19,26 +20,61 @@
  * never reaches it at all.
  *
  * Flags: --dry-run (print the exact dispatch, send nothing; skips the push),
- * --no-sync (dispatch without committing/pushing first: the push lane, and a linked own-repo brand's workflow sync),
- * --direct (build + store-publish from this machine: `npm run release`).
+ * --direct (build + store-publish from this machine: the ONE command CI runs).
  */
+const path = require('node:path');
 const { execSync } = require('node:child_process');
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('deploy');
-const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
-const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
-const { resolveSeedMode } = require('@omega.js/config');
+const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
+const attachLogFile = require('@omega.js/devkit/attach-log-file');
+const { assertBrandVersion } = require('@omega.js/devkit/brand-version');
+const { targetNameFromDir } = require('@omega.js/config');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { deployPrecheck } = require('./lib/deploy-precheck.js');
+
+// The build+publish command, ONE spelling for both lanes
+// ([#865](https://github.com/Omega-JS-Stack/omega/issues/865)): the scaffolded
+// `publish.yml` runs exactly this with `OMEGA_IS_PUBLISH` in its env, and so
+// does `--direct` below.
+const PUBLISH_COMMAND = 'npm run build';
 
 module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
   const projectDir = process.cwd();
 
+  // The whole verb goes to the target's own deploy log, from its first line
+  // ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)): the scaffold,
+  // the precheck's refusals and the followed run all land in one file instead
+  // of scrollback. Tees STACK, so a brand fan-out's log gets the same lines.
+  attachLogFile(path.join(projectDir, 'logs', 'deploy.log'));
+
   // The local half of the retired `omega setup` (#675) — idempotent, offline,
   // and quiet on a converged target.
   await ensureTarget({ projectDir, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
+
+  // The brand's ONE version ([#869](https://github.com/Omega-JS-Stack/omega/issues/869)):
+  // a target whose version drifted from the brand root's is refused here, before
+  // the precheck, because a drifted target must not push its secrets and
+  // dispatch a build of the wrong number. A read, so every lane reaches it
+  // (`--direct` and `--dry-run` included).
+  assertBrandVersion({ dir: projectDir });
+
+  // The consumer's pre-deploy hook, on BOTH lanes and before anything is
+  // published or published to ([#900](https://github.com/Omega-JS-Stack/omega/issues/900)):
+  // the playground's prunes its GitHub releases (the version itself comes from
+  // `omega bump` at the brand root, #869). Through the package task's own
+  // hook loader, the one `hooks/build/pre.js` already goes through: one loader
+  // per surface. A dry run skips it, because a hook may act on the world and a
+  // dry run promises to send nothing.
+  if (dryRun) {
+    logger.log('DRY RUN, skipping hook "deploy/pre"');
+  } else {
+    // The one ctx shape every OMEGA hook takes, `{ manager, projectRoot, mode }`,
+    // and a deploy's mode is PRODUCTION: what it is about to publish is a release.
+    await require('../gulp/tasks/package.js').hook('deploy:pre', { mode: 'production' });
+  }
 
   // The direct lane, on request: build + store-publish from THIS machine.
   // BEFORE the precheck, which belongs to the CI lane (web and backend already
@@ -50,40 +86,63 @@ module.exports = async function (options) {
   }
 
   // The NETWORK half, as a precheck: the CI lane needs the remote side right
-  // (its secrets). A dry run sends nothing, so it prechecks nothing.
-  if (!dryRun) {
-    await deployPrecheck({ projectDir, options, logger });
-  }
+  // (its secrets). A DRY RUN runs it too
+  // ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)): every step is
+  // a read or a plan under `dryRun`, so the preview is the real one.
+  await deployPrecheck({ projectDir, options, logger, dryRun });
 
-  // Inside a brand monorepo the target's CI lives in the BRAND ROOT's workflows
-  // dir under a per-target name (#265) — dispatch what setup actually composed.
-  const WORKFLOW = composedWorkflowName({
-    targetDir: process.cwd(),
-    brandRoot: resolveSeedMode(process.cwd()).brandRoot,
+  // The ONE dispatch address helper ([#847](https://github.com/Omega-JS-Stack/omega/issues/847)):
+  // the repo the brand's CONFIG names (never the git remote, which inside a
+  // brand nested in another repo is the enclosing one), and the workflow the
+  // target's scaffold actually composed at the brand root (#265).
+  const { owner, repo, workflow: WORKFLOW } = dispatchTarget({
+    projectRoot: process.cwd(),
+    config: Manager.getConfig(),
     workflow: 'publish.yml',
   });
 
-  // ONE lane for all four targets (#872): the executor resolves it from the
-  // BRAND (`dir`): pack + snapshot push when the brand is nested or linked,
-  // commit + push when it is neither, and then it waits for the workflow and
-  // dispatches. `--no-sync` skips the push on both lanes that have one.
-  const { owner, repo } = dispatchAddress();
-  const { plan, dispatched, lane } = await deployViaDispatch({
+  // ONE lane for all four targets (#872, #915): the executor resolves it from
+  // the BRAND (`dir`), refuses a checkout behind the default branch, puts the
+  // composed workflows on that branch when they differ, packs any local
+  // frameworks and pushes the snapshot to `omega-deploy`, and then it waits for
+  // the workflow and dispatches.
+  // Read BEFORE the dispatch: it is what tells the follower which run is this
+  // one rather than the run before it (#873).
+  const since = new Date();
+  const { plan, dispatched, lane, sha } = await deployViaDispatch({
     workflow: WORKFLOW,
     owner,
     repo,
     dir: process.cwd(),
     dryRun,
-    sync: options.sync !== false,
+    // The brand root's one snapshot for the whole fan-out, when a brand-root
+    // deploy spawned this verb (#901): the push is done, so this run
+    // dispatches against that sha instead of pushing over it. Nobody types it.
+    snapshot: options.snapshot,
     logger,
   });
 
   if (dispatched) {
-    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'dispatch' } });
-    logger.log(`Dispatched ${WORKFLOW} (${lane.mode} lane, ref ${lane.ref}): CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: targetNameFromDir(process.cwd()) || 'extension', detail: { method: 'dispatch' } });
+    logger.log(`Dispatched ${WORKFLOW} (${laneLabel(lane, sha)}): CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
     logger.log(`Watch: ${plan.runsUrl}`);
+
+    // Follow the run to its verdict (#873): the jobs' logs stream in here, and
+    // a red run throws, so the verb's exit code is the run's conclusion rather
+    // than "the dispatch was accepted". The run also has to be building the
+    // tree this deploy pushed (#902): a brand with no repo snapshots nothing,
+    // so there is no sha and that check is off.
+    await require('@omega.js/devkit/deploy-follow').followRun({
+      owner,
+      repo,
+      workflow: WORKFLOW,
+      since,
+      headSha: sha,
+      token: resolveToken(),
+      logger,
+    });
   } else {
-    logger.log(`DRY RUN (${lane.mode} lane, ref ${lane.ref}), would send:`);
+    logger.log(`DRY RUN (${laneLabel(lane)}), would send:`);
     logger.log(`  ${plan.method} ${plan.url}`);
     logger.log(`  body: ${JSON.stringify(plan.body)}`);
     logger.log(`  then watch: ${plan.runsUrl}`);
@@ -98,6 +157,13 @@ module.exports = async function (options) {
  * spec, which took the CI lane away from the brands that need it most; a
  * linked brand now packs its frameworks into the snapshot the runner installs.
  *
+ * ONE command, the one CI runs ([#865](https://github.com/Omega-JS-Stack/omega/issues/865)):
+ * the build already ENDS in the publish task (`gulp/main.js`'s `exports.build`),
+ * so the `npm run build && npm run publish` script this used to run entered
+ * that task twice and published the same version to every store twice over.
+ * The publish flag rides the env the way the workflow sets it, so the local
+ * lane and the CI lane are the same one process.
+ *
  * @param {object} [options]
  * @param {boolean} [options.dryRun] - Print what would run, run nothing.
  * @param {function} [options.exec] - Injectable shell (tests).
@@ -108,30 +174,14 @@ function deployDirect(options) {
   const exec = options.exec || execSync;
 
   if (options.dryRun) {
-    return logger.log('DRY RUN, would run: npm run release (local build + store publish)');
+    return logger.log(`DRY RUN, would run: ${PUBLISH_COMMAND} with OMEGA_IS_PUBLISH=true (local build + store publish)`);
   }
 
   logger.log('Building + publishing LOCALLY (store credentials must be available in this shell)...');
-  exec('npm run release', { stdio: 'inherit' });
-  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'direct' } });
+  exec(PUBLISH_COMMAND, { stdio: 'inherit', env: { ...process.env, OMEGA_IS_PUBLISH: 'true' } });
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: targetNameFromDir(process.cwd()) || 'extension', detail: { method: 'direct' } });
 
   return logger.log('Deployed from the LOCAL build.');
 }
 
-/**
- * The repo this target's CI dispatch addresses: the brand's own, from its
- * config ([#799](https://github.com/Omega-JS-Stack/omega/issues/799)). A git
- * remote answers the repo the working tree SITS IN, which inside a brand nested
- * in another repo is the enclosing one, so the dispatch went to a workflow that
- * was never there. The rule is `@omega.js/devkit/deploy`'s `dispatchRepo`, the
- * same call web's deploy and desktop's release verbs make. Exported for tests.
- *
- * @returns {{ owner: string, repo: string }} owner and bare repo name
- * @throws {Error} when the config names no repo
- */
-function dispatchAddress() {
-  return dispatchRepo(Manager.getConfig());
-}
-
-module.exports.dispatchAddress = dispatchAddress;
 module.exports.deployDirect = deployDirect;

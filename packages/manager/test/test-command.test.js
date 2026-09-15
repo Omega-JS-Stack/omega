@@ -57,14 +57,13 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, backend: ${JSON.stringify(backend)} },
+  targets: { web: { type: 'web' }, backend: ${JSON.stringify({ type: 'backend', ...backend })} },
 }
 `);
 
-  write(path.join(brand, 'targets', 'website', 'package.json'), JSON.stringify({
-    name: 'website', private: true, devDependencies: { '@omega.js/web': '*' },
+  write(path.join(brand, 'targets', 'web', 'package.json'), JSON.stringify({
+    name: 'web', private: true, devDependencies: { '@omega.js/web': '*' },
   }));
-  write(path.join(brand, 'targets', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
   // Target-root manifest (src/dist pillar): the backend's framework dep is a
   // RUNTIME dependency on the ONE target package.json — no functions/ manifest.
@@ -72,7 +71,7 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
     ...(backendScripts ? { scripts: backendScripts } : {}),
   }));
-  write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
+
 
   for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
@@ -132,7 +131,7 @@ test('bare run fans out to every target: each spawned bare, in its own cwd', asy
     assert.deepEqual(call.argv, ['test'], 'bare per-target: only the test command, no ids');
   }
   const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
-  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'website'));
+  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'web'));
   assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
   assert.equal(code, undefined, 'all targets green → no error exit code');
 });
@@ -279,7 +278,7 @@ test("custom-server backend: a bare run takes its own `test` script, and no fram
   await runTestCommand(brand, []);
 
   const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the website its framework bin');
+  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the web target its framework bin');
   const script = calls.find((c) => c.name === 'backend-script');
   assert.equal(script.cwd, path.join(brand, 'targets', 'backend'));
   assert.deepEqual(script.argv, [], 'a package script hears no scope ids and no flags');
@@ -298,20 +297,16 @@ test('custom-server backend with no `test` script: skipped loudly on a bare run,
 
   const code = await runTestCommand(brand, []);
 
-  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], 'only the website ran');
+  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web'], 'only the web target ran');
   assert.equal(code, undefined, 'an absent script is a brand that has not wired it, not a failure');
 });
 
 // ─── The --target picker (#775) ──────────────────────────────────────────────
 
-test('--target narrows a bare run to the named targets, by key or by dir name', async () => {
-  const byKey = stageBrand().brand;
-  await runTestCommand(byKey, [], { target: 'web' });
-  assert.deepEqual(readCalls(byKey).map((c) => c.name), ['web']);
-
-  const byDir = stageBrand().brand;
-  await runTestCommand(byDir, [], { target: 'website' });
-  assert.deepEqual(readCalls(byDir).map((c) => c.name), ['web'], 'the dir name matches too');
+test('--target narrows a bare run to the named targets', async () => {
+  const { brand } = stageBrand();
+  await runTestCommand(brand, [], { target: 'web' });
+  assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);
 });
 
 test('--target narrows a framework: run the same way it narrows a bare one', async () => {
@@ -325,7 +320,7 @@ test('--target narrows a framework: run the same way it narrows a bare one', asy
 
 test('--target composes with a full: run, keeping both sources on the picked target', async () => {
   const { brand } = stageBrand();
-  await runTestCommand(brand, ['full:auth'], { target: 'web,website' });
+  await runTestCommand(brand, ['full:auth'], { target: 'web,web' });
 
   const calls = readCalls(brand);
   assert.deepEqual(calls.map((c) => c.name), ['web'], 'a target named twice still runs once');
@@ -340,7 +335,7 @@ test('a framework scope whose owner --target excludes REFUSES, and nothing ran',
     (error) => {
       assert.equal(error.refusal, true, 'a refusal prints its message alone (no stack)');
       assert.match(error.message, /refusing --target=backend beside the "web:pages\/" scope/);
-      assert.match(error.message, /targets\/website owns that framework/);
+      assert.match(error.message, /targets\/web owns that framework/);
       return true;
     },
   );
@@ -497,11 +492,12 @@ test('`omega test --extended full:` parses as a value-less flag and still carrie
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
   assert.ok(BOOLEAN_FLAGS.includes('extended'), '--extended takes no value — it must be declared boolean');
 
-  // The parse the bin really performs. Undeclared, yargs reads the next
-  // positional as the flag's VALUE: `extended: 'full:'` with the scope gone,
-  // which ran every target BARE while looking like it had been asked for both.
-  const argv = require('yargs')(['test', '--extended', 'full:'])
-    .boolean(BOOLEAN_FLAGS).version(false).help(false).parseSync();
+  // The parse the bin really performs. Undeclared, the next token is read as
+  // the flag's VALUE: `extended: 'full:'` with the scope gone, which ran every
+  // target BARE while looking like it had been asked for both.
+  const argv = require('@omega.js/devkit/argv').parseArgv(['test', '--extended', 'full:'], {
+    booleans: BOOLEAN_FLAGS,
+  });
 
   assert.equal(argv.extended, true);
   assert.deepEqual(argv._, ['test', 'full:'], 'the scope stayed a positional');
@@ -527,11 +523,46 @@ test('`omega test --extended full:` parses as a value-less flag and still carrie
 
 test('the value-taking flags stay value-taking through the same parse', () => {
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  const argv = require('yargs')(['test', '--target=web,backend', '--lane=stripe-live'])
-    .boolean(BOOLEAN_FLAGS).version(false).help(false).parseSync();
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
 
+  const argv = parse(['test', '--target=web,backend', '--lane=stripe-live']);
   assert.equal(argv.target, 'web,backend');
   assert.equal(argv.lane, 'stripe-live');
   assert.equal(BOOLEAN_FLAGS.includes('target'), false, 'a picker with a value must never be boolean');
   assert.equal(BOOLEAN_FLAGS.includes('lane'), false);
+
+  // And in the SPACE-separated spelling the docs teach for the manage walk
+  // (`omega manage --service publishing`), which nothing declares.
+  const spaced = parse(['manage', '--service', 'publishing']);
+  assert.equal(spaced.service, 'publishing');
+  assert.deepEqual(spaced._, ['manage'], 'the value is the flag\'s, never a positional');
+
+  // A flag the manager never heard of rides through to the target with its
+  // value intact, which is what the fan-out forwards (#920).
+  const forwarded = parse(['test', '--filter', 'auth', '--dry-run']);
+  assert.equal(forwarded.filter, 'auth');
+  assert.equal(forwarded.dryRun, true);
+  assert.deepEqual(forwarded._, ['test']);
+});
+
+test('every value-LESS manage flag is declared, and the value-taking one is not', () => {
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+  for (const flag of ['verbose', 'strict', 'apply', 'major', 'force-fresh']) {
+    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
+  }
+
+  // The pin: a declared boolean never eats the token after it.
+  const argv = parse(['manage', '--strict', 'payment']);
+  assert.equal(argv.strict, true);
+  assert.deepEqual(argv._, ['manage', 'payment']);
+
+  // --reset-assets is value-TAKING (bare = both kinds, `logos`/`templates`
+  // names one), so declaring it boolean would drop the kind.
+  assert.equal(BOOLEAN_FLAGS.includes('reset-assets'), false);
+  assert.equal(parse(['manage', '--reset-assets', 'logos']).resetAssets, 'logos');
+  assert.equal(parse(['manage', '--reset-assets']).resetAssets, true, 'and the bare form still means both');
 });

@@ -1,7 +1,8 @@
 // Main-process tests for lib/client-bridge.js — unit-level coverage that doesn't hit Firebase.
 //
 // Real Firebase integration tests live in client-bridge.integration.test.js
-// (gated on OMEGA_TEST_FIREBASE_ADMIN_KEY presence).
+// (gated on extended mode); the sign-in proof itself is #904's, through a
+// persona the backend emulator seeds.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
@@ -187,10 +188,10 @@ module.exports = defineCases({
           connectAuthEmulator: (auth, url, opts) => connects.push({ auth, url, opts }),
         };
 
-        const run = (isTesting) => {
+        const run = (isTesting, dev) => {
           bridge._firebaseAuth = null;
           bridge._manager = {
-            config: { cloud: { config: { apiKey: 'AIza-test', projectId: 'demo-desktop' } } },
+            config: { cloud: { config: { apiKey: 'AIza-test', projectId: 'demo-desktop' } }, ...(dev ? { dev } : {}) },
             isTesting: () => isTesting,
           };
           return bridge._getFirebaseAuth(null);
@@ -203,17 +204,29 @@ module.exports = defineCases({
           ctx.expect(run(false)).toBe(authInstance);
           ctx.expect(connects.length).toBe(0);
 
-          // testing shape — classic 9099 when no resolved port is on the env channel
-          ctx.expect(run(true)).toBe(authInstance);
+          // testing shape: the port comes from the map the bundle baked, which
+          // carries @omega.js/config's classic 9099 as its floor
+          // ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
+          ctx.expect(run(true, { ports: { auth: 9099 } })).toBe(authInstance);
           ctx.expect(connects.length).toBe(1);
           ctx.expect(connects[0].auth).toBe(authInstance);
           ctx.expect(connects[0].url).toBe('http://localhost:9099');
 
           // a bumped port arrives on OMEGA_AUTH_PORT (N7)
           process.env.OMEGA_AUTH_PORT = '9199';
-          run(true);
+          run(true, { ports: { auth: 9099 } });
           ctx.expect(connects.length).toBe(2);
           ctx.expect(connects[1].url).toBe('http://localhost:9199');
+
+          // Neither channel is a broken artifact, and it says so by name
+          // rather than dialling a port nothing identity-checks (#834).
+          delete process.env.OMEGA_AUTH_PORT;
+          let threw;
+          try { run(true); } catch (e) { threw = e; }
+          ctx.expect(threw).toBeDefined();
+          ctx.expect(threw.message).toMatch(/dev port for `auth`/);
+          ctx.expect(threw.message).toMatch(/bundle task/);
+          ctx.expect(connects.length).toBe(2);
         } finally {
           bridge._firebase       = saved.firebase;
           bridge._firebaseModule = saved.module;

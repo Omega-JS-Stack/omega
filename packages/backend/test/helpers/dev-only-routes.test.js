@@ -41,10 +41,11 @@ function listDevOnlyRoutes() {
   return names;
 }
 
-// The env-detection vars are getEnvironment()'s only inputs — clear them for a
-// clean slate per case, and restore afterward (mirrors helpers/environment).
+// `OMEGA_ENVIRONMENT` is getEnvironment()'s only input
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): clear the lot
+// for a clean slate per case, and restore afterward (mirrors helpers/environment).
 function withEnv(overrides, fn) {
-  const KEYS = ['OMEGA_TEST_MODE', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
+  const KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_TEST_MODE', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
   const saved = {};
   for (const k of KEYS) saved[k] = process.env[k];
   try {
@@ -78,7 +79,7 @@ module.exports = defineCases({
     {
       name: 'every route in the dev-only folder is refused in production',
       async run({ Manager, assert }) {
-        withEnv({ ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = Manager.getEnvironment();
           assert.equal(environment, 'production', 'the real Manager resolves production');
 
@@ -96,7 +97,7 @@ module.exports = defineCases({
     {
       name: 'a route added to the folder later is refused without touching the guard',
       async run({ Manager, assert }) {
-        withEnv({ ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           // Not a file that exists — the point is that the gate keys off the
           // FOLDER, so a handler nobody has written yet is already covered.
           assert.equal(
@@ -112,8 +113,8 @@ module.exports = defineCases({
       name: 'the same routes serve under the emulator (development AND testing)',
       async run({ Manager, assert }) {
         const scenarios = [
-          { env: { FUNCTIONS_EMULATOR: 'true' }, expect: 'development' },
-          { env: { OMEGA_TEST_MODE: 'true' }, expect: 'testing' },
+          { env: { OMEGA_ENVIRONMENT: 'development' }, expect: 'development' },
+          { env: { OMEGA_ENVIRONMENT: 'testing' }, expect: 'testing' },
         ];
 
         for (const scenario of scenarios) {
@@ -143,7 +144,7 @@ module.exports = defineCases({
         // so the exception list — and the mechanism behind it — is gone.
         assert.equal(Middleware.DEV_ONLY_ROUTE_EXCEPTIONS, undefined, 'the exception mechanism is gone, not just emptied');
 
-        withEnv({ ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           assert.equal(isDevOnlyRouteBlocked('test/health', Manager.getEnvironment()), true, 'the old probe path is refused in production like every other test route');
         });
       },
@@ -152,7 +153,7 @@ module.exports = defineCases({
     {
       name: 'routes outside the folder are never gated',
       async run({ Manager, assert }) {
-        withEnv({ ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = Manager.getEnvironment();
 
           for (const route of ['', 'user/sign-up', 'payments/intent', 'general/uuid', 'testing/thing', 'contest']) {
@@ -169,7 +170,7 @@ module.exports = defineCases({
     {
       name: 'the URL shapes the function path hands in are normalized before the check',
       async run({ Manager, assert }) {
-        withEnv({ ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'production' }, () => {
           const environment = Manager.getEnvironment();
 
           // BackendRouter takes routePath straight off the request URL, so a

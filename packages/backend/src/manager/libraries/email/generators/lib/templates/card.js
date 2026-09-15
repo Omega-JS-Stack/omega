@@ -21,7 +21,7 @@ function build({ data, theme }) {
         ${button(content.button)}
         ${signoff(data, theme)}
     `)}
-    ${footer(brand, email)}
+    ${footer(brand, email, data?.company)}
   `);
 }
 

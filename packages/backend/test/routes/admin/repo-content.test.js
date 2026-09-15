@@ -2,7 +2,7 @@
  * Test: POST /admin/repo/content
  * Tests the admin write repo content endpoint
  * Writes arbitrary content to a GitHub repository
- * Requires admin/blogger role, GitHub API key, and a resolvable github repo (targets.backend.github.repo slug or repo.providers.github.org + brand.id)
+ * Requires admin/blogger role, GitHub API key, and a resolvable source repo (repo.org + brand.id -> <brand.id>-omega)
  *
  * IMPORTANT: These tests require GH_TOKEN and a resolvable github repo to be configured.
  * If GitHub is not configured, the tests will fail.
@@ -154,15 +154,16 @@ module.exports = defineCases({
       timeout: 60000,
 
       async run({ state, config }) {
-        const { brandRepoOwner, brandRepoName } = require('../../helpers/_shared-config.js');
-        if (!process.env.GH_TOKEN || !brandRepoOwner(config) || !brandRepoName(config)) {
+        const { sourceRepo } = require('../../helpers/_shared-config.js');
+        const source = sourceRepo(config);
+        if (!process.env.GH_TOKEN || !source) {
           return;
         }
 
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
 
         // Owner/repo from the shared brand-repo derivation (e.g., 'https://github.com/owner/repo')
-        const repoMatch = [null, brandRepoOwner(config), brandRepoName(config)];
+        const repoMatch = [null, source.owner, source.name];
         if (!repoMatch) {
           return;
         }

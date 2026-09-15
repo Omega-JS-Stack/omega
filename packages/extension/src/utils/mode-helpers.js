@@ -1,78 +1,32 @@
-// Runtime mode helpers (@omega.js/backend/EM/UJM-pattern), shared across BXM's eight context Managers
-// (build / background / popup / options / content / sidepanel / page / offscreen).
+// Runtime mode helpers, shared across BXM's eight context Managers (build /
+// background / popup / options / content / sidepanel / page / offscreen).
 //
-// `getEnvironment()` is the SINGLE SOURCE OF TRUTH: it is the ONLY function that reads the
-// raw signals (OMEGA_TEST_MODE / manifest.update_url / OMEGA_BUILD_MODE / NODE_ENV /
-// config.omega.environment) and resolves them to exactly ONE of three mutually-exclusive
-// values. The three is*() checks DERIVE from it — they never read raw signals themselves,
-// so they can never disagree with getEnvironment().
+// The environment half is NOT implemented here any more
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It is
+// @omega.js/config's `environment.js`, the ONE module every OMEGA target
+// answers from, and this file only re-exports it beside the extension's own
+// getVersion(). The four framework copies it replaced each carried their own
+// signal list and their own default, and they disagreed with each other.
 //
-//   isDevelopment() — `getEnvironment() === 'development'`: running unpacked from disk (an
-//                     unpacked extension via chrome://extensions or a dev build), and NOT
-//                     testing.
-//   isTesting()     — `getEnvironment() === 'testing'`: BXM's test framework is running this
-//                     process (OMEGA_TEST_MODE=true). TAKES PRECEDENCE — a test run is not dev.
-//   isProduction()  — `getEnvironment() === 'production'`: running from a packed .crx /
-//                     store-installed extension, and NOT testing. A real positive check —
-//                     NOT `!isDevelopment()`.
+// The contract, in full, is the shared module's:
+//   getEnvironment() reads ONE input, the `OMEGA_ENVIRONMENT` variable in
+//   build-time Node and the baked `OMEGA_BUILD_JSON.config.environment` in an
+//   extension context (which has no process.env), and a context with neither
+//   throws by name. Nothing sniffs `manifest.update_url` or NODE_ENV any more:
+//   the build names the environment where it resolves its config (src/build.js's
+//   getConfig) and bakes that same word into every bundle, so what an artifact
+//   WAS BUILT AS is what it answers, wherever it is loaded from.
 //
-// To gate "anything non-production" use `!isProduction()` or `isDevelopment() ||
-// isTesting()` intentionally — never assume two values.
+//   isDevelopment() / isProduction() / isTesting() DERIVE from it, so they can
+//   never disagree with it and exactly one is true. isProduction() is a real
+//   positive check, never `!isDevelopment()`. Gate "anything non-production"
+//   with `!isProduction()` or `isDevelopment() || isTesting()` intentionally.
 //
-// Context caveat: in build-time Node (gulp / CLI), `chrome` is undefined. getEnvironment()
-// detects via `typeof chrome` so the same code works in every context. Browser detection
-// uses `chrome.runtime.getManifest().update_url` — packed store extensions have one,
-// unpacked ones do not.
+// The shared module requires nothing, so it rides every browser bundle exactly
+// as this file always has.
+const environment = require('@omega.js/config/environment');
 
-// getEnvironment() — the SINGLE SOURCE OF TRUTH. Reads every raw signal and resolves to
-// exactly ONE of 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
-// Precedence: testing → production → development.
-function getEnvironment() {
-  // 1. Testing wins — set by BXM's test runners / harness, or a testing-baked build.
-  //    Works in Node (process.env), extension contexts (globalThis set before consumer JS),
-  //    and config-baked builds (config.omega.environment === 'testing').
-  if (typeof process !== 'undefined' && process.env && process.env.OMEGA_TEST_MODE === 'true') return 'testing';
-  if (typeof globalThis !== 'undefined' && globalThis.OMEGA_TEST_MODE === true) return 'testing';
-  if (this && this.config && this.config.omega && this.config.omega.environment === 'testing') return 'testing';
-
-  // 2. Browser-side: packed/store extensions have `update_url`; unpacked ones do not.
-  //    This is the authoritative runtime signal in an extension context.
-  if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
-    try {
-      return chrome.runtime.getManifest().update_url ? 'production' : 'development';
-    } catch (_) { /* fall through to Node/config signals */ }
-  }
-
-  // 3. Node / build-time + config signals.
-  if (process.env.OMEGA_BUILD_MODE === 'true') return 'production';
-  if (process.env.NODE_ENV === 'development') return 'development';
-  if (this && this.config && this.config.omega && this.config.omega.environment === 'development') return 'development';
-  if (this && this.config && this.config.omega && this.config.omega.environment === 'production') return 'production';
-
-  // 4. Default: development. BXM's deployed artifacts ALWAYS carry their signal — a packed /
-  //    store extension has `manifest.update_url`, and build-time Node sets OMEGA_BUILD_MODE. So
-  //    reaching here means a bare tooling / unpacked context, where development is the sensible
-  //    answer. (Contrast @omega.js/backend/EM, whose deployed RUNTIME can legitimately lack a signal, so they
-  //    default to production.)
-  return 'development';
-}
-
-// The three checks DERIVE from getEnvironment() — they never read raw signals, so they can
-// never disagree with it. isDevelopment() is NOT true in testing; isProduction() is a real
-// positive check (never `!isDevelopment()`).
-function isDevelopment() {
-  return getEnvironment.call(this) === 'development';
-}
-
-function isProduction() {
-  return getEnvironment.call(this) === 'production';
-}
-
-function isTesting() {
-  return getEnvironment.call(this) === 'testing';
-}
-
-// `getVersion()` — returns the extension's version string.
+// `getVersion()` returns the extension's version string.
 //   1. `chrome.runtime.getManifest().version` when running inside an extension context.
 //   2. `<cwd>/package.json#version` for build-time scripts.
 //   3. null when neither resolves.
@@ -92,26 +46,21 @@ function getVersion() {
 }
 
 // Mix the helpers into a Manager constructor's prototype + the constructor itself
-// (so `Manager.isTesting()` works statically too, matching @omega.js/backend/EM/UJM pattern).
-// getEnvironment() is the SSOT and is attached here too — build.js no longer defines it.
+// (so `Manager.isTesting()` works statically too). The environment four come from
+// the shared module's own attachTo(), so every extension context and every
+// sibling framework hangs the identical functions; getVersion() is the
+// extension's and is attached beside them.
 function attachTo(Manager) {
-  Manager.prototype.getEnvironment = getEnvironment;
-  Manager.prototype.isDevelopment  = isDevelopment;
-  Manager.prototype.isProduction   = isProduction;
-  Manager.prototype.isTesting      = isTesting;
-  Manager.prototype.getVersion     = getVersion;
-  Manager.getEnvironment = getEnvironment;
-  Manager.isDevelopment  = isDevelopment;
-  Manager.isProduction   = isProduction;
-  Manager.isTesting      = isTesting;
-  Manager.getVersion     = getVersion;
+  environment.attachTo(Manager);
+  Manager.prototype.getVersion = getVersion;
+  Manager.getVersion = getVersion;
 }
 
 module.exports = {
   attachTo,
-  getEnvironment,
-  isDevelopment,
-  isProduction,
-  isTesting,
+  getEnvironment: environment.getEnvironment,
+  isDevelopment: environment.isDevelopment,
+  isProduction: environment.isProduction,
+  isTesting: environment.isTesting,
   getVersion,
 };

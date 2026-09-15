@@ -3,8 +3,8 @@
  *
  * One merge behavior at every level of the hierarchy:
  *
- *   framework defaults ← company ← brand shared ← brand targets.<type>
- *                      ← local shared ← local targets.<type>
+ *   framework defaults ← company ← brand shared ← brand targets.<name>
+ *                      ← local shared ← local targets.<name>
  *
  * Semantics:
  *   - Plain objects merge recursively; every other value (string, number,

@@ -31,10 +31,15 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
-const { writeConfigValues, DIR_TARGETS } = require('@omega.js/config');
+const { writeConfigValues } = require('@omega.js/config');
 
 const { writeEnvValue } = require('../../../lib/env-secret.js');
 const { streamSecretEnvName } = require('../../../lib/analytics-secret.js');
+
+// The legacy analytics-stream keys, as the retired state file spelled them:
+// its stream dirs, mapped onto the target TYPE they ran (which is also the
+// name the wizard gives that target today)
+const LEGACY_DIR_TARGETS = { website: 'web' };
 
 const STATE_FILE = join('.omega', 'state.json');
 
@@ -108,10 +113,16 @@ function planMoves(state, brandConfig = {}) {
   //    Protocol secret is a secret — the stream id and URI re-derive ─────────
   for (const [key, stream] of Object.entries(state.analytics?.streams || {})) {
     // A legacy state file keys the stream by its target DIR (`website`), which
-    // composed straight through would write `targets.website` — a target the
-    // validator rejects. DIR_TARGETS is the one dir→target normalizer (#505);
-    // a key that is already a target name passes through it untouched
-    const target = DIR_TARGETS[key] || key;
+    // composed straight through would write `targets.website` instead of the
+    // `targets.web` a converted brand declares (#505). A brand that DECLARES
+    // the key is already naming a target with it (`website: { type: 'web' }`
+    // is a legal name now, #886), so only an undeclared key remaps
+    const declared = brandConfig.targets?.[key];
+    const target = declared ? key : (LEGACY_DIR_TARGETS[key] || key);
+    // The config path is keyed by NAME, but the .env key is the env schema's
+    // own, spelled per TYPE (#678): GOOGLE_ANALYTICS_SECRET_WEB is the only
+    // name declared for a web stream, whatever the target is called
+    const type = declared?.type || LEGACY_DIR_TARGETS[key] || key;
     toConfig(
       `analytics.streams.${key}.measurementId`,
       `targets.${target}.analytics.providers.google.id`,
@@ -119,7 +130,7 @@ function planMoves(state, brandConfig = {}) {
     );
     toEnv(
       `analytics.streams.${key}.apiSecret`,
-      streamSecretEnvName(target),
+      streamSecretEnvName(type),
       stream?.apiSecret,
     );
   }

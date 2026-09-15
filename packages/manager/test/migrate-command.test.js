@@ -52,7 +52,7 @@ const CONVERTED = `// Fixture Brand — brand-level omega.json5
 
       imagemin: {}, // keep me
     },
-    backend: {}, // enabled, defaults
+    backend: { type: 'backend' }, // enabled, defaults
   },
 }
 `;
@@ -123,7 +123,7 @@ test('migrate: everything the retired keys sat beside survives, byte for byte', 
   assert.ok(written.includes('// Fixture Brand — brand-level omega.json5'));
   assert.ok(written.includes("id: 'fixture-brand',"));
   assert.ok(written.includes('imagemin: {}, // keep me'));
-  assert.ok(written.includes('backend: {}, // enabled, defaults'));
+  assert.ok(written.includes("backend: { type: 'backend' }, // enabled, defaults"));
   // The removed keys took their own documentation with them
   assert.ok(!written.includes('The download page map'));
   assert.ok(!written.includes('Contact form provider'));
@@ -153,8 +153,114 @@ test('migrate --dry-run: reports the same plan and writes nothing', async () => 
   assert.ok(text.includes('slapform'));
 });
 
+// ─── Conversion (#858) ───────────────────────────────────────────────────────
+
+// A retired row may carry a `convert`: the setting MOVES instead of merely
+// vanishing. `translation.exclude` is the first one: the route list says what
+// to TRANSLATE now, so each excluded route becomes a negation on top of the
+// framework default, written before the old key is deleted, in the same run.
+const CARRIES_EXCLUDE = `// Fixture Brand
+{
+  brand: {
+    id: 'fixture-brand',
+    name: 'Fixture Brand',
+    url: 'https://fixture-brand.test',
+  },
+
+  // AI translation, the marketing surface only.
+  translation: {
+    languages: ['es'],
+    exclude: ['docs', '/changelog/'],
+  },
+
+  targets: {
+    web: { type: 'web' }, // keep me
+  },
+}
+`;
+
+test('migrate: `translation.exclude` is CONVERTED to an include list, then removed', async () => {
+  const brand = stageBrand(CARRIES_EXCLUDE);
+  const { text, code } = await runMigrate(brand);
+
+  const parsed = JSON5.parse(readConfig(brand));
+  assert.equal(code, undefined);
+  assert.deepEqual(parsed.translation.include, ['**', '!docs', '!changelog'], 'each excluded route became a negation');
+  assert.equal(parsed.translation.exclude, undefined, 'the retired key is gone');
+  assert.deepEqual(parsed.translation.languages, ['es'], 'the rest of the block is untouched');
+
+  // The line says both halves of the move
+  const line = text.split('\n').find((entry) => entry.includes('translation.exclude'));
+  assert.ok(line, `no line for translation.exclude: ${text}`);
+  assert.ok(line.includes('translation.include'), `the line does not name its replacement: ${line}`);
+});
+
+// A brand that STARTED the migration by hand carries both keys: the converted
+// old list would silently replace the include list it wrote (B2).
+const CARRIES_BOTH = `// Fixture Brand
+{
+  brand: {
+    id: 'fixture-brand',
+    name: 'Fixture Brand',
+    url: 'https://fixture-brand.test',
+  },
+
+  translation: {
+    languages: ['es'],
+    exclude: ['docs'],
+    include: ['**', '!secret/**'],
+  },
+
+  targets: {
+    web: { type: 'web' }, // keep me
+  },
+}
+`;
+
+test('migrate: a conversion never overwrites an authored value, it refuses the row', async () => {
+  const brand = stageBrand(CARRIES_BOTH);
+  const { text, code } = await runMigrate(brand);
+
+  const parsed = JSON5.parse(readConfig(brand));
+  assert.deepEqual(parsed.translation.include, ['**', '!secret/**'], 'the authored include list was overwritten');
+  assert.deepEqual(parsed.translation.exclude, ['docs'], 'the old key went away with the conflict unresolved');
+  assert.equal(code, 1, 'a refused row must exit nonzero');
+
+  assert.ok(text.includes('translation.include'), `the refusal does not name the path: ${text}`);
+  assert.ok(text.includes('delete one of the two by hand'), `the refusal does not say what to do: ${text}`);
+});
+
+test('migrate: a conversion preserves the comments around it', async () => {
+  const brand = stageBrand(CARRIES_EXCLUDE);
+  await runMigrate(brand);
+  const written = readConfig(brand);
+
+  assert.ok(written.includes('// Fixture Brand'));
+  assert.ok(written.includes('// AI translation, the marketing surface only.'));
+  assert.ok(written.includes("web: { type: 'web' }, // keep me"));
+});
+
+test('migrate --dry-run: a conversion prints both halves and writes nothing', async () => {
+  const brand = stageBrand(CARRIES_EXCLUDE);
+  const { text } = await runMigrate(brand, { 'dry-run': true, dryRun: true });
+
+  assert.equal(readConfig(brand), CARRIES_EXCLUDE, 'a dry run wrote to the config');
+  assert.ok(text.includes('translation.include'), `the plan names the write: ${text}`);
+  assert.ok(text.includes('translation.exclude'), 'and the removal');
+});
+
+test('migrate: a converted brand rerun is idempotent', async () => {
+  const brand = stageBrand(CARRIES_EXCLUDE);
+  await runMigrate(brand);
+  const afterFirst = readConfig(brand);
+
+  const { text } = await runMigrate(brand);
+  assert.equal(readConfig(brand), afterFirst, 'the rerun rewrote the file');
+  assert.match(text, /no retired keys/i);
+});
+
 test('migrate: a clean brand says so and touches nothing', async () => {
-  const clean = `{\n  brand: { id: 'b', name: 'B', url: 'https://b.test' },\n  targets: { web: {} },\n}\n`;
+  const clean = `{\n  brand: { id: 'b', name: 'B', url: 'https://b.test' },\n  targets: { web: { type: 'web' } },\n}\n`;
   const brand = stageBrand(clean);
   const { text, code } = await runMigrate(brand);
 

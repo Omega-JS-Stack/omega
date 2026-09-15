@@ -7,13 +7,19 @@
 `<consumer>/src/assets/scss/main.scss` — loaded by EVERY window. It configures the theme via `@use ... with (...)`:
 
 ```scss
+// Generated from `brand.color` by the sass task (#912).
+@use 'brand';
+
 @use 'omega-desktop' as * with (
-  $primary: #2563EB,
+  $primary: brand.$primary,
   $dark: #1a1a2e,
   $classy-bg-dark: #0f0f1a,
   $classy-bg-dark-secondary: #161628,
   $classy-bg-dark-tertiary: #1e1e38,
 );
+
+// The runtime --omega-accent ramp, after the framework import.
+@include brand.ramp;
 
 // Custom global styles below
 ```
@@ -26,7 +32,7 @@ Compiles to `dist/assets/css/main.bundle.css` (Bootstrap + classy theme + your g
 
 ## Theme integration
 
-The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omega.js/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override — see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block. See [themes.md](themes.md) for the full variable reference.
+The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omega.js/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override, see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block, and `$primary` arrives from `brand.color` through the generated `dist/assets/scss/_brand.scss` unless a literal replaces `brand.$primary` ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)). See [themes.md](themes.md) for the full variable reference.
 
 ## Icon presentation
 

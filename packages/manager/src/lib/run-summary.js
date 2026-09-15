@@ -4,8 +4,8 @@
  * per-brand breakdown, drilled-down details for update failures and testing
  * warnings, and a copy-pasteable retry command.
  *
- * Created once in runManage(), accumulates across every service (and, in the
- * future company mode, across brands). Always prints a summary at the end.
+ * Created once in runManage(), accumulates across every service. Always
+ * prints a summary at the end.
  */
 
 const chalk = require('chalk').default;

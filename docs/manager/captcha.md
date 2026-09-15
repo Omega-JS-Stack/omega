@@ -24,12 +24,14 @@ One operation, `site-key`:
 | Key | Meaning |
 |---|---|
 | `captcha.providers.recaptcha.enabled: false` | Skip the service. |
-| `captcha.providers.recaptcha.siteKey` | The public site key — the client mints tokens with it. |
+| `captcha.providers.recaptcha.siteKey` | The public site key, and its ONE home ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)): every page carrying a form renders it, so it is public by definition. An interactive run ASKS for it here (the config flow, landed in omega.json5) instead of naming an env key. |
 | `captcha.providers.recaptcha.project` | Only for a key minted OUTSIDE the brand's own GCP project; otherwise the deep-link resolves from `cloud.config.projectId`. |
 | `captcha.providers.recaptcha.domainsConfirmed` | The one-time domain-list confirmation. |
 
-`RECAPTCHA_SITE_KEY` + `RECAPTCHA_SECRET_KEY` in the brand `.env`. Missing keys → an
-interactive run asks; a non-interactive one skips with guidance.
+`RECAPTCHA_SECRET_KEY` in the brand `.env` (the only half that is a credential;
+`RECAPTCHA_SITE_KEY` is a retired env key, #893). Missing either half → an
+interactive run asks, each through its own home's flow; a non-interactive one
+skips with guidance.
 
 ## Gotcha: the orphan secret
 
@@ -37,7 +39,8 @@ interactive run asks; a non-interactive one skips with guidance.
 403 on every protected POST ([#507](https://github.com/Omega-JS-Stack/omega/issues/507)): the
 backend enforces verification the moment the secret exists, and the client has no key to mint
 a token with. This service is the one place that sees both halves, so it says that direction
-out loud, with the console link to paste the site key from.
+out loud, with the console link to paste the site key from, whenever nobody could be asked
+for the key (a headless run, a step-aside).
 
 The REVERSE direction — a site key requiring its secret — is the env schema's `requiredWhen`
 rule ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): warned brand-wide by the

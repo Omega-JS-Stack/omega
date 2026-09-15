@@ -32,7 +32,7 @@ const OWNER_UID = 'uid_owner1';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ replyify = {}, targets = { web: {}, backend: {} } } = {}) {
+function brandConfig({ replyify = {}, targets = { web: { type: 'web' }, backend: { type: 'backend' } } } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: URL, description: DESCRIPTION },
     inbound: {
@@ -210,9 +210,17 @@ test('email: a shared agent managed by another brand skips the service', async (
 });
 
 test('email: skips without a backend target (the agent answers the backend\'s support email)', async () => {
-  const result = await runService(brandConfig({ targets: { web: {} } }), { db: fakeDb() });
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /no backend target/);
+});
+
+// The gate is by TYPE (#886): a brand may name its backend target anything
+test('email: a backend target named `api` runs the service, key spelling is not the gate', async () => {
+  const config = brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } });
+  const result = await runService(config, { db: fakeDb(convergedResponses(config)) });
+
+  assert.notEqual(result.status, 'skipped');
 });
 
 test('email: skips without replyify.agentId', async () => {

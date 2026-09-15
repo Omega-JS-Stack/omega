@@ -2,6 +2,7 @@
 const path    = require('path');
 const fs      = require('fs');
 const Manager = new (require('../build.js'));
+const { setEnvironment } = require('@omega.js/config/environment');
 const logger  = Manager.logger('test');
 const { run } = require('../test/runner.js');
 const attachLogFile = require('../utils/attach-log-file.js');
@@ -47,6 +48,12 @@ module.exports = async function (options) {
 
   // Canonical signal — every Manager picks this up via isTesting().
   process.env.OMEGA_TEST_MODE = 'true';
+
+  // The one environment input (#817): this lane NAMES testing, so the bundles
+  // this run builds bake `testing` and every context reading the baked config
+  // answers it. A production build spawned from here still names production
+  // for itself (src/build.js lets OMEGA_BUILD_MODE win).
+  setEnvironment('testing');
 
   // When BXM itself runs its own boot-layer tests (the cwd's package.json is
   // BXM's package.json), there's no real consumer extension to target. Point

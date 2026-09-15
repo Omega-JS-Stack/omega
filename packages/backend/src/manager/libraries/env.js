@@ -25,22 +25,9 @@
  *
  * Values are never printed. Errors name the KEY and the fix.
  */
-const { envSchemaEntry, requiredEnvKeys, envEnvironment } = require('@omega.js/config');
+const { envSchemaEntry, requiredEnvKeys } = require('@omega.js/config');
+const { getEnvironment } = require('@omega.js/config/environment');
 const { checkEnvRules } = require('@omega.js/config/env-rules');
-
-/**
- * The runtime environment — what the Manager's `getEnvironment()` and the three
- * `is*()` checks return. It is @omega.js/config's `envEnvironment()`, the ONE
- * home of the vocabulary: the same three names the `.env.<environment>` overlay
- * files are spelled with (#586), so a `.env.development` and a
- * `Manager.isDevelopment()` can never mean different things.
- *
- * Re-exported here because the provider libraries below already read the
- * environment through this reader and hold no Manager handle.
- *
- * @returns {'testing'|'production'|'development'} The environment.
- */
-const environment = envEnvironment;
 
 /** How a missing key gets fixed, by who is supposed to provide it. */
 function remedy(entry) {
@@ -188,7 +175,18 @@ function guardIsAdvisory({ hasConsumerConfig }) {
 }
 
 module.exports = {
-  environment,
+  // The runtime environment: @omega.js/config's `getEnvironment()`, the ONE
+  // module every OMEGA target answers from
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It reads ONE
+  // input, the `OMEGA_ENVIRONMENT` variable the boot sets from the .env
+  // cascade's own answer, so the `.env.<environment>` overlay that composed
+  // (#586) and the runtime's own word are the same word by construction.
+  //
+  // Re-exported here because the provider libraries below already read the
+  // environment through this reader and hold no Manager handle. The name is
+  // the one every other surface uses: the bare `environment()` alias this
+  // reader used to add is gone.
+  getEnvironment,
   get,
   has,
   require: require_,

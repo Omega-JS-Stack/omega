@@ -7,8 +7,9 @@
  * processes the event against its own Firestore and providers.
  *
  * Gating:
- *   - Only enabled when Manager.config.parent === 'self'. Any other value (a URL
- *     pointing TO the parent, the typical setup for child BEMs) returns 404.
+ *   - Only enabled on the webhook ROOT: a brand that names no company, or names
+ *     itself as one (`company: { id: 'self' }`, #677). A brand belonging to a
+ *     company (the typical setup for child backends) returns 404.
  *   - Same OMEGA_WEBHOOK_KEY is shared across all brands, so the
  *     parent forwards the key it received (already validated) when calling
  *     each child.
@@ -40,8 +41,9 @@ module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
   const query = ctx.request.query;
 
-  // Gate: only the parent @omega.js/backend exposes this route. Any brand whose config.parent
-  // points to a URL (the normal case) returns 404 — pretend the route doesn't exist.
+  // Gate: only the parent @omega.js/backend exposes this route. Any brand that
+  // belongs to a company (the normal case) returns 404: pretend the route
+  // doesn't exist.
   if (!Manager.isParent()) {
     return ctx.respond('Not found', { code: 404 });
   }

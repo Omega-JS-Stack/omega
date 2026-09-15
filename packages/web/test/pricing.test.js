@@ -21,7 +21,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { composePricing } = require('../src/pricing.js');
 const { catalogWarning } = require('../src/commands/build.js');
-const { buildSite, buildWith: sharedBuildWith, miniData, BARE } = require('./lib/build.js');
+const { buildSite, buildWith: sharedBuildWith, readBuildJson, miniData, BARE } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
@@ -683,13 +683,19 @@ test("`omega build`'s empty-catalog warning counts the VISIBLE catalog (#348)", 
 test('classy: a hidden product never reaches the pricing page (#348)', async () => {
   const pages = await buildWith({ ...miniData, payment: HIDDEN_QA });
   const html = pages.get('/pricing');
-  // The client Configuration blob keeps the WHOLE catalog (checkout resolves
-  // a hidden product by id) — the claim is about what the page RENDERS.
+  // The claim is about what the page RENDERS: the config the browser reads is
+  // the run's ONE `build.js` snapshot (#894), never an inline blob on the page,
+  // so the markup is read with its scripts stripped and the catalog is read out
+  // of the snapshot the chrome loads.
   const markup = html.replace(/<script[\s\S]*?<\/script>/g, '');
+  const products = readBuildJson(pages).config.payment.products;
 
   assert.ok(!markup.includes('Proof Press'), 'the hidden product name is nowhere on the page');
   assert.ok(!markup.includes('test prints, pulled immediately'), 'nor its tagline');
   assert.ok(!markup.includes('data-plan-id="proof-press"'), 'and it has no checkout button');
   assert.ok(markup.includes('data-plan-id="premium"'), 'the visible catalog still renders');
-  assert.ok(html.includes('"id":"proof-press"'), 'while the client still resolves it by id');
+  // The snapshot keeps the WHOLE catalog, hidden products included: checkout
+  // resolves one by id, so the client needs it even though no card renders it.
+  assert.ok(products.some((product) => product.id === 'proof-press'), 'while the client still resolves it by id');
+  assert.ok(!html.includes('"id":"proof-press"'), 'and the page bakes no second copy of the catalog');
 });

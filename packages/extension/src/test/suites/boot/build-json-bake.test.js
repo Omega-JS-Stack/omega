@@ -1,18 +1,17 @@
 // Boot-layer test for the OMEGA_BUILD_JSON bake
 // ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
 //
-// The build-lane suite proves the emitted bundles carry the snapshot. This one
-// proves the artifact a BROWSER loads resolves it — in the two contexts that
-// used to reach it by two different mechanisms:
+// The build-lane suite proves the build writes the one `dist/build.js` and that
+// no bundle carries a copy of it. This one proves the artifact a BROWSER loads
+// resolves it, in the two contexts that load the same file two legal ways:
 //
-//   - the service worker, which read `/build.js` through an importScripts() call
-//   - a page, which read it from a `<script src="/build.js">` tag the page
-//     template emitted ahead of the page's own bundle
+//   - the service worker, through `importScripts('/build.js')` on its first line
+//   - a page, through the `<script src="/build.js">` tag the page template emits
+//     ahead of the page's own bundle
 //
-// Neither file is in the artifact any more, so a lane that only asserted the
-// global would pass on a build that still shipped the old file. The absence is
-// asserted from inside the extension, over the extension's own origin — the one
-// place a leftover `/build.js` would still be fetchable.
+// The file itself is fetchable over the extension's own origin, which is what a
+// script tag and importScripts both do, and that is asserted from inside the
+// extension. The `build.json` sidecar nothing read stays gone.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
@@ -23,7 +22,7 @@ const READ_BRAND = () => (globalThis.OMEGA_BUILD_JSON || {}).config?.brand?.id ?
 module.exports = defineCases({
   type: 'group',
   layer: 'boot',
-  description: 'OMEGA_BUILD_JSON — baked into the bundles, no /build.js in the artifact (#743)',
+  description: 'OMEGA_BUILD_JSON: one /build.js, loaded by every context (#743)',
   tests: [
     {
       description: 'the packaged service worker resolves OMEGA_BUILD_JSON.config.brand',
@@ -31,8 +30,8 @@ module.exports = defineCases({
         expect(extension.swTarget).not.toBeNull();
         const worker = await extension.swTarget.worker();
 
-        // `self` is what background.js reads; globalThis is the same object in a
-        // service worker, and the banner assigns both.
+        // `self` is what background.js reads, and globalThis is the same object
+        // in a service worker: the file assigns `self`, so both answer.
         const fromSelf = await worker.evaluate(() => (self.OMEGA_BUILD_JSON || {}).config?.brand?.id ?? null);
         expect(typeof fromSelf).toBe('string');
         expect(fromSelf.length > 0).toBe(true);
@@ -50,12 +49,12 @@ module.exports = defineCases({
         await page.goto(extension.popupUrl, { waitUntil: 'load' });
         const inPage = await page.evaluate(() => (window.OMEGA_BUILD_JSON || {}).config?.brand?.id ?? null);
 
-        // Every bundle carries its OWN copy — the promise is that they agree.
+        // ONE file, both contexts: the promise is that they cannot disagree.
         expect(inPage).toBe(inWorker);
       },
     },
     {
-      description: 'no /build.js and no /build.json are reachable on the extension origin',
+      description: '/build.js is reachable on the extension origin, /build.json is not',
       inspect: async ({ extension, page, expect }) => {
         await page.goto(extension.popupUrl, { waitUntil: 'domcontentloaded' });
 
@@ -72,7 +71,9 @@ module.exports = defineCases({
           return { js: await probe('build.js'), json: await probe('build.json') };
         }, extension.id);
 
-        expect(reachable.js).toBe(false);
+        // The one file every context loads…
+        expect(reachable.js).toBe(true);
+        // …and no sidecar describing the same build a second time.
         expect(reachable.json).toBe(false);
       },
     },

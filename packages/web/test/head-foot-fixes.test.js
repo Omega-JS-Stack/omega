@@ -12,7 +12,10 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'head-foot-test');
 
@@ -70,7 +73,7 @@ test('W13: unconfigured comments never inject the Giscus client script', async (
 
 // #251 — the chatsy preconnect gated on `resolved.client.chatsy.enabled`, a key
 // nothing writes: the SSOT is `resolved.inbound.chat.providers.chatsy.enabled`
-// (foot.html's Configuration blob and @omega.js/client's loader both read it),
+// (the head's OMEGA_BUILD_JSON snapshot and @omega.js/client's loader both read it),
 // so the hint never fired for any chatsy-enabled brand.
 test('#251: the chatsy preconnect follows the inbound.chat SSOT', async () => {
   const chatsy = (enabled) => ({
@@ -85,6 +88,46 @@ test('#251: the chatsy preconnect follows the inbound.chat SSOT', async () => {
 
   const off = await buildWith(chatsy(false), {}, 'head-foot-chatsy-off');
   assert.ok(!off.get('/blog').includes('chatsy.ai'), 'a disabled brand emits neither hint');
+});
+
+// #850: the four schema-less web sections retire. Two of them had readers in
+// this shared Liquid: `favicon.path` overrode the minted set's folder and
+// `favicon.theme-color` fed the browser-chrome meta. The minted set is the ONE
+// favicon source now, and the chrome paints `brand.color`, the one place a
+// brand states its hex.
+test('#850: theme-color paints brand.color, and no favicon path override survives', async () => {
+  const branded = {
+    ...miniData,
+    brand: { ...miniData.brand, color: '#3366ff' },
+    // The retired shapes, authored: neither may reach the page.
+    favicon: { path: 'https://cdn.retired.test/favicon', 'theme-color': '#ff0000' },
+  };
+
+  const html = (await buildWith(branded, {}, 'head-foot-theme-color')).get('/');
+
+  assert.ok(html.includes('<meta name="theme-color" content="#3366ff"/>'), 'the chrome color is the brand color');
+  assert.ok(!html.includes('#ff0000'), 'the retired favicon.theme-color reaches nothing');
+  assert.ok(!html.includes('cdn.retired.test'), 'and the retired favicon.path overrides no favicon link');
+});
+
+test('#850: a brand with no color emits no theme-color meta at all', async () => {
+  // An empty `content=""` paints nothing and is invalid metadata: the meta is
+  // gated on the ramp the brand color produced (mini declares no color).
+  const html = (await buildWith(miniData, {}, 'head-foot-theme-color-none')).get('/');
+
+  assert.ok(!/name="theme-color"/.test(html), 'no brand color, no meta');
+});
+
+// The pricing JSON-LD's currency moved to `payment.currency` with the same
+// ruling. Its block is gated on `page-is-product`, which nothing in the
+// framework assigns and no consumer page may (page frontmatter is meta-only),
+// so there is no rendered page to read it off: the template SOURCE is what a
+// regression would change, and this pins it.
+test('#850: the pricing JSON-LD reads payment.currency, never the retired top-level key', () => {
+  const foot = fs.readFileSync(path.join(PKG, 'core', '_includes', 'core', 'foot.html'), 'utf8');
+
+  assert.ok(foot.includes('"priceCurrency": "{{ resolved.config.payment.currency }}"'), 'the currency comes from the payment section');
+  assert.ok(!foot.includes('resolved.config.currency'), 'the retired top-level key is read nowhere');
 });
 
 // #271 — every built page shipped one JSON-LD block with `"@type": ""`: the

@@ -38,16 +38,16 @@ These apply identically on every OS — set them once.
 
 If you need a per-platform value not in the table, use the raw `electronBuilder.mac.category` / `electronBuilder.linux.category` override.
 
-## Windows (`platforms.win.*`)
+## Windows (`platforms.windows.*`)
 
 | Field | Default | What it does |
 |---|---|---|
-| `platforms.win.arch` | `['x64', 'ia32']` | Architectures. Single multi-arch NSIS installer ships both. |
-| `platforms.win.oneClick` | `true` | Slack-style: no installer wizard, just installs immediately to `%LocalAppData%\Programs\<App>`. Set to `false` for a standard "Next, Next, Finish" wizard. |
-| `platforms.win.desktopShortcut` | `true` | Create desktop shortcut. |
-| `platforms.win.startMenuShortcut` | `true` | Create Start menu entry. |
-| `platforms.win.runAfterFinish` | `true` | Auto-launch the app when the install completes. |
-| `platforms.win.perMachine` | `false` | Install for current user. Set `true` to install for all users (requires UAC elevation; **incompatible with `oneClick: true`**). |
+| `platforms.windows.arch` | `['x64', 'ia32']` | Architectures. Single multi-arch NSIS installer ships both. |
+| `platforms.windows.oneClick` | `true` | Slack-style: no installer wizard, just installs immediately to `%LocalAppData%\Programs\<App>`. Set to `false` for a standard "Next, Next, Finish" wizard. |
+| `platforms.windows.desktopShortcut` | `true` | Create desktop shortcut. |
+| `platforms.windows.startMenuShortcut` | `true` | Create Start menu entry. |
+| `platforms.windows.runAfterFinish` | `true` | Auto-launch the app when the install completes. |
+| `platforms.windows.perMachine` | `false` | Install for current user. Set `true` to install for all users (requires UAC elevation; **incompatible with `oneClick: true`**). |
 
 ### Why `oneClick: true` by default
 
@@ -61,7 +61,7 @@ If your app needs enterprise deployment, set `oneClick: false` to opt into the w
 
 ### `ia32` (32-bit Windows)
 
-@omega.js/desktop ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time — no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `platforms.win.arch: ['x64']`.
+@omega.js/desktop ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time, no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `platforms.windows.arch: ['x64']`.
 
 ## macOS (`platforms.mac.*`)
 
@@ -87,32 +87,35 @@ Reference plists from a working MAS-published Electron app (Slapform) are archiv
 | Field | Default | What it does |
 |---|---|---|
 | `platforms.linux.arch` | `['x64']` | Architectures. ia32 is essentially extinct on modern Linux. |
-| `platforms.linux.snap.enabled` | `true` (in scaffold) | Snap Store publishing. @omega.js/desktop scaffold ships this `true`; programmatic callers without the field default to OFF. Auto-skipped if `SNAPCRAFT_STORE_CREDENTIALS` env is unset. |
-| `platforms.linux.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
-| `platforms.linux.snap.grade` | `'stable'` | `stable` or `devel`. |
-| `platforms.linux.snap.autoStart` | `true` | Register the snap to auto-start on login. |
-| `platforms.linux.snap.channels` | `['stable']` | Snap Store channels to publish to. |
+| `platforms.linux.formats.deb` | on | The Debian package. `false` drops it. |
+| `platforms.linux.formats.appimage` | on | The AppImage. `false` drops it. |
+| `platforms.linux.formats.snap` | on | Snap Store publishing. Presence is the switch ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): `false` drops it, and a BUILD auto-skips it when `SNAPCRAFT_STORE_CREDENTIALS` is unset. A publish refuses instead when the brand WROTE the format down. |
+| `platforms.linux.formats.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
+| `platforms.linux.formats.snap.grade` | `'stable'` | `stable` or `devel`. |
+| `platforms.linux.formats.snap.autoStart` | `true` | Register the snap to auto-start on login. |
+| `platforms.linux.formats.snap.channels` | `['stable']` | Snap Store channels to publish to. |
 
 ### Snap Store publishing
 
-Tri-state behavior:
+Behavior, since the snap became a declared FORMAT (#867):
 
-- **Field missing entirely** → off. `build-config.js` checks `=== true` strictly, so older configs / programmatic callers without the field don't suddenly emit a snap target.
-- **`enabled: true` (scaffold default) + no `SNAPCRAFT_STORE_CREDENTIALS`** → off, with a build-time log line: `Snap target enabled in config but SNAPCRAFT_STORE_CREDENTIALS not set — skipping snap target.` This means a fresh `mgr setup` produces a working `.deb + .AppImage` build out of the box without failing on a missing snap publish credential.
-- **`enabled: true` + `SNAPCRAFT_STORE_CREDENTIALS` set** → snap target emits, snap publishes on release.
-- **`enabled: false`** → off, regardless of credentials. Explicit opt-out.
+- **Nothing declared** → the snap SHIPS, like every other format: presence is the switch and the default is on.
+- **Defaulted (nothing written) + no `SNAPCRAFT_STORE_CREDENTIALS`** → skipped, with a build-time log line naming the credential and how to get it. A fresh scaffold produces a working `.deb + .AppImage` build out of the box without failing on a missing publish credential.
+- **WRITTEN in config + no `SNAPCRAFT_STORE_CREDENTIALS`** → a BUILD still skips it as above, but `omega publish` REFUSES in its first step, naming the credential, `platforms.linux.formats.snap` and `omega manage --service publishing` ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)). Writing the format down is saying this brand ships it, and a release that silently drops it is the failure this replaced.
+- **Declared + `SNAPCRAFT_STORE_CREDENTIALS` set** → the snap target emits and publishes on release.
+- **`platforms.linux.formats.snap: false`** → off, regardless of credentials. The explicit opt-out.
 
-To turn snap publishing on for a project that already has the field set to `true`:
+To turn snap publishing on for a project that ships the format:
 
 1. Mint store credentials locally:
    ```bash
    snapcraft export-login -    # writes a credentials blob to stdout
    ```
 2. Paste the entire blob (multi-line) into `.env` as `SNAPCRAFT_STORE_CREDENTIALS=...`.
-3. Run `npx omega push-secrets` to flow the secret to GitHub Actions.
+3. Run `npx omega deploy` (its precheck flows the secret to GitHub Actions).
 4. Next `npm run release` builds + uploads the snap automatically. No config flip needed.
 
-Reference: the workflow's Linux step conditionally installs `snapcraft` (`sudo snap install snapcraft --classic`) only when both (a) `platforms.linux.snap.enabled !== false` AND (b) `SNAPCRAFT_STORE_CREDENTIALS` secret is present. Mirrors the build-config-side gate.
+Reference: the workflow's Linux step conditionally installs `snapcraft` (`sudo snap install snapcraft --classic`) only when both (a) the brand still ships the snap format (read through `@omega.js/config`'s own `enabledFormats`, so the check cannot drift from the build's) AND (b) the `SNAPCRAFT_STORE_CREDENTIALS` secret is present.
 
 ## File associations + custom protocols (uncommon)
 

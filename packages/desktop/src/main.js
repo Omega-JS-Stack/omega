@@ -3,6 +3,7 @@
 // Boot sequence below — each step delegates to a `lib/*.js` module. Stubs today, real impls land in pass 2.
 
 const LoggerLite = require('./lib/logger-lite.js');
+const { setEnvironment, ENVIRONMENT_VAR } = require('@omega.js/config/environment');
 
 const storage      = require('./lib/storage.js');
 const theme        = require('./lib/theme.js');
@@ -145,6 +146,21 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
 
   self.config = consumerConfig || {};
   self._options = options || {};
+
+  // The environment's ONE input is the `OMEGA_ENVIRONMENT` variable
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and a lane
+  // that named one is NEVER overridden here
+  // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). The baked word
+  // is the FALLBACK, for the one case with no parent lane to inherit from: a
+  // packaged app, where this is the input every later read answers (the
+  // context-free ones, like test-stealth's, included). A dev boot inherits the
+  // word from the gulp lane that spawned this electron, and the test lanes spawn
+  // their child with `testing` while booting a PRODUCTION artifact, so writing
+  // the baked word over theirs turned every isTesting() gate in a booted app
+  // silently off.
+  if (!process.env[ENVIRONMENT_VAR] && self.config.environment) {
+    setEnvironment(self.config.environment);
+  }
 
   {
     const fs = require('fs');

@@ -15,6 +15,12 @@ const os = require('node:os');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
+const { recordBrand } = require('@omega.js/config');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const targets = require('../src/services/update/write/targets.js');
 
 // Counted on disk: dist/ is excluded from the fingerprint sweep, so the build
@@ -160,6 +166,35 @@ test('#681: a brand `.env.<environment>` overlay edit triggers the build again',
 
   await run(root, targetPath);
   assert.equal(buildCount(targetPath), 3, 'an untouched overlay leaves the target converged');
+});
+
+// #677: the company layer is part of a build's input set too, and it resolves
+// through the ONE rule: the same relative path inside the company tree.
+test('a company config or .env edit triggers the build again', async () => {
+  const { root, targetPath } = stageBrand();
+
+  const companyBrandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-update-company-'));
+  jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co" } } } }');
+  jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="value"\n');
+  recordBrand({ id: 'fixture-co', root: companyBrandRoot, name: 'Fixture Co', url: 'https://fixture-co.test' });
+  jetpack.write(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'fixture', name: 'Fixture' }, company: { id: 'fixture-co' } }`);
+
+  await run(root, targetPath);
+
+  jetpack.write(path.join(companyBrandRoot, 'company', 'config', 'omega.json5'), '{ monitoring: { providers: { sentry: { org: "fixture-co-renamed" } } } }');
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 2, 'a company config edit is fresh input');
+
+  jetpack.write(path.join(companyBrandRoot, 'company', '.env'), 'COMPANY_KEY="changed value"\n');
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 3, 'a company .env edit is fresh input');
+
+  jetpack.write(path.join(companyBrandRoot, 'company', '.env.development'), 'COMPANY_KEY="from the overlay"\n');
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 4, 'a company overlay is fresh input');
+
+  await run(root, targetPath);
+  assert.equal(buildCount(targetPath), 4, 'an untouched company layer leaves the target converged');
 });
 
 // ─── Frameworks ──────────────────────────────────────────────────────────────

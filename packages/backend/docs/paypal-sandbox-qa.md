@@ -11,11 +11,13 @@ stays hand-made — PayPal retired the sandbox-accounts API (see below).
 
 - **Merchant / API creds** — the sandbox business account (display name
   "test facilitator's Test Store", PayPal's default; rename in the developer
-  dashboard if the checkout header matters). Creds: `PAYPAL_CLIENT_ID` +
+  dashboard if the checkout header matters). Creds: the client id in config
+  (`payment.providers.paypal.clientId`, public by design) and
   `PAYPAL_CLIENT_SECRET` in the playground backend's `.env`
-  (`brands/playground-omega/targets/backend/.env`). The manager wants the client id in
-  config (`payment.providers.paypal.clientId`) and only the secret in `.env`;
-  the backend wants both as env vars.
+  (`brands/playground-omega/targets/backend/.env`). ONE home each since
+  [#893](https://github.com/Omega-JS-Stack/omega/issues/893): the provider
+  library reads the id off the config and the secret off the env, and
+  `PAYPAL_CLIENT_ID` in a `.env` is a retired key that fails the load.
 - **Webhook** — registered by the manager payment walk, pointing at the deployed
   playground backend (`api.playground.omegajs.dev/omega/payments/webhook`).
   Deliveries arrive with real signature headers; the deployed backend is the

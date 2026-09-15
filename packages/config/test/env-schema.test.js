@@ -26,7 +26,9 @@ const MANAGER_LANE_KEYS = [
   'GH_TOKEN', 'CLOUDFLARE_TOKEN',
   'NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
-  'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY',
+  // #893 retired RECAPTCHA_SITE_KEY outright: a public site key is config
+  // (captcha.providers.recaptcha.siteKey), so the floor drops it with the schema
+  'RECAPTCHA_SECRET_KEY',
   'META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN',
   'SENTRY_AUTH_TOKEN',
   'SENDGRID_API_KEY', 'BEEHIIV_API_KEY',
@@ -112,6 +114,26 @@ test('names are unique and every group is used', () => {
 // crypto provider came back for real in #642, but under the key its API is
 // actually called with (COINBASE_COMMERCE_API_KEY, below): this bare name still
 // reads nowhere, so it stays dead.
+// #893: the six PUBLIC identifiers left .env for config. A public value that
+// a store URL, a browser bundle or a binary carries is config by the rule in
+// docs/shared/config.md, and two homes for one value drift. Each name is now a
+// RETIRED_ENV_KEYS row (env-retired.test.js) rather than a schema entry.
+test('the public identifiers are gone from the env schema (#893)', () => {
+  const moved = {
+    CHROME_EXTENSION_ID: 'extension',
+    FIREFOX_EXTENSION_ID: 'extension',
+    EDGE_PRODUCT_ID: 'extension',
+    RECAPTCHA_SITE_KEY: 'web',
+    PAYPAL_CLIENT_ID: 'backend',
+    CHARGEBEE_SITE: 'backend',
+  };
+
+  for (const [name, target] of Object.entries(moved)) {
+    assert.equal(envSchemaEntry(name), undefined, `${name} lives in config now, not the env schema`);
+    assert.ok(!envKeysForTarget(target).includes(name), `${name} must not compose into the ${target} env`);
+  }
+});
+
 test('the dead keys are gone — no reader, no entry (#636)', () => {
   for (const name of ['COINBASE_API_KEY', 'APOLLO_API_KEY']) {
     assert.equal(envSchemaEntry(name), undefined, `${name} has no reader anywhere — it must not be declared`);
@@ -159,6 +181,14 @@ test('requiredEnvKeys(): the backend refuses to run without the minted four', ()
   assert.deepEqual(requiredEnvKeys('backend'), ['OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE', 'UNSUBSCRIBE_HMAC_KEY']);
   // Nothing else is required — a brand with no Stripe account boots fine
   assert.deepEqual(requiredEnvKeys('web'), []);
+});
+
+test('GH_TOKEN names every target that consumes it, the extension included (#883)', () => {
+  // The extension publish uploads its zips to `<brand.id>-releases`, a repo the
+  // run does not own, so the extension is a first-class consumer: declared here
+  // and delivered `ci`, never borrowed from a sibling target's secret push.
+  assert.deepEqual(envSchemaEntry('GH_TOKEN').targets, ['web', 'backend', 'desktop', 'extension']);
+  assert.deepEqual(envSchemaEntry('GH_TOKEN').delivery, { web: 'ci', backend: 'env', desktop: 'ci', extension: 'ci' });
 });
 
 test('envSchemaEntry(): unknown names miss, dynamic families match their pattern', () => {
@@ -322,13 +352,16 @@ test('publicAtRest is declared only where something actually bakes', () => {
   assert.deepEqual(baked, ['GOOGLE_ANALYTICS_SECRET_DESKTOP', 'GOOGLE_ANALYTICS_SECRET_EXTENSION']);
 });
 
-test('the two lanes a brand actually feeds declare how every key reaches them', () => {
+test('every live target declares how each key reaches it', () => {
   const fileGroups = new Set(envFileGroups().map((group) => group.id));
+  // Mobile is PARKED (no packages/mobile, no delivery lane to declare), so it
+  // is the one target name excluded here (#819).
+  const liveTargets = TARGETS.filter((target) => target !== 'mobile');
 
   for (const entry of ENV_SCHEMA) {
     if (!fileGroups.has(entry.group)) continue;
 
-    for (const target of ['web', 'backend']) {
+    for (const target of liveTargets) {
       if (!entry.targets.includes(target)) continue;
       const where = entry.name || String(entry.match);
       assert.ok(entry.delivery && entry.delivery[target], `${where}: names ${target} but never says how it gets there`);
@@ -374,7 +407,26 @@ test('requiredWhen names a config path, one direction only', () => {
   assert.deepEqual(ruled.map((entry) => [entry.name, entry.requiredWhen]), [
     ['RECAPTCHA_SECRET_KEY', 'captcha.providers.recaptcha.siteKey'],
     ['SENTRY_AUTH_TOKEN', 'monitoring.providers.sentry.dsn'],
-    ['SNAPCRAFT_STORE_CREDENTIALS', 'platforms.linux.snap.enabled'],
+    // The signing sets (#891): a brand that declares Apple signing owes the mac
+    // set, and each Windows strategy owes ITS credentials and no other's
+    ['APPLE_API_ISSUER', 'certificates.providers.apple'],
+    ['APPLE_API_KEY_ID', 'certificates.providers.apple'],
+    ['APPLE_TEAM_ID', 'certificates.providers.apple'],
+    ['CSC_LINK', 'certificates.providers.apple'],
+    ['APPLE_API_KEY', 'certificates.providers.apple'],
+    ['WIN_EV_TOKEN_PATH', 'platforms.windows.signing.strategy=self-hosted'],
+    ['WIN_CSC_KEY_PASSWORD', 'platforms.windows.signing.strategy=self-hosted'],
+    ['AZURE_TENANT_ID', 'platforms.windows.signing.cloud.provider=azure'],
+    ['AZURE_CLIENT_ID', 'platforms.windows.signing.cloud.provider=azure'],
+    ['AZURE_CLIENT_SECRET', 'platforms.windows.signing.cloud.provider=azure'],
+    ['AZURE_TRUSTED_SIGNING_ENDPOINT', 'platforms.windows.signing.cloud.provider=azure'],
+    ['SSLCOM_USERNAME', 'platforms.windows.signing.cloud.provider=sslcom'],
+    ['SSLCOM_PASSWORD', 'platforms.windows.signing.cloud.provider=sslcom'],
+    ['SSLCOM_CREDENTIAL_ID', 'platforms.windows.signing.cloud.provider=sslcom'],
+    ['DIGICERT_API_KEY', 'platforms.windows.signing.cloud.provider=digicert'],
+    ['DIGICERT_KEYPAIR_ALIAS', 'platforms.windows.signing.cloud.provider=digicert'],
+    ['SNAPCRAFT_STORE_CREDENTIALS', 'platforms.linux.formats.snap'],
+    ['CSC_KEY_PASSWORD', 'certificates.providers.apple'],
     ['GOOGLE_ANALYTICS_SECRET_WEB', 'analytics.providers.google.id'],
     ['GOOGLE_ANALYTICS_SECRET_BACKEND', 'analytics.providers.google.id'],
     ['GOOGLE_ANALYTICS_SECRET_DESKTOP', 'analytics.providers.google.id'],
@@ -387,7 +439,9 @@ test('requiredWhen names a config path, one direction only', () => {
   assert.equal(envSchemaEntry('GOOGLE_ANALYTICS_SECRET_MOBILE').requiredWhen, undefined);
 
   for (const entry of ruled) {
-    assert.match(entry.requiredWhen, /^[a-z][A-Za-z0-9.]+$/, `${entry.name}: a dotted config path`);
+    // A dotted config path, optionally PINNED to one value (#891): an enum's
+    // value is what decides which credentials exist.
+    assert.match(entry.requiredWhen, /^[a-z][A-Za-z0-9.]+(=[a-z-]+)?$/, `${entry.name}: a dotted config path`);
     assert.equal(entry.required, false, `${entry.name}: a conditional requirement is never an unconditional one`);
   }
 });

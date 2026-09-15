@@ -95,5 +95,59 @@ module.exports = defineCases({
         expect(bundle.includes('data-shell-dismiss')).toBe(true);
       },
     },
+
+    {
+      // #925: the lane spawns this child with OMEGA_ENVIRONMENT=testing and the
+      // artifact it boots was BUILT production, so the booted app used to answer
+      // `production` and every isTesting() gate in it was silently off. The proof
+      // is a gate that writes to the log: auth persistence resolves to `none` in a
+      // test run alone, and that is the line the booted app records. (The emulator
+      // line the bridge logs next is out of reach here, because the fixture's
+      // `cloud.config` is empty and this boot never initializes Firebase auth.)
+      description: 'the booted app runs in the lane environment, not the one baked into its bundle (#925)',
+      inspect: async ({ manager, expect, projectRoot }) => {
+        const fs = require('fs');
+        const path = require('path');
+
+        expect(manager.isTesting()).toBe(true);
+        expect(manager.config.environment).toBe('production');   // the artifact IS a production build
+
+        const log = fs.readFileSync(path.join(projectRoot, 'logs', 'runtime.log'), 'utf8');
+        expect(log.includes('auth persistence: none (test mode)')).toBe(true);
+      },
+    },
+
+    {
+      // #925: a page has no `process`, so its Manager reads the baked word. The
+      // preload hands the running one over on `window.desktop`, and the renderer
+      // bootstrap applies it, so this window answers what main answers.
+      description: 'the main window renderer answers the lane environment too (#925)',
+      inspect: async ({ manager, expect }) => {
+        const { BrowserWindow } = require('electron');
+
+        // The window is created in the consumer's initialize().then(), and its
+        // bootstrap sets the config a moment later; poll for both, the way the
+        // view test above polls for the window.
+        let answer = null;
+        let win = null;
+        for (let i = 0; i < 40; i++) {
+          win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          if (win && !win.isDestroyed() && !win.webContents.isLoading()) {
+            answer = await win.webContents.executeJavaScript(
+              'window.__omegaManager && window.__omegaManager.config ? window.__omegaManager.getEnvironment() : null',
+            );
+            if (answer) break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        const baked = await win.webContents.executeJavaScript('window.OMEGA_BUILD_JSON.config.environment');
+        const bridged = await win.webContents.executeJavaScript('window.desktop.environment');
+
+        expect(baked).toBe('production');     // what the build baked
+        expect(bridged).toBe('testing');      // what the preload read off the lane
+        expect(answer).toBe('testing');       // what the renderer's Manager answers
+      },
+    },
   ],
 });

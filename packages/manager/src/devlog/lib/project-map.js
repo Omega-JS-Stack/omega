@@ -4,16 +4,15 @@
  * belongs to. Repos not in the map are treated as standalone and linked to
  * GitHub instead.
  *
- * In the brand-monorepo world every brand is ONE repo, addressed by
- * `@omega.js/config`'s `brandRepo` — the typed `repo.providers.github.repo` slug
- * (whose owner half wins when it carries one), else `<brand.id>-omega` under
- * `repo.providers.github.org`, the ONE derivation the github service reads too;
+ * In the brand-monorepo world every brand writes its code in ONE repo,
+ * addressed by `@omega.js/config`'s `sourceRepo`: `<brand.id>-omega` under
+ * `repo.org`, the ONE derivation the repo service reads too (#883);
  * omega-manager's per-target + subdomain repo fan-out collapsed at the
- * redesign. Brands without a repo.providers.github.org are skipped (the github service
+ * redesign. Brands that declare no `repo.org` are skipped (the repo service
  * skips them too).
  */
 
-const { brandRepo: deriveBrandRepo, brandRepoName } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
 
 /**
  * Resolve a loaded brand's repo identity, or null when it has none.
@@ -22,18 +21,11 @@ const { brandRepo: deriveBrandRepo, brandRepoName } = require('@omega.js/config'
  * @returns {{ owner: string, repo: string }|null}
  */
 function brandRepo(brand) {
-  const github = brand.config.repo?.providers?.github;
+  // The loaded brand's own id stands in for a config that names none: the
+  // derivation needs both halves, and `<brand.id>-omega` is the whole name.
+  const source = sourceRepo({ ...brand.config, brand: { ...brand.config.brand, id: brand.config.brand?.id || brand.id } });
 
-  if (!github.org) {
-    return null;
-  }
-
-  // BOTH halves from the one derivation: an `owner/name` slug houses the repo
-  // under its own owner. The loaded brand's own id stands in for a config that
-  // names none.
-  const { owner, name } = deriveBrandRepo(brand.config);
-
-  return { owner, repo: name || brandRepoName({ brand: { id: brand.id } }) };
+  return source ? { owner: source.owner, repo: source.name } : null;
 }
 
 /**

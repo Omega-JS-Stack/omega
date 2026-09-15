@@ -104,7 +104,7 @@ Web Manager is designed to work in multiple environments:
 
 ## Configuration
 
-> **Dev mode = local Firebase, zero flags.** When `environment` is `'development'`, the client auto-connects the REAL Auth + Firestore SDKs to the local emulator suite — never live Firebase. `omega dev` injects that environment automatically; production builds never connect. There is deliberately no live-Firebase opt-out for dev — build production locally if you truly need live.
+> **Local stack = local Firebase, zero flags.** When `environment` is `'development'`, or `'testing'` with a resolved `dev.ports` map (the desktop boot lane and the extension's emulator run bake one), the client auto-connects the REAL Auth + Firestore SDKs to the local emulator suite and routes the API to the local ports, never live Firebase. `omega dev` injects development automatically; a testing page with no map stays live; production builds never connect. There is deliberately no live-Firebase opt-out for dev: build production locally if you truly need live.
 >
 > **Dev ports (N7):** the client resolves the port map with precedence `window.__OMEGA_DEV_PORTS__` (runtime channel — set by drivers like the devkit e2e harness after the page was built) → `config.dev.ports` (baked into the chrome by `omega dev`) → classic defaults (auth `:9099`, firestore `:8080`, functions `:5001`, hosting `:5002`). The emulator connects, `getFunctionsUrl()`, and `getApiUrl()` all read it, so bumped ports (a second brand's concurrent stack) reach the browser. Dev `getApiUrl()`: mapped `hosting` → plain `http://127.0.0.1:<port>` (the hosting emulator speaks http), mapped `https` → `mgr serve`'s mkcert proxy, no map → the classic `https://localhost:5002` serve assumption.
 
@@ -210,6 +210,14 @@ await Manager.initialize({
 
 ### Configuration Notes
 
+- **One blob from every surface**: web, desktop and the extension all hand over
+  `OMEGA_BUILD_JSON.config`, the browser-safe subset of the brand's resolved
+  `omega.json5` ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)). The client
+  maps that canonical shape onto the reference above itself: the `client` section IS this
+  top level (so a brand's `client.consent` reads as `config.consent`), `cloud.config` is
+  the Firebase home it boots from, and `monitoring.providers.sentry` is the one
+  error-reporting switch (a DSN there outranks a legacy `sentry` blob). Nothing composes a
+  bridge for it any more.
 - **Timeout values** can be specified as strings with math expressions: `'1000 * 60 * 60'` (evaluated safely)
 - **Deep merge**: Your config is deep-merged with defaults, so you only need to specify what you want to change
 - **Firebase required**: Most features require Firebase to be configured and enabled

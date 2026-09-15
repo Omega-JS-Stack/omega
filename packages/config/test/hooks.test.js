@@ -1,8 +1,8 @@
 /**
- * Owner-hook loader tests for @omega.js/config — call-site-mirroring nested
- * paths (config/hooks/<hookPath>.js), brand-over-company precedence via the
- * .omega/company.json marker, absent-hook null, and the loud failures
- * (broken file, non-function export, malformed hook path).
+ * Owner-hook loader tests for @omega.js/config: call-site-mirroring nested
+ * paths (config/hooks/<hookPath>.js), brand-over-company precedence through
+ * the ONE inheritance rule (`company: { id }`, #677), absent-hook null, and
+ * the loud failures (broken file, non-function export, malformed hook path).
  *
  * Fixtures are built under packages/config/.temp/ (gitignored), matching the
  * env cascade tests.
@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { resolveHook, loadHook } = require('../src/index.js');
+const { resolveHook, loadHook, recordBrand } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -32,9 +32,19 @@ function cleanup(t, root) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 }
 
-function stampCompany(brandRoot, companyRoot) {
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+// The fixture's own machine home plus the parent brand's registry line: the
+// company tree resolves from those two, the same way every consumer resolves it.
+function useCompany(t, root, id = 'acme-co') {
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(root, 'home');
+  t.after(() => {
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  });
+
+  recordBrand({ id, root: path.join(root, 'parent'), name: 'Acme Co', url: 'https://acme.test' });
+
+  return path.join(root, 'parent', 'company');
 }
 
 // ─── Resolution ───
@@ -51,19 +61,18 @@ test('hooks: nested hook path resolves under the brand root', (t) => {
 
 test('hooks: company hook applies when the brand has none, brand wins when both exist', (t) => {
   const root = makeFixture('hooks-precedence', {
-    'company/config/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
-    'brand-a/config/omega.json5': `{ brand: { id: 'a' } }`,
-    'brand-b/config/omega.json5': `{ brand: { id: 'b' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/config/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
+    'brand-a/config/omega.json5': `{ brand: { id: 'a' }, company: { id: 'acme-co' } }`,
+    'brand-b/config/omega.json5': `{ brand: { id: 'b' }, company: { id: 'acme-co' } }`,
     'brand-b/config/hooks/account/password.js': 'module.exports = ({ email }) => `brand:${email}`;\n',
   });
   cleanup(t, root);
-  const companyRoot = path.join(root, 'company');
+  const companyRoot = useCompany(t, root);
   const brandA = path.join(root, 'brand-a');
   const brandB = path.join(root, 'brand-b');
-  stampCompany(brandA, companyRoot);
-  stampCompany(brandB, companyRoot);
 
-  // brand-a: no own hook → the company's
+  // brand-a: no own hook, so the company's applies
   const fromCompany = loadHook(brandA, 'account/password');
   assert.equal(fromCompany.file, path.join(companyRoot, 'config', 'hooks', 'account', 'password.js'));
   assert.equal(fromCompany.fn({ email: 'x@y.z' }), 'company:x@y.z');

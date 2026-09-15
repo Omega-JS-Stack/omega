@@ -10,25 +10,25 @@ Manager.isTesting()         // true ONLY in testing
 Manager.isProduction()      // true ONLY in production
 ```
 
-**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / `chrome.runtime.getManifest().update_url` / `OMEGA_BUILD_MODE` / `NODE_ENV` / `config.bxm.environment`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
+**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` reads the `OMEGA_ENVIRONMENT` variable in build-time Node, and the baked `OMEGA_BUILD_JSON.config.environment` in an extension context (which has no `process.env`). Nothing else is consulted: the `chrome.runtime.getManifest().update_url`, `OMEGA_BUILD_MODE` and `NODE_ENV` sniffs are gone, and a context with neither input **throws**, naming the variable. What an artifact WAS BUILT AS is what it answers, wherever it is loaded from.
 
-**One implementation, mixed into all eight Managers.** @omega.js/extension has eight Manager entry points (build / background / popup / options / content / sidepanel / page / offscreen). The helpers are defined once in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) and mixed into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
+**One implementation, shared with every sibling framework.** The four calls are `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/desktop, @omega.js/web, @omega.js/backend and @omega.js/client all answer from. @omega.js/extension has eight Manager entry points (build / background / popup / options / content / sidepanel / page / offscreen); [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) re-exports the shared four beside the extension's own `getVersion()` and mixes them into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
 
 ```javascript
 manager.getEnvironment()    // same answer in every extension context
 Manager.isTesting()         // static form, for build-time scripts
 ```
 
-**Resolution order:** testing wins first, then production, else development. The three checks are mutually exclusive — exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
+**The three checks are mutually exclusive**: exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
 
 ## Available helpers
 
 | Helper | Returns |
 |---|---|
-| `getEnvironment()` | `'development' \| 'testing' \| 'production'` — the SSOT resolver; the only reader of raw signals. |
-| `isDevelopment()` | `true` ONLY in development (unpacked extension via chrome://extensions / dev build), and NOT testing. Derives from `getEnvironment()`. |
-| `isTesting()` | `true` ONLY in testing (`OMEGA_TEST_MODE === 'true'`). **Takes precedence** — a test run is not development. |
-| `isProduction()` | `true` ONLY in production (packed / store-installed extension, `manifest.update_url` present). A **real positive check** — NOT `!isDevelopment()`. |
+| `getEnvironment()` | `'development' \| 'testing' \| 'production'`: the one reader of the one input; throws when it is absent. |
+| `isDevelopment()` | `true` ONLY in development (a dev BUILD), and NOT testing. Derives from `getEnvironment()`. |
+| `isTesting()` | `true` ONLY in testing (a testing build, or a Node lane naming it). Derives from `getEnvironment()`. |
+| `isProduction()` | `true` ONLY in production (a production BUILD). A **real positive check**, NOT `!isDevelopment()`. |
 
 ## Gating side effects — use the INTENTIONAL check
 
@@ -47,7 +47,7 @@ if (isDevelopment() || isTesting()) { /* DevTools menu items, verbose logging */
 
 ## URL helpers
 
-@omega.js/extension owns ONE backend URL helper, `getApiUrl()` in [src/utils/url-helpers.js](../src/utils/url-helpers.js), mixed into every context Manager beside the mode helpers. It follows the same local-in-dev/testing, production-otherwise convention as @omega.js/client's `getApiUrl`. The local port comes from whichever channel the context has: the `OMEGA_HTTPS_PORT` / `OMEGA_HOSTING_PORT` env vars (build-time Node and the test harness), then the `dev.ports` map the build baked into `OMEGA_BUILD_JSON` (a browser context has no `process.env`, so a bumped emulator port reaches it this way, [#744](https://github.com/Omega-JS-Stack/omega/issues/744)), then the classic 5002. The rule "call the getter, never hardcode" applies everywhere; the runtime contexts' other backend URLs come from the `@omega.js/client` singleton.
+@omega.js/extension owns ONE backend URL helper, `getApiUrl()` in [src/utils/url-helpers.js](../src/utils/url-helpers.js), mixed into every context Manager beside the mode helpers. It follows the same local-in-dev/testing, production-otherwise convention as @omega.js/client's `getApiUrl`. The local port comes from whichever channel the context has: the `OMEGA_HTTPS_PORT` / `OMEGA_HOSTING_PORT` env vars (build-time Node and the test harness), then the `dev.ports` map the build baked into `OMEGA_BUILD_JSON` (a browser context has no `process.env`, so a bumped emulator port reaches it this way, [#744](https://github.com/Omega-JS-Stack/omega/issues/744)). There is no third step: the classic number used to be hand-typed under them and it is gone ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)). The classics still reach the helper, from the ONE place they are defined: the bundle task bakes `CLASSIC_PORTS` (`@omega.js/config`) as the FLOOR of the `dev` map, with the live stack's resolved numbers over them, so a dev artifact always carries a complete map and a read that finds none throws, naming the fact and the build step that writes it. The background worker's auth-emulator port walks the same chain. The rule "call the getter, never hardcode" applies everywhere; the runtime contexts' other backend URLs come from the `@omega.js/client` singleton.
 
 ## Where they live
 
@@ -55,12 +55,14 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 
 ## How detection works
 
-`getEnvironment()` resolves in this precedence order:
+`getEnvironment()` reads ONE input, and there is no precedence ladder under it
+([#817](https://github.com/Omega-JS-Stack/omega/issues/817)):
 
-1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'`, `globalThis.OMEGA_TEST_MODE === true`, or a build baked with `config.bxm.environment === 'testing'` (set by the harness before any consumer JS runs). A test run is a test run regardless of any other signal.
-2. **Production / Development (runtime)** — `chrome.runtime.getManifest().update_url`: present → production (packed / store-installed), absent → development (unpacked). This is the authoritative runtime signal in an extension context. In build-time Node, `chrome` is undefined, so it falls through.
-3. **Build-time + config signals** — `OMEGA_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development; `config.bxm.environment` (`'development'` / `'production'`) override.
-4. **Default** — development. @omega.js/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `OMEGA_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast @omega.js/backend/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
+1. **`process.env.OMEGA_ENVIRONMENT`**, wherever this context has a `process` (build-time Node, the test harness).
+2. **The baked `config.environment`** off the Manager the call is made on, for every extension context. It is the build fact every OMEGA surface spells the same way ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)), written into every bundle by the bundle task.
+3. **Neither** is a loud error naming `OMEGA_ENVIRONMENT`. There is no default, because the four framework copies this replaced each had one and they disagreed: this one answered `development` with no signal while @omega.js/desktop's answered `production`.
+
+[src/build.js](../src/build.js) names the input at LOAD, from the lane: `OMEGA_BUILD_MODE` (the `omega build` flag) is `production` and WINS over an inherited value, the `test` verb names `testing`, and a bare dev boot is `development`. That word is baked into every bundle, which is what the browser contexts read. The whole table of who names what lives in [docs/shared/config.md](../../../docs/shared/config.md).
 
 ## Adding a new helper
 
@@ -68,11 +70,11 @@ Write the function in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) 
 
 ## Why this matters
 
-**One signal, used everywhere.** The test runner sets `OMEGA_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
+**One signal, used everywhere.** The `test` verb names `OMEGA_ENVIRONMENT=testing`, and the bundles that run names it too; every piece of code that calls `isTesting()` (framework or consumer) then sees `true`, no need to invent a per-module env var.
 
 **Sub-modules check the same signal.** When framework code (an auto-update probe, an analytics flush) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
-**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals (`manifest.update_url` vs `OMEGA_BUILD_MODE`), there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible.
+**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals, there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible. Since #817 that holds ACROSS frameworks too: the resolver is one shared module, so this framework and @omega.js/desktop can no longer answer differently from the same inputs.
 
 ## See also
 

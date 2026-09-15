@@ -226,7 +226,8 @@ function runnerLogFile(home) {
 
 // Is this process a TEST run? `OMEGA_TEST_RUNNER` is set by `omega test` for the
 // whole run (and inherited by the electron/boot children); `OMEGA_TEST_MODE` is
-// the canonical signal those children already carried. Either one means: no
+// the marker a sibling framework's runner or a consumer's own test script sets
+// (desktop's runners name the environment instead, #925). Either one means: no
 // command here may touch the machine's real runner home.
 //
 // It reads process.env, ALWAYS, and takes no environment argument. An injected

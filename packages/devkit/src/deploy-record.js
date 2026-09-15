@@ -1,8 +1,8 @@
 /**
- * The per-brand deploy record — `<target>` under the `deploy` section of
- * `.omega/state.json` (gitignored, per-machine). Multi-instance targets key
- * per target: the primary stays `<target>`, other instances record under
- * `<target>:<id>` (see deployKey).
+ * The per-brand deploy record: one key per target NAME under the `deploy`
+ * section of `.omega/state.json` (gitignored, per-machine). A brand running
+ * several targets of one type records each under its own name (#886), so
+ * targets/web and targets/admin never share a stamp.
  *
  * Written by every framework's deploy verb on success; read by the
  * manager's testing service to tell "never deployed" (live-URL checks skip
@@ -81,19 +81,6 @@ function describe(records) {
 }
 
 /**
- * Record key for a target's instance (multi-instance targets): the primary
- * keeps today's bare target key (zero breaking change — existing records
- * stay valid); any other instance keys `<target>:<id>`, matching the
- * per-target deploy model (each target deploys its own instance).
- * @param {string} target - Target key (web/backend/desktop/extension)
- * @param {string} [instance] - Instance id ('main' or absent = the primary)
- * @returns {string} The deploy-record key
- */
-function deployKey(target, instance) {
-  return instance && instance !== 'main' ? `${target}:${instance}` : target;
-}
-
-/**
  * Run fn under a best-effort cross-process lock on the records file, so two
  * targets deploying in parallel can't drop each other's record in the
  * read-modify-write. Lock contention waits briefly; a stale lock (owner
@@ -142,15 +129,13 @@ function withStateLock(file, fn) {
  *
  * @param {Object} options
  * @param {string} options.dir - Any directory inside the brand (target or root)
- * @param {string} options.target - Target key (web/backend/desktop/extension)
- * @param {string} [options.instance] - Instance id; non-main instances record
- *   under their own `<target>:<id>` key (per-target deploy records)
+ * @param {string} options.target - Target name (web, admin, backend, desktop, …)
  * @param {Object} [options.detail] - Extra fields (method, adopted, …)
  * @returns {Object} The written record
  */
 function recordDeploy(options) {
   const file = stateFile(options.dir);
-  const key = deployKey(options.target, options.instance);
+  const key = options.target;
 
   return withStateLock(file, () => {
     const state = loadState(file);
@@ -163,18 +148,17 @@ function recordDeploy(options) {
 }
 
 /**
- * The recorded deploy for a target's instance — null when the brand has
- * never deployed it from this machine (and no manage run has adopted a live
- * site yet).
+ * The recorded deploy for a target, null when the brand has never deployed it
+ * from this machine (and no manage run has adopted a live site yet).
  *
- * @param {Object} options - { dir, target, instance? }
+ * @param {Object} options - { dir, target }
  * @returns {Object|null}
  */
 function readDeployRecord(options) {
   const file = stateFile(options.dir);
   // Under the lock because the read is also where a legacy record is adopted
   const state = withStateLock(file, () => loadState(file));
-  return state.deploy[deployKey(options.target, options.instance)] || null;
+  return state.deploy[options.target] || null;
 }
 
-module.exports = { recordDeploy, readDeployRecord, deployKey };
+module.exports = { recordDeploy, readDeployRecord };

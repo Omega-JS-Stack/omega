@@ -77,7 +77,7 @@ platform rail).
 `omega.json5 → brand.color` is an optional hex string (`#RGB` / `#RRGGBB`,
 schema-validated since [#272](https://github.com/Omega-JS-Stack/omega/issues/272);
 unset leaves the token sheet's neutral placeholder standing) and it drives
-`composeBrandTokens()` (`packages/web/src/brand-tokens.js`): a light ramp plus a **dark-mode variant**
+`composeBrandTokens()` (`packages/devkit/src/brand-tokens.js`): a light ramp plus a **dark-mode variant**
 (darker brands lift into a legible lightness band for the charcoal ground;
 already-light brands pass through). `core/_includes/core/head.html` emits both
 as inline `:root` blocks AFTER the css bundles — same three-stamp plumbing as
@@ -85,6 +85,23 @@ the token sheet — so the ramp wins the cascade everywhere, including
 `.btn-primary`, links, focus rings, `.form-check-input:checked`,
 `.progress-bar`, and `.text-primary`/`.bg-primary` (classy re-points those at
 the tokens).
+
+ONE hex, three surfaces ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)).
+Desktop and the extension have no `<head>` of their own to inline into, so their
+sass tasks write the SAME ramp to a generated partial before every compile:
+`<dist>/assets/scss/_brand.scss` on desktop, `<dist>/assets/css/_brand.scss` on
+the extension, both rendered by `renderBrandScss()` beside the ramp math. The
+partial carries `$primary` (the compile-time accent Bootstrap's color ramp
+derives from) plus a `ramp` mixin holding the runtime `--omega-accent` family,
+and the scaffold's `main.scss` reads both: `@use 'brand'` above the framework
+import for the variable, `@include brand.ramp;` below it for the css. The mixin
+is why the include sits below: a used module's css is emitted at its LOAD
+position, which is ahead of the token sheet and theme it has to beat, so a
+root-level rule in the partial would lose to the very placeholders it replaces.
+A brand that WANTS a different accent from `brand.color` puts a literal back in
+the `with (...)` block, in place of `brand.$primary`. No `brand.color` at all,
+and the renderer's own fallback (`#2563EB`, the hex the classy theme declares
+with `!default`) is what compiles.
 
 ## Consumer customization (tier 1 — main.scss)
 
@@ -593,6 +610,14 @@ AND the two topbar toggles that drive it (dead buttons otherwise, naming an id
 the page no longer carries,
 [#740](https://github.com/Omega-JS-Stack/omega/issues/740)), and
 `theme.topbar.enabled: false` drops the topbar.
+
+A link's `icon` carries the FULL Font Awesome class string
+([#903](https://github.com/Omega-JS-Stack/omega/issues/903)): `icon: 'fa-brands
+fa-github'`, rendered exactly as authored, so the whole chrome spells one key one
+way, the nav, the sidebar, the topbar (its notifications bell included), the page
+header (its title's `theme.header.title.icon` included), the account dropdown,
+the account section header and the footer, and any family the set carries is
+reachable. The mechanism behind the markup: [icons.md](icons.md).
 
 ## Stable-API line (don't churn once consumers exist)
 

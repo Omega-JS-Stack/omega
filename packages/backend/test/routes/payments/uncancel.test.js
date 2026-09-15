@@ -205,10 +205,12 @@ module.exports = defineCases({
       async run({ assert, Manager }) {
         const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
-        // PayPal's credentials are stripped: ANY attempt to reach PayPal would
+        // PayPal's credential is stripped: ANY attempt to reach PayPal would
         // throw inside the client and surface as a 500. A 400 is therefore proof
         // the route refused BEFORE dispatch — no network dependency at all.
-        const sent = await withEnvironment({ PAYPAL_CLIENT_ID: null, PAYPAL_CLIENT_SECRET: null }, () => uncancel(Manager, user));
+        // Only the SECRET is an env key now (#893): the public client id is
+        // config, which a route test never rewrites.
+        const sent = await withEnvironment({ PAYPAL_CLIENT_SECRET: null }, () => uncancel(Manager, user));
 
         assert.equal(sent.code, 400, `An unsupported operation is a client fault, not an outage, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.match(`${sent.body}`, /billing portal/i, `The refusal should point at the billing portal, got: ${sent.body}`);
@@ -226,7 +228,7 @@ module.exports = defineCases({
         const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal-code', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         const { sent, properties } = await withEnvironment(
-          { PAYPAL_CLIENT_ID: null, PAYPAL_CLIENT_SECRET: null },
+          { PAYPAL_CLIENT_SECRET: null },
           () => uncancelReadingProperties(Manager, user),
         );
 

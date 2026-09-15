@@ -20,6 +20,7 @@ const { spawnSync } = require('node:child_process');
 
 const guardPrepare = require('../tools/prepare-guard');
 const { prepareDecision, rewire, GUARDED_PREPARE, UNGUARDED_PREPARE } = guardPrepare;
+const local = require('../src/local');
 
 const GUARD = path.join(__dirname, '..', 'tools', 'prepare-guard.js');
 
@@ -33,9 +34,11 @@ function makeScratch(t) {
 /**
  * Write a scratch monorepo (package.json named "omega" + a packages/devkit
  * workspace, which is what isMonorepoRoot recognizes) holding one buildable
- * package whose prepare is the real one-liner from the framework packages:
+ * package whose prepare calls the gate and then a stand-in build:
  * `node -e "require('<guard>')() && require('<build>')()"`. The build appends a
- * line to builds.log, so "did prepare run?" is a file read.
+ * line to builds.log, so "did prepare run?" is a file read, and the `&&` makes
+ * the gate's own decision visible without prepare-package in the way (the
+ * shipped script calls `run()`, which is the gate plus prepare-package).
  * @param {string} root - Directory to write the monorepo into.
  * @param {object} [options]
  * @param {boolean} [options.guarded] - Wire the guard into the prepare script.
@@ -432,17 +435,22 @@ test('WITH the guard, `npm pack` in the linked package still builds its dist', (
  * @param {string} dir - Package directory.
  * @param {object} [options]
  * @param {boolean} [options.hooked] - Wire the after chain.
+ * @param {boolean} [options.failing] - Make the FIRST after hook exit nonzero
+ *   (what the vendor hook does on a bad reference), so the chain stops before
+ *   the rewire entry ever runs (#870).
+ * @param {string} [options.prepare] - The prepare script to write (default the
+ *   shipped gate; a scratch package needs the guard by absolute path).
  * @returns {string} The package directory.
  */
 function writePreparable(dir, options = {}) {
-  const { hooked = true } = options;
+  const { hooked = true, failing = false, prepare = GUARDED_PREPARE } = options;
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'src', 'index.js'), 'module.exports = 1;\n');
   fs.writeFileSync(path.join(dir, 'package.json'), `${JSON.stringify({
     name: '@omega.js/widget',
     version: '1.0.0',
     main: './dist/index.js',
-    scripts: { prepare: GUARDED_PREPARE },
+    scripts: { prepare },
     preparePackage: {
       input: './src',
       output: './dist',
@@ -450,7 +458,9 @@ function writePreparable(dir, options = {}) {
       hooks: hooked
         ? {
           after: [
-            `node -e "require('fs').writeFileSync('${path.join(dir, 'first-hook.txt')}', 'ran')"`,
+            failing
+              ? `node -e "require('fs').writeFileSync('${path.join(dir, 'first-hook.txt')}', 'ran'); process.exit(7)"`
+              : `node -e "require('fs').writeFileSync('${path.join(dir, 'first-hook.txt')}', 'ran')"`,
             `node -e "require('${GUARD}').rewire()"`,
           ],
           afterBlocking: true,
@@ -515,4 +525,147 @@ test('rewire never stomps a prepare it does not own', (t) => {
 
   assert.equal(rewire({ packageDir }), false);
   assert.equal(prepareScript(packageDir), 'node scripts/build.js');
+});
+
+// ── surviving a failed hook (#870) ──────────────────────────────────────────
+
+// The gated one-liner exactly as every dist-building package.json carries it.
+// Hard-coded on purpose: the rule these cases pin is that a prepare leaves THIS
+// string on disk, whatever happened inside it, so the expectation can never be
+// computed from the implementation it checks.
+const GATED_SCRIPT = 'node -e "require(\'../devkit/tools/prepare-guard\').run()"';
+
+/**
+ * Make the real prepare-package resolvable from a scratch package (a symlink,
+ * so its own requires still resolve from its real location).
+ * @param {string} scratchRoot - Directory ABOVE the scratch package.
+ */
+function linkPreparePackage(scratchRoot) {
+  const real = path.join(path.dirname(require.resolve('prepare-package')), '..');
+  fs.mkdirSync(path.join(scratchRoot, 'node_modules'), { recursive: true });
+  fs.symlinkSync(real, path.join(scratchRoot, 'node_modules', 'prepare-package'), 'dir');
+}
+
+test('GUARDED_PREPARE is the gated one-liner the packages carry', () => {
+  assert.equal(GUARDED_PREPARE, GATED_SCRIPT);
+});
+
+test('a prepare whose after hook FAILS still leaves the gate wired (#870)', (t) => {
+  const scratch = makeScratch(t);
+  linkPreparePackage(scratch);
+  const packageDir = writePreparable(path.join(scratch, 'widget'), {
+    failing: true,
+    // The shipped gate, with the guard reached by absolute path (a scratch
+    // package has no devkit sibling to hop to)
+    prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
+  });
+
+  const built = npm(['run', 'prepare'], packageDir);
+
+  assert.notEqual(built.status, 0, 'the hook failure is still loud');
+  assert.ok(fs.existsSync(path.join(packageDir, 'first-hook.txt')), 'the failing hook ran');
+  assert.ok(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran');
+  assert.equal(prepareScript(packageDir), GATED_SCRIPT, 'the gate is back even though the chain died');
+});
+
+test('a prepare that ends on a string nobody owns exits NONZERO (C4)', (t) => {
+  const scratch = makeScratch(t);
+  linkPreparePackage(scratch);
+  const packageDir = writePreparable(path.join(scratch, 'widget'), {
+    hooked: false,
+    prepare: GUARDED_PREPARE.replace('../devkit/tools/prepare-guard', GUARD),
+  });
+
+  // An after hook that leaves scripts.prepare on a THIRD string: rewire refuses
+  // to touch a prepare nobody owns, so the build ends with the #350 gate off.
+  // npm buffers the warning away from a plain install, so the only signal a
+  // lane can act on is the exit code.
+  const manifestPath = path.join(packageDir, 'package.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.preparePackage.hooks = {
+    after: [`node -e "const f=require('fs');const m=JSON.parse(f.readFileSync('${manifestPath}','utf8'));m.scripts.prepare='node scripts/build.js';f.writeFileSync('${manifestPath}', JSON.stringify(m,null,2)+'\\n')"`],
+    afterBlocking: true,
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const built = npm(['run', 'prepare'], packageDir);
+
+  assert.ok(fs.existsSync(path.join(packageDir, 'dist', 'index.js')), 'the build itself ran');
+  assert.notEqual(built.status, 0, 'an ungated prepare ended green');
+  assert.equal(prepareScript(packageDir), 'node scripts/build.js', 'the deliberate prepare is left alone');
+});
+
+test('the freshness heal never leaves a manifest its prepare stripped (#870)', (t) => {
+  delete process.env.OMEGA_SKIP_FRESHNESS;
+  delete process.env.OMEGA_FRESH_REEXEC;
+  const scratch = makeScratch(t);
+  const root = path.join(scratch, 'monorepo');
+  const packageDir = path.join(root, 'packages', 'widget');
+
+  // A monorepo-shaped checkout: the heal reads the gate from the devkit BESIDE
+  // the package it prepared, the same hop the gated script's relative require makes
+  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'packages', 'devkit', 'tools'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: 'omega', version: '1.0.0', private: true }, null, 2)}\n`);
+  fs.writeFileSync(path.join(root, 'packages', 'devkit', 'package.json'), `${JSON.stringify({ name: '@omega.js/devkit', version: '1.0.0', private: true }, null, 2)}\n`);
+  fs.copyFileSync(GUARD, path.join(root, 'packages', 'devkit', 'tools', 'prepare-guard.js'));
+
+  // The package: src/, an EMPTY dist (stale, so the heal fires), and a prepare
+  // that strips the gate and then DIES: prepare-package's manifest write
+  // followed by a hook that fails, with nothing left to put the gate back
+  fs.mkdirSync(path.join(packageDir, 'src'), { recursive: true });
+  fs.mkdirSync(path.join(packageDir, 'dist'), { recursive: true });
+  fs.writeFileSync(path.join(packageDir, 'src', 'index.js'), 'module.exports = 1;\n');
+  fs.writeFileSync(path.join(packageDir, 'strip.js'), [
+    "const fs = require('fs');",
+    "const path = require('path');",
+    "const manifestPath = path.join(__dirname, 'package.json');",
+    "const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));",
+    `manifest.scripts.prepare = ${JSON.stringify(UNGUARDED_PREPARE)};`,
+    'fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\\n`);',
+    'process.exit(7);',
+    '',
+  ].join('\n'));
+  fs.writeFileSync(path.join(packageDir, 'package.json'), `${JSON.stringify({
+    name: '@omega.js/widget',
+    version: '1.0.0',
+    main: './dist/index.js',
+    scripts: { prepare: 'node strip.js' },
+  }, null, 2)}\n`);
+
+  const consumer = path.join(scratch, 'consumer');
+  fs.mkdirSync(path.join(consumer, 'node_modules', '@omega.js'), { recursive: true });
+  fs.writeFileSync(path.join(consumer, 'package.json'), `${JSON.stringify({ name: 'consumer', version: '1.0.0' }, null, 2)}\n`);
+  fs.symlinkSync(packageDir, path.join(consumer, 'node_modules', '@omega.js', 'widget'), 'dir');
+
+  const healed = local.ensureFreshLocalDist({ packageName: '@omega.js/widget', fromDir: consumer });
+
+  assert.equal(healed.status, 'heal-failed', 'the prepare failure is still a loud stop');
+  assert.equal(prepareScript(packageDir), GATED_SCRIPT, 'the heal restored the gate its prepare stripped');
+});
+
+test('every dist-building package carries the gate, with rewire ahead of the hook that can fail', () => {
+  const packagesDir = path.join(__dirname, '..', '..');
+  const rewireHook = 'node -e "require(\'@omega.js/devkit/prepare-guard\').rewire()"';
+  const gated = [];
+
+  for (const name of fs.readdirSync(packagesDir).sort()) {
+    const manifestPath = path.join(packagesDir, name, 'package.json');
+    if (!fs.existsSync(manifestPath)) {
+      continue;
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (!manifest.scripts || !manifest.scripts.prepare) {
+      continue; // Nothing to build, nothing for a consumer install to reach into
+    }
+
+    gated.push(name);
+    assert.equal(manifest.scripts.prepare, GATED_SCRIPT, `${name}'s prepare is the gate`);
+    // The prepare:watch lane never runs scripts.prepare, so its only restore is
+    // this hook: it goes FIRST, ahead of a vendor hook that can die (#870)
+    const after = ((manifest.preparePackage || {}).hooks || {}).after || [];
+    assert.equal(after[0], rewireHook, `${name} rewires before any hook that can fail`);
+  }
+
+  assert.deepEqual(gated, ['backend', 'client', 'desktop', 'extension', 'manager', 'web']);
 });

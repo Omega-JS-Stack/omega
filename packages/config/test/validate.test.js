@@ -12,6 +12,7 @@ const {
   runSchema,
   formatErrors,
   TARGETS,
+  AMO_CATEGORIES,
 } = require('../src/index.js');
 
 // ─── validateConfig: shared schema ───
@@ -48,13 +49,12 @@ test('email identity keys are optional but typed when present', () => {
     ...VALID,
     brand: {
       ...VALID.brand,
-      company: 'Sandbox Holdings Inc',
       contact: {
         email: 'hello@sandbox.example',
         person: { name: 'Jane Doe, CEO', firstName: 'Jane', image: 'https://x.com/j.jpg', url: 'https://jane.example', urlText: '@jane' },
         carbonCopy: [{ email: 'audit@sandbox.example', name: 'Audit' }],
       },
-      images: { companyWordmark: 'https://x.com/wordmark.png' },
+      images: { wordmark: 'https://x.com/wordmark.png' },
     },
   });
 
@@ -72,14 +72,26 @@ test('email identity keys are optional but typed when present', () => {
   assert.ok(errors.some((e) => e.includes('config.brand.contact.carbonCopy has wrong type')));
 });
 
-test("parent accepts 'self', a URL string, or the deliberate false opt-out: union types (shared rule, #277)", () => {
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'self' }).errors, []);
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'https://api.example.com' }).errors, []);
-  // false = "shared webhook account owned elsewhere" (the playground's shape)
-  assert.deepStrictEqual(validateConfig({ ...VALID, parent: false }).errors, []);
+test('parent is retired OUTRIGHT, and its last meaning is company.webhooks (#677)', () => {
+  // Every shape of it, the old opt-out included: the key is gone, and the
+  // error names where the meaning went.
+  for (const value of [false, 'self', 'https://api.example.com', true]) {
+    const { errors } = validateConfig({ ...VALID, parent: value });
+    assert.ok(errors.some((e) => e.includes('config.parent is retired') && e.includes('company.webhooks')), `parent: ${value} names the new home`);
+  }
 
-  const { errors } = validateConfig({ ...VALID, parent: 42 });
-  assert.ok(errors.some((e) => e.includes('config.parent has wrong type') && e.includes('string|boolean')));
+  // The successor: a typed boolean inside the company block, default true.
+  assert.deepStrictEqual(validateConfig({ ...VALID, company: { id: 'itw-creative-works', webhooks: false } }).errors, []);
+  assert.ok(validateConfig({ ...VALID, company: { id: 'itw-creative-works', webhooks: 'no' } }).errors
+    .some((e) => e.includes('config.company.webhooks has wrong type')));
+});
+
+test('company: the id is the one typed key, and the rest is resolved (#677)', () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, company: { id: 'itw-creative-works' } }).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, company: { id: 'self' } }).errors, []);
+
+  const { errors } = validateConfig({ ...VALID, company: { id: 42 } });
+  assert.ok(errors.some((e) => e.includes('config.company.id has wrong type')));
 });
 
 test('auth.signup.maxPerIpPerDay is a positive integer (backend rule, #133)', () => {
@@ -115,7 +127,7 @@ test('translation section: valid shape passes, providers block + types enforced'
   assert.deepStrictEqual(
     validateConfig({
       ...VALID,
-      translation: { enabled: true, default: 'en', languages: ['es', 'fr'], providers: { claude: {} }, exclude: ['blog'] },
+      translation: { enabled: true, default: 'en', languages: ['es', 'fr'], providers: { claude: {} }, include: ['**', '!blog/**'] },
     }).errors,
     [],
   );
@@ -247,9 +259,8 @@ test('the six manager-level sections are shared keys: a website-only brand carri
   // enable the target.
   const websiteOnly = {
     ...VALID,
-    targets: { web: {} },
-    parent: 'https://itwcreativeworks.com',
-    github: { user: 'itw-creative-works', website: 'https://github.com/itw-creative-works/clockii' },
+    targets: { web: { type: 'web' } },
+    repo: { org: 'itw-creative-works' },
     reviews: { enabled: true, sites: ['trustpilot.com'] },
     marketing: { campaigns: { enabled: true, providers: { sendgrid: { listId: 'lst_1' } } }, prune: { enabled: true } },
     blog: { enabled: false },
@@ -260,9 +271,8 @@ test('the six manager-level sections are shared keys: a website-only brand carri
   assert.deepStrictEqual(validateConfig(websiteOnly, { target: 'web' }).errors, []);
 
   // Shared keys are TYPED shared too: no backend target needed to catch a shape mistake.
-  const { errors } = validateConfig({ ...VALID, parent: 42, github: 'itw', reviews: 'yes', marketing: [1], blog: 'on', dataRequest: 3 });
-  assert.ok(errors.some((e) => e.includes('config.parent has wrong type')));
-  assert.ok(errors.some((e) => e.includes('config.github has wrong type')));
+  const { errors } = validateConfig({ ...VALID, repo: 'itw', reviews: 'yes', marketing: [1], blog: 'on', dataRequest: 3 });
+  assert.ok(errors.some((e) => e.includes('config.repo has wrong type')));
   assert.ok(errors.some((e) => e.includes('config.reviews has wrong type')));
   assert.ok(errors.some((e) => e.includes('config.marketing has wrong type')));
   assert.ok(errors.some((e) => e.includes('config.blog has wrong type')));
@@ -274,8 +284,8 @@ test('directory + sponsorships are shared keys, typed shared, and secret-free (#
   // same way as the #277 six.
   const participating = {
     ...VALID,
-    targets: { web: {} },
-    parent: 'https://itwcreativeworks.com',
+    targets: { web: { type: 'web' } },
+    company: { id: 'itw-creative-works' },
     directory: { enabled: true },
     sponsorships: {
       acceptable: ['tech'],
@@ -321,21 +331,69 @@ test('an unrecognized top-level key stays unvalidated: the move admits six NAMED
 
 // ─── validateConfig: targets sanity ───
 
-test('unknown target names and non-object entries are errors; {} is enabled-with-defaults', () => {
+test('#886: every entry declares a type, and the KEY is only a name', () => {
   const { errors } = validateConfig({
     ...VALID,
-    targets: { web: {}, extension: {}, website: {}, backend: true },
+    targets: {
+      web: { type: 'web' },
+      untyped: {},
+      admin: { type: 'website' },
+      backend: true,
+    },
   });
 
-  assert.ok(errors.some((e) => e.includes('config.targets.website is not a known target')));
-  assert.ok(errors.some((e) => e.includes('config.targets.backend must be an object')));
-  assert.strictEqual(errors.length, 2);
+  assert.ok(errors.some((e) => e.includes('config.targets.untyped must declare `type`')));
+  assert.ok(errors.some((e) => e.includes('config.targets.admin must declare `type`') && e.includes('"website"')));
+  assert.ok(errors.some((e) => e.includes('config.targets.backend must be an object declaring its type')));
+  assert.strictEqual(errors.length, 3);
 });
 
-test('all canonical targets are accepted (mobile stays reserved but valid)', () => {
-  const targets = Object.fromEntries(TARGETS.map((t) => [t, {}]));
+test('#886: the retired instance ARRAY names its replacement, a sibling key', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { web: [{ id: 'main' }, { id: 'admin' }] },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.web is an array')
+      && e.includes('sibling key')
+      && e.includes('docs/shared/breaking-changes.md 2026-09-11')),
+    `the array form must bounce with the migration pointer: ${errors.join(' | ')}`,
+  );
+});
+
+test('#886: a key that is not a dir-safe slug is an error, since the name IS the folder', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: { 'Admin Console': { type: 'web' } },
+  });
+
+  assert.ok(errors.some((e) => e.includes('config.targets.Admin Console is not a usable target name')));
+  assert.strictEqual(errors.length, 1);
+});
+
+test('#886: any NAME is legal when its type is, so targets/website is a brand\'s own choice', () => {
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, targets: { website: { type: 'web' }, community: { type: 'web' }, api: { type: 'custom' } } }).errors,
+    [],
+  );
+});
+
+test('all canonical types are accepted (mobile stays reserved but valid)', () => {
+  const targets = Object.fromEntries(TARGETS.map((t) => [t, { type: t }]));
 
   assert.deepStrictEqual(validateConfig({ ...VALID, targets }).errors, []);
+});
+
+test('#886: more than one backend target is a WARNING, never an error', () => {
+  const multi = validateConfig({ ...VALID, targets: { backend: { type: 'backend' }, eu: { type: 'backend' } } });
+
+  assert.deepStrictEqual(multi.errors, []);
+  assert.ok(multi.warnings.some((w) => w.includes('2 backend targets') && w.includes('unsupported')));
+
+  const single = validateConfig({ ...VALID, targets: { backend: { type: 'backend' } } });
+  assert.deepStrictEqual(single.errors, []);
+  assert.deepStrictEqual(single.warnings, []);
 });
 
 // ─── validateConfig: per-target refinements ───
@@ -388,6 +446,45 @@ test('extension listings are declared keys: valid urls pass, a non-url bounces (
     { target: 'extension' },
   );
   assert.ok(errors.some((e) => e.includes('config.listings.chrome.url') && e.includes('does not match')));
+});
+
+test('extension listing IDS are declared keys beside the url, one home for the store identifier (#893)', () => {
+  // A store item id is public by design (it is IN the listing URL), so it lives
+  // in config beside the url it belongs to, never in .env, which holds secrets.
+  const identified = {
+    ...VALID,
+    listings: {
+      chrome: { id: 'abcdefghijklmnopabcdefghijklmnop', url: 'https://chromewebstore.google.com/detail/x' },
+      firefox: { id: 'extension@acme.com' },
+      edge: { id: '11111111-2222-3333-4444-555555555555' },
+    },
+  };
+  assert.deepStrictEqual(validateConfig(identified, { target: 'extension' }).errors, []);
+
+  const { errors } = validateConfig(
+    { ...VALID, listings: { chrome: { id: 12345 } } },
+    { target: 'extension' },
+  );
+  assert.ok(errors.some((e) => e.includes('config.listings.chrome.id has wrong type')));
+});
+
+test('extension categories are AMO slugs: the live list passes, anything else names the list (#884)', () => {
+  // The first Firefox publish sends these to addons.mozilla.org verbatim, so a
+  // slug AMO does not know is a submission that fails at the store instead of
+  // in the build. Every live slug validates, because the list IS the schema's.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, categories: AMO_CATEGORIES }, { target: 'extension' }).errors,
+    [],
+  );
+
+  const { errors } = validateConfig(
+    { ...VALID, categories: ['alerts-updates', 'productivity'] },
+    { target: 'extension' },
+  );
+  assert.ok(errors.some((e) => e.includes('config.categories') && e.includes('"productivity"') && e.includes('alerts-updates')));
+
+  const typed = validateConfig({ ...VALID, categories: 'alerts-updates' }, { target: 'extension' });
+  assert.ok(typed.errors.some((e) => e.includes('config.categories has wrong type')));
 });
 
 test('unknown options.target throws (programmer error, not a config error)', () => {
@@ -556,7 +653,7 @@ test('the retired firebaseConfig key is an error; its replacement passes', () =>
 });
 
 test('the current client key is untouched by the retired-key guard', () => {
-  const config = { ...VALID, targets: { web: { client: { auth: {}, chatsy: {}, consent: {} } } } };
+  const config = { ...VALID, targets: { web: { type: 'web', client: { auth: {}, chatsy: {}, consent: {} } } } };
 
   assert.deepStrictEqual(validateConfig(config).errors, []);
 });
@@ -578,6 +675,7 @@ test('#610: the legacy download and extension page maps are retired — site.tar
     ...VALID,
     targets: {
       web: {
+        type: 'web',
         download: { mac: { universal: 'https://acme.com/dl/mac' } },
         extension: { chrome: 'https://acme.com/ext' },
       },
@@ -597,10 +695,42 @@ test('#610: the legacy download and extension page maps are retired — site.tar
   assert.deepStrictEqual(
     validateConfig({
       ...VALID,
-      targets: { desktop: { releases: {} }, extension: { listings: { chrome: { url: 'https://store/x' } } } },
+      targets: { desktop: { type: 'desktop', releases: {} }, extension: { type: 'extension', listings: { chrome: { url: 'https://store/x' } } } },
     }).errors,
     [],
   );
+});
+
+test('#850: the four schema-less web sections are retired, one row each', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: {
+      web: {
+        type: 'web',
+        favicon: { path: 'https://cdn.acme.com/favicon', 'theme-color': '#ffffff' },
+        manifest: { name: 'Acme' },
+        icons: { style: 'solid' },
+        currency: 'USD',
+      },
+    },
+  });
+
+  const named = {
+    favicon: 'brand.images.favicon',
+    manifest: 'site.webmanifest',
+    icons: 'Font Awesome',
+    currency: 'payment.currency',
+  };
+
+  for (const [key, replacement] of Object.entries(named)) {
+    assert.ok(
+      errors.some((e) => e.includes(`config.targets.web.${key} is retired`) && e.includes(replacement)),
+      `${key} bounces and names what answers it now (got: ${errors.join(' | ')})`,
+    );
+  }
+
+  // The section the currency moved INTO is untouched.
+  assert.deepStrictEqual(validateConfig({ ...VALID, payment: { currency: 'USD' } }).errors, []);
 });
 
 test('#466: the web redirect map is retired — the edge owns templated redirects', () => {
@@ -754,10 +884,38 @@ test('#564: `seo.index` is retired and points at targets.web.meta.index', () => 
   );
 });
 
+// #858 (Ian 2026-09-13): the route list says what to TRANSLATE now, so the
+// key that named what to skip is retired outright: no dual-read, and
+// `omega migrate` converts a carrying brand's list.
+test('#858: `translation.exclude` is retired and points at translation.include', () => {
+  const { errors } = validateConfig({ ...VALID, translation: { exclude: ['docs'] } });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.translation.exclude is retired') && e.includes('translation.include')),
+    `translation.exclude must bounce naming its replacement: ${errors.join(' | ')}`,
+  );
+
+  // The same key written inside a web target entry is the same mistake.
+  const scoped = validateConfig(
+    { ...VALID, targets: { web: { type: 'web', translation: { exclude: ['docs'] } } } },
+    { target: 'web' },
+  ).errors;
+  assert.ok(
+    scoped.some((e) => e.includes('translation.exclude is retired')),
+    `the target-scoped spelling must bounce too: ${scoped.join(' | ')}`,
+  );
+
+  // The include list itself validates clean.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, translation: { include: ['**', '!blog/**'] } }).errors,
+    [],
+  );
+});
+
 test('#564: `targets.web.meta.index` is LIVE, the site-wide default of the page flag', () => {
   // Authored shape: nothing in the block is retired any more.
   assert.deepStrictEqual(
-    validateConfig({ ...VALID, targets: { web: { meta: { index: false } } } }, { target: 'web' }).errors,
+    validateConfig({ ...VALID, targets: { web: { type: 'web', meta: { index: false } } } }, { target: 'web' }).errors,
     [],
     'the authored site default carries no retired key',
   );
@@ -777,44 +935,69 @@ test('#564: `targets.web.meta.index` is LIVE, the site-wide default of the page 
   );
 });
 
-// #732 — the array (multi-instance) target form indexes positionally, so the
-// walk's real keyPath is `targets.web.1.meta`. Every `targets.<type>.*` row
-// missed that shape, which is the one a brand with two sites has.
-test('#732: a retired path inside a multi-instance target instance bounces', () => {
+// #732: a retired `targets.web.*` row has to fire inside the ENTRY itself,
+// which is the shape every brand authors.
+test('#732: a retired path inside a target entry bounces', () => {
   const { errors } = validateConfig({
     ...VALID,
     targets: {
-      web: [
-        { id: 'main' },
-        { id: 'docs', meta: { title: 'Site default' }, redirects: [{ from: '/c/:id', to: '/code?id=:id' }] },
-      ],
+      web: { type: 'web', meta: { title: 'Site default' }, redirects: [{ from: '/c/:id', to: '/code?id=:id' }] },
     },
   });
 
-  // The REPORTED path keeps the index — that is where the author finds the key.
   assert.ok(
-    errors.some((e) => e.includes('config.targets.web.1.meta.title is retired') && e.includes('brand.name')),
-    `the instance's meta title must bounce at its real path: ${errors.join(' | ')}`,
+    errors.some((e) => e.includes('config.targets.web.meta.title is retired') && e.includes('brand.name')),
+    `the entry's meta title must bounce at its real path: ${errors.join(' | ')}`,
   );
   assert.ok(
-    errors.some((e) => e.includes('config.targets.web.1.redirects is retired')
+    errors.some((e) => e.includes('config.targets.web.redirects is retired')
       && e.includes('edge.providers.cloudflare.rules.redirect')),
-    `the instance's redirect map must bounce too: ${errors.join(' | ')}`,
+    `the entry's redirect map must bounce too: ${errors.join(' | ')}`,
   );
 
-  // An instance carrying nothing retired is still clean.
+  // Two web targets carrying nothing retired are still clean.
   assert.deepStrictEqual(
-    validateConfig({ ...VALID, targets: { web: [{ id: 'main' }, { id: 'docs' }] } }).errors,
+    validateConfig({ ...VALID, targets: { web: { type: 'web' }, docs: { type: 'web' } } }).errors,
+    [],
+  );
+});
+
+// #886: a RETIRED_PATHS row names the target TYPE, and the key is a NAME now,
+// so the row has to fire on EVERY target of that type. A brand with two sites
+// would otherwise hear it only on the one whose name happens to be `web`.
+test('#886: a targets.<name> retired row fires on a target NAMED anything', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    targets: {
+      web: { type: 'web' },
+      community: { type: 'web', meta: { title: 'Site default' } },
+      app: { type: 'desktop', downloads: { enabled: true } },
+    },
+  });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.community.meta.title is retired') && e.includes('brand.name')),
+    `the second web target's retired key must bounce at its real path: ${errors.join(' | ')}`,
+  );
+  assert.ok(
+    errors.some((e) => e.includes('config.targets.app.downloads.enabled is retired') && e.includes('#799')),
+    `the renamed desktop target's retired key must bounce too: ${errors.join(' | ')}`,
+  );
+
+  // A name whose TYPE owns no such row stays clean: `meta` under a custom
+  // target is that target's own business.
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, targets: { docs: { type: 'custom', meta: { title: 'Docs' } } } }).errors,
     [],
   );
 });
 
 // #588: brand.subdomains was read by the cloud hosting op and by nothing
 // else. No schema rule, no default, never materialized. Ian's 2026-09-01 call
-// made the web instance the home (the instance id IS the subdomain), so a
-// brand still carrying the list must hear the recipe instead of validating
-// clean while the hosting op quietly reconciles api.{sub}.{domain} domains.
-test('#588: brand.subdomains is retired, since each subdomain is a web instance', () => {
+// made the web target the home (the NAME is the subdomain), so a brand still
+// carrying the list must hear the recipe instead of validating clean while the
+// hosting op quietly reconciles api.{sub}.{domain} domains.
+test('#588: brand.subdomains is retired, since each subdomain is a web target', () => {
   const { errors } = validateConfig({
     ...VALID,
     brand: { ...VALID.brand, subdomains: ['admin', 'cdn'] },
@@ -823,29 +1006,29 @@ test('#588: brand.subdomains is retired, since each subdomain is a web instance'
   assert.ok(
     errors.some((e) => e.includes('config.brand.subdomains is retired')
       && e.includes('targets.web')
-      && e.includes("{ id: 'admin' }")),
+      && e.includes("admin: { type: 'web' }")),
     `the subdomain list must bounce and carry the recipe: ${errors.join(' | ')}`,
   );
 
   // The replacement itself validates clean, and one api.<domain> serves them all
   assert.deepStrictEqual(
-    validateConfig({ ...VALID, targets: { web: [{ id: 'main' }, { id: 'admin' }, { id: 'cdn' }] } }).errors,
+    validateConfig({ ...VALID, targets: { web: { type: 'web' }, admin: { type: 'web' }, cdn: { type: 'web' } } }).errors,
     [],
   );
 });
 
 // H1: `subdomains` exists nowhere else in the schema, so it is a NAME test
 // (retired-keys.js's #142 rule), walked at every depth. A brand that pushed the
-// list down into an instance's own brand block must hear it on a whole-file
+// list down into a target entry's own brand block must hear it on a whole-file
 // load, which is the shape the manager walk validates.
-test('#588: the subdomains list bounces at every depth, instance arrays included', () => {
+test('#588: the subdomains list bounces at every depth, target entries included', () => {
   const { errors } = validateConfig({
     ...VALID,
-    targets: { web: [{ id: 'main' }, { id: 'admin', brand: { subdomains: ['x'] } }] },
+    targets: { web: { type: 'web' }, admin: { type: 'web', brand: { subdomains: ['x'] } } },
   });
 
   assert.ok(
-    errors.some((e) => e.includes('config.targets.web.1.brand.subdomains is retired')
+    errors.some((e) => e.includes('config.targets.admin.brand.subdomains is retired')
       && e.includes('targets.web')),
     `the nested list must bounce at its real path: ${errors.join(' | ')}`,
   );
@@ -892,6 +1075,119 @@ test('#788: the oauth2 section bounces at every depth, target overrides included
   );
 });
 
+// ─── one repo block, one hosting key (#883) ───────────────────────────────
+
+// `repo: { provider, org }` is the whole declaration, and the org is the owner
+// of every repo the brand's names derive under. A block with no org would let
+// every derivation answer null and every reader skip in its own quiet way.
+test('#883: the repo block is provider + org, and the org is required when the block is there', () => {
+  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { org: 'Acme-Org' } }).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, repo: { provider: 'github', org: 'Acme-Org' } }).errors, []);
+
+  const { errors } = validateConfig({ ...VALID, repo: { provider: 'github' } });
+  assert.ok(
+    errors.some((e) => e.includes('config.repo.org is required when the repo block is present')),
+    `an org-less block must bounce: ${errors.join(' | ')}`,
+  );
+
+  assert.ok(
+    validateConfig({ ...VALID, repo: { org: '   ' } }).errors
+      .some((e) => e.includes('config.repo.org is required')),
+    'whitespace is not an org',
+  );
+});
+
+test('#883: repo.provider names a host OMEGA builds for', () => {
+  const { errors } = validateConfig({ ...VALID, repo: { provider: 'gitlab', org: 'Acme-Org' } });
+
+  assert.ok(
+    errors.some((e) => e.includes('config.repo.provider "gitlab" is not a host OMEGA builds for')
+      && e.includes('github')),
+    `an unbuilt provider must bounce and name the table: ${errors.join(' | ')}`,
+  );
+});
+
+// Only a web target has a built site to serve, so `hosting` anywhere else is a
+// statement nothing reads: the deploy would publish nothing and the manage walk
+// would create no repo for it.
+test('#883: hosting is a WEB target key, and its provider is table-checked', () => {
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      repo: { org: 'Acme-Org' },
+      targets: { web: { type: 'web', hosting: { provider: 'github' } }, community: { type: 'web' } },
+    }).errors,
+    [],
+  );
+
+  const wrongTarget = validateConfig({
+    ...VALID,
+    targets: { web: { type: 'web' }, desktop: { type: 'desktop', hosting: { provider: 'github' } } },
+  });
+  assert.ok(
+    wrongTarget.errors.some((e) => e.includes('config.targets.desktop.hosting is a web-target key')),
+    `hosting on a non-web target must bounce: ${wrongTarget.errors.join(' | ')}`,
+  );
+
+  const wrongProvider = validateConfig({
+    ...VALID,
+    targets: { web: { type: 'web', hosting: { provider: 'vercel' } } },
+  });
+  assert.ok(
+    wrongProvider.errors.some((e) => e.includes('config.targets.web.hosting.provider "vercel" is not a host OMEGA builds for')),
+    `an unbuilt hosting provider must bounce: ${wrongProvider.errors.join(' | ')}`,
+  );
+});
+
+// Every key the four old spellings used is a retired ROW: each one validated
+// clean under the new shape and silently addressed a repo nothing publishes to.
+test('#883: every retired repo key bounces and names what replaced it', () => {
+  const { errors } = validateConfig({
+    ...VALID,
+    repo: { providers: { github: { enabled: true, org: 'Acme-Org', repo: 'acme-site', shared: false, private: true } } },
+    github: { user: 'acme', website: 'https://github.com/acme/acme-site' },
+    targets: {
+      web: { type: 'web' },
+      api: { type: 'backend', github: { repo: 'acme-content' } },
+      desktop: { type: 'desktop', releases: { owner: 'Acme-Binaries', repo: 'acme-bins' } },
+    },
+  });
+
+  const rows = {
+    'config.repo.providers.github.org': 'repo.org',
+    'config.repo.providers.github.repo': '<brand.id>-omega',
+    'config.repo.providers.github.private': 'package.json `private` field',
+    'config.repo.providers.github.shared': 'org profile',
+    'config.repo.providers.github.enabled': 'presence of the `repo` block',
+    'config.github.user': 'repo.org',
+    'config.github.website': '<brand.id>-<target name>',
+    // The per-type row fires on a backend target named anything (#886).
+    'config.targets.api.github.repo': '<brand.id>-<role>',
+    'config.targets.desktop.releases.owner': '<brand.id>-releases',
+    'config.targets.desktop.releases.repo': '<brand.id>-releases',
+  };
+
+  for (const [path, replacement] of Object.entries(rows)) {
+    assert.ok(
+      errors.some((e) => e.includes(`${path} is retired`) && e.includes(replacement)),
+      `${path} must bounce and name its replacement: ${errors.join(' | ')}`,
+    );
+  }
+});
+
+// `releases: {}` stays the presence switch for the site's download links: only
+// the owner/repo override left with #883.
+test('#883: a bare releases block still validates, with no repo to name', () => {
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      repo: { org: 'Acme-Org' },
+      targets: { web: { type: 'web' }, desktop: { type: 'desktop', releases: {} } },
+    }).errors,
+    [],
+  );
+});
+
 test('the new homes themselves validate clean — the provider keeps its own name one level down', () => {
   const config = {
     ...VALID,
@@ -903,7 +1199,7 @@ test('the new homes themselves validate clean — the provider keeps its own nam
     edge: { providers: { cloudflare: { zone: 'zone-id' } } },
     captcha: { providers: { recaptcha: { siteKey: 'key' } } },
     search: { providers: { searchConsole: { submitSitemap: false } } },
-    repo: { providers: { github: { org: 'Acme-Org' } } },
+    repo: { org: 'Acme-Org' },
     cloud: { provider: 'firebase', config: { projectId: 'acme' }, organizationId: false, billingAccount: false },
     advertising: { providers: { adsense: { client: 'ca-pub-1', displaySlot: '1' } } },
   };
@@ -1056,6 +1352,33 @@ test('a target entry\'s own keys are never undeclared — that namespace is the 
   });
 
   assert.deepStrictEqual(warnings, [], 'targets.<name>.* is open by design (custom targets, per-framework keys)');
+});
+
+// The drift guard (#911): a framework's ANNOTATED DEFAULT is the checklist of
+// what its runtime reads, so a key it hands every new consumer that the schema
+// has never heard of is the schema falling behind. Materialized and resolved
+// for the desktop target, it declares itself completely or this fails naming
+// the gap.
+test('the desktop annotated default carries no undeclared paths (#911)', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { loadConfig } = require('../src/load.js');
+
+  // Every load records its brand in the machine registry, and a framework's
+  // default file is no brand of this machine: point the home at a temp dir.
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-home-'));
+
+  try {
+    const defaults = path.join(__dirname, '..', '..', 'desktop', 'src', 'defaults');
+    const { warnings } = loadConfig(defaults, 'desktop');
+
+    assert.deepStrictEqual(warnings, [], warnings.join(' | '));
+  } finally {
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  }
 });
 
 // The point of the check: run it against every brand in this repo. A path a

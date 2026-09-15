@@ -31,7 +31,7 @@
         headline: 'Ready to ship',
         headline_accent: 'something great?',
         subheadline: 'Start free and grow into every surface your product needs.',
-        primary_button: { text: 'Start free', href: '/signup', icon: 'rocket' },
+        primary_button: { text: 'Start free', href: '/signup', icon: 'fa-solid fa-rocket' },
         command: 'npx acme setup',
         secondary_button: { text: 'Talk to sales', href: '/contact', nudge: true },
       },

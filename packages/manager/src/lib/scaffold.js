@@ -29,7 +29,7 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
-const { TARGET_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
+const { TARGET_FRAMEWORKS } = require('../config.js');
 // The environment vocabulary is @omega.js/config's — the same three names the
 // overlay files are suffixed with and every runtime's environment() answers
 const { ENV_ENVIRONMENTS } = require('@omega.js/config');
@@ -99,6 +99,22 @@ function renderOmegaConfig(answers) {
     '    },',
     '  },',
     '',
+  );
+
+  // The ONE key that joins this brand to its company (#677): the parent's own
+  // brand.id, or "self" when this brand IS the company. Unanswered writes
+  // nothing: a standalone brand carries no `company` key at all.
+  if (answers.company) {
+    lines.push(
+      '  // The company this brand belongs to: the parent\'s brand.id ("self" when this',
+      '  // brand IS the company). Its config layer, .env, hooks and signing tree resolve',
+      '  // from the company/ folder in that brand\'s repo.',
+      `  company: { id: ${JSON.stringify(answers.company.id)} },`,
+      '',
+    );
+  }
+
+  lines.push(
     '  // Social handles (platform: "handle") — each entry lights its footer icon, its JSON-LD sameAs entry, and a /<platform> shortlink.',
     '  socials: {},',
     '',
@@ -137,7 +153,7 @@ function renderOmegaConfig(answers) {
   // Backend brands get a bootable cloud project out of the box: demo-* ids
   // are the emulator-only convention (never touch live Firebase), so the
   // emulator boots before any real project exists (dogfood friction #3).
-  if (answers.targets.includes('backend')) {
+  if (answers.targets.some((entry) => entry.type === 'backend')) {
     lines.push(
       '  // Cloud project (backend target). demo-* ids are EMULATOR-ONLY — the',
       '  // emulators boot against this immediately; swap in a real Firebase project',
@@ -179,7 +195,7 @@ function renderOmegaConfig(answers) {
 
   // App-signing brands get their reverse-DNS bundle prefix derived at
   // onboarding (parent company's domain when one exists, else the brand's)
-  if (answers.targets.includes('desktop') && answers.bundleIdPrefix) {
+  if (answers.targets.some((entry) => entry.type === 'desktop') && answers.bundleIdPrefix) {
     lines.push(
       '  // Apple signing (certificates service): reverse-DNS prefix derived from',
       '  // the company/brand domain at onboarding. Bundle IDs mint as',
@@ -196,13 +212,15 @@ function renderOmegaConfig(answers) {
   }
 
   lines.push(
-    '  // Key presence = target enabled; the value is that target\'s type-wide',
-    '  // config (any shared key inside overrides it for that surface).',
+    '  // Key = the target NAME, which is its folder under targets/; `type` says',
+    '  // which framework runs there. Any shared key inside overrides it there.',
     '  targets: {',
   );
 
-  for (const target of answers.targets) {
-    lines.push(`    ${target}: {},`);
+  // The key is the target NAME and the folder (#886); its `type` says which
+  // framework runs there, so `admin: { type: 'web' }` is targets/admin.
+  for (const entry of answers.targets) {
+    lines.push(`    ${entry.name}: { type: '${entry.type}' },`);
   }
 
   lines.push('  },', '}');
@@ -210,10 +228,30 @@ function renderOmegaConfig(answers) {
   return `${lines.join('\n')}\n`;
 }
 
+// The license every scaffolded manifest starts with (#884): npm's own value
+// for closed-source commercial code, and the one the extension's Firefox lane
+// maps to AMO's `all-rights-reserved`. One name, root and targets alike.
+const BRAND_LICENSE = 'UNLICENSED';
+
+/**
+ * Render the brand root's package.json. Its `private` field is also the ONE
+ * statement of the brand's visibility (#883): the manage walk reconciles the
+ * source repo to it, and a fresh brand starts private.
+ *
+ * @param {object} answers - The onboard answers.
+ * @returns {string} The file contents.
+ */
 function renderRootPackageJson(answers) {
   return `${JSON.stringify({
     name: answers.id,
     private: true,
+    // npm's own word for closed-source commercial code, which a brand is until
+    // it says otherwise ([#884](https://github.com/Omega-JS-Stack/omega/issues/884)).
+    // It is a REAL field, not decoration: the extension's Firefox lane sends a
+    // target's license to AMO when it creates the listing, and an unstated one
+    // used to make that submission a Bad Request. A brand that open-sources
+    // itself edits this to its SPDX id.
+    license: BRAND_LICENSE,
     ...(answers.description ? { description: answers.description } : {}),
     workspaces: ['targets/*'],
     // npm scripts put node_modules/.bin on PATH, so plain `omega` (the
@@ -296,10 +334,9 @@ function renderEnvOverlayStub(environment) {
 
 function renderReadme(answers) {
   const targetList = answers.targets
-    .map((target) => {
-      const dir = TARGET_DIRS[target] || target;
-      const framework = TARGET_FRAMEWORKS[target];
-      return `- \`targets/${dir}/\` — the ${target} target${framework ? ` (framework: \`${framework}\`)` : ''}`;
+    .map((entry) => {
+      const framework = TARGET_FRAMEWORKS[entry.type];
+      return `- \`targets/${entry.name}/\`: the ${entry.name} target${framework ? ` (framework: \`${framework}\`)` : ''}`;
     })
     .join('\n');
 
@@ -330,22 +367,23 @@ ${targetList}
 `;
 }
 
-function renderTargetPackageJson(answers, target, dir) {
-  const framework = TARGET_FRAMEWORKS[target];
+function renderTargetPackageJson(answers, entry) {
+  const framework = TARGET_FRAMEWORKS[entry.type];
   // The exact family pin (#794): satisfied by a workspace link in-monorepo,
   // `mgr i local` pre-publish (which flips the spec to `file:`), and the npm
   // registry once @omega.js/* publish — where the pin is what keeps every
   // target on ONE framework version.
-  const depKey = RUNTIME_DEP_TARGETS.includes(target) ? 'dependencies' : 'devDependencies';
+  const depKey = RUNTIME_DEP_TARGETS.includes(entry.type) ? 'dependencies' : 'devDependencies';
 
   // version + author: electron-builder hard-requires version and warns on
   // author (the cp142 rehearsal catch) — every target gets both, they're healthy
   return `${JSON.stringify({
-    name: `${answers.id}-${dir}`,
+    name: `${answers.id}-${entry.name}`,
     version: '0.0.1',
     author: answers.name,
     private: true,
-    description: `${answers.name} ${target} target`,
+    license: BRAND_LICENSE,
+    description: `${answers.name} ${entry.name} target`,
     ...(framework ? { [depKey]: { [framework]: FAMILY_VERSION } } : {}),
   }, null, 2)}\n`;
 }
@@ -353,7 +391,7 @@ function renderTargetPackageJson(answers, target, dir) {
 /**
  * Build the scaffold plan for a brand.
  *
- * @param {Object} answers - { id, name, description, tagline, url, email, person, targets }
+ * @param {Object} answers - { id, name, description, tagline, url, email, person, targets: [{ name, type }] }
  * @returns {Array<{ path: string, contents: string }>} - Brand-root-relative file plan
  */
 function buildScaffoldPlan(answers) {
@@ -366,9 +404,9 @@ function buildScaffoldPlan(answers) {
     { path: 'README.md', contents: renderReadme(answers) },
   ];
 
-  for (const target of answers.targets) {
-    const dir = TARGET_DIRS[target] || target;
-    plan.push({ path: `targets/${dir}/package.json`, contents: renderTargetPackageJson(answers, target, dir) });
+  // The target NAME is its folder (#886); its `type` names the framework
+  for (const entry of answers.targets) {
+    plan.push({ path: `targets/${entry.name}/package.json`, contents: renderTargetPackageJson(answers, entry) });
   }
 
   return plan;

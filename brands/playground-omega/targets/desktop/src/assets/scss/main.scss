@@ -4,11 +4,16 @@
 // Customize Classy theme variables here. See:
 // node_modules/@omega.js/desktop/dist/assets/themes/classy/_config.scss for all available variables.
 
+// The brand accent, generated from `brand.color` in config/omega.json5 by the
+// sass task. Deliberate divergence? Put a literal in its place below:
+//   $primary: #2563EB,      // in place of `brand.$primary`
+@use 'brand';
+
 @use 'omega-desktop' as * with (
   // ============================================
   // Brand Colors
   // ============================================
-  $primary: #2563EB,
+  $primary: brand.$primary,
   // $secondary: #6C757D,
 
   // ============================================
@@ -28,7 +33,12 @@
   // $border-radius: 0.5rem,
 );
 
+// The runtime --omega-accent ramp, the same light and dark families the web
+// target inlines into its <head>. It goes AFTER the framework import so it wins
+// the cascade over the token sheet's placeholders.
+@include brand.ramp;
+
 // ============================================
 // Custom Global Styles
 // ============================================
-// Add your project-specific styles below — applied on every page.
+// Add your project-specific styles below, applied on every page.

@@ -13,9 +13,14 @@ module.exports = async ({ ctx, Manager }) => {
  * Excludes sensitive fields: monitoring, analytics, blog, etc.
  */
 function buildPublicConfig(config) {
+  const { repoBlock } = require('@omega.js/config');
+
   return {
     brand: config.brand || {},
-    repo: config.repo || {},
+    // The repo block as the config DERIVATION reads it (#883): provider + org,
+    // the only two facts there are, defaulted the one way every other reader
+    // defaults them. Null when the brand declares no repo at all.
+    repo: repoBlock(config),
     connections: config.connections || {},
     payment: config.payment || {},
     cloud: config.cloud || {},

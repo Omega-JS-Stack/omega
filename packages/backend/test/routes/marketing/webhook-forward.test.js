@@ -1,16 +1,18 @@
 /**
  * Test: POST /marketing/webhook/forward (parent forwarder)
  *
- * This route is gated to only work when Manager.config.parent === 'self'.
- * Most test runs happen on a CHILD brand (e.g. Somiibo's config/omega.json5
- * has `parent: 'https://api.itwcreativeworks.com'`), so the route should return 404.
+ * This route is gated to the webhook ROOT: a brand that names no company, or
+ * names itself as one (`company: { id: 'self' }`, #677). Most test runs happen
+ * on a brand that BELONGS to a company (its config names
+ * `company: { id: 'itw-creative-works' }`), so the route should return 404.
  *
  * The actual fan-out behavior (reading brands collection, derive API URLs,
  * POST to each child) is verified by unit-style tests in test/helpers/webhook-forward.js
  * which exercise the forwarder logic against a mock admin + mock fetch — no emulator
  * round-trip required.
  *
- * This file only verifies the GATE: on a non-parent @omega.js/backend, the route is invisible.
+ * This file only verifies the GATE: on a brand that belongs to a company, the
+ * route is invisible.
  */
 
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -24,11 +26,12 @@ module.exports = defineCases({
       name: 'forwarder-returns-404-on-non-parent-brand',
       auth: 'none',
       async run({ http, assert, config, skip }) {
-        // This gate only applies to CHILD brands. If this brand IS the parent
-        // (config.parent === 'self'), the forwarder route is visible by design,
-        // so there's nothing to assert here — skip rather than fail.
-        if (!config.parent || config.parent === 'self') {
-          skip('Brand is its own parent (config.parent === "self") — forwarder gate does not apply');
+        // This gate only applies to brands INSIDE a company. If this brand is
+        // the webhook root (no company, or its own), the forwarder route is
+        // visible by design, so there's nothing to assert here: skip rather
+        // than fail.
+        if (!config.company?.id || config.company.id === 'self') {
+          skip('Brand is the webhook root (it names no company): forwarder gate does not apply');
         }
 
         const response = await http.as('none').post(
@@ -36,7 +39,7 @@ module.exports = defineCases({
           [{ sg_event_id: 'should-not-process', event: 'group_unsubscribe', email: 'test@example.com' }]
         );
 
-        assert.isError(response, 404, 'Forwarder should be invisible (404) on non-parent BEMs');
+        assert.isError(response, 404, 'Forwarder should be invisible (404) on a brand inside a company');
       },
     },
 
@@ -44,19 +47,20 @@ module.exports = defineCases({
       name: 'forwarder-returns-404-even-with-valid-key',
       auth: 'none',
       async run({ http, assert, config, skip }) {
-        // Only meaningful on a CHILD brand. On the parent itself the forwarder is
-        // visible by design, so skip rather than fail.
-        if (!config.parent || config.parent === 'self') {
-          skip('Brand is its own parent (config.parent === "self") — forwarder gate does not apply');
+        // Only meaningful on a brand inside a company. On the webhook root the
+        // forwarder is visible by design, so skip rather than fail.
+        if (!config.company?.id || config.company.id === 'self') {
+          skip('Brand is the webhook root (it names no company): forwarder gate does not apply');
         }
 
-        // A valid key shouldn't unlock the forwarder — gate is on config.parent, not key.
+        // A valid key shouldn't unlock the forwarder: the gate is the company,
+        // not the key.
         const response = await http.as('none').post(
           `backend-manager/marketing/webhook/forward?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           { id: 'should-not-process', event: 'subscription.unsubscribed', email: 'test@example.com' }
         );
 
-        assert.isError(response, 404, 'Even with valid key, non-parent returns 404');
+        assert.isError(response, 404, 'Even with a valid key, a brand inside a company returns 404');
       },
     },
   ],

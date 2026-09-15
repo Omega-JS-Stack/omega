@@ -60,14 +60,14 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 const ROOT = path.join(__dirname, '..');
 const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
 const EXTENSION_APP = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'extension');
-const PACKAGED_DIR = path.join(EXTENSION_APP, 'packaged', 'chromium', 'raw');
+const PACKAGED_DIR = path.join(EXTENSION_APP, 'packaged', 'chrome', 'raw');
 const LOG_DIR = path.join(ROOT, '.temp', 'extension-auth-e2e');
 const EXTENSION_DIR = path.join(LOG_DIR, 'extension');
 
 const { readPortsFile } = require('@omega.js/config');
-// The snapshot is baked into every emitted bundle since
-// [#743](https://github.com/Omega-JS-Stack/omega/issues/743) — there is no
-// build.json sidecar to read, so this lane reads it back the way a browser does.
+// The snapshot is the ONE `build.js` at the artifact's root since
+// [#743](https://github.com/Omega-JS-Stack/omega/issues/743), so this lane reads
+// it back the way a browser does: by running the file.
 const { readBakedBuildJson } = require(path.join(ROOT, 'packages', 'extension', 'src', 'gulp', 'tasks', 'utils', 'build-json.js'));
 const { createStepsLog } = require('./steps-log');
 
@@ -122,7 +122,10 @@ function buildExtension() {
   const gulpBin = path.join(ROOT, 'node_modules', '.bin', 'gulp');
   const child = spawn(gulpBin, ['build'], {
     cwd: EXTENSION_APP,
-    env: { ...process.env, OMEGA_TEST_MODE: 'true' },
+    // The one environment input (#817), named the way `omega test` names it for
+    // its own children: the build lane keeps a word it inherited, and a bare
+    // gulp boot would otherwise bake `development`.
+    env: { ...process.env, OMEGA_TEST_MODE: 'true', OMEGA_ENVIRONMENT: 'testing' },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -266,16 +269,15 @@ async function main() {
       if (!fs.existsSync(manifestPath)) {
         throw new Error(`no packaged build at ${PACKAGED_DIR}`);
       }
-      // Read it out of the SERVICE WORKER's own bundle — the artifact whose bake
+      // Read the file every context in the artifact loads, which is the thing
       // this lane is about, rather than a sidecar that only described it.
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      const serviceWorker = manifest.background?.service_worker;
-      if (!serviceWorker) {
-        throw new Error('the packaged manifest declares no background.service_worker — nothing to read the bake from');
+      const buildJsPath = path.join(PACKAGED_DIR, 'build.js');
+      if (!fs.existsSync(buildJsPath)) {
+        throw new Error(`the packaged artifact carries no build.js at ${PACKAGED_DIR}`);
       }
-      buildConfig = readBakedBuildJson(path.join(PACKAGED_DIR, serviceWorker)).config;
-      if (buildConfig.omega?.environment !== 'testing') {
-        throw new Error(`build is not a testing build (omega.environment: ${buildConfig.omega?.environment})`);
+      buildConfig = readBakedBuildJson(buildJsPath).config;
+      if (buildConfig.environment !== 'testing') {
+        throw new Error(`build is not a testing build (environment: ${buildConfig.environment})`);
       }
       if (!buildConfig.cloud?.config?.apiKey) {
         throw new Error('build config carries no cloud.config — the SW cannot initialize Firebase');

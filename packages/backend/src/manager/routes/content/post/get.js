@@ -4,7 +4,7 @@
  */
 const { Octokit } = require('@octokit/rest');
 const { parse } = require('yaml');
-const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+const { cmsContext } = require('../../../helpers/web-target.js');
 const env = require('../../../libraries/env.js');
 
 module.exports = async ({ ctx, Manager, settings, analytics }) => {
@@ -14,8 +14,15 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
     return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
-  if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return ctx.respond('GitHub repo not configured (set targets.backend.github.repo — "owner/name" or bare name — or repo.providers.github.org + brand.id).', { code: 500 });
+  // The SOURCE repo this reads from, and WHICH website inside it (#887): the
+  // search is scoped to that target's folder, so two websites sharing one
+  // backend never answer for each other
+  let source;
+  let target;
+  try {
+    ({ source, target } = cmsContext(Manager.config, settings.target));
+  } catch (e) {
+    return ctx.respond(e.message, { code: e.code });
   }
 
   // Setup Octokit
@@ -37,8 +44,9 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Get the post
   const filename = url.pathname.replace(/blog|\//ig, '');
-  const repoInfo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
-  const query = `title+repo:${repoInfo.user}/${repoInfo.name}+filename:${filename}`;
+  const repoInfo = { user: source.owner, name: source.name };
+  const postsPath = `${target.path}/src/_posts`;
+  const query = `title+repo:${repoInfo.user}/${repoInfo.name}+path:${postsPath}+filename:${filename}`;
 
   ctx.log('Running search', query, repoInfo);
 
@@ -57,8 +65,12 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
     return ctx.respond('Post not found', { code: 404 });
   }
 
-  // Get the first result
-  const firstResult = results.data.items[0];
+  // Get the first result INSIDE this target: the `path:` qualifier narrows the
+  // search, it does not bind it, so the folder is what decides here
+  const firstResult = (results.data.items || []).find((item) => item.path.startsWith(`${postsPath}/`));
+  if (!firstResult) {
+    return ctx.respond(`Post not found in ${postsPath}`, { code: 404 });
+  }
 
   // Fetch the content of the post
   const post = await octokit.rest.repos.getContent({
@@ -86,6 +98,7 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   return ctx.respond({
     // Meta
+    target: target.name,
     name: post.data.name,
     path: post.data.path,
     size: post.data.size,

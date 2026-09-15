@@ -449,6 +449,7 @@ module.exports = [
         categories: { type: 'array', items: { type: 'string' }, description: 'Post categories' },
         headerImageURL: { type: 'string', description: 'Header image URL' },
         status: { type: 'string', description: 'Post status (e.g. "draft", "published")' },
+        target: { type: 'string', description: 'Web target name (#887): required only when the brand runs several web targets' },
       },
       required: ['title', 'body'],
     },
@@ -467,6 +468,7 @@ module.exports = [
         body: { type: 'string', description: 'Updated post content body' },
         title: { type: 'string', description: 'Updated post title' },
         postPath: { type: 'string', description: 'Path to the post (default: "guest")' },
+        target: { type: 'string', description: 'Web target name (#887): required only when the brand runs several web targets' },
       },
       required: ['url', 'body'],
     },
@@ -482,6 +484,7 @@ module.exports = [
       type: 'object',
       properties: {
         url: { type: 'string', description: 'Full public URL of the post (e.g. https://site.com/blog/my-post)' },
+        target: { type: 'string', description: 'Web target name (#887): required only when the brand runs several web targets' },
       },
       required: ['url'],
     },

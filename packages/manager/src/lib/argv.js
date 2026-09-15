@@ -3,8 +3,8 @@
  *
  * Every manager invocation now names its command (`omega manage --service=x`),
  * so anything that REBUILDS an invocation from the raw argv — the run
- * summary's copy-pasteable retry line, the company runner's per-brand child
- * args — has to drop that verb first, or it doubles into `omega manage manage`.
+ * summary's copy-pasteable retry line, has to drop that verb first, or it
+ * doubles into `omega manage manage`.
  */
 
 /**

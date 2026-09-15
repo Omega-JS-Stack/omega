@@ -14,6 +14,11 @@ const { test } = require('node:test');
 const { loadConfig, toSiteGlobal } = require('@omega.js/config');
 
 const { purgeCss } = require('../src/assets.js');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { buildSite } = require('../src/build.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -87,13 +92,14 @@ test('#250 wiring: a brand omega.json5 safelist survives the resolved-config pat
     theme: { id: 'classy' },
     // .carousel-inner is genuinely unused by the bare fixture — it purges
     // without this section, so its survival can ONLY come from the config.
-    targets: { web: { purgecss: { safelist: { standard: ['carousel-inner'] } } } },
+    targets: { web: { type: 'web', purgecss: { safelist: { standard: ['carousel-inner'] } } } },
   }, null, 2));
 
   const { config, errors } = loadConfig(brandRoot, 'web');
   assert.deepStrictEqual(errors, [], 'the fixture config validates clean');
 
   const outDir = path.join(PKG, '.omega', 'purge-config-path');
+  setEnvironment('development');
   try {
     const { manifest } = await buildSite({
       consumerDir: path.join(__dirname, 'fixtures', 'bare-site'),

@@ -11,7 +11,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const { ensureTarget, PROJECT_SCRIPTS } = require('../src/commands/lib/ensure-target.js');
-const { deployPrecheck } = require('../src/commands/lib/deploy-precheck.js');
+const { deployPrecheck, STEPS } = require('../src/commands/lib/deploy-precheck.js');
 const Main = require('../src/cli.js');
 
 const quiet = { log() {}, warn() {}, error() {} };
@@ -35,6 +35,9 @@ test('ensureTarget: writes on a fresh target, no-op on the rerun', () => {
     'the omega verb scripts are synced',
   );
   assert.ok(!('setup' in manifest.scripts), 'no `setup` script — the verbs run ensureTarget themselves');
+  // Every OMEGA target states its license (#884): npm's own word for
+  // closed-source commercial code, seeded only when the manifest states none
+  assert.strictEqual(manifest.license, 'UNLICENSED');
 
   // The rerun adds nothing and syncs nothing. (One caveat, pre-existing and
   // named in `merged`: the omega.json5 seed is written verbatim on the fresh
@@ -79,6 +82,14 @@ test('deploy precheck: --no-secrets skips every step, bare deploy runs them in o
   const result = await deployPrecheck({ projectDir: '/tmp/x', options: {}, logger: quiet, steps });
   assert.deepStrictEqual(ran, ['push-secrets'], 'the precheck runs by default');
   assert.deepStrictEqual(result.ran, ran);
+});
+
+// FATAL on all four frameworks (#891): the runner builds with what this step
+// sends, so a refused or half publish stops the deploy instead of dispatching
+// a run that cannot succeed.
+test('deploy precheck: the secrets step is FATAL (#891)', () => {
+  assert.deepStrictEqual(STEPS.map((step) => step.name), ['push-secrets']);
+  assert.strictEqual(STEPS[0].fatal, true);
 });
 
 test('cli: no `setup` command, and a bare invocation resolves to help', () => {

@@ -19,6 +19,7 @@ const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { parseTestScope, isPathTargeted, noMatchMessage, noMatchExitCode, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { consumerPaths } = require('../consumer.js');
 const { checkDistLinks, loadExceptions, loadLinkExceptions, EXCEPTIONS_FILE } = require('../link-resolver.js');
@@ -27,6 +28,12 @@ const { auditDist } = require('../dist-audit.js');
 const logger = new Logger('test');
 
 module.exports = async function (options) {
+  // The verb names the environment for the whole process
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and hands it
+  // to every child it spawns. The production build below is a child of its own
+  // and names production for itself.
+  setEnvironment('testing');
+
   const paths = consumerPaths();
 
   // Tee the whole run to <targetRoot>/logs/test.log (#197) — the file to grep

@@ -129,13 +129,31 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'cli-run disables yargs built-in --help/--version (router owns both)',
+      name: 'cli-run declares its value-less flags and claims neither --help nor --version (router owns both)',
       run: (ctx) => {
-        // The built-ins printed an empty stub and version "0.0.0" instead of
-        // reaching the alias table / the router's generated help (wave-6 D1).
-        const source = require('fs').readFileSync(path.join(__dirname, '..', '..', '..', 'cli-run.js'), 'utf8');
-        ctx.expect(source.includes('.version(false)')).toBeTruthy();
-        ctx.expect(source.includes('.help(false)')).toBeTruthy();
+        // The parse the bin really performs (#920). The built-ins it replaced
+        // printed an empty stub and version "0.0.0" instead of reaching the
+        // alias table / the router's generated help (wave-6 D1).
+        const { BOOLEAN_FLAGS } = require(path.join(__dirname, '..', '..', '..', 'cli-run.js'));
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
+
+        // A value-less flag never swallows the next positional.
+        const scoped = parse(['test', '--extended', 'mgr:build/cli']);
+        ctx.expect(scoped.extended).toBe(true);
+        ctx.expect(scoped._.join(' ')).toBe('test mgr:build/cli');
+
+        // A value flag keeps its value in the space-separated form too.
+        ctx.expect(parse(['test', '--filter', 'auth']).filter).toBe('auth');
+
+        // Every value-LESS flag is declared, so none of them can eat the token
+        // after it: `omega update --apply out` keeps the alias positional.
+        const applied = parse(['update', '--apply', 'out']);
+        ctx.expect(applied.apply).toBe(true);
+        ctx.expect(applied._.join(' ')).toBe('update out');
+
+        // And --help reaches the router rather than a built-in.
+        ctx.expect(parse(['deploy', '--help']).help).toBe(true);
       },
     },
     {

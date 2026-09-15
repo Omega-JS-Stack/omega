@@ -1,52 +1,57 @@
 /**
- * Repo service — ensures the brand's GitHub presence matches config:
- * org profile, the brand-monorepo repo, and GitHub Pages. The monorepo
- * cousin of omega-manager's github service (which managed one repo per
- * target); here a brand is ONE repo.
+ * Repo service: every repo the brand owns on GitHub, in the two ROLES a brand
+ * has ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
  *
- * Config (brand omega.json5 `repo.providers.github`):
- *   org      — repo owner (GitHub org or user). No default; unset = service skips.
- *   shared   — org shared with other brands → org-level reconciliation skipped.
- *   repo     — optional "owner/name" slug or bare name; name defaults to the
- *              brand id, owner to repo.providers.github.org (@omega.js/config brandRepoName/
- *              brandRepoOwner — shared with deploy --direct).
- *   private  — repo visibility (manager default: true).
- *   location — org profile location; only reconciled when set.
+ *   source  `<brand.id>-omega`   the monorepo the brand is written in
+ *   website `<brand.id>-<name>`  one per GitHub-hosted web target, built site only
+ *
+ * Config is ONE block, `repo: { provider: 'github', org }`, and its PRESENCE
+ * is the switch (the same rule targets follow): no block, no repo service.
+ * Nothing else is declared, because nothing else can be: every repo name
+ * derives from `<brand.id>-<role>` and visibility is the brand root's
+ * package.json `private` field.
+ *
+ * The org profile reconcile is gone with the `shared` switch that guarded it:
+ * one org hosts as many brands as it likes, so no brand rewrites an org's
+ * name, email or description (2026-09-11).
  */
 const chalk = require('chalk').default;
-const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
+const { repoBlock, sourceRepo, brandVisibility } = require('@omega.js/config');
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { GitHubAPI } = require('./lib/github-api.js');
-
-// Operations that touch org-level settings — skipped when the org is shared
-// with other brands (one brand must not rewrite a shared org's profile)
-const SHARED_SKIP_OPERATIONS = new Set(['org']);
+const { createGitHub } = require('./lib/github.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: (context) => {
-    const github = context.brandConfig.repo?.providers?.github || {};
+    const block = repoBlock(context.brandConfig);
 
-    if (github.enabled === false) {
-      return { skip: true, reason: 'github.enabled = false' };
+    if (!block) {
+      return { skip: true, reason: 'no repo.org configured (set repo: { org } in config/omega.json5)' };
     }
 
-    if (!github.org) {
-      return { skip: true, reason: 'no repo.providers.github.org configured (set repo.providers.github.org in config/omega.json5)' };
+    // A brand that declares an org but no `brand.id` has half an address, and
+    // half an address addresses nothing: every repo name derives from the id.
+    const source = sourceRepo(context.brandConfig);
+    if (!source) {
+      throw new Error(`repo.org is ${block.org} but the config names no brand.id: every repo derives from <brand.id>-<role>, so there is no repo to ensure`);
     }
 
-    const repoName = brandRepoName(context.brandConfig);
-    const repoOwner = brandRepoOwner(context.brandConfig);
-    console.log(`    Repo: ${chalk.cyan(`${repoOwner}/${repoName}`)}${github.shared === true ? chalk.dim(' (shared org)') : ''}`);
+    const visibility = brandVisibility(context.brandRoot);
+    console.log(`    Repo: ${chalk.cyan(source.slug)} ${chalk.dim(`(${visibility})`)}`);
 
     // Tests inject a fake client via context.githubApi; the real one verifies
     // gh is installed + authenticated at construction
-    const result = { githubApi: context.githubApi || new GitHubAPI() };
+    const github = context.githubApi || createGitHub();
 
-    if (github.shared === true) {
-      result.operations = context.operations.filter((op) => !SHARED_SKIP_OPERATIONS.has(op.name));
-    }
+    // ONE plan read per walk (#883): the plan is the ORG's, not a target's, so
+    // a brand with three web targets still asks GitHub once. Lazy, so a brand
+    // with no website role never asks at all.
+    let plan = null;
+    const orgPlan = () => {
+      if (plan === null) plan = github.ownerPlan(block.org);
+      return plan;
+    };
 
-    return result;
+    return { githubApi: github, repoOrg: block, sourceRepoInfo: source, brandVisibility: visibility, orgPlan };
   },
 });

@@ -18,14 +18,14 @@
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
+const { hasTargetOfType } = require('@omega.js/config');
+const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { createBackendClient } = require('./lib/backend-client.js');
 const { createPasswordResolver } = require('./lib/resolve-password.js');
-
-const SERVICE_ACCOUNT_PATH = join('.omega', 'secrets', 'service-account.json');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -36,8 +36,7 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'account.enabled = false' };
     }
 
-    const targets = context.brandConfig.targets || {};
-    if (!targets.backend) {
+    if (!hasTargetOfType(context.brandConfig, 'backend')) {
       return { skip: true, reason: 'no backend target' };
     }
 
@@ -71,11 +70,11 @@ module.exports.run = createServiceRunner({
     let firestore = context.firestore;
     let accountBackend = context.accountBackend;
     if (!authAdmin) {
-      if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_PATH))) {
-        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the cloud service first)` };
+      if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_REL))) {
+        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_REL} (run the cloud service first)` };
       }
 
-      const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_PATH, context.brandRoot);
+      const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_REL, context.brandRoot);
       authAdmin = createAuthAdmin(serviceAccount);
       firestore = new FirestoreREST(serviceAccount);
       accountBackend = createBackendClient({ authAdmin, apiKey, apiBaseUrl });

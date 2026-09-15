@@ -32,7 +32,7 @@ The bundler's `__theme__` alias resolves to the package's `dist/assets/themes/<i
 ```jsonc
 {
   targets: {
-    extension: { theme: { id: 'classy' } },
+    extension: { type: 'extension', theme: { id: 'classy' } },
   },
 }
 ```
@@ -62,15 +62,27 @@ dist/assets/themes/<theme-id>/   (vendored — the SSOT is @omega.js/web/themes/
 In a consumer's `src/assets/css/main.scss`:
 
 ```scss
+// Generated from `brand.color` in config/omega.json5 by the sass task
+@use 'brand';
+
 // Override before @use to take effect
 @use 'omega-extension' as * with (
-  $primary: #2563EB,
+  $primary: brand.$primary,
   $secondary: #FFA500,
 );
 @use 'theme' as *;
+
+// The runtime --omega-accent ramp, after the framework import
+@include brand.ramp;
 ```
 
 `!default` flags on theme variables let `with (...)` overrides win.
+
+`$primary` is `brand.color`, not a literal: recoloring the extension is a config
+edit, and the same partial carries the runtime `--omega-accent` ramp. Want an
+accent that DIVERGES from the brand? Put the literal back in its place:
+`$primary: #2563EB,` ([#912](https://github.com/Omega-JS-Stack/omega/issues/912),
+[shared/theming.md](shared/theming.md)).
 
 ## `{{ theme.appearance }}`
 

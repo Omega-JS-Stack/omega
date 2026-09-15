@@ -1,0 +1,21 @@
+{
+  "name": "playground-website",
+  "version": "0.0.3",
+  "private": true,
+  "description": "OMEGA web app",
+  "dependencies": {
+    "@omega.js/web": "file:../../../../packages/web",
+    "@anthropic-ai/claude-agent-sdk": ">=0.2"
+  },
+  "scripts": {
+    "start": "omega dev",
+    "build": "omega build",
+    "test": "omega test",
+    "clean": "omega clean",
+    "deploy": "omega deploy"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "UNLICENSED"
+}

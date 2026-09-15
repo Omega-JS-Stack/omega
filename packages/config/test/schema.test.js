@@ -26,7 +26,7 @@ test('advertising schema: role-keyed providers with the inhouse source (ads spec
 
   assert.ok(paths.includes('advertising.providers.adsense.client'));
   assert.ok(paths.includes('advertising.providers.inhouse.source'));
-  assert.ok(paths.includes('company.url'));
+  assert.ok(paths.includes('company.id'), 'the in-house company source derives its api from the RESOLVED company.url, whose one typed input is company.id (#677)');
   for (const slot of ['displaySlot', 'inArticleSlot', 'inFeedSlot', 'multiplexSlot']) {
     assert.ok(paths.includes(`advertising.providers.adsense.${slot}`), `missing ${slot}`);
   }
@@ -110,6 +110,36 @@ test('payment: coinbase is an explicit enabled switch, default OFF (#642)', () =
   );
 });
 
+// #850: the price currency had two homes (targets.web.currency for the pricing
+// page, a bare 'USD' fallback in the backend's order history) and one of them was
+// undeclared. It is a payment fact: every reader now names payment.currency, and
+// the default states the answer they each carried.
+test('payment: the price currency is declared, ISO 4217, default USD (#850)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const { validateConfig } = require('../src/validate.js');
+  const { schemaDefaults } = require('../src/defaults.js');
+
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'payment.currency');
+
+  assert.ok(rule, 'missing payment.currency');
+  assert.equal(rule.type, 'string');
+  assert.equal(rule.required, false);
+  assert.equal(rule.default, 'USD', "the backend's order history read 'USD' when nothing said otherwise");
+  assert.ok(rule.description, 'payment.currency documents what it drives');
+
+  // The default resolves for every reader, so nothing carries a fallback of its own.
+  assert.equal(schemaDefaults().payment.currency, 'USD');
+
+  // A brand naming its own currency validates clean; a non-string bounces.
+  const base = { brand: { id: 'mini', name: 'MiniCo' } };
+  assert.deepStrictEqual(validateConfig({ ...base, payment: { currency: 'EUR' } }).errors, []);
+  assert.ok(
+    validateConfig({ ...base, payment: { currency: 840 } }).errors
+      .some((e) => e.includes('config.payment.currency has wrong type')),
+    'a currency is the ISO code, never the numeric one',
+  );
+});
+
 test('monitoring declares every knob the monitoring package resolves (#380)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const paths = SHARED_SCHEMA.map((entry) => entry.path);
@@ -137,7 +167,7 @@ test('the de-branded role sections are declared (#23)', () => {
     'edge.providers.cloudflare.zone',
     'captcha.providers.recaptcha.siteKey',
     'search.providers.searchConsole.submitSitemap',
-    'repo.providers.github.org',
+    'repo.org',
     // the gcp/firebase fold — one cloud home, projectId only under cloud.config
     'cloud.organizationId',
     'cloud.billingAccount',
@@ -273,12 +303,14 @@ test('socials is declared — the block @omega.js/web generates shortlink pages 
   assert.equal(validateConfig({ ...base, socials: ['twitter'] }).errors.length, 1, 'a list is not a socials block');
 });
 
-// #546 — three service switches the manager READS and the schema never
-// declared: an undeclared key validates clean, so `enbaled: false` reads as ON
-// forever and the validator cannot say what the real key does. All three are
+// #546: the service switches the manager READS and the schema never declared:
+// an undeclared key validates clean, so `enbaled: false` reads as ON forever
+// and the validator cannot say what the real key does. Both are
 // case 2 of the gating doctrine (docs/shared/config.md): a zero-data feature
 // the framework runs for every brand, switched by `enabled`, default ON, read
-// `!== false` at the service.
+// `!== false` at the service. The repo service left the list in #883: its
+// switch is the PRESENCE of the `repo` block, so there is no `enabled` key to
+// declare or to default.
 test('the service enabled switches the manager reads are declared, default ON (#546)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const { validateConfig } = require('../src/validate.js');
@@ -286,7 +318,6 @@ test('the service enabled switches the manager reads are declared, default ON (#
   const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
 
   const expected = [
-    'repo.providers.github.enabled',
     'search.providers.searchConsole.enabled',
     'edge.providers.cloudflare.enabled',
   ];
@@ -300,7 +331,6 @@ test('the service enabled switches the manager reads are declared, default ON (#
 
   // The default is materialized, so a brand's own config carries the answer.
   const defaults = schemaDefaults('web');
-  assert.equal(defaults.repo.providers.github.enabled, true);
   assert.equal(defaults.search.providers.searchConsole.enabled, true);
   assert.equal(defaults.edge.providers.cloudflare.enabled, true);
 
@@ -308,7 +338,6 @@ test('the service enabled switches the manager reads are declared, default ON (#
   assert.deepEqual(
     validateConfig({
       ...base,
-      repo: { providers: { github: { enabled: false } } },
       search: { providers: { searchConsole: { enabled: false } } },
       edge: { providers: { cloudflare: { enabled: false } } },
     }).errors,
@@ -316,8 +345,8 @@ test('the service enabled switches the manager reads are declared, default ON (#
     'the OFF state every one of them honors is expressible',
   );
   assert.ok(
-    validateConfig({ ...base, repo: { providers: { github: { enabled: 'no' } } } }).errors
-      .some((e) => e.includes('config.repo.providers.github.enabled has wrong type')),
+    validateConfig({ ...base, search: { providers: { searchConsole: { enabled: 'no' } } } }).errors
+      .some((e) => e.includes('config.search.providers.searchConsole.enabled has wrong type')),
     'a truthy string would read as ON — the switch is a boolean',
   );
 });
@@ -487,6 +516,93 @@ test('the client keys a brand authors are declared (#650)', () => {
 });
 
 // ─── backendProjectType (#584) ───
+
+// #883: the repo block is TWO keys, and the schema is where a second provider
+// lands. `github` (the old identity block), `repo.providers.github.*` and the
+// desktop releases owner/repo are gone from the schema entirely: each is a
+// retired row instead, so a brand still carrying one hears about it.
+test('the repo block is provider + org, and nothing else is declared (#883)', () => {
+  const { SHARED_SCHEMA, REPO_PROVIDERS } = require('../src/schema.js');
+  const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
+  const repoPaths = [...rules.keys()].filter((path) => path === 'repo' || path.startsWith('repo.'));
+
+  assert.deepStrictEqual(repoPaths, ['repo', 'repo.provider', 'repo.org']);
+  assert.deepStrictEqual(rules.get('repo.provider').enum, REPO_PROVIDERS);
+  assert.equal(rules.get('repo.provider').type, 'string');
+  assert.equal(rules.get('repo.org').type, 'string');
+
+  // The presence-gate exclusion (docs/shared/config.md, Defaults &
+  // self-healing): the BLOCK's presence is the switch, so a defaulted provider
+  // would say a brand hosts its source somewhere when it declared nothing.
+  assert.ok(!Object.prototype.hasOwnProperty.call(rules.get('repo.provider'), 'default'));
+
+  assert.ok(!rules.has('github'), 'the separate GitHub identity block is retired, not declared');
+});
+
+test('hosting is declared on the WEB target only (#883)', () => {
+  const { TARGET_SCHEMAS, HOSTING_PROVIDERS } = require('../src/schema.js');
+  const web = new Map(TARGET_SCHEMAS.web.map((entry) => [entry.path, entry]));
+
+  assert.ok(web.has('hosting'));
+  assert.deepStrictEqual(web.get('hosting.provider').enum, HOSTING_PROVIDERS);
+
+  for (const [type, rules] of Object.entries(TARGET_SCHEMAS)) {
+    if (type === 'web') continue;
+    assert.ok(
+      !rules.some((rule) => rule.path === 'hosting' || rule.path.startsWith('hosting.')),
+      `${type} declares no hosting key: only a web target has a built site to serve`,
+    );
+  }
+});
+
+test('the desktop releases block is a presence switch, with no repo to name (#883)', () => {
+  const { TARGET_SCHEMAS } = require('../src/schema.js');
+  const paths = TARGET_SCHEMAS.desktop.map((rule) => rule.path);
+
+  assert.ok(paths.includes('releases'));
+  assert.ok(paths.includes('releases.enabled'));
+  assert.ok(!paths.includes('releases.owner'), 'the releases repo derives: `<brand.id>-releases` under repo.org');
+  assert.ok(!paths.includes('releases.repo'), 'the releases repo derives: `<brand.id>-releases` under repo.org');
+});
+
+// #911: the schema was behind the desktop runtime. Every key the annotated
+// default carries (plus omega.authPersistence, which the client bridge reads)
+// owes a rule, so a typo in one of them is loud again instead of passing as a
+// feature nobody declared.
+test('the desktop target declares every key its runtime reads (#911)', () => {
+  const { TARGET_SCHEMAS, SHARED_SCHEMA } = require('../src/schema.js');
+  const paths = new Set(TARGET_SCHEMAS.desktop.map((rule) => rule.path));
+
+  for (const key of [
+    'omega.authPersistence',
+    'app.appId',
+    'app.productName',
+    'app.copyright',
+    'app.languages',
+    'app.darkModeSupport',
+    'startup.openAtLogin.enabled',
+    'startup.openAtLogin.mode',
+    'autoUpdate.enabled',
+    'autoUpdate.autoDownload',
+    'autoUpdate.startupDelayMs',
+    'autoUpdate.feedCheckIntervalMs',
+    'autoUpdate.idleEvalIntervalMs',
+    'autoUpdate.maxAgeMs',
+    'remoteConfig.enabled',
+    'remoteConfig.url',
+  ]) {
+    assert.ok(paths.has(key), `targets.desktop.${key} owes a schema rule`);
+  }
+
+  // `type` is EVERY target entry's key (#886), so its one home is the shared
+  // schema: declaring it per target would be four copies of one contract.
+  assert.ok(SHARED_SCHEMA.some((rule) => rule.path === 'type'), 'every target entry declares its type');
+
+  // No beta/update channels exist (Ian 2026-09-02) and nothing in the desktop
+  // runtime reads one: `autoUpdate.channel` stays undeclared, and the
+  // annotated default no longer offers it.
+  assert.ok(!paths.has('autoUpdate.channel'), 'there are no update channels to declare');
+});
 
 test('backendProjectType reads the backend target entry, firebase unless it says custom', () => {
   assert.deepStrictEqual(BACKEND_PROJECT_TYPES, ['firebase', 'custom']);

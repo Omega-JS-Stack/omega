@@ -42,7 +42,7 @@ function build({ data, theme: themeIn, templateName }) {
         ${_helpText(brand)}
         ${signoff(data, theme)}
     `)}
-    ${footer(brand, email)}
+    ${footer(brand, email, data?.company)}
   `);
 }
 

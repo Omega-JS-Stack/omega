@@ -70,49 +70,49 @@ test('workflows op is registered in the workspace OPERATIONS', () => {
 });
 
 test('workflows: a target dropped from the config loses its composed files, the dir survives', async () => {
-  const root = stageBrand(['website', 'extension']);
-  assert.deepEqual(composed(root), ['extension-build.yml', 'website-build.yml']);
+  const root = stageBrand(['web', 'extension']);
+  assert.deepEqual(composed(root), ['extension-build.yml', 'web-build.yml']);
 
   // `targets.extension` is gone from omega.json5; targets/extension/ is still
   // on disk (whole-dir removal is deliberately not ours) so discovery finds it
   const discovered = [
-    { name: 'website', target: 'web' },
+    { name: 'web', target: 'web' },
     { name: 'extension', target: 'extension' },
   ];
 
   const result = await workflowsOp(context(root, discovered, ['web']));
 
   assert.equal(result.output.workflows.removed, 1);
-  assert.deepEqual(composed(root), ['website-build.yml']);
+  assert.deepEqual(composed(root), ['web-build.yml']);
   assert.equal(fs.existsSync(path.join(root, 'targets', 'extension')), true);
 });
 
 test('workflows: every enabled target keeps its files, and the rerun removes nothing', async () => {
-  const root = stageBrand(['website', 'extension']);
+  const root = stageBrand(['web', 'extension']);
   const discovered = [
-    { name: 'website', target: 'web' },
+    { name: 'web', target: 'web' },
     { name: 'extension', target: 'extension' },
   ];
 
   assert.equal(await workflowsOp(context(root, discovered, ['web', 'extension'])), null);
-  assert.deepEqual(composed(root), ['extension-build.yml', 'website-build.yml']);
+  assert.deepEqual(composed(root), ['extension-build.yml', 'web-build.yml']);
 
   // Set → unset → rerun: one removal, then a converged no-op
   const dropped = await workflowsOp(context(root, discovered, ['web']));
   assert.equal(dropped.output.workflows.removed, 1);
   assert.equal(await workflowsOp(context(root, discovered, ['web'])), null);
-  assert.deepEqual(composed(root), ['website-build.yml']);
+  assert.deepEqual(composed(root), ['web-build.yml']);
 });
 
 test('workflows: a declared custom target is live — it has no framework to compose with', async () => {
-  const root = stageBrand(['website']);
+  const root = stageBrand(['web']);
   const discovered = [
-    { name: 'website', target: 'web' },
+    { name: 'web', target: 'web' },
     { name: 'render-api', target: null, custom: true },
   ];
 
   assert.equal(await workflowsOp(context(root, discovered, ['web', 'render-api'])), null);
-  assert.deepEqual(composed(root), ['website-build.yml']);
+  assert.deepEqual(composed(root), ['web-build.yml']);
 });
 
 test('workflows: a dry run names the files and deletes nothing', async () => {

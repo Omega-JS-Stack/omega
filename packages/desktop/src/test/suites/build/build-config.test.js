@@ -86,6 +86,34 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'baseConfig: the DMG is signed with the Developer ID identity (#891)',
+      run: (ctx) => {
+        const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const out = baseConfig({ app: { productName: 'Deployment Playground' } });
+
+        // Gatekeeper assesses a downloaded image by its OWN signature
+        // (`--context context:primary-signature`), and electron-builder leaves
+        // the image unsigned unless told: run 34735658588 notarized and stapled
+        // the DMG, then spctl refused it for the missing signature.
+        ctx.expect(out.dmg.sign).toBe(true);
+      },
+    },
+    {
+      name: 'notarizeHooks: the DMG is proved per artifact, BEFORE its upload (#891)',
+      run: (ctx) => {
+        const { notarizeHooks } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
+        const hooks = notarizeHooks();
+
+        // electron-builder awaits `artifactBuildCompleted` before it emits the
+        // `artifactCreated` the publisher uploads on; `afterAllArtifactBuild`
+        // runs after every upload is queued. Run 34738410986 published a signed
+        // and notarized DMG with no staple because the proof ran there.
+        ctx.expect(hooks.afterSign).toContain(path.join('hooks', 'notarize.js'));
+        ctx.expect(hooks.artifactBuildCompleted).toContain(path.join('hooks', 'notarize-artifacts.js'));
+        ctx.expect(hooks.afterAllArtifactBuild).toBeUndefined();
+      },
+    },
+    {
       name: 'baseConfig: artifact names carry NO version, from @omega.js/config\'s ONE rule (#620)',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
@@ -97,19 +125,22 @@ module.exports = defineCases({
         // github.com/<org>/<repo>/releases/latest/download/<asset> a stable
         // direct-download URL — the site derives its buttons from THESE names,
         // so a second spelling here is a dead download button.
-        ctx.expect(out.mac.artifactName).toBe('Deployment-Playground-mac-universal.${ext}');
-        ctx.expect(out.nsis.artifactName).toBe('Deployment-Playground-windows-universal.${ext}');
-        ctx.expect(out.deb.artifactName).toBe(names.linux.debian);
+        // The segment is the FORMAT (#867), the same word the site's
+        // /download/<platform>/<format> link carries.
+        ctx.expect(out.dmg.artifactName).toBe(names.mac.dmg);
+        ctx.expect(out.nsis.artifactName).toBe(names.windows.nsis);
+        ctx.expect(out.deb.artifactName).toBe(names.linux.deb);
         ctx.expect(out.appImage.artifactName).toBe(names.linux.appimage);
+        ctx.expect(out.dmg.artifactName).toBe('Deployment-Playground-mac-dmg.dmg');
+        ctx.expect(out.nsis.artifactName).toBe('Deployment-Playground-windows-nsis.exe');
 
-        // The mac fallback covers the dmg AND the auto-update zip, so the dmg
-        // needs no override of its own.
-        ctx.expect(out.mac.artifactName.replace('${ext}', 'dmg')).toBe(names.mac.universal);
-        ctx.expect(out.nsis.artifactName.replace('${ext}', 'exe')).toBe(names.windows.universal);
-        ctx.expect(out.dmg.artifactName).toBe(undefined);
+        // The mac FALLBACK is the auto-update zip's, the one mac artifact that
+        // is not a declared format: nobody links it, the feed names it.
+        ctx.expect(out.mac.artifactName).toBe('Deployment-Playground-mac.${ext}');
+        ctx.expect(out.mac.artifactName.replace('${ext}', 'zip')).toBe('Deployment-Playground-mac.zip');
 
         // Nothing keeps a ${version} token — every name is stable across releases.
-        for (const template of [out.mac.artifactName, out.nsis.artifactName, out.deb.artifactName, out.appImage.artifactName, out.linux.artifactName]) {
+        for (const template of [out.mac.artifactName, out.dmg.artifactName, out.nsis.artifactName, out.deb.artifactName, out.appImage.artifactName, out.linux.artifactName]) {
           ctx.expect(template.includes('${version}')).toBe(false);
         }
       },
@@ -174,7 +205,7 @@ module.exports = defineCases({
 
         // NSIS merges every arch into ONE installer, so windows is genuinely
         // safe — its multi-arch default is never refused.
-        ctx.expect(baseConfig({ platforms: { win: { arch: ['x64', 'ia32', 'arm64'] } } }, build).win.target[0].arch)
+        ctx.expect(baseConfig({ platforms: { windows: { arch: ['x64', 'ia32', 'arm64'] } } }, build).win.target[0].arch)
           .toEqual(['x64', 'ia32', 'arm64']);
 
         // One linux arch names one deb: an arm64-only brand ships fine.
@@ -295,28 +326,28 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'baseConfig: platforms.win.oneClick: false produces wizard installer',
+      name: 'baseConfig: platforms.windows.oneClick: false produces wizard installer',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
-        const out = baseConfig({ platforms: { win: { oneClick: false } } });
+        const out = baseConfig({ platforms: { windows: { oneClick: false } } });
         ctx.expect(out.nsis.oneClick).toBe(false);
         ctx.expect(out.nsis.allowToChangeInstallationDirectory).toBe(true);
       },
     },
     {
-      name: 'baseConfig: snap missing from config — no snap target (default OFF)',
+      name: 'baseConfig: a config that declares no platforms ships every format, snap included (#867)',
       run: (ctx) => {
-        // Behavior contract: callers who never set platforms.linux.snap.enabled should
-        // never get a snap target emitted. The scaffold ships `enabled: true` so new
-        // projects opt in by virtue of the scaffold; this case is for older projects
-        // or programmatic callers that don't supply the field.
+        // Presence is the switch and every format defaults ON, so a caller that
+        // declares nothing gets the framework's whole shipping set. The snap's
+        // second gate is its credentials, which is what keeps a brand that has
+        // not run the Snap ask yet from failing CI.
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
-        process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';   // creds present, but config doesn't enable
+        process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';
         try {
           const out = baseConfig({});
-          ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeUndefined();
-          ctx.expect(out.snap).toBeUndefined();
+          ctx.expect(out.linux.target.map((t) => t.target)).toEqual(['deb', 'AppImage', 'snap']);
+          ctx.expect(out.snap).toBeDefined();
         } finally {
           if (saved === undefined) delete process.env.SNAPCRAFT_STORE_CREDENTIALS;
           else process.env.SNAPCRAFT_STORE_CREDENTIALS = saved;
@@ -324,13 +355,13 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'baseConfig: snap enabled in config but no creds — auto-skipped',
+      name: 'baseConfig: snap declared but no creds, auto-skipped',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         delete process.env.SNAPCRAFT_STORE_CREDENTIALS;
         try {
-          const out = baseConfig({ platforms: { linux: { snap: { enabled: true } } } });
+          const out = baseConfig({ platforms: { linux: { formats: { snap: {} } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeUndefined();
           ctx.expect(out.snap).toBeUndefined();
         } finally {
@@ -339,13 +370,13 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'baseConfig: snap explicitly disabled — no snap target regardless of creds',
+      name: 'baseConfig: snap dropped with `false`, no snap target regardless of creds',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';
         try {
-          const out = baseConfig({ platforms: { linux: { snap: { enabled: false } } } });
+          const out = baseConfig({ platforms: { linux: { formats: { snap: false } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeUndefined();
           ctx.expect(out.snap).toBeUndefined();
         } finally {
@@ -355,18 +386,18 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'baseConfig: snap enabled + creds present emits snap target + snap publish block',
+      name: 'baseConfig: snap declared + creds present emits snap target + snap publish block',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';
         try {
-          const out = baseConfig({ platforms: { linux: { snap: { enabled: true } } } });
+          const out = baseConfig({ platforms: { linux: { formats: { snap: { channels: ['edge'] } } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeDefined();
           ctx.expect(out.snap).toBeDefined();
           ctx.expect(out.snap.confinement).toBe('strict');
           ctx.expect(out.snap.publish.provider).toBe('snapStore');
-          ctx.expect(out.snap.publish.channels).toEqual(['stable']);
+          ctx.expect(out.snap.publish.channels).toEqual(['edge'], 'the format\'s own settings ride inside it');
         } finally {
           if (saved === undefined) delete process.env.SNAPCRAFT_STORE_CREDENTIALS;
           else process.env.SNAPCRAFT_STORE_CREDENTIALS = saved;
@@ -379,9 +410,9 @@ module.exports = defineCases({
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const out = baseConfig({
           platforms: {
-            mac:   { arch: ['arm64'] },
-            win:   { arch: ['x64'] },
-            linux: { arch: ['arm64'] },
+            mac:     { arch: ['arm64'] },
+            windows: { arch: ['x64'] },
+            linux:   { arch: ['arm64'] },
           },
         });
         ctx.expect(out.mac.target[0].arch).toEqual(['arm64']);
@@ -427,7 +458,7 @@ module.exports = defineCases({
         // framework monorepo, and a feed baked from it would 404 forever.
         ctx.expect(publishConfig({
           brand: { id: 'omega-playground' },
-          repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
+          repo: { provider: 'github', org: 'Omega-JS-Stack' },
           releases: {},
         })).toEqual({
           provider:    'github',
@@ -436,12 +467,19 @@ module.exports = defineCases({
           releaseType: 'release',
         });
 
-        // An explicit block still names its own repo.
+        // #883: `releases` is a presence switch and nothing more. The owner
+        // and repo overrides are retired, so the feed can only ever be the
+        // brand's one derived releases repo.
         ctx.expect(publishConfig({
           brand: { id: 'acme' },
-          repo: { providers: { github: { org: 'Acme-Org' } } },
-          releases: { owner: 'Acme-Binaries', repo: 'acme-bins' },
-        }).repo).toBe('acme-bins');
+          repo: { provider: 'github', org: 'Acme-Org' },
+          releases: {},
+        })).toEqual({
+          provider:    'github',
+          owner:       'Acme-Org',
+          repo:        'acme-releases',
+          releaseType: 'release',
+        });
       },
     },
     {
@@ -451,7 +489,7 @@ module.exports = defineCases({
 
         ctx.expect(publishConfig({
           brand: { id: 'acme' },
-          repo: { providers: { github: { org: 'Acme-Org' } } },
+          repo: { provider: 'github', org: 'Acme-Org' },
           releases: { enabled: false },
         })).toBe(null);
 

@@ -10,132 +10,67 @@
  * twice in one window writes two posts about the same commits — the cadence
  * is owned by whoever runs it.
  *
- * Works from a brand root (that brand publishes; company siblings via the
- * .omega/company.json stamp still feed the backlink map) or a company root
- * (--brand, or the single brand with devlog.enabled).
+ * Runs from a brand root: that brand publishes, and its own config is the
+ * SSOT for the repos the post links to.
  */
 
 const { join } = require('node:path');
 
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { loadEnvRoots, chosenProvider } = require('@omega.js/config');
+const { loadEnvRoots, chosenProvider, resolveCompany } = require('@omega.js/config');
 
 const { resolveBrandRoot, loadBrand } = require('../lib/brand.js');
-const {
-  isCompanyRoot, discoverBrands, readCompanyMarker,
-} = require('../lib/company.js');
-const { GitHubAPI } = require('../services/repo/lib/github-api.js');
+const { gh } = require('@omega.js/devkit/github-repo');
+const { verifyGhCli } = require('../services/repo/lib/github.js');
 const { collectCommits } = require('./lib/collect-commits.js');
 const { buildProjectMap, buildBrandRepos } = require('./lib/project-map.js');
 const { generatePost } = require('./lib/generate-post.js');
 const { publishToWebsite, renderPostFile } = require('./lib/publish-website.js');
 
 /**
- * Pick the brand that publishes: explicit --brand wins; otherwise exactly one
- * loaded brand must have devlog.enabled.
+ * Resolve the run context from any cwd: the publishing brand and the company
+ * tree under it, when the brand names one (#677): the company `.env` is a
+ * layer of this run's secrets like any other.
  *
- * @param {Array} brands - Loaded brands (lib/brand.js loadBrand shape)
+ * @param {string} startDir - Any directory inside a brand
  * @param {string} [explicitId] - Brand ID passed via --brand
- * @returns {object} The publishing brand
- */
-function pickBrand(brands, explicitId) {
-  if (explicitId) {
-    const brand = brands.find((b) => b.id === explicitId);
-    if (!brand) {
-      throw new Error(`Brand not found: ${explicitId} (known: ${brands.map((b) => b.id).join(', ')})`);
-    }
-    return brand;
-  }
-
-  const enabled = brands.filter((b) => b.config.devlog.enabled === true);
-
-  if (enabled.length === 0) {
-    throw new Error('No brand has devlog.enabled — set it in the brand\'s config/omega.json5 or pass --brand');
-  }
-  if (enabled.length > 1) {
-    throw new Error(`Multiple brands have devlog.enabled (${enabled.map((b) => b.id).join(', ')}) — pass --brand`);
-  }
-
-  return enabled[0];
-}
-
-/**
- * Resolve the run context from any cwd: the publishing brand, every sibling
- * brand (they feed the backlink map — the brand configs are the SSOT for
- * where repos live), and the company root when one is in play.
- *
- * @param {string} startDir - Any directory inside a brand or company workspace
- * @param {string} [explicitId] - Brand ID passed via --brand
- * @returns {{ brand: object, brands: Array, companyRoot: string|null }}
+ * @returns {{ brand: object, brands: Array, companyDir: string|null }}
  */
 function resolveContext(startDir, explicitId) {
   const root = resolveBrandRoot(startDir);
 
   if (!root) {
     throw new Error(
-      `No brand or company workspace found at or above ${startDir} — `
+      `No brand found at or above ${startDir}: `
       + 'expected a config/omega.json5 at the root (see docs/shared/config.md).',
     );
-  }
-
-  // Company root: every managed brand loads with the company layer (folded by
-  // @omega.js/config off each brand's own .omega/company.json stamp — #83); the
-  // publishing brand is picked from among them.
-  if (isCompanyRoot(root)) {
-    const brands = discoverBrands(root).brands.map((b) => loadBrand(b.root));
-
-    if (brands.length === 0) {
-      throw new Error(`No brands found under ${root} — nothing to devlog about`);
-    }
-
-    return { brand: pickBrand(brands, explicitId), brands, companyRoot: root };
-  }
-
-  // Brand root: this brand publishes. The company stamp (when present and
-  // fresh) surfaces the sibling brands for the project map and the company
-  // .env; the config layer itself rides the same stamp inside loadBrand.
-  const marker = readCompanyMarker(root);
-  let companyRoot = null;
-
-  if (marker?.stale) {
-    console.log(chalk.yellow(`⚠ .omega/company.json points at ${marker.companyRoot}, which is no longer a company workspace — running standalone`));
-  } else if (marker) {
-    companyRoot = marker.companyRoot;
   }
 
   const brand = loadBrand(root);
 
   if (explicitId && explicitId !== brand.id) {
-    throw new Error(`--brand=${explicitId} does not match this brand root (${brand.id}) — run from the company root to target siblings`);
+    throw new Error(`--brand=${explicitId} does not match this brand root (${brand.id})`);
   }
 
-  let brands = [brand];
-  if (companyRoot) {
-    const siblings = discoverBrands(companyRoot).brands
-      .filter((b) => b.id !== brand.id)
-      .map((b) => loadBrand(b.root));
-    brands = [brand, ...siblings];
-  }
-
-  return { brand, brands, companyRoot };
+  return { brand, brands: [brand], companyDir: resolveCompany(root).dir };
 }
 
 /**
  * Main devlog runner: collect commits → map projects → generate post →
  * publish (or preview on --dry-run).
  *
- * @param {string} startDir - Any directory inside the brand/company workspace
+ * @param {string} startDir - Any directory inside the brand
  * @param {object} [options] - { brand?, days?, dryRun? }
- * @param {object} [deps] - Test seams: { githubApi?, generatePost? } — prod
- *   callers pass nothing and get the real GitHubAPI + Ghostii pipeline
+ * @param {object} [deps] - Test seams: { githubApi?, generatePost? }; prod
+ *   callers pass nothing and get the real gh CLI + Ghostii pipeline
  * @returns {Promise<{ published: boolean, commits: number, previewPath?: string, posts?: Array }>}
  */
 async function runDevlog(startDir, options = {}, deps = {}) {
   console.log(chalk.bold.cyan('Omega Manager — Devlog'));
   console.log('');
 
-  const { brand, brands, companyRoot } = resolveContext(startDir, options.brand);
+  const { brand, brands, companyDir } = resolveContext(startDir, options.brand);
 
   if (!brand.config.devlog.enabled) {
     throw new Error(`Devlog is disabled for ${brand.id} — set devlog.enabled: true`);
@@ -158,7 +93,7 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   // layer overlaid by its own `.env.<environment>` file (#586). `production`
   // is PINNED, never the shell's answer: a devlog run reads REAL GitHub and
   // publishes with the brand's real writer account.
-  loadEnvRoots([brand.root, companyRoot], { environment: 'production' });
+  loadEnvRoots([brand.root, companyDir], { environment: 'production' });
 
   const days = Number(options.days || settings.lookbackDays);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -173,8 +108,14 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   const projectMap = buildProjectMap(brands, { excludeRepos: settings.excludeRepos });
   const brandRepos = buildBrandRepos(brands, { excludeRepos: settings.excludeRepos });
 
-  // 2. Collect commits from GitHub
-  const api = deps.githubApi || new GitHubAPI();
+  // 2. Collect commits from GitHub. The listings are plain `gh api` reads, so
+  //    they ride devkit's ONE gh wrapper (#883) behind the same verify the
+  //    walk does, which names a missing or unauthenticated CLI up front.
+  let api = deps.githubApi;
+  if (!api) {
+    verifyGhCli();
+    api = { runCommand: (args) => gh(args) };
+  }
   const { commits, repos } = collectCommits({
     api,
     orgs: settings.orgs,

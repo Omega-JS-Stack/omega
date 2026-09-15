@@ -55,13 +55,18 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
     },
     importScripts: (...urls) => {
       importedScripts.push(...urls);
-      // What the emitted /build.js does: assign the config transport.
+      // What the emitted /build.js does: assign the ONE snapshot every OMEGA
+      // browser surface loads (#743), wrapper and all.
       if (urls.some((url) => url.endsWith('build.js'))) {
         sw.OMEGA_BUILD_JSON = {
-          brand: 'test',
-          environment: 'test',
-          cacheBreaker: 1,
-          firebase: { projectId: 'test' },
+          config: {
+            brand: { id: 'test' },
+            environment: 'test',
+            buildTime: 1,
+            cloud: { config: { projectId: 'test' } },
+          },
+          package: { name: 'test', version: '1.0.0' },
+          mode: { environment: 'test', build: true, publish: false },
         };
       }
     },

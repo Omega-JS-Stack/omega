@@ -49,19 +49,17 @@ function stageBrand() {
   }));
   write(path.join(brand, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, backend: {} },
+  targets: { web: { type: 'web' }, backend: { type: 'backend' } },
 }
 `);
 
-  write(path.join(brand, 'targets', 'website', 'package.json'), JSON.stringify({
-    name: 'website', private: true, devDependencies: { '@omega.js/web': '*' },
+  write(path.join(brand, 'targets', 'web', 'package.json'), JSON.stringify({
+    name: 'web', private: true, devDependencies: { '@omega.js/web': '*' },
   }));
-  write(path.join(brand, 'targets', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
   write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
   }));
-  write(path.join(brand, 'targets', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
   for (const [pkg, short] of [['@omega.js/web', 'web'], ['@omega.js/backend', 'backend']]) {
     const pkgDir = path.join(brand, 'node_modules', pkg);
@@ -110,7 +108,7 @@ test('bare run fans out to every target, each spawned `update` in its own cwd', 
   }
   const byName = Object.fromEntries(calls.map((c) => [c.name, c]));
   assert.equal(byName.backend.cwd, path.join(brand, 'targets', 'backend'));
-  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'website'));
+  assert.equal(byName.web.cwd, path.join(brand, 'targets', 'web'));
   assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
@@ -121,7 +119,7 @@ test('flags forward verbatim (--apply, --major, --min-age); --target= is consume
   const calls = readCalls(brand);
   assert.equal(calls.length, 2);
   for (const call of calls) {
-    assert.deepEqual(call.argv, ['update', '--apply', '--major', '--min-age=14'], 'camelCase yargs twin never forwards twice');
+    assert.deepEqual(call.argv, ['update', '--apply', '--major', '--min-age=14'], 'the camelCase twin never forwards twice');
   }
 
   fs.rmSync(path.join(brand, 'calls.log'));

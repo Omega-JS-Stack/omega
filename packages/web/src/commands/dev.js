@@ -9,9 +9,9 @@
  *      hot-swaps, js reloads — no hand refresh).
  *
  * Port (N7): the website convention is 4000, resolved through the allocator —
- * taken ports bump +1. Multi-instance web brands offset deterministically:
- * each instance wants 4000 + its position in the instances array, so
- * targets/website and targets/website-admin dev side-by-side. `omega dev
+ * taken ports bump +1. A brand running several web targets offsets
+ * deterministically: each target wants 4000 + its position among the web
+ * targets, so targets/web and targets/admin dev side-by-side. `omega dev
  * --port=4001` (or a config `ports.website` entry) PINS the port instead:
  * busy = hard error, never a silent bump. The
  * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
@@ -37,8 +37,9 @@ const Logger = require('@omega.js/devkit/logger');
 const {
   CLASSIC_PORTS, isPortFree, resolvePorts, envPort,
   readSiblingPorts, writePortsFile, clearPortsFile,
-  findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
+  findBrandRoot, hasOmegaConfig, loadConfig, targetPortOffset,
 } = require('@omega.js/config');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { watchEnvChain } = require('@omega.js/devkit/env-watch');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
@@ -70,6 +71,11 @@ const REARM_POLL_MS = 200;
 module.exports = async function (options) {
   options = options || {};
 
+  // The verb names the environment for the whole process (#817): a dev loop is
+  // development, so the config overlay, the build meta and the emulator gates
+  // all answer the same word without asking the machine.
+  setEnvironment('development');
+
   // Tee the whole run to <targetRoot>/logs/dev.log — first statement of the verb
   // so a crash on the way up is already in the file (#197).
   attachLogFile(path.join(consumerPaths().root, 'logs', 'dev.log'));
@@ -84,10 +90,11 @@ module.exports = async function (options) {
 
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
-  // The target's own package version — read ONCE and handed to both consumers: the
-  // build manifest and the page chrome's Configuration block (the client's
+  // The target's own package.json: read ONCE and handed to both consumers: the
+  // build manifest and the page chrome's OMEGA_BUILD_JSON bake (the client's
   // release tag, #380).
-  const version = jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version;
+  const projectPackage = jetpack.read(path.join(paths.root, 'package.json'), 'json');
+  const version = projectPackage?.version;
   const clientEntry = resolveClientEntry();
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
 
@@ -173,8 +180,8 @@ module.exports = async function (options) {
   jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
   logger.log('Assets built (dev mode: stable names, no minify, sourcemaps)');
 
-  // ---- Service worker + build meta (/service-worker.js, /build.js,
-  // /build.json) — dev serves the REAL service worker so push/caching are
+  // ---- Service worker + build meta (/service-worker.js, /build.json;
+  // /build.js is the engine's): dev serves the REAL service worker so push/caching are
   // testable; registration takeover + cache eviction keep one localhost
   // port safe across different projects.
   const buildSw = async () => {
@@ -296,6 +303,7 @@ module.exports = async function (options) {
         assetManifest: manifest,
         environment: 'development',
         version,
+        packageName: projectPackage?.name,
         dev: devPorts,
       });
     },
@@ -814,47 +822,54 @@ function devAuthEmulator(authPort) {
 }
 
 /**
- * The `dev:` value of the Configuration chrome, as `core/_includes/core/foot.html`
- * renders it (`dev: {{ jekyll.dev | jsonify }},`) — one compact JSON line, or
- * `null` on a build that bakes no dev chrome. The lookahead is what makes the
- * non-greedy body stop at the object's OWN close brace rather than the nested
- * ports one. The coupling to that template is pinned by the served-page test,
- * which rewrites a REAL rendered page.
+ * The dev map the build snapshot carries, as @omega.js/devkit writes it into
+ * `build.js` (`self.OMEGA_BUILD_JSON.config.dev = {…};`, #743): its own
+ * statement on its own line, one compact JSON object or `null` on a build with
+ * no local stack. The coupling to that writer is pinned by the served-file
+ * test, which rewrites a REAL emitted build.js.
  */
-const DEV_CHROME = /(\n\s*dev: )(?:\{.*?\}|null)(?=,\n)/s;
+const DEV_CHROME = /(\n?self\.OMEGA_BUILD_JSON\.config\.dev = )(?:\{.*\}|null)(?=;)/s;
 
 /**
- * Serve-time dev-ports injection (#346): every HTML response leaves this server
- * carrying the map of the stack running RIGHT NOW, whatever its page baked.
+ * Serve-time dev-ports injection (#346): the snapshot this server hands out
+ * carries the map of the stack running RIGHT NOW, whatever the build baked.
  *
- * The render-time bake is a snapshot of the moment a page was built, and the
+ * The build-time write is a snapshot of the moment a site was built, and the
  * normal boot order builds every page before the backend publishes anything:
  * the website build finishes in under a second while the emulator suite seeds
- * for minutes, so the whole initial fleet bakes `{ website }` alone and nothing
- * re-renders it — no source file changed. Same hole for a mid-session emulator
- * restart onto bumped numbers. Rewriting the chrome as the page goes out covers
- * both by construction; the bake stays as it is on disk, advisory, and the
- * built output is byte-for-byte what the build wrote.
+ * for minutes, so the build bakes `{ website }` alone and nothing re-runs it,
+ * because no source file changed. Same hole for a mid-session emulator restart
+ * onto bumped numbers. Rewriting the one file as it goes out covers both by
+ * construction; the file on disk stays as the build wrote it.
  *
- * The rewrite wraps `res.end` rather than the response object: eleventy wrapped
- * `res` before the middleware chain ran (its live-reload injection), so ours is
- * the OUTER end — it rewrites the string the static handler hands over, and
- * eleventy's transform then runs on the rewritten html and sizes the body from
- * it. HTML only, and only a response whose body arrives as a string, which is
- * how eleventy serves a page. A response with no chrome (a redirect stub, an
- * error page) matches nothing and passes through untouched.
+ * ONE file instead of every HTML response (#743): every page and the service
+ * worker load the same `/build.js`, so the rewrite happens once per request for
+ * it rather than once per page, and a page served from any other path is
+ * untouched. The rewrite wraps `res.end` rather than the response object:
+ * eleventy wrapped `res` before the middleware chain ran (its live-reload
+ * injection), so ours is the OUTER end, rewriting what the static handler hands
+ * over. A response that carries no dev statement matches nothing and passes
+ * through untouched.
  * @param {function} devChrome - the live dev-chrome getter (devPortsOption)
  * @returns {function} connect-style middleware
  */
 function devInjectDevPorts(devChrome) {
   return (req, res, next) => {
+    const url = String(req.url || '').split('?')[0];
+    if (url !== '/build.js') return next();
+
     const end = res.end;
 
     res.end = (data, ...rest) => {
-      const contentType = String(res.getHeader('content-type') || '');
+      const body = typeof data === 'string' ? data
+        : (Buffer.isBuffer(data) ? data.toString('utf8') : null);
 
-      if (typeof data === 'string' && contentType.startsWith('text/html')) {
-        return end.call(res, data.replace(DEV_CHROME, (match, open) => `${open}${JSON.stringify(devChrome())}`), ...rest);
+      if (body !== null) {
+        const rewritten = body.replace(DEV_CHROME, (match, open) => `${open}${JSON.stringify(devChrome())}`);
+        // The body length changes with the map, so the header the static
+        // handler set for the file on disk has to move with it.
+        if (res.setHeader && !res.headersSent) res.setHeader('content-length', Buffer.byteLength(rewritten));
+        return end.call(res, rewritten, ...rest);
       }
 
       return end.call(res, data, ...rest);
@@ -963,9 +978,9 @@ async function resolveWebsitePort(root, flagPort) {
 /**
  * The wanted (pre-allocator) website port: OMEGA_WEBSITE_PORT (a parent that
  * already allocated) or the classic 4000, plus this target's deterministic
- * instance offset (multi-instance targets: an instance wants base + its
- * position in the instances array, so N instances dev side-by-side off the
- * same base). Lenient like loadPortPins — no config means no offset.
+ * offset (a brand's Nth web target wants base + its position among the web
+ * targets, so N web targets dev side-by-side off the same base). Lenient like
+ * loadPortPins: no config means no offset.
  */
 function websiteWantedPort(root) {
   const base = envPort('website') || CLASSIC_PORTS.website;
@@ -974,8 +989,8 @@ function websiteWantedPort(root) {
     if (!hasOmegaConfig(root)) {
       return base;
     }
-    const { config, instance } = loadConfig(root, 'web');
-    return base + instancePortOffset(config.targets?.web, instance);
+    const { config, name } = loadConfig(root, 'web');
+    return base + targetPortOffset(config, name);
   } catch (error) {
     return base;
   }
@@ -1015,7 +1030,13 @@ function loadPortPins(root) {
  */
 function devPortsOption(root, port, origin) {
   return () => ({
-    ports: { ...readSiblingPorts(root), website: port },
+    // The classic map is the FLOOR, from @omega.js/config, the one place the
+    // numbers are defined ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
+    // A live sibling backend's resolved (possibly bumped) numbers land on top
+    // of it, and this server's own resolved website port on top of those, so a
+    // page always receives a COMPLETE map and @omega.js/client needs no
+    // browser-side copy of the defaults to fall back to.
+    ports: { ...CLASSIC_PORTS, ...readSiblingPorts(root), website: port },
     origin,
     authEmulatorProxy: true,
   });

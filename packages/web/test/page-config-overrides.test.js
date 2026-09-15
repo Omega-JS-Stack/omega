@@ -21,7 +21,7 @@ const { test } = require('node:test');
 
 const { configureOmega } = require('../src/index.js');
 const { SITE_FACT_KEYS } = require('../src/config-sections.js');
-const { buildSite, BARE } = require('./lib/build.js');
+const { buildSite, readBuildJson, readPageConfig, BARE } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
@@ -66,8 +66,15 @@ test('a page `config:` block overrides the brand config for that page only', asy
     const html = pages.get('/');
     assert.ok(html, 'page built');
     assert.ok(!html.includes('href="https://chatsy.ai"'), 'the page config switched the chat preconnect off');
-    assert.match(html, /chatsy:\s*\{\s*enabled:\s*false/, 'the Configuration blob carries the page value');
-    assert.match(html, /agentId:\s*"agent-607"/, 'the rest of the brand chat block still merges underneath');
+    // The site's snapshot plus THIS page's `config:` delta, the one line
+    // head.html emits after the loader tag (#743).
+    const line = html.match(/Object\.assign\(self\.OMEGA_BUILD_JSON\.config,\s*(\{.*?\})\s*\);/s);
+    assert.ok(line && line[1].includes('"inbound"'), 'the page emits its own delta line, naming the section it changed');
+    const chatsy = readPageConfig(pages, html).inbound.chat.providers.chatsy;
+    assert.strictEqual(chatsy.enabled, false, 'the page delta carries the page value');
+    assert.strictEqual(chatsy.agentId, 'agent-607', 'the rest of the brand chat block still merges underneath');
+    assert.strictEqual(readBuildJson(pages).config.inbound.chat.providers.chatsy.enabled, true,
+      'and the SITE snapshot is untouched: the delta is this page\'s alone');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -79,7 +86,12 @@ test('with no page `config:`, the brand config stands', async () => {
     const pages = await buildSite(consumerDir, chatOn, { environment: 'development' }, 'page-config-chat-on');
     const html = pages.get('/');
     assert.ok(html.includes('href="https://chatsy.ai"'), 'the brand chat block still renders the preconnect');
-    assert.match(html, /chatsy:\s*\{\s*enabled:\s*true/, 'the Configuration blob carries the brand value');
+    // A page that changes nothing about a section emits no delta for it: the
+    // line after the loader tag names only what its own view really differs on
+    // (this page's layout chain moves `theme`, and nothing else).
+    const delta = html.match(/Object\.assign\(self\.OMEGA_BUILD_JSON\.config,\s*(\{.*?\})\s*\);/s);
+    assert.ok(!delta || !delta[1].includes('"inbound"'), 'no page block, no chat delta');
+    assert.strictEqual(readPageConfig(pages, html).inbound.chat.providers.chatsy.enabled, true, 'the snapshot carries the brand value');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

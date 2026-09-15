@@ -1,6 +1,6 @@
 // createCliRouter(config) — the shared OMEGA framework CLI dispatcher.
 //
-// Every framework bin parses argv (yargs) and hands the result to a Main class
+// Every framework bin parses argv (src/argv.js) and hands the result to a Main class
 // whose process() resolves a command name and runs commands/<name>.js from the
 // framework's dist. That router was copy-pasted per framework (UJM/BXM/EM,
 // drift-identical); this is the single implementation. @omega.js/backend's CLI is a different
@@ -46,8 +46,8 @@ function createCliRouter(config) {
     // `--help`/`-h` route to the built-in help FIRST — before positionals, so
     // `omega deploy --help` prints help instead of RUNNING deploy, and never
     // the default command (the old fallthrough ran setup/manage on a help
-    // request). Frameworks must disable yargs' built-in help so the flag
-    // reaches the router.
+    // request). No parse may claim `--help` for itself: the flag has to reach
+    // the router.
     if (options.help || options.h) {
       return 'help';
     }

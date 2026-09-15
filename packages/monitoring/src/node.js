@@ -31,7 +31,13 @@ const logger = createLogger('node');
 function initialize(options) {
   options = options || {};
 
-  const { shouldEnable, options: resolved, reason } = resolveConfig(options.config, readGates(options));
+  // The gates are asked with the host's SIGNALS, never with the whole options
+  // blob: `options.config` is the MONITORING section, whose own `environment`
+  // key is the sentry tag, and it must never be able to answer the process's
+  // environment question (#817). On this side there is always a real process,
+  // so the one environment reads `OMEGA_ENVIRONMENT`.
+  const gates = readGates({ isProduction: options.isProduction, allowInDev: options.allowInDev });
+  const { shouldEnable, options: resolved, reason } = resolveConfig(options.config, gates);
   if (!shouldEnable) {
     logger.log(`disabled — ${reason}`);
     return null;

@@ -1,25 +1,19 @@
 /**
  * Ensure the brand-monorepo structure: a root package.json with targets/*
- * workspaces, and a target directory for every enabled target. Dirs that map
- * to no target are warned (never silently skipped); enabled targets with no
+ * workspaces, and a target directory for every declared target. Dirs that map
+ * to no target are warned (never silently skipped); declared targets with no
  * dir are errors with the exact dir to create.
  *
- * Multi-instance targets: an ARRAY-form target expects one dir PER
- * instance (`main` → the canonical dir, any other id → `<canonical>-<id>`) —
- * an enabled instance without its dir is the same create-this-dir error. The
- * single-object form keeps today's any-dir-of-the-type check untouched.
- *
- * Custom targets (#603) map to no framework by design, so they are checked BY
- * DIR (the declaration names it) and never counted among the unmapped — this
- * service is one of the two ops that see them at all.
+ * ONE check covers every target (#886): a `targets` key IS its folder name, so
+ * a declared name either has its `targets/<name>` dir or it does not. Custom
+ * targets (#603) need no branch of their own here, and neither does a second
+ * target of a type the brand already runs.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { normalizeTargetInstances, instanceTargetDir, isCustomTargetEntry } = require('@omega.js/config');
-const { TARGET_DIRS } = require('../../../config.js');
-const { customTargetDirs } = require('../../../lib/custom-target.js');
+const { targetEntries, targetPath } = require('@omega.js/config');
 
 module.exports = async ({ brandRoot, brand, targets }) => {
   const problems = [];
@@ -36,45 +30,20 @@ module.exports = async ({ brandRoot, brand, targets }) => {
     }
   }
 
-  // Every enabled target needs at least one dir; the multi-instance array
-  // form needs every instance's exact dir (the config validator owns id
-  // sanity — malformed entries are its errors, never doubled here)
-  for (const target of brand.enabledTargets) {
-    const declared = brand.config?.targets?.[target];
-
-    // A custom target's dirs are named by its own declaration, one per
-    // instance — the same create-this-dir error, checked by name
-    if (isCustomTargetEntry(declared)) {
-      for (const dir of customTargetDirs({ targets: { [target]: declared } })) {
-        if (!targets.some((entry) => entry.name === dir)) {
-          problems.push(`enabled custom target "${target}" has no dir — create targets/${dir}/`);
-        }
-      }
-      continue;
-    }
-
-    if (Array.isArray(declared)) {
-      for (const instance of normalizeTargetInstances(declared)) {
-        if (typeof instance?.id !== 'string') continue;
-        const dir = instanceTargetDir(target, instance.id);
-        if (!targets.some((entry) => entry.name === dir)) {
-          problems.push(`enabled target "${target}" instance "${instance.id}" has no dir — create targets/${dir}/`);
-        }
-      }
-      continue;
-    }
-
-    if (!targets.some((entry) => entry.target === target)) {
-      const suggested = TARGET_DIRS[target] || target;
-      problems.push(`enabled target "${target}" has no dir — create targets/${suggested}/`);
+  // Every declared target needs ITS dir (the config validator owns type
+  // sanity, so a malformed entry is its error, never doubled here)
+  for (const entry of targetEntries(brand.config)) {
+    const dir = targetPath(brand.config, entry.name);
+    if (!targets.some((found) => found.dir === dir)) {
+      problems.push(`declared target "${entry.name}" has no dir, create ${dir}/`);
     }
   }
 
-  // Dirs that resolve to no target are suspicious but not fatal — a DECLARED
+  // Dirs the brand never declares are suspicious but not fatal. A DECLARED
   // custom dir is neither: the brand said what it is
   const unmapped = targets.filter((entry) => !entry.target && !entry.custom);
   for (const entry of unmapped) {
-    findings.push(`${entry.dir} maps to no target — declare one in its omega.json5, use a conventional dir name, or declare it \`type: 'custom'\``);
+    findings.push(`${entry.dir} maps to no target: declare \`targets.${entry.name}\` with its \`type\` (\`custom\` when no framework owns it)`);
   }
 
   if (problems.length > 0) {

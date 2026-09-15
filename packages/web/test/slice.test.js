@@ -10,7 +10,13 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { configureOmega } = require('../src/index.js');
+const { readBuildJson } = require('./lib/build.js');
 
 const PKG = path.resolve(__dirname, '..');
 const MINI = path.join(__dirname, 'fixtures', 'mini-site');
@@ -22,6 +28,7 @@ const siteData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), '
  * @returns {Promise<Map<string, string>>} url → rendered content
  */
 async function buildMini(overrides = {}) {
+  setEnvironment('development');
   const Eleventy = require('@11ty/eleventy').default;
   const elev = new Eleventy(MINI, path.join(PKG, '.omega', 'test-out'), {
     quietMode: true,
@@ -58,7 +65,14 @@ async function buildMini(overrides = {}) {
   });
 
   const results = await elev.toJSON();
-  return new Map(results.map((r) => [r.url, r.content]));
+  const indexed = new Map(results.map((r) => [r.url, r.content]));
+
+  // The build snapshot is a FILE the engine writes on the way into the run
+  // (#743), served at `/build.js` like any other artifact.
+  const buildJs = path.join(PKG, '.omega', 'test-out', 'build.js');
+  if (fs.existsSync(buildJs)) indexed.set('/build.js', fs.readFileSync(buildJs, 'utf8'));
+
+  return indexed;
 }
 
 let pages;
@@ -231,11 +245,13 @@ test('zero-page consumer still gets a homepage at / (cp194 wizard-rehearsal catc
   }
 });
 
-test('resolved site seed: site sections surface as resolved.* (Configuration block)', () => {
-  const html = pages.get('/');
-  assert.ok(html.includes('brand: {"id":"mini","name":"MiniCo"'), 'resolved.brand jsonified from site seed');
-  assert.ok(html.includes('captcha: null'), 'absent sections emit null (valid JS), not empty');
-  assert.ok(html.includes('src="/assets/js/main-TEST.js"'), 'main bundle from the manifest');
+test('resolved site seed: site sections surface as resolved.* (the OMEGA_BUILD_JSON snapshot)', () => {
+  const config = readBuildJson(pages).config;
+  assert.deepStrictEqual(config.brand.id, 'mini', 'resolved.brand rides the snapshot from the site seed');
+  assert.deepStrictEqual(config.brand.name, 'MiniCo');
+  // An absent section is ABSENT (#894): the subset never invents an empty one
+  assert.strictEqual(config.captcha, undefined, 'a section the brand never declared is not in the snapshot');
+  assert.ok(pages.get('/').includes('src="/assets/js/main-TEST.js"'), 'main bundle from the manifest');
 });
 
 test('pricing: template-default hero copy renders (layout frontmatter knobs are gone)', () => {
@@ -392,12 +408,12 @@ test('farm mode (symlinks, dev): identical output to virtual mode', async () => 
   assert.ok(fs.lstatSync(link).isSymbolicLink(), 'farm is symlinks, not copies');
 });
 
-test('dev chrome (N7): jekyll.dev is null by default, the resolved ports map when omega dev injects it', async () => {
-  assert.ok(pages.get('/').includes('dev: null,'), 'default builds carry no dev map (client falls back to classics)');
+test('dev chrome (N7): the snapshot\'s dev map is null by default, the resolved ports map when omega dev injects it', async () => {
+  assert.strictEqual(readBuildJson(pages).config.dev, null, 'default builds carry no dev map (client falls back to classics)');
 
   const dev = await buildMini({ environment: 'development', dev: { ports: { website: 4001, hosting: 5003 } } });
-  const html = dev.get('/');
-  assert.ok(html.includes('environment: "development"'), 'dev environment in the chrome');
-  assert.ok(html.includes('"website":4001'), 'resolved website port baked into the Configuration chrome');
-  assert.ok(html.includes('"hosting":5003'), 'sibling emulator ports ride along');
+  const config = readBuildJson(dev).config;
+  assert.strictEqual(config.environment, 'development', 'dev environment in the bake');
+  assert.strictEqual(config.dev.ports.website, 4001, 'resolved website port baked into the dev chrome');
+  assert.strictEqual(config.dev.ports.hosting, 5003, 'sibling emulator ports ride along');
 });

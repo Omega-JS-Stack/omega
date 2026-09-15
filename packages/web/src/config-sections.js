@@ -17,18 +17,17 @@
  *   site.*             — BUILD FACTS only: the collections the build indexed,
  *                        the build stamp, the curated targets view. Never config.
  *
- * CONFIG_SECTIONS is the schema's own list (`configSections('web')`) plus the
- * web presentation sections that ride `targets.web` without a schema rule yet
- * — the keys docs/shared/config.md's UJM mapping table sends there. It answers
- * the `config:` namespace question in BOTH directions: a section restated bare
+ * CONFIG_SECTIONS is EXACTLY the schema's own list (`configSections('web')`),
+ * minus the page machinery below. Everything the build processes has a schema
+ * home (Ian 2026-09-09): the four schema-less presentation blocks the legacy
+ * converter wrote under `targets.web` (`favicon`, `manifest`, `icons`,
+ * `currency`) are retired keys now, not a private list this package keeps to
+ * let its own guard pass them
+ * ([#850](https://github.com/Omega-JS-Stack/omega/issues/850)). It answers the
+ * `config:` namespace question in BOTH directions: a section restated bare
  * is a build error, and a key under `config:` that is not a section is one too.
  */
 const { configSections } = require('@omega.js/config/schema');
-
-// Config sections @omega.js/web owns that carry no schema rule yet: the legacy
-// UJM presentation blocks the config converter still writes under
-// `targets.web` (docs/shared/config.md's mapping table).
-const WEB_ONLY_SECTIONS = ['favicon', 'manifest', 'icons', 'currency'];
 
 // `meta` is the ONE schema section that is not a `config:` section on a page.
 // `targets.web.meta.index` is the SITE-WIDE DEFAULT of a page-machinery key
@@ -39,10 +38,22 @@ const WEB_ONLY_SECTIONS = ['favicon', 'manifest', 'icons', 'currency'];
 // `omega migrate`, and refused under `config:`.
 const PAGE_MACHINERY_SECTIONS = ['meta'];
 
+// The sections that are a REAL config section AND a page-machinery name at
+// `resolved.<key>` ([#858](https://github.com/Omega-JS-Stack/omega/issues/858),
+// Ian 2026-09-13). `translation` is the one: the site's route list is
+// `translation.include` in omega.json5 and a page's own override of it is
+// `translation.include` in frontmatter, which is Ian's 2026-09-09 same-name
+// ruling asking for exactly this collision. Unlike `meta`, the section does not
+// leave the config file, so it stays in CONFIG_SECTIONS (a page may still say
+// `config: { translation: { languages: [...] } }`, reaching
+// `resolved.config.translation`); what it also earns is a LEGAL `resolved.translation`
+// read, which is the page half and not a flat config path.
+const PAGE_OVERRIDE_SECTIONS = ['translation'];
+
 // Every top-level key a web build's resolved config can hold, MINUS the page
 // machinery above.
 const CONFIG_SECTIONS = new Set(
-  [...configSections('web'), ...WEB_ONLY_SECTIONS].filter((key) => !PAGE_MACHINERY_SECTIONS.includes(key)),
+  configSections('web').filter((key) => !PAGE_MACHINERY_SECTIONS.includes(key)),
 );
 
 // The sections a `site.<key>` read is DEAD on: the config ones, plus `meta`.
@@ -59,6 +70,7 @@ const DEAD_SITE_SECTIONS = new Set([...CONFIG_SECTIONS, 'meta']);
 // fails any other `site.<key>` read in the framework's own templates.
 const SITE_FACT_KEYS = [
   'targets',      // the curated per-target display view (#85)
+  'target',       // WHICH target this build is: `{ name, type }` (#887)
   'posts',        // the indexed collections, Jekyll doc shape
   'team',
   'updates',
@@ -232,9 +244,9 @@ function assignsRandomId(source) {
 
 module.exports = {
   CONFIG_SECTIONS,
+  PAGE_OVERRIDE_SECTIONS,
   DEAD_SITE_SECTIONS,
   SITE_FACT_KEYS,
-  WEB_ONLY_SECTIONS,
   NOT_A_READ,
   RANDOM_ID_ASSIGN_IDIOM: '{% assign random_id = 100 | omega_random %}',
   displayRegions,

@@ -13,7 +13,8 @@ const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
-const { findBrandRoot, readPortsFile } = require('@omega.js/config');
+const { findBrandRoot, readPortsFile, pagesHost, targetNameFromDir } = require('@omega.js/config');
+const { setEnvironment } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -62,6 +63,13 @@ function liveDevPort(root) {
 
 module.exports = async function (options) {
   options = options || {};
+
+  // The verb names the environment for the whole process
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): a build bakes
+  // a PRODUCTION artifact, so every read below (the config overlay, the build
+  // meta, the collision gate) answers production without asking the machine.
+  setEnvironment('production');
+
   const paths = consumerPaths();
 
   // Dev and build write the SAME dist/, so a build under a running dev server
@@ -84,7 +92,11 @@ module.exports = async function (options) {
   // and quiet on a converged target.
   ensureTarget({ projectDir: paths.root, log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
-  const siteData = loadSiteData(paths.root);
+  // `omega build` IS the production build (the license check below says so
+  // too), so the config it loads is the PRODUCTION one: the environment overlay
+  // that composes is named by the lane, never by the machine the build runs on
+  // ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)).
+  const siteData = loadSiteData(paths.root, { environment: 'production' });
   const brandRoot = findBrandRoot(paths.root);
 
   const emptyCatalog = catalogWarning(siteData.payment);
@@ -101,6 +113,10 @@ module.exports = async function (options) {
   const license = await resolveLicenseStamp({ config: siteData, production: true });
   logger.log(`License: ${license.status} (attribution ${license.attribution}, payments ${license.payments})`);
 
+  // The target's own package.json: the version is the client's release tag
+  // (#380) and the name rides the page bake's `package` block (#894).
+  const projectPackage = jetpack.read(path.join(paths.root, 'package.json'), 'json');
+
   const result = await buildSite({
     consumerDir: paths.src,
     siteAssetsDir: paths.assets,
@@ -109,7 +125,8 @@ module.exports = async function (options) {
     clientEntry: resolveClientEntry(),
     environment: 'production',
     license,
-    version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
+    version: projectPackage?.version,
+    packageName: projectPackage?.name,
     manifestPath: paths.manifest,
     staticDirs: resolveStaticDirs({
       brandRoot,
@@ -141,10 +158,10 @@ module.exports = async function (options) {
   }
 
   // GH Pages custom domain: every production build carries dist/CNAME so
-  // BOTH deploy lanes publish it — the CI workflow passes no cname to its
-  // gh-pages action, and a push without the file clears the Pages domain
-  // (UJM auto-created it; omega parity).
-  const cname = require('./deploy.js').pagesHost(siteData);
+  // BOTH deploy lanes publish it: a push without the file clears the Pages
+  // domain (UJM auto-created it; omega parity). The derivation is the config's
+  // ONE `pagesHost`, the same one the manage walk sets the domain from (#883).
+  const cname = pagesHost(siteData, targetNameFromDir(paths.root) || 'web');
   if (cname) {
     jetpack.write(path.join(paths.out, 'CNAME'), cname);
   }

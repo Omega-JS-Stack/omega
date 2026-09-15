@@ -24,6 +24,7 @@
  *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
+const { hasTargetOfType } = require('@omega.js/config');
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
@@ -51,7 +52,7 @@ module.exports.run = createServiceRunner({
     }
 
     // The contact form lives on the brand's website
-    if (!context.brandConfig.targets?.web) {
+    if (!hasTargetOfType(context.brandConfig, 'web')) {
       return { skip: true, reason: 'no web target' };
     }
 

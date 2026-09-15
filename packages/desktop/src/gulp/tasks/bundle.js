@@ -1,5 +1,6 @@
 // bundle — three bundles (main / preload / renderer), built in parallel.
-// Each one gets `OMEGA_BUILD_JSON` baked in as a define.
+// The NODE pair (main / preload) gets `OMEGA_BUILD_JSON` baked in as a define;
+// the renderer reads the ONE `dist/build.js` the page template loads (#743).
 //
 // The bundler is esbuild since [#737](https://github.com/Omega-JS-Stack/omega/issues/737),
 // and the file, the gulp task, the log tag and `npm run gulp -- bundle` were
@@ -19,11 +20,12 @@ const logger = Manager.logger('bundle');
 const path = require('path');
 const glob = require('glob').globSync;
 const jetpack = require('fs-jetpack');
-const { readSiblingPorts, readSiblingOrigin, envPorts } = require('@omega.js/config');
-const { bakeKeys } = require('@omega.js/config/env-delivery');
+const { CLASSIC_PORTS, CLASSIC_DEV_ORIGIN, readSiblingPorts, readSiblingOrigin, envPorts, targetNameFromDir } = require('@omega.js/config');
+const { bakeKeys, bakeSourceKeys } = require('@omega.js/config/env-delivery');
 const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const { bundle, formatBytes } = require('@omega.js/devkit/bundle');
+const buildJsonKit = require('@omega.js/devkit/build-json');
 const { emptyModulesPlugin } = require('@omega.js/devkit/empty-modules-plugin');
 const electronTargets = require('../../utils/electron-targets.js');
 
@@ -49,31 +51,70 @@ const RENDERER_EMPTY_MODULES = [
   'querystring', 'string_decoder', 'electron',
 ];
 
-// The blob every bundle reads as OMEGA_BUILD_JSON.config — and the ONLY thing
-// the renderer hands @omega.js/client (renderer.js merges `buildJson.config`
-// with the runtime overrides). The app's VERSION rides INSIDE it for that
-// reason: the client tags every error report `<brand.id>@<version>` and falls
-// back to the build stamp without one (#380), and it never sees the sibling
-// `package` key. The dev map (#300) is a dev-build key only.
-function composeBuildConfig(config, dev, pkg) {
-  return { ...config, version: pkg.version, ...(dev ? { dev } : {}) };
+// The build FACTS this artifact carries, composed onto the resolved config by
+// both halves ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)) and
+// spelled the way web and the extension spell them. The app's VERSION rides
+// INSIDE the config: the client tags every error report `<brand.id>@<version>`
+// and falls back to the build stamp without one (#380), and it never sees the
+// sibling `package` key. `runtime` is baked because the client's own sniff has
+// no Electron signal to find in a renderer and would answer `'web'`
+// ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)). The dev map
+// (#300) is a dev-build key only.
+function buildFacts({ pkg, mode, dev }) {
+  return {
+    runtime: 'electron',
+    environment: mode.environment,
+    version: pkg.version,
+    buildTime: Date.now(),
+    // WHICH target this artifact IS, by name (#887)
+    target: targetNameFromDir(projectRoot) || 'desktop',
+    ...(dev ? { dev } : {}),
+  };
 }
 
-// OMEGA_BUILD_JSON itself — the build's own record of what it produced. The
-// `license` stamp ([#320](https://github.com/Omega-JS-Stack/omega/issues/320))
-// rides HERE and not inside `config`: it is a fact about the build, not part
-// of the client contract the renderer hands @omega.js/client. Nothing in the
-// app reads it today (a packaged app has no attribution surface, and payments
-// ride the backend's own gate) — it is what makes an artifact say which
-// verdict it was packaged under.
-function composeBuildJson({ config, dev, pkg, mode, license }) {
+// The wrapper's `mode`, the same three keys on every OMEGA surface (#894).
+// Desktop's own `server` verdict stays inside the Manager, which is the only
+// thing that reads it: an artifact records what it WAS BUILT as.
+function artifactMode(mode) {
+  return { environment: mode.environment, build: mode.build, publish: mode.publish };
+}
+
+// The config blob the NODE bundles read as OMEGA_BUILD_JSON.config (main and
+// preload): the WHOLE resolved config plus this build's facts.
+function composeBuildConfig(config, facts) {
+  return { ...config, ...facts };
+}
+
+// OMEGA_BUILD_JSON for the NODE half: the build's own record of what it
+// produced. The `license` stamp
+// ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)) rides HERE and
+// not inside `config`: it is a fact about the build, not part of the client
+// contract the renderer hands @omega.js/client. Nothing in the app reads it
+// today (a packaged app has no attribution surface, and payments ride the
+// backend's own gate); it is what makes an artifact say which verdict it was
+// packaged under.
+//
+// Main and preload keep the whole resolved config because the main process
+// BOOTS from it (main.js reads OMEGA_BUILD_JSON.config in a packaged app, where
+// config/omega.json5 is inside the asar), and a preload is isolated from the
+// page. Both are Node, neither is a public surface.
+function composeBuildJson({ config, facts, pkg, mode, license }) {
   return {
-    config: composeBuildConfig(config, dev, pkg),
+    config: composeBuildConfig(config, facts),
     package: pkg,
-    mode,
+    mode: artifactMode(mode),
     license,
     builtAt: new Date().toISOString(),
   };
+}
+
+// The BROWSER half's snapshot ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)):
+// @omega.js/devkit composes it (through @omega.js/config's browser subset) and
+// writes it to `dist/build.js`, which every view's page template loads with one
+// script tag ahead of its own bundle. One file, one shape and one consumption
+// on web, desktop and the extension alike.
+function composeClientBuildJson({ config, facts, pkg, mode, license }) {
+  return buildJsonKit.composeBuildJson({ config, pkg, mode, license, facts });
 }
 
 module.exports = function bundleTask(done) {
@@ -88,13 +129,20 @@ module.exports = function bundleTask(done) {
   // channel, resolved on every build so a rebuild picks up a restarted
   // emulator ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)).
   // The sibling website's published dev ORIGIN rides the same bake
-  // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)); a key
-  // present is a resolved fact, absent means the client assumes and warns.
-  // Never in production: a packaged app has no local stack.
+  // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)). Never in
+  // production: a packaged app has no local stack, so its `dev` is null and
+  // every dev read throws by name rather than reaching a localhost port.
   const devOrigin = isProd ? null : readSiblingOrigin(projectRoot);
   const dev = isProd ? null : {
-    ports: { ...readSiblingPorts(projectRoot), ...envPorts() },
-    ...(devOrigin ? { origin: devOrigin } : {}),
+    // The classic map is the FLOOR, from @omega.js/config, the one place the
+    // numbers are defined ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
+    // A live stack's resolved (possibly bumped) numbers land on top of it, so a
+    // dev artifact always carries a COMPLETE map and no browser-side code needs
+    // a second copy of the defaults to fall back to. The same floor goes under
+    // the origin: the classic dev origin is `omega dev`'s own default, and a
+    // live website's published one wins over it.
+    ports: { ...CLASSIC_PORTS, ...readSiblingPorts(projectRoot), ...envPorts() },
+    origin: devOrigin || CLASSIC_DEV_ORIGIN,
   };
 
   // The license check (#320), once per build: a PRODUCTION build asks the
@@ -104,8 +152,14 @@ module.exports = function bundleTask(done) {
   const projectPackage = Manager.getPackage('project');
   resolveLicenseStamp({ config, production: isProd })
     .then((license) => {
-      // OMEGA_BUILD_JSON — frozen at build time, accessible at runtime as window/globalThis.OMEGA_BUILD_JSON.
-      const buildJson = composeBuildJson({ config, dev, pkg: projectPackage, mode, license });
+      // OMEGA_BUILD_JSON: frozen at build time. The NODE pair reads it as a
+      // define; the renderer reads the file written below.
+      const input = { config, facts: buildFacts({ pkg: projectPackage, mode, dev }), pkg: projectPackage, mode, license };
+      const buildJson = composeBuildJson(input);
+
+      // The ONE build.js, at dist/: the web root every view's shell resolves
+      // `../../build.js` against, inside a packaged asar exactly as on disk (#743).
+      buildJsonKit.writeBuildJs(outputRoot, composeClientBuildJson(input));
 
       logger.log(`bundling — environment=${mode.environment}, license=${license.status}`);
       runBundles(buildJson, isProd).then(() => done()).catch(done);
@@ -130,10 +184,16 @@ async function runBundles(buildJson, isProd) {
     dev: !isProd,
   };
 
+  // The renderer takes the same defines MINUS the snapshot: it reads the one
+  // build.js the page template loads ahead of it (#743), so nothing is copied
+  // into a bundle a user can read.
+  const { OMEGA_BUILD_JSON, ...rendererDefine } = shared.define;
+  const { banner, ...rendererShared } = { ...shared, define: rendererDefine };
+
   const builds = [
     mainBundle(shared),
     preloadBundle(shared),
-    rendererBundle(shared),
+    rendererBundle(rendererShared),
   ].filter(Boolean);
 
   if (builds.length === 0) {
@@ -172,7 +232,7 @@ function resolveTargets() {
   }
 }
 
-// Inject OMEGA_BUILD_JSON into every bundle two ways:
+// Inject OMEGA_BUILD_JSON into the NODE bundles (main and preload) two ways:
 // 1. `define` replaces the bare `OMEGA_BUILD_JSON` identifier with the literal at build time
 //    (so framework code can reference it without globals).
 // 2. `banner` prepends a tiny IIFE that assigns the same value to globalThis.OMEGA_BUILD_JSON
@@ -198,8 +258,9 @@ function buildJsonDefines(buildJson, isProd) {
 }
 
 /**
- * The globalThis/window assignment every bundle carries.
- * @param {object} buildJson - The blob every bundle bakes.
+ * The globalThis/window assignment the NODE bundles carry. The renderer takes
+ * no banner at all: its snapshot is the one `dist/build.js` its shell loads (#743).
+ * @param {object} buildJson - The blob the node bundles bake.
  * @returns {object} an esbuild banner
  */
 function buildJsonBanner(buildJson) {
@@ -214,6 +275,8 @@ function buildJsonBanner(buildJson) {
 // GOOGLE_ANALYTICS_SECRET read this replaced was one of three hand-kept lists
 // for one concern. A new baked key is one schema entry and nothing here.
 const BAKED_KEYS = bakeKeys('desktop');
+// The same set at the level a HUMAN sets it: what the bake guard judges (#891)
+const BAKED_SOURCE_KEYS = bakeSourceKeys('desktop');
 
 /**
  * The schema's presence rules at the BAKE seam
@@ -228,6 +291,12 @@ const BAKED_KEYS = bakeKeys('desktop');
  * warns and keeps going, because a half-configured brand is a normal step on
  * the way to a configured one.
  *
+ * Only keys this build BAKES are its business
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the schema's
+ * other desktop rules are CI-delivered signing credentials, which the deploy
+ * lane owns (the deploy precheck refuses to publish a half set) and which a local
+ * unsigned build has no need of at all.
+ *
  * @param {object} config - The target's resolved omega.json5 config.
  * @param {object} env - The build env.
  * @param {object} [options]
@@ -241,7 +310,7 @@ function assertBakeRules(config, env, options) {
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
   const violations = checkEnvRules(config, env, { target: 'desktop' })
-    .filter((violation) => violation.rule === 'requiredWhen');
+    .filter((violation) => violation.rule === 'requiredWhen' && BAKED_SOURCE_KEYS.includes(violation.key));
   if (violations.length === 0) return;
 
   // The BRAND-LEVEL key name (GOOGLE_ANALYTICS_SECRET_DESKTOP, not the
@@ -249,7 +318,7 @@ function assertBakeRules(config, env, options) {
   // in the brand .env and in the repo's Actions secrets.
   const named = violations.map(({ key, path }) => `${key} (required by ${path})`).join(', ');
   const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
-    + 'Set it in the brand .env (and as a repo Actions secret for a CI build — `omega push-secrets` sends them), then build again.';
+    + 'Set it in the brand .env (a CI build reads it as a repo Actions secret, which `omega deploy`\'s precheck pushes), then build again.';
 
   if (mode.build || mode.publish) {
     throw new Error(message);
@@ -365,7 +434,7 @@ function rendererEntryKey(rel) {
 /**
  * One browser bundle per `src/assets/js/components/<name>/index.js`, loaded by
  * the page template as a plain `<script src>` — so iife, not esm.
- * @param {object} shared - `{ define, banner, targets, dev }`, composed once per run
+ * @param {object} shared - `{ define, targets, dev }`, composed once per run (no banner: #743)
  * @returns {object|null} `{ name, options }`, or null when the consumer has no entries
  */
 function rendererBundle(shared) {
@@ -412,7 +481,8 @@ function rendererBundle(shared) {
         // a browser bundle leaves it undefined, so it is rewritten textually.
         global: 'globalThis',
       },
-      banner: shared.banner,
+      // No banner and no snapshot define: the renderer reads the ONE
+      // `dist/build.js` its page template loads ahead of it (#743).
       plugins: [emptyModulesPlugin(RENDERER_EMPTY_MODULES)],
     },
   };
@@ -443,8 +513,10 @@ function nativeExternals() {
 // The list behind the renderer's Node-builtin shim (#737) — pinned by
 // src/test/suites/build/renderer-node-shims.test.js.
 module.exports.RENDERER_EMPTY_MODULES = RENDERER_EMPTY_MODULES;
+module.exports.buildFacts = buildFacts;
 module.exports.composeBuildConfig = composeBuildConfig;
 module.exports.composeBuildJson = composeBuildJson;
+module.exports.composeClientBuildJson = composeClientBuildJson;
 module.exports.rendererEntryKey = rendererEntryKey;
 // The schema-derived bake set and its reader (#627).
 module.exports.BAKED_KEYS = BAKED_KEYS;

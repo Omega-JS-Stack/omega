@@ -13,9 +13,10 @@ module.exports = async function (options) {
   // This process is a TEST RUN, and everything it spawns inherits that. The box's
   // mutating verbs read it and refuse to touch a real runner home
   // ([#337](https://github.com/Omega-JS-Stack/omega/issues/337): a suite once ran
-  // a real `runner install` on the signing box). Deliberately NOT the canonical
-  // OMEGA_TEST_MODE, which means "the app under test runs in testing mode" and
-  // would change what the boot lane's production build compiles.
+  // a real `runner install` on the signing box). Deliberately a marker about THIS
+  // process, never a word about the app under test: the environment the thing
+  // being tested RUNS in is `OMEGA_ENVIRONMENT`, and the runners name it on their
+  // own children alone (#925).
   process.env.OMEGA_TEST_RUNNER = '1';
 
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors

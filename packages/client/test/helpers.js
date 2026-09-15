@@ -1,8 +1,14 @@
 const assert = require('assert');
 const { before, beforeEach, after } = require('node:test');
 
-// Shared test config (Firebase + Sentry disabled for unit tests)
+// Shared test config (Firebase + Sentry disabled for unit tests).
+//
+// `environment` is NOT optional (#817): it is the one input this runtime
+// answers from in a browser, the build fact every OMEGA surface bakes into
+// OMEGA_BUILD_JSON, and a config without it throws by name rather than reading
+// as "not development". A unit-test config is a testing artifact, so it says so.
 const TEST_CONFIG = {
+  environment: 'testing',
   brand: { id: 'test' },
   firebase: { app: { enabled: false } },
   sentry: { enabled: false },

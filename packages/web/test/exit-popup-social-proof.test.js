@@ -32,8 +32,8 @@ function socialProof(html) {
 function popup(html) {
   const start = html.indexOf('<div id="modal-exit-popup"');
   assert.ok(start > -1, 'the page mounts the exit popup');
-  const end = html.indexOf('var Configuration', start);
-  assert.ok(end > -1, 'the popup closes before the configuration blob');
+  const end = html.indexOf('<script type="module"', start);
+  assert.ok(end > -1, 'the popup closes before the foot\'s module bundles');
   return html.slice(start, end);
 }
 

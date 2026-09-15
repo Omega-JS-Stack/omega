@@ -30,7 +30,7 @@ const main = {
   initialize(host) {
     main._initialized = true;
 
-    const { shouldEnable, options, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates());
+    const { shouldEnable, options, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates(host));
     main._options = options;
 
     if (!shouldEnable) {

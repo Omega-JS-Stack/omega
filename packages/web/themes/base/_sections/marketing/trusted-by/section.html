@@ -15,7 +15,7 @@
                 </span>
               {% elsif logo.icon %}
                 <span class="omega-logos__lockup">
-                  <i class="fa-solid fa-{{ logo.icon }}"></i>
+                  <i class="{{ logo.icon }}" aria-hidden="true"></i>
                   <span>{{ logo.name }}</span>
                 </span>
               {% else %}

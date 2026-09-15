@@ -77,5 +77,53 @@ module.exports = defineCases({
         assert.equal(settings.deploy, false, `deploy: false should survive validation, got ${settings.deploy}`);
       },
     },
+
+    // The dispatch used to hand devkit's PATH-taking helper a bare target name
+    // and a fake brand root ('.'), and relied on `path.basename` of a bare
+    // string to come back out. The backend holds a NAME, so it asks the
+    // name-taking form of the same rule.
+    {
+      name: 'dispatch: the composed workflow is <target>-build.yml, named by devkit',
+      async run({ assert }) {
+        const dispatchDeploy = require('../../../dist/manager/routes/admin/post/dispatch-deploy.js');
+
+        const requests = [];
+        const savedFetch = globalThis.fetch;
+        const savedToken = process.env.GH_TOKEN;
+        globalThis.fetch = async (url) => {
+          requests.push(url);
+          return { status: 204, text: async () => '' };
+        };
+        process.env.GH_TOKEN = 'fixture-dispatch-token';
+
+        const said = [];
+        const ctx = { log: (line) => said.push(line), warn: (line) => said.push(line) };
+        // The dispatch asks for the DEPLOY branch now (#919), never the repo's
+        // default one, through the publish lib's one branch-exists read: the
+        // ref and its refusal are pinned in
+        // routes/admin/deploy-branch-publish.test.js.
+        const octokit = { rest: { git: { getRef: async ({ ref }) => ({ data: { ref: `refs/${ref}`, object: { sha: 'head-deploy' } } }) } } };
+
+        try {
+          const settings = await dispatchDeploy(ctx, octokit, {
+            deploy: true,
+            target: 'admin',
+            githubUser: 'acme',
+            githubRepo: 'acme-omega',
+          });
+
+          assert.equal(settings.deployDispatched, true, `the dispatch should have been sent: ${said.join(' | ')}`);
+          assert.equal(requests.length, 1, 'exactly one dispatch');
+          assert.ok(
+            requests[0].endsWith('/repos/acme/acme-omega/actions/workflows/admin-build.yml/dispatches'),
+            `the second web target dispatches its OWN workflow, got ${requests[0]}`,
+          );
+        } finally {
+          globalThis.fetch = savedFetch;
+          if (savedToken === undefined) delete process.env.GH_TOKEN;
+          else process.env.GH_TOKEN = savedToken;
+        }
+      },
+    },
   ],
 });

@@ -186,6 +186,8 @@ function opContext(overrides = {}) {
   };
 }
 
+// context.companyRoot is the company TREE the walk resolved (#677): a dir
+// with a `.env` like any other layer root, which is all this op needs.
 test('workspace env-order op: reorders brand AND company .env files', async () => {
   const brandRoot = tmpdir();
   const companyRoot = tmpdir();

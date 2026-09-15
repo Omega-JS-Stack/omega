@@ -3,9 +3,9 @@
  * declares — and the list of sections the framework OWNS in the entry.
  *
  * Identity is not optional: a directory entry with no name addresses nothing.
- * The repo slugs come from @omega.js/config's one derivation (#290) — the same
- * `{ owner, name, repo }` the backend hands consumers as
- * `config.resolved.github` — never re-derived here.
+ * The repo slug comes from @omega.js/config's one derivation (#883), the same
+ * `{ owner, name, slug }` the backend hands consumers as the source repo, and
+ * is never re-derived here.
  *
  * BLOCKS is the extension point (#246). One entry per publishable block,
  * naming the brand-config section it reads; a block crosses only when the
@@ -16,7 +16,7 @@
  * nothing secret can be in them: these are schema-known public config keys and
  * @omega.js/config hard-fails secret-shaped keys before any merge happens.
  */
-const { brandRepo } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
 
 // Block name → the brand-config section it publishes.
 const BLOCKS = {
@@ -64,11 +64,11 @@ function buildEntry(config) {
     entry.brand.url = config.brand.url;
   }
 
-  // '' unless BOTH halves resolve (#290) — half an address addresses nothing,
-  // and an entry is better without the key than with a broken one.
-  const github = brandRepo(config);
-  if (github.repo) {
-    entry.github = github;
+  // Null unless the brand declares an org (#883): half an address addresses
+  // nothing, and an entry is better without the key than with a broken one.
+  const source = sourceRepo(config);
+  if (source) {
+    entry.github = source;
   }
 
   for (const [name, read] of Object.entries(BLOCKS)) {

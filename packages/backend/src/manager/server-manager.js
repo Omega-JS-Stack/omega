@@ -1,6 +1,6 @@
 const powertools = require('node-powertools');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+const { parseArgv } = require('@omega.js/devkit/argv');
+const { BOOLEAN_FLAGS, MULTIPLE_FLAGS } = require('../cli/flags.js');
 const chalk = require('chalk').default;
 
 function ServerManager(command, options) {
@@ -19,8 +19,10 @@ ServerManager.prototype.monitor = function (command, options) {
     command = command || self.command;
     options = options || self.options;
 
-    // Set the command
-    command = command || yargs(hideBin(process.argv)).argv.command || 'npm start';
+    // Set the command. `--command <cmd>` carries a value by the parse's own
+    // rule; the CLI's declarations ride along so this is not a second shape.
+    const argv = parseArgv(process.argv.slice(2), { booleans: BOOLEAN_FLAGS, multiples: MULTIPLE_FLAGS });
+    command = command || argv.command || 'npm start';
 
     // Set the options
     options = options || {};

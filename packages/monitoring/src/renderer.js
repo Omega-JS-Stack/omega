@@ -26,7 +26,7 @@ const renderer = {
   initialize(host) {
     renderer._initialized = true;
 
-    const { shouldEnable, options, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates());
+    const { shouldEnable, options, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates(host));
     renderer._options = options;
 
     if (!shouldEnable) {

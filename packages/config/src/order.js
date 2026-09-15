@@ -36,14 +36,14 @@ const { parseRoot } = require('./edit.js');
 // manager-owned block (#484 retired `testing`: no schema rule, and the testing
 // service reads no config at all, so converters were carrying a dead key).
 const CANONICAL_TOP_LEVEL_ORDER = [
-  'enabled', 'parent', 'brand', 'url', 'company', 'socials', 'account', 'local', 'ports',
-  'repo', 'github', 'domain',
+  'enabled', 'brand', 'url', 'type', 'company', 'socials', 'account', 'local', 'ports',
+  'repo', 'domain',
   'edge', 'cloud', 'captcha', 'analytics',
   'monitoring', 'advertising', 'features', 'payment', 'connections', 'sponsorships',
   'marketing', 'blog', 'devlog', 'reviews', 'seo', 'search',
   'dataRequest', 'forms', 'inbound',
   'server', 'assets', 'directory',
-  'certificates', 'theme', 'ai', 'translation', 'client', 'migrations', 'targets',
+  'certificates', 'publishing', 'theme', 'ai', 'translation', 'client', 'migrations', 'targets',
 ];
 
 /**

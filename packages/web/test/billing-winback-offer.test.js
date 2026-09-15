@@ -752,7 +752,7 @@ test('#268: the built account page carries the dialog the gate opens', async () 
     delete globalThis[name];
   }
 
-  const { buildWith, miniData } = require('./lib/build.js');
+  const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
   const pages = await buildWith(miniData, {}, 'billing-winback-test');
   const page = pages.get('/dashboard/account');
   assert.ok(page, 'account page built');
@@ -781,7 +781,7 @@ test('#268: the build resolves the offer into the client config', async () => {
     delete globalThis[name];
   }
 
-  const { buildWith, miniData } = require('./lib/build.js');
+  const { buildWith, readBuildJson, miniData } = require('./lib/build.js');
   const pages = await buildWith(
     { ...miniData, payment: { currency: 'USD', products: PRODUCTS } },
     {},
@@ -790,11 +790,12 @@ test('#268: the build resolves the offer into the client config', async () => {
   const page = pages.get('/dashboard/account');
   assert.ok(page, 'account page built');
 
-  // The client blob foot.html emits: `"payment": { … }`, spread from site.client.
-  const paymentAt = page.indexOf('"payment":');
-  assert.ok(paymentAt > 0, 'the client blob carries the payment section at all');
-
-  const emitted = page.slice(paymentAt, paymentAt + 4000);
-  assert.match(emitted, /"winback":\{[^}]*"enabled":true/, 'the client blob carries the resolved offer');
-  assert.match(emitted, /"percent":50/, 'with the framework default baked in');
+  // The config a browser reads is the run's ONE `build.js` snapshot (#894), the
+  // file the chrome loads with its first script tag: the page itself carries no
+  // config blob any more, so the resolved offer is read out of the snapshot.
+  const payment = readBuildJson(pages).config.payment;
+  assert.ok(payment, 'the snapshot carries the payment section at all');
+  assert.strictEqual(payment.winback.enabled, true, 'the snapshot carries the resolved offer');
+  assert.strictEqual(payment.winback.percent, 50, 'with the framework default baked in');
+  assert.ok(!page.includes('"winback"'), 'and the page bakes no second copy of it');
 });

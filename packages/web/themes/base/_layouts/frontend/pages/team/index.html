@@ -30,13 +30,13 @@ principles:
   items:
     - title: "We ship weekly"
       description: "Small releases, every week. Momentum beats ceremony."
-      icon: "rocket"
+      icon: "fa-solid fa-rocket"
     - title: "Everyone talks to users"
       description: "Support isn't a department. The person who built it answers for it."
-      icon: "comments"
+      icon: "fa-solid fa-comments"
     - title: "Writing over meetings"
       description: "Decisions get written down where everyone can read them."
-      icon: "pen-nib"
+      icon: "fa-solid fa-pen-nib"
 
 # Join CTA
 join_cta:
@@ -113,10 +113,12 @@ bands below keep the reveal lane. {% endcomment %}
               {% iftruthy member.member.links %}
                 <div class="omega-person__links">
                   {% for link in member.member.links %}
-                    {% assign link_icon = link.id %}
-                    {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                    {% comment %} The id names a PLATFORM, not an icon (#929): a profile
+                    link is always a brand mark, and `website` is the one that is not. {% endcomment %}
+                    {% assign link_icon = 'fa-brands fa-' | append: link.id %}
+                    {% if link.id == "website" %}{% assign link_icon = "fa-solid fa-globe" %}{% endif %}
                     <a href="{{ link.url }}" class="omega-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                      <i class="fa-solid fa-{{ link_icon }} fa-sm"></i>
+                      <i class="{{ link_icon }} fa-sm" aria-hidden="true"></i>
                     </a>
                   {% endfor %}
                 </div>
@@ -142,7 +144,7 @@ bands below keep the reveal lane. {% endcomment %}
         {% for item in resolved.principles.items %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ item.icon }} fa-sm"></i></span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="{{ item.icon }} fa-sm" aria-hidden="true"></i></span>
               <strong>{{ item.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ item.description }}</span>

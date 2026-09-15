@@ -117,7 +117,11 @@ ${CUSTOM_MARKER}
       },
     },
     {
-      name: 'gitignore: migrates user-added Default line to Custom when not in new defaults (no quoting for gitignore)',
+      // The framework block is COMPLETELY managed ([#926](https://github.com/Omega-JS-Stack/omega/issues/926)):
+      // a retired framework line and a line a user typed into the framework block
+      // cannot be told apart, and the block header says it is overwritten on
+      // every setup, so a line the new block does not carry leaves the file.
+      name: 'gitignore: a Default line the new defaults no longer carry DROPS instead of migrating (#926)',
       run: (ctx) => {
         const existing = `${DEFAULT_MARKER}
 node_modules/
@@ -132,10 +136,29 @@ dist/
 ${CUSTOM_MARKER}
 `;
         const merged = mergeLineBasedFiles(existing, incoming, '.gitignore');
-        ctx.expect(merged).toContain('my-fork-only.txt');
+        ctx.expect(merged).not.toContain('my-fork-only.txt');
         ctx.expect(merged).toContain('dist/');
-        // gitignore is NOT quoted.
-        ctx.expect(merged).not.toContain('"my-fork-only.txt"');
+      },
+    },
+    {
+      // The value a retired key holds is the user's DATA, so it still migrates
+      // (the case above); an EMPTY retired key holds nothing and drops (#926).
+      name: 'env: an EMPTY retired key drops instead of migrating to Custom (#926)',
+      run: (ctx) => {
+        const existing = `${DEFAULT_MARKER}
+GH_TOKEN="mine"
+MY_EMPTY_KEY=
+
+${CUSTOM_MARKER}
+`;
+        const incoming = `${DEFAULT_MARKER}
+GH_TOKEN=""
+
+${CUSTOM_MARKER}
+`;
+        const merged = mergeLineBasedFiles(existing, incoming, '.env');
+        ctx.expect(merged).not.toContain('MY_EMPTY_KEY');
+        ctx.expect(merged).toContain('GH_TOKEN="mine"');
       },
     },
     {

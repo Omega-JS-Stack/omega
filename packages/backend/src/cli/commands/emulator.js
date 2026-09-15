@@ -632,7 +632,7 @@ class EmulatorCommand extends BaseCommand {
       // targets the RESOLVED hosting port, not a classic that may have bumped
       this.startStripeWebhookForwarding(emulatorPorts.hosting);
 
-      // Seed personas unless --no-seed was passed (yargs boolean negation:
+      // Seed personas unless --no-seed was passed (the parse's negation rule:
       // `--no-seed` parses as argv.seed === false). seedPersonas is fully
       // non-fatal — any failure logs a warning and the emulator keeps running.
       if (this.argv.seed !== false) {

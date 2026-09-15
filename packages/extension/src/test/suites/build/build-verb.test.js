@@ -38,14 +38,21 @@ function freshCli() {
   return require(CLI_PATH);
 }
 
+// OMEGA_ENVIRONMENT rides the list because it is the ONE environment input
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)) and src/build.js
+// WRITES it at load from the lane, so clearing the build-mode flag and
+// re-requiring the CLI without clearing it leaves the previous lane's word in
+// the process, for this case and for the next suite.
 async function withEnv(run) {
-  const previous = process.env.OMEGA_BUILD_MODE;
-  delete process.env.OMEGA_BUILD_MODE;
+  const keys = ['OMEGA_ENVIRONMENT', 'OMEGA_BUILD_MODE'];
+  const previous = keys.map((key) => [key, process.env[key]]);
+  keys.forEach((key) => delete process.env[key]);
   try {
     return await run();
   } finally {
-    if (previous === undefined) delete process.env.OMEGA_BUILD_MODE;
-    else                       process.env.OMEGA_BUILD_MODE = previous;
+    previous.forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    });
   }
 }
 

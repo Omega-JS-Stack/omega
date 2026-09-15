@@ -6,12 +6,9 @@
 {
   targets: {
     backend: {
-      parent: '',
-      // No `repo` slug — offline fixture; the routes' "not configured"
-      // guard is the correct behavior here.
-      github: {
-        user: 'ITW-Creative-Works',
-      },
+      // The brand declares no `repo` block at all (#883), so the content
+      // routes' "not configured" guard is the correct behavior here: an
+      // offline fixture commits to nothing.
       marketing: {
         campaigns: {
           enabled: false,

@@ -4,11 +4,13 @@
  * via the App Store Connect API.
  *
  * Signing home: ONE Apple account signs everything a company ships, so a
- * company-managed brand (`.omega/company.json` marker → context.companyRoot)
- * shares the COMPANY workspace's signing tree; a standalone brand (the
- * playground today — no parent yet) keeps it brand-local, and the material
- * simply moves to the company root when one is born. Layout under the
- * gitignored {companyRoot||brandRoot}/.omega/certificates/apple/:
+ * brand naming a company (`company: { id }` -> context.companyRoot, the
+ * company TREE inside the parent's repo, #677) resolves signing material in
+ * TWO tiers (@omega.js/devkit/signing-tree, #892): every READ looks in the
+ * company tree first and the brand's own second, and every WRITE lands in the
+ * company tree when there is one. A standalone brand keeps it brand-local, and
+ * the material simply moves into the company tree when one is born. Layout
+ * under the gitignored {companyRoot||brandRoot}/.omega/certificates/apple/:
  *   AuthKey_*.p8                           (App Store Connect API key — the interactive rescue files it from Downloads)
  *   certificates/{TYPE}.cer + .p12         (downloaded/created + exported)
  *   csr/{TYPE}/{private.key,request.csr}   (PRESERVED — the issued cert is paired with this key)
@@ -37,6 +39,8 @@ const { randomBytes } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
+const { signingTree } = require('@omega.js/devkit/signing-tree');
+const { hasTargetOfType } = require('@omega.js/config');
 
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
@@ -49,25 +53,32 @@ const { importP12Files } = require('./lib/keychain.js');
 const APPSTORE_KEYS_URL = 'https://appstoreconnect.apple.com/access/api';
 
 /**
- * Find the user-placed App Store Connect API key (AuthKey_*.p8) in the
- * brand's Apple dir. Auto-detected by prefix so no path config is needed.
+ * Find the user-placed App Store Connect API key (AuthKey_*.p8) in the signing
+ * tree, company tier FIRST (one Apple account per company, #892). Auto-detected
+ * by prefix so no path config is needed.
  *
- * @param {string} appleDir - {brandRoot}/.omega/certificates/apple
+ * @param {object} tree - The brand's signing tree
  * @returns {string|null} - Absolute path to the .p8, or null
  */
-function findAuthKey(appleDir) {
-  if (!jetpack.exists(appleDir)) {
-    return null;
+function findAuthKey(tree) {
+  for (const dir of tree.readDirs) {
+    if (!jetpack.exists(dir)) {
+      continue;
+    }
+    const p8Files = jetpack.find(dir, { matching: 'AuthKey_*.p8', recursive: false });
+    if (p8Files[0]) {
+      return p8Files[0];
+    }
   }
-  const p8Files = jetpack.find(appleDir, { matching: 'AuthKey_*.p8', recursive: false });
-  return p8Files[0] || null;
+
+  return null;
 }
 
 /**
  * Generate a random CSC_KEY_PASSWORD and persist it to the signing root's
- * .env (the company workspace when company-managed — shared .p12s need the
+ * .env (the company TREE for a brand of a company: shared .p12s need the
  * ONE shared password, and the env chain loads the company .env under every
- * sibling brand's — else the brand root).
+ * brand of that company, else the brand root).
  *
  * .p12 files MUST carry a real password — modern macOS rejects
  * empty-password .p12 in `security import` ("MAC verification failed").
@@ -92,7 +103,8 @@ function ensureCertPassword(signingRoot) {
  * filing it into the signing tree. Non-interactive runs keep the skip +
  * guidance contract.
  */
-async function rescueAuthKey(appleDir, downloadsDir = join(homedir(), 'Downloads')) {
+async function rescueAuthKey(tree, downloadsDir = join(homedir(), 'Downloads')) {
+  const appleDir = tree.writeDir;
   const startedAt = Date.now();
 
   const result = await openBrowserAndPoll({
@@ -123,7 +135,7 @@ async function rescueAuthKey(appleDir, downloadsDir = join(homedir(), 'Downloads
 
   if (result.success) {
     console.log(`      ${chalk.green('✓')} Filed ${chalk.cyan(result.result)} into ${chalk.gray(appleDir)}`);
-    return findAuthKey(appleDir);
+    return findAuthKey(tree);
   }
 
   return null;
@@ -134,7 +146,7 @@ async function rescueAuthKey(appleDir, downloadsDir = join(homedir(), 'Downloads
  * signing tree. Returns { skip, reason } when anything is missing — except
  * a missing .p8 on an interactive run, which gets the download rescue.
  */
-async function resolveAppleSecrets(context, appleDir, signingRoot) {
+async function resolveAppleSecrets(context, tree, signingRoot) {
   const dryRun = context.options?.dryRun || false;
 
   // The shared setup contract (#608): an interactive run walks the App Store
@@ -149,14 +161,14 @@ async function resolveAppleSecrets(context, appleDir, signingRoot) {
   const keyId = process.env.APPLE_API_KEY_ID;
   const teamId = process.env.APPLE_TEAM_ID;
 
-  let privateKeyPath = findAuthKey(appleDir);
+  let privateKeyPath = findAuthKey(tree);
   if (!privateKeyPath && canPrompt(context.options)) {
-    privateKeyPath = await rescueAuthKey(appleDir, context.downloadsDir);
+    privateKeyPath = await rescueAuthKey(tree, context.downloadsDir);
   }
   if (!privateKeyPath) {
     return {
       skip: true,
-      reason: `no App Store Connect API key found — download the .p8 from ${APPSTORE_KEYS_URL} and save it as AuthKey_<KEYID>.p8 in ${appleDir}`,
+      reason: `no App Store Connect API key found: download the .p8 from ${APPSTORE_KEYS_URL} and save it as AuthKey_<KEYID>.p8 in ${tree.writeDir}`,
     };
   }
 
@@ -191,22 +203,22 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'certificates.enabled = false' };
     }
 
-    const targets = context.brandConfig.targets || {};
-    if (!targets.desktop && !targets.mobile) {
+    if (!hasTargetOfType(context.brandConfig, 'desktop') && !hasTargetOfType(context.brandConfig, 'mobile')) {
       return { skip: true, reason: 'no desktop or mobile target' };
     }
 
-    // One Apple account signs everything a company ships — company-managed
-    // brands share the company workspace's signing tree; standalone brands
-    // keep it brand-local (and the material moves when a company is born)
+    // One Apple account signs everything a company ships: a brand of a company
+    // READS the company tree first and WRITES into it; standalone brands keep
+    // it brand-local (and the material moves when a company is born)
+    const tree = signingTree({ brandRoot: context.brandRoot, companyRoot: context.companyRoot || null });
     const signingRoot = context.companyRoot || context.brandRoot;
-    const appleDir = join(signingRoot, '.omega', 'certificates', 'apple');
+    const appleDir = tree.writeDir;
 
     // Tests inject a fake client + secrets via context
     let appleClient = context.appleClient;
     let appleSecrets = context.appleSecrets;
     if (!appleClient) {
-      const resolved = await resolveAppleSecrets(context, appleDir, signingRoot);
+      const resolved = await resolveAppleSecrets(context, tree, signingRoot);
       if (resolved.skip) {
         return resolved;
       }
@@ -218,6 +230,7 @@ module.exports.run = createServiceRunner({
       appleClient,
       appleSecrets,
       appleDir,
+      tree,
       // Tests inject a recorder so the real macOS keychain is never touched
       keychainImport: context.keychainImport || importP12Files,
     };

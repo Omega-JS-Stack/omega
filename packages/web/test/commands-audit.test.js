@@ -21,7 +21,7 @@ test('parseThresholds: no flag = no gate (report-only default)', () => {
   assert.deepStrictEqual(audit.parseThresholds({ _: ['audit'] }), {});
 });
 
-test('parseThresholds: dashed and yargs-camelized flags both arm their category', () => {
+test('parseThresholds: dashed and camelized flags both arm their category', () => {
   const thresholds = audit.parseThresholds({
     _: ['audit'],
     'min-performance': 90,
@@ -56,7 +56,7 @@ test('parseMaxLcp: no flag = no LCP gate (report-only default)', () => {
   assert.strictEqual(audit.parseMaxLcp({ _: ['audit'] }), null);
 });
 
-test('parseMaxLcp: dashed and yargs-camelized flags both arm the gate', () => {
+test('parseMaxLcp: dashed and camelized flags both arm the gate', () => {
   assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 1000 }), 1000);
   assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], maxLcp: '1000' }), 1000);
   assert.strictEqual(audit.parseMaxLcp({ _: ['audit'], 'max-lcp': 1000, maxLcp: 1000 }), 1000);

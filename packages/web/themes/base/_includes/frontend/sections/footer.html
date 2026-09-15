@@ -46,7 +46,11 @@
               {% capture social_href %}{% omega_social platform %}{% endcapture %}
               {% iftruthy social_href %}
                 <a href="{{ social_href }}" class="omega-footer__social-link" aria-label="{{ platform | capitalize }}">
-                  <i class="fa-solid fa-{{ platform }} fa-sm"></i>
+                  {% comment %} The key names a PLATFORM, not an icon (#929): a social
+                  profile is always a brand mark, so the family is derived at the one
+                  site that knows it, never typed by a brand that only named the
+                  platform. {% endcomment %}
+                  <i class="fa-brands fa-{{ platform }} fa-sm" aria-hidden="true"></i>
                 </a>
               {% endiftruthy %}
             {% endfor %}
@@ -71,7 +75,9 @@
                 {% for link in link_group.links %}
                   {% capture link_classes %}omega-footer__link{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
                   {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
-                  {% capture link_icon %}{% if link.icon %}{{ resolved.config.icons[link.icon] }}{% endif %}{% endcapture %}
+                  {% comment %} A link carries its OWN Font Awesome classes (#619, #850): `icon: 'fa-brands fa-github'`.
+                    The name-to-markup `icons` map this used to look the name up in is a retired config key. {% endcomment %}
+                  {% capture link_icon %}{% if link.icon %}<i class="{{ link.icon }}" aria-hidden="true"></i>{% endif %}{% endcapture %}
                   {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
                   <li>
                     <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
@@ -94,10 +100,11 @@
           {% if data.copyright.text %}
             {{ data.copyright.text | omega_liquify }}
           {% else %}
-            {% comment %} A sub-brand credits its parent (brand.company), linked
-            when company.url names one — no parent configured (or a company that
-            IS the brand) keeps the plain line {% endcomment %}
-            {% assign parent_company = resolved.config.brand.company %}
+            {% comment %} A sub-brand credits its parent, linked when the
+            resolved company.url names one (#677). A standalone brand resolves
+            its company to ITSELF, so the name check below keeps the plain line
+            with no fallback of its own {% endcomment %}
+            {% assign parent_company = resolved.config.company.name %}
             {% if parent_company and parent_company != '' and parent_company != 'null' and parent_company != resolved.config.brand.name %}
               {% if resolved.config.company.url %}
                 {% capture parent_mark %}<a href="{{ resolved.config.company.url }}">{{ parent_company }}</a>{% endcapture %}

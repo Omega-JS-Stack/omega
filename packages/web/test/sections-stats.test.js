@@ -43,14 +43,14 @@ test('#518: an item with icon and color renders the glyph and the token class', 
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(
     '{% section "marketing/stats" %}\nitems:\n'
-    + '  - number: "1M+"\n    label: "Happy customers"\n    icon: "smile"\n    color: "tone-3"\n'
+    + '  - number: "1M+"\n    label: "Happy customers"\n    icon: "fa-solid fa-smile"\n    color: "tone-3"\n'
     + '{% endsection %}',
     {},
   );
 
   assert.ok(html.includes('<div class="omega-stat omega-tone-3" data-omega-reveal>'), 'the tone slot rides the stat, from the ONE palette');
-  assert.ok(/<span class="omega-icon-chip omega-stat__icon"><i class="fa-solid fa-smile fa-sm"><\/i>/.test(html),
-    'the glyph rides the one icon mechanism, in the shared chip idiom');
+  assert.ok(/<span class="omega-icon-chip omega-stat__icon"><i class="fa-solid fa-smile fa-sm" aria-hidden="true"><\/i>/.test(html),
+    'the glyph rides the one icon mechanism, in the shared chip idiom, exactly as authored');
   assert.ok(html.includes('<div class="omega-stat__num" data-omega-countup>1M+</div>'), 'the number is untouched');
   assert.ok(html.includes('Happy customers'), 'and its label');
   assert.deepEqual(warnings, [], 'icon and color are declared item keys');
@@ -73,7 +73,7 @@ test('#518: a color that is not a palette name paints nothing — no hex ever re
   const { engine } = makeEngine();
   const html = await engine.parseAndRender(
     '{% section "marketing/stats" %}\nitems:\n'
-    + '  - number: "3x"\n    label: "Faster"\n    icon: "bolt"\n    color: "#d6336c"\n'
+    + '  - number: "3x"\n    label: "Faster"\n    icon: "fa-solid fa-bolt"\n    color: "#d6336c"\n'
     + '{% endsection %}',
     {},
   );

@@ -121,8 +121,8 @@ phone home).
 |---|---|---|---|
 | web | `omega build` (the production build — on the runner for a deploy, locally for a local one) | `site.license`, a build fact beside `site.pricing`/`site.brandTokens` | the footer's "Powered by omegajs.dev" block renders only while `site.license.attribution == 'shown'` (themes/base `_includes/frontend/sections/footer.html`) |
 | backend | `omega deploy`, before the stage — the CLI reads the key from the .env cascade in its own process | `OMEGA_LICENSE_STATUS` in the composed `dist/.env` (the one COMPUTED key there; the KEY itself never rides the upload) | `libraries/payment/license.js` refuses Stripe/PayPal/Chargebee `init()` on `keyless`. The `test` provider is never gated, and an ABSENT status — every local lane, the emulator, a test — behaves exactly as before |
-| desktop | the bundle task, production builds only | `OMEGA_BUILD_JSON.license` (outside `config`, the blob the renderer hands @omega.js/client) | nothing at runtime: the artifact records what it was packaged as. Neither target has an attribution surface today, and their payments ride the backend's gate |
-| extension | the bundle task, production builds only (once per build — the one snapshot every browser target then copies) | `OMEGA_BUILD_JSON.license`, baked into every bundle, likewise outside `config` | as desktop |
+| desktop | the bundle task, production builds only | `OMEGA_BUILD_JSON.license` (outside `config`, in the bundles' define and in the renderer's `dist/build.js`) | nothing at runtime: the artifact records what it was packaged as. Neither target has an attribution surface today, and their payments ride the backend's gate |
+| extension | the bundle task, production builds only (once per build: the one snapshot every browser target then copies) | `OMEGA_BUILD_JSON.license` in the artifact's `build.js`, likewise outside `config` | as desktop |
 
 **Honesty system** (spec call 6): plain readable checks, no obfuscation and no artifact
 signing. The legal backing is the Elastic License 2.0 below, whose terms forbid
@@ -163,7 +163,7 @@ circumventing license-key functionality and removing notices.
 3. **Verify from the outside**: in an empty temp dir, `npm install @omega.js/web`
    (and one more, e.g. manager) — install + `require.resolve` must succeed with no
    overrides. That is the moment the untested-lane risk is retired.
-4. **Flip the real brand (omega-omega) to registry specs**: from any TARGET root (`targets/website`;
+4. **Flip the real brand (omega-omega) to registry specs**: from any TARGET root (`targets/web`;
    the manager has no `i` verb), `npx omega i live` — tree-wide `file:` → the EXACT
    family pin + one registry install (`restoreRegistrySpecs` writes the linked copy's version with no
    caret, because the family is lockstep; `omega i local` is the way back for

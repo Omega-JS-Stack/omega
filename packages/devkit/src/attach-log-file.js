@@ -22,6 +22,11 @@
 // That is what keeps an inner tee's detach from stealing (and truncating) the outer tee's
 // file, the way a shared singleton did.
 //
+// Two attaches on ONE tee stack the same way: a second attach of a DIFFERENT path pushes a
+// layer on top of the first instead of replacing it, so a verb that runs another verb in
+// process (`omega test` running `omega deploy`) keeps teeing both files. Detach order is
+// LIFO, and the module-level `detach()` pops the newest layer.
+//
 // Skipped in CI: a runner has its own log capture and wants no logs/ left in the workspace.
 // `attachInCI: true` opts out of that skip, for a sink whose file is the POINT rather than
 // workspace debris (the signing box's own runner log, which a CI job is exactly when it
@@ -51,8 +56,10 @@ function isCI(env) {
 
 // Factory — each call returns an independent tee with its own closure state.
 function createTee() {
-  let activePath = null;
-  let activeDetach = null;
+  // One entry per live attach on this tee, oldest first. A layer restores the writers it
+  // captured, so detaching in LIFO order (the only order a nested run produces) unwinds
+  // the patches exactly as they went on.
+  const layers = [];
   let warned = false;
 
   function attach(filePath, options) {
@@ -63,10 +70,10 @@ function createTee() {
 
     const abs = path.resolve(filePath);
 
-    // Already teeing this exact file — do not patch a second time (that would write
-    // every line twice).
-    if (activePath === abs) { return activeDetach; }
-    if (activeDetach) { activeDetach(); }
+    // Already teeing this exact file, so do not patch a second time (that would write every
+    // line twice, and reopen the file truncated under the live layer).
+    const live = layers.find((layer) => layer.path === abs);
+    if (live) { return live.detach; }
 
     let fd;
     try {
@@ -125,21 +132,22 @@ function createTee() {
       process.off('exit', closeFd);
       closeFd();
 
-      if (activeDetach === detach) {
-        activePath = null;
-        activeDetach = null;
-      }
+      const index = layers.indexOf(layer);
+      if (index !== -1) { layers.splice(index, 1); }
     }
 
-    activePath = abs;
-    activeDetach = detach;
+    const layer = { path: abs, detach };
+    layers.push(layer);
 
     return detach;
   }
 
   return {
     attach,
-    detach: () => { if (activeDetach) { activeDetach(); } },
+    detach: () => {
+      const newest = layers[layers.length - 1];
+      if (newest) { newest.detach(); }
+    },
   };
 }
 

@@ -40,16 +40,16 @@ const { checkTargetFiles } = require('../src/services/testing/lib/checks.js');
 const BASE = { brand: { id: 'b', name: 'B', url: 'https://b.test' } };
 
 /**
- * A brand monorepo with a website and a backend target, the backend declaring
+ * A brand monorepo with a web and a backend target, the backend declaring
  * `projectType` (omitted = the firebase default) and carrying `scripts`.
  */
 function makeBrand({ projectType, scripts = {}, files = {} } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'omega-backend-mode-'));
-  const backend = projectType ? { projectType } : {};
+  const backend = { type: 'backend', ...(projectType ? { projectType } : {}) };
 
-  jetpack.write(join(root, 'config', 'omega.json5'), JSON.stringify({ ...BASE, targets: { web: {}, backend } }, null, 2));
+  jetpack.write(join(root, 'config', 'omega.json5'), JSON.stringify({ ...BASE, targets: { web: { type: 'web' }, backend } }, null, 2));
   jetpack.write(join(root, 'package.json'), { name: 'b', workspaces: ['targets/*'] });
-  jetpack.write(join(root, 'targets', 'website', 'package.json'), { name: 'website', dependencies: { '@omega.js/web': '*' } });
+  jetpack.write(join(root, 'targets', 'web', 'package.json'), { name: 'web', dependencies: { '@omega.js/web': '*' } });
   jetpack.write(join(root, 'targets', 'backend', 'package.json'), {
     name: 'backend',
     dependencies: { '@omega.js/backend': '*' },

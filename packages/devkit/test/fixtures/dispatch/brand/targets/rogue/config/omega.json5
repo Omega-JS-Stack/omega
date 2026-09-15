@@ -2,6 +2,6 @@
 // must skip it (target-of-brand) and resolve the brand root above.
 {
   targets: {
-    web: {},
+    web: { type: 'web' },
   },
 }

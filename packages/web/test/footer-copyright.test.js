@@ -1,6 +1,7 @@
 /**
- * The footer copyright line — a sub-brand credits the parent company from
- * CONFIG (brand.company, linked with company.url), never a typed literal.
+ * The footer copyright line: a sub-brand credits the parent company from the
+ * RESOLVED `company` section (#677: the loader fills name/url from the parent's
+ * own config, the brand types only `company: { id }`), never a typed literal.
  * Three shapes: no parent (the plain line), a parent without a url (plain
  * text), a parent with one (a link). The year keeps coming from site.omega.date.
  */
@@ -24,9 +25,9 @@ test('no parent company configured → the plain brand line stands', async () =>
   assert.ok(!line.includes(' by '), 'nothing to credit');
 });
 
-test('brand.company without company.url → the parent is credited as plain text', async () => {
+test('a resolved company with no url → the parent is credited as plain text', async () => {
   const pages = await buildWith(
-    { ...miniData, brand: { ...miniData.brand, company: 'Mini Holdings' } },
+    { ...miniData, company: { id: 'mini-holdings', name: 'Mini Holdings', url: null, images: {} } },
     {},
     'footer-copyright-text',
   );
@@ -36,12 +37,11 @@ test('brand.company without company.url → the parent is credited as plain text
   assert.ok(!line.includes('<a'), 'no url configured, so no link');
 });
 
-test('brand.company + company.url → the parent name links the parent site', async () => {
+test('a resolved company name + url → the parent name links the parent site', async () => {
   const pages = await buildWith(
     {
       ...miniData,
-      brand: { ...miniData.brand, company: 'Mini Holdings' },
-      company: { url: 'https://miniholdings.example.com' },
+      company: { id: 'mini-holdings', name: 'Mini Holdings', url: 'https://miniholdings.example.com', images: {} },
     },
     {},
     'footer-copyright-link',
@@ -109,9 +109,11 @@ test('#379: the bolt and attribution links take the brand primary in both themes
   assert.ok(/a\s*\{[^}]*var\(--nf-volt\)/.test(nfCopyright), 'newsflash parent-company link is volt');
 });
 
-test('a company that IS the brand adds no self-credit', async () => {
+test('a company that IS the brand adds no self-credit (the standalone resolution)', async () => {
+  // A brand with no company resolves to its OWN name and url, which is what
+  // lets every reader work with no fallback (#677).
   const pages = await buildWith(
-    { ...miniData, brand: { ...miniData.brand, company: 'MiniCo' } },
+    { ...miniData, company: { id: null, name: 'MiniCo', url: miniData.brand.url, images: {} } },
     {},
     'footer-copyright-self',
   );

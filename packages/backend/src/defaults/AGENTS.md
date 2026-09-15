@@ -43,8 +43,6 @@ npx omega install dev       # use LOCAL @omega.js/backend source (to test framew
 npx omega install live      # restore the published @omega.js/backend from npm
 ```
 
-`npx omega-backend <cmd>` works too (alias of `npx omega <cmd>`).
-
 > Editing the @omega.js/backend framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/backend`). Run `npx omega install live` to switch back.
 
 ## Where things live

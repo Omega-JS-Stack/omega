@@ -141,6 +141,11 @@ Main is Node — Firebase defaults to in-memory there — so @omega.js/desktop p
 }
 ```
 
+A TEST RUN is always `none`, whatever this config says, on the main and boot layers
+alike: the harness never signs a real user in, so it never asks the OS keychain
+([#907](https://github.com/Omega-JS-Stack/omega/issues/907), the mechanics in
+[test-framework.md](test-framework.md)).
+
 Storage only — distribution across processes stays the IPC sync protocol above.
 The session restores at boot (offline included: no network round trip), so a restart
 keeps the user signed in; renderers then re-resolve the account and re-push the plan.
@@ -169,7 +174,7 @@ Firebase is **bundled from @omega.js/desktop's module context** (@omega.js/clien
 
 If you're building a no-auth Electron app, just leave `cloud.config` empty — the bridge is a clean no-op.
 
-In a TESTING run (`OMEGA_TEST_MODE=true`) the bridge connects its auth instance to the local auth emulator, on the port it reads in three steps: `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, then the `dev.ports.auth` value the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then the classic `9099`. Same chain `getApiUrl()` walks ([environment-detection.md](environment-detection.md)) and the same move it makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
+In a TESTING run (`OMEGA_ENVIRONMENT=testing`) the bridge connects its auth instance to the local auth emulator, on the port it reads in three steps: `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, then the `dev.ports.auth` value the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then the classic `9099`. Same chain `getApiUrl()` walks ([environment-detection.md](environment-detection.md)) and the same move it makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
 
 ## Common patterns
 
@@ -245,18 +250,15 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 
 `npm run test:e2e-desktop` ([scripts/e2e-desktop-auth.js](../../../scripts/e2e-desktop-auth.js)) boots a real Electron app against the backend emulator and delivers `<brand.id>://auth/token` from a SECOND instance — the OS-forwarded argv path — then asserts main AND the renderer both land on the emulator user. Offline; it is the lane that proves this whole chain end to end.
 
-### Extended tests (skip without opt-in + creds)
+### Extended tests (skip without the opt-in)
 
-`client-bridge.integration.test.js` actually mints custom tokens via `firebase-admin` and signs in — it hits REAL Firebase, so it's gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)). To run:
+`client-bridge.integration.test.js` talks to REAL Firebase, so it is gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)):
 
 ```bash
-npm i -D firebase-admin                                   # already in @omega.js/desktop's devDeps
-export OMEGA_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
-export OMEGA_TEST_USER_UID=desktop-test-user                      # optional, defaults to desktop-test-user
 npx omega test --extended                                   # or: TEST_EXTENDED_MODE=true npx omega test
 ```
 
-Without the extended-mode opt-in the suite skips cleanly with a clear reason; same when `OMEGA_TEST_FIREBASE_ADMIN_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS`) isn't set. CI without creds → tests stay green.
+It asks for NO credential of its own ([#819](https://github.com/Omega-JS-Stack/omega/issues/819), Ian 2026-09-13): the service-account path and the test uid it used to mint a custom token from are retired env keys now. The SIGN-IN proof belongs to [#904](https://github.com/Omega-JS-Stack/omega/issues/904), which signs desktop in as a persona the backend emulator seeds, the same mechanism web and the extension use. Without the opt-in the suite skips cleanly with a reason, so CI stays green.
 
 ## Implementation notes
 

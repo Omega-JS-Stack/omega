@@ -13,6 +13,12 @@ const path = require('node:path');
 const { PassThrough } = require('node:stream');
 const { setPromptStreams } = require('@omega.js/devkit/prompt');
 
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
+const { resolveCompany } = require('@omega.js/config');
+
 const { REQUIRES, SERVICE_ORDER } = require('../src/config.js');
 const { runPreflight, checkService, readTokenStore, assertFamilyVersions } = require('../src/lib/preflight.js');
 const { runManage } = require('../src/manage.js');
@@ -343,6 +349,80 @@ test('preflight walkthrough: what/which/why/fix/rerun — and env VALUES never a
   }
 });
 
+// A brand of a company, both real on disk (#910): the parent carries the
+// shared `company/` tree, whose `.env` is the tier every sub-brand inherits,
+// and the machine registry is how the child's `company: { id }` resolves.
+function stageCompanyBrand({ envFile = true } = {}) {
+  const parentRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-preflight-company-'));
+  fs.mkdirSync(path.join(parentRoot, 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(parentRoot, 'config', 'omega.json5'),
+    JSON.stringify({ brand: { id: 'parent-brand', name: 'Parent', url: 'https://parent.test' } }),
+  );
+  fs.mkdirSync(path.join(parentRoot, 'company', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(parentRoot, 'company', 'config', 'omega.json5'), JSON.stringify({}));
+  if (envFile) fs.writeFileSync(path.join(parentRoot, 'company', '.env'), 'SHARED="value"\n');
+  fs.writeFileSync(
+    path.join(process.env.OMEGA_HOME, 'brands.json'),
+    JSON.stringify({ 'parent-brand': { root: parentRoot, name: 'Parent', url: 'https://parent.test' } }),
+  );
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-preflight-child-'));
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'config', 'omega.json5'),
+    JSON.stringify({ brand: { id: 'child-brand', name: 'Child', url: 'https://child.test' }, company: { id: 'parent-brand' } }),
+  );
+
+  return { root, companyEnv: path.join(parentRoot, 'company', '.env') };
+}
+
+test('preflight walkthrough: a company brand is sent to the COMPANY .env (#910)', () => {
+  const { root, companyEnv } = stageCompanyBrand();
+  const company = resolveCompany(root);
+  assert.equal(company.id, 'parent-brand', 'the fixture resolves a company');
+
+  let result;
+  const log = captureLog(() => {
+    withStreams(false, () => {
+      result = runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company, options: {} }, { requires: UNPROMPTED_REQUIRES });
+    });
+  });
+
+  // One shape for every REQUIRES entry the walkthrough prints: the key belongs
+  // in the company file each sub-brand inherits, and the brand file is the
+  // override, not the home.
+  assert.match(log, new RegExp(`${VAR_MISSING}=<value>`));
+  assert.ok(log.includes(companyEnv), `the fix line names the company .env: ${log}`);
+  assert.match(log, /brand \.env overrides it/);
+  assert.ok(result.gates.fake.reason.includes(companyEnv), `the skip reason says it too: ${result.gates.fake.reason}`);
+});
+
+test('preflight walkthrough: the company .env is named even before it exists (#910)', () => {
+  // The file a first-time company brand has yet to create is still the file
+  // the key belongs in, so the line names the path rather than falling back.
+  const { root, companyEnv } = stageCompanyBrand({ envFile: false });
+
+  const log = captureLog(() => {
+    withStreams(false, () => {
+      runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company: resolveCompany(root), options: {} }, { requires: UNPROMPTED_REQUIRES });
+    });
+  });
+
+  assert.ok(log.includes(companyEnv), `the fix line names the file to create: ${log}`);
+});
+
+test('preflight walkthrough: a standalone brand keeps the brand .env line (#910)', () => {
+  const root = stageTokenStore(null);
+
+  const log = captureLog(() => {
+    withStreams(false, () => runPreflight({ services: ['fake'], brandConfig: {}, brandRoot: root, company: resolveCompany(root), options: {} }, { requires: UNPROMPTED_REQUIRES }));
+  });
+
+  assert.match(log, /to the brand \.env/);
+  assert.ok(!log.includes('company'), `no company, no company line: ${log}`);
+});
+
 test('preflight walkthrough: scope gap names the acting identity + both remedies (cp236 model)', () => {
   process.env.GOOGLE_CLIENT_ID = 'id';
   process.env.GOOGLE_CLIENT_SECRET = SECRET_VALUE;
@@ -397,18 +477,18 @@ function stageBrand() {
     url: 'https://preflight-brand.test',
   },
   targets: {
-    web: {},
+    web: { type: 'web' },
   },
 }`);
-  // A no-dep website target whose build writes dist/index.html — the update
+  // A no-dep web target whose build writes dist/index.html: the update
   // service must pass so the loop provably continues PAST preflight skips
-  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), JSON.stringify({
-    name: 'preflight-website',
+  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), JSON.stringify({
+    name: 'preflight-web',
     private: true,
     scripts: { build: 'node build.js' },
   }, null, 2));
-  fs.writeFileSync(path.join(root, 'targets', 'website', 'build.js'), `const fs = require('node:fs');
+  fs.writeFileSync(path.join(root, 'targets', 'web', 'build.js'), `const fs = require('node:fs');
 const path = require('node:path');
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(__dirname, 'dist', 'index.html'), '<!doctype html><title>preflight</title>');
@@ -506,21 +586,21 @@ function stageInstalledBrand(installs, { spec = null } = {}) {
 
 test('lockstep boot check: every installed package on the family version passes', () => {
   const { root, targets } = stageInstalledBrand({
-    website: { target: 'web', framework: 'web', version: MANAGER_VERSION, client: MANAGER_VERSION },
+    web: { target: 'web', framework: 'web', version: MANAGER_VERSION, client: MANAGER_VERSION },
     backend: { target: 'backend', framework: 'backend', version: MANAGER_VERSION, client: MANAGER_VERSION, clientAt: 'nested' },
   });
 
   const report = assertFamilyVersions({ brandRoot: root, targets });
 
   assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.checked.map((entry) => entry.dir).sort(), ['backend', 'website']);
+  assert.deepEqual(report.checked.map((entry) => entry.dir).sort(), ['backend', 'web']);
   // The client is found wherever npm put it — hoisted at the root, or nested
-  assert.deepEqual(report.checked.map((entry) => entry.dir + ':' + entry.packages.length).sort(), ['backend:2', 'website:2']);
+  assert.deepEqual(report.checked.map((entry) => `${entry.dir}:${entry.packages.length}`).sort(), ['backend:2', 'web:2']);
 });
 
 test('lockstep boot check: one target behind REFUSES, naming the target, both versions and the fix', () => {
   const { root, targets } = stageInstalledBrand({
-    website: { target: 'web', framework: 'web', version: MANAGER_VERSION },
+    web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
     backend: { target: 'backend', framework: 'backend', version: '0.0.9', client: '0.0.9', clientAt: 'nested' },
   });
 
@@ -533,7 +613,7 @@ test('lockstep boot check: one target behind REFUSES, naming the target, both ve
       assert.match(error.message, new RegExp(MANAGER_VERSION.replace(/\./g, '\\.')), 'names the manager\'s version');
       assert.equal(error.refusal, true, 'a refusal prints its message alone — no stack (#706)');
       assert.match(error.message, /omega update --apply/, 'names the verb that actually installs, not the report-only form');
-      assert.ok(!error.message.includes('website'), 'a target that matches is not listed');
+      assert.ok(!error.message.includes('web'), 'a target that matches is not listed');
       return true;
     },
   );
@@ -541,27 +621,27 @@ test('lockstep boot check: one target behind REFUSES, naming the target, both ve
 
 test('lockstep boot check: a `file:` spec is exempt — the local era is the monorepo\'s version by construction', () => {
   const { root, targets } = stageInstalledBrand({
-    website: { target: 'web', framework: 'web', version: '9.9.9', client: '9.9.9', clientAt: 'nested' },
+    web: { target: 'web', framework: 'web', version: '9.9.9', client: '9.9.9', clientAt: 'nested' },
   }, { spec: 'file:../../../omega/packages/web' });
 
   const report = assertFamilyVersions({ brandRoot: root, targets });
 
   assert.deepEqual(report.mismatched, []);
-  assert.deepEqual(report.exempt.map((entry) => entry.dir), ['website']);
+  assert.deepEqual(report.exempt.map((entry) => entry.dir), ['web']);
 });
 
 test('lockstep boot check: a target with no install yet is skipped, not a mismatch', () => {
   const { root, targets } = stageInstalledBrand({
-    website: { target: 'web', framework: 'web' },
+    web: { target: 'web', framework: 'web' },
   });
 
   const log = captureLog(() => {
     const report = assertFamilyVersions({ brandRoot: root, targets });
     assert.deepEqual(report.mismatched, []);
-    assert.deepEqual(report.skipped.map((entry) => entry.dir), ['website']);
+    assert.deepEqual(report.skipped.map((entry) => entry.dir), ['web']);
   });
 
-  assert.match(log, /website/, 'the skip is a line, never silence');
+  assert.match(log, /web/, 'the skip is a line, never silence');
   assert.match(log, /@omega\.js\/web/);
 });
 
@@ -578,9 +658,9 @@ test('lockstep boot check: a custom target has no framework to compare', () => {
 test('lockstep boot check: an installed manifest that cannot be read is a REFUSAL naming the file (#794)', () => {
   for (const [label, contents] of [['unparseable', '{ not json'], ['versionless', JSON.stringify({ name: '@omega.js/web' })]]) {
     const { root, targets } = stageInstalledBrand({
-      website: { target: 'web', framework: 'web', version: MANAGER_VERSION },
+      web: { target: 'web', framework: 'web', version: MANAGER_VERSION },
     });
-    const manifest = path.join(root, 'targets', 'website', 'node_modules', '@omega.js', 'web', 'package.json');
+    const manifest = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web', 'package.json');
     fs.writeFileSync(manifest, contents);
 
     assert.throws(
@@ -599,17 +679,17 @@ test('lockstep boot check: an installed manifest that cannot be read is a REFUSA
 
 test('lockstep boot check: the framework hoisted at the BRAND ROOT is found by the climb', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-hoist-'));
-  const targetPath = path.join(root, 'targets', 'website');
+  const targetPath = path.join(root, 'targets', 'web');
   fs.mkdirSync(targetPath, { recursive: true });
   fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'hoisted-website', devDependencies: { '@omega.js/web': MANAGER_VERSION },
+    name: 'hoisted-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
   }));
   // npm's normal placement in a workspace tree: nothing under the target
   const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
   fs.mkdirSync(hoisted, { recursive: true });
   fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.7' }));
 
-  const targets = [{ name: 'website', dir: 'targets/website', path: targetPath, target: 'web' }];
+  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
 
   assert.throws(
     () => assertFamilyVersions({ brandRoot: root, targets }),
@@ -622,10 +702,10 @@ test('lockstep boot check: the framework hoisted at the BRAND ROOT is found by t
 
 test('lockstep boot check: a target-local copy WINS over the hoisted one — nearest, climbing', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lockstep-nearest-'));
-  const targetPath = path.join(root, 'targets', 'website');
+  const targetPath = path.join(root, 'targets', 'web');
   fs.mkdirSync(targetPath, { recursive: true });
   fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-    name: 'nearest-website', devDependencies: { '@omega.js/web': MANAGER_VERSION },
+    name: 'nearest-web', devDependencies: { '@omega.js/web': MANAGER_VERSION },
   }));
 
   const hoisted = path.join(root, 'node_modules', '@omega.js', 'web');
@@ -638,7 +718,7 @@ test('lockstep boot check: a target-local copy WINS over the hoisted one — nea
   fs.mkdirSync(local, { recursive: true });
   fs.writeFileSync(path.join(local, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: MANAGER_VERSION }));
 
-  const targets = [{ name: 'website', dir: 'targets/website', path: targetPath, target: 'web' }];
+  const targets = [{ name: 'web', dir: 'targets/web', path: targetPath, target: 'web' }];
   const report = assertFamilyVersions({ brandRoot: root, targets });
 
   assert.deepEqual(report.mismatched, [], 'the target-local copy matches, so the stale hoisted one is not what runs here');

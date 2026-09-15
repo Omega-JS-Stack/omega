@@ -55,7 +55,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 const ROOT = path.join(__dirname, '..');
 const PLAYGROUND = path.join(ROOT, 'brands', 'playground-omega');
 const PLAYGROUND_BACKEND = path.join(PLAYGROUND, 'targets', 'backend');
-const PLAYGROUND_WEBSITE = path.join(PLAYGROUND, 'targets', 'website');
+const PLAYGROUND_WEBSITE = path.join(PLAYGROUND, 'targets', 'web');
 // The hoisted local bins, spawned DIRECTLY (see @omega.js/devkit/test/boot-child)
 const MGR_BIN = path.join(ROOT, 'node_modules', '.bin', 'mgr');
 const OMEGA_BIN = path.join(ROOT, 'node_modules', '.bin', 'omega');

@@ -19,9 +19,11 @@
  * add their own `config/hooks/` ignore line.
  *
  * Resolution walks the same hierarchy as the .env cascade: the brand root's
- * own `config/hooks/` first, then the company root's (via the
- * .omega/company.json stamp) — so a company-wide hook covers every brand and
- * a single brand can still override it. Hooks are plain CJS modules whose
+ * own `config/hooks/` first, then the company tree's (the parent brand's
+ * `company/config/hooks/`, resolved through company.js), so a company-wide hook
+ * covers every brand and a single brand can still override it. It is the ONE
+ * inheritance rule (#677) applied to one more relative path, and costs no code
+ * of its own. Hooks are plain CJS modules whose
  * `module.exports` IS the hook function; call-site docs define each hook's
  * signature and return contract.
  */
@@ -29,7 +31,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { readCompanyRoot } = require('./company.js');
+const { resolveCompany } = require('./company.js');
 
 // Hook points are code-owned kebab-case path constants ('account/password') —
 // enforce the shape so a typo'd or traversal-shaped path fails loudly.
@@ -44,7 +46,7 @@ function hookFile(root, hookPath) {
 
 /**
  * Resolve a hook point to the file that defines it: the brand root's own
- * `config/hooks/<hookPath>.js`, else the company root's (company.json stamp).
+ * `config/hooks/<hookPath>.js`, else the company tree's.
  *
  * @param {string} startRoot - Brand (or standalone-project) root
  * @param {string} hookPath - Call-site-mirroring hook point, e.g. 'account/password'
@@ -55,13 +57,13 @@ function resolveHook(startRoot, hookPath) {
     throw new Error(`Invalid hook path ${JSON.stringify(hookPath)} — kebab-case segments joined by '/', e.g. 'account/password'`);
   }
 
-  const roots = [path.resolve(startRoot)];
-  const companyRoot = readCompanyRoot(roots[0]);
-  if (companyRoot && companyRoot !== roots[0]) {
-    roots.push(companyRoot);
-  }
+  const brandRoot = path.resolve(startRoot);
+  const own = hookFile(brandRoot, hookPath);
+  if (fs.existsSync(own)) return own;
 
-  return roots.map((root) => hookFile(root, hookPath)).find((file) => fs.existsSync(file)) || null;
+  // One relative path, one rule: whatever the child lacks resolves from the
+  // company tree at the same place.
+  return resolveCompany(brandRoot).file(path.relative(brandRoot, own));
 }
 
 /**

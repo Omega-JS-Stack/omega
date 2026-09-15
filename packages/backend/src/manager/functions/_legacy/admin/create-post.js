@@ -1,4 +1,5 @@
-const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
+const { resolveWebTarget } = require('../../../helpers/web-target.js');
 const env = require('../../../libraries/env.js');
 let fetch;
 let Poster;
@@ -40,13 +41,24 @@ let Module = {
         // label: '',
       });
 
-      let repoInfo = { user: brandRepoOwner(self.Manager.config), name: brandRepoName(self.Manager.config) };
+      const source = sourceRepo(self.Manager.config) || {};
+      let repoInfo = { owner: source.owner, name: source.name };
 
       if (!user.roles.admin) {
         response.status = 401;
         response.error = new Error('Unauthenticated, admin required.');
         ctx.error(response.error)
       } else {
+        // WHICH website the post belongs to (#887): every path below is
+        // composed inside this target's folder
+        let target;
+        try {
+          target = resolveWebTarget(self.Manager.config, ctx.request.data.target);
+        } catch (e) {
+          ctx.error(e);
+          return res.status(e.code || 400).send(e.message);
+        }
+
         // Poster = Poster || require('/Users/ianwiedenman/Documents/GitHub/ITW-Creative-Works/ultimate-jekyll-poster');
         Poster = Poster || require('ultimate-jekyll-poster');
 
@@ -55,9 +67,9 @@ let Module = {
         // Save to disk OR commit
         poster.onDownload = async function (meta) {
           return new Promise(async function(resolve, reject) {
-            let finalPath = poster.removeDirDot(meta.finalPath);
+            let finalPath = `${target.path}/${poster.removeDirDot(meta.finalPath)}`;
             let tempPath = (meta.tempPath);
-            await createFile(self.Manager.config?.github?.user, repoInfo.user, repoInfo.name, env.get('GH_TOKEN'), finalPath, await poster.readImage(tempPath))
+            await createFile(repoInfo.owner, repoInfo.name, env.get('GH_TOKEN'), finalPath, await poster.readImage(tempPath))
             .catch((e) => {
               // console.log('---CAUGHT 1', e);
             })
@@ -68,7 +80,7 @@ let Module = {
         let finalPost = await poster.create(ctx.request.data);
 
         // Save post OR commit
-        await createFile(self.Manager.config?.github?.user, repoInfo.user, repoInfo.name, env.get('GH_TOKEN'), poster.removeDirDot(finalPost.path), finalPost.content)
+        await createFile(repoInfo.owner, repoInfo.name, env.get('GH_TOKEN'), `${target.path}/${poster.removeDirDot(finalPost.path)}`, finalPost.content)
         .catch((e) => {
           response.status = 400;
           response.error = new Error('Failed to post: ' + e);
@@ -89,7 +101,7 @@ let Module = {
 module.exports = Module;
 
 // HELPERS //
-async function createFile(user, repoUser, repoName, key, path, contents) {
+async function createFile(repoOwner, repoName, key, path, contents) {
   pathApi = pathApi || require('path');
   let fileParsed = pathApi.parse(path);
 
@@ -102,7 +114,7 @@ async function createFile(user, repoUser, repoName, key, path, contents) {
 
       let branch = (repoName === 'ultimate-jekyll') ? 'template' : 'master';
 
-      let pathGet = `https://api.github.com/repos/${repoUser}/${repoName}/git/trees/${branch}:${encodeURIComponent(pathApi.dirname(path))}`;
+      let pathGet = `https://api.github.com/repos/${repoOwner}/${repoName}/git/trees/${branch}:${encodeURIComponent(pathApi.dirname(path))}`;
       await makeRequest({
         method: 'GET',
         url: pathGet,
@@ -111,9 +123,8 @@ async function createFile(user, repoUser, repoName, key, path, contents) {
         timeout: 30000,
         response: 'json',
         headers: {
-          'User-Agent': user,
-          // 'Authorization': `Basic ${user}:${key}`,
-          'Authorization': `Basic ${Buffer.from(user + ':' + key).toString('base64')}`,
+          'User-Agent': repoOwner,
+          'Authorization': `Basic ${Buffer.from(repoOwner + ':' + key).toString('base64')}`,
         }
       })
       .then(function (resp) {
@@ -128,7 +139,7 @@ async function createFile(user, repoUser, repoName, key, path, contents) {
     sha = null;
   }
 
-  let pathPut = `https://api.github.com/repos/${repoUser}/${repoName}/contents/${path}`;
+  let pathPut = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
   let writeRequest =
   {
     // url: `https://api.github.com/repos/:owner/:repo/contents/:path`,
@@ -141,9 +152,8 @@ async function createFile(user, repoUser, repoName, key, path, contents) {
     timeout: 30000,
     response: 'json',
     headers: {
-      'User-Agent': user,
-      // 'Authorization': `Basic ${user}:${key}`,
-      'Authorization': `Basic ${Buffer.from(user + ':' + key).toString('base64')}`,
+      'User-Agent': repoOwner,
+      'Authorization': `Basic ${Buffer.from(repoOwner + ':' + key).toString('base64')}`,
     }
   }
   if (sha) {

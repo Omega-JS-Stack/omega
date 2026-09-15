@@ -26,9 +26,8 @@ npm install
 npm run build
 ```
 5. The built extensions will be in `packaged/` directory:
-   - **Chrome/Edge/Brave:** `packaged/chromium/raw/` (unpacked) and `packaged/chromium/extension.zip`
+   - **Chrome/Edge/Brave:** `packaged/chrome/raw/` (unpacked) and `packaged/chrome/extension.zip`
    - **Firefox:** `packaged/firefox/raw/` (unpacked) and `packaged/firefox/extension.zip`
-   - **Opera:** `packaged/opera/raw/` (unpacked) and `packaged/opera/extension.zip`
 
 ## Loading the Extension
 
@@ -36,13 +35,13 @@ npm run build
 1. Go to `chrome://extensions`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
-4. Select the `packaged/chromium/raw/` directory
+4. Select the `packaged/chrome/raw/` directory
 
 ### Edge
 1. Go to `edge://extensions`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
-4. Select the `packaged/chromium/raw/` directory
+4. Select the `packaged/chrome/raw/` directory
 
 ### Firefox
 1. Go to `about:debugging`
@@ -50,17 +49,11 @@ npm run build
 3. Click "Load Temporary Add-on"
 4. Select `packaged/firefox/raw/manifest.json`
 
-### Opera
-1. Go to `opera://extensions`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select the `packaged/opera/raw/` directory
-
 ### Brave
 1. Go to `brave://extensions`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
-4. Select the `packaged/chromium/raw/` directory
+4. Select the `packaged/chrome/raw/` directory
 
 > **Note:** Brave is Chromium-based and uses the same build as Chrome/Edge. Extensions published to the Chrome Web Store are automatically available in Brave.
 

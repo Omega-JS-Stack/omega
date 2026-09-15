@@ -29,7 +29,7 @@ function brandConfig({ url = `https://${DOMAIN}`, client = CLIENT } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     advertising: { providers: { adsense: { client } } },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 
@@ -257,7 +257,7 @@ test('setup: interactive run offers account selection and lands the client id in
   // Fixture Brand — adsense writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   advertising: { providers: { adsense: {} } }, // client lands here
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
   setBrowserOpener(async () => true); // create-new is never picked, but a test must never launch a real browser
@@ -288,7 +288,7 @@ test('setup: Disable opts the provider out — never a false where the schema wa
   // Fixture Brand — adsense disable target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
   advertising: { providers: { adsense: {} } }, // opted in, no client yet
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
   const tty = openTtyPrompt();

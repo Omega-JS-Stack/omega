@@ -170,7 +170,18 @@ test('scripts op is registered in the workspace OPERATIONS', () => {
 
 const { discoverTargets } = require('../src/lib/brand.js');
 
+/**
+ * Plant a target dir AND the brand declaration that types it (#886): the
+ * fixture names each target for its own type, so `targets/<dir>` is
+ * `targets.<dir>: { type: '<dir>' }` in the brand file.
+ */
 function plantTarget(root, dir, targetPkg, frameworkName, frameworkPkg) {
+  const configPath = path.join(root, 'config', 'omega.json5');
+  const declared = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : { brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.test' }, targets: {} };
+  declared.targets[dir] = { type: dir };
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, `${JSON.stringify(declared, null, 2)}\n`);
+
   const targetPath = path.join(root, 'targets', dir);
   fs.mkdirSync(targetPath, { recursive: true });
   if (targetPkg !== undefined) {
@@ -264,27 +275,27 @@ test('scripts op: a script-less scaffolded target gets its framework projectScri
 
 test('scripts op: the walk OVERWRITES a hand-edited standard script back to the default — one policy with the verbs (#689)', async () => {
   const root = tmpBrand({ name: 'b', workspaces: ['targets/*'], scripts: ROOT_OK });
-  plantTarget(root, 'website',
-    { name: 'b-website', scripts: { start: 'node my-own-dev.js', lint: 'eslint .' } },
+  plantTarget(root, 'web',
+    { name: 'b-web', scripts: { start: 'node my-own-dev.js', lint: 'eslint .' } },
     '@omega.js/web',
     { name: '@omega.js/web', projectScripts: { start: 'omega dev', build: 'omega build' } });
 
   const result = await scriptsOp(opInput(root));
-  assert.deepEqual(result.output.targetScripts, { website: ["start: 'omega dev'", "build: 'omega build'"] });
-  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8'));
+  assert.deepEqual(result.output.targetScripts, { web: ["start: 'omega dev'", "build: 'omega build'"] });
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.start, 'omega dev', 'the framework owns its own script keys — an edited one is rewritten, hooks are the customization seam');
   assert.equal(pkg.scripts.lint, 'eslint .', 'a key the framework never declares is the consumer\'s own');
 
   // Second pass: converged, byte-identical
-  const bytes = fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8');
+  const bytes = fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8');
   assert.equal(await scriptsOp(opInput(root)), null);
-  assert.equal(fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8'), bytes);
+  assert.equal(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'), bytes);
 });
 
 test('scripts op: an uninstalled framework and a projectScripts-less one are skipped quietly', async () => {
   const root = tmpBrand({ name: 'c', workspaces: ['targets/*'], scripts: ROOT_OK });
   plantTarget(root, 'backend', { name: 'c-backend' }); // no node_modules at all
-  plantTarget(root, 'website', { name: 'c-website' }, '@omega.js/web', { name: '@omega.js/web' }); // no projectScripts
+  plantTarget(root, 'web', { name: 'c-web' }, '@omega.js/web', { name: '@omega.js/web' }); // no projectScripts
 
   assert.equal(await scriptsOp(opInput(root)), null, 'nothing to heal from — converged');
 });
@@ -338,19 +349,19 @@ test('scripts op: a custom-server backend is PER-KEY — the framework-owned sub
 
 test('scripts op: an unparseable target manifest WARNS the run instead of reporting converged', async () => {
   const root = tmpBrand({ name: 'f', workspaces: ['targets/*'], scripts: ROOT_OK });
-  const targetPath = plantTarget(root, 'website', '{ not json',
+  const targetPath = plantTarget(root, 'web', '{ not json',
     '@omega.js/web',
     { name: '@omega.js/web', projectScripts: { start: 'omega dev' } });
 
   const result = await scriptsOp(opInput(root));
   assert.equal(result.status, 'warned');
-  assert.match(result.reason, /targets\/website\/package\.json doesn't parse/);
+  assert.match(result.reason, /targets\/web\/package\.json doesn't parse/);
   assert.equal(fs.readFileSync(path.join(targetPath, 'package.json'), 'utf8'), '{ not json', 'never touched');
 });
 
 test('scripts op: a dry run whose only finding is an unreadable target manifest reports warned, never an empty plan', async () => {
   const root = tmpBrand({ name: 'f-dry', workspaces: ['targets/*'], scripts: ROOT_OK });
-  plantTarget(root, 'website', '{ not json',
+  plantTarget(root, 'web', '{ not json',
     '@omega.js/web',
     { name: '@omega.js/web', projectScripts: { start: 'omega dev' } });
 
@@ -358,7 +369,7 @@ test('scripts op: a dry run whose only finding is an unreadable target manifest 
   // what a real run would rather than a plan with no parts in it.
   const result = await scriptsOp(opInput(root, { options: { dryRun: true } }));
   assert.equal(result.status, 'warned');
-  assert.match(result.reason, /targets\/website\/package\.json doesn't parse/);
+  assert.match(result.reason, /targets\/web\/package\.json doesn't parse/);
 });
 
 // ─── The retired `npx omega setup` migration (#707) ──────────────────────────

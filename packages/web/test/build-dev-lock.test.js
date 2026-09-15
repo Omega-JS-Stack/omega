@@ -35,7 +35,7 @@ function consumer(t) {
     'config/omega.json5': `{
   brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com' },
   payment: { processors: { stripe: {} } },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }`,
     'package.json': JSON.stringify({
       name: 'fixture-website',

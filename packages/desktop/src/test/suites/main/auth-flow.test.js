@@ -20,17 +20,28 @@ function get(url) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Stub the externals for one test body. Returns { opened, tokens, shown, restore }.
+//
+// The baked `dev` block is staged too: the sign-in chain starts at
+// getWebsiteUrl(), which since
+// [#834](https://github.com/Omega-JS-Stack/omega/issues/834) answers from the
+// resolved dev map the bundle task bakes (whose floor is @omega.js/config's
+// classic numbers) and throws when an artifact carries none. The harness manager
+// loads src/defaults' config, which has no build behind it, so a real dev
+// artifact's block is stated here.
 function stubExternals(ctx) {
   const electron = require('electron');
+  const { CLASSIC_PORTS } = require('@omega.js/config');
   const opened = [];
   const tokens = [];
   const shown = [];
   const origOpen = electron.shell.openExternal;
   const origHandle = ctx.manager.omega.handleAuthToken;
   const origShow = ctx.manager.windows.show;
+  const origDev = ctx.manager.config.dev;
   electron.shell.openExternal = async (url) => { opened.push(url); };
   ctx.manager.omega.handleAuthToken = (t) => { tokens.push(t); };
   ctx.manager.windows.show = (name) => { shown.push(name); };
+  ctx.manager.config.dev = { ports: { ...CLASSIC_PORTS } };
   return {
     opened,
     tokens,
@@ -39,6 +50,7 @@ function stubExternals(ctx) {
       electron.shell.openExternal = origOpen;
       ctx.manager.omega.handleAuthToken = origHandle;
       ctx.manager.windows.show = origShow;
+      if (origDev !== undefined) ctx.manager.config.dev = origDev; else delete ctx.manager.config.dev;
       ctx.manager.authFlow.cancel();
     },
   };

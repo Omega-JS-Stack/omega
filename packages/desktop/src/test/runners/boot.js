@@ -28,6 +28,13 @@ const chalk = require('chalk').default;
 const distSnapshot = require('../utils/dist-snapshot.js');
 const { renderEvent } = require('./render-event.js');
 
+// How long a booted app gets to say anything at all before the run is declared
+// failed. Generous: the app under test is the consumer's real one, cold.
+const DEFAULT_BOOT_TIMEOUT_MS = 60000;
+
+// How long the child gets to go down politely before SIGKILL.
+const KILL_GRACE_MS = 2000;
+
 async function runBootTests({ tests, suites, projectRoot, frameworkDistRoot }) {
   suites = suites || [];
 
@@ -148,7 +155,7 @@ async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) 
   //   OMEGA_TEST_BOOT_SPEC     — JSON file with the test definitions
   // Argv would be cleaner but Electron rejects unknown CLI flags.
   const childEnv = Object.assign({}, process.env, {
-    OMEGA_TEST_MODE:                  'true',   // canonical signal — manager.isTesting() picks it up
+    OMEGA_ENVIRONMENT:             'testing',   // the one environment input (#817): this lane names it
     OMEGA_TEST_BOOT:                  '1',      // boot-runner-specific dispatch marker (main.js reads this to load the harness instead of doing normal init)
     OMEGA_TEST_BOOT_HARNESS:          bootEntry,
     OMEGA_TEST_BOOT_SPEC:             specFile,
@@ -171,8 +178,27 @@ async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) 
   // @omega.js/desktop's main.js detects OMEGA_TEST_BOOT and `require()`s the boot harness itself after init.
   const args = [testApp.appRoot];
 
+  return runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, skipEvents, testCount });
+}
+
+// Spawn the booted app, render what its harness emits, and end the run.
+//
+// A boot that never produces harness output is a FAILED run with a report, never a
+// hung runner ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)): the child
+// can block inside initialize(), long before main.js requires the harness, so the
+// per-test timeout in harness/boot-entry.js never gets the chance to fire. The report
+// quotes the last line of the booted app's runtime.log, which is the one clue about
+// where it stopped.
+//
+// The budget is IDLE time, never total run time: every harness line rearms it, so a
+// healthy suite that legitimately runs longer than the budget is left alone and only
+// SILENCE for a whole budget fails the run.
+//
+// `spawnFn`, `timeoutMs` and `killGraceMs` are the seams the build-layer suite drives
+// (suites/build/boot-runner-timeout.test.js), the way the deploy modules take an execFn.
+function runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, skipEvents, testCount, spawnFn = spawn, timeoutMs = bootTimeoutMs(), killGraceMs = KILL_GRACE_MS }) {
   return new Promise((resolve) => {
-    const child = spawn(electronBin, args, {
+    const child = spawnFn(electronBin, args, {
       cwd: effectiveRoot,
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -184,42 +210,106 @@ async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) 
     // Suites the module skipped whole: reported before the run they never join.
     skipEvents.forEach((evt) => renderEvent(evt, counts));
 
-    child.stdout.on('data', (chunk) => {
+    let timer = null;
+
+    // Rearmed by every harness line below, so the budget measures SILENCE.
+    function armBudget() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.log(chalk.red(`    ✗ boot: no harness output after ${Math.round(timeoutMs / 1000)}s; last runtime.log line: "${lastRuntimeLogLine(effectiveRoot)}"`));
+        counts.failed += testCount;
+        // Detached BEFORE the counts are handed out: a line the child emits
+        // while it is being killed must not move numbers already reported.
+        cleanup();
+        endChild(child, killGraceMs);
+        resolve(counts);
+      }, timeoutMs);
+    }
+
+    function onStdout(chunk) {
       buffer += chunk.toString();
       let nl;
       while ((nl = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
         if (line.startsWith('__EM_TEST__')) {
+          armBudget();
           renderEvent(JSON.parse(line.slice('__EM_TEST__'.length)), counts);
         } else if (process.env.OMEGA_TEST_DEBUG && line.trim().length > 0) {
           process.stdout.write(chalk.gray(`      ${line}\n`));
         }
       }
-    });
+    }
 
-    child.stderr.on('data', (chunk) => {
+    function onStderr(chunk) {
       if (process.env.OMEGA_TEST_DEBUG) {
         process.stderr.write(chalk.gray(`[boot:stderr] ${chunk.toString()}`));
       }
-    });
+    }
 
-    child.on('error', (err) => {
+    function onError(err) {
       console.log(chalk.red(`    ✗ Failed to spawn boot harness: ${err.message}`));
       counts.failed += 1;
       cleanup();
       resolve(counts);
-    });
+    }
 
-    child.on('exit', () => {
+    function onExit() {
       cleanup();
       resolve(counts);
-    });
+    }
+
+    child.stdout.on('data', onStdout);
+    child.stderr.on('data', onStderr);
+    child.on('error', onError);
+    child.on('exit', onExit);
+
+    armBudget();
 
     function cleanup() {
+      clearTimeout(timer);
+      child.stdout.removeListener('data', onStdout);
+      child.stderr.removeListener('data', onStderr);
+      child.removeListener('error', onError);
+      child.removeListener('exit', onExit);
       try { fs.unlinkSync(specFile); } catch (_) { /* ignore */ }
     }
   });
+}
+
+// The boot budget, overridable with OMEGA_TEST_BOOT_TIMEOUT_MS the way
+// OMEGA_TEST_SKIP_BUILD opts out of the rebuild above.
+function bootTimeoutMs() {
+  const override = Number(process.env.OMEGA_TEST_BOOT_TIMEOUT_MS);
+  return Number.isFinite(override) && override > 0 ? override : DEFAULT_BOOT_TIMEOUT_MS;
+}
+
+// The last non-empty line of the booted app's runtime log: where a blocked boot got to.
+// A boot that died before the logger opened a file has none, which is itself the report.
+function lastRuntimeLogLine(effectiveRoot) {
+  let contents;
+  try {
+    contents = fs.readFileSync(path.join(effectiveRoot, 'logs', 'runtime.log'), 'utf8');
+  } catch (_) {
+    return '(no runtime.log)';
+  }
+
+  const lines = contents.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].trim().length > 0) return lines[i].trim();
+  }
+  return '(runtime.log is empty)';
+}
+
+// End a child that outlived its budget. Polite first, then SIGKILL: the direct child
+// is the orphan the hang used to leave behind. The grace timer is unref'd so it never
+// holds the runner open on its own.
+function endChild(child, killGraceMs) {
+  try { child.kill(); } catch (_) { /* already gone */ }
+  const grace = setTimeout(() => {
+    try { child.kill('SIGKILL'); } catch (_) { /* already gone */ }
+  }, killGraceMs);
+  if (typeof grace.unref === 'function') grace.unref();
 }
 
 // Serialize the boot-bound renderer suites (`view: '<name>'`) for the spec file, the same
@@ -411,4 +501,4 @@ function removeFixtureDeps(links) {
   }
 }
 
-module.exports = { runBootTests };
+module.exports = { runBootTests, runBootChild };

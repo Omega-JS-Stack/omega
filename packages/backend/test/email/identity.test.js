@@ -21,7 +21,6 @@ const FRAMEWORK_IDENTITY = /Ian Wiedenman|ianwiedenman|ianwieds|ITW Creative Wor
 
 const brandWithPerson = {
   name: 'Acme',
-  company: 'Acme Holdings Inc',
   url: 'https://acme.example',
   contact: {
     email: 'support@acme.example',
@@ -32,8 +31,13 @@ const brandWithPerson = {
       urlText: '@janedoe',
     },
   },
-  images: { companyWordmark: 'https://acme.example/holdings-wordmark.png' },
+  images: {},
 };
+
+// The RESOLVED company (#677): the loader fills it from `company: { id }`, and
+// a brand with no company resolves to its own name, so the footer never
+// carries a fallback of its own.
+const COMPANY = { id: 'acme-holdings', name: 'Acme Holdings Inc', url: 'https://acmeholdings.example', images: { wordmark: 'https://acme.example/holdings-wordmark.png' } };
 
 const brandWithoutPerson = { name: 'Acme', contact: { email: 'support@acme.example' } };
 
@@ -47,6 +51,7 @@ function buildWith(brand, settings) {
   const Manager = {
     config: {
       brand: { id: 'acme', url: 'https://acme.example', images: {}, ...brand },
+      company: structuredClone(COMPANY),
       // The account's unsubscribe group ids (#649) — every send resolves one from config
       marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
     },
@@ -201,10 +206,10 @@ module.exports = defineCases({
     // ---------- Footer: company identity ----------
 
     {
-      name: 'footer renders the configured company name + wordmark',
+      name: 'footer renders the resolved company name + wordmark',
 
       run() {
-        const out = footer(brandWithPerson, {});
+        const out = footer(brandWithPerson, {}, COMPANY);
 
         assert.ok(out.includes('Acme Holdings Inc'), `company name missing: ${out}`);
         assert.ok(out.includes('https://acme.example/holdings-wordmark.png'), 'company wordmark missing');
@@ -213,10 +218,10 @@ module.exports = defineCases({
     },
 
     {
-      name: 'footer falls back to brand.name for the company name (documented schema chain)',
+      name: 'footer falls back to brand.name when the company resolved nothing',
 
       run() {
-        const out = footer({ name: 'Acme', url: 'https://acme.example' }, {});
+        const out = footer({ name: 'Acme', url: 'https://acme.example' }, {}, {});
 
         assert.ok(out.includes('&copy;') && out.includes('Acme'), `copyright name missing: ${out}`);
         assert.ok(!FRAMEWORK_IDENTITY.test(out), 'footer leaked the framework identity');
@@ -227,7 +232,7 @@ module.exports = defineCases({
       name: 'footer omits the wordmark entirely when unconfigured',
 
       run() {
-        const out = footer({ name: 'Acme', url: 'https://acme.example' }, {});
+        const out = footer({ name: 'Acme', url: 'https://acme.example' }, {}, {});
 
         assert.ok(!out.includes('<mj-image'), `rendered a wordmark with nothing configured: ${out}`);
       },

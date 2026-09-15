@@ -9,10 +9,15 @@
  * the ONE copy; each framework binds it with its own target string and nothing
  * else.
  *
- *   1. DERIVE — the KEY SET is the env schema's: every entry whose `delivery`
- *      names the target (`publishSecretKeys(target)`, @omega.js/config). Never
- *      "whatever the composed .env holds", which published a brand's unrelated
- *      keys to a runner.
+ *   1. DERIVE: the KEY SET is @omega.js/config'sONE delivery primitive, read
+ *      off the schema AND the composed values (`publishSecretKeys(target,
+ *      { values })`): every entry whose `delivery` names the target, plus the
+ *      `match` family members this brand actually configured
+ *      ([#876](https://github.com/Omega-JS-Stack/omega/issues/876)) and the
+ *      keys the schema does not know at all, a consumer's own
+ *      ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)). Still not
+ *      "whatever the composed .env holds": a declared key this target does not
+ *      deliver, and every `machineLocal` one, stay home.
  *   2. COLLECT — the VALUES come from the target's COMPOSED env
  *      (`composeTargetEnv`, [#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
  *      company ← brand ← target `.env`, the brand-side layers schema-filtered
@@ -23,7 +28,7 @@
  *      schema drops them from the delivered set itself.
  *   3. GUARD — secrets belong to the repo whose Actions run the workflow, and
  *      the only acceptable proof of which repo that is, is the brand's own
- *      config (`repo.providers.github`). An inferred git remote is not proof: a
+ *      config (`repo.org`, the SOURCE repo). An inferred git remote is not proof: a
  *      target vendored into a framework/test monorepo, a cloned starter still
  *      pointing at the template author, or any fork would publish this brand's
  *      `.env` to a stranger's Actions.
@@ -34,26 +39,80 @@
  * a skip — it throws the boundary's instructions (install, `gh auth login`, or
  * `omega deploy --no-secrets`).
  *
- * Desktop binds it too ([#682](https://github.com/Omega-JS-Stack/omega/issues/682)),
- * over the `resolveValue` seam: its signing secrets are named by PATH in the
- * cascade (`CSC_LINK=config/certs/dev-id.p12`) and what CI needs is the FILE, so
- * it base64-encodes an existing file between COLLECT and PUBLISH. That seam is
- * the only shape difference between the three binds — the transport is one.
+ * A key the SCHEMA says this target's config requires (`required` /
+ * `requiredWhen`, @omega.js/config's env-rules) and the cascade resolves EMPTY
+ * stops the publish outright ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)):
+ * the run that reads those secrets is the one that signs a release, and half a
+ * signing set on a runner is a green build nobody can install. Nothing is
+ * pushed on that path, so the fix and the re-run are one step, not a partial
+ * state to reason about. A key that is merely absent and NOT required gets one
+ * line naming it.
  *
- * Backend binds it too ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
- * over a second seam: `extraSecrets`, already-valued keys with no `.env` home at
- * all. Its deploy credential is a service-account FILE the firebase manage
- * service mints, so there is nothing in the cascade to compose it from, and the
- * runner still needs it as a repo secret like everything else.
+ * There is no per-framework BIND any more
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the four files
+ * that passed a target string and a seam were four places to forget a rule, and
+ * the standalone `omega push-secrets` verb they backed is gone with them. The
+ * seams live HERE, in one table keyed by target type, and every caller (each
+ * framework's deploy precheck, the manager's repo walk) makes the same call.
+ *
+ *   desktop  `resolveValue` base64-encodes a secret that names a FILE
+ *            (#682: `CSC_LINK` points at a `.p12` and CI needs the bytes), and
+ *            `deriveValues` fills the signing paths from the signing tree, by
+ *            the ONE derivation the desktop env load runs
+ *            (`@omega.js/devkit/signing-env`), so no operator pastes a path.
+ *   backend  `extraSecrets`: the deploy credential is a service-account FILE
+ *            the cloud manage service mints (#872), so there is nothing in the
+ *            cascade to compose it from and it arrives already valued.
+ *   web, extension  plain strings, no seam.
+ *
+ * `dryRun` ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)) prints
+ * the key NAMES that would publish, the derived lines and any refusal, and
+ * sends nothing. The refusal still THROWS in a dry run: a plan that cannot be
+ * made is loud.
  */
-const { composeTargetEnv } = require('@omega.js/config');
+const { composeTargetEnv, loadConfig } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
+const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { publishActionsSecrets } = require('./actions-secrets.js');
 const { resolveRepo, resolveDeployLane } = require('./deploy.js');
+const { targetSeams } = require('./target-seams.js');
 
 /**
- * The publishable secrets for a target: the schema's delivery set for it,
- * valued from the composed env. An empty value never claims a key.
+ * The target's COMPOSED env, with the bind's own derivations applied to it.
+ *
+ * PRODUCTION, named rather than sniffed: these values fuel the runner's release
+ * build, and the composer would otherwise default to whatever environment this
+ * shell happens to be
+ * ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)): the same
+ * determinism the "FILES only, never the shell" rule above buys.
+ *
+ * Everything that reads the cascade reads it through HERE (the required-key
+ * check and the collection both), so a derived value is as real as a typed one
+ * to each of them ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)).
+ *
+ * @param {object} options
+ * @param {string} options.targetDir - The target root.
+ * @param {string} options.target - Target name.
+ * @param {function} [options.deriveValues] - The derive seam (see collectTargetSecrets).
+ * @param {object} [options.logger] - `{ log, warn, error }`; each derivation prints one line.
+ * @returns {{ values: object, fixes: Object<string, string> }}
+ */
+function composeValues({ targetDir, target, deriveValues, logger }) {
+  const { values } = composeTargetEnv({ targetDir, target, environment: 'production' });
+
+  const { derived = [], fixes = {} } = (deriveValues ? deriveValues(values) : null) || {};
+  for (const { key, value } of derived) {
+    if (logger) logger.log(`${key} derived from ${value}`);
+  }
+
+  return { values, fixes };
+}
+
+/**
+ * The publishable secrets for a target: the delivery set the ONE primitive
+ * answers for it (schema names, family members, the consumer's own keys),
+ * valued from the same composed env the set is read off. An empty value never
+ * claims a key.
  *
  * @param {object} options
  * @param {string} options.targetDir - The target root (its .env is the local layer).
@@ -62,20 +121,32 @@ const { resolveRepo, resolveDeployLane } = require('./deploy.js');
  *   applied to each collected value before it travels (desktop base64-encodes
  *   its file-path signing secrets). A falsy return DROPS the key, exactly as an
  *   empty composed value does.
+ * @param {function} [options.deriveValues] - `(values) => { derived, fixes }`, the
+ *   seam applied to the COMPOSED map before anything reads it: a bind may VALUE
+ *   a key the cascade left empty (desktop derives its signing paths from the
+ *   dispersed artifacts) and may name, per key it could NOT value, the fix line
+ *   the refusal should carry. `derived` is `[{ key, value }]` (already written
+ *   into the map); `fixes` is `key → sentence`.
  * @returns {Object<string, string>} key → value, ready to publish.
  */
 function collectTargetSecrets(options) {
-  const { targetDir, target, resolveValue } = options;
-  // PRODUCTION, named rather than sniffed: these values fuel the runner's
-  // release build, and the composer would otherwise default to whatever
-  // environment this shell happens to be
-  // ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)) — the same
-  // determinism the "FILES only, never the shell" rule above buys.
-  const { values } = composeTargetEnv({ targetDir, target, environment: 'production' });
+  const { targetDir, target, logger } = options;
+  const seams = targetSeams({ target, targetDir });
+  const resolveValue = 'resolveValue' in options ? options.resolveValue : seams.resolveValue;
+  const deriveValues = 'deriveValues' in options ? options.deriveValues : seams.deriveValues;
+  const { values } = composeValues({ targetDir, target, deriveValues, logger });
 
   const secrets = {};
-  for (const key of publishSecretKeys(target)) {
-    if (!values[key]) continue;
+  // The key set and the values come from ONE composition (#835, #876): a
+  // family member or a consumer's own key exists only in the composed map, so
+  // the set has to be read off the same map it is valued from.
+  for (const key of publishSecretKeys(target, { values })) {
+    if (!values[key]) {
+      // Never silence: a key with no value in the cascade is a key CI will not
+      // have. Whether that MATTERS is the schema's answer, below.
+      if (logger) logger.log(`No value for ${key} in the .env cascade: not published`);
+      continue;
+    }
     const value = resolveValue ? resolveValue(values[key], key) : values[key];
     if (value) secrets[key] = value;
   }
@@ -84,10 +155,55 @@ function collectTargetSecrets(options) {
 }
 
 /**
- * The brand's OWN repo as `owner/name`, from the target's resolved config — the
- * same derivation `omega deploy --direct` uses (`repo.providers.github`, name
- * falling back to brand.id). Null when the config declares nothing usable or
- * doesn't load.
+ * The keys this target's own config REQUIRES that the cascade cannot value.
+ *
+ * The rules are the schema's, evaluated by the ONE checker (#626) against the
+ * target's resolved config and its COMPOSED env, narrowed to the keys this
+ * publisher would send: a required key CI never reads is not the publish's
+ * business, and a rule nobody delivers cannot be fixed by pushing anything.
+ *
+ * The bind's derivations run FIRST (`deriveValues`), because a key the brand
+ * never typed but the dispersed files answer is not missing, and a key the
+ * derivation could not value carries that seam's own fix line
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)).
+ *
+ * @param {object} options
+ * @param {string} options.targetDir - The target root.
+ * @param {string} options.target - Target name.
+ * @param {function} [options.deriveValues] - The derive seam (see collectTargetSecrets).
+ * @returns {Array<{ key: string, rule: string, path: string|null, fix: string|null }>}
+ */
+function missingRequiredSecrets(options) {
+  const { targetDir, target } = options;
+  const deriveValues = 'deriveValues' in options
+    ? options.deriveValues
+    : targetSeams({ target, targetDir }).deriveValues;
+
+  let config;
+  try {
+    // PRODUCTION, the same environment `composeValues` composes for: the rules
+    // and the values have to be read off ONE config, or a developer machine's
+    // `config/omega.development.json5` decides whether a release publish
+    // refuses ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)).
+    config = loadConfig(targetDir, target, { environment: 'production' }).config;
+  } catch (e) {
+    // No loadable config: there is no declaration to owe anything to.
+    return [];
+  }
+
+  const { values, fixes } = composeValues({ targetDir, target, deriveValues });
+  const delivered = new Set(publishSecretKeys(target, { values }));
+
+  return checkEnvRules(config, values, { target })
+    .filter((violation) => delivered.has(violation.key))
+    .map((violation) => ({ ...violation, fix: fixes[violation.key] || null }));
+}
+
+/**
+ * The brand's SOURCE repo as `owner/name`, from the target's resolved config:
+ * the one the workflows and their secrets live on, derived as
+ * `<brand.id>-omega` under `repo.org` (#883). Null when the config declares
+ * nothing usable or doesn't load.
  *
  * @param {object} options
  * @param {string} options.targetDir - The target root.
@@ -96,13 +212,14 @@ function collectTargetSecrets(options) {
  */
 function declaredBrandRepo(options) {
   try {
-    const { loadConfig, brandRepoOwner, brandRepoName } = require('@omega.js/config');
-    const { config } = loadConfig(options.targetDir, options.target);
+    const { loadConfig, sourceRepo } = require('@omega.js/config');
+    // PRODUCTION, like every other read this publish makes (#895): the repo a
+    // release's secrets belong to is the one the production config names.
+    const { config } = loadConfig(options.targetDir, options.target, { environment: 'production' });
     if (!config) return null;
 
-    const owner = brandRepoOwner(config);
-    const name = brandRepoName(config);
-    return owner && name ? `${owner}/${name}` : null;
+    const source = sourceRepo(config);
+    return source ? source.slug : null;
   } catch (e) {
     return null;
   }
@@ -117,17 +234,27 @@ function declaredBrandRepo(options) {
  * @param {string} options.target - Target name ('web', 'extension', …).
  * @param {object} options.logger - `{ log, warn, error }`.
  * @param {object} [options.env] - Env map (default: process.env).
- * @param {function} [options.resolveValue] - Value seam (see collectTargetSecrets).
- * @param {Object<string, string>} [options.extraSecrets] - Already-valued keys
- *   that have no `.env` home, merged OVER the composed set.
+ * @param {boolean} [options.dryRun] - Print the plan (key NAMES, the derived
+ *   lines, any refusal) and send nothing (#895).
+ * @param {function} [options.resolveValue] - Value seam override (tests).
+ * @param {function} [options.deriveValues] - Derive seam override (tests).
+ * @param {Object<string, string>} [options.extraSecrets] - Override for the
+ *   target's already-valued keys, merged OVER the composed set (tests).
  * @param {function} [options.execFn] - Injectable `gh` exec (tests).
  * @param {function} [options.gitExecFn] - Injectable `git` exec for remote discovery (tests).
- * @returns {{ skipped: string }|{ published: string[], failed: Array<object> }}
+ * @returns {{ skipped: string }|{ planned: string[] }|{ published: string[], failed: Array<object> }}
  */
 function publishTargetSecrets(options) {
   options = options || {};
-  const { targetDir, target, logger } = options;
+  const { targetDir, target, logger, dryRun } = options;
   const env = options.env || process.env;
+
+  // The target type's own shape differences, in ONE table (#891). A caller
+  // passes a seam only to stub it.
+  const seams = targetSeams({ target, targetDir });
+  const resolveValue = 'resolveValue' in options ? options.resolveValue : seams.resolveValue;
+  const deriveValues = 'deriveValues' in options ? options.deriveValues : seams.deriveValues;
+  const extraSecrets = 'extraSecrets' in options ? options.extraSecrets : seams.extraSecrets;
 
   // CI runs the generated workflow as its build/publish step — the secrets
   // already exist there and the runner token can't write them.
@@ -141,8 +268,26 @@ function publishTargetSecrets(options) {
   // firebase service mints, #872), so it arrives valued and travels verbatim:
   // `resolveValue` is the COMPOSED half's seam and would only mangle it. An
   // empty extra claims no key, exactly as an empty composed value does.
-  const secrets = { ...collectTargetSecrets({ targetDir, target, resolveValue: options.resolveValue }) };
-  for (const [key, value] of Object.entries(options.extraSecrets || {})) {
+  // The config's OWN requirements first: a half set is never published (#891)
+  const missing = missingRequiredSecrets({ targetDir, target, deriveValues });
+  if (missing.length > 0) {
+    // ONE line shape per key, whatever answers it: `<KEY> (required by <path>):
+    // <the fix>`. A key a bind can DERIVE names the producer that delivers the
+    // file (`omega manage --service certificates`, then disperse) instead of
+    // asking for a path to paste; everything else names the .env to set.
+    const lines = missing.map(({ key, path, fix }) => {
+      const detail = fix || `set it in the ${target} target's .env or the brand's, then re-run.`;
+
+      return `  ${key}${path ? ` (required by ${path})` : ''}: ${detail}`;
+    });
+    throw new Error(
+      `${missing.length} secret(s) this brand's config requires are empty in the .env cascade (company/brand/target). `
+      + `Nothing was published.\n${lines.join('\n')}`,
+    );
+  }
+
+  const secrets = { ...collectTargetSecrets({ targetDir, target, resolveValue, deriveValues, logger }) };
+  for (const [key, value] of Object.entries(extraSecrets || {})) {
     if (value) secrets[key] = value;
   }
 
@@ -154,7 +299,7 @@ function publishTargetSecrets(options) {
 
   const declared = declaredBrandRepo({ targetDir, target });
   if (!declared) {
-    logger.warn('Skipping secret publication — this brand names no GitHub repo in config (repo.providers.github). Set it, then re-run `omega deploy`.');
+    logger.warn('Skipping secret publication: this brand names no GitHub repo in config (repo.org). Set it, then re-run `omega deploy`.');
     return { skipped: 'no-declared-repo' };
   }
 
@@ -184,6 +329,16 @@ function publishTargetSecrets(options) {
     }
   }
 
+  // The PLAN, and nothing else (#895): what the composition answered, by NAME.
+  // It runs after the refusal and the two guards above on purpose, so a dry run
+  // is a real preview of whether the deploy would publish at all: every one of
+  // them is a READ, and a plan naming keys the real run would skip is a promise
+  // the deploy cannot keep.
+  if (dryRun) {
+    logger.log(`DRY RUN, would publish ${keys.length} secret(s) for ${target}: ${keys.join(', ')}`);
+    return { planned: keys };
+  }
+
   logger.log(`Publishing ${keys.length} secret(s) to ${repo}: ${keys.join(', ')}`);
 
   const result = publishActionsSecrets({ repo, secrets, logger, execFn: options.execFn });
@@ -192,4 +347,4 @@ function publishTargetSecrets(options) {
   return result;
 }
 
-module.exports = { collectTargetSecrets, declaredBrandRepo, publishTargetSecrets };
+module.exports = { collectTargetSecrets, declaredBrandRepo, missingRequiredSecrets, publishTargetSecrets };

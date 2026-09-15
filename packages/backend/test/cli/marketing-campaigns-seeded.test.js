@@ -142,7 +142,7 @@ module.exports = defineCases({
     {
       name: 'flag-drift-fails-into-fix-and-seeds',
       async run({ assert }) {
-        // Both the kebab and camelCase yargs keys opt in.
+        // Both the kebab and camelCase keys the parse mints opt in.
         for (const argv of [{ 'seed-campaigns': true }, { seedCampaigns: true }]) {
           const test = buildTest({ projectId: 'real-project', argv: argv, store: {} });
           const result = await test.run();

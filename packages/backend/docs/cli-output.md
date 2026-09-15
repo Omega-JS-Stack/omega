@@ -133,7 +133,7 @@ Firestore docs, so the opt-in loses to `--offline`). Read-only checks are
 unaffected. `BaseTest.isOffline` is the one reader of the flag.
 
 > **No more `UnhandledPromiseRejection`.** Hard failures exit cleanly via
-> `haltSetup()` / `process.exit(1)`, and `bin/omega-backend` wraps the run in a
+> `haltSetup()` / `process.exit(1)`, and `bin/omega` wraps the run in a
 > `try/catch` that prints a one-line `✗ <message>` instead of Node's raw rejection
 > dump.
 

@@ -1,22 +1,21 @@
 /**
- * `omega-manager company <init|adopt>` — the COMPANY rung's own verb.
+ * `omega-manager company <init>`: the COMPANY rung's own verb.
  *
- *   omega company init [path]          scaffold a company workspace (default: cwd)
- *   omega company adopt <brand-path>   stamp a brand so it inherits this company
+ *   omega company init   create the `company/` tree in THIS brand (it must be
+ *                        the company brand: `company: { id: 'self' }`)
  *
- * Everything else about a company workspace rides the verbs it already has:
- * `omega manage` from a company root fans out over its brands, `omega
- * onboard` creates a new brand under brands.roots[0] and stamps it.
+ * That is the whole surface: a brand JOINS a company by naming it with
+ * `company: { id }` in its own config, so nothing else needs a command
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)).
  */
 const chalk = require('chalk').default;
 
-const { runCompanyInit, runCompanyAdopt } = require('../company-init.js');
+const { runCompanyInit } = require('../company-init.js');
 
 const USAGE = [
   'Usage: omega company <command>',
   '',
-  '  init [path]          scaffold a company workspace (default: the current directory)',
-  '  adopt <brand-path>   stamp a brand so it inherits this company workspace',
+  '  init   create the company/ tree in this brand (company: { id: "self" })',
 ].join('\n');
 
 module.exports = async (options) => {
@@ -24,12 +23,7 @@ module.exports = async (options) => {
 
   try {
     if (subcommand === 'init') {
-      runCompanyInit(options._?.[2] || process.cwd());
-      return;
-    }
-
-    if (subcommand === 'adopt') {
-      runCompanyAdopt(process.cwd(), options._?.[2]);
+      runCompanyInit(process.cwd());
       return;
     }
 

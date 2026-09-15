@@ -1,7 +1,8 @@
 // The env schema is the ONE declaration of how a key reaches the desktop app
 // ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): the build
-// workflow's env block, the bundle task's bake, and `omega push-secrets` all read
-// `delivery: { desktop: … }` and nothing else. Each used to carry its own
+// workflow's env block, the bundle task's bake, and the deploy precheck's
+// secrets publish all read `delivery: { desktop: … }` and nothing else. Each
+// used to carry its own
 // hand-kept list — the workflow's was 21 lines a human maintained across four
 // job/step blocks, and a key added to one never reached the others.
 //
@@ -15,12 +16,13 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 
 const { publishSecretKeys, bakeKeys, renderSecretsBlock, WORKFLOW_OWNED_KEYS } = require('@omega.js/config/env-delivery');
+const { composeTargetEnv } = require('@omega.js/config');
 
 const SRC = path.join(__dirname, '..', '..', '..');
 const Manager = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
 const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
-const pushSecrets = require(path.join(SRC, 'commands', 'push-secrets.js'));
+const { collectTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
@@ -51,7 +53,7 @@ function tmpBrand(brandEnv) {
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
-  description: 'env delivery (#627) — the workflow block, the bake list, and push-secrets from ONE schema',
+  description: 'env delivery (#627): the workflow block, the bake list, and the secrets publish from ONE schema',
   tests: [
     {
       name: 'the build workflow renders the schema block — every CI key, no hand list, no token left',
@@ -144,7 +146,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'push-secrets pushes the schema DELIVERY set — a key CI never reads stays home',
+      name: 'the secrets publish sends the schema DELIVERY set: a key CI never reads stays home',
       run: (ctx) => {
         const { brand, target } = tmpBrand([
           'GH_TOKEN=brand-token',
@@ -156,9 +158,14 @@ module.exports = defineCases({
         ].join('\n'));
 
         try {
-          const keys = Object.keys(pushSecrets.collectEnvSecrets(target));
-          ctx.expect(keys.sort()).toEqual(['APPLE_TEAM_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET']);
-          ctx.expect(keys.every((key) => publishSecretKeys('desktop').includes(key))).toBe(true);
+          const values = composeTargetEnv({ targetDir: target, target: 'desktop', environment: 'production' }).values;
+          const keys = Object.keys(collectTargetSecrets({ targetDir: target, target: 'desktop' }));
+
+          // OMEGA_ADMIN_KEY is the backend's and stays home; MY_CUSTOM_THING is
+          // a key the schema never declared, so it is the CONSUMER's own and
+          // travels to every target ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)).
+          ctx.expect(keys.sort()).toEqual(['APPLE_TEAM_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET', 'MY_CUSTOM_THING']);
+          ctx.expect(keys.every((key) => publishSecretKeys('desktop', { values }).includes(key))).toBe(true);
         } finally {
           fs.rmSync(brand, { recursive: true, force: true });
         }

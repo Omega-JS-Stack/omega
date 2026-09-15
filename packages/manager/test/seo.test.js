@@ -56,11 +56,11 @@ function contentItem(overrides = {}) {
   };
 }
 
-function brandConfig({ seo, content = [contentItem()], github = { org: 'default-org' } } = {}) {
+function brandConfig({ seo, content = [contentItem()], repo = { provider: 'github', org: 'default-org' } } = {}) {
   const config = {
     brand: structuredClone(BRAND),
-    targets: { web: {} },
-    repo: { providers: { github } },
+    targets: { web: { type: 'web' } },
+    ...(repo ? { repo } : {}),
   };
   if (seo !== undefined) {
     config.seo = seo;
@@ -403,7 +403,7 @@ test('seo: an unset token env var falls back to default auth', async () => {
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
-test('seo: org defaults to github.org and homepage to brand.url', async () => {
+test('seo: org defaults to repo.org and homepage to brand.url', async () => {
   const item = contentItem({ org: undefined, cta: undefined });
   const contents = templateContents(item, 'default-org');
   const api = fakeSeo({
@@ -427,7 +427,7 @@ test('seo: an item with no org anywhere errors without touching the API', async 
   const item = contentItem({ org: undefined });
   const api = fakeSeo();
 
-  const result = await runService(brandConfig({ content: [item], github: {} }), { api });
+  const result = await runService(brandConfig({ content: [item], repo: null }), { api });
 
   assert.equal(result.status, 'error');
   assert.match(result.output.githubRepos.repos[0].error, /missing org or name/);

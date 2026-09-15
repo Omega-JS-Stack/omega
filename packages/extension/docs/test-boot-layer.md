@@ -78,7 +78,7 @@ Each boot test gets a **fresh** `page` (closed at the end of the test). The brow
 The runner looks for the consumer's Chrome-loadable build in this order:
 
 1. `OMEGA_TEST_BOOT_DIR` env var (absolute path) — full override
-2. `<consumer>/packaged/chromium/raw/` — default. This is what @omega.js/extension's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
+2. `<consumer>/packaged/chrome/raw/`: default. This is what @omega.js/extension's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
 3. `<consumer>/dist/` — for non-standard pipelines (and the framework's own fixture extension, which is authored as strict JSON)
 
 **A directory qualifies only when its `manifest.json` is STRICT JSON** — what Chrome can actually parse. Existence alone used to qualify, and the intermediate `<consumer>/dist/` (JSON5, the framework-authored source style) exists after any dev run or `omega clean`, so an unbuilt project loaded that copy and hard-failed every boot test instead of skipping ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). A JSON5 `dist/` is passed over and named in the skip.
@@ -119,14 +119,14 @@ This catches real ship-breakers (broken locale references, missing bundles) befo
 
 ## Skipping the build before boot tests
 
-Boot tests assume `packaged/chromium/raw/` exists. They don't auto-trigger `npm run build` (that would slow the test loop). If no candidate carries a strict-JSON manifest, you get:
+Boot tests assume `packaged/chrome/raw/` exists. They don't auto-trigger `npm run build` (that would slow the test loop). If no candidate carries a strict-JSON manifest, you get:
 
 ```
 ○ boot tests skipped (no strict-JSON manifest.json found in any of:
-    /path/to/project/packaged/chromium/raw
+    /path/to/project/packaged/chrome/raw
     /path/to/project/dist
   /path/to/project/dist/manifest.json exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)
-  — run `npm run build` first to produce packaged/chromium/raw/)
+  - run `npm run build` first to produce packaged/chrome/raw/)
 ```
 
 In CI, run build then test in separate steps so failures are isolated.

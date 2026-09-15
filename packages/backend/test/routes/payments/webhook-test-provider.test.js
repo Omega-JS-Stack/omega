@@ -21,6 +21,7 @@
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 function withProductionEnvironment(fn) {
   const original = {
+    OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
     OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE,
     ENVIRONMENT: process.env.ENVIRONMENT,
     TERM_PROGRAM: process.env.TERM_PROGRAM,
@@ -30,6 +31,8 @@ function withProductionEnvironment(fn) {
   delete process.env.OMEGA_TEST_MODE;
   delete process.env.TERM_PROGRAM;
   delete process.env.FUNCTIONS_EMULATOR;
+  // The ONE environment input (#817), named the way a deployed lane names it.
+  process.env.OMEGA_ENVIRONMENT = 'production';
   process.env.ENVIRONMENT = 'production';
 
   try {

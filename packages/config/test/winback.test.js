@@ -22,7 +22,7 @@ function brandConfig(payment) {
   return {
     brand: { id: 'acme', name: 'Acme' },
     payment: payment,
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 

@@ -22,6 +22,24 @@ overdraw their viewBox).
 
 **Emojis are text**, not icons: type the character. Nothing to build.
 
+**A DATA key that carries an icon carries the same string**: every chrome
+`icon` (nav, sidebar, topbar, page header, account dropdown, account section
+header, footer) is the full class string (`icon: 'fa-brands fa-github'`), never
+a bare name a template wraps
+([#903](https://github.com/Omega-JS-Stack/omega/issues/903)). One shape to
+author, and every family the brand's set carries is reachable from data.
+
+The same string is what a SECTION arg, a page-layout arg and the feature
+catalog's `icon` carry
+([#929](https://github.com/Omega-JS-Stack/omega/issues/929)): `{% section
+"marketing/stats" %}` takes `icon: 'fa-brands fa-figma'`, and every template
+and runtime builder emits the value verbatim, adding only its own size and
+spacing classes. One key, one shape, wherever it lives. The two keys that name
+a PLATFORM rather than an icon (the footer's `socials` block and a team
+member's link `id`) stay platform keys: a social profile is always a brand
+mark, so the family is derived at the one site that knows it and a brand never
+types a class for a platform it only named.
+
 ## The two halves
 
 | Half | When | What happens |

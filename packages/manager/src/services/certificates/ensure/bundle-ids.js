@@ -10,8 +10,8 @@
  * the profiles handler.
  */
 const chalk = require('chalk').default;
+const { hasTargetOfType, composeBundleId } = require('@omega.js/config');
 const { catchAgreements } = require('../lib/apple-api.js');
-const { composeBundleId } = require('../../../lib/bundle-id.js');
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 
 // Where the brand's identifiers live — the page a prefix is read off of
@@ -52,10 +52,9 @@ module.exports = catchAgreements(async (context) => {
   }
 
   const bundleIdentifier = composeBundleId(prefix, brandId);
-  const targets = brandConfig.targets || {};
   const platforms = [
-    ...(targets.mobile ? ['IOS'] : []),
-    ...(targets.desktop ? ['MACOS'] : []),
+    ...(hasTargetOfType(brandConfig, 'mobile') ? ['IOS'] : []),
+    ...(hasTargetOfType(brandConfig, 'desktop') ? ['MACOS'] : []),
   ];
   const capabilities = appleConfig.capabilities || [];
   const brandName = brandConfig.brand?.name || brandId;

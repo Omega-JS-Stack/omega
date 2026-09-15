@@ -14,7 +14,7 @@ config:
       enabled: true
 ---
 
-{% capture company %}{{ resolved.config.brand.company | default: resolved.config.brand.name }}{% endcapture %}
+{% capture company %}{{ resolved.config.company.name | default: resolved.config.brand.name }}{% endcapture %}
 
 <!-- ═══ Document header ═══ -->
 {% comment %} #467 (after #749): this masthead IS the page's first viewport, so

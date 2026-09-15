@@ -4,11 +4,12 @@ layout: frontend/core/base
 # ═══ /download — reimagined 2026-07-16 (manus-grade: the page knows your
 # platform and leads with YOUR button; everything else is one scroll away).
 # Data contract preserved: resolved.downloads.platforms drives cards + the
-# detection JS; site.targets.desktop.downloads[platform][artifact] supplies the
+# detection JS; site.targets.desktop.downloads[platform][format] supplies the
 # desktop URLs (#610 — the curated targets view is the ONE home). Each is a
 # DIRECT download of a versionless asset (#620), so a button hands over the
-# file and a desktop release never touches this page. The platform/artifact
-# keys below are the catalog's: a `type` with no derived URL renders no button.
+# file and a desktop release never touches this page. The platform/format keys
+# below are the format table's, the one vocabulary (#867: mac/dmg,
+# windows/nsis, linux/deb): a `type` with no derived URL renders no button.
 # Mobile derives nothing while MAM is parked, so every mobile store stays on
 # the notify form.
 
@@ -39,49 +40,49 @@ downloads:
   platforms:
     - id: "mac"
       name: "macOS"
-      icon: "apple"
+      icon: "fa-brands fa-apple"
       description: "macOS 10.15+ (Apple Silicon & Intel)"
       types:
-        - type: "universal"
+        - type: "dmg"
           name: "Download for macOS"
-          icon: "apple"
+          icon: "fa-brands fa-apple"
     - id: "windows"
       name: "Windows"
-      icon: "windows"
+      icon: "fa-brands fa-windows"
       description: "Windows 10 and later"
       types:
-        - type: "universal"
+        - type: "nsis"
           name: "Download for Windows"
-          icon: "windows"
+          icon: "fa-brands fa-windows"
     - id: "linux"
       name: "Linux"
-      icon: "linux"
+      icon: "fa-brands fa-linux"
       description: "Ubuntu 18.04+ and friends"
       types:
-        - type: "debian"
+        - type: "deb"
           name: "Debian package"
-          icon: "linux"
+          icon: "fa-brands fa-linux"
         - type: "appimage"
           name: "AppImage"
-          icon: "linux"
+          icon: "fa-brands fa-linux"
     - id: "ios"
       name: "iOS"
-      icon: "apple"
+      icon: "fa-brands fa-apple"
       description: "iOS 13 and later"
       store_badge: "apple-app-store"
       types:
         - type: "universal"
           name: "App Store"
-          icon: "apple"
+          icon: "fa-brands fa-apple"
     - id: "android"
       name: "Android"
-      icon: "android"
+      icon: "fa-brands fa-android"
       description: "Android 8.0 and later"
       store_badge: "google-play-store"
       types:
         - type: "universal"
           name: "Google Play"
-          icon: "android"
+          icon: "fa-brands fa-android"
 
 # What travels with you — hairline rows. Named `highlights`, not `features`:
 # `features` is a CONFIG section now (the feature catalog, #647) and a page key
@@ -95,16 +96,16 @@ highlights:
   items:
     - title: "Everything syncs"
       description: "Sign in anywhere and your work is already there: desktop, mobile, browser."
-      icon: "rotate"
+      icon: "fa-solid fa-rotate"
     - title: "Updates itself"
       description: "New versions arrive quietly in the background. You never install twice."
-      icon: "cloud-arrow-down"
+      icon: "fa-solid fa-cloud-arrow-down"
     - title: "Fast to first use"
       description: "Small download, no bundled extras, running in under a minute."
-      icon: "bolt"
+      icon: "fa-solid fa-bolt"
     - title: "Secure by default"
       description: "Signed builds and encrypted sync, on every platform."
-      icon: "shield-halved"
+      icon: "fa-solid fa-shield-halved"
 
 # System Requirements Section
 system_requirements:
@@ -115,20 +116,20 @@ system_requirements:
   subheadline: "Almost certainly. Here's the fine print."
   desktop:
     label: "Desktop"
-    icon: "desktop"
+    icon: "fa-solid fa-desktop"
     items:
       - text: "2GB RAM minimum"
-        icon: "check"
+        icon: "fa-solid fa-check"
       - text: "500MB free disk space"
-        icon: "check"
+        icon: "fa-solid fa-check"
   mobile:
     label: "Mobile"
-    icon: "mobile"
+    icon: "fa-solid fa-mobile"
     items:
       - text: "100MB free storage"
-        icon: "check"
+        icon: "fa-solid fa-check"
       - text: "Internet connection required"
-        icon: "check"
+        icon: "fa-solid fa-check"
 
 # FAQ Section
 faqs:
@@ -156,11 +157,11 @@ cta:
   subheadline: "Real humans answer. Bring your error message."
   primary_button:
     text: "Contact support"
-    icon: "headset"
+    icon: "fa-solid fa-headset"
     href: "/contact"
   secondary_button:
     text: "Release notes"
-    icon: "book"
+    icon: "fa-solid fa-book"
     href: "/updates"
     nudge: true
 ---
@@ -219,7 +220,7 @@ bands below keep the reveal lane. {% endcomment %}
         <div class="col-md-6 col-lg-4 d-flex" data-omega-reveal>
           <div class="omega-dl-card omega-hover-lift" data-download-card data-platform="{{ platform.id }}">
             <span class="omega-dl-card__mark">
-              <i class="fa-solid fa-{{ platform.icon }} fa-2xl"></i>
+              <i class="{{ platform.icon }} fa-2xl" aria-hidden="true"></i>
             </span>
             <h3 class="omega-dl-card__name">{{ platform.name }}</h3>
             <p class="omega-dl-card__req omega-quiet small">{{ platform.description }}</p>
@@ -307,7 +308,7 @@ bands below keep the reveal lane. {% endcomment %}
                 {% endfor %}
                 {% unless has_download %}
                   <span class="d-inline-flex align-items-center gap-2">
-                    <i class="fa-solid fa-{{ platform.icon }} fa-sm"></i>
+                    <i class="{{ platform.icon }} fa-sm" aria-hidden="true"></i>
                     <strong>{{ platform.name }}</strong>
                   </span>
                 {% endunless %}
@@ -353,7 +354,7 @@ bands below keep the reveal lane. {% endcomment %}
         {% for feature in resolved.highlights.items %}
           <div class="omega-rowlist__item" data-omega-reveal>
             <span class="d-inline-flex align-items-center gap-3">
-              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ feature.icon }} fa-sm"></i></span>
+              <span class="omega-icon-chip omega-icon-chip--neutral"><i class="{{ feature.icon }} fa-sm" aria-hidden="true"></i></span>
               <strong>{{ feature.title }}</strong>
             </span>
             <span class="omega-rowlist__meta">{{ feature.description }}</span>
@@ -670,7 +671,7 @@ bands below keep the reveal lane. {% endcomment %}
                    hand-spelled rule. Debian is the only install step there is —
                    the pipeline builds a .deb and an AppImage (which needs no
                    install), and never an .rpm. -->
-              {% assign deb_file = site.targets.desktop.downloads.linux.debian | split: "/" | last %}
+              {% assign deb_file = site.targets.desktop.downloads.linux.deb | split: "/" | last %}
               <div class="omega-dl-modal__pane p-4 overflow-hidden position-relative">
                 <div>
                   <small class="text-muted d-block mb-2 fw-bold" id="linux-debian-label">For Debian/Ubuntu:</small>

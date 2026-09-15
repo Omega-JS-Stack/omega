@@ -3,7 +3,8 @@
  * Admin/blogger endpoint to write files to GitHub
  */
 const { Octokit } = require('@octokit/rest');
-const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+const { writeFileBothBranches } = require('../../lib/deploy-branch.js');
+const { cmsContext } = require('../../../../helpers/web-target.js');
 const env = require('../../../../libraries/env.js');
 
 module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
@@ -23,13 +24,20 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
     return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
-  if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return ctx.respond('GitHub repo not configured (set targets.backend.github.repo — "owner/name" or bare name — or repo.providers.github.org + brand.id).', { code: 500 });
+  // The SOURCE repo this commits to, and WHICH website inside it (#887):
+  // `path` is SITE-relative, and the target's folder is what turns it into a
+  // repo path
+  let source;
+  let target;
+  try {
+    ({ source, target } = cmsContext(Manager.config, settings.target));
+  } catch (e) {
+    return ctx.respond(e.message, { code: e.code });
   }
 
   ctx.log('main(): settings', settings);
 
-  const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
+  const bemRepo = { user: source.owner, name: source.name };
 
   // Setup Octokit
   const octokit = new Octokit({
@@ -46,6 +54,9 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
   // Fix other values
   settings.type = settings.type;
+  // `path` stays the caller's site-relative value; `repoPath` is where it lands
+  settings.target = target.name;
+  settings.repoPath = `${target.path}/${settings.path}`;
   // Always the brand's own repo — caller-supplied values would let a blogger-role
   // user point the shared GH_TOKEN at any repo it can write
   settings.githubUser = bemRepo.user;
@@ -71,7 +82,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 async function uploadContent(ctx, octokit, settings) {
   const owner = settings.githubUser;
   const repo = settings.githubRepo;
-  const filename = settings.path;
+  const filename = settings.repoPath;
   const content = settings.content;
 
   ctx.log('uploadContent(): filename', filename);
@@ -90,17 +101,26 @@ async function uploadContent(ctx, octokit, settings) {
     throw existing;
   }
 
-  // Upload content
-  const result = await octokit.rest.repos.createOrUpdateFileContents({
+  // Upload content to BOTH branches (#919): the default branch is the record,
+  // and the deploy branch is what CI builds, so content that skipped it would
+  // never reach the live site on a brand running local framework packages.
+  const { result, deployBranch } = await writeFileBothBranches({
+    ctx,
+    octokit,
     owner: owner,
     repo: repo,
     path: filename,
     sha: existing?.data?.sha || undefined,
     message: `📦 admin/repo/content ${filename}`,
-    content: Buffer.from(content).toString('base64'),
+    content: content,
   });
+
+  settings.deployBranch = deployBranch;
 
   ctx.log('uploadContent(): Result', result);
 
   return result;
 }
+
+// Expose the write for tests
+module.exports.uploadContent = uploadContent;

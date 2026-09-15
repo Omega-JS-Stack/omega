@@ -8,7 +8,7 @@
  * local web loop. GUI/watcher targets (desktop opens an Electron window,
  * extension runs a build watcher) never boot unless asked.
  *   omega dev                        web + backend
- *   omega dev --target=web           one leg (target key or dir name)
+ *   omega dev --target=web           one leg (the target NAME)
  *   omega dev --target=web,backend   explicit set
  *   omega dev --all                  every target with a dev leg
  *   omega dev --full                 boot on the WHOLE manage walk, not the lane
@@ -39,7 +39,7 @@ const { resolveBrandRoot, discoverTargets } = require('../lib/brand.js');
 const { assertFamilyVersions } = require('../lib/preflight.js');
 const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
-const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens, targetMatches } = require('../lib/target-selection.js');
+const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens } = require('../lib/target-selection.js');
 
 // Target → the npm leg that IS local dev for that target
 const DEV_LEGS = {
@@ -87,7 +87,8 @@ const stopChild = (child, killGroup = (pid, signal) => process.kill(pid, signal)
   }
 };
 
-// Booted without flags — the local web loop
+// Booted without flags: the local web loop. These are target NAMES (#886), so
+// a brand that names its web target something else boots it with `--target=`.
 const DEFAULT_TARGETS = ['web', 'backend'];
 
 /**
@@ -98,37 +99,43 @@ const DEFAULT_TARGETS = ['web', 'backend'];
  * declares that script — no script, no dev leg.
  *
  * @param {object} input
- * @param {string[]} input.available - targets that have a dir in this brand
+ * @param {Array<{ name: string, target: string|null }>} input.available - the discovered targets that have a dev leg ({ name, target: the TYPE })
  * @param {string[]} [input.custom] - custom target names with a `start` script
  * @param {string} [input.target] - the --target= comma list: exact set to boot
  * @param {boolean} [input.all] - start every target with a dev leg
- * @returns {{ selected: string[], missing: string[] }}
+ * @returns {{ selected: string[] }}
  * @throws {Error} when a --target= token names no dev leg
  */
 function selectDevTargets({ available, custom = [], target, all }) {
+  const names = available.map((entry) => entry.name);
+  const typeOf = new Map(available.map((entry) => [entry.name, entry.target]));
+
   // A custom target is a first-class leg once it has a start script — the
   // default set boots it beside web + backend (it is part of the local stack,
   // never an opt-in GUI surface)
-  const hasLeg = (name) => Boolean(DEV_LEGS[name]) || custom.includes(name);
-  const defaults = [...DEFAULT_TARGETS, ...custom].filter((name) => available.includes(name));
+  // The vocabulary is the SAME one `test`, `deploy` and `update` take (#886):
+  // this brand's declared target NAMES, custom ones included. A type word is
+  // only a token when a target answers to it, so `--target=web` on a brand
+  // whose web target is named `site` is a typo, never a silent skip.
+  const legs = [...new Set([...names, ...custom])];
+  const defaults = [...DEFAULT_TARGETS, ...custom].filter((name) => names.includes(name));
 
   const tokens = parseTargetTokens(target);
   const requested = tokens.length > 0
     ? tokens
-    : (all ? [...Object.keys(DEV_LEGS), ...custom] : defaults);
+    : (all ? legs : defaults);
 
   // A token naming no leg STOPS the boot (#780) — booting the rest of the set
-  // would serve a stack the human did not ask for. A named leg with no dir in
-  // this brand is a different thing: reported below, never invented.
-  assertKnownTargets(requested.filter((name) => !hasLeg(name)), [...Object.keys(DEV_LEGS), ...custom]);
+  // would serve a stack the human did not ask for.
+  assertKnownTargets(requested.filter((name) => !legs.includes(name)), legs);
 
-  const selected = requested.filter((name) => available.includes(name));
-  const missing = requested.filter((name) => !available.includes(name));
+  // Backend first: it publishes the emulator port map the web leg reads. The
+  // order is by TYPE (#886), never by the word: a backend NAMED `api` still
+  // boots ahead of the legs that read its ports.
+  const backendFirst = (name) => (typeOf.get(name) === 'backend' ? -1 : 0);
+  const selected = [...requested].sort((a, b) => backendFirst(a) - backendFirst(b));
 
-  // Backend first: it publishes the emulator port map the web leg reads
-  selected.sort((a, b) => (a === 'backend' ? -1 : 0) - (b === 'backend' ? -1 : 0));
-
-  return { selected, missing };
+  return { selected };
 }
 
 /**
@@ -206,29 +213,19 @@ module.exports = async (options = {}) => {
   const customLegs = discovered.filter((entry) => entry.custom && targetScripts(entry.path).start);
   const targets = [
     ...discovered.filter((entry) => entry.target && DEV_LEGS[entry.target]),
-    ...customLegs.map((entry) => ({ ...entry, target: entry.name })),
+    ...customLegs,
   ];
 
   const custom = customLegs.map((entry) => entry.name);
 
-  // A --target= token names a target by KEY ('web') or by its dir name
-  // ('website') — the same two spellings every other brand-root verb takes
-  // (#780). The pairing lives in the discovered entries, so the dir spelling
-  // resolves to its key HERE, through the one shared matcher; a token that
-  // names nothing passes through untouched and the selector refuses it.
-  const picker = parseTargetTokens(options[PICKER_FLAG])
-    .map((token) => (targets.find((entry) => targetMatches(entry, token)) || {}).target || token)
-    .join(',');
-
-  const { selected, missing } = selectDevTargets({
-    available: targets.map((entry) => entry.target),
+  // A --target= token is the target NAME (#886), the one word every
+  // brand-root verb takes, so the picker passes straight through: a token
+  // that names nothing reaches the selector, which refuses it.
+  const { selected } = selectDevTargets({
+    available: targets,
     custom,
-    target: picker,
+    target: options[PICKER_FLAG],
     all: options.all,
-  });
-
-  missing.forEach((target) => {
-    console.log(chalk.yellow(`⊘ ${target}: no dir in this brand — skipped`));
   });
 
   if (selected.length === 0) {
@@ -249,8 +246,8 @@ module.exports = async (options = {}) => {
   // through the web package the web leg was mid-rebuild on. Swept first, every
   // lane's own check is a no-op.
   const hosts = [];
-  for (const target of selected) {
-    const entry = targets.find((item) => item.target === target);
+  for (const name of selected) {
+    const entry = targets.find((item) => item.name === name);
     const found = findTarget(entry.path);
     if (found && found.kind === 'framework') {
       hosts.push({ packageName: found.name, fromDir: found.dir });
@@ -336,7 +333,7 @@ module.exports = async (options = {}) => {
   // bypass, so Node prints no warning. A shell-set value wins verbatim.
   const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
 
-  const pad = Math.max(...selected.map((target) => target.length));
+  const pad = Math.max(...selected.map((name) => name.length));
   const children = [];
   let shuttingDown = false;
 
@@ -356,15 +353,15 @@ module.exports = async (options = {}) => {
     stream.on('end', () => emit(deduper.flush()));
   };
 
-  for (const target of selected) {
-    const entry = targets.find((item) => item.target === target);
+  for (const name of selected) {
+    const entry = targets.find((item) => item.name === name);
     const leg = devLegFor(entry);
     const node = resolveTargetNode(entry.path);
     if (node?.error) {
-      console.log(chalk.yellow(`   ⚠ ${target}: ${node.error} — using the inherited node`));
+      console.log(chalk.yellow(`   ⚠ ${name}: ${node.error}, using the inherited node`));
     }
 
-    console.log(chalk.dim(`   ${target.padEnd(pad)} → ${leg.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
+    console.log(chalk.dim(`   ${name.padEnd(pad)} → ${leg.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
 
     const child = spawn(leg[0], leg.slice(1), {
       cwd: entry.path,
@@ -382,11 +379,11 @@ module.exports = async (options = {}) => {
       // would get only npm killed, orphaning the emulator on its ports.
       detached: true,
     });
-    forward(child.stdout, console.log, target);
-    forward(child.stderr, console.error, target);
+    forward(child.stdout, console.log, name);
+    forward(child.stderr, console.error, name);
     child.on('close', (code) => {
       if (shuttingDown) return;
-      console.error(chalk.red(`✖ ${target} exited (code ${code}) — siblings stay up; Ctrl-C stops everything`));
+      console.error(chalk.red(`✖ ${name} exited (code ${code}): siblings stay up; Ctrl-C stops everything`));
     });
     children.push(child);
   }

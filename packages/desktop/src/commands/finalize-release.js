@@ -33,7 +33,7 @@ const logger = Manager.logger('finalize-release');
 
 module.exports = async function finalizeRelease(options = {}) {
   const argv = options._ || [];
-  // Parse flags from yargs-style options (yargs camelCases --signed-dir → signedDir).
+  // The parse mints both spellings of a kebab flag (--signed-dir, signedDir).
   const signedDir = options.signedDir || options['signed-dir'];
   const doPublish = options.publish === true;
 
@@ -59,10 +59,11 @@ module.exports = async function finalizeRelease(options = {}) {
   }
 
   // The releases repo (the auto-updater feed source), from config alone.
-  const { owner, name, repo } = releasesRepo(config);
-  if (!repo) {
-    throw new Error('finalize-release: could not address the releases repo. Set repo.providers.github.org (or targets.desktop.releases.owner) and brand.id in config/omega.json5.');
+  const releases = releasesRepo(config);
+  if (!releases) {
+    throw new Error('finalize-release: could not address the releases repo. Set repo.org and brand.id in config/omega.json5 (the releases repo is <brand.id>-releases under that org).');
   }
+  const { owner, name } = releases;
 
   const releaseTag = `v${pkgVersion}`;
 

@@ -7,7 +7,7 @@
   "devDependencies": {
     "@omega.js/desktop": "^0.1.0",
     "electron": ">=42",
-    "electron-builder": ">=26",
+    "electron-builder": ">=26.16.1",
     "gulp": "^5.0.1"
   }
 }

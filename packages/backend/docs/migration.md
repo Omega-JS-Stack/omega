@@ -14,10 +14,10 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 | `backend_manager.namespace` or `backendmanager.namespace` | `OMEGA_NAMESPACE` |
 | `github.key` or `github.token` | `GITHUB_TOKEN` |
 | `openai.key` or `openai.api_key` | `OPENAI_API_KEY` |
-| `paypal.client_id` | `PAYPAL_CLIENT_ID` |
+| `paypal.client_id` | `payment.providers.paypal.clientId` in config/omega.json5 (public, #893) |
 | `paypal.client_secret` | `PAYPAL_CLIENT_SECRET` |
 | `stripe.secret_key` or `stripe.key` | `STRIPE_SECRET_KEY` |
-| `chargebee.site` | `CHARGEBEE_SITE` |
+| `chargebee.site` | `payment.providers.chargebee.site` in config/omega.json5 (public, #893) |
 | `chargebee.api_key` or `chargebee.key` | `CHARGEBEE_API_KEY` |
 | `cloudflare.token` or `cloudflare.key` | `CLOUDFLARE_TOKEN` |
 | `recaptcha.secret_key` or `recaptcha.key` | `RECAPTCHA_SECRET_KEY` |
@@ -33,7 +33,7 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 4. **Check existing `.env` for conflicts**: skip existing keys and warn.
 5. **Write/update `functions/.env`**: each mapped key as a top-level variable.
 6. **Delete source files**: remove `functions/.runtimeconfig.json` if it existed.
-7. **Convert `functions/backend-manager-config.json` to `functions/config/omega.json5`** (shared sections top-level, backend settings under `targets.backend` — see CHANGELOG for the mapping), then: remove the deprecated `mailchimp` key entirely; update `brand` to the nested structure `{ name, url, contact: { email }, images: { brandmark, wordmark, combomark } }`; set `github.user` to `"itw-creative-works"`.
+7. **Convert `functions/backend-manager-config.json` to `functions/config/omega.json5`** (shared sections top-level, backend settings under `targets.backend`, see CHANGELOG for the mapping), then: remove the deprecated `mailchimp` key entirely; update `brand` to the nested structure `{ name, url, contact: { email }, images: { brandmark, wordmark, combomark } }`; declare the repo org once at the top level, `repo: { provider: 'github', org: 'itw-creative-works' }` ([#883](https://github.com/Omega-JS-Stack/omega/issues/883): the content repo derives as `<brand.id>-omega` under it, and the retired `github.user` / per-target `github` keys fail validation).
 8. Update `functions/.nvmrc` to `v22/*` and `functions/package.json` `engines.node` to `"22"`.
 9. Clean up `functions/.gitignore` duplicates.
 
@@ -51,9 +51,9 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | `Manager.config.sendgrid.key` | `process.env.SENDGRID_API_KEY` |
 | `Manager.config.stripe.secret_key` | `process.env.STRIPE_SECRET_KEY` |
 | `Manager.config.openai.key` | `process.env.OPENAI_API_KEY` |
-| `Manager.config.paypal.client_id` | `process.env.PAYPAL_CLIENT_ID` |
+| `Manager.config.paypal.client_id` | `Manager.config.payment.providers.paypal.clientId` |
 | `Manager.config.paypal.client_secret` | `process.env.PAYPAL_CLIENT_SECRET` |
-| `Manager.config.chargebee.site` | `process.env.CHARGEBEE_SITE` |
+| `Manager.config.chargebee.site` | `Manager.config.payment.providers.chargebee.site` |
 | `Manager.config.chargebee.api_key` | `process.env.CHARGEBEE_API_KEY` |
 | `Manager.config.cloudflare.token` | `process.env.CLOUDFLARE_TOKEN` |
 | `Manager.config.recaptcha.secret_key` | `process.env.RECAPTCHA_SECRET_KEY` |

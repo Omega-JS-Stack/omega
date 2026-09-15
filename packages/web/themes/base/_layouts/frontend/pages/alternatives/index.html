@@ -36,13 +36,13 @@ value_props:
   items:
     - title: "Lightning fast"
       description: "Built on modern infrastructure for blazing performance. No more waiting around."
-      icon: "bolt"
+      icon: "fa-solid fa-bolt"
     - title: "AI-powered"
       description: "Smart automation built into every workflow to save you hours every week."
-      icon: "wand-magic-sparkles"
+      icon: "fa-solid fa-wand-magic-sparkles"
     - title: "24/7 support"
       description: "Real humans ready to help whenever you need it. Average response time under 5 minutes."
-      icon: "headset"
+      icon: "fa-solid fa-headset"
 
 # Stats Section
 stats:
@@ -163,7 +163,7 @@ bands below keep the reveal lane. {% endcomment %}
           {% for prop in resolved.value_props.items %}
             <div class="omega-rowlist__item" data-omega-reveal>
               <span class="d-inline-flex align-items-center gap-3">
-                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="fa-solid fa-{{ prop.icon }} fa-sm"></i></span>
+                <span class="omega-icon-chip omega-icon-chip--neutral"><i class="{{ prop.icon }} fa-sm" aria-hidden="true"></i></span>
                 <strong>{{ prop.title }}</strong>
               </span>
               <span class="omega-rowlist__meta">{{ prop.description }}</span>

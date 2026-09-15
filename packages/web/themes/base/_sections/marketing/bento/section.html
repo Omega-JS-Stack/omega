@@ -27,7 +27,7 @@
                 <span class="omega-tile__ordinal">{{ forloop.index }}</span>
               {% endiftruthy %}
               {% iftruthy item.icon %}
-                <span class="omega-icon-chip"><i class="fa-solid fa-{{ item.icon }} fa-sm"></i></span>
+                <span class="omega-icon-chip"><i class="{{ item.icon }} fa-sm" aria-hidden="true"></i></span>
               {% endiftruthy %}
               <span class="omega-tile__title">{{ item.title }}</span>
             </div>

@@ -29,14 +29,14 @@ const path = require('node:path');
 
 const MONOREPO_ROOT = path.join(__dirname, '..');
 const { runOnboard } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'onboard.js'));
-const { TARGET_DIRS } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'config.js'));
 const { configureOmega, loadSiteData } = require('@omega.js/web');
+const { setEnvironment } = require('@omega.js/config/environment');
 
 // One row per brand shape. targets: null = the non-interactive derivation
 // default (web+backend). theme flips the seeded config. post drops a real
-// _posts entry before the build. instances flips targets.web to the
-// 2-instance array form and proves the multi-instance sweep (structure,
-// per-instance compose, port offsets, deploy-record keys, both builds).
+// _posts entry before the build. twoWeb adds a SECOND named web target and
+// proves the sweep across siblings (structure, per-target compose, port
+// offsets, deploy-record keys, both builds).
 // themeOverride drops a consumer-local tier-2 theme over the seeded one and
 // proves the cascade through a REAL production build (proveThemeOverride).
 const CELLS = [
@@ -47,7 +47,7 @@ const CELLS = [
   { id: 'shape-backend-only', targets: 'backend' },
   { id: 'shape-desktop-extension', targets: 'desktop,extension' },
   { id: 'shape-with-post', targets: 'web', post: true },
-  { id: 'shape-web-two-instance', targets: 'web', instances: true },
+  { id: 'shape-web-two-targets', targets: 'web', twoWeb: true },
   { id: 'shape-theme-override', targets: 'web', themeOverride: true },
 ];
 
@@ -130,10 +130,10 @@ function writePost(webTargetDir) {
  * marker-merge with nothing on the network, and every dependency resolves from
  * the monorepo (no installs).
  * @param {string} brandRoot - the born brand
- * @param {string} [targetDirName] - the target dir (multi-instance cells pass their own)
+ * @param {string} [targetDirName] - the target dir (a sibling web cell passes its own)
  * @returns {Promise<Map<string, string>>} url → built file content
  */
-async function buildWebTarget(brandRoot, targetDirName = 'website') {
+async function buildWebTarget(brandRoot, targetDirName = 'web') {
   const { buildSite, resolveClientEntry, consumerPaths } = require('@omega.js/web');
   const { ensureTarget } = require(path.join(MONOREPO_ROOT, 'packages', 'web', 'src', 'commands', 'lib', 'ensure-target.js'));
 
@@ -227,16 +227,16 @@ function assertWebInvariants(cell, pages) {
 }
 
 /**
- * The multi-instance proof (_attic/plans/multi-instance-targets.md step 3): flip the
- * born brand's targets.web to the 2-instance array form and exercise the
- * whole sweep through the REAL mechanisms — the workspace structure op's
- * per-instance dir expectations, per-instance compose (the admin entry
- * overrides brand shared for admin ONLY), deterministic dev-port offsets,
- * deploy-record keying by target dir, and a real Eleventy build of BOTH instances.
+ * The sibling-web-target proof (#886): give the born brand a SECOND web target,
+ * named `admin`, and exercise the whole sweep through the REAL mechanisms, the
+ * workspace structure op's per-target dir expectations, per-target compose (the
+ * admin entry overrides brand shared for admin ONLY), deterministic dev-port
+ * offsets, deploy-record keying by target name, and a real Eleventy build of
+ * BOTH targets.
  */
-async function proveInstances(brandRoot, cell) {
+async function proveTwoWebTargets(brandRoot, cell) {
   const JSON5 = require('json5');
-  const { loadConfig, targetInstance, instancePortOffset } = require('@omega.js/config');
+  const { loadConfig, targetPortOffset } = require('@omega.js/config');
   const { loadBrand } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'lib', 'brand.js'));
   const structureOp = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'services', 'workspace', 'ensure', 'structure.js'));
   const { websiteWantedPort } = require(path.join(MONOREPO_ROOT, 'packages', 'web', 'src', 'commands', 'dev.js'));
@@ -247,18 +247,15 @@ async function proveInstances(brandRoot, cell) {
   const baseName = deriveName(cell.id);
   const adminName = `${baseName} Admin`;
 
-  // Flip targets.web to the array form: main + an admin instance that
-  // overrides brand.name for ITS instance only (comments are corpus-expendable)
+  // Declare the sibling: a second web target NAMED admin, overriding brand.name
+  // for ITS target only (comments are corpus-expendable)
   const configPath = path.join(brandRoot, 'config', 'omega.json5');
   const data = JSON5.parse(fs.readFileSync(configPath, 'utf8'));
-  data.targets.web = [
-    { id: 'main' },
-    { id: 'admin', url: `https://admin.${cell.id}.invalid`, brand: { name: adminName } },
-  ];
+  data.targets.admin = { type: 'web', url: `https://admin.${cell.id}.invalid`, brand: { name: adminName } };
   fs.writeFileSync(configPath, JSON5.stringify(data, null, 2));
 
   // Structure op (quiet — its console lines are not corpus output): the
-  // enabled admin instance without its dir is the create-this-dir error
+  // declared admin target without its dir is the create-this-dir error
   const runStructure = async () => {
     const log = console.log;
     console.log = () => {};
@@ -270,41 +267,41 @@ async function proveInstances(brandRoot, cell) {
     }
   };
   const missing = await runStructure();
-  need(missing.status === 'error' && /create targets\/website-admin\//.test(missing.error || ''), 'structure errors on the missing instance dir');
+  need(missing.status === 'error' && /create targets\/admin\//.test(missing.error || ''), 'structure errors on the missing target dir');
 
-  // Birth the admin instance as a copy of the main dir, then structure heals
-  const mainDir = path.join(brandRoot, 'targets', 'website');
-  const adminDir = path.join(brandRoot, 'targets', 'website-admin');
+  // Birth the admin target as a copy of the web dir, then structure heals
+  const mainDir = path.join(brandRoot, 'targets', 'web');
+  const adminDir = path.join(brandRoot, 'targets', 'admin');
   fs.cpSync(mainDir, adminDir, { recursive: true });
   const healed = await runStructure();
-  need(healed.status !== 'error', `structure passes with both instance dirs (${healed.error || 'ok'})`);
+  need(healed.status !== 'error', `structure passes with both target dirs (${healed.error || 'ok'})`);
 
-  // Per-instance compose: the admin entry is scoped to targets/website-admin
+  // Per-target compose: the admin entry is scoped to targets/admin
   const main = loadConfig(mainDir, 'web');
   const admin = loadConfig(adminDir, 'web');
-  need(main.errors.length === 0 && admin.errors.length === 0, 'both instances validate');
-  need(main.instance === 'main' && admin.instance === 'admin', 'target dirs resolve their instance ids');
-  need(main.config.brand.name === baseName, 'main keeps the brand-shared name');
-  need(admin.config.brand.name === adminName, 'admin instance entry overrides brand shared for admin only');
-  need(admin.config.url === `https://admin.${cell.id}.invalid`, 'admin carries its instance url');
+  need(main.errors.length === 0 && admin.errors.length === 0, 'both targets validate');
+  need(main.name === 'web' && admin.name === 'admin', 'target dirs resolve their names');
+  need(main.config.brand.name === baseName, 'web keeps the brand-shared name');
+  need(admin.config.brand.name === adminName, 'the admin entry overrides brand shared for admin only');
+  need(admin.config.url === `https://admin.${cell.id}.invalid`, 'admin carries its own url');
 
   // Dev-port offsets: side-by-side capable, deterministic off the same base
-  need(instancePortOffset(data.targets.web, 'admin') === 1, 'admin offsets by its array position');
-  need(websiteWantedPort(adminDir) - websiteWantedPort(mainDir) === 1, 'admin wants the next port beside main');
+  need(targetPortOffset(data, 'admin') === 1, 'admin offsets by its position among the web targets');
+  need(websiteWantedPort(adminDir) - websiteWantedPort(mainDir) === 1, 'admin wants the next port beside web');
 
-  // Deploy records key by target dir: main stays `web`, admin lands `web:admin`
-  recordDeploy({ dir: mainDir, target: 'web', instance: targetInstance(mainDir, 'web'), detail: { method: 'corpus' } });
-  recordDeploy({ dir: adminDir, target: 'web', instance: targetInstance(adminDir, 'web'), detail: { method: 'corpus' } });
+  // Deploy records key by target NAME: `web` and `admin`, never one stamp
+  recordDeploy({ dir: mainDir, target: 'web', detail: { method: 'corpus' } });
+  recordDeploy({ dir: adminDir, target: 'admin', detail: { method: 'corpus' } });
   const state = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'state.json'), 'utf8'));
-  need(!!(state.deploy?.web && state.deploy['web:admin']), 'deploy records key per instance dir');
+  need(!!(state.deploy?.web && state.deploy?.admin), 'deploy records key per target name');
 
-  // Real Eleventy build of BOTH instances — each branded as ITS instance
-  const mainPages = await buildWebTarget(brandRoot, 'website');
-  const adminPages = await buildWebTarget(brandRoot, 'website-admin');
+  // Real Eleventy build of BOTH targets: each branded as ITS target
+  const mainPages = await buildWebTarget(brandRoot, 'web');
+  const adminPages = await buildWebTarget(brandRoot, 'admin');
   failures.push(...assertWebInvariants(cell, mainPages));
   const mainHome = mainPages.get('/') || '';
   const adminHome = adminPages.get('/') || '';
-  need(!mainHome.includes(adminName), 'main homepage never leaks the admin branding');
+  need(!mainHome.includes(adminName), 'the web homepage never leaks the admin branding');
   need(adminHome.includes(adminName), `admin homepage branded "${adminName}"`);
 
   return failures;
@@ -329,7 +326,7 @@ async function proveThemeOverride(brandRoot, cell) {
 
   const failures = [];
   const need = (condition, label) => { if (!condition) failures.push(label); };
-  const paths = consumerPaths(path.join(brandRoot, 'targets', 'website'));
+  const paths = consumerPaths(path.join(brandRoot, 'targets', 'web'));
   const themeId = cell.theme || 'classy';
 
   // The override lands where the LAYERS code probes — resolveThemeLayers reads
@@ -411,9 +408,10 @@ async function runCell(cell) {
 
     const targets = expectedTargets(cell);
     for (const target of targets) {
-      const dir = TARGET_DIRS[target] || target;
-      if (!fs.existsSync(path.join(brandRoot, 'targets', dir, 'package.json'))) {
-        failures.push(`targets/${dir} missing for target ${target}`);
+      // The onboard wizard names a brand's first target of a type for the type
+      // itself, and the name IS the folder (#886)
+      if (!fs.existsSync(path.join(brandRoot, 'targets', target, 'package.json'))) {
+        failures.push(`targets/${target} missing for target ${target}`);
       }
     }
     const scaffoldedDirs = fs.readdirSync(path.join(brandRoot, 'targets'));
@@ -424,13 +422,13 @@ async function runCell(cell) {
     // The build half is timed on its own: a web cell now runs a REAL build
     // (#776), so the line says what that costs.
     const buildStarted = process.hrtime.bigint();
-    if (cell.instances) {
-      failures.push(...await proveInstances(brandRoot, cell));
+    if (cell.twoWeb) {
+      failures.push(...await proveTwoWebTargets(brandRoot, cell));
     } else if (cell.themeOverride) {
       failures.push(...await proveThemeOverride(brandRoot, cell));
     } else if (targets.includes('web')) {
       if (cell.theme) flipTheme(brandRoot, cell.theme);
-      if (cell.post) writePost(path.join(brandRoot, 'targets', 'website'));
+      if (cell.post) writePost(path.join(brandRoot, 'targets', 'web'));
       failures.push(...assertWebInvariants(cell, await buildWebTarget(brandRoot)));
     }
     if (targets.includes('web')) {
@@ -453,6 +451,12 @@ async function runCell(cell) {
 }
 
 async function main() {
+  // This lane stands where `omega test` stands and builds in process, so it
+  // names the environment for the whole process the way that verb does
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): every read
+  // below answers `testing`, and production's html minify stays off.
+  setEnvironment('testing');
+
   console.log(`\nBrand-shape corpus — ${CELLS.length} cells (offline: real onboard + real web builds, no installs)\n`);
   const outcomes = [];
 

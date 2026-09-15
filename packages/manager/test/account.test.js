@@ -56,7 +56,7 @@ function stageBrand() {
 function brandConfig({ account, admins, products, cloud, url } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: url !== undefined ? url : `https://${DOMAIN}` },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     // The Firebase web API key comes from config now (#434) — the cloud
     // service's sdk-config writeback is what puts it there
     cloud: cloud || { shared: false, config: { apiKey: 'fixture-api-key' } },
@@ -351,13 +351,26 @@ test('account: the env pin beats the hook', async (t) => {
   assert.deepEqual(backend.of('verifyPassword')[0].args, [EMAIL, 'EnvWins1!']);
 });
 
-test('account: a company hook covers a stamped brand (Ian\'s formula lives in HIS tree)', async () => {
-  const companyRoot = stageBrand();
-  writeHook(companyRoot, 'account/password', 'module.exports = ({ email, brand }) => `Co1!${brand.id}/${email}`;\n');
+test('account: a company hook covers a brand that names one (Ian\'s formula lives in HIS tree)', async (t) => {
+  // The company tree lives inside the PARENT brand's repo (#677), and the
+  // machine registry line is what says where the parent is.
+  const parentRoot = stageBrand();
+  mkdirSync(join(parentRoot, 'config'), { recursive: true });
+  writeFileSync(join(parentRoot, 'config', 'omega.json5'), "{ brand: { id: 'fixture-co' }, company: { id: 'self' } }");
+  writeHook(join(parentRoot, 'company'), 'account/password', 'module.exports = ({ email, brand }) => `Co1!${brand.id}/${email}`;\n');
 
   const root = stageBrand();
-  mkdirSync(join(root, '.omega'), { recursive: true });
-  writeFileSync(join(root, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+  mkdirSync(join(root, 'config'), { recursive: true });
+  writeFileSync(join(root, 'config', 'omega.json5'), "{ brand: { id: 'fixture-brand' }, company: { id: 'fixture-co' } }");
+
+  const home = stageBrand();
+  writeFileSync(join(home, 'brands.json'), JSON.stringify({ 'fixture-co': { root: parentRoot } }));
+  const previousHome = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = home;
+  t.after(() => {
+    if (previousHome === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previousHome;
+  });
 
   const { auth, firestore, backend } = convergedClients();
   const result = await runService(brandConfig(), { root, auth, firestore, backend, seed: null });

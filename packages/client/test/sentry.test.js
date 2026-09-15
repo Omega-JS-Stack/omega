@@ -31,3 +31,28 @@ describe('Sentry release tagging', () => {
     assert.strictEqual(options.release, 'test@1755648000000');
   });
 });
+
+// #817: the environment an event is tagged with comes from the ONE environment
+// surface, the same module every OMEGA target answers from, never off
+// `config.environment` by hand.
+describe('Sentry environment tagging', () => {
+
+  it('should tag the environment the one surface answers', async () => {
+    const options = await initOptions({ environment: 'development' });
+    assert.strictEqual(options.environment, 'development');
+  });
+
+  it('should refuse to initialize by name when the artifact baked no environment', async () => {
+    const manager = getManager();
+    const { environment, ...withoutEnvironment } = TEST_CONFIG;
+
+    // A build that baked no environment is a broken artifact, so the reporter
+    // says which fact is missing instead of tagging every event `undefined`.
+    await manager.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
+
+    await assert.rejects(
+      () => manager.sentry().init({ dsn: 'https://key@o1.ingest.sentry.io/1' }),
+      /OMEGA_ENVIRONMENT/,
+    );
+  });
+});

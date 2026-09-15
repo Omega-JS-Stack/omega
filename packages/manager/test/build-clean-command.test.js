@@ -33,7 +33,7 @@ function write(filePath, content) {
 /**
  * A brand monorepo on disk: a web target, a backend target, an extension
  * target, and a custom `api` target whose package.json carries `scripts`. The
- * dirs are written website-first so any ordering assertion proves the ORDER
+ * dirs are written web-first so any ordering assertion proves the ORDER
  * came from the fan-out, not the directory listing.
  */
 function stageBrand({ scripts = { build: 'tsc', clean: 'rm -rf dist' }, extension = false } = {}) {
@@ -42,11 +42,11 @@ function stageBrand({ scripts = { build: 'tsc', clean: 'rm -rf dist' }, extensio
   write(path.join(root, 'package.json'), { name: 'fixture-brand', private: true, workspaces: ['targets/*'] });
   write(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, backend: {}${extension ? ', extension: {}' : ''}, api: { type: 'custom' } },
+  targets: { web: { type: 'web' }, backend: { type: 'backend' }${extension ? ", extension: { type: 'extension' }" : ''}, api: { type: 'custom' } },
 }
 `);
 
-  write(path.join(root, 'targets', 'website', 'package.json'), { name: 'website', private: true, devDependencies: { '@omega.js/web': '*' } });
+  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, devDependencies: { '@omega.js/web': '*' } });
   write(path.join(root, 'targets', 'backend', 'package.json'), { name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' } });
   write(path.join(root, 'targets', 'api', 'package.json'), { name: 'api', private: true, scripts });
   if (extension) {
@@ -105,7 +105,7 @@ async function runFanout(command, root, options = {}, { fail = [] } = {}) {
 test('omega build: every target type builds, in dependency order, custom LAST', async () => {
   const { calls, code } = await runFanout(buildCommand, stageBrand());
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'website', 'api']);
+  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
   assert.equal(code, undefined, 'all targets green → no error exit code');
 
   // A framework target dispatches its OWN framework's `omega build`
@@ -122,7 +122,7 @@ test('omega build: every target type builds, in dependency order, custom LAST', 
 test('omega build: a custom target with no build script is a LOUD skip, never a failure', async () => {
   const { calls, output, code } = await runFanout(buildCommand, stageBrand({ scripts: { clean: 'rm -rf dist' } }));
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'website'], 'the api target ran nothing');
+  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web'], 'the api target ran nothing');
   assert.match(output, /api/, 'the skip names the target');
   assert.match(output, /"build" script/, 'and the verb it had no script for');
   assert.equal(code, undefined, 'an absent script is not an error');
@@ -144,17 +144,17 @@ test('omega build: an extension target takes the FRAMEWORK lane — its CLI serv
 test('omega build: a failing target never stops the rest — every one is reported, exit 1', async () => {
   const { calls, code } = await runFanout(buildCommand, stageBrand(), {}, { fail: ['backend'] });
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'website', 'api'], 'the fan-out kept going');
+  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api'], 'the fan-out kept going');
   assert.equal(code, 1);
 });
 
-test('omega build: --target= narrows to one target, by target key or dir name', async () => {
+test('omega build: --target= narrows to one target, by its NAME', async () => {
   const { calls } = await runFanout(buildCommand, stageBrand(), { target: 'api' });
 
   assert.deepEqual(calls.map((call) => call.name), ['api']);
 
-  const byKey = await runFanout(buildCommand, stageBrand(), { target: 'web' });
-  assert.deepEqual(byKey.calls.map((call) => call.name), ['website'], 'the target key names the dir');
+  const byName = await runFanout(buildCommand, stageBrand(), { target: 'web' });
+  assert.deepEqual(byName.calls.map((call) => call.name), ['web'], 'the name IS the dir');
 });
 
 test('omega build: a --target= token matching nothing STOPS the run, never a matched subset', async () => {
@@ -193,7 +193,7 @@ test('omega build --dry-run: nothing runs at all, every target prints its plan',
 
   assert.deepEqual(calls, [], 'a dry run executes NOTHING — no framework bin, no package script');
   assert.match(output, /would run omega build in targets\/backend/, 'the framework lane reports the plan');
-  assert.match(output, /would run omega build in targets\/website/);
+  assert.match(output, /would run omega build in targets\/web/);
   assert.match(output, /would run npm run build in targets\/api/, 'the custom lane reports its plan too');
   assert.equal(code, undefined, 'a dry run is not a failure');
 });
@@ -203,7 +203,7 @@ test('omega build --dry-run: nothing runs at all, every target prints its plan',
 test('omega clean: every target type cleans, in the same order', async () => {
   const { calls, code } = await runFanout(cleanCommand, stageBrand());
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'website', 'api']);
+  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
   assert.deepEqual(calls[0].args.slice(1), ['clean'], 'the framework lane runs `omega clean`');
   assert.deepEqual(calls[2].args, ['run', 'clean'], 'the custom lane runs its own script');
   assert.equal(code, undefined);
@@ -212,7 +212,7 @@ test('omega clean: every target type cleans, in the same order', async () => {
 test('omega clean: a custom target with no clean script is the same loud skip', async () => {
   const { calls, output, code } = await runFanout(cleanCommand, stageBrand({ scripts: { build: 'tsc' } }));
 
-  assert.deepEqual(calls.map((call) => call.name), ['backend', 'website']);
+  assert.deepEqual(calls.map((call) => call.name), ['backend', 'web']);
   assert.match(output, /api/);
   assert.match(output, /"clean" script/);
   assert.equal(code, undefined);

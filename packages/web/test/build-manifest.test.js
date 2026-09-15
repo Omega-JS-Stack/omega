@@ -1,9 +1,12 @@
 /**
- * The build manifest (#13) — `writeBuildMeta` emits /build.json + /build.js on
- * every build. /build.json is what the /status page's "Build manifest" card
- * reads, and what @omega.js/client's version check polls, so every field the
- * page shows is pinned here: what the site is, what it is made of, what skin
- * it wears, where it lives, and which commit it came from.
+ * The build manifest (#13): `writeBuildMeta` emits /build.json on every build.
+ * It is what the /status page's "Build manifest" card reads, and what
+ * @omega.js/client's version check polls, so every field the page shows is
+ * pinned here: what the site is, what it is made of, what skin it wears, where
+ * it lives, and which commit it came from.
+ *
+ * The service worker's CONFIG is not here (#743): it loads the one `/build.js`
+ * the engine writes, the same snapshot every page loads.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -12,6 +15,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { test } = require('node:test');
 
+const { setEnvironment } = require('@omega.js/config/environment');
 const { writeBuildMeta } = require('../src/service-worker.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -20,17 +24,20 @@ const CLIENT_ENTRY = path.join(PKG, '..', 'client', 'src', 'index.js');
 const SITE_DATA = {
   brand: { id: 'contract', name: 'Contract' },
   theme: { id: 'newsflash' },
-  repo: { providers: { github: { org: 'Omega-JS-Stack' } } },
+  repo: { provider: 'github', org: 'Omega-JS-Stack' },
   cloud: { config: { projectId: 'demo-contract' } },
 };
 
 /** Build the meta into a throwaway dir and read the emitted /build.json back. */
 function emit(overrides = {}) {
+  // The lane NAMES the environment (#817), and the manifest records that one
+  // answer rather than a loose option of its own: `omega build` is production.
+  setEnvironment(overrides.environment || 'production');
+
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-build-meta-'));
   const returned = writeBuildMeta({
     siteData: SITE_DATA,
     outDir,
-    environment: 'production',
     version: '2.4.0',
     clientEntry: CLIENT_ENTRY,
     consumerDir: PKG,
@@ -75,14 +82,13 @@ test('packages: an unresolvable client still leaves a usable manifest', () => {
   assert.match(json.packages.firebase, /^\d+\.\d+\.\d+/, 'the pinned fallback keeps page and worker in step');
 });
 
-test('repo: derived through @omega.js/config, the one repo derivation', () => {
-  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract-omega' }, 'owner from github.org, name derived as `<brand.id>-omega`');
-  assert.deepEqual(
-    emit({ siteData: { ...SITE_DATA, repo: { providers: { github: { repo: 'itw-creative-works/omega-brand' } } } } }).json.repo,
-    { user: 'itw-creative-works', name: 'omega-brand' },
-    'an owner/name slug wins over both defaults',
-  );
-  assert.equal(emit({ siteData: { brand: { id: 'contract' } } }).json.repo, null, 'no owner, no repo link — never half a URL');
+// #883: the manifest links where the site is AUTHORED, so it names the
+// SOURCE monorepo (`<brand.id>-omega`), never the website repo the built site
+// is pushed to. Both derive from the one `repo.org`.
+test('repo: the SOURCE repo, derived through @omega.js/config (#883)', () => {
+  assert.deepEqual(emit().json.repo, { user: 'Omega-JS-Stack', name: 'contract-omega' }, 'owner from repo.org, name derived as `<brand.id>-omega`');
+  assert.equal(emit({ siteData: { brand: { id: 'contract' } } }).json.repo, null, 'no org, no repo link: never half a URL');
+  assert.equal(emit({ siteData: { repo: { org: 'Omega-JS-Stack' } } }).json.repo, null, 'and no brand.id is half an address too');
 });
 
 test('commit: the sha when the consumer is a repo, null when it is not', () => {
@@ -96,12 +102,13 @@ test('commit: the sha when the consumer is a repo, null when it is not', () => {
   assert.equal(emit({ consumerDir: undefined }).json.commit, null);
 });
 
-test('/build.js carries the SAME meta for the service worker (importScripts cannot read JSON)', () => {
-  const { outDir, json } = emit();
-  const jsonp = fs.readFileSync(path.join(outDir, 'build.js'), 'utf8');
+test('the manifest is the ONLY file this writes: /build.js belongs to the engine (#743)', () => {
+  const { outDir } = emit();
 
-  assert.ok(jsonp.startsWith('self.OMEGA_BUILD_JSON = '), 'the SW transport shape');
-  assert.deepEqual(JSON.parse(jsonp.replace('self.OMEGA_BUILD_JSON = ', '').replace(/;\n$/, '')), json);
+  // One snapshot, one writer. This used to emit a second `self.OMEGA_BUILD_JSON`
+  // file of its own for the service worker, carrying a DIFFERENT shape from the
+  // one every page read.
+  assert.deepEqual(fs.readdirSync(outDir), ['build.json']);
 });
 
 test('the status page reads every manifest field the builder emits', () => {

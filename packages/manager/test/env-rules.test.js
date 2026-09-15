@@ -24,6 +24,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execSync } = require('node:child_process');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
 
 const envRulesOp = require('../src/services/workspace/ensure/env-rules.js');
 const { loadBrand } = require('../src/lib/brand.js');
@@ -40,8 +45,9 @@ function writeBrand(config) {
 
 // Run the op against a brand fixture with the named keys forced absent/present,
 // capturing the lines it prints and restoring the process env afterwards.
-async function runOp(config, { env = {} } = {}) {
+async function runOp(config, { env = {}, stage } = {}) {
   const brandRoot = writeBrand(config);
+  if (stage) stage(brandRoot);
   const saved = {};
   for (const [name, value] of Object.entries(env)) {
     saved[name] = process.env[name];
@@ -75,8 +81,8 @@ const CANONICAL = {
   captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } },
   analytics: { providers: { google: { id: null } } },
   targets: {
-    web: { analytics: { providers: { google: { id: 'G-FIXTUREWEB' } } } },
-    backend: { analytics: { providers: { google: { id: 'G-FIXTUREBE' } } } },
+    web: { type: 'web', analytics: { providers: { google: { id: 'G-FIXTUREWEB' } } } },
+    backend: { type: 'backend', analytics: { providers: { google: { id: 'G-FIXTUREBE' } } } },
   },
 };
 
@@ -118,7 +124,7 @@ test('env-rules op: a target the brand does not enable owes nothing', async () =
   const { keys } = await runOp({
     ...CANONICAL,
     analytics: { providers: { google: { id: 'G-SHARED' } } },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
   }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
 
   assert.deepEqual(keys.sort(), ['GOOGLE_ANALYTICS_SECRET_BACKEND', 'GOOGLE_ANALYTICS_SECRET_WEB']);
@@ -132,13 +138,26 @@ test('env-rules op: each target\'s own secret is judged on its own', async () =>
   assert.deepEqual(keys, ['GOOGLE_ANALYTICS_SECRET_BACKEND']);
 });
 
+// The target is addressed by NAME and typed by its `type` (#886): the schema's
+// rules are scoped by TYPE, so a renamed target still owes its type's key.
+test('env-rules op: a web target NAMED site still owes GOOGLE_ANALYTICS_SECRET_WEB', async () => {
+  const { keys, lines } = await runOp({
+    brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
+    analytics: { providers: { google: { id: null } } },
+    targets: { site: { type: 'web', analytics: { providers: { google: { id: 'G-SITE' } } } } },
+  }, { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret', ...GA_KEYS } });
+
+  assert.deepEqual(keys, ['GOOGLE_ANALYTICS_SECRET_WEB'], 'the key is the TYPE\'s, the target is found by it');
+  assert.match(lines.join('\n'), /analytics\.providers\.google\.id/);
+});
+
 test('env-rules op: a target-less entry is judged against the brand config', async () => {
   // SENTRY_AUTH_TOKEN belongs to the monitoring SERVICE — no target reads it,
   // so no target's resolved config could ever raise it.
   const { keys } = await runOp({
     brand: { id: 'fixture' },
     monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
 
   assert.deepEqual(keys, ['SENTRY_AUTH_TOKEN']);
@@ -155,8 +174,8 @@ test('env-rules op: a target-less entry sees the PER-TARGET value too (#683)', a
     brand: { id: 'fixture' },
     monitoring: { providers: { sentry: { dsn: null } } },
     targets: {
-      web: { monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } } },
-      backend: {},
+      web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://abc@o1.ingest.sentry.io/2' } } } },
+      backend: { type: 'backend' },
     },
   }, { env: { SENTRY_AUTH_TOKEN: null, ...GA_KEYS } });
 
@@ -165,7 +184,7 @@ test('env-rules op: a target-less entry sees the PER-TARGET value too (#683)', a
 
 test('env-rules op: a key the cascade already serves is not a violation', async () => {
   const { result } = await runOp(
-    { brand: { id: 'fixture' }, captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } }, targets: { backend: {} } },
+    { brand: { id: 'fixture' }, captcha: { providers: { recaptcha: { siteKey: '6Lfixture' } } }, targets: { backend: { type: 'backend' } } },
     { env: { RECAPTCHA_SECRET_KEY: 'fixture-secret' } },
   );
 
@@ -173,12 +192,70 @@ test('env-rules op: a key the cascade already serves is not a violation', async 
 });
 
 test('env-rules op: an unconfigured brand owes nothing — the rule is one-directional', async () => {
-  const { result, lines } = await runOp({ brand: { id: 'fixture' }, targets: { web: {}, backend: {} } }, {
+  const { result, lines } = await runOp({ brand: { id: 'fixture' }, targets: { web: { type: 'web' }, backend: { type: 'backend' } } }, {
     env: { RECAPTCHA_SECRET_KEY: null, ...GA_KEYS },
   });
 
   assert.deepEqual(result.output.envRules.violations, []);
   assert.match(lines.join('\n'), /✓/, 'the clean state still says so');
+});
+
+// ─── The DERIVED signing keys (#910) ────────────────────────────────────────
+//
+// CSC_LINK and APPLE_API_KEY are never pasted: the repo service's secrets op
+// derives both from the brand's signing tree (#891), the same derivation the
+// desktop env load runs. This op asked `process.env` raw, so the two ops
+// disagreed on every company brand: one published CSC_LINK while the other
+// called it missing. Real material only, the way signing-env's own tests
+// build it, because the password gate is the real container check.
+const SIGNING_PASSWORD = 'fixture-password';
+const SIGNING_KEY_ID = 'FIXKEY1234';
+
+const SIGNING_FIXTURE = fs.mkdtempSync(path.join(os.tmpdir(), 'manager-env-rules-signing-'));
+execSync(
+  `openssl req -x509 -nodes -newkey rsa:2048 -keyout "${SIGNING_FIXTURE}/private.key" -out "${SIGNING_FIXTURE}/cert.pem" -days 365 -subj "/CN=Fixture/C=US"`,
+  { stdio: 'pipe' },
+);
+execSync(
+  `openssl pkcs12 -export -legacy -inkey "${SIGNING_FIXTURE}/private.key" -in "${SIGNING_FIXTURE}/cert.pem" -out "${SIGNING_FIXTURE}/fixture.p12" -passout pass:${SIGNING_PASSWORD}`,
+  { stdio: 'pipe' },
+);
+process.on('exit', () => fs.rmSync(SIGNING_FIXTURE, { recursive: true, force: true }));
+
+const APPLE_BRAND = {
+  brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
+  certificates: { providers: { apple: { bundleIdPrefix: 'com.fixture' } } },
+  targets: { desktop: { type: 'desktop' } },
+};
+
+// The signing tree the certificates walk writes, in the brand tier.
+function stageSigningTree(brandRoot) {
+  const dir = path.join(brandRoot, '.omega', 'certificates', 'apple');
+  fs.mkdirSync(path.join(dir, 'certificates'), { recursive: true });
+  fs.copyFileSync(path.join(SIGNING_FIXTURE, 'fixture.p12'), path.join(dir, 'certificates', 'DEVELOPER_ID_APPLICATION_G2.p12'));
+  fs.writeFileSync(path.join(dir, `AuthKey_${SIGNING_KEY_ID}.p8`), 'fixture-key');
+}
+
+const APPLE_ENV = {
+  APPLE_API_ISSUER: 'issuer',
+  APPLE_API_KEY_ID: SIGNING_KEY_ID,
+  APPLE_TEAM_ID: 'TEAM123',
+  CSC_KEY_PASSWORD: SIGNING_PASSWORD,
+  CSC_LINK: null,
+  APPLE_API_KEY: null,
+};
+
+test('env-rules op: a signing tree ANSWERS CSC_LINK and APPLE_API_KEY, so neither is owed (#910)', async () => {
+  const { keys } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV }, stage: stageSigningTree });
+
+  assert.deepEqual(keys, [], `the derivation answers both: ${keys.join(', ')}`);
+});
+
+test('env-rules op: with no signing tree, both derived keys are still owed (#910)', async () => {
+  const { keys, lines } = await runOp(APPLE_BRAND, { env: { ...GA_KEYS, ...APPLE_ENV } });
+
+  assert.deepEqual(keys.sort(), ['APPLE_API_KEY', 'CSC_LINK']);
+  assert.match(lines.join('\n'), /certificates\.providers\.apple/);
 });
 
 test('env-rules: the op runs in the workspace service', () => {

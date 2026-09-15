@@ -17,7 +17,7 @@ const service = require('../src/services/server/index.js');
 delete process.env.SERVER_SERVICE_ACCOUNT;
 
 const BRAND = { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' };
-const GITHUB = { shared: false, private: true };
+const REPO = { provider: 'github', org: 'fixture-org' };
 const SPONSORSHIPS = {
   acceptable: ['tech', 'marketing'],
   unacceptable: ['spam'],
@@ -30,9 +30,9 @@ const DOC_PATH = `brands/${BRAND.id}`;
 function brandConfig({ server = {}, sponsorships = SPONSORSHIPS } = {}) {
   const config = {
     brand: structuredClone(BRAND),
-    repo: { providers: { github: structuredClone(GITHUB) } },
+    repo: structuredClone(REPO),
     server: server === false ? false : { ...structuredClone(DEFAULTS.server), ...server },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     // Non-whitelisted sections — must never reach the registry
     payment: { products: [{ id: 'premium' }] },
     analytics: { providers: { google: { id: 'G-FIXTURE' } } },
@@ -45,7 +45,7 @@ function brandConfig({ server = {}, sponsorships = SPONSORSHIPS } = {}) {
 
 /** The exact document the registry should hold for the default fixture. */
 function desiredDoc() {
-  return { brand: structuredClone(BRAND), repo: { providers: { github: structuredClone(GITHUB) } }, sponsorships: structuredClone(SPONSORSHIPS) };
+  return { brand: structuredClone(BRAND), repo: structuredClone(REPO), sponsorships: structuredClone(SPONSORSHIPS) };
 }
 
 /** Method-level recording fake — a call with no configured response throws LOUDLY. */
@@ -137,7 +137,7 @@ test('server: key order differences are not drift', async () => {
         unacceptable: ['spam'],
         acceptable: ['tech', 'marketing'],
       },
-      repo: { providers: { github: { private: true, shared: false } } },
+      repo: { org: 'fixture-org', provider: 'github' },
       brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
   });
@@ -167,7 +167,7 @@ test('server: an absent sponsorships section is omitted from the document', asyn
   const result = await runService(brandConfig({ sponsorships: null }), { db });
 
   assert.equal(result.status, 'success');
-  assert.deepEqual(db.mutations()[0].args[1], { brand: BRAND, repo: { providers: { github: GITHUB } } });
+  assert.deepEqual(db.mutations()[0].args[1], { brand: BRAND, repo: REPO });
 });
 
 test('server: drifted brand data is replace-written with the full document', async () => {

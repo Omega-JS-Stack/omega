@@ -9,11 +9,12 @@
  * source of user choices — the manager reads the same file every framework
  * reads, no mirror to disperse.
  *
- * Target dir → target mapping, first match wins:
- *   1. Declared — the dir's own config/omega.json5 lists exactly the target
- *      under `targets` (key presence = enabled).
- *   2. Directory convention — targets/website* → web, targets/backend* → backend,
- *      targets/desktop* → desktop, targets/extension* → extension, targets/mobile* → mobile.
+ * Target dir → target mapping (#886), first match wins:
+ *   1. The BRAND declares the dir's name: `targets.<name>.type` is the
+ *      framework that runs there (the name is the folder, the type is the
+ *      framework, so targets/community with `{ type: 'web' }` is a web target).
+ *   2. The dir's own config/omega.json5 declares a target under `targets`,
+ *      the standalone-target case where no brand file names it.
  * Unmapped dirs surface as workspace-service warnings, never silent skips.
  *
  * A CUSTOM target (#603) is neither: the brand config declares it
@@ -34,9 +35,9 @@ const JSON5 = require('json5');
 
 // resolveBrandRoot moved into @omega.js/config (cp73c) — the hierarchy walk
 // has ONE home there, alongside findBrandRoot and the env cascade.
-const { loadConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, backendProjectType, normalizeTargetInstances } = require('@omega.js/config');
-const { DEFAULTS, DIR_TARGETS, templateObject } = require('../config.js');
-const { customTargetDirs } = require('./custom-target.js');
+const { loadConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, backendProjectType } = require('@omega.js/config');
+const { DEFAULTS, templateObject } = require('../config.js');
+const { customTargetNames } = require('./custom-target.js');
 
 /**
  * Read a target's raw omega.json5 (no merge, no validation) purely to see which
@@ -57,19 +58,6 @@ function readDeclaredTargets(targetPath) {
 }
 
 /**
- * Map a target directory name to a target via the naming convention:
- * exact match or `<name>-*` prefix (targets/website-docs → web).
- */
-function targetFromDirName(dirName) {
-  for (const [prefix, target] of Object.entries(DIR_TARGETS)) {
-    if (dirName === prefix || dirName.startsWith(`${prefix}-`)) {
-      return target;
-    }
-  }
-  return null;
-}
-
-/**
  * Discover the targets under {brandRoot}/targets.
  *
  * A brand still carrying `apps/` fails LOUDLY here (#443): the old shape is
@@ -85,12 +73,13 @@ function targetFromDirName(dirName) {
  * @throws {Error} when the brand is still on the pre-#443 `apps/` shape
  */
 function discoverTargets(brandRoot) {
-  // The brand file's own raw view — read here (never through loadBrand, which
-  // calls US) purely to learn which dirs are declared custom. Discovery must
-  // never throw: an unreadable brand file simply declares no custom targets,
-  // and the workspace service reports the real problem.
-  let customDirs = new Set();
-  // How the backend RUNS (#584) — 'firebase' (Cloud Functions) or 'custom'
+  // The brand file's own raw view, read here (never through loadBrand, which
+  // calls US) purely to learn what each declared NAME is. Discovery must
+  // never throw: an unreadable brand file simply declares nothing, and the
+  // workspace service reports the real problem.
+  let declared = {};
+  let customNames = new Set();
+  // How the backend RUNS (#584): 'firebase' (Cloud Functions) or 'custom'
   // (its own server on a container host). Read from the same raw view, since
   // it steers which verbs the fan-outs may dispatch at that target.
   let backendMode = 'firebase';
@@ -98,11 +87,13 @@ function discoverTargets(brandRoot) {
     const brandConfigPath = resolveConfigPath(brandRoot);
     if (brandConfigPath) {
       const raw = JSON5.parse(fs.readFileSync(brandConfigPath, 'utf8'));
-      customDirs = new Set(customTargetDirs(raw));
-      backendMode = backendProjectType(normalizeTargetInstances(raw.targets?.backend)[0]);
+      declared = raw.targets && typeof raw.targets === 'object' ? raw.targets : {};
+      customNames = new Set(customTargetNames(raw));
+      // By TYPE, never by key: the backend may be named anything (#886)
+      backendMode = backendProjectType(Object.values(declared).find((target) => target && target.type === 'backend'));
     }
   } catch {
-    // Unreadable brand config — no custom declarations to honor
+    // Unreadable brand config: no declarations to honor
   }
 
   const targetsDir = path.join(brandRoot, 'targets');
@@ -124,9 +115,9 @@ function discoverTargets(brandRoot) {
 
     const targetPath = path.join(targetsDir, entry.name);
 
-    // A custom target (#603) has no framework to map to — the brand's own
+    // A custom target (#603) has no framework to map to: the brand's own
     // declaration is the whole mapping, and `target` stays null on purpose
-    if (customDirs.has(entry.name)) {
+    if (customNames.has(entry.name)) {
       targets.push({
         name: entry.name,
         dir: `targets/${entry.name}`,
@@ -138,17 +129,12 @@ function discoverTargets(brandRoot) {
       continue;
     }
 
-    const declaredTargets = readDeclaredTargets(targetPath);
-
-    // Declared target wins; a single declaration is unambiguous, multiple
-    // declarations fall back to the directory convention as the tiebreaker.
-    let target = null;
-    if (declaredTargets && declaredTargets.length === 1) {
-      target = declaredTargets[0];
-    } else {
-      target = targetFromDirName(entry.name);
-      if (!target && declaredTargets) target = declaredTargets[0];
-    }
+    // The brand's own declaration of this NAME says which framework runs
+    // here (#886). Only a dir the brand never names falls through to the
+    // dir's own file, and a dir neither names is unmapped.
+    const brandType = typeof declared[entry.name]?.type === 'string' ? declared[entry.name].type : null;
+    const declaredTargets = brandType ? null : readDeclaredTargets(targetPath);
+    const target = brandType || (declaredTargets ? declaredTargets[0] : null);
 
     targets.push({
       name: entry.name,
@@ -170,10 +156,10 @@ function discoverTargets(brandRoot) {
  * whole-file merge with `{ domain }` templating applied), enabled targets,
  * discovered target dirs.
  *
- * The COMPANY layer is @omega.js/config's, not ours (#83): loadConfig reads
- * the brand's `.omega/company.json` stamp itself and folds the company file
- * (minus `brands`) between the defaults and the brand file. The manager keeps
- * the company config only as PROVENANCE — runManage hangs it on the loaded
+ * The COMPANY layer is @omega.js/config's, not ours (#83/#677): loadConfig
+ * resolves the brand's own `company: { id }` and folds the company tree's
+ * config between the defaults and the brand file. The manager keeps it only as
+ * PROVENANCE: runManage hangs the company TREE and its layer on the loaded
  * brand as `companyRoot`/`companyConfig` for services that ask "did this come
  * from the company?" — never as a second fold.
  *
@@ -182,14 +168,19 @@ function discoverTargets(brandRoot) {
  * service reports them through the normal status flow.
  *
  * @param {string} brandRoot - Absolute brand-monorepo root
+ * @param {object} [options]
+ * @param {string} [options.environment] - The environment whose overlay
+ *   composes ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): a
+ *   lane producing a PRODUCTION artifact names it, and everything else reads
+ *   the running environment.
  * @returns {{ root, id, config, configError, configErrors, enabledTargets, targets, files }}
  */
-function loadBrand(brandRoot) {
+function loadBrand(brandRoot, options = {}) {
   let loaded = null;
   let configError = null;
 
   try {
-    loaded = loadConfig(brandRoot, undefined, { defaults: DEFAULTS });
+    loaded = loadConfig(brandRoot, undefined, { defaults: DEFAULTS, environment: options.environment });
   } catch (error) {
     configError = error.message;
   }
@@ -237,4 +228,4 @@ function absoluteBrandImage(brandConfig, key) {
   return base ? `${base}${value.startsWith('/') ? '' : '/'}${value}` : null;
 }
 
-module.exports = { resolveBrandRoot, loadBrand, discoverTargets, targetFromDirName, absoluteBrandImage };
+module.exports = { resolveBrandRoot, loadBrand, discoverTargets, absoluteBrandImage };

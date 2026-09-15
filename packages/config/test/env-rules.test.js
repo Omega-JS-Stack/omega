@@ -18,6 +18,7 @@ const FIXTURE = [
   { name: 'PAIR_SECRET',  owner: 't', targets: ['backend'],  group: 'captcha', secret: true,  required: false, requiredWhen: 'captcha.providers.recaptcha.siteKey', description: 'The secret half of a configured pair.' },
   { name: 'STREAM_WEB',   owner: 't', targets: ['web'],      group: 'machine', secret: true,  required: false, requiredWhen: 'analytics.providers.google.id', deliverAs: 'STREAM_SECRET', description: 'Delivered under its runtime name.' },
   { name: 'UNRULED',      owner: 't', targets: ['backend'],  group: 'payment', secret: true,  required: false, description: 'No rule at all.' },
+  { name: 'EV_TOKEN',     owner: 't', targets: ['desktop'],  group: 'apple',   secret: false, required: false, requiredWhen: 'platforms.windows.signing.strategy=self-hosted', description: 'Owed by ONE value of an enum.' },
   { match: /^DYNAMIC_.+$/, owner: 't', targets: ['backend'], group: 'payment', secret: true,  required: false, description: 'A pattern family — no fixed name to check.' },
 ];
 
@@ -44,6 +45,21 @@ test('requiredWhen: the rule fires only when the config path is truthy', () => {
 
   // Configured AND supplied
   assert.deepEqual(checkEnvRules(configured, { MINTED: 'v', PAIR_SECRET: 'shh' }, { schema: FIXTURE }), []);
+});
+
+test('requiredWhen can PIN the path to one value: an enum owes only its own credentials (#891)', () => {
+  const selfHosted = { platforms: { windows: { signing: { strategy: 'self-hosted' } } } };
+  const cloud = { platforms: { windows: { signing: { strategy: 'cloud' } } } };
+
+  assert.deepEqual(checkEnvRules(selfHosted, { MINTED: 'v' }, { schema: FIXTURE, target: 'desktop' }), [
+    { key: 'EV_TOKEN', rule: 'requiredWhen', path: 'platforms.windows.signing.strategy=self-hosted' },
+  ]);
+
+  // A brand on the cloud strategy owes no EV token: a truthy-path rule would
+  // have demanded one from every brand that names any strategy at all.
+  assert.deepEqual(checkEnvRules(cloud, { MINTED: 'v' }, { schema: FIXTURE, target: 'desktop' }), []);
+  assert.deepEqual(checkEnvRules({}, { MINTED: 'v' }, { schema: FIXTURE, target: 'desktop' }), []);
+  assert.deepEqual(checkEnvRules(selfHosted, { MINTED: 'v', EV_TOKEN: 'thumbprint' }, { schema: FIXTURE, target: 'desktop' }), []);
 });
 
 test('an EMPTY value is an absent value — presence, never shape', () => {
@@ -114,11 +130,17 @@ test('the reCAPTCHA pair, the Sentry token and the Snap credentials', () => {
     { key: 'SENTRY_AUTH_TOKEN', rule: 'requiredWhen', path: 'monitoring.providers.sentry.dsn' },
   ]);
 
-  assert.deepEqual(checkEnvRules({ platforms: { linux: { snap: { enabled: true } } } }, {}, { target: 'desktop' }).filter((v) => v.rule === 'requiredWhen'), [
-    { key: 'SNAPCRAFT_STORE_CREDENTIALS', rule: 'requiredWhen', path: 'platforms.linux.snap.enabled' },
+  // The snap's gate is the DECLARATION itself (#867), and the value there is an
+  // OBJECT: presence is what makes the credentials mandatory, so the checker
+  // reads an object-valued path as present exactly like a scalar one.
+  assert.deepEqual(checkEnvRules({ platforms: { linux: { formats: { snap: { channels: ['stable'] } } } } }, {}, { target: 'desktop' }).filter((v) => v.rule === 'requiredWhen'), [
+    { key: 'SNAPCRAFT_STORE_CREDENTIALS', rule: 'requiredWhen', path: 'platforms.linux.formats.snap' },
   ]);
-  assert.deepEqual(checkEnvRules({ platforms: { linux: { snap: { enabled: false } } } }, {}, { target: 'desktop' }).filter((v) => v.rule === 'requiredWhen'), [],
-    'snap off = no credentials owed');
+  assert.deepEqual(checkEnvRules({ platforms: { linux: { formats: { snap: {} } } } }, {}, { target: 'desktop' }).filter((v) => v.rule === 'requiredWhen'), [
+    { key: 'SNAPCRAFT_STORE_CREDENTIALS', rule: 'requiredWhen', path: 'platforms.linux.formats.snap' },
+  ], 'an empty settings block is still a declared format');
+  assert.deepEqual(checkEnvRules({ platforms: { linux: { formats: { snap: false } } } }, {}, { target: 'desktop' }).filter((v) => v.rule === 'requiredWhen'), [],
+    'the format dropped = no credentials owed');
 });
 
 test('the minted four are the only unconditional requirement', () => {

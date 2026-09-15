@@ -1,27 +1,34 @@
 /**
- * run() — the omega-desktop bin body, shared by bin/omega-desktop (via
- * dist/omega-bin.js) and cross-framework dispatch ('@omega.js/desktop/cli').
+ * run(): the CLI body, shared by bin/omega (via dist/omega-bin.js, the
+ * dispatcher) and cross-framework dispatch ('@omega.js/desktop/cli').
  */
+// The value-LESS flags, the only list a CLI owes the parse: every other flag
+// takes the next token as its value, which is what carries CI's own
+// `sign-windows --in release --out release/signed`. Mirrors the same fix in
+// @omega.js/backend's CLI.
+const BOOLEAN_FLAGS = [
+  'extended', 'local', 'quick', 'q', 'direct', 'dry-run', 'secrets',
+  'smoke', 'verify-only', 'find-window-id', 'publish', 'open', 'tail', 'f', 'strict',
+  'apply', 'major', 'force-fresh',
+];
+
 async function run() {
   // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
   // invocation re-execs once, so no command ever runs stale framework code
   require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/desktop' });
+
+  // Boot preludes: the cheap, non-interactive checks every verb passes through,
+  // filtered by the verb about to run (#890)
+  require('@omega.js/devkit/preludes').runPreludes({ verb: process.argv[2], targetDir: process.cwd() });
 
   // Strip ELECTRON_RUN_AS_NODE — it leaks into our env from common parent processes
   // (e.g. VS Code's Claude Code extension) and makes every Electron binary we shell
   // to silently run as plain Node. Strip once at the CLI boundary.
   delete process.env.ELECTRON_RUN_AS_NODE;
 
-  // Value-less flags must be declared boolean — otherwise yargs treats the next
-  // positional as the flag's VALUE. Mirrors the same fix in @omega.js/backend's CLI.
-  // yargs' built-in --version/--help are disabled so both route through the
-  // alias table / the router's built-in help (the built-ins printed an empty
-  // stub and version "0.0.0" — yargs can't resolve our package version here).
-  const argv = require('yargs')(process.argv.slice(2))
-    .boolean(['extended', 'local', 'quick', 'q', 'direct', 'dry-run', 'sync', 'secrets'])
-    .version(false)
-    .help(false)
-    .parseSync();
+  // The router owns --help/--version, so both route through the alias table
+  // and the router's built-in help.
+  const argv = require('@omega.js/devkit/argv').parseArgv(process.argv.slice(2), { booleans: BOOLEAN_FLAGS });
   const cli = new (require('./cli.js'))(argv);
 
   try {
@@ -31,4 +38,4 @@ async function run() {
   }
 }
 
-module.exports = { run };
+module.exports = { run, BOOLEAN_FLAGS };

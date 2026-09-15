@@ -25,6 +25,10 @@
 //        than "store it in a browser session".
 //   'none' — explicit opt-out; Firebase stays in-memory (pre-1.12 behavior).
 //
+// A TEST RUN is always 'none', whatever the config says: the test lanes never sign a
+// real user in, so the harness never touches the OS keychain. Both lanes, on the one
+// signal isTestRun() reads below ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
+//
 // Select via config `omega.authPersistence` ('safeStorage' | 'none' | a custom
 // registered name). Register custom strategies BEFORE manager.initialize():
 //   require('@omega.js/desktop/lib/auth-persistence').register('keytar', {...})
@@ -110,6 +114,15 @@ const noneStrategy = {
   async removeItem() {},
 };
 
+// Is this process a TEST RUN, in either lane that reaches this lib? The manager
+// answers it, in both: each lane spawns its child with `OMEGA_ENVIRONMENT=testing`
+// and the baked word never writes over it
+// ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so a booted
+// production artifact reports the lane it is running in too.
+function isTestRun(manager) {
+  return !!manager?.isTesting?.();
+}
+
 const authPersistence = {
   _initialized: false,
   _manager:     null,
@@ -140,6 +153,18 @@ const authPersistence = {
   // Pick + availability-check the configured strategy. Returns the active strategy
   // or null (→ caller falls back to firebase's in-memory default).
   async resolve(manager) {
+    // A TEST RUN is `none`, before any config is read: the test lanes never sign a
+    // real user in, so the OS keychain is never asked. This overrides an explicit
+    // consumer value too, because the boot layer boots the brand's REAL config through
+    // the staged test app, and an unsigned Electron binary asking macOS for a keychain
+    // item parks the whole run behind a SecurityAgent prompt
+    // ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
+    if (isTestRun(manager)) {
+      logger.log('auth persistence: none (test mode)');
+      authPersistence._active = null;
+      return null;
+    }
+
     const wanted = manager.config?.omega?.authPersistence || 'safeStorage';
     const strategy = authPersistence._strategies[wanted];
 

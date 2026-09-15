@@ -1,6 +1,6 @@
 {
   "name": "playground-backend",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "OMEGA Playground backend (rehearsal brand Cloud Functions)",
   "private": true,
   "engines": {
@@ -20,5 +20,6 @@
     "build": "npx omega build",
     "test:static": "npm test",
     "test:emulator": "omega test"
-  }
+  },
+  "license": "UNLICENSED"
 }

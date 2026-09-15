@@ -24,14 +24,14 @@
       {
         id: 'dashboard',
         label: 'Dashboard',
-        icon: 'gauge-high',
+        icon: 'fa-solid fa-gauge-high',
         video: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-1.webm',
         features: ['Easy setup', 'Powerful tools', 'Real-time updates'],
       },
       {
         id: 'analytics',
         label: 'Analytics',
-        icon: 'chart-line',
+        icon: 'fa-solid fa-chart-line',
         video: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-2.webm',
         features: ['Advanced analytics', 'Custom reports', 'Data insights'],
       },

@@ -14,7 +14,7 @@ walk provisions.
   back to `monitoring.providers.sentry.org`) and the team, then ensures one project per
   enabled target.
 - **`dsn`** — each project's client-key DSN written to
-  `targets.<type>.monitoring.providers.sentry.dsn`
+  `targets.<name>.monitoring.providers.sentry.dsn`
   ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) through the comment-preserving
   writeback. DSNs are PUBLIC by design and schema-pinned, so config is their home; only the
   auth token is a secret. The resolved value always wins — a hand-set stale DSN is drift and
@@ -27,7 +27,7 @@ walk provisions.
 | `monitoring.enabled: false` (or `monitoring: false`) | Skip. |
 | `monitoring.providers.sentry` | The monitor is a KEY under `providers`: no entry means none chosen and the service skips. Any other key is "not a known monitor". |
 | `monitoring.providers.sentry.org` | The Sentry org — resolved and written back when absent. |
-| `targets.<type>.monitoring.providers.sentry.dsn` | Where each DSN lands. |
+| `targets.<name>.monitoring.providers.sentry.dsn` | Where each DSN lands. |
 
 **Credential**: `SENTRY_AUTH_TOKEN` in the brand `.env` — a PERSONAL auth token with
 `org:read`, `project:read`, `project:write`, `team:read`, `team:write`.

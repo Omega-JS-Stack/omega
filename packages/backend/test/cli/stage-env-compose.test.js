@@ -18,26 +18,41 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const JSON5 = require('json5');
 
 const { stageFunctions, envWatchInputs, watchAndStage } = require('../../dist/cli/utils/stage-functions.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /**
- * A backend target inside a brand monorepo, with a company root above it:
- * <root>/company/.env, <root>/brand/.env, <root>/brand/targets/backend/.
+ * A backend target inside a brand monorepo whose brand names a COMPANY (#677):
+ * the parent brand's company/ tree holds the shared .env, and the machine
+ * registry (pointed at this fixture's own home) says where the parent is.
  */
-function seedBrand({ companyEnv, brandEnv, brandEnvOverlays, targetEnv }) {
+function seedBrand({ companyEnv, brandEnv, brandEnvOverlays, brandConfig, brandConfigOverlays, targetEnv }) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-stage-env-')));
-  const companyRoot = path.join(root, 'company');
+  const parentRoot = path.join(root, 'parent');
+  const companyRoot = path.join(parentRoot, 'company');
   const brandRoot = path.join(root, 'brand');
   const targetDir = path.join(brandRoot, 'targets', 'backend');
 
+  jetpack.write(path.join(parentRoot, 'config', 'omega.json5'), JSON.stringify({
+    brand: { id: 'fixture-co', name: 'Fixture Co', url: 'https://fixture-co.test' },
+    company: { id: 'self' },
+  }));
   jetpack.write(path.join(companyRoot, '.env'), companyEnv || '');
-  jetpack.write(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+  jetpack.write(path.join(root, 'home', 'brands.json'), JSON.stringify({ 'fixture-co': { root: parentRoot } }));
+  process.env.OMEGA_HOME = path.join(root, 'home');
   jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
-    targets: { backend: {} },
+    company: { id: 'fixture-co' },
+    targets: { backend: { type: 'backend' } },
+    ...(brandConfig || {}),
   }));
+  // The config half of the same pair (#856): `omega.<environment>.json5` beside
+  // the brand file, exactly where `.env.<environment>` sits beside the .env.
+  for (const [environment, contents] of Object.entries(brandConfigOverlays || {})) {
+    jetpack.write(path.join(brandRoot, 'config', `omega.${environment}.json5`), JSON.stringify(contents));
+  }
 
   jetpack.write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
   jetpack.write(path.join(targetDir, 'src', 'index.js'), '// fixture backend entry\n');
@@ -86,7 +101,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const { root, targetDir } = seedBrand({
           companyEnv: 'ANTHROPIC_API_KEY="company-anthropic"\n',
-          brandEnv: 'GH_TOKEN="brand-gh"\nCONNECTIONS_GOOGLE_CLIENT_ID="brand-oauth-id"\nRECAPTCHA_SITE_KEY="brand-site-key"\nGOOGLE_ANALYTICS_SECRET_BACKEND="brand-stream"\n',
+          brandEnv: 'GH_TOKEN="brand-gh"\nCONNECTIONS_GOOGLE_CLIENT_ID="brand-oauth-id"\nCHROME_CLIENT_ID="brand-chrome-client"\nGOOGLE_ANALYTICS_SECRET_BACKEND="brand-stream"\n',
         });
 
         try {
@@ -96,7 +111,7 @@ module.exports = defineCases({
           assert.equal(env.CONNECTIONS_GOOGLE_CLIENT_ID, 'brand-oauth-id', 'the connections pattern family composes too (#678)');
           assert.equal(env.ANTHROPIC_API_KEY, 'company-anthropic', 'the company layer fills the gaps');
           assert.equal(env.GOOGLE_ANALYTICS_SECRET, 'brand-stream', "the backend's own GA4 stream secret arrives renamed");
-          assert.equal(env.RECAPTCHA_SITE_KEY, undefined, 'a key the schema names for web only never joins the functions upload');
+          assert.equal(env.CHROME_CLIENT_ID, undefined, 'a key the schema names for the extension only never joins the functions upload');
         } finally {
           jetpack.remove(root);
         }
@@ -178,6 +193,41 @@ module.exports = defineCases({
           const upload = stagedEnv(targetDir, { environment: 'production' });
           assert.equal(upload.STRIPE_SECRET_KEY, 'sk_live_base', 'the deploy composes base + production — no overlay exists, so the base ships');
           assert.equal(Object.keys(upload).filter((key) => key.endsWith('_DEV')).length, 0, 'nothing named _DEV survives anywhere (#586)');
+        } finally {
+          jetpack.remove(root);
+        }
+      },
+    },
+
+    {
+      name: 'each-lane-stages-its-own-config-overlay',
+      auth: 'none',
+
+      // #856: the CONFIG overlay follows the same word the .env overlay above
+      // it does. The compose runs on a machine whose ambient answer is
+      // `development` (a terminal, a runner), so the lane names what the
+      // artifact is FOR and the upload carries that environment's values only.
+      async run({ assert }) {
+        const { root, targetDir } = seedBrand({
+          brandConfig: { payment: { providers: { stripe: { publishableKey: 'pk_live_base' } } } },
+          brandConfigOverlays: {
+            development: { payment: { providers: { stripe: { publishableKey: 'pk_test_dev' } } } },
+          },
+        });
+
+        const stagedConfig = (environment) => {
+          stageFunctions({ projectDir: targetDir, environment });
+          return JSON5.parse(jetpack.read(path.join(targetDir, 'dist', 'config', 'omega.json5')));
+        };
+
+        try {
+          const upload = stagedConfig('production');
+          assert.equal(upload.payment.providers.stripe.publishableKey, 'pk_live_base',
+            'the deploy upload carries the base value, never the development override');
+
+          const local = stagedConfig('development');
+          assert.equal(local.payment.providers.stripe.publishableKey, 'pk_test_dev',
+            'a local stage carries the development overlay, the same word its .env used');
         } finally {
           jetpack.remove(root);
         }

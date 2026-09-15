@@ -114,7 +114,7 @@ function brandConfig({ url = BRAND_URL, products = makeProducts(), payment = {},
       providers: { ...paymentDefaults.providers, ...(payment.providers || {}) },
       products,
     },
-    targets: { web: {}, backend: {} },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
   };
 }
 

@@ -33,8 +33,25 @@
  *                                          // makes it mandatory
  *     machineLocal: true,                  // a developer-machine value (a local
  *                                          // path): never published to CI
+ *     label:       'Snap Store credentials', // the human name an ask opens with
+ *     url:         'https://snapcraft.io/account', // the page that MINTS it
+ *     hint:        'Run `snapcraft export-login -`', // how to get it there
  *     description: 'What the key drives.',
  *   }
+ *
+ * `label`, `url` and `hint` are the HUMAN half, and this schema is their one
+ * home ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): the
+ * manager's REQUIRES registry used to carry a second copy per service, so a key
+ * no service had wired up (every desktop signing key, every extension store
+ * key) had no mint page anywhere and nobody could be asked for it. `label` is
+ * what the setup gate opens with, `url` is the page a human pastes the value
+ * FROM (the manage walk's Enter-to-open target, and what publish prints when a
+ * key is missing), and `hint` is the one line that says what to do on that
+ * page. `url: null` is a deliberate statement that no page mints this value,
+ * and such an entry owes a `hint` saying where it does come from (a token a
+ * portal authorization returns, a path on the developer's own box). The
+ * manager's registry keeps only its own fields (which service asks, whether the
+ * ask is interactive, what Disable writes).
  *
  * `generated:` is the mint switch: the manager writes those keys into a brand
  * .env (at onboard and on every manage that finds one missing) because no
@@ -74,8 +91,12 @@
  * that replaced three unrelated hand-kept lists
  * ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)):
  *
- *   - `'env'`  — read from the composed .env at runtime (the backend, the one
- *                target whose artifact ships an env file).
+ *   - `'env'`  : read from the composed .env the target runs with. On the
+ *                backend that file ships with the deploy artifact; on every
+ *                other target it is the composed .env on the DEVELOPER'S
+ *                machine, so an `env` delivery there declares the local
+ *                channel and renders no workflow line at all
+ *                ([#819](https://github.com/Omega-JS-Stack/omega/issues/819)).
  *   - `'ci'`   — the generated workflow injects it into the runner env for the
  *                build step.
  *   - `'bake'` — the build writes the value INTO the shipped artifact, because
@@ -127,7 +148,7 @@ const ENV_GROUPS = [
   { id: 'cloudflare', comment: 'Cloudflare (edge service + every DNS-writing flow) — API token with Zone edit' },
   { id: 'namecheap', comment: 'Namecheap registrar (domain service)' },
   { id: 'google-oauth', comment: 'Google OAuth client (cloud, analytics, search, advertising services)' },
-  { id: 'captcha', comment: "Classic reCAPTCHA keys — the brand's own, from its GCP reCAPTCHA console (captcha service)" },
+  { id: 'captcha', comment: "Classic reCAPTCHA SECRET key - the brand's own, from its GCP reCAPTCHA console (captcha service); the public site key is config, captcha.providers.recaptcha.siteKey" },
   {
     id: 'pixels',
     comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)',
@@ -154,14 +175,12 @@ const ENV_GROUPS = [
   },
   {
     id: 'extension-stores',
-    comment: 'Extension store publishing (extension target: Chrome Web Store, Firefox Add-ons, Edge Add-ons)',
+    comment: 'Extension store API credentials (extension target: Chrome Web Store, Firefox Add-ons, Edge Add-ons); each store\'s own listing id is config, targets.<name>.listings.<browser>.id',
   },
   { id: 'fontawesome', comment: 'Font Awesome Pro (icons) — path to the local Pro package dir' },
   { id: 'backend-services', comment: 'Backend service keys (composed into targets/backend/dist/.env by the env composer)' },
-  {
-    id: 'testing',
-    comment: 'Test-lane credentials (every target) — optional; a suite that needs one skips without it',
-  },
+  // No `testing` group: #819 retired the two test-lane credentials and a suite
+  // asks a brand for none, so the bucket went with them (see ENV_SCHEMA).
   {
     id: 'machine',
     comment: 'Auto-generated and persisted on the first real run — machine-owned, leave unset',
@@ -183,12 +202,14 @@ const ENV_SCHEMA = [
   {
     name:        'OMEGA_ADMIN_KEY',
     owner:       'workspace',
-    targets:     ['backend', 'desktop'],
+    targets:     ['backend'],
     group:       'omega',
     generated:   () => randomBytes(32).toString('base64url'),
     secret:      true,
     required:    true,
     delivery:    { backend: 'env' },
+    label:       'Omega admin key',
+    url:         null,
     description: 'Grants admin on the brand backend: the header every privileged call carries, and the seed the connection state cipher derives from.',
   },
   {
@@ -200,6 +221,8 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    true,
     delivery:    { backend: 'env' },
+    label:       'Omega webhook key',
+    url:         null,
     description: 'Authenticates third-party webhook deliveries (payments, marketing) — the `key` query parameter every webhook route compares.',
   },
   {
@@ -241,12 +264,12 @@ const ENV_SCHEMA = [
   {
     name:        'GH_TOKEN',
     owner:       'repo',
-    targets:     ['web', 'backend', 'desktop'],
+    targets:     ['web', 'backend', 'desktop', 'extension'],
     group:       'github',
     secret:      true,
     required:    false,
-    delivery:    { web: 'ci', backend: 'env', desktop: 'ci' },
-    description: 'GitHub token for repo + seo work and the backend\'s content/admin routes (blog commits, workflow dispatch); the web target publishes CI secrets with it and the desktop target cuts releases and mirrors downloads with it. `gh auth login` serves the manager instead; the deployed backend needs the token.',
+    delivery:    { web: 'ci', backend: 'env', desktop: 'ci', extension: 'ci' },
+    description: 'GitHub token for repo + seo work and the backend\'s content/admin routes (blog commits, workflow dispatch); the web target publishes CI secrets with it and the desktop target cuts releases and mirrors downloads with it. `gh auth login` serves the manager instead; the deployed backend needs the token. The extension target carries it too: its publish uploads the built zips to the `<brand.id>-releases` repo, a repo that run does not own, so the run-scoped `secrets.GITHUB_TOKEN` cannot reach it ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).',
   },
   {
     name:        'CLOUDFLARE_TOKEN',
@@ -256,6 +279,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { web: 'ci', backend: 'env' },
+    label:       'Cloudflare API token',
+    url:         'https://dash.cloudflare.com/profile/api-tokens',
+    hint:        'Create a token with Zone edit on the brand zone; the DNS-writing flows and the zone nameserver read both use it',
     description: 'Cloudflare API token with Zone edit — the edge service and every DNS-writing flow, plus the backend\'s cache-purge calls. The web build workflow\'s post-publish purge step reads it from the runner env, so the publish lane pushes it as a repo secret.',
   },
   {
@@ -265,6 +291,9 @@ const ENV_SCHEMA = [
     group:       'namecheap',
     secret:      false,
     required:    false,
+    label:       'Namecheap account username',
+    url:         'https://ap.www.namecheap.com/settings/tools/apiaccess/',
+    hint:        'The account the domain is registered under (the same page enables API access)',
     description: 'Namecheap account the domain service registers and configures domains through.',
   },
   {
@@ -274,6 +303,9 @@ const ENV_SCHEMA = [
     group:       'namecheap',
     secret:      true,
     required:    false,
+    label:       'Namecheap API key',
+    url:         'https://ap.www.namecheap.com/settings/tools/apiaccess/',
+    hint:        'Toggle API Access on, then whitelist this machine\'s IP on the same page',
     description: 'Namecheap API key paired with NAMECHEAP_USERNAME (the API also allowlists the calling IP).',
   },
   {
@@ -283,6 +315,9 @@ const ENV_SCHEMA = [
     group:       'google-oauth',
     secret:      false,
     required:    false,
+    label:       'Google OAuth client ID',
+    url:         'https://console.cloud.google.com/apis/credentials',
+    hint:        'A Desktop-app OAuth client: the one Google identity every service shares',
     description: 'OAuth client the manager authenticates Google APIs with (cloud, analytics, search, advertising services).',
   },
   {
@@ -292,17 +327,9 @@ const ENV_SCHEMA = [
     group:       'google-oauth',
     secret:      true,
     required:    false,
+    label:       'Google OAuth client secret',
+    url:         'https://console.cloud.google.com/apis/credentials',
     description: 'Secret half of GOOGLE_CLIENT_ID.',
-  },
-  {
-    name:        'RECAPTCHA_SITE_KEY',
-    owner:       'captcha',
-    targets:     ['web'],
-    group:       'captcha',
-    secret:      false,
-    required:    false,
-    delivery:    { web: 'ci' },
-    description: "Public half of the brand's classic reCAPTCHA pair — the web target renders it into forms.",
   },
   {
     name:        'RECAPTCHA_SECRET_KEY',
@@ -313,6 +340,9 @@ const ENV_SCHEMA = [
     required:    false,
     requiredWhen: 'captcha.providers.recaptcha.siteKey',
     delivery:    { backend: 'env' },
+    label:       'reCAPTCHA secret key',
+    url:         'https://console.cloud.google.com/security/recaptcha',
+    hint:        'Create a classic key in the brand\'s OWN GCP project (never a shared company key); its SITE half lands in config',
     description: 'Secret half of the reCAPTCHA pair — the backend verifies submitted tokens with it.',
   },
   {
@@ -333,6 +363,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Meta Pixel access token',
+    url:         'https://business.facebook.com/settings/system-users',
+    hint:        'A Business Manager SYSTEM USER token with ads_management: it creates the pixel and signs the conversions',
     description: 'Business Manager system-user token with ads_management: creates the Meta pixel and signs the conversions the backend sends.',
   },
   {
@@ -343,6 +376,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'TikTok Events API access token',
+    url:         null,
+    hint:        'Minted by the portal authorization the analytics setup walks (#448): the app secret is only needed at mint time, so there is no page to paste this from',
     description: 'TikTok Business token: creates the pixel on the advertiser account and signs the events the backend sends.',
   },
   {
@@ -353,6 +389,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     requiredWhen: 'monitoring.providers.sentry.dsn',
+    label:       'Sentry personal auth token',
+    url:         'https://sentry.io/settings/account/api/auth-tokens/',
+    hint:        'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write (organization tokens cannot create projects)',
     description: 'Personal Sentry auth token with project+team write scopes — the monitoring service provisions projects and uploads source maps with it.',
   },
   {
@@ -363,6 +402,8 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'SendGrid API key',
+    url:         'https://app.sendgrid.com/settings/api_keys',
     description: 'SendGrid API key — every transactional and campaign email the backend sends, and the contact lists the campaigns service reconciles.',
   },
   {
@@ -373,6 +414,8 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Beehiiv API key',
+    url:         'https://app.beehiiv.com/settings/workspace/api',
     description: 'Beehiiv API key — newsletter subscriptions and the publication the newsletter service reconciles.',
   },
   {
@@ -383,6 +426,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Stripe secret key',
+    url:         'https://dashboard.stripe.com/apikeys',
+    hint:        'Developers, then API keys, on the BRAND\'s Stripe account (sk_live_... or sk_test_...)',
     description: 'Stripe secret key — the backend creates checkout sessions, subscriptions, and refunds with it.',
   },
   {
@@ -393,6 +439,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'PayPal client secret',
+    url:         'https://developer.paypal.com/dashboard/applications',
+    hint:        'The secret half of the brand\'s REST API app (its client id is public and lives in omega.json5)',
     description: 'Secret half of the PayPal app credentials (the client id is public and lives in omega.json5).',
   },
   {
@@ -403,6 +452,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Chargebee API key',
+    url:         'https://app.chargebee.com/',
+    hint:        'Settings, then API keys, on the brand\'s Chargebee site (the site name is public and lives in omega.json5)',
     description: 'Chargebee API key for the brand site (the site name is public and lives in omega.json5).',
   },
   {
@@ -413,6 +465,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Coinbase Commerce API key',
+    url:         'https://commerce.coinbase.com/settings/security',
+    hint:        'Settings, then Security, then API keys, on the brand\'s Coinbase Commerce account (this key is the whole credential: there is no public half)',
     description: 'Coinbase Commerce API key — the backend creates hosted crypto charges with it. The provider has no public half at all, so payment.providers.coinbase carries only its `enabled` switch.',
   },
   {
@@ -422,6 +477,9 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    label:       'Slapform\'s service-account JSON path',
+    url:         null,
+    hint:        'Operator-only: the Slapform project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
     description: 'Path to the Slapform service-account JSON the forms service authenticates with.',
   },
   {
@@ -431,6 +489,9 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    label:       'Chatsy\'s service-account JSON path',
+    url:         null,
+    hint:        'Operator-only: the Chatsy project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
     description: 'Path to the Chatsy service-account JSON the chat service authenticates with.',
   },
   {
@@ -440,6 +501,9 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    label:       'Replyify\'s service-account JSON path',
+    url:         null,
+    hint:        'Operator-only: the Replyify project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
     description: 'Path to the Replyify service-account JSON the email service authenticates with.',
   },
   {
@@ -449,6 +513,9 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    label:       'the company server\'s service-account JSON path',
+    url:         null,
+    hint:        'Operator-only: the company server project\'s own service-account JSON, from its Firebase console. Absolute, or relative to the brand root',
     description: 'Path to the server service-account JSON the server service authenticates with.',
   },
   {
@@ -458,6 +525,9 @@ const ENV_SCHEMA = [
     group:       'service-accounts',
     secret:      true,
     required:    false,
+    label:       'Mr. Logo\'s service-account JSON path',
+    url:         null,
+    hint:        'Operator-only: the Mr. Logo project\'s own service-account JSON. Absolute, or relative to the brand root',
     description: 'Path to the Mr. Logo service-account JSON the assets service generates brand artwork through.',
   },
   {
@@ -467,8 +537,12 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: 'App Store Connect API issuer id — notarization of the desktop build.',
+    label:       'App Store Connect issuer ID',
+    url:         'https://appstoreconnect.apple.com/access/api',
+    hint:        'Users and Access, then Integrations: the issuer ID sits above the key list',
+    description: 'App Store Connect API issuer id: notarization of the desktop build. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
   {
     name:        'APPLE_API_KEY_ID',
@@ -477,8 +551,12 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: 'App Store Connect API key id — also names the .p8 file the certificates service places (AuthKey_<id>.p8).',
+    label:       'App Store Connect API key ID',
+    url:         'https://appstoreconnect.apple.com/access/api',
+    hint:        'The key you download as AuthKey_<id>.p8; the id is the filename',
+    description: 'App Store Connect API key id: also names the .p8 file the certificates service places (AuthKey_<id>.p8). Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
   {
     name:        'APPLE_TEAM_ID',
@@ -487,8 +565,12 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: 'Apple Developer team id the desktop build signs under.',
+    label:       'Apple Developer team ID',
+    url:         'https://developer.apple.com/account',
+    hint:        'Membership details shows the 10-character Team ID',
+    description: 'Apple Developer team id the desktop build signs under. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
   {
     name:        'CSC_LINK',
@@ -497,8 +579,9 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with — unset, the build derives it from a delivered config/certs/developer-id-application.p12, then falls back to the Keychain.',
+    description: 'Path to the macOS Developer ID signing certificate (.p12) electron-builder signs with; unset, the build derives it from a delivered config/certs/developer-id-application.p12, then falls back to the Keychain. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
   {
     name:        'APPLE_API_KEY',
@@ -507,8 +590,9 @@ const ENV_SCHEMA = [
     group:       'apple',
     secret:      false,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: 'Path to the App Store Connect API key (.p8) notarization uses — unset, the build derives it from a delivered config/certs/AuthKey_<APPLE_API_KEY_ID>.p8.',
+    description: 'Path to the App Store Connect API key (.p8) notarization uses; unset, the build derives it from a delivered config/certs/AuthKey_<APPLE_API_KEY_ID>.p8. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.',
   },
 
   // ── desktop-publishing — the Windows + Linux halves of a desktop release ──
@@ -519,8 +603,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      false,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.strategy=self-hosted',
     delivery:    { desktop: 'ci' },
-    description: 'Thumbprint/path of the EV code-signing certificate on the self-hosted Windows runner (platforms.win.signing.strategy = self-hosted).',
+    label:       'Windows EV certificate thumbprint',
+    url:         null,
+    hint:        'Read off the EV token on the self-hosted Windows runner: `certutil -user -store My` prints the thumbprint of the installed certificate',
+    description: 'Thumbprint/path of the EV code-signing certificate on the self-hosted Windows runner (platforms.windows.signing.strategy = self-hosted). Required when platforms.windows.signing.strategy is self-hosted.',
   },
   {
     name:        'WIN_CSC_KEY_PASSWORD',
@@ -529,8 +617,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.strategy=self-hosted',
     delivery:    { desktop: 'ci' },
-    description: 'SafeNet token PIN the Windows signing job unlocks the EV token with.',
+    label:       'Windows EV token PIN',
+    url:         null,
+    hint:        'The SafeNet token PIN set when the EV certificate was issued; the token vendor never shows it again',
+    description: 'SafeNet token PIN the Windows signing job unlocks the EV token with. Required when platforms.windows.signing.strategy is self-hosted.',
   },
   {
     name:        'SIGNTOOL_PATH',
@@ -540,9 +632,12 @@ const ENV_SCHEMA = [
     secret:      false,
     required:    false,
     delivery:    { desktop: 'ci' },
+    label:       'signtool.exe path',
+    url:         null,
+    hint:        'Where the Windows SDK installed signtool.exe on the runner, e.g. C:\\\\Program Files (x86)\\\\Windows Kits\\\\10\\\\bin\\\\10.0.22621.0\\\\x64\\\\signtool.exe',
     description: 'Path to signtool.exe on the Windows runner.',
   },
-  // The cloud signing providers (platforms.win.signing.strategy = cloud): the
+  // The cloud signing providers (platforms.windows.signing.strategy = cloud): the
   // windows-sign job injects all three sets and the configured provider is the
   // one that consumes its own ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)).
   {
@@ -552,8 +647,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
     delivery:    { desktop: 'ci' },
-    description: 'Azure Trusted Signing: the directory (tenant) the signing account lives in.',
+    label:       'Azure Trusted Signing tenant ID',
+    url:         'https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/Overview',
+    hint:        'The directory (tenant) the Trusted Signing account lives in',
+    description: 'Azure Trusted Signing: the directory (tenant) the signing account lives in. Required when platforms.windows.signing.cloud.provider is azure.',
   },
   {
     name:        'AZURE_CLIENT_ID',
@@ -562,8 +661,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
     delivery:    { desktop: 'ci' },
-    description: 'Azure Trusted Signing: the app registration the signing job authenticates as.',
+    label:       'Azure app registration client ID',
+    url:         'https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+    hint:        'The app registration the signing job authenticates as',
+    description: 'Azure Trusted Signing: the app registration the signing job authenticates as. Required when platforms.windows.signing.cloud.provider is azure.',
   },
   {
     name:        'AZURE_CLIENT_SECRET',
@@ -572,8 +675,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
     delivery:    { desktop: 'ci' },
-    description: 'Azure Trusted Signing: the client secret of AZURE_CLIENT_ID.',
+    label:       'Azure app registration client secret',
+    url:         'https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+    hint:        'Certificates and secrets on the app registration above; the value is shown once',
+    description: 'Azure Trusted Signing: the client secret of AZURE_CLIENT_ID. Required when platforms.windows.signing.cloud.provider is azure.',
   },
   {
     name:        'AZURE_TRUSTED_SIGNING_ENDPOINT',
@@ -582,8 +689,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=azure',
     delivery:    { desktop: 'ci' },
-    description: 'Azure Trusted Signing: the regional endpoint the signing account was created in.',
+    label:       'Azure Trusted Signing endpoint',
+    url:         'https://portal.azure.com/#view/HubsExtension/BrowseResource/resourceType/Microsoft.CodeSigning%2FcodeSigningAccounts',
+    hint:        'The regional endpoint of the Trusted Signing account, e.g. https://eus.codesigning.azure.net',
+    description: 'Azure Trusted Signing: the regional endpoint the signing account was created in. Required when platforms.windows.signing.cloud.provider is azure.',
   },
   {
     name:        'SSLCOM_USERNAME',
@@ -592,8 +703,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
     delivery:    { desktop: 'ci' },
-    description: 'SSL.com eSigner account the cloud signing job authenticates with.',
+    label:       'SSL.com eSigner account',
+    url:         'https://www.ssl.com/login/',
+    hint:        'The eSigner account the cloud signing job authenticates with',
+    description: 'SSL.com eSigner account the cloud signing job authenticates with. Required when platforms.windows.signing.cloud.provider is sslcom.',
   },
   {
     name:        'SSLCOM_PASSWORD',
@@ -602,8 +717,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
     delivery:    { desktop: 'ci' },
-    description: 'Password of the SSL.com eSigner account.',
+    label:       'SSL.com eSigner password',
+    url:         'https://www.ssl.com/login/',
+    hint:        'The password of the eSigner account above',
+    description: 'Password of the SSL.com eSigner account. Required when platforms.windows.signing.cloud.provider is sslcom.',
   },
   {
     name:        'SSLCOM_CREDENTIAL_ID',
@@ -612,8 +731,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=sslcom',
     delivery:    { desktop: 'ci' },
-    description: 'SSL.com eSigner credential id naming which certificate in the account signs.',
+    label:       'SSL.com eSigner credential ID',
+    url:         'https://www.ssl.com/login/',
+    hint:        'Under the certificate order: it names WHICH certificate in the account signs',
+    description: 'SSL.com eSigner credential id naming which certificate in the account signs. Required when platforms.windows.signing.cloud.provider is sslcom.',
   },
   {
     name:        'DIGICERT_API_KEY',
@@ -622,8 +745,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=digicert',
     delivery:    { desktop: 'ci' },
-    description: 'DigiCert KeyLocker API key the cloud signing job authenticates with.',
+    label:       'DigiCert KeyLocker API key',
+    url:         'https://one.digicert.com/signingmanager/keypairs',
+    hint:        'Account, then API tokens, in DigiCert ONE Software Trust Manager',
+    description: 'DigiCert KeyLocker API key the cloud signing job authenticates with. Required when platforms.windows.signing.cloud.provider is digicert.',
   },
   {
     name:        'DIGICERT_KEYPAIR_ALIAS',
@@ -632,8 +759,12 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
+    requiredWhen: 'platforms.windows.signing.cloud.provider=digicert',
     delivery:    { desktop: 'ci' },
-    description: 'DigiCert KeyLocker keypair alias naming which certificate in the account signs.',
+    label:       'DigiCert KeyLocker keypair alias',
+    url:         'https://one.digicert.com/signingmanager/keypairs',
+    hint:        'The alias of the keypair that signs, from the Keypairs list',
+    description: 'DigiCert KeyLocker keypair alias naming which certificate in the account signs. Required when platforms.windows.signing.cloud.provider is digicert.',
   },
   {
     name:        'SNAPCRAFT_STORE_CREDENTIALS',
@@ -642,22 +773,15 @@ const ENV_SCHEMA = [
     group:       'desktop-publishing',
     secret:      true,
     required:    false,
-    requiredWhen: 'platforms.linux.snap.enabled',
+    requiredWhen: 'platforms.linux.formats.snap',
     delivery:    { desktop: 'ci' },
-    description: 'Snap Store credentials blob (`snapcraft export-login -`) the Linux publish job uses — required only when platforms.linux.snap.enabled.',
+    label:       'Snap Store credentials',
+    url:         'https://snapcraft.io/account',
+    hint:        'Log in, then run `snapcraft export-login -` locally and paste the whole blob it prints',
+    description: 'Snap Store credentials blob (`snapcraft export-login -`) the Linux publish job uses. Required only when the brand ships the snap format (platforms.linux.formats.snap).',
   },
 
   // ── extension-stores — one credential set per browser store ──────────────
-  {
-    name:        'CHROME_EXTENSION_ID',
-    owner:       'certificates',
-    targets:     ['extension'],
-    group:       'extension-stores',
-    secret:      false,
-    required:    false,
-    delivery:    { extension: 'ci' },
-    description: 'Chrome Web Store item id the publish verb uploads to.',
-  },
   {
     name:        'CHROME_CLIENT_ID',
     owner:       'certificates',
@@ -666,6 +790,9 @@ const ENV_SCHEMA = [
     secret:      false,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Chrome Web Store OAuth client ID',
+    url:         'https://console.cloud.google.com/apis/credentials',
+    hint:        'Enable the Chrome Web Store API in the project, then create a Desktop-app OAuth client; the refresh token is minted from this client',
     description: 'OAuth client id of the Chrome Web Store API credential.',
   },
   {
@@ -676,6 +803,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Chrome Web Store OAuth client secret',
+    url:         'https://console.cloud.google.com/apis/credentials',
+    hint:        'The secret half of the OAuth client above',
     description: 'OAuth client secret of the Chrome Web Store API credential.',
   },
   {
@@ -686,17 +816,10 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Chrome Web Store refresh token',
+    url:         null,
+    hint:        'Minted once by granting the OAuth client above the chromewebstore scope (the Chrome Web Store API guide walks the consent exchange); no dashboard shows it',
     description: 'Refresh token the Chrome Web Store API credential mints its access tokens from.',
-  },
-  {
-    name:        'FIREFOX_EXTENSION_ID',
-    owner:       'certificates',
-    targets:     ['extension'],
-    group:       'extension-stores',
-    secret:      false,
-    required:    false,
-    delivery:    { extension: 'ci' },
-    description: 'Firefox Add-ons id the publish verb uploads to.',
   },
   {
     name:        'FIREFOX_API_KEY',
@@ -706,6 +829,9 @@ const ENV_SCHEMA = [
     secret:      false,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Firefox Add-ons API key',
+    url:         'https://addons.mozilla.org/developers/addon/api/key/',
+    hint:        'The JWT issuer half of the AMO credential',
     description: 'Firefox Add-ons API key (JWT issuer) from addons.mozilla.org.',
   },
   {
@@ -716,17 +842,10 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Firefox Add-ons API secret',
+    url:         'https://addons.mozilla.org/developers/addon/api/key/',
+    hint:        'Shown once when the credential is generated, beside the issuer above',
     description: 'Firefox Add-ons API secret the JWT is signed with.',
-  },
-  {
-    name:        'EDGE_PRODUCT_ID',
-    owner:       'certificates',
-    targets:     ['extension'],
-    group:       'extension-stores',
-    secret:      false,
-    required:    false,
-    delivery:    { extension: 'ci' },
-    description: 'Microsoft Edge Add-ons product id the publish verb uploads to.',
   },
   {
     name:        'EDGE_CLIENT_ID',
@@ -736,6 +855,9 @@ const ENV_SCHEMA = [
     secret:      false,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Edge Add-ons API client ID',
+    url:         'https://partner.microsoft.com/dashboard/microsoftedge/publishapi',
+    hint:        'Publish API on the Edge program dashboard: it issues the client id and the key together',
     description: 'Edge Add-ons API client id.',
   },
   {
@@ -746,30 +868,19 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { extension: 'ci' },
+    label:       'Edge Add-ons API key',
+    url:         'https://partner.microsoft.com/dashboard/microsoftedge/publishapi',
+    hint:        'Issued beside the client id above; it authenticates every publish request',
     description: 'Edge Add-ons API key the publish request authenticates with.',
   },
 
-  // ── testing — the credentials an opt-in test lane needs ──────────────────
-  {
-    name:        'OMEGA_TEST_FIREBASE_ADMIN_KEY',
-    owner:       'backend',
-    targets:     ['web', 'backend', 'desktop', 'extension'],
-    group:       'testing',
-    secret:      true,
-    required:    false,
-    delivery:    { web: 'ci', backend: 'env' },
-    description: 'Path to a service-account JSON the extended test lanes mint custom tokens with — absent, those suites skip with a reason (GOOGLE_APPLICATION_CREDENTIALS is the fallthrough).',
-  },
-  {
-    name:        'OMEGA_TEST_USER_UID',
-    owner:       'backend',
-    targets:     ['web', 'backend', 'desktop', 'extension'],
-    group:       'testing',
-    secret:      false,
-    required:    false,
-    delivery:    { web: 'ci', backend: 'env' },
-    description: "Uid the extended test lanes sign in as — each framework's suite defaults to its own (`desktop-test-user` and siblings).",
-  },
+  // No test-lane credentials live here any more
+  // ([#819](https://github.com/Omega-JS-Stack/omega/issues/819), Ian
+  // 2026-09-13): web, desktop and extension each test their own sign-in
+  // against a persona the backend emulator seeds, so a suite never asks a
+  // brand for a key. The pair that used to sit here is retired outright
+  // (env-retired.js carries both rows); #904 owns the replacement.
+
   {
     name:        'OMEGA_FONTAWESOME_ROOT',
     owner:       'assets',
@@ -793,8 +904,11 @@ const ENV_SCHEMA = [
     group:       'backend-services',
     secret:      true,
     required:    false,
-    delivery:    { web: 'ci', backend: 'env' },
-    description: 'The OpenAI key wherever the backend calls OpenAI, and what the shared translation engine needs when translation.providers names chatgpt (the default "claude" provider needs none) — the brand .env wins, a company .env serves every brand that sets none.',
+    delivery:    { web: 'env', backend: 'env', extension: 'env' },
+    label:       'OpenAI API key',
+    url:         'https://platform.openai.com/api-keys',
+    hint:        'A secret key on the account that should be billed for the brand\'s OpenAI calls',
+    description: 'The OpenAI key wherever the backend calls OpenAI, and what the shared translation engine needs when translation.providers names chatgpt (the default "claude" provider needs none): the brand .env wins, a company .env serves every brand that sets none. Every delivery is `env`, the composed .env on the developer\'s own machine, because translation runs locally by default and CI reads the committed cache ([#905](https://github.com/Omega-JS-Stack/omega/issues/905)): no workflow line delivers this key to a runner.',
   },
   {
     name:        'ANTHROPIC_API_KEY',
@@ -804,6 +918,9 @@ const ENV_SCHEMA = [
     secret:      true,
     required:    false,
     delivery:    { backend: 'env' },
+    label:       'Anthropic API key',
+    url:         'https://console.anthropic.com/settings/keys',
+    hint:        'A workspace API key (the Claude Code subscription login is a separate thing and needs no key)',
     description: 'The Anthropic key wherever the backend calls Anthropic — the brand .env wins, a company .env serves every brand that sets none.',
   },
   {
@@ -854,8 +971,9 @@ const ENV_SCHEMA = [
     group:       'machine',
     secret:      true,
     required:    false,
+    requiredWhen: 'certificates.providers.apple',
     delivery:    { desktop: 'ci' },
-    description: "Password of the desktop signing certificate the certificates service created — electron-builder reads it at package time.",
+    description: "Password of the desktop signing certificate the certificates service created; electron-builder reads it at package time. Required once the brand declares Apple signing (certificates.providers.apple): an `omega deploy` that cannot push it ships an unsigned mac build.",
   },
   {
     name:        'VAPID_PRIVATE_KEY',
@@ -939,24 +1057,6 @@ const ENV_SCHEMA = [
     description: "A target's own Measurement Protocol secret — the delivery renames the brand-level GOOGLE_ANALYTICS_SECRET_<TARGET> to this name (deliverAs), so it is never composed from a brand key of the same name.",
   },
   {
-    name:        'PAYPAL_CLIENT_ID',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'runtime',
-    secret:      false,
-    required:    false,
-    description: 'Public PayPal client id — the backend publishes it into its own env from payment.providers.paypal.clientId at boot.',
-  },
-  {
-    name:        'CHARGEBEE_SITE',
-    owner:       'payment',
-    targets:     ['backend'],
-    group:       'runtime',
-    secret:      false,
-    required:    false,
-    description: 'Public Chargebee site name — the backend publishes it into its own env from payment.providers.chargebee.site at boot.',
-  },
-  {
     name:        'OMEGA_LICENSE_STATUS',
     owner:       'workspace',
     targets:     ['backend'],
@@ -995,12 +1095,19 @@ function envFileGroups() {
  * The entry that governs a name — an exact match first, then the dynamic
  * families' patterns. Undefined for a name the schema does not know.
  *
+ * A name no entry governs is the CONSUMER's own key
+ * ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)), and the
+ * optional `schema` is the same escape every delivery function takes: a caller
+ * (the tests) exercises the rules against a fixture, and nobody re-implements
+ * the exact-then-pattern lookup.
+ *
  * @param {string} name - The env var name.
+ * @param {object[]} [schema] - Env schema entries (default: the real schema).
  * @returns {object|undefined} The schema entry.
  */
-function envSchemaEntry(name) {
-  return ENV_SCHEMA.find((entry) => entry.name === name)
-    || ENV_SCHEMA.find((entry) => entry.match instanceof RegExp && entry.match.test(name));
+function envSchemaEntry(name, schema = ENV_SCHEMA) {
+  return schema.find((entry) => entry.name === name)
+    || schema.find((entry) => entry.match instanceof RegExp && entry.match.test(name));
 }
 
 /**

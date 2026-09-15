@@ -52,7 +52,7 @@ Transactional.prototype.build = async function (settings) {
   const ctx = self.ctx;
 
   // --- 1. Brand + sender ---
-  const { brand, brandDomain } = prepare.resolveBrand(Manager);
+  const { brand, brandDomain, company } = prepare.resolveBrand(Manager);
   const { from, groupId } = prepare.resolveSender(settings, brand, brandDomain, Manager);
   const categories = prepare.buildCategories('transactional', brand.id, settings.categories);
   const signoff = prepare.resolveSignoff(settings?.data?.signoff, brand);
@@ -99,7 +99,7 @@ Transactional.prototype.build = async function (settings) {
         throw errorWithCode('Each brand.contact.carbonCopy entry needs an email in config/omega.json5', 400);
       }
 
-      bcc.push({ email: entry.email, name: entry.name || brand.company || brand.name });
+      bcc.push({ email: entry.email, name: entry.name || company.name || brand.name });
     }
   }
 
@@ -159,6 +159,7 @@ Transactional.prototype.build = async function (settings) {
 
   const templateData = prepare.buildTemplateData({
     brand,
+    company,
     subject,
     preview,
     contentHtml,

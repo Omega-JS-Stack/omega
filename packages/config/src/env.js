@@ -5,8 +5,8 @@
  *
  * Same walk as the config cascade (load.js owns it): a target inside a brand
  * monorepo ({brand}/targets/{target}) layers the brand root's .env under its own,
- * and a brand stamped with .omega/company.json layers its company root's
- * .env underneath that. Loading uses dotenv's no-override semantics — keys
+ * and a brand naming a company (`company: { id }`) layers that company's own
+ * `company/.env` underneath that (#677). Loading uses dotenv's no-override semantics: keys
  * already in process.env (the shell) always win, and files apply
  * innermost-first, so local beats brand beats company.
  *
@@ -30,32 +30,40 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { findBrandRoot } = require('./load.js');
-const { readCompanyRoot } = require('./company.js');
-const { ENV_SCHEMA, envFileGroups } = require('./env-schema.js');
-
-// The ONE environment vocabulary, strongest signal first: every `.env.<name>`
-// overlay is suffixed with one of these, every framework's environment() answers
-// one of these, and nothing anywhere spells a fourth
-// ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)).
-const ENV_ENVIRONMENTS = ['development', 'testing', 'production'];
+const { resolveCompany } = require('./company.js');
+const { ENV_SCHEMA, envFileGroups, envSchemaEntry } = require('./env-schema.js');
+const { assertNoRetiredEnvKeys } = require('./env-retired.js');
+// The one vocabulary lives with the one environment module (#817); this file
+// re-exports it so the .env overlay names and the runtime answer stay one list.
+const { ENV_ENVIRONMENTS } = require('./environment.js');
 
 /**
- * The runtime environment — the SINGLE SOURCE OF TRUTH for the one vocabulary,
- * shared by the env overlay above and by every framework's own environment
- * answer (@omega.js/backend's `env.environment()` / `Manager.getEnvironment()`
- * delegate here). Exactly ONE of three mutually-exclusive values: testing wins,
- * then production, else development.
+ * The AMBIENT environment answer: what a lane resolves when nothing named one
+ * for it. It is the PRODUCER of the one input, never a second reader of it:
+ * `environment.js` owns the runtime answer (one input, `OMEGA_ENVIRONMENT`, no
+ * guessing), and this is the sniff a lane runs ONCE to decide what to set
+ * ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It is also the
+ * default for the two overlay selections below (`.env.<environment>` and
+ * `config/omega.<environment>.json5`), so a compose that was told nothing
+ * follows the same answer the runtime will give.
+ *
+ * An already-set `OMEGA_ENVIRONMENT` wins outright, so the producer and the
+ * reader can never disagree inside one process. Otherwise: testing wins, then
+ * production, else development.
  *
  * The final `else` is PRODUCTION on purpose: a deployed Cloud Function has no
  * FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so "no signal" IS the normal
  * production state. Defaulting to development would make every deployed
- * function skip real side effects (emails/analytics/webhooks). (Contrast
- * UJM/BXM, whose deployed artifacts always carry their signal.)
+ * function skip real side effects (emails/analytics/webhooks).
  *
  * @returns {'testing'|'production'|'development'} The environment.
  */
 function envEnvironment() {
-  // Testing takes precedence — set by the test runner / emulator (OMEGA_TEST_MODE=true).
+  // The one input, when a lane already named it (#817).
+  if (ENV_ENVIRONMENTS.includes(process.env.OMEGA_ENVIRONMENT)) {
+    return process.env.OMEGA_ENVIRONMENT;
+  }
+  // Testing takes precedence, set by the test runner / emulator (OMEGA_TEST_MODE=true).
   if (process.env.OMEGA_TEST_MODE === 'true') {
     return 'testing';
   }
@@ -104,14 +112,17 @@ function envLayerFiles(envPath, environment) {
 function resolveEnvChain(startDir) {
   const targetDir = path.resolve(startDir);
   const brandRoot = findBrandRoot(targetDir);
-  // The marker sits at the brand root; when startDir IS a brand root (no
-  // targets/ walk above it), its own marker supplies the company layer.
-  const companyRoot = readCompanyRoot(brandRoot || targetDir);
+  // The company is named by the BRAND's config; when startDir IS a brand root
+  // (no targets/ walk above it), its own config names it. The layer is the
+  // company TREE's `.env`, named whether or not it exists: this resolves paths,
+  // and an `.env.<environment>` overlay (#586) derives from the base name, so a
+  // company that ships only an overlay still layers.
+  const company = resolveCompany(brandRoot || targetDir);
 
   return {
     local: path.join(targetDir, '.env'),
     brand: brandRoot ? path.join(brandRoot, '.env') : null,
-    company: companyRoot ? path.join(companyRoot, '.env') : null,
+    company: company.dir ? path.join(company.dir, '.env') : null,
   };
 }
 
@@ -163,7 +174,7 @@ function loadEnvChain(envPaths) {
   for (const envPath of envPaths) {
     if (!envPath || !fs.existsSync(envPath)) continue;
 
-    const parsed = require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
+    const parsed = parseEnvFile(envPath);
     for (const [key, value] of Object.entries(parsed)) {
       if (value === '' || key in process.env) continue;
       process.env[key] = value;
@@ -311,13 +322,22 @@ function reloadEnv(startDir, { target, environment = envEnvironment() } = {}) {
 /**
  * Parse one .env file into a plain map. Missing files read as empty.
  *
+ * The ONE place a `.env` layer is read, so it is also where a RETIRED key is
+ * refused ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)): there
+ * is no dual-read, so a line for a key that moved into config is a value
+ * nothing consults, and both readers below (the process cascade and the
+ * artifact composer) fail on it naming the move.
+ *
  * @param {string|null} envPath
  * @returns {Object<string, string>} Parsed key → value.
  */
 function parseEnvFile(envPath) {
   if (!envPath || !fs.existsSync(envPath)) return {};
 
-  return require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
+  const parsed = require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
+  assertNoRetiredEnvKeys(parsed, envPath);
+
+  return parsed;
 }
 
 /**
@@ -358,7 +378,11 @@ function deliveringEntry(key, target) {
  * there is): a key rides down when some entry claims it — by name or by
  * pattern — names this target, and sits in a file group. The TARGET layer
  * passes through unfiltered: placing a key in the target's own .env IS the
- * targeting. `deliverAs` renames on arrival in EVERY layer (the per-target GA4
+ * targeting. A key NO entry claims at all is the consumer's own
+ * ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)) and rides down
+ * to every target: the schema never heard of it, so it names no target to be
+ * filtered by, and a consumer who wants one on a single target has that
+ * target's own .env. `deliverAs` renames on arrival in EVERY layer (the per-target GA4
  * secrets), so a human writing the brand-level name in the target's own .env
  * gets the one delivered key, overriding the brand's.
  *
@@ -398,7 +422,12 @@ function composeTargetEnv({ targetDir, target, environment = envEnvironment() })
   for (const { file, layer, filtered } of files) {
     const claimed = {};
     for (const [key, value] of Object.entries(parseEnvFile(file))) {
-      if (filtered && !deliveringEntry(key, target)) continue;
+      // The filter is on DECLARED keys: an entry that does not name this
+      // target keeps its key home. A key the schema knows nothing about is the
+      // CONSUMER's own (#835), has no target of its own to be judged by, and
+      // rides down to every target; a consumer who wants one on a single
+      // target puts it in that target's .env, which passes unfiltered anyway.
+      if (filtered && envSchemaEntry(key) && !deliveringEntry(key, target)) continue;
       claimed[key] = value;
     }
 

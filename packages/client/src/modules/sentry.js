@@ -56,7 +56,11 @@ class mod {
             // is the fallback for a surface that ships no version yet.
             version: this.manager.config.version || this.manager.config.buildTime,
           }),
-          environment: this.manager.config.environment,
+          // The ONE environment surface (#817), never the raw baked fact: the
+          // Manager's getEnvironment() is the same module every other OMEGA
+          // target answers from, so an artifact that baked no environment
+          // throws by name here instead of tagging every event `undefined`.
+          environment: this.manager.getEnvironment(),
           isDevelopment: () => this.manager.isDevelopment(),
           getUser: () => {
             const storage = this.manager.storage();

@@ -1,6 +1,14 @@
 // Build-layer test for utils/mode-helpers.js — verifies the cross-context helpers
 // (isDevelopment / isProduction / isTesting / getVersion) behave correctly in a
-// Node context (no `chrome` global), driven by env vars + cwd package.json.
+// Node context (no `chrome` global).
+//
+// The environment four are the ONE module's since
+// [#817](https://github.com/Omega-JS-Stack/omega/issues/817): this file re-exports
+// them beside the extension's own getVersion(), and they read ONE input, the
+// `OMEGA_ENVIRONMENT` variable in Node and the baked `config.environment` in an
+// extension context. The manifest.update_url / OMEGA_BUILD_MODE / NODE_ENV sniffs
+// are gone, along with the per-surface `development` default that disagreed with
+// @omega.js/desktop's `production` one.
 
 const path = require('path');
 const fs   = require('fs');
@@ -41,40 +49,51 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'isTesting() reads OMEGA_TEST_MODE env var',
+      name: 'the four calls ARE the shared module\'s, not a copy',
       run: (ctx) => {
-        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-          ctx.expect(helpers.isTesting()).toBe(true);
-        });
-        withEnv({ OMEGA_TEST_MODE: null }, () => {
-          ctx.expect(helpers.isTesting()).toBe(false);
+        const shared = require('@omega.js/config/environment');
+        ctx.expect(helpers.getEnvironment).toBe(shared.getEnvironment);
+        ctx.expect(helpers.isDevelopment).toBe(shared.isDevelopment);
+        ctx.expect(helpers.isProduction).toBe(shared.isProduction);
+        ctx.expect(helpers.isTesting).toBe(shared.isTesting);
+      },
+    },
+    {
+      name: 'the three checks answer the one input, in Node',
+      run: (ctx) => {
+        for (const name of ['development', 'testing', 'production']) {
+          withEnv({ OMEGA_ENVIRONMENT: name }, () => {
+            ctx.expect(helpers.getEnvironment()).toBe(name);
+            ctx.expect(helpers.isDevelopment()).toBe(name === 'development');
+            ctx.expect(helpers.isTesting()).toBe(name === 'testing');
+            ctx.expect(helpers.isProduction()).toBe(name === 'production');
+          });
+        }
+      },
+    },
+    {
+      name: 'an extension context answers the BAKED config.environment',
+      run: (ctx) => {
+        // No process.env in a packed extension: the build bakes the word it was
+        // built as into every bundle, and that is what the context reads.
+        withEnv({ OMEGA_ENVIRONMENT: null }, () => {
+          for (const name of ['development', 'testing', 'production']) {
+            const context = { config: { environment: name } };
+            ctx.expect(helpers.getEnvironment.call(context)).toBe(name);
+            ctx.expect(helpers.isTesting.call(context)).toBe(name === 'testing');
+          }
         });
       },
     },
     {
-      name: 'isDevelopment() is true under NODE_ENV=development (and not testing)',
+      name: 'no input at all is a loud error naming OMEGA_ENVIRONMENT, never a default',
       run: (ctx) => {
-        withEnv({ NODE_ENV: 'development', OMEGA_BUILD_MODE: null, OMEGA_TEST_MODE: null }, () => {
-          ctx.expect(helpers.isDevelopment()).toBe(true);
+        withEnv({ OMEGA_ENVIRONMENT: null }, () => {
+          ctx.expect(() => helpers.getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
+          ctx.expect(() => helpers.isDevelopment()).toThrow(/OMEGA_ENVIRONMENT/);
         });
-      },
-    },
-    {
-      name: 'isDevelopment() is false / isProduction() true when OMEGA_BUILD_MODE=true (and not testing)',
-      run: (ctx) => {
-        withEnv({ NODE_ENV: null, OMEGA_BUILD_MODE: 'true', OMEGA_TEST_MODE: null }, () => {
-          ctx.expect(helpers.isDevelopment()).toBe(false);
-          ctx.expect(helpers.isProduction()).toBe(true);
-        });
-      },
-    },
-    {
-      name: 'testing takes precedence — is* are mutually exclusive (exactly one true)',
-      run: (ctx) => {
-        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_BUILD_MODE: 'true' }, () => {
-          ctx.expect(helpers.isTesting()).toBe(true);
-          ctx.expect(helpers.isDevelopment()).toBe(false);
-          ctx.expect(helpers.isProduction()).toBe(false);
+        withEnv({ OMEGA_ENVIRONMENT: 'staging' }, () => {
+          ctx.expect(() => helpers.getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
         });
       },
     },
@@ -93,21 +112,14 @@ module.exports = defineCases({
       },
     },
     {
-      // The core invariant of the SSOT refactor: is*() DERIVE from getEnvironment(), so they
-      // can NEVER disagree with it, and exactly one is always true. (In build-time Node `chrome`
-      // is undefined, so getEnvironment() resolves via the env-var fallback.)
+      // The core invariant: is*() DERIVE from getEnvironment(), so they can
+      // NEVER disagree with it, and exactly one is always true.
       name: 'invariant: is*() exactly matches getEnvironment() + mutually exclusive (every scenario)',
       run: (ctx) => {
-        const scenarios = [
-          { env: { OMEGA_TEST_MODE: 'true', OMEGA_BUILD_MODE: 'true', NODE_ENV: null }, expect: 'testing' },
-          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: 'true', NODE_ENV: null },    expect: 'production' },
-          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: null, NODE_ENV: 'development' }, expect: 'development' },
-          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: null, NODE_ENV: null },       expect: 'development' }, // BXM defaults dev (unpacked)
-        ];
-        for (const s of scenarios) {
-          withEnv(s.env, () => {
+        for (const name of ['development', 'testing', 'production']) {
+          withEnv({ OMEGA_ENVIRONMENT: name }, () => {
             const e = helpers.getEnvironment();
-            ctx.expect(e).toBe(s.expect);
+            ctx.expect(e).toBe(name);
             ctx.expect(helpers.isDevelopment()).toBe(e === 'development');
             ctx.expect(helpers.isTesting()).toBe(e === 'testing');
             ctx.expect(helpers.isProduction()).toBe(e === 'production');

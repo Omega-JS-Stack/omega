@@ -48,7 +48,7 @@ function makeEngine() {
   return { engine, warnings };
 }
 
-const ITEMS = 'items:\n  - type: default\n    icon: bolt\n    title: "Fast by default"\n    description: "Static output, tuned assets."\n';
+const ITEMS = 'items:\n  - type: default\n    icon: fa-solid fa-bolt\n    title: "Fast by default"\n    description: "Static output, tuned assets."\n';
 
 test('#439: cta_button renders the closing CTA in the sibling button idiom, warn-free', async () => {
   const { engine, warnings } = makeEngine();
@@ -133,7 +133,7 @@ test('#514: a tile with href IS the anchor — one wrapping link, interactive st
   const { engine, warnings } = makeEngine();
   const html = await engine.parseAndRender(
     '{% section "marketing/bento" %}\nitems:\n'
-    + '  - icon: bolt\n    title: "Solutions"\n    description: "What we build."\n    href: "/solutions"\n'
+    + '  - icon: fa-solid fa-bolt\n    title: "Solutions"\n    description: "What we build."\n    href: "/solutions"\n'
     + '{% endsection %}',
     {},
   );

@@ -1,9 +1,9 @@
 /**
  * Onboard wizard tests: non-interactive flag/derivation paths, the real
  * interactive wizard over fake TTY streams, fill-missing (never-overwrite)
- * semantics, dry-run, company-mode placement + stamping, resume inside an
- * existing brand, the manage handoff, and the manage pins — workspace green
- * on a fresh scaffold, testing honestly nudging toward the update service.
+ * semantics, dry-run, the company field (#677), resume inside an existing
+ * brand, the manage handoff, and the manage pins: workspace green on a fresh
+ * scaffold, testing honestly nudging toward the update service.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,8 +12,14 @@ const os = require('node:os');
 const path = require('node:path');
 const JSON5 = require('json5');
 
+const { recordBrand } = require('@omega.js/config');
+
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677). Tests that need their own
+// home still override it per test.
+require('./lib/temp-home.js');
+
 const { runOnboard, deriveId, deriveName, deriveUrl } = require('../src/onboard.js');
-const { discoverBrands } = require('../src/lib/company.js');
 const { runManage } = require('../src/manage.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
@@ -149,7 +155,7 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     'package.json',
     'targets/backend/package.json',
     'targets/desktop/package.json',
-    'targets/website/package.json',
+    'targets/web/package.json',
   ]);
   assert.deepEqual(report.kept, []);
 
@@ -173,6 +179,9 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // a seeded platform key would print a link to a profile nobody owns
   assert.deepEqual(config.socials, {});
   assert.deepEqual(Object.keys(config.targets), ['web', 'backend', 'desktop']);
+  // Every entry declares its TYPE (#886): the key is the name and the folder,
+  // the type says which framework runs there
+  assert.deepEqual(config.targets, { web: { type: 'web' }, backend: { type: 'backend' }, desktop: { type: 'desktop' } });
   // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
   assert.deepEqual(config.certificates, { providers: { apple: { bundleIdPrefix: 'io.acme' } } });
   // `targets` is the LAST top-level key in the seeded config (canonical order)
@@ -181,6 +190,10 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.name, 'acme');
   assert.equal(pkg.private, true);
+  // npm's own word for closed-source commercial code (#884). Every scaffolded
+  // manifest states it, because a target's license field is what the Firefox
+  // lane sends AMO when it creates the brand's listing (all-rights-reserved)
+  assert.equal(pkg.license, 'UNLICENSED');
   assert.deepEqual(pkg.workspaces, ['targets/*']);
   // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
   // the scaffold must declare it or nothing installs it outside the monorepo
@@ -199,8 +212,15 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.ok(readmeText.includes('npx omega'));
   assert.ok(!readmeText.includes('omega-manager'), 'README never mentions the retired bin name');
 
-  const targetPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'website', 'package.json'), 'utf8'));
-  assert.equal(targetPkg.name, 'acme-website');
+  const targetPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
+  assert.equal(targetPkg.name, 'acme-web');
+
+  // Every target, not just the root: the license travels with the manifest a
+  // store reads it from (#884)
+  for (const target of ['web', 'backend', 'desktop']) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'targets', target, 'package.json'), 'utf8'));
+    assert.equal(manifest.license, 'UNLICENSED', `targets/${target} states its license`);
+  }
 
   // cp95a seeds: framework dep per target — the backend's is a RUNTIME
   // dependency on its ONE target manifest (src/dist pillar: the stage derives
@@ -291,6 +311,7 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     await tty.answer('Brand ID:', 'wizard-brand\r');
     await tty.answer('Brand name:', '\r');                    // accept derived: Wizard Brand
     await tty.answer('Brand URL:', '\r');                     // accept derived: https://wizardbrand.com
+    await tty.answer('Company brand id', '\r');               // blank → standalone, no company key
     await tty.answer('Brand description', 'A wizard-made brand\r');
     await tty.answer('Brand tagline', '\r');                  // empty → omitted
     await tty.answer('Contact person (', 'Jane Doe, CEO\r');
@@ -318,6 +339,8 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     assert.deepEqual(Object.keys(config.targets), ['web', 'backend']);
     // Inherited account list stays unwritten — the source layer keeps owning it
     assert.ok(!('account' in config));
+    // A blank company answer is the standalone brand: no key at all (#677)
+    assert.ok(!('company' in config));
   } finally {
     tty.close();
   }
@@ -330,6 +353,7 @@ test('interactive: customizing the account list writes account.admins into the b
   try {
     const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend' });
 
+    await tty.answer('Company brand id', '\r');
     await tty.answer('Brand description', '\r');
     await tty.answer('Brand tagline', '\r');
     await tty.answer('Contact person (', 'Boss Person\r');
@@ -394,13 +418,13 @@ test('resume from inside an existing brand: answers come from its config, only g
   fs.mkdirSync(path.join(root, 'config'));
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
     brand: { id: 'existing', name: 'Existing Brand', url: 'https://existing.test' },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   }`);
-  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), '{ "name": "existing-website" }\n');
+  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), '{ "name": "existing-web" }\n');
 
   // From INSIDE the target dir — the brand root resolves by walk-up
-  const report = await runOnboard(path.join(root, 'targets', 'website'), { manage: false });
+  const report = await runOnboard(path.join(root, 'targets', 'web'), { manage: false });
 
   assert.equal(report.mode, 'resume');
   assert.equal(report.brandRoot, root);
@@ -413,6 +437,30 @@ test('resume from inside an existing brand: answers come from its config, only g
   assert.ok(env.startsWith('# Existing Brand'));
 });
 
+test('resume: a target NAMED admin scaffolds targets/admin around its declared type (#886)', async () => {
+  const root = tempDir();
+  fs.mkdirSync(path.join(root, 'config'));
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+    brand: { id: 'named', name: 'Named Brand', url: 'https://named.test' },
+    targets: { web: { type: 'web' }, admin: { type: 'web' } },
+  }`);
+
+  const report = await runOnboard(root, { manage: false });
+
+  assert.equal(report.mode, 'resume');
+  assert.ok(report.created.includes('targets/admin/package.json'), 'the NAME is the folder');
+
+  // The TYPE picks the framework, so the admin target is a web target
+  const adminPkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'admin', 'package.json'), 'utf8'));
+  assert.equal(adminPkg.name, 'named-admin');
+  assert.deepEqual(adminPkg.devDependencies, { '@omega.js/web': MANAGER_VERSION });
+
+  // README lists it by name, and the brand's own config is never rewritten
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.match(readme, /`targets\/admin\/`/);
+  assert.deepEqual(Object.keys(readConfig(root).targets), ['web', 'admin']);
+});
+
 test('resume: an existing contact person survives a rerun untouched (#770)', async () => {
   const root = tempDir();
   fs.mkdirSync(path.join(root, 'config'));
@@ -423,7 +471,7 @@ test('resume: an existing contact person survives a rerun untouched (#770)', asy
       url: 'https://personful.test',
       contact: { email: 'support@personful.test', person: { name: 'Jane Doe, CEO' } },
     },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   }`;
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), authored);
 
@@ -465,37 +513,60 @@ test('port: a carried legacy oauth.json converts ONCE into the canonical google-
   assert.equal(rerun.legacyOAuth.converted, false);
 });
 
-// ─── Company mode ────────────────────────────────────────────────────────────
+// ─── The company field (#677) ────────────────────────────────────────────────
 
-test('company mode: the new brand lands under brands.roots[0] and gets the company stamp', async () => {
-  const companyRoot = tempDir('omega-onboard-co-');
-  fs.mkdirSync(path.join(companyRoot, 'config'));
-  fs.writeFileSync(path.join(companyRoot, 'config', 'omega.json5'), `{
-    brand: { name: 'My Co' },
-    monitoring: { providers: { sentry: { dsn: 'https://co@sentry.example/1' } } },
-    brands: { roots: ['./brands'] },
+test('company: the wizard asks ONE field, and the answer lands as the top-level key', async (t) => {
+  const dir = tempDir('omega-onboard-co-');
+  const root = path.join(dir, 'acme');
+  fs.mkdirSync(root);
+  const tty = openTtyPrompt();
+
+  // The parent on this machine: its own run's registry line is what makes a
+  // child's `company: { id }` resolvable
+  const parent = path.join(dir, 'fixture-co');
+  fs.mkdirSync(path.join(parent, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(parent, 'config', 'omega.json5'), `{
+    brand: { id: 'fixture-co', name: 'Fixture Co', url: 'https://fixture-co.com' },
+    company: { id: 'self' },
   }`);
-  fs.mkdirSync(path.join(companyRoot, 'brands'));
 
-  const report = await runOnboard(companyRoot, { id: 'acme', manage: false });
+  const previousHome = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(dir, 'home');
+  t.after(() => {
+    tty.close();
+    if (previousHome === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previousHome;
+  });
+  recordBrand({ id: 'fixture-co', root: parent, name: 'Fixture Co', url: 'https://fixture-co.com' });
 
-  const brandRoot = path.join(companyRoot, 'brands', 'acme');
-  assert.equal(report.brandRoot, brandRoot);
+  const run = runOnboard(root, { id: 'acme', name: 'Acme', url: 'https://acme.com', targets: 'web', manage: false });
+
+  await tty.answer('Company brand id', 'fixture-co\r');
+  await tty.answer('Brand description', '\r');
+  await tty.answer('Brand tagline', '\r');
+  await tty.answer('Contact person (', 'Boss Person\r');
+  await tty.answer('Contact person headshot URL', '\r');
+  await tty.answer('Contact person link URL', '\r');
+  await tty.answer('Keep this account list?', '\r');
+
+  const report = await run;
+
   assert.equal(report.mode, 'fresh');
   assert.equal(report.valid, true);
 
-  // Stamped: brand-local runs will layer the company defaults
-  const marker = JSON.parse(fs.readFileSync(path.join(brandRoot, '.omega', 'company.json'), 'utf8'));
-  assert.equal(marker.root, companyRoot);
+  // The one key, outside `brand`, and nothing else about the relationship
+  const config = readConfig(root);
+  assert.deepEqual(config.company, { id: 'fixture-co' });
+  assert.equal(fs.existsSync(path.join(root, '.omega', 'company.json')), false, 'the stamp is retired (#677)');
 
-  // Discovery sees the new brand
-  const { brands } = discoverBrands(companyRoot);
-  assert.deepEqual(brands.map((b) => b.id), ['acme']);
+  // The signing prefix comes from the COMPANY's domain, not the brand's
+  assert.equal(config.certificates?.providers?.apple?.bundleIdPrefix, undefined, 'no signing target, no prefix written');
 
-  // Onboarding the same id again converges instead of clobbering
-  const again = await runOnboard(companyRoot, { id: 'acme', manage: false });
+  // Onboarding the same brand again converges and keeps the answer
+  const again = await runOnboard(root, { manage: false });
   assert.equal(again.mode, 'resume');
   assert.equal(again.created.length, 0);
+  assert.deepEqual(readConfig(root).company, { id: 'fixture-co' });
 });
 
 // ─── Manage pins ─────────────────────────────────────────────────────────────

@@ -20,5 +20,6 @@
     "build": "npx omega build",
     "test:static": "npm test",
     "test:emulator": "omega test"
-  }
+  },
+  "license": "UNLICENSED"
 }

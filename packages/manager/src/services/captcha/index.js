@@ -14,14 +14,19 @@
  * `captcha.providers.recaptcha.siteKey` in config — see the guard below. The
  * reverse direction is the env schema's shared `requiredWhen` rule (#626).
  *
- * Auth: RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY in the brand .env.
- * Missing keys → interactive runs ask; non-interactive runs skip with guidance.
+ * Auth: the SITE key is config (`captcha.providers.recaptcha.siteKey`), because
+ * every page that carries a form renders it: it is public by definition, so it
+ * is asked for through the config flow and landed in omega.json5
+ * ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)). The SECRET key
+ * is RECAPTCHA_SECRET_KEY in the brand .env, asked for through the env flow.
+ * Missing either → interactive runs ask; non-interactive runs skip with guidance.
  */
 const chalk = require('chalk').default;
 
 const { serviceInputSpec } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
+const { resolveConfigValue } = require('../../lib/config-flow.js');
 const { RecaptchaAPI } = require('./lib/recaptcha-api.js');
 const { recaptchaConsoleUrl } = require('./lib/console-url.js');
 
@@ -34,20 +39,38 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'captcha.providers.recaptcha.enabled = false' };
     }
 
+    // The site key's ONE home is config (#893), so a missing one is ASKED for
+    // right here through the config flow, which lands it in omega.json5 and
+    // patches the in-memory config so the rest of this run sees it. A run that
+    // cannot prompt gets null back and falls through to the warning below.
+    const configuredSiteKey = await resolveConfigValue(context, {
+      path: 'captcha.providers.recaptcha.siteKey',
+      label: 'reCAPTCHA site key',
+      disablePath: 'captcha.providers.recaptcha.enabled',
+      instructions: [
+        "Create a CLASSIC reCAPTCHA key in the brand's OWN GCP project (never a shared company key),",
+        'then paste the SITE key here. The secret half stays in the brand .env.',
+      ],
+      entry: {
+        url: recaptchaConsoleUrl(context.brandConfig, null),
+        message: 'reCAPTCHA site key (the public half):',
+      },
+    });
+
     // The ORPHAN SECRET half (#507): RECAPTCHA_SECRET_KEY set with no
     // captcha.providers.recaptcha.siteKey in config is a silent 403 on every
-    // protected POST — the backend enforces verification the moment the secret
-    // exists, and the client has no key to mint a token with (the playground's
-    // live checkout, 2026-08-22). This service is the ONE place that sees both
-    // halves, so it still says this direction out loud.
+    // protected POST, because the backend enforces verification the moment the
+    // secret exists and the client has no key to mint a token with (the
+    // playground's live checkout, 2026-08-22). This service is the ONE place
+    // that sees both halves, so it still says this direction out loud whenever
+    // nobody could be asked for the key above.
     //
-    // The REVERSE direction — a site key requiring its secret — is the env
+    // The REVERSE direction (a site key requiring its secret) is the env
     // schema's `requiredWhen` rule now
     // ([#626](https://github.com/Omega-JS-Stack/omega/issues/626)): warned
     // brand-wide by the workspace env-rules op, and refused by a production
     // backend boot. Neither half = the sanctioned unkeyed brand (#17), which
     // stays green and skips below.
-    const configuredSiteKey = recaptchaConfig.siteKey || null;
     const configuredSecret = process.env.RECAPTCHA_SECRET_KEY || null;
     if (configuredSecret && !configuredSiteKey) {
       console.log(`      ${chalk.yellow('⚠')} RECAPTCHA_SECRET_KEY is set but captcha.providers.recaptcha.siteKey is missing from config — the client sends an empty token and every protected POST 403s. Paste the site key into config/omega.json5: ${recaptchaConsoleUrl(context.brandConfig, configuredSiteKey)}`);
@@ -58,14 +81,13 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    // The site key is handler data (console link, domain guidance), not just
-    // auth — both keys must come from the .env even when tests inject the api
     // De-ITW: the ask points at the GCP reCAPTCHA console (the brand's OWN
     // project) via the registry entries — the paste flow is the ONLY path to
-    // a key; no default value exists anywhere
+    // a key; no default value exists anywhere. The registry carries the SECRET
+    // half only: the public site key is config, asked for above (#893).
     const gate = await requestServiceInput(context, serviceInputSpec('captcha'));
     if (gate) return gate;
-    const siteKey = process.env.RECAPTCHA_SITE_KEY;
+    const siteKey = configuredSiteKey;
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
 
     // Tests inject a fake client via context.recaptchaApi

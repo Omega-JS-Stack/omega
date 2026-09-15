@@ -1,8 +1,8 @@
 /**
  * Custom targets (#603) — the ONE home for a target the framework does not
  * own: a Render API, a worker, a script. It is declared like any other target
- * (`targets.<name>: { type: 'custom' }`, or the array form for instances), and
- * everything it can DO comes from its own package.json scripts:
+ * (`targets.<name>: { type: 'custom' }`), and everything it can DO comes from
+ * its own package.json scripts:
  *
  *   start · build · test · deploy · clean
  *
@@ -27,7 +27,7 @@
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
-const { isCustomTargetEntry, normalizeTargetInstances, instanceTargetDir } = require('@omega.js/config');
+const { isCustomTargetEntry } = require('@omega.js/config');
 
 /**
  * The custom target NAMES a brand config declares.
@@ -45,18 +45,6 @@ function customTargetNames(brandConfig) {
 }
 
 /**
- * The target DIRS those declarations expect under targets/ — the shared
- * multi-instance mapping (`main` → the bare dir, any other id → `<name>-<id>`).
- *
- * @param {object} brandConfig - The merged brand config.
- * @returns {string[]} Directory basenames.
- */
-function customTargetDirs(brandConfig) {
-  return customTargetNames(brandConfig).flatMap((name) => normalizeTargetInstances(brandConfig.targets[name])
-    .map((instance) => instanceTargetDir(name, instance.id)));
-}
-
-/**
  * A target dir's package.json scripts — the whole verb surface of a custom
  * target. An unreadable or absent package.json declares nothing.
  *
@@ -70,6 +58,5 @@ function targetScripts(targetPath) {
 
 module.exports = {
   customTargetNames,
-  customTargetDirs,
   targetScripts,
 };

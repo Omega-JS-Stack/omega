@@ -33,7 +33,7 @@ test('one declared handle → exactly that link, with the platform brand icon', 
   const links = row.match(/<a\s/g) || [];
   assert.strictEqual(links.length, 1, `exactly one link: ${row}`);
   assert.ok(row.includes('href="https://twitter.com/minico"'), `the profile URL: ${row}`);
-  assert.ok(/data-omega-fa="solid\/twitter"><svg/.test(row), `the FA brand icon inlined: ${row}`);
+  assert.ok(/data-omega-fa="brands\/twitter"><svg/.test(row), `the FA brand icon inlined: ${row}`);
   assert.ok(!/facebook|instagram|linkedin|github/.test(row), 'nothing the brand never declared');
 });
 

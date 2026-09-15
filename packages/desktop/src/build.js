@@ -1,17 +1,11 @@
 // Libraries
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const { setEnvironment, buildLaneEnvironment } = require('@omega.js/config/environment');
 const fs = require('fs');
 const JSON5 = require('json5');
 const { force, execute } = require('node-powertools');
-
-// argv is parsed lazily — yargs is ESM-only and can't be `require()`'d in older Node runtimes.
-let _argv = null;
-function getArgv() {
-  if (_argv) return _argv;
-  _argv = require('yargs')(process.argv.slice(2)).parseSync();
-  return _argv;
-}
+const { parseArgv } = require('@omega.js/devkit/argv');
 
 // Class
 function Manager() {
@@ -44,11 +38,11 @@ Manager.prototype.logger = function (name) {
   return this._logger;
 };
 
-// argv (yargs is loaded on first call so the runtime build.js doesn't pull in ESM-only deps)
+// argv: the gulp lane's own parse. It is spawned with the TASK NAME alone
+// (`npm run gulp -- build`), so `debug` is the one flag it declares.
 Manager.getArguments = function () {
-  const options = getArgv() || {};
+  const options = parseArgv(process.argv.slice(2), { booleans: ['debug'] });
 
-  options._ = options._ || [];
   options.debug = force(options.debug === undefined ? false : options.debug, 'boolean');
 
   return options;
@@ -92,12 +86,29 @@ Manager.actLikeProduction = function () {
 };
 Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
-// getEnvironment() is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
-// (alongside isDevelopment/isProduction/isTesting — the natural environment-helper family).
-// It's mixed into ALL FOUR @omega.js/desktop Manager entry points (main / renderer / preload / build) via
-// the mode-helpers attachTo() call at the bottom of each, so every context resolves the
-// environment identically. (@omega.js/desktop has four separate Manager constructors that share code only
-// through these mixins — unlike UJM/BXM, where one build.js Manager serves every context.)
+// The environment is the ONE module's (@omega.js/config's environment.js,
+// [#817](https://github.com/Omega-JS-Stack/omega/issues/817)), reachable from
+// all four @omega.js/desktop Manager entry points (main / renderer / preload /
+// build) through the mode-helpers attachTo() call at the bottom of each, so
+// every context resolves it identically. It reads ONE input and never guesses.
+//
+// THIS FILE IS THE NODE LANE'S ONE SETTER, and it runs at load, before any
+// gulp task, verb or getConfig() asks. Two rules, no sniffing:
+//   1. OMEGA_BUILD_MODE is the lane saying it is producing a PRODUCTION
+//      artifact (`omega build` / `package` / `publish` / `release` all set it,
+//      and so does the boot runner's staged build). It WINS over an inherited
+//      variable, so a production build spawned from a test run still bakes
+//      production.
+//   2. Otherwise a lane that already named one keeps it (the test runners spawn
+//      their children with `testing`), and a bare dev boot is `development`.
+// Before #817 a dev boot with no signal answered `production` here, so
+// `npm start` bundled itself as a production artifact, while the extension's
+// copy of the same function answered `development` from the same inputs.
+//
+// The electron app this lane spawns inherits the variable; a PACKAGED app has
+// no parent env, so main.js sets it from the baked config instead (the same
+// word, written into the artifact by the bundle task).
+setEnvironment(buildLaneEnvironment(Manager.isBuildMode()));
 
 Manager.getMode = function () {
   return {
@@ -114,28 +125,58 @@ Manager.prototype.getMode = Manager.getMode;
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
 // config merges underneath the target's. Then @omega.js/desktop's derived defaults:
-//   app.appId       ← reverse-domain of brand.url (`https://foo.example.com` →
-//                     `com.example.foo`), else `app.${brand.id}` — the BRAND
-//                     owns the identity, never a hardcoded company (friction #18)
+//   app.appId       ← certificates.providers.apple.bundleIdPrefix + brand.id,
+//                     dashes as dots (`com.example` + `my-app` →
+//                     `com.example.my.app`), the same id the
+//                     certificates service registers (#909). No prefix
+//                     declared → reverse-domain of brand.url
+//                     (`https://foo.example.com` → `com.example.foo`), else
+//                     `app.${brand.id}`: the BRAND owns the identity, never a
+//                     hardcoded company (friction #18)
 //   app.productName ← brand.name if not set
 // These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo',
 // url: 'https://foo.com' }` is enough; appId/productName flow through automatically.
 Manager.getConfig = function () {
-  const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
+  const { hasOmegaConfig, loadConfig, composeBundleId, deriveBundleIdPrefix } = require('@omega.js/config');
+
+  // WHICH environment overlay composes
+  // ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): a build bakes
+  // a PRODUCTION artifact, so it names production rather than asking the
+  // machine, which answers `development` in a terminal. That decision is now
+  // made ONCE, at the top of this file, and lands in the one input (#817) that
+  // every other read in the process answers from, so the overlay that composes
+  // and the environment the artifact records can never be two different words.
+  // Same rule, same shape, in @omega.js/extension's getConfig.
+  const environment = Manager.getEnvironment();
 
   // No config at all (fresh dir, non-consumer cwd) → seeded empty shape below; the
   // schema validation in audit/boot reports what's actually missing.
   const cwd = process.cwd();
-  const config = hasOmegaConfig(cwd) ? loadConfig(cwd, 'desktop').config : {};
+  const config = hasOmegaConfig(cwd) ? loadConfig(cwd, 'desktop', { environment }).config : {};
+
+  // The environment rides ON the resolved config as the build fact every OMEGA
+  // surface spells the same way ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)),
+  // so a dev boot loading config off disk hands main the same key a packaged
+  // app reads out of OMEGA_BUILD_JSON.
+  config.environment = environment;
 
   // Apply derived defaults. Always seed `brand` + `app` so callers can deref
   // `config.brand.X` / `config.app.X` without optional-chaining at every callsite.
   config.brand = config.brand || {};
   config.app   = config.app   || {};
   if (!config.app.appId) {
-    const host = String(config.brand.url || '').replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-    if (host) {
-      config.app.appId = host.split('.').reverse().join('.');
+    // The bundle-id policy is @omega.js/config's ONE derivation (#909): a
+    // config carrying an Apple prefix (its own, or the company layer's) signs
+    // under the very id the certificates service registers. The URL host is
+    // the fallback for a brand that declares no prefix, and a brand whose url
+    // is a code-host repo is why it cannot be the rule.
+    const prefix = config.certificates?.providers?.apple?.bundleIdPrefix;
+    const derived = deriveBundleIdPrefix(config.brand.url || '');
+
+    if (prefix && config.brand.id) {
+      config.app.appId = composeBundleId(prefix, config.brand.id);
+    } else if (derived) {
+      config.app.appId = derived;
     } else if (config.brand.id) {
       config.app.appId = `app.${config.brand.id}`;
     }
@@ -178,11 +219,11 @@ Manager.getLiveReloadPort = function () {
 };
 Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
 
-// Windows signing strategy. Config-only — `platforms.win.signing.strategy`
-// (targets.desktop.platforms.win in the raw omega.json5). Default 'self-hosted'.
+// Windows signing strategy. Config-only: `platforms.windows.signing.strategy`
+// (targets.desktop.platforms.windows in the raw omega.json5). Default 'self-hosted'.
 Manager.getWindowsSignStrategy = function () {
   const config = Manager.getConfig();
-  return config?.platforms?.win?.signing?.strategy || 'self-hosted';
+  return config?.platforms?.windows?.signing?.strategy || 'self-hosted';
 };
 Manager.prototype.getWindowsSignStrategy = Manager.getWindowsSignStrategy;
 

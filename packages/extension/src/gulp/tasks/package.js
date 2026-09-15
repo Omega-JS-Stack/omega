@@ -2,13 +2,13 @@
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('package');
 const watcherLogger = Manager.logger('package:watcher');
-const operaLogger = Manager.logger('package:opera');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
 const { execute, getKeys, template } = require('node-powertools');
 const JSON5 = require('json5');
 const { CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
+const { listingId, deriveFirefoxId } = require('../../lib/listings.js');
 
 // Load package
 const project = Manager.getPackage('project');
@@ -26,9 +26,13 @@ const input = [
 const output = 'dist';
 const delay = 250;
 
-// Build targets with browser-specific configurations
+// Build targets with browser-specific configurations. The keys are OMEGA's
+// browser vocabulary ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)),
+// which is the client's `getBrowser()`: `chrome`, never `chromium`. There are
+// TWO builds, not three: `edge` ships the chrome artifact (one chromium zip,
+// two stores), and the packaged dir a browser loads is `packaged/<target>/raw`.
 const TARGETS = {
-  chromium: {
+  chrome: {
     // Chrome, Edge, Brave, etc. - uses service_worker
     adjustManifest: (manifest) => {
       if (manifest.background) {
@@ -41,24 +45,39 @@ const TARGETS = {
     // Firefox - uses scripts array, no service_worker
     adjustManifest: (manifest) => {
       // Firefox REFUSES an add-on it cannot identify, and an id assigned at
-      // submission time can never be updated from a self-hosted build — a
+      // submission time can never be updated from a self-hosted build: a
       // packaged, submittable-looking artifact that is dead on arrival (#264).
-      // A declared id is authoritative. Missing, it is DERIVED from the brand
-      // config (deterministic per brand) so a fresh scaffold builds out of the
-      // box; only a project with no brand facts at all still fails loudly.
-      if (!manifest.browser_specific_settings?.gecko?.id) {
-        let host = null;
-        try { host = new URL(config.brand?.url).hostname; } catch (e) { /* no brand url — fall through to brand.id */ }
-        host = host || (config.brand?.id ? `${config.brand.id}.extension` : null);
+      //
+      // CONFIG is the id's one home (#893): `targets.<name>.listings.firefox.id`
+      // is the AMO add-on id, which IS this gecko id, so a brand declares it
+      // once and the manifest is written from it. A manifest that declares a
+      // DIFFERENT id is a contradiction, not an override, and a brand that has
+      // declared neither still derives one from its brand facts (deterministic
+      // per brand) so a fresh scaffold builds out of the box; only a project
+      // with no brand facts at all fails loudly.
+      const configuredId = listingId(config, 'firefox');
+      const declaredId = manifest.browser_specific_settings?.gecko?.id;
 
-        if (!host) {
-          throw new Error('Cannot package the firefox artifact: browser_specific_settings.gecko.id is missing — declare it in src/manifest.json (e.g. { browser_specific_settings: { gecko: { id: \'my-extension@example.com\' } } })');
+      if (configuredId && declaredId && declaredId !== configuredId) {
+        throw new Error(`Cannot package the firefox artifact: src/manifest.json declares browser_specific_settings.gecko.id "${declaredId}" while config/omega.json5 declares listings.firefox.id "${configuredId}". The config is the id's one home: delete the manifest key, or make the two match.`);
+      }
+
+      if (!declaredId) {
+        let geckoId = configuredId;
+
+        if (!geckoId) {
+          geckoId = deriveFirefoxId(config);
+
+          if (!geckoId) {
+            throw new Error('Cannot package the firefox artifact: browser_specific_settings.gecko.id is missing. Declare listings.firefox.id in config/omega.json5 (e.g. my-extension@example.com)');
+          }
+
+          logger.log(`firefox: no listings.firefox.id declared; using the derived ${geckoId} (the local scaffold pins it into config/omega.json5)`);
         }
 
         manifest.browser_specific_settings = manifest.browser_specific_settings || {};
         manifest.browser_specific_settings.gecko = manifest.browser_specific_settings.gecko || {};
-        manifest.browser_specific_settings.gecko.id = `extension@${host}`;
-        logger.log(`firefox: no gecko id declared; derived ${manifest.browser_specific_settings.gecko.id} from the brand config. Declare browser_specific_settings.gecko.id in src/manifest.json before publishing — the id must stay stable across releases.`);
+        manifest.browser_specific_settings.gecko.id = geckoId;
       }
 
       if (manifest.background) {
@@ -85,41 +104,6 @@ const TARGETS = {
 
       if (Array.isArray(manifest.permissions)) {
         manifest.permissions = manifest.permissions.filter((permission) => permission !== 'sidePanel');
-      }
-
-      return manifest;
-    },
-  },
-  opera: {
-    // Opera - like chromium but with stricter requirements
-    // Opera enforces 12-char limit on short_name INCLUDING placeholder text
-    adjustManifest: (manifest) => {
-      // Same as chromium for background
-      if (manifest.background) {
-        delete manifest.background.scripts;
-      }
-
-      // Opera requires static short_name (12 char limit includes placeholder text)
-      // __MSG_appNameShort__ is 19 chars, so we must use actual value
-      if (manifest.short_name && manifest.short_name.startsWith('__MSG_')) {
-        // Try to get the value from default locale
-        const localesDir = path.join('dist', '_locales');
-        const defaultLocale = manifest.default_locale || 'en';
-        const messagesPath = path.join(localesDir, defaultLocale, 'messages.json');
-
-        if (jetpack.exists(messagesPath)) {
-          try {
-            const messages = JSON5.parse(jetpack.read(messagesPath));
-            // Extract key from __MSG_keyName__
-            const key = manifest.short_name.replace(/^__MSG_/, '').replace(/__$/, '');
-            if (messages[key]?.message) {
-              manifest.short_name = messages[key].message;
-              operaLogger.log(`Resolved short_name to "${manifest.short_name}"`);
-            }
-          } catch (e) {
-            operaLogger.warn(`Could not resolve short_name from locale: ${e.message}`);
-          }
-        }
       }
 
       return manifest;
@@ -368,7 +352,7 @@ const PACKAGE_EXCLUDE_PATTERNS = [
   '**/.DS_Store',
 ];
 
-// Package raw for a specific target (chromium or firefox)
+// Package raw for a specific target (chrome or firefox)
 async function packageRawForTarget(target) {
   logger.log(`[${target}] Starting raw packaging...`);
 
@@ -668,16 +652,17 @@ function packageFnWatcher(complete) {
 // Export tasks
 module.exports = series(packageFn, packageFnWatcher);
 module.exports.packageFn = packageFn;
+module.exports.packageZip = packageZip;
 module.exports.compileManifest = compileManifest;
 module.exports.compileLocales = compileLocales;
 module.exports.deployStoreAssets = deployStoreAssets;
 module.exports.hook = hook;
-// The browser targets the package lane builds — the one list the CI workflow's
-// artifact upload is checked against (it ships packaged/<target>/extension.zip).
+// The browser targets the package lane builds: the one list the publish task's
+// release upload is checked against (it ships packaged/<target>/extension.zip).
 module.exports.TARGETS = TARGETS;
 
 // Run hooks
-async function hook(file) {
+async function hook(file, ctx) {
   // Candidate paths, in order: the NESTED form the defaults scaffold writes and
   // setup's migration moves flat files to (`hooks/build/pre.js`), then the flat
   // pre-migration form (`hooks/build:pre.js`) as a transition fallback. Resolving
@@ -719,7 +704,11 @@ async function hook(file) {
     return await hook({
       manager: Manager,
       projectRoot: process.cwd(),
+      // Build mode answers the BUILD lane's hooks. A caller that knows better
+      // says so: the deploy verb's hook runs outside a build and what it is
+      // about to publish is a release, so it names `production` itself.
       mode: Manager.isBuildMode() ? 'production' : 'development',
+      ...(ctx || {}),
     });
   } catch (e) {
     throw new Error(`Error running hook: ${fullPath} ${e.stack}`);

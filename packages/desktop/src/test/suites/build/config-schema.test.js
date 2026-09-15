@@ -113,12 +113,12 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'resolved: has platforms.win.signing block (Windows-specific signing config)',
+      name: 'resolved: has platforms.windows.signing block (Windows-specific signing config)',
       run: (ctx) => {
         ctx.expect(ctx.state.cfg.platforms).toBeTruthy();
-        ctx.expect(ctx.state.cfg.platforms.win).toBeTruthy();
-        ctx.expect(ctx.state.cfg.platforms.win.signing).toBeTruthy();
-        ctx.expect(['self-hosted', 'cloud', 'local']).toContain(ctx.state.cfg.platforms.win.signing.strategy);
+        ctx.expect(ctx.state.cfg.platforms.windows).toBeTruthy();
+        ctx.expect(ctx.state.cfg.platforms.windows.signing).toBeTruthy();
+        ctx.expect(['self-hosted', 'cloud', 'local']).toContain(ctx.state.cfg.platforms.windows.signing.strategy);
       },
     },
     {

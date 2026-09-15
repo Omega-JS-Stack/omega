@@ -74,7 +74,7 @@ function build({ data, theme }) {
 
         ${signoff(data, theme)}
     `)}
-    ${footer(brand, email)}
+    ${footer(brand, email, data?.company)}
   `);
 }
 

@@ -45,11 +45,27 @@ const FIREWALL_TOKEN = '{{ installFirewall }}';
 // the action reports (`firewall-path-binary`) instead of guessing at it.
 const FIREWALL_STEP_ID = 'omega-firewall';
 
+// The token every framework template carries at the END of its install command,
+// and what a COMPOSED job renders it into ([#898](https://github.com/Omega-JS-Stack/omega/issues/898)).
+// At a brand root npm installs every target's workspace, so the desktop job on
+// Electron's node installed the backend workspace whose engines.node is the
+// Firebase runtime pin and warned EBADENGINE on every leg. Each job installs
+// only the workspace it belongs to instead.
+//
+// `.`, not the target's path: npm resolves `--workspace` against the CWD, and
+// every composed run step already carries `working-directory: targets/<name>`,
+// so `--workspace targets/desktop` from inside targets/desktop looks for
+// targets/desktop/targets/desktop and refuses with "No workspaces found". The
+// dot is the target's real directory whatever the brand named it ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)),
+// and no template ever spells a path.
+const INSTALL_WORKSPACE_TOKEN = '{{ installWorkspace }}';
+const INSTALL_WORKSPACE_FLAG = '--workspace .';
+
 /**
  * Action inputs that name a path inside the checkout, per action. `uses:` steps
  * ignore `working-directory:` entirely (it is a `run:` key), so a composed
- * workflow has to scope these itself — the gh-pages publish otherwise pushes a
- * repo-root `dist/` no build ever wrote, and the cache key hashes nothing.
+ * workflow has to scope these itself: an unscoped cache key hashes nothing and
+ * an unscoped artifact upload collects an empty repo-root path.
  *
  * Named per action on purpose: a blanket "any input called path" rule would
  * rewrite inputs that mean something else — `actions/checkout`'s `path:` names
@@ -60,7 +76,6 @@ const SCOPED_ACTION_INPUTS = {
   'actions/cache': ['path'],
   'actions/upload-artifact': ['path'],
   'actions/download-artifact': ['path'],
-  'peaceiris/actions-gh-pages': ['publish_dir'],
 };
 
 /**
@@ -101,6 +116,27 @@ function renderInstallFirewall(contents) {
   ].join('\n'));
 }
 
+/**
+ * Render every `{{ installWorkspace }}` token: into the workspace flag on a
+ * COMPOSED brand-root copy, into nothing at all on a standalone one.
+ *
+ * Both lanes go through this one function, like the firewall step above, so the
+ * flag lives in ONE place instead of four templates. A standalone target IS its
+ * own repo root and declares no workspaces, so the flag there would refuse the
+ * install by name ("No workspaces found: --workspace=."); the token and the
+ * space before it are dropped and the command is the plain install it always was.
+ *
+ * @param {string} contents - The workflow template.
+ * @param {object} [options]
+ * @param {boolean} [options.composed] - Composing into a brand root.
+ * @returns {string} The same text with every token replaced.
+ */
+function renderInstallWorkspace(contents, options) {
+  const composed = !!(options && options.composed);
+
+  return contents.replace(new RegExp(`[ \\t]*${escapeRegExp(INSTALL_WORKSPACE_TOKEN)}`, 'g'), composed ? ` ${INSTALL_WORKSPACE_FLAG}` : '');
+}
+
 /** The literal, safe to drop into a RegExp. */
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -123,11 +159,16 @@ function composeWorkflow(contents, options) {
   // what it is: a `uses:` step, which is never scoped to the target dir.
   let composed = renderInstallFirewall(contents);
 
+  // This job installs ONLY the target it belongs to (#898): the composed copy
+  // is the one that runs inside a brand, where every other target's workspace
+  // (and its own engines.node pin) sits beside it.
+  composed = renderInstallWorkspace(composed, { composed: true });
+
   // Display name carries the target — two targets' runs are told apart in the
   // Actions list, where only the workflow name shows.
   composed = composed.replace(/^name:[ \t]*(.*)$/m, (full, value) => `name: ${value.trim()} (${targetPath})`);
 
-  // Per-target concurrency: `${{ github.ref }}` alone means the website's deploy
+  // Per-target concurrency: `${{ github.ref }}` alone means the web target's deploy
   // cancels the extension's.
   composed = composed.replace(/^(concurrency:\n(?:[ \t]+.*\n)*?[ \t]+group:[ \t]*)(.*)$/m, (full, prefix, value) => `${prefix}${targetName}-${value.trim()}`);
 
@@ -210,7 +251,7 @@ function composeTargetWorkflows(options) {
  * @param {object} options
  * @param {string} options.brandRoot - The brand (repo) root
  * @param {string[]} options.liveTargets - The target DIR names the brand's config
- *   still enables (`website`, `extension`, …). A composed file owned by anything
+ *   still enables (`web`, `extension`, …). A composed file owned by anything
  *   else is a leftover.
  * @param {boolean} [options.dryRun] - Report what would go, delete nothing
  * @param {object} [options.logger] - Logger with `log`/`warn` (defaults to console)
@@ -262,7 +303,21 @@ function composedWorkflowName(options) {
   if (!options.brandRoot || path.resolve(options.brandRoot) === path.resolve(options.targetDir)) {
     return options.workflow;
   }
-  return `${path.basename(options.targetDir)}-${options.workflow}`;
+  return composedWorkflowNameFor(path.basename(options.targetDir), options.workflow);
+}
+
+/**
+ * The same name from the target's NAME, for a caller that holds the name and no
+ * path at all (the backend's deploy dispatch reads the target out of a request,
+ * never off a disk it does not have). The path-taking form above is this one
+ * plus a basename, so the two can never spell the rule differently.
+ *
+ * @param {string} name - The target name (e.g. web)
+ * @param {string} workflow - The framework's workflow file name (e.g. build.yml)
+ * @returns {string} the composed workflow file name
+ */
+function composedWorkflowNameFor(name, workflow) {
+  return `${name}-${workflow}`;
 }
 
 // Scope every `run:` step that executes AFTER its job's checkout to the target dir.
@@ -578,4 +633,4 @@ function header(targetPath) {
   ].join('\n');
 }
 
-module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows, renderInstallFirewall, FIREWALL_ACTION, FIREWALL_STEP_ID, FIREWALL_TOKEN };
+module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, composedWorkflowNameFor, reconcileComposedWorkflows, renderInstallFirewall, renderInstallWorkspace, FIREWALL_ACTION, FIREWALL_STEP_ID, FIREWALL_TOKEN, INSTALL_WORKSPACE_TOKEN, INSTALL_WORKSPACE_FLAG };

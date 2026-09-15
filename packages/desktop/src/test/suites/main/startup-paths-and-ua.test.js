@@ -18,7 +18,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const { app } = require('electron');
         const userData = app.getPath('userData');
-        // OMEGA_TEST_MODE=true → isTesting() → dedicated " (Testing)" dir, wiped at
+        // OMEGA_ENVIRONMENT=testing → isTesting() → dedicated " (Testing)" dir, wiped at
         // boot, so test runs never read or pollute dev ("(Development)") or
         // production data on the same machine.
         ctx.expect(typeof userData).toBe('string');

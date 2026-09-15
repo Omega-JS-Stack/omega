@@ -21,15 +21,33 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const package = Manager.getPackage('main');
 
-// A consumer whose peer deps are already satisfied — the steady state.
-function stageConsumer() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-ensure-'));
+// The manifest of a consumer whose peer deps are already satisfied (the steady
+// state, where ensurePeerDependencies installs nothing).
+function consumerManifest() {
   const devDependencies = { [package.name]: `^${package.version}` };
   for (const [name, ver] of Object.entries(package.peerDependencies || {})) {
     devDependencies[name] = ver;
   }
-  jetpack.write(path.join(tmp, 'package.json'), `${JSON.stringify({ name: 'staged-app', version: '1.0.0', devDependencies }, null, 2)}\n`);
+  return `${JSON.stringify({ name: 'staged-app', version: '1.0.0', devDependencies }, null, 2)}\n`;
+}
+
+function stageConsumer() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-ensure-'));
+  jetpack.write(path.join(tmp, 'package.json'), consumerManifest());
   return tmp;
+}
+
+// A BRAND tree: the target under targets/<name>, the config at the brand root.
+// That is the shape findBrandRoot resolves, and the one the firefox id is
+// pinned into (#893).
+function stageBrand(config) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-ensure-brand-'));
+  const target = path.join(root, 'targets', 'extension');
+
+  jetpack.write(path.join(root, 'config', 'omega.json5'), config);
+  jetpack.write(path.join(target, 'package.json'), consumerManifest());
+
+  return { root, target, configPath: path.join(root, 'config', 'omega.json5') };
 }
 
 module.exports = defineCases({
@@ -56,13 +74,16 @@ module.exports = defineCases({
           // The synced scripts never mention the retired command
           ctx.expect(JSON.stringify(manifest.scripts).includes('omega setup')).toBe(false);
 
-          // The rerun adds nothing and syncs nothing. (One caveat, pre-existing
-          // and named in `merged`: config/omega.json5 is copied verbatim on the
-          // fresh pass and re-emitted in the defaults-merge's normalized form on
-          // the next one, so it converges on pass three.)
+          // The rerun adds nothing and syncs one thing: the firefox id pin
+          // (#893) reads the config the defaults scaffold only just wrote, so
+          // on a FRESH standalone project it lands on pass two. (One further
+          // caveat, pre-existing and named in `merged`: config/omega.json5 is
+          // copied verbatim on the fresh pass and re-emitted in the
+          // defaults-merge's normalized form on the next one.) Both converge on
+          // pass three.
           const second = await ensureTarget({ projectDir: tmp });
           ctx.expect(second.written).toEqual([]);
-          ctx.expect(second.changed).toEqual([]);
+          ctx.expect(second.changed).toEqual(['config/omega.json5']);
 
           const third = await ensureTarget({ projectDir: tmp });
           ctx.expect(third).toEqual({ written: [], merged: [], changed: [] });
@@ -103,6 +124,57 @@ module.exports = defineCases({
           ctx.expect(jetpack.read(manifestPath)).toBe(before);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'pins the DERIVED firefox add-on id into the brand config, once (#893)',
+      run: async (ctx) => {
+        // The id is ours, not AMO's: the store adopts whatever gecko id the
+        // packaged manifest carries. So the local scaffold writes the derived
+        // value into the brand config before anything packages or publishes,
+        // and the runner (a throwaway checkout of the mirror) never writes.
+        const { root, target, configPath } = stageBrand(`{\n  brand: { id: 'staged-brand', name: 'Staged', url: 'https://staged.example.com' },\n  targets: { extension: { type: 'extension' } },\n}\n`);
+
+        try {
+          const lines = [];
+          const first = await ensureTarget({ projectDir: target, log: (line) => lines.push(line) });
+
+          const written = jetpack.read(configPath);
+          ctx.expect(written).toContain('listings');
+          ctx.expect(written).toContain('extension@staged.example.com');
+          // The brand's own file is EDITED, never rewritten: every other key survives
+          ctx.expect(written).toContain("name: 'Staged'");
+
+          ctx.expect(first.changed.some((line) => line.includes('config/omega.json5'))).toBe(true);
+          ctx.expect(lines.some((line) => line.includes('Pinned targets.extension.listings.firefox.id = extension@staged.example.com'))).toBe(true);
+
+          // The rerun reads its own pin and changes nothing at all.
+          const rerunLines = [];
+          const second = await ensureTarget({ projectDir: target, log: (line) => rerunLines.push(line) });
+
+          ctx.expect(jetpack.read(configPath)).toBe(written);
+          ctx.expect(second.changed.some((line) => line.includes('config/omega.json5'))).toBe(false);
+          ctx.expect(rerunLines.some((line) => line.includes('Pinned'))).toBe(false);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'a DECLARED firefox listing id is left alone, byte for byte (#893)',
+      run: async (ctx) => {
+        const source = `{\n  brand: { id: 'staged-brand', name: 'Staged', url: 'https://staged.example.com' },\n  targets: { extension: { type: 'extension', listings: { firefox: { id: 'addon@declared.example.com' } } } },\n}\n`;
+        const { root, target, configPath } = stageBrand(source);
+
+        try {
+          const lines = [];
+          await ensureTarget({ projectDir: target, log: (line) => lines.push(line) });
+
+          ctx.expect(jetpack.read(configPath)).toBe(source);
+          ctx.expect(lines.some((line) => line.includes('Pinned'))).toBe(false);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
         }
       },
     },

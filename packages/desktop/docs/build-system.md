@@ -41,7 +41,7 @@ Auto-loads tasks from `<@omega.js/desktop>/dist/gulp/tasks/*.js` via `<@omega.js
 | `package` | real | Run `electron-builder build --config dist/electron-builder.yml` (full DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux) |
 | `package-quick` | real | Quick-package for host platform/arch only — `--dir` mode, no DMG/zip/universal/notarize. ~30s vs ~3min for full `package`. Output: `release/<platform>-<arch>/<ProductName>.app` (or `.exe`-folder/linux-unpacked) — directly launchable. Used for smoke-testing packaged-mode behavior locally. `--quick` trims the electron-builder phase and NOTHING else: the build ahead of it is full and cold (#737). |
 | `release` | real | `electron-builder build --publish always` |
-| `audit` | real | Validate consumer config (required keys, valid enums, deep-link scheme format), ensure icon + entrypoints exist; in publish mode also requires `releases.repo` + `electron-builder.yml`. Throws with a numbered list of every problem found |
+| `audit` | real | Validate consumer config (required keys, valid enums, deep-link scheme format), ensure icon + entrypoints exist; in publish mode also requires an ADDRESSABLE releases repo (`repo.org` + `brand.id`) + `electron-builder.yml`. Throws with a numbered list of every problem found |
 | `serve` | real | Spawns `electron .` against the build output, websocket on `OMEGA_LIVERELOAD_PORT` |
 
 ### Composition
@@ -97,9 +97,16 @@ webpack encoded the runtime as `target: 'electron-main' | 'electron-preload' | '
 
 The renderer runs with `contextIsolation: true` — a browser-like environment with no Node globals — but libraries bundled through @omega.js/client still IMPORT `fs`, `path`, `crypto` and friends on code paths their browser builds never take. webpack answered with `resolve.fallback: { fs: false, … }`; esbuild has no such option, so the same list is a resolve hook onto one empty CommonJS module (`RENDERER_EMPTY_MODULES` in the task). `electron` is on the list too: a renderer that reached the real module would be a security hole, not a missing polyfill.
 
-### OMEGA_BUILD_JSON injection
+### OMEGA_BUILD_JSON: a define for Node, one file for the browser
 
-An esbuild `define` replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed config. A `banner` prepends an IIFE that assigns it to `globalThis` and `window` so renderer code can read `window.OMEGA_BUILD_JSON.config`. `process.env.NODE_ENV` is defined the same way — webpack derived it from its `mode`, esbuild has no modes, so the build states it.
+The wrapper is the ONE shape every OMEGA browser surface carries, `{ config, package, mode, license, builtAt }` ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)), with `mode` the same three keys everywhere (`{ environment, build, publish }`; desktop's own `server` verdict stays inside `Manager.getMode()`). Two blobs come out of one composition, off one set of build facts:
+
+- `composeBuildJson()` → main and preload, as an esbuild `define` (the bare identifier becomes the literal at compile time) plus a `banner` that assigns it to `globalThis`. Its `config` is the WHOLE resolved config, because the main process boots from it in a packaged app, and both bundles are Node rather than a public surface. `process.env.NODE_ENV` is defined the same way: webpack derived it from its `mode`, esbuild has no modes, so the build states it.
+- `composeClientBuildJson()` → the renderer, written ONCE as `dist/build.js` through `@omega.js/devkit/build-json` ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)). Its `config` is `clientConfig(resolved)` from `@omega.js/config`, the browser-safe subset every OMEGA browser surface carries: a renderer is readable from DevTools, so the GCP account facts, the signing certificates and the account admins stay out of it. The page template loads the file with `<script src="../../build.js">` as the view's FIRST script, ahead of the view bundle (`dist/views/<view>/` → `dist/`, resolved inside a packaged asar exactly as the bundle tag beside it is), and the renderer bundle carries no define and no banner of its own.
+
+The build facts ride on both: `runtime: 'electron'` ([#896](https://github.com/Omega-JS-Stack/omega/issues/896), the fact @omega.js/client cannot sniff from inside a renderer), `environment`, `version`, `buildTime`, `target`, and the resolved `dev` map on non-production builds.
+
+Pinned by `src/test/suites/build/build-json-bake.test.js`.
 
 ## electron-builder
 
@@ -111,10 +118,10 @@ An esbuild `define` replaces the bare identifier `OMEGA_BUILD_JSON` with the par
   - **mac**: arch (default `universal`), MAS stubs (not implemented)
   - **win**: arch (default `x64`+`ia32`), NSIS oneClick + shortcuts
   - **linux**: arch, optional snap publishing
-- Versionless `artifactName` templates from `@omega.js/config`'s `desktop-artifacts.js` — the ONE naming rule the website's direct-download URLs read too, so `/releases/latest/download/<asset>` never changes. The asset table + the whole release contract: [releasing.md](releasing.md#versionless-assets-and-direct-download-links)
+- Target lists derived from the `platforms` declaration and versionless `artifactName` templates from `@omega.js/config`'s `platforms.js`: the ONE format table the website's direct-download URLs read too, so `/releases/latest/download/<asset>` never changes. The asset table + the whole release contract: [releasing.md](releasing.md#versionless-assets-and-direct-download-links)
 - Mode-dependent injections like `mac.extendInfo.LSUIElement: true` when `startup.mode === 'hidden'` (zero-bounce production launches — see [startup.md](startup.md))
 - `electronVersion` pinned from the INSTALLED electron (resolved via the framework's module context — electron-builder refuses semver ranges and can't see a workspace-hoisted electron from the target dir)
-- Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish owner resolves config-first: `releases.owner` → the brand's `repo.providers.github.org` → git-remote discovery (a brand-monorepo target has no git remote of its own; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
+- Generated entitlements + resolved icons + materialized publish + afterSign hook. The publish block is CONFIG-ONLY and fully derived ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): `<brand.id>-releases` under `repo.org`, through @omega.js/config's `releasesRepo`. No git-remote discovery and no typed repo name (a brand-monorepo target's remote is the repo it is nested in; electron-builder's update-info step crashes on a null publish config, so this isn't cosmetic)
 - Optional passthrough: `fileAssociations`, `protocols`
 - The `files` list: everything under the target root except source maps, `.env` files, `logs/`, and the scratch and state dirs `.omega/`, `.claude/`, `.temp/`, `.cache/`, `.gh-runners/` and `test/` ([#866](https://github.com/Omega-JS-Stack/omega/issues/866): the boot runner stages `.omega/test-app` with symlinks into the target, and the packager followed them). `src/` ships, because the runtime reads `src/integrations/*` from the app root; `config/` (the build resources dir) and `release/` are excluded by electron-builder itself
 
@@ -135,7 +142,7 @@ Environment variables (set in-process by the `omega build` / `omega package` / `
 
 ## Windows code signing
 
-Strategy-pluggable via `platforms.win.signing.strategy` in `config/omega.json5`:
+Strategy-pluggable via `platforms.windows.signing.strategy` in `config/omega.json5`:
 
 | Strategy | Where signing runs | When to use |
 |---|---|---|
@@ -143,7 +150,7 @@ Strategy-pluggable via `platforms.win.signing.strategy` in `config/omega.json5`:
 | `cloud` | `windows-latest` runner shells out to a cloud signing CLI (Azure Trusted Signing / SSL.com / DigiCert KeyLocker) | Future migration target |
 | `local` | Developer's Windows machine after CI uploads unsigned artifact | Fallback when no runner is available |
 
-The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `platforms.win.signing.strategy` so the same code path drives all three. Provider modules live in `src/lib/sign-providers/{ev,azure,sslcom,digicert}.js` (Pass 3).
+The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `platforms.windows.signing.strategy` so the same code path drives all three. Provider modules live in `src/lib/sign-providers/{ev,azure,sslcom,digicert}.js` (Pass 3).
 
 ## GitHub Actions
 

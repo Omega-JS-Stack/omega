@@ -14,10 +14,11 @@
   {% assign page-keywords = resolved.meta.keywords | omega_liquify %}
 {%- endiftruthy -%}
 
+{% comment %} The minted set is the ONE favicon source (#850): the manager's assets
+  service mints it from the brand images and the static-assets channel bridges it
+  here, so there is no path override to honor. A brand changes the icon by
+  changing the source image. {% endcomment %}
 {% assign favicon-path = resolved.config.url | append: "/assets/images/favicon" %}
-{%- iftruthy resolved.config.favicon.path -%}
-  {% assign favicon-path = resolved.config.favicon.path %}
-{%- endiftruthy -%}
 
 <!-- The index posture (#564): `meta.index` is the ONE decision, resolved once
      per page by the engine (engine.js `resolved`): the site default
@@ -167,6 +168,21 @@
 
 <!-- Meta -->
 <meta charset="utf-8"/>
+
+<!-- OMEGA_BUILD_JSON: the ONE build snapshot every OMEGA browser surface loads
+     (#743, #894), and the only thing the page hands @omega.js/client. The FIRST
+     script on the page, because everything below may read it; the service worker
+     loads the same file with importScripts, and desktop and the extension load
+     it the same way from their own roots. `omega dev` rewrites its dev line per
+     response (#346), so a page built before the emulator came up still gets the
+     map of the stack running right now. -->
+<script src="/build.js?cb={{ site.omega.cache_breaker }}"></script>
+{%- assign page-build-config = resolved.config | omega_page_config: config -%}
+{% if page-build-config %}
+<!-- This page's own `config:` block (#607), over the site's snapshot: the chat
+     widget and every other runtime reader sees what THIS page declared. -->
+<script>Object.assign(self.OMEGA_BUILD_JSON.config, {{ page-build-config | jsonify }});</script>
+{% endif %}
 
 <!-- Motion gate: reveal styles (core/css/motion) only hide content under this
      stamp, so no-JS pages render fully visible. Inline + first so the stamp
@@ -331,7 +347,13 @@
   <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | omega_cachebreak }}"/>
   <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | omega_cachebreak }}"/>
 {% endif %}
-<meta name="theme-color" content="{{ resolved.config.favicon.theme-color }}"/>
+{% comment %} The browser chrome paints the BRAND color (#850): `brand.color` is the one
+  place a brand states its hex, and `site.brandTokens.accent` is that hex as the ramp
+  regenerated it, the same value the `:root` accent block below emits, never the config
+  string verbatim. No brand color, no meta: an empty one paints nothing anyway. {% endcomment %}
+{% iftruthy site.brandTokens %}
+  <meta name="theme-color" content="{{ site.brandTokens.accent }}"/>
+{% endiftruthy %}
 
 <!-- Browser Support -->
 <!--[if lte IE 11]>
@@ -393,7 +415,7 @@
   {% endif %}
 {% endfor %}
 
-<!-- Brand accent tokens: derived from brand.color at build (src/brand-tokens.js);
+<!-- Brand accent tokens: derived from brand.color at build (@omega.js/devkit/brand-tokens);
      emitted AFTER the bundles so the ramps win the cascade over the token sheet's
      placeholders. Two ramps — light plus a legibility-lifted dark variant —
      stamped with the SAME plumbing as the token sheet (OS preference carries,

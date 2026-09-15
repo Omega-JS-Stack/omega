@@ -1006,7 +1006,7 @@ module.exports = defineCases({
     // ─── Mode helpers (@omega.js/backend-pattern: isDevelopment / isProduction / isTesting) ────
 
     {
-      name: 'manager.isTesting() returns true under OMEGA_TEST_MODE (set by test runner)',
+      name: 'manager.isTesting() returns true under OMEGA_ENVIRONMENT=testing (named by the test runner)',
       run: (ctx) => {
         ctx.expect(typeof ctx.manager.isTesting).toBe('function');
         ctx.expect(ctx.manager.isTesting()).toBe(true);
@@ -1015,7 +1015,7 @@ module.exports = defineCases({
     {
       name: 'manager.isDevelopment() is false during tests (testing takes precedence)',
       run: (ctx) => {
-        // The test runs unpackaged, but OMEGA_TEST_MODE=true → testing wins, so this is a
+        // The test runs unpackaged, but the lane named testing, so this is a
         // TEST environment, not development. isDevelopment() is therefore false.
         ctx.expect(typeof ctx.manager.isDevelopment).toBe('function');
         ctx.expect(ctx.manager.isDevelopment()).toBe(false);

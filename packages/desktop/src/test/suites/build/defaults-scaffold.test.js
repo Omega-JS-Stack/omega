@@ -107,8 +107,77 @@ module.exports = defineCases({
         const gitignore = jetpack.read(path.join(tmp, '.gitignore'));
         const customPart = gitignore.slice(gitignore.indexOf(CUSTOM_MARKER));
         ctx.expect(customPart).toContain('my-secret-dir/');
-        // Not in @omega.js/desktop's defaults → migrated below the Custom marker.
-        ctx.expect(customPart).toContain('user-added-dir/');
+        // The framework block is completely managed ([#926](https://github.com/Omega-JS-Stack/omega/issues/926)):
+        // a line inside it that @omega.js/desktop's defaults no longer carry leaves the
+        // file. Lines the consumer owns go below the Custom marker.
+        ctx.expect(gitignore).not.toContain('user-added-dir/');
+      },
+    },
+    {
+      name: 'config/certs/: the target .gitignore hides the material and tracks the README (#913)',
+      run: async (ctx) => {
+        const { spawnSync } = require('child_process');
+
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
+        await copyDefaults(tmp);
+
+        const gitignore = jetpack.read(path.join(tmp, '.gitignore'));
+        const defaultPart = gitignore.slice(0, gitignore.indexOf(CUSTOM_MARKER));
+        ctx.expect(defaultPart).toContain('config/certs/*');
+        ctx.expect(defaultPart).toContain('!config/certs/README.md');
+        // The framework section is a file consumers edit, and the dotfiles emdash
+        // hook bounces one (built by code point so this file carries none either).
+        ctx.expect(defaultPart.includes(String.fromCharCode(0x2014))).toBe(false);
+
+        // The README the scaffold writes says the target .gitignore is what
+        // hides this directory, so no sibling .gitignore ships beside it.
+        ctx.expect(jetpack.exists(path.join(tmp, 'config', 'certs', 'README.md'))).toBe('file');
+        ctx.expect(jetpack.exists(path.join(tmp, 'config', 'certs', '.gitignore'))).toBe(false);
+
+        // git is the only authority on this: prove it against a real repo.
+        jetpack.write(path.join(tmp, 'config', 'certs', 'foo.p12'), 'not a real cert');
+        spawnSync('git', ['init', '-q'], { cwd: tmp });
+        const ignored = (file) => spawnSync('git', ['check-ignore', '-q', file], { cwd: tmp }).status === 0;
+
+        ctx.expect(ignored('config/certs/README.md')).toBe(false);
+        ctx.expect(ignored('config/certs/foo.p12')).toBe(true);
+      },
+    },
+    {
+      name: 'config/certs/: a target scaffolded before #913 converges on the next verb run',
+      run: async (ctx) => {
+        // Three leftovers each keep the README hidden on their own, so the next
+        // verb run heals all three: the old `config/certs/` line, which the
+        // marker merge now DROPS with the rest of the retired framework block
+        // ([#926](https://github.com/Omega-JS-Stack/omega/issues/926)), the
+        // sibling `.gitignore` (a nested ignore file beats the parent), and the
+        // README's own sentence, which cited that sibling.
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
+        const sibling = path.join(tmp, 'config', 'certs', '.gitignore');
+        const readme = path.join(tmp, 'config', 'certs', 'README.md');
+
+        jetpack.write(
+          path.join(tmp, '.gitignore'),
+          `${DEFAULT_MARKER}\n.env\nconfig/certs/\n*.p12\n\n${CUSTOM_MARKER}\nmy-secret-dir/\n`
+        );
+        jetpack.write(sibling, '*\n!.gitignore\n');
+        jetpack.write(readme, '# `config/certs/`\n\nThe `.gitignore` beside this file ignores everything it holds.\n');
+
+        await copyDefaults(tmp);
+
+        const gitignore = jetpack.read(path.join(tmp, '.gitignore'));
+        ctx.expect(gitignore.split('\n').some((line) => line.trim() === 'config/certs/')).toBe(false);
+        const defaultHalf = gitignore.slice(0, gitignore.indexOf(CUSTOM_MARKER));
+        ctx.expect(defaultHalf).toContain('config/certs/*');
+        ctx.expect(defaultHalf).toContain('!config/certs/README.md');
+        ctx.expect(gitignore).toContain('my-secret-dir/');
+        ctx.expect(jetpack.exists(sibling)).toBe(false);
+        ctx.expect(jetpack.read(readme)).toContain("The target's `.gitignore` ignores everything here except this file");
+
+        // Anything else in that sibling is the consumer's, and is never destroyed.
+        jetpack.write(sibling, '*\n!.gitignore\n!my-own-note.txt\n');
+        await copyDefaults(tmp);
+        ctx.expect(jetpack.exists(sibling)).toBe('file');
       },
     },
     {

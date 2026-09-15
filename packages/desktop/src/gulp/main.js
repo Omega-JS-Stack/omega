@@ -1,4 +1,4 @@
-// Strip ELECTRON_RUN_AS_NODE — see bin/omega-desktop for the full story. Belt-and-suspenders
+// Strip ELECTRON_RUN_AS_NODE: see src/cli-run.js for the full story. Belt-and-suspenders
 // at the gulp boundary too because gulp can be invoked outside of mgr (e.g. `npx gulp build`).
 delete process.env.ELECTRON_RUN_AS_NODE;
 
@@ -15,10 +15,16 @@ const package = Manager.getPackage('main');
 const project = Manager.getPackage('project');
 const projectRoot = Manager.getRootPath('project');
 
-// Resolve the .env cascade from the project root (shell > app > brand > company).
-// `target` delivers the schema's `deliverAs` renames into process.env (#678);
-// gulp can be invoked outside the CLI (`npx gulp build`), so it asks here too.
-require('@omega.js/config').loadEnv(projectRoot, { target: 'desktop' });
+// Resolve the .env cascade from the project root (shell > app > brand > company)
+// and derive the signing paths the brand's signing tree implies. gulp is its own
+// PROCESS (npm start invokes it with no CLI above it), so it asks the same
+// wrapper the CLI asks and gets the same answer
+// ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)). The load has to
+// precede the log tee (the tee reads the env it populates), so what it derived
+// is REPORTED below instead: the derived lines are what a CI signing failure is
+// diagnosed from, and they belong in build.log.
+const { loadDesktopEnv, reportSigningEnv } = require('../utils/load-env.js');
+const signingEnv = loadDesktopEnv(projectRoot);
 
 // Empty-string signing placeholders (CSC_LINK="" etc. from the .env template)
 // must read as UNSET — app-builder-lib only null-checks and would resolve ''
@@ -40,26 +46,8 @@ if (logFileEnv !== 'false' && logFileEnv !== '0') {
   logger.log(`Logs tee'd to ${logPath}`);
 }
 
-// Signing certificate lookup: explicit CSC_LINK → the brand's gitignored
-// .omega/certificates tree → the Keychain (the default, and what a tree-less
-// setup keeps getting). Runs AFTER the log tee so the chosen source and reason
-// land in build.log — the line a CI signing failure is diagnosed from.
-// See utils/resolve-signing-cert.js.
-const signingCert = require('../utils/resolve-signing-cert.js')({ projectRoot });
-if (signingCert.source === 'certificates') {
-  process.env.CSC_LINK = signingCert.cscLink;
-}
-logger.log(`Signing certificate: ${signingCert.source} (${signingCert.reason})`);
-
-// The signing paths the DELIVERED artifacts imply (#678): the manager's
-// disperse service used to stamp CSC_LINK / APPLE_API_KEY into the target's
-// .env; no machine writes a target .env any more, so an unset key whose file
-// sits in config/certs/ is derived here instead. Runs last: an explicit
-// answer, and the lookup above, always win. See utils/derive-signing-env.js.
-const derivedSigningKeys = require('../utils/derive-signing-env.js')({ env: process.env, projectDir: projectRoot });
-if (derivedSigningKeys.length) {
-  logger.log(`Derived signing env from the certs dir: ${derivedSigningKeys.map((entry) => `${entry.key}=${entry.value}`).join(', ')}`);
-}
+// What the env load derived, now that build.log is catching lines.
+reportSigningEnv(signingEnv, logger);
 
 logger.log('Starting...', argv);
 

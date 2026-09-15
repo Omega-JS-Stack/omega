@@ -11,11 +11,15 @@
 
     <!-- Component-specific CSS -->
     <link href="/assets/css/components/{{ page.name }}.bundle.css?cb={{ cacheBust }}" rel="stylesheet">
+
+    <!-- The ONE build snapshot (#743): every OMEGA browser surface loads the same
+         file first, so OMEGA_BUILD_JSON is there before any bundle reads it. -->
+    <script src="/build.js?cb={{ cacheBust }}"></script>
   </head>
   <body>
     {{ content }}
 
-    <!-- Main JS (OMEGA_BUILD_JSON rides baked in the bundle's banner, #743) -->
+    <!-- Main JS -->
     <script src="/assets/js/components/{{ page.name }}.bundle.js?cb={{ cacheBust }}"></script>
   </body>
 </html>

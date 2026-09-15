@@ -26,10 +26,9 @@ const path = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { envLayerFiles, ENV_ENVIRONMENTS } = require('@omega.js/config');
+const { envLayerFiles, ENV_ENVIRONMENTS, resolveCompany } = require('@omega.js/config');
 
 const { runCommand } = require('../../../lib/run-command.js');
-const { readCompanyMarker } = require('../../../lib/company.js');
 const { fingerprintTarget, resolvePackageDir } = require('../lib/fingerprint.js');
 const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
 
@@ -60,9 +59,9 @@ function envLayerEntries(label, root) {
 
 /**
  * The merge-chain files OUTSIDE the target tree that its build still reads:
- * brand config/.env, and the company pair when the brand carries a marker.
- * A brand-config edit must dirty every target's fingerprint, or the
- * converged skip serves stale output.
+ * brand config/.env, and the company pair when the brand names a company
+ * whose tree resolves on this machine (#677). A brand-config edit must dirty
+ * every target's fingerprint, or the converged skip serves stale output.
  */
 function chainFiles(brandRoot) {
   const files = [
@@ -70,12 +69,18 @@ function chainFiles(brandRoot) {
     ...envLayerEntries('brand-env', brandRoot),
   ];
 
-  const marker = readCompanyMarker(brandRoot);
-  if (marker) {
-    files.push(
-      { label: 'company-config', file: path.join(marker.companyRoot, 'config', 'omega.json5') },
-      ...envLayerEntries('company-env', marker.companyRoot),
-    );
+  // The ONE inheritance rule: each file resolves from the company tree at the
+  // same relative path, so a company that is not on this machine (or has no
+  // tree yet) simply contributes nothing to fingerprint.
+  const company = resolveCompany(brandRoot);
+  const companyConfig = company.file(path.join('config', 'omega.json5'));
+  const companyEnv = company.file('.env');
+
+  if (companyConfig) {
+    files.push({ label: 'company-config', file: companyConfig });
+  }
+  if (companyEnv) {
+    files.push(...envLayerEntries('company-env', path.dirname(companyEnv)));
   }
 
   return files;

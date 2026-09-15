@@ -16,7 +16,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const Logger = require('@omega.js/devkit/logger');
-const { isProduction } = require('./mode-helpers.js');
+const { isProduction } = require('@omega.js/config/environment');
 
 const logger = new Logger('limit-collections');
 
@@ -160,7 +160,7 @@ function collectionDocuments(consumerDir, name, collections) {
  */
 function applyCollectionLimits(eleventyConfig, options) {
   const config = readLimits(options.limits, options.collections);
-  if (!config || !config.entries.length || isProduction.call(options)) return null;
+  if (!config || !config.entries.length || isProduction()) return null;
 
   const dropped = new Set();
   const limited = [];

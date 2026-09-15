@@ -1,7 +1,9 @@
 /**
  * Bookmark service — pushes the brand's console/dashboard bookmarks to
- * the companion Chrome extension (extension/) over the WebSocket
- * protocol; the extension files them under Ω / {Brand} / {Category}.
+ * the OMEGA Companion extension over the WebSocket protocol; the extension
+ * files them under Ω / {Brand} / {Category}. It is the OMEGA brand's own
+ * extension target since #927: install it from the Chrome Web Store, or load
+ * omega-omega/targets/extension/packaged/chrome/raw/ unpacked.
  *
  * The links are derived from the brand's own config + state (new-world
  * shapes: the single brand monorepo repo instead of omega-manager's

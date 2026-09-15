@@ -7,18 +7,16 @@
  * transient output lands in .omega/runs/{timestamp}.json; the summary
  * prints last.
  *
- * Company mode (many brands from one workspace — Ian's omega-manager case)
- * layers on top of this later: runManage() is already per-brand, so the
- * company runner is a loop + the parallel logger, both ported when that
- * mode lands.
+ * One walk, one brand: a company is a LAYER a brand inherits
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)), never a
+ * second kind of root, so `omega manage` always runs exactly one brand.
  */
 
 const chalk = require('chalk').default;
-const { loadEnvRoots } = require('@omega.js/config');
+const { loadEnvRoots, resolveCompany } = require('@omega.js/config');
 
 const { SERVICE_ORDER, BOOT_SERVICES, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
-const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { writeRunOutput } = require('./lib/run-output.js');
 const { formatDuration } = require('./lib/duration.js');
 const { runPreflight, assertFamilyVersions } = require('./lib/preflight.js');
@@ -40,7 +38,12 @@ const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-');
 async function runService(serviceName, brand, options = {}) {
   const operations = OPERATIONS[serviceName] || [];
 
+  // A service REGISTERED with nothing to do says so
+  // ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): disperse is
+  // held open for the next thing that cannot ride the config hierarchy, and a
+  // silent pass reads like a service that ran and found nothing.
   if (operations.length === 0) {
+    console.log(`  ${chalk.dim('⊘ no operations')}`);
     return { status: 'skipped', reason: 'no operations' };
   }
 
@@ -129,18 +132,12 @@ async function runManage(startDir, options = {}) {
     return { hasErrors: false, results: { migrations: result }, brand: null };
   }
 
-  // Company layer: a company-managed brand carries a .omega/company.json
-  // stamp (written idempotently by company runs) pointing at its company
-  // root — its config becomes the layer between manager DEFAULTS and the
-  // brand file, and its .env fills the gaps under the brand .env.
-  const marker = readCompanyMarker(brandRoot);
-  let companyConfig = null;
-
-  if (marker?.stale) {
-    console.log(chalk.yellow(`⚠ .omega/company.json points at ${marker.companyRoot}, which is no longer a company workspace — running standalone (delete the file to silence this)`));
-  } else if (marker) {
-    companyConfig = loadCompanyConfig(marker.companyRoot);
-  }
+  // Company layer: a brand naming `company: { id }` inherits that company's own
+  // `company/` tree ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)),
+  // resolved by @omega.js/config's ONE resolver: its config is the layer
+  // between manager DEFAULTS and the brand file, and its .env fills the gaps
+  // under the brand .env.
+  const company = resolveCompany(brandRoot);
 
   // Secrets chain: shell env > brand .env > company .env — the shared
   // cascade (files load strongest-first, never overriding what's set), each
@@ -154,23 +151,24 @@ async function runManage(startDir, options = {}) {
   // the key it would otherwise re-mint.
   loadEnvRoots([
     brandRoot,
-    companyConfig ? marker.companyRoot : null,
+    company.dir,
   ], { environment: 'production' });
 
-  // The company layer itself is folded by @omega.js/config off the same stamp
-  // (#83) — loadBrand takes no company argument; what we resolved here is
-  // provenance and the .env chain.
+  // The company layer itself is folded by @omega.js/config off the same
+  // `company: { id }` (#83/#677): loadBrand takes no company argument, and what
+  // we resolved here is provenance and the .env chain.
   const brand = loadBrand(brandRoot);
 
-  // Company-shared resources (Apple signing material) live at the company
-  // workspace root — services resolve it via context.companyRoot
-  brand.companyRoot = companyConfig ? marker.companyRoot : null;
+  // Company-shared resources (Apple signing material, the shared PSD
+  // templates) live in the company TREE, which services resolve via
+  // context.companyRoot
+  brand.companyRoot = company.dir;
 
   // The inheritable company layer itself rides along for provenance: its
   // values are already merged into brand.config, but flows that want to say
   // "this came from the company" (e.g. the GA account default) compare
   // against it via context.companyConfig
-  brand.companyConfig = companyConfig;
+  brand.companyConfig = company.config;
 
   console.log('');
   console.log(chalk.bold.cyan('🚀 Omega Manager'));
@@ -205,9 +203,10 @@ async function runManage(startDir, options = {}) {
   console.log(`  ${chalk.bold.white(brand.config.brand?.name || brand.id)} ${chalk.cyan(brand.config.brand?.url || '')} ${chalk.dim(`@ ${new Date().toLocaleTimeString()}`)}`);
   console.log(chalk.cyan('━'.repeat(70)));
   console.log(`  ${chalk.dim('Root:')}     ${brand.root}`);
-  if (companyConfig) {
-    console.log(`  ${chalk.dim('Company:')}  ${marker.companyRoot}`);
-  }
+  // ALWAYS one line: membership is a fact of the brand, and "none" is an
+  // answer. A named company whose repo is not on this machine says so:
+  // inheritance is off for this run, and nothing else changes.
+  console.log(`  ${chalk.dim('Company:')}  ${company.id ? `${company.id} (${company.root || 'not on this machine'})` : 'none'}`);
   console.log(`  ${chalk.dim('Enabled:')}  ${brand.enabledTargets.join(', ') || chalk.yellow('none enabled')}`);
   console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.map((entry) => `${entry.name}${entry.target ? chalk.dim(`→${entry.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
@@ -229,10 +228,14 @@ async function runManage(startDir, options = {}) {
   // how a boot names what the full setup still owes. Gates are only consulted
   // for the services this run actually walks, so an unwalked finding records
   // nothing and fails nothing.
+  // The company rides along (#910): a shared credential's home is the company
+  // `.env` every sibling brand inherits, so that is the file each fix line
+  // sends the operator to, with the brand `.env` as the override.
   const preflight = runPreflight({
     services: options.service ? [options.service] : SERVICE_ORDER,
     brandConfig: brand.config,
     brandRoot,
+    company,
     options,
   });
 

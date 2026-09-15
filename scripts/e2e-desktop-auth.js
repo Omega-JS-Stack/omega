@@ -204,10 +204,10 @@ function stageApp({ projectId, apiKey, ports }) {
       contact: { email: 'support@desktop-auth-e2e.test' },
       images: { icon: '' },
     },
-    // The renderer's @omega.js/client reads `environment` + `dev.ports`: development
-    // is what makes IT connect to the auth/firestore emulators (main gets there
-    // through OMEGA_TEST_MODE instead). Desktop's own environment is unaffected —
-    // it resolves from OMEGA_TEST_MODE / app.isPackaged, never this key.
+    // The baked word. The RUNNING environment beats it (#925): the boot lane
+    // names `testing`, main and the renderer both answer it, and the renderer's
+    // @omega.js/client connects to the auth/firestore emulators in any
+    // non-production environment, reading the ports from `dev.ports`.
     environment: 'development',
     dev: { ports },
     cloud: {
@@ -218,6 +218,7 @@ function stageApp({ projectId, apiKey, ports }) {
     analytics: { providers: { google: { id: '' } } },
     targets: {
       desktop: {
+        type: 'desktop',
         startup: { mode: 'normal' },
         releases: { enabled: false },
       },

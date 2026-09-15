@@ -18,7 +18,7 @@
         <div class="col-md-4" data-lazy="@class animation-slide-up">
           <a href="{{ desk_href }}" class="card newsflash-story-card h-100 p-4 text-decoration-none">
             <span class="newsflash-desks__icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
-              <i class="fa-solid fa-{{ desk.icon }}"></i>
+              <i class="{{ desk.icon }}" aria-hidden="true"></i>
             </span>
             <h3 class="h4 mb-2">{{ desk.title }}</h3>
             <p class="text-body-secondary mb-0">{{ desk.description }}</p>
@@ -31,7 +31,7 @@
     {% iftruthy args.cta_button %}
       <div class="text-center mt-5" data-lazy="@class animation-slide-up">
         <a href="{{ args.cta_button.href }}" class="btn btn-primary btn-lg">
-          <i class="fa-solid fa-{{ args.cta_button.icon }} me-2"></i>{{ args.cta_button.text }}
+          <i class="{{ args.cta_button.icon }} me-2" aria-hidden="true"></i>{{ args.cta_button.text }}
         </a>
       </div>
     {% endiftruthy %}

@@ -5,8 +5,6 @@
  * loads, then optionally hand off to manage.
  *
  * Context-sensitive on where it runs, mirroring manage:
- *   inside a company workspace → the new brand lands under brands.roots[0]
- *                                (or a selected root) + gets the company stamp
  *   inside an existing brand   → resume: no wizard, answers come from the
  *                                brand's own config, only MISSING files fill in
  *   anywhere else              → in-place: the cwd becomes the brand root
@@ -23,15 +21,14 @@ const { spawn, spawnSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { input, select, checkbox, confirm } = require('@omega.js/devkit/prompt');
-const { TARGETS, hasOmegaConfig } = require('@omega.js/config');
+const { input, checkbox, confirm } = require('@omega.js/devkit/prompt');
+const { TARGETS, targetEntries, resolveCompany, deriveBundleIdPrefix } = require('@omega.js/config');
 
-const { TARGET_DIRS, TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
-const { DEFAULT_BRAND_ROOTS, resolveManageRoot, readRawConfig, stampCompanyMarker } = require('./lib/company.js');
-const { loadBrand } = require('./lib/brand.js');
+const { TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
+const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
+const { askCompanyId } = require('./lib/company-question.js');
 const { buildScaffoldPlan, applyScaffoldPlan, printPlanResults } = require('./lib/scaffold.js');
 const { canPrompt } = require('./lib/run-gates.js');
-const { deriveBundleIdPrefix } = require('./lib/bundle-id.js');
 const { convertLegacyOAuthSecret } = require('./lib/legacy-oauth.js');
 
 // New-brand ids are a conservative subset of the schema's brand.id pattern —
@@ -40,6 +37,17 @@ const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const ID_HINT = 'lowercase letters, numbers, dashes; starts with a letter';
 
 const DEFAULT_TARGETS = ['web', 'backend'];
+
+/**
+ * The wizard picks TYPES; the scaffold writes NAMES (#886). A fresh brand
+ * names each target for its own type, so `web` runs the web framework in
+ * targets/web, and a rename afterwards is a one-line config edit.
+ * @param {string[]} types - Chosen target types.
+ * @returns {Array<{ name: string, type: string }>} The target entries.
+ */
+function targetEntriesFromTypes(types) {
+  return types.map((type) => ({ name: type, type }));
+}
 
 /**
  * Derive a valid brand id from a directory name ('My Brand 2' → 'my-brand-2');
@@ -117,11 +125,14 @@ function parseTargetsFlag(value) {
 
 /**
  * The admin-account list a fresh brand would inherit without writing
- * anything: the company config's account.admins when onboarding into a
- * company workspace, else the manager's built-in default.
+ * anything: the company layer's account.admins when the brand names a company
+ * whose tree resolves here (#677), else the manager's built-in default.
+ *
+ * @param {object} company - The resolveCompany() answer for this brand.
+ * @returns {{ list: Array, source: string }}
  */
-function inheritedAdmins(companyRoot) {
-  const companyAdmins = companyRoot ? readRawConfig(companyRoot)?.account?.admins : null;
+function inheritedAdmins(company) {
+  const companyAdmins = company.config?.account?.admins;
 
   return Array.isArray(companyAdmins) && companyAdmins.length > 0
     ? { list: companyAdmins, source: 'company config' }
@@ -173,10 +184,10 @@ async function collectAccountAdmins(inherited, interactive) {
 /**
  * Collect the wizard answers for a FRESH brand: flags win, prompts fill the
  * gaps interactively, derivation covers the rest. `defaultId` comes from the
- * in-place directory name (null in company mode); `companyRoot` (when
- * onboarding into a company workspace) supplies the inherited account list.
+ * in-place directory name; `brandRoot` is where the brand will live, which is
+ * what the company answer resolves against.
  */
-async function collectAnswers(options, defaultId, interactive, companyRoot = null) {
+async function collectAnswers(options, defaultId, interactive, brandRoot = null) {
   // id — the only field with no universal derivation
   let id = options.id ?? null;
   if (id != null && !ID_PATTERN.test(String(id))) {
@@ -223,6 +234,22 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
       : deriveUrl(id);
   }
 
+  // company: the ONE key that joins this brandto its company (#677): the
+  // parent's own brand.id, `self` when this brand IS the company, blank for a
+  // standalone brand. Everything the company owns (config layer, .env, hooks,
+  // signing tree) follows from it; nothing else is asked or written.
+  let companyId = null;
+  if (interactive) {
+    companyId = await askCompanyId();
+  }
+
+  // The resolved company: its own facts come from the PARENT's config through
+  // the one resolver, so the wizard restates nothing the parent owns.
+  const company = resolveCompany(brandRoot, {
+    brand: { name, url },
+    ...(companyId ? { company: { id: companyId } } : {}),
+  });
+
   // description / tagline — optional; empty answers stay out of the config
   let description = options.description ?? null;
   if (description == null && interactive) {
@@ -264,13 +291,13 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
   }
 
   // targets — checkbox in a TTY, web+backend otherwise
-  let targets = options.targets != null ? parseTargetsFlag(options.targets) : null;
-  if (!targets) {
-    targets = interactive
+  let targetTypes = options.targets != null ? parseTargetsFlag(options.targets) : null;
+  if (!targetTypes) {
+    targetTypes = interactive
       ? await checkbox({
         message: 'Targets (key presence in omega.json5 = enabled):',
         choices: TARGETS.map((target) => ({
-          name: `${target} — targets/${TARGET_DIRS[target] || target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved — MAM overhaul pending)'}`,
+          name: `${target}: targets/${target}${TARGET_FRAMEWORKS[target] ? ` (${TARGET_FRAMEWORKS[target]})` : ' (reserved: MAM overhaul pending)'}`,
           value: target,
           checked: DEFAULT_TARGETS.includes(target),
         })),
@@ -281,48 +308,24 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
 
   // accounts — inherit by default (null writes nothing); customizing lands
   // the brand's own account.admins
-  const accountAdmins = await collectAccountAdmins(inheritedAdmins(companyRoot), interactive);
-
-  // Bundle-id prefix — reverse-DNS of the parent company's domain when
-  // onboarding into a company workspace, else the brand's own (seeded into
-  // config only for targets that sign apps)
-  const companyUrl = companyRoot ? readRawConfig(companyRoot)?.brand?.url : null;
+  const accountAdmins = await collectAccountAdmins(inheritedAdmins(company), interactive);
 
   return {
     id,
     name,
     url,
+    company: companyId ? { id: companyId } : null,
     description: description || null,
     tagline: tagline || null,
     email: deriveEmail(url),
     person: buildPerson({ name: contactName, image: contactImage, url: contactUrl }),
-    targets,
+    targets: targetEntriesFromTypes(targetTypes),
     accountAdmins,
-    bundleIdPrefix: deriveBundleIdPrefix(companyUrl || url),
+    // Bundle-id prefix: reverse-DNS of the COMPANY's domain when the brand
+    // names one, else the brand's own (seeded into config only for targets
+    // that sign apps)
+    bundleIdPrefix: deriveBundleIdPrefix(company.url || url),
   };
-}
-
-/**
- * Resolve where the new brand lives when onboarding from a company root:
- * brands.roots[0], or a selected root when several are configured and the
- * run is interactive.
- */
-async function resolveCompanyBrandsDir(companyRoot, interactive) {
-  const roots = readRawConfig(companyRoot)?.brands?.roots || DEFAULT_BRAND_ROOTS;
-
-  let rootSpec = roots[0];
-  if (roots.length > 1 && interactive) {
-    rootSpec = await select({
-      message: 'Where should the new brand live?',
-      choices: roots.map((r) => ({ value: r })),
-    });
-  }
-
-  if (path.isAbsolute(rootSpec)) {
-    throw new Error(`brands.roots entries must be RELATIVE to the company root — got absolute path: ${rootSpec}`);
-  }
-
-  return path.resolve(companyRoot, rootSpec);
 }
 
 /**
@@ -341,6 +344,9 @@ function answersFromBrand(brandRoot) {
   return {
     id,
     name: brand.config.brand?.name || deriveName(id),
+    // The brand's own answer: the loader FILLS `company` on every config, so
+    // only an authored id means anything here
+    company: brand.config.company?.id ? { id: brand.config.company.id } : null,
     url,
     description: brand.config.brand?.description || null,
     tagline: brand.config.brand?.tagline || null,
@@ -348,7 +354,9 @@ function answersFromBrand(brandRoot) {
     // The brand's own answer, kept as it stands — the scaffold never rewrites
     // an existing config, so a rerun leaves the person byte-identical (#770)
     person: brand.config.brand?.contact?.person || null,
-    targets: brand.enabledTargets.length > 0 ? brand.enabledTargets : DEFAULT_TARGETS,
+    // The brand's own declarations, name AND type: a target named `admin`
+    // scaffolds targets/admin around whichever framework it declares (#886)
+    targets: brand.enabledTargets.length > 0 ? targetEntries(brand.config) : targetEntriesFromTypes(DEFAULT_TARGETS),
     bundleIdPrefix: brand.config.certificates?.providers?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
   };
 }
@@ -405,8 +413,8 @@ function printNextSteps(answers) {
   console.log(chalk.bold('Next steps'));
 
   const frameworks = answers.targets
-    .filter((target) => TARGET_FRAMEWORKS[target])
-    .map((target) => `${TARGET_FRAMEWORKS[target]} → targets/${TARGET_DIRS[target]}`);
+    .filter((entry) => TARGET_FRAMEWORKS[entry.type])
+    .map((entry) => `${TARGET_FRAMEWORKS[entry.type]} → targets/${entry.name}`);
   if (frameworks.length > 0) {
     console.log(`  1. Install each target's framework and run its setup: ${frameworks.join(', ')}`);
   }
@@ -426,37 +434,21 @@ async function runOnboard(cwd, options = {}) {
   console.log('');
 
   const interactive = canPrompt(options);
-  const resolved = resolveManageRoot(cwd);
+  const existing = resolveBrandRoot(cwd);
 
   // Resolve the brand root + answers per context
   let brandRoot;
   let answers;
   let mode;
-  let companyRoot = null;
 
-  if (resolved?.isCompany) {
-    companyRoot = resolved.root;
-    console.log(`${chalk.dim('→')} Company workspace: ${chalk.cyan(companyRoot)}`);
-
-    const brandsDir = await resolveCompanyBrandsDir(companyRoot, interactive);
-    answers = await collectAnswers(options, null, interactive, companyRoot);
-    brandRoot = path.join(brandsDir, answers.id);
-
-    if (hasOmegaConfig(brandRoot)) {
-      console.log(`${chalk.dim('→')} Brand ${chalk.cyan(answers.id)} already exists — filling missing files only`);
-      answers = answersFromBrand(brandRoot);
-      mode = 'resume';
-    } else {
-      mode = 'fresh';
-    }
-  } else if (resolved) {
-    brandRoot = resolved.root;
+  if (existing) {
+    brandRoot = existing;
     console.log(`${chalk.dim('→')} Existing brand: ${chalk.cyan(brandRoot)} — filling missing files only`);
     answers = answersFromBrand(brandRoot);
     mode = 'resume';
   } else {
     brandRoot = cwd;
-    answers = await collectAnswers(options, deriveId(path.basename(cwd)), interactive);
+    answers = await collectAnswers(options, deriveId(path.basename(cwd)), interactive, brandRoot);
     mode = 'fresh';
   }
 
@@ -483,13 +475,6 @@ async function runOnboard(cwd, options = {}) {
     console.log(`  ${chalk.green('✓')} google-oauth.json ${chalk.dim('← the carried legacy oauth.json (converted, legacy file removed)')}`);
   } else if (legacyOAuth.reason) {
     console.log(`  ${chalk.yellow('⚠')} legacy oauth.json not converted ${chalk.dim(`(${legacyOAuth.reason})`)}`);
-  }
-
-  // Company link — brand-local runs now layer the company defaults
-  if (companyRoot) {
-    if (stampCompanyMarker(brandRoot, companyRoot)) {
-      console.log(`  ${chalk.green('✓')} company stamp ${chalk.dim(`→ .omega/company.json (${companyRoot})`)}`);
-    }
   }
 
   // Prove the brand actually loads before calling it done

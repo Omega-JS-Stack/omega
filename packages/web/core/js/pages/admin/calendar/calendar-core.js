@@ -30,8 +30,8 @@ export const TYPE_COLORS = {
 // Campaign status styles
 export const STATUS_STYLES = {
   pending: { opacity: 1, icon: null },
-  sent: { opacity: 0.55, icon: 'circle-check' },
-  failed: { opacity: 1, icon: 'triangle-exclamation' },
+  sent: { opacity: 0.55, icon: 'fa-solid fa-circle-check' },
+  failed: { opacity: 1, icon: 'fa-solid fa-triangle-exclamation' },
 };
 
 // Display type constants
@@ -61,7 +61,7 @@ export function formatDateUTC(input) {
  */
 export function formatTimeUTC(input) {
   const d = typeof input === 'number' ? new Date(input * 1000) : input;
-  return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
 /**

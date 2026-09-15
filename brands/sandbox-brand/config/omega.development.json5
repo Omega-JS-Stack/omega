@@ -1,0 +1,15 @@
+// Sandbox brand - DEVELOPMENT overlay of config/omega.json5 (#856). Only the
+// keys that differ for a development run: this file is not a second copy of the
+// config, and only the RUNNING environment's overlay is ever read.
+{
+  payment: {
+    providers: {
+      stripe: {
+        // The test-mode publishable key a local checkout pairs with the
+        // sk_test_ secret in .env.development. Demo value, like every other
+        // value in this brand.
+        publishableKey: 'pk_test_demo-sandbox-brand',
+      },
+    },
+  },
+}

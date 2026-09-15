@@ -6,7 +6,7 @@
 
 const path = require('path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
-const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { renderSecretsBlock, renderEnvFileKeys } = require('@omega.js/config/env-delivery');
 
 // The framework's own manifest: its pinned Cloud Functions runtime is the Node
@@ -65,22 +65,29 @@ function scaffoldDefaults(options) {
   // never scaffold, and existing framework-owned-only copies are swept (retire
   // rules; consumer content is never destroyed). Standalone projects keep them.
   const fileMap = { ...FILE_MAP };
-  const { resolveSeedMode } = require('@omega.js/config');
+  const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
   const seed = resolveSeedMode(options.outputDir);
   const defaultsDir = options.defaultsDir || path.resolve(__dirname, '../defaults');
 
   // The deploy workflow's env block and .env writer are GENERATED from the env
-  // schema (#627, #872): one `KEY: ${{ secrets.KEY }}` line per key delivered
-  // to backend, and the JSON list of the names its runtime reads, which the
-  // workflow's node writer serializes out of the runner env. Both are
-  // re-rendered on every verb, so a key added to the schema reaches CI without
-  // anyone editing a workflow.
+  // schema AND this brand's COMPOSED production values (#627, #872, #835,
+  // #876): one `KEY: ${{ secrets.KEY }}` line per key delivered to backend, and
+  // the JSON list of the names its runtime reads, which the workflow's node
+  // writer serializes out of the runner env. Both come out of the ONE delivery
+  // primitive reading ONE set, so what the runner is handed and what its .env
+  // writer names cannot disagree. The composed half is what names the keys the
+  // schema cannot: the CONNECTIONS_* providers this brand configured, and the
+  // consumer's own keys. Both are re-rendered on every verb, so a key added to
+  // the schema or to .env.production reaches CI without anyone editing a
+  // workflow. NAMES only ever reach the file; no value is rendered anywhere.
+  const { values: composed } = composeTargetEnv({ targetDir: options.outputDir, target: 'backend', environment: 'production' });
+
   fileMap[WORKFLOW] = {
     ...fileMap[WORKFLOW],
     template: {
       versions: { node: String(parseInt(frameworkPackage.omega.functionsRuntime, 10)) },
-      githubSecrets: renderSecretsBlock('backend', { indent: '  ' }),
-      envFileKeys: renderEnvFileKeys('backend'),
+      githubSecrets: renderSecretsBlock('backend', { indent: '  ', values: composed }),
+      envFileKeys: renderEnvFileKeys('backend', { values: composed }),
     },
   };
 
@@ -99,10 +106,12 @@ function scaffoldDefaults(options) {
     defaultsDir,
     outputDir: options.outputDir,
     fileMap,
-    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
-    // (#872): the brand lane gets it inside composeWorkflow below, a STANDALONE
-    // target here. The action and its pin live in ONE place.
-    transform: (contents) => renderInstallFirewall(contents),
+    // The firewall step and the workspace flag are devkit's, rendered wherever
+    // a workflow is WRITTEN (#872, #898): the brand lane gets both inside
+    // composeWorkflow below, a STANDALONE target here. The action, its pin and
+    // the flag live in ONE place. A standalone target is its own repo root and
+    // declares no workspaces, so the flag renders to nothing here.
+    transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: options.logger,
   });
 

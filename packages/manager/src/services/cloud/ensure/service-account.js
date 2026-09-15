@@ -3,10 +3,11 @@
  * needs, and its key is downloaded.
  *
  * Google shows service account keys ONCE at creation — they can't be
- * re-downloaded. The key's ONE home is the brand's gitignored
- * .omega/secrets/service-account.json — the backend's stage step (`omega
- * build`, src/dist pillar) reads it from there and carries it into the
- * staged dist/ tree; no per-target copy exists anymore.
+ * re-downloaded. The key's ONE home is the gitignored path
+ * `SERVICE_ACCOUNT_REL` names (@omega.js/devkit/service-account owns every
+ * brand secrets path): the backend's stage step (`omega build`, src/dist
+ * pillar) reads it from there and carries it into the staged dist/ tree; no
+ * per-target copy exists anymore.
  *
  * The IAM role grant diffs the policy first (omega-manager PUT the policy on
  * every run) — a converged account is a zero-mutation no-op.
@@ -14,6 +15,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { SERVICE_ACCOUNT_REL } = require('@omega.js/devkit/service-account');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 const { appEngineDefaultAccount, computeDefaultAccount } = require('../lib/runtime-accounts.js');
 
@@ -147,8 +149,8 @@ module.exports = async function ensureServiceAccount(context) {
   const { firebaseApi: api, brandConfig, brandRoot, projectId, options = {} } = context;
   const brandName = brandConfig.brand?.name || context.brandId;
 
-  // The key's ONE home — the backend stage step reads it from here
-  const sourceKeyPath = join(brandRoot, '.omega', 'secrets', 'service-account.json');
+  // The key's ONE home, the backend stage step reads it from here
+  const sourceKeyPath = join(brandRoot, SERVICE_ACCOUNT_REL);
 
   // === Key already downloaded — verify roles ===
   if (jetpack.exists(sourceKeyPath)) {

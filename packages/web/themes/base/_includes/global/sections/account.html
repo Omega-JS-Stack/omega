@@ -1,4 +1,6 @@
 <!-- Account Dropdown (shared across frontend nav, backend topbar, admin topbar) -->
+{% comment %} A dropdown item's `icon` carries its OWN Font Awesome classes (#619, #850, #903):
+  `icon: 'fa-brands fa-github'`, emitted verbatim with only the size and spacing added. {% endcomment %}
 {% assign account_data = site.data._includes.global.sections.account %}
 {% assign avatar_size = include.size | default: "md" %}
 
@@ -46,7 +48,7 @@
       {% capture child_class %}dropdown-item d-flex align-items-center text-body {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
       {% capture child_content %}
         {% if child.icon %}
-          <i class="fa-solid fa-{{ child.icon }} fa-md me-3"></i>
+          <i class="{{ child.icon }} fa-md me-3" aria-hidden="true"></i>
         {% endif %}
         <span>{{ child.label }}</span>
       {% endcapture %}

@@ -17,6 +17,7 @@
     "./build": "./dist/build.js",
     "./test": "./dist/test/index.js",
     "./hooks/notarize": "./dist/hooks/notarize.js",
+    "./hooks/notarize-artifacts": "./dist/hooks/notarize-artifacts.js",
     "./lib/app-state": "./dist/lib/app-state.js",
     "./lib/auto-updater": "./dist/lib/auto-updater.js",
     "./lib/context-menu": "./dist/lib/context-menu.js",
@@ -35,13 +36,13 @@
     "./lib/client-bridge": "./dist/lib/client-bridge.js",
     "./lib/window-manager": "./dist/lib/window-manager.js",
     "./cli": "./dist/cli-run.js",
+    "./ensure-target": "./dist/commands/lib/ensure-target.js",
     "./scripts/sync-nvmrc": "./scripts/sync-nvmrc.js"
   },
   "bin": {
     "omega": "./bin/omega",
     "omg": "./bin/omg",
-    "mgr": "./bin/omega",
-    "omega-desktop": "./bin/omega-desktop"
+    "mgr": "./bin/omega"
   },
   "files": [
     "bin/",
@@ -56,8 +57,8 @@
     "replace": {},
     "hooks": {
       "after": [
-        "node -e \"require('@omega.js/devkit/vendor')()\"",
-        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\""
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\"",
+        "node -e \"require('@omega.js/devkit/vendor')()\""
       ],
       "afterBlocking": true
     }
@@ -89,14 +90,19 @@
         "package": "@omega.js/web",
         "from": "themes",
         "to": "assets/themes"
+      },
+      {
+        "package": "@omega.js/devkit",
+        "from": "src/test/fixtures/esm-only-package",
+        "to": "vendor/devkit/test/fixtures/esm-only-package"
       }
     ]
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node ./bin/omega-desktop test"
+    "test": "node ./bin/omega test"
   },
   "projectScripts": {
     "start": "omega clean && npm run gulp --",
@@ -130,7 +136,7 @@
   "license": "Elastic-2.0",
   "peerDependencies": {
     "electron": ">=42",
-    "electron-builder": ">=26",
+    "electron-builder": ">=26.16.1",
     "gulp": "^5.0.1"
   },
   "devDependencies": {
@@ -141,7 +147,7 @@
     "@omega.js/monitoring": "*",
     "@omega.js/web": "*",
     "electron": "^42.0.1",
-    "electron-builder": "^26.8.1",
+    "electron-builder": "^26.16.1",
     "firebase-admin": "^13.9.0",
     "prepare-package": "^2.2.0"
   },
@@ -176,8 +182,7 @@
     "uuid": "^14.0.0",
     "wonderful-fetch": "^2.0.5",
     "wonderful-version": "^1.3.2",
-    "ws": "^8.20.0",
-    "yargs": "^18.0.0"
+    "ws": "^8.20.0"
   },
   "optionalDependencies": {
     "automately": "^1.0.5"

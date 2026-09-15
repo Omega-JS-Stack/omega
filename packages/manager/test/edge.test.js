@@ -7,6 +7,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const { OPERATIONS, DEFAULTS, templateObject } = require('../src/config.js');
 const service = require('../src/services/edge/index.js');
 const { buildRequiredRecords } = require('../src/services/edge/lib/dns-records-helpers.js');
@@ -41,7 +45,7 @@ function brandConfig(url = `https://${DOMAIN}`) {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     domain: structuredClone(DEFAULTS.domain),
     edge: { providers: { cloudflare: structuredClone(DEFAULTS.edge.providers.cloudflare) } },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
   return templateObject(config, { domain: url.replace(/^https?:\/\//, '') });
 }

@@ -19,16 +19,19 @@ from the real merge rules. The framework runs the recipe once; brands read the a
 
 | Path | What it is |
 |---|---|
-| `config.resolved.github.repo` | The brand repo as an `owner/name` slug (`''` unless both halves resolve) |
+| `config.resolved.github` | The brand's SOURCE repo, or `null` when the config names no org |
+| `config.resolved.github.slug` | That repo as an `owner/name` slug |
 | `config.resolved.github.owner` | The same answer's owner (GitHub org or user) |
 | `config.resolved.github.name` | The same answer's bare repo name |
 
-The GitHub values resolve `repo.providers.github` (`org`, `repo`) overlaid by the backend
-target's own `github` block, which wins — the CMS/content-repo override — with `repo`
-taking either an `owner/name` slug or a bare name, name falling back to `brand.id` and
-owner to `repo.providers.github.org`.
+The GitHub value is the brand's SOURCE repo, `<brand.id>-omega` under the one
+`repo: { provider, org }` block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
+No repo name is configurable anywhere: the per-target `github` override, the top-level
+`github` block and the `repo.providers.*` keys are all retired, and a config still
+carrying one fails validation. `null` is the honest answer for a brand that declares no
+org, and the CMS routes answer "GitHub repo not configured" off exactly that.
 
-Every derivation lives in `@omega.js/config` (`brandRepo()` here) — never a second copy.
+Every derivation lives in `@omega.js/config` (`sourceRepo()` here), never a second copy.
 `src/manager/helpers/resolved-config.js` only names the group and the values in it; new
 derived values join there as real brand needs surface, each with a test pinning it to the
 config package's own function.

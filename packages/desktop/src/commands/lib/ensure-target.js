@@ -34,7 +34,7 @@ const version = require('wonderful-version');
 const Manager = new (require('../../build.js'));
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
-const { composeTargetWorkflows, renderInstallFirewall } = require('@omega.js/devkit/ci-workflows');
+const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const logger = Manager.logger('ensure-target');
@@ -42,7 +42,8 @@ const package = Manager.getPackage('main');
 
 /**
  * Sync the consumer manifest: the omega verb scripts, the npm-private latch,
- * and the electron main entry (the gulp `bundle` task's output bundle).
+ * the license (#884, seeded only when the manifest states none), and the
+ * electron main entry (the gulp `bundle` task's output bundle).
  * Identical content is not a write (#590).
  */
 function setupScripts(projectDir, result) {
@@ -60,6 +61,12 @@ function setupScripts(projectDir, result) {
   // Electron consumer projects should not be published to npm
   project.private = true;
 
+  // The license every OMEGA target states when it states none of its own
+  // ([#884](https://github.com/Omega-JS-Stack/omega/issues/884)): UNLICENSED is
+  // npm's word for closed-source commercial code, and electron-builder reads
+  // the field for the packaged app's metadata. A brand's own license is kept.
+  project.license = project.license || 'UNLICENSED';
+
   // Point electron at the built main bundle.
   // The gulp `bundle` task emits dist/main.bundle.js; the consumer's src/main.js is the *source* entry.
   project.main = 'dist/main.bundle.js';
@@ -75,7 +82,7 @@ function setupScripts(projectDir, result) {
   }
 
   jetpack.write(projectPath, contents);
-  result.changed.push('package.json (scripts + main + private)');
+  result.changed.push('package.json (scripts + main + private + license)');
 }
 
 /**
@@ -141,9 +148,15 @@ async function copyDefaults(projectDir, engineLogger) {
   // `KEY: ${{ secrets.KEY }}` line per key the schema delivers to desktop, at
   // the token's two-space indent. The yml rule below re-renders on every verb,
   // so the block tracks the schema like the node version tracks the pin.
+  // The composed half (#835): the brand's PRODUCTION values name the keys the
+  // schema cannot, which on desktop is the consumer's own `.env` lines. NAMES
+  // only ever reach the workflow file; no value is rendered anywhere.
+  const { composeTargetEnv } = require('@omega.js/config');
+  const { values: composed } = composeTargetEnv({ targetDir: projectDir, target: 'desktop', environment: 'production' });
+
   const templateContext = {
     versions: { ...(package.engines || {}), node: package.omega.nodeRuntime },
-    githubSecrets: renderSecretsBlock('desktop', { indent: '  ' }),
+    githubSecrets: renderSecretsBlock('desktop', { indent: '  ', values: composed }),
   };
 
   // Scaffolding runs through the shared devkit engine (vendored at prepare time).
@@ -177,6 +190,11 @@ async function copyDefaults(projectDir, engineLogger) {
       // target .env is an optional per-key override a HUMAN writes, and no
       // machine writes a target .env — so the template is gone.
       '_.gitignore': { mergeLines: true, template: templateContext },
+      // The one TRACKED file under config/certs/ ([#913](https://github.com/Omega-JS-Stack/omega/issues/913)),
+      // and framework-owned like the workflow YAMLs: it explains where signing
+      // material really lives, so a target keeps the explanation that matches
+      // the ignore rules the scaffold just wrote, never an older one.
+      'config/certs/README.md': { overwrite: true },
       // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
       // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied
       // when missing by the `**/*` rule above, never clobbered.
@@ -205,12 +223,15 @@ async function copyDefaults(projectDir, engineLogger) {
       // rule above; a STANDALONE target (its own git root) keeps its own copy.
       ...(isBrandTarget ? { '.github/**/*': { skip: true } } : {}),
     },
-    // The firewall step is devkit's, rendered wherever a workflow is WRITTEN
-    // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)): the brand
-    // lane gets it inside composeWorkflow below, a STANDALONE target here, on
-    // the copy this engine writes. The action and its pin live in ONE place,
-    // so none of the four templates restates them.
-    transform: (contents) => renderInstallFirewall(contents),
+    // The firewall step and the workspace flag are devkit's, rendered wherever
+    // a workflow is WRITTEN ([#872](https://github.com/Omega-JS-Stack/omega/issues/872),
+    // [#898](https://github.com/Omega-JS-Stack/omega/issues/898)): the brand
+    // lane gets both inside composeWorkflow below, a STANDALONE target here, on
+    // the copy this engine writes. The action, its pin and the flag live in ONE
+    // place, so none of the four templates restates them. A standalone target
+    // is its own repo root and declares no workspaces, so the flag renders to
+    // nothing here.
+    transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: engineLogger,
   });
 
@@ -227,35 +248,54 @@ async function copyDefaults(projectDir, engineLogger) {
     });
   }
 
+  removeRetiredCertsIgnore(projectDir, engineLogger);
+
   return applied;
 }
 
-/** Warn when the framework is a `file:` LINK, the install that never publishes. */
-function checkLocality(projectDir, warn) {
+/**
+ * Remove the sibling `config/certs/.gitignore` left over from the era when
+ * `config/certs/` was ignored whole
+ * ([#913](https://github.com/Omega-JS-Stack/omega/issues/913)). The directory's
+ * README is the one tracked explanation of where signing material really lives,
+ * and a nested ignore file of `*` + `!.gitignore` beats the parent file, so it
+ * keeps hiding the README on a target scaffolded before the new rules. The
+ * parent's own retired `config/certs/` line needs no healing: the marker merge
+ * drops it with the rest of the framework block
+ * ([#926](https://github.com/Omega-JS-Stack/omega/issues/926)). A copy an
+ * EARLIER run already moved into the consumer's Custom section is the
+ * consumer's by that rule and is left alone.
+ *
+ * The sibling is framework-written and known byte for byte, so only that exact
+ * shape is removed. Anything a consumer wrote stays.
+ *
+ * @param {string} projectDir - The target root.
+ * @param {object} engineLogger - `{ log, warn }`.
+ */
+function removeRetiredCertsIgnore(projectDir, engineLogger) {
+  const siblingPath = path.join(projectDir, 'config', 'certs', '.gitignore');
+  const sibling = jetpack.read(siblingPath);
+
+  if (sibling && sibling.replace(/\r\n/g, '\n').trim() === '*\n!.gitignore') {
+    jetpack.remove(siblingPath);
+    engineLogger.log('Healed → config/certs/.gitignore (retired: the target .gitignore owns this directory)');
+  }
+}
+
+/**
+ * The framework must BE a dependency of the target: everything below it reads
+ * the installed version. A `file:` spec is no finding of its own
+ * ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the deploy
+ * snapshot packs every locally linked package into the mirror it pushes, so a
+ * local install is exactly what the deploy is built for.
+ */
+function checkLocality(projectDir) {
   const project = readProject(projectDir);
   const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
 
   if (!installedVersion) {
     throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
-
-  // Not every `file:` spec is a link. A spec pointing at a DIRECTORY is the
-  // `omega i local` symlink and it is dead on any other machine; one pointing at
-  // a packed `.tgz` is what the deploy snapshot ships
-  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and that install
-  // carries the real package. Warning on the tarball told every CI run its own
-  // lane was broken.
-  if (installedVersion.startsWith('file:') && isLinkedSpec(projectDir, installedVersion)) {
-    warn(`⚠️  You are using the local version of ${package.name}. This WILL NOT WORK when published.`);
-  }
-}
-
-/** Does a `file:` spec resolve to a directory (a link) rather than a tarball? */
-function isLinkedSpec(projectDir, spec) {
-  const target = spec.replace(/^file:/, '');
-  const resolved = path.isAbsolute(target) ? target : path.join(projectDir, target);
-
-  return jetpack.exists(resolved) === 'dir';
 }
 
 /**
@@ -308,7 +348,7 @@ async function ensureTarget(options) {
     result.merged.push(...applied.merged);
   }
 
-  checkLocality(projectDir, warn);
+  checkLocality(projectDir);
 
   for (const [label, files] of [['Created', result.written], ['Merged', result.merged], ['Synced', result.changed]]) {
     if (files.length > 0) log(`${label} ${files.join(', ')}`);

@@ -1,11 +1,11 @@
 # Config schema
 
-@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, cloud, analytics, payment, monitoring, connections, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/shared/config.md` for the format).
+@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, cloud, analytics, payment, monitoring, connections, theme, targets); the desktop-specific refinements (app.category, the `platforms` shipping declaration, platforms.windows.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config: `targets.desktop` contents land at the top level (see the monorepo's `docs/shared/config.md` for the format).
 
 Validation runs in two places:
 
 1. **`Manager.initialize()` (boot)** — hard-fails the app at boot if any required field is missing or any present field is invalid. So a misconfigured app never reaches the "white window of confusion" phase — it tells you exactly which field is broken.
-2. **`gulp audit` (build)** — same schema, plus build-pipeline-specific extras (file-existence for icons, `releases.repo` in publish mode, etc.).
+2. **`gulp audit` (build)**: same schema, plus build-pipeline-specific extras (file-existence for icons, an addressable releases repo in publish mode, etc.).
 
 ## Schema entry shape
 
@@ -56,7 +56,7 @@ A non-empty credential value enables a feature — there is no separate `enabled
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
 | Firebase Auth (renderer) | `cloud.config.projectId = '...'` (etc.) | empty `cloud.config` |
 
-**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`, `platforms.linux.snap.enabled`. These toggle BEHAVIOR, not credentials — you can have `releases.repo` set but still want releases off in a fork, for example.
+**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`. (`platforms.linux.snap.enabled` was one until [#867](https://github.com/Omega-JS-Stack/omega/issues/867): the snap is a declared FORMAT now, so its presence is the switch and `platforms.linux.formats.snap: false` is the off.) These toggle BEHAVIOR, not credentials: a fork can keep the brand's `repo.org` and still want releases off, for example.
 
 ## Adding a new field
 
@@ -72,7 +72,7 @@ These checks live in [`gulp/tasks/audit.js`](../src/gulp/tasks/audit.js) instead
 
 - **`src/main.js` / `src/preload.js` existence** — the bundle task skips them with a warning but the schema doesn't know about consumer entry points.
 - **`brand.images.icon` file existence** — only enforced when packaging (`isBuildMode()` / `isPublishMode()`); dev runs with the default Electron icon.
-- **`releases.repo` presence** — only enforced in publish mode.
+- **An addressable releases repo** (`repo.org` + `brand.id`), only enforced in publish mode.
 
 These are kept in `audit.js` so the schema stays a pure description of the config shape, callable from any context without dragging in build state.
 

@@ -12,7 +12,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeWorkflow, composeTargetWorkflows, composedWorkflowName, reconcileComposedWorkflows, FIREWALL_ACTION, FIREWALL_STEP_ID } = require('../src/ci-workflows');
+const { composeWorkflow, composeTargetWorkflows, composedWorkflowName, composedWorkflowNameFor, reconcileComposedWorkflows, renderInstallWorkspace, FIREWALL_ACTION, FIREWALL_STEP_ID, INSTALL_WORKSPACE_TOKEN, INSTALL_WORKSPACE_FLAG } = require('../src/ci-workflows');
 
 const TEMP = path.join(__dirname, '..', '.temp', `ci-workflows-${process.pid}`);
 let caseIndex = 0;
@@ -27,8 +27,6 @@ name: Build and Publish Extension
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [omega-deploy]
 
 concurrency:
   group: \${{ github.ref }}
@@ -80,6 +78,21 @@ function frameworkTemplates() {
 }
 
 // The job blocks of a composed workflow (job keys sit at two spaces).
+// The one command shape a template may run a framework verb with (#877): the
+// framework's own bin FILE, under the workspace root npm hoists it to.
+function frameworkBin(framework) {
+  return `node "${'${{ github.workspace }}'}/node_modules/@omega.js/${framework}/bin/omega"`;
+}
+
+// The install steps of a workflow, the ones that install the TREE. A global
+// install (the backend's firebase-tools) names no workspace and is not one.
+function installLines(contents) {
+  return contents
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .filter((line) => /\bnpm(?:\.cmd)? (?:ci|install)\b/.test(line) && !/ -g /.test(line));
+}
+
 function jobBlocks(composed) {
   return composed
     .slice(composed.indexOf('\njobs:\n'))
@@ -133,7 +146,7 @@ test('composeWorkflow: scopes the run to the target, keeps the workflow itself i
   // The workflow's own content is carried over verbatim
   assert.match(composed, /uses: actions\/checkout@v4/);
   assert.match(composed, /run: npx omega setup && npm run build/);
-  assert.match(composed, /types: \[omega-deploy\]/);
+  assert.match(composed, /^ {2}workflow_dispatch:$/m);
 });
 
 test('the REAL framework templates: nothing before a job\'s checkout is scoped to the target dir', () => {
@@ -160,6 +173,21 @@ test('the REAL framework templates: nothing before a job\'s checkout is scoped t
   }
 });
 
+// `repository_dispatch` names an event TYPE, never a ref, so such a run checks
+// out the DEFAULT branch, which since #915 never carries the deploy tree.
+// Nothing in OMEGA ever sent one (devkit's `dispatchWorkflow` posts
+// `workflow_dispatch` only), so the trigger is gone from every template and
+// `workflow_dispatch` at ref `omega-deploy` is the one way in (#923).
+test('the REAL framework templates: workflow_dispatch is the only dispatch trigger (#923)', () => {
+  const templates = frameworkTemplates();
+  assert.ok(templates.length > 0, 'no framework workflow templates found, so the pin would be vacuous');
+
+  for (const template of templates) {
+    assert.match(template.contents, /^on:\n {2}workflow_dispatch:$/m, `${template.label}: the manual dispatch is the one way in`);
+    assert.doesNotMatch(template.contents, /repository_dispatch/, `${template.label}: a repository_dispatch run checks out the default branch, which never carries the deploy tree`);
+  }
+});
+
 test('the REAL extension template: the git config step stays at the root, the build step runs in the target', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'extension/publish.yml');
   assert.ok(template, 'the extension publish template is missing');
@@ -169,8 +197,9 @@ test('the REAL extension template: the git config step stays at the root, the bu
   // Step 1 of the shipped template: a `run:` before actions/checkout
   assert.match(composed, / {6}- name: Setup git config\n {8}run: \|\n/);
 
-  // Post-checkout `run:` steps carry the scope, in both YAML shapes
-  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm install\n/);
+  // Post-checkout `run:` steps carry the scope, in both YAML shapes, and the
+  // install is scoped a second way, to this target's workspace alone (#898).
+  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm install --workspace \.\n/);
   assert.match(composed, / {6}- name: Build and publish extension\n {8}working-directory: targets\/extension\n {8}run: \|\n/);
 
   // `uses:` steps are never scoped: checkout and friends want the repo root.
@@ -195,21 +224,23 @@ test('the REAL web template: the action inputs a working-directory can never rea
   const template = frameworkTemplates().find((entry) => entry.label === 'web/build.yml');
   assert.ok(template, 'the web build template is missing');
 
-  const composed = composeWorkflow(template.contents, { targetPath: 'targets/website', targetName: 'website' });
+  const composed = composeWorkflow(template.contents, { targetPath: 'targets/web', targetName: 'web' });
 
-  // `working-directory:` is a `run:` key — an action's inputs ignore it, so the
-  // gh-pages publish pushed a repo-root dist/ that no build ever wrote
-  assert.match(composed, /^ {10}publish_dir: targets\/website\/dist$/m);
-  assert.match(composed, /^ {10}path: targets\/website\/\.omega\/cache\/imagemin$/m);
-  assert.match(composed, /hashFiles\('targets\/website\/src\/assets\/images\/\*\*'\)/);
+  // `working-directory:` is a `run:` key: an action's inputs ignore it, so an
+  // unscoped cache path and key hash a directory no build ever wrote
+  assert.match(composed, /^ {10}path: targets\/web\/\.omega\/cache\/imagemin$/m);
+  assert.match(composed, /hashFiles\('targets\/web\/src\/assets\/images\/\*\*'\)/);
 
-  // Untouched: the action's own inputs, and the key's literal prefix
-  assert.match(composed, /^ {10}github_token: \$\{\{ secrets\.GH_TOKEN \}\}$/m);
+  // Untouched: the key's literal prefix
   assert.match(composed, /^ {10}key: omega-imagemin-\$\{\{ hashFiles\(/m);
+
+  // The publish is the framework's own verb since #883, a plain `run:` step
+  // that `working-directory:` scopes like any other: no third-party action, so
+  // no `publish_dir` for the table to rewrite.
+  assert.doesNotMatch(composed, /peaceiris|publish_dir/);
 
   // A standalone project IS the repo root: the scaffolded template is unchanged,
   // scoping belongs to composition alone
-  assert.match(template.contents, /^ {10}publish_dir: \.\/dist$/m);
   assert.match(template.contents, /^ {10}path: \.omega\/cache\/imagemin$/m);
   assert.doesNotMatch(template.contents, /targets\//);
 });
@@ -245,33 +276,33 @@ test('the REAL extension template: a target with no path-bearing action inputs i
 
 test('the sweep is unaffected: the target copy of a REAL template still compares byte-equal', () => {
   const template = frameworkTemplates().find((entry) => entry.label === 'web/build.yml');
-  const { brandRoot, targets } = stageBrand({ website: { 'build.yml': template.contents } });
+  const { brandRoot, targets } = stageBrand({ web: { 'build.yml': template.contents } });
 
   // What a prior target-level scaffold wrote: the framework template, untouched.
   // Scoping happens at COMPOSE time, so this still matches and is still swept —
   // a token rendered into the template would have made every dead copy "differ".
-  jetpack.write(path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml'), template.contents);
+  jetpack.write(path.join(targets.web.targetDir, '.github', 'workflows', 'build.yml'), template.contents);
 
   const warnings = [];
   const result = composeTargetWorkflows({
-    sourceDir: targets.website.sourceDir,
-    targetDir: targets.website.targetDir,
+    sourceDir: targets.web.sourceDir,
+    targetDir: targets.web.targetDir,
     brandRoot,
     logger: { ...quiet, warn: (message) => warnings.push(message) },
   });
 
   assert.deepEqual(result.removed, ['.github/workflows/build.yml']);
   assert.deepEqual(warnings, []);
-  assert.equal(jetpack.exists(path.join(targets.website.targetDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.web.targetDir, '.github')), false);
 });
 
 test('two-target monorepo: one root workflow per target, each scoped to its own dir', () => {
   const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE },
-    website: { 'build.yml': TEMPLATE.replace('Build and Publish Extension', 'Compile and Build Site') },
+    web: { 'build.yml': TEMPLATE.replace('Build and Publish Extension', 'Compile and Build Site') },
   });
 
-  for (const name of ['extension', 'website']) {
+  for (const name of ['extension', 'web']) {
     composeTargetWorkflows({
       sourceDir: targets[name].sourceDir,
       targetDir: targets[name].targetDir,
@@ -281,18 +312,18 @@ test('two-target monorepo: one root workflow per target, each scoped to its own 
   }
 
   const composedFiles = jetpack.list(path.join(brandRoot, '.github', 'workflows')).sort();
-  assert.deepEqual(composedFiles, ['extension-publish.yml', 'website-build.yml']);
+  assert.deepEqual(composedFiles, ['extension-publish.yml', 'web-build.yml']);
 
   const extension = jetpack.read(rootWorkflow(brandRoot, 'extension-publish.yml'));
-  const website = jetpack.read(rootWorkflow(brandRoot, 'website-build.yml'));
+  const web = jetpack.read(rootWorkflow(brandRoot, 'web-build.yml'));
   assert.match(extension, /working-directory: targets\/extension/);
-  assert.match(website, /working-directory: targets\/website/);
+  assert.match(web, /working-directory: targets\/web/);
   assert.match(extension, /group: extension-/);
-  assert.match(website, /group: website-/);
+  assert.match(web, /group: web-/);
 
   // No per-target .github/ in a monorepo — GitHub would never run it
   assert.equal(jetpack.exists(path.join(targets.extension.targetDir, '.github')), false);
-  assert.equal(jetpack.exists(path.join(targets.website.targetDir, '.github')), false);
+  assert.equal(jetpack.exists(path.join(targets.web.targetDir, '.github')), false);
 });
 
 test('idempotent: re-running setup updates the target\'s file and never duplicates', () => {
@@ -329,12 +360,12 @@ test('idempotent: re-running setup updates the target\'s file and never duplicat
 test('sweeps the dead per-target copy, keeps one the consumer edited', () => {
   const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE },
-    website: { 'build.yml': TEMPLATE },
+    web: { 'build.yml': TEMPLATE },
   });
 
   // What a prior setup scaffolded into the target dirs: one untouched, one edited
   const deadCopy = path.join(targets.extension.targetDir, '.github', 'workflows', 'publish.yml');
-  const editedCopy = path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml');
+  const editedCopy = path.join(targets.web.targetDir, '.github', 'workflows', 'build.yml');
   jetpack.write(deadCopy, TEMPLATE);
   jetpack.write(editedCopy, `${TEMPLATE}      - name: My own step\n        run: echo hi\n`);
 
@@ -342,7 +373,7 @@ test('sweeps the dead per-target copy, keeps one the consumer edited', () => {
   const logger = { ...quiet, warn: (message) => warnings.push(message) };
 
   const extension = composeTargetWorkflows({ sourceDir: targets.extension.sourceDir, targetDir: targets.extension.targetDir, brandRoot, logger });
-  const website = composeTargetWorkflows({ sourceDir: targets.website.sourceDir, targetDir: targets.website.targetDir, brandRoot, logger });
+  const web = composeTargetWorkflows({ sourceDir: targets.web.sourceDir, targetDir: targets.web.targetDir, brandRoot, logger });
 
   // Framework-owned: deleted, and the empty .github/ goes with it
   assert.equal(jetpack.exists(deadCopy), false);
@@ -351,15 +382,15 @@ test('sweeps the dead per-target copy, keeps one the consumer edited', () => {
 
   // Consumer content is NEVER destroyed — it is reported instead
   assert.equal(jetpack.exists(editedCopy), 'file');
-  assert.deepEqual(website.removed, []);
+  assert.deepEqual(web.removed, []);
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /targets\/website\/\.github\/workflows\/build\.yml/);
+  assert.match(warnings[0], /targets\/web\/\.github\/workflows\/build\.yml/);
   // A kept copy carries lines the current template does not ship, which is all
   // the compare can prove, so the warning never claims edits by name; it does
   // name the composed file to compare against
   assert.doesNotMatch(warnings[0], /your own edits/);
   assert.match(warnings[0], /differs from the current .*template/);
-  assert.match(warnings[0], /\.github\/workflows\/website-build\.yml/);
+  assert.match(warnings[0], /\.github\/workflows\/web-build\.yml/);
 });
 
 test('sweeps a copy left by a superseded template, keeps one that changed a line', () => {
@@ -373,13 +404,13 @@ test('sweeps a copy left by a superseded template, keeps one that changed a line
 
   const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': current },
-    website: { 'build.yml': current },
+    web: { 'build.yml': current },
   });
 
   // One copy is the superseded generation verbatim; the other CHANGED a line
   // the framework wrote, which no template of this framework ever shipped
   const supersededCopy = path.join(targets.extension.targetDir, '.github', 'workflows', 'publish.yml');
-  const editedCopy = path.join(targets.website.targetDir, '.github', 'workflows', 'build.yml');
+  const editedCopy = path.join(targets.web.targetDir, '.github', 'workflows', 'build.yml');
   jetpack.write(supersededCopy, TEMPLATE);
   jetpack.write(editedCopy, current.replace('ubuntu-latest', 'ubuntu-24.04'));
 
@@ -387,7 +418,7 @@ test('sweeps a copy left by a superseded template, keeps one that changed a line
   const logger = { ...quiet, warn: (message) => warnings.push(message) };
 
   const extension = composeTargetWorkflows({ sourceDir: targets.extension.sourceDir, targetDir: targets.extension.targetDir, brandRoot, logger });
-  const website = composeTargetWorkflows({ sourceDir: targets.website.sourceDir, targetDir: targets.website.targetDir, brandRoot, logger });
+  const web = composeTargetWorkflows({ sourceDir: targets.web.sourceDir, targetDir: targets.web.targetDir, brandRoot, logger });
 
   // The superseded copy is framework-owned: swept, empty .github/ pruned with it
   assert.equal(jetpack.exists(supersededCopy), false);
@@ -396,9 +427,9 @@ test('sweeps a copy left by a superseded template, keeps one that changed a line
 
   // The changed line is content no framework template wrote: kept and warned
   assert.equal(jetpack.exists(editedCopy), 'file');
-  assert.deepEqual(website.removed, []);
+  assert.deepEqual(web.removed, []);
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /targets\/website\/\.github\/workflows\/build\.yml/);
+  assert.match(warnings[0], /targets\/web\/\.github\/workflows\/build\.yml/);
 });
 
 test('composedWorkflowName: the root name in a monorepo, the plain name standalone', () => {
@@ -414,7 +445,7 @@ test('composedWorkflowName: the root name in a monorepo, the plain name standalo
     workflow: 'publish.yml',
   }), 'publish.yml');
 
-  // The TARGET DIR prefixes the name, not the framework: web's `website` and
+  // The TARGET DIR prefixes the name, not the framework: a `web` target and
   // desktop's `desktop` both ship a `build.yml`, and the two composed files sit
   // side by side at the brand root. Desktop's release/deploy verbs read this
   // name too (#799).
@@ -425,16 +456,31 @@ test('composedWorkflowName: the root name in a monorepo, the plain name standalo
   }), 'desktop-build.yml');
 
   assert.equal(composedWorkflowName({
-    targetDir: '/brand/targets/website',
+    targetDir: '/brand/targets/web',
     brandRoot: '/brand',
     workflow: 'build.yml',
-  }), 'website-build.yml');
+  }), 'web-build.yml');
 
   assert.equal(composedWorkflowName({
     targetDir: '/standalone-desktop-app',
     brandRoot: null,
     workflow: 'build.yml',
   }), 'build.yml');
+});
+
+// P4: a caller that holds a target NAME and no path (the backend's CMS deploy
+// dispatch reads the target off a request, on a machine with no checkout) used
+// to pass the bare name as a `targetDir` with a fake `brandRoot: '.'` and rely
+// on `path.basename` handing it back. The rule is one function either way.
+test('composedWorkflowNameFor: the same name from a bare target name, and the path form is built on it', () => {
+  assert.equal(composedWorkflowNameFor('web', 'build.yml'), 'web-build.yml');
+  assert.equal(composedWorkflowNameFor('community', 'build.yml'), 'community-build.yml');
+
+  assert.equal(
+    composedWorkflowName({ targetDir: '/brand/targets/community', brandRoot: '/brand', workflow: 'build.yml' }),
+    composedWorkflowNameFor('community', 'build.yml'),
+    'the path form is the name form plus a basename, never a second spelling',
+  );
 });
 
 test('a transform hook renders the template before composing (site tokens)', () => {
@@ -460,18 +506,18 @@ test('a transform hook renders the template before composing (site tokens)', () 
 test('reconcile: a target the config no longer enables loses its composed files', () => {
   const { brandRoot, targets } = stageBrand({
     extension: { 'publish.yml': TEMPLATE },
-    website: { 'build.yml': TEMPLATE.replace('Build and Publish Extension', 'Compile and Build Site') },
+    web: { 'build.yml': TEMPLATE.replace('Build and Publish Extension', 'Compile and Build Site') },
   });
-  for (const name of ['extension', 'website']) {
+  for (const name of ['extension', 'web']) {
     composeTargetWorkflows({ sourceDir: targets[name].sourceDir, targetDir: targets[name].targetDir, brandRoot, logger: quiet });
   }
 
   // `targets.extension` is deleted from omega.json5 — the dir may well still be
   // on disk, but the brand no longer enables it
-  const result = reconcileComposedWorkflows({ brandRoot, liveTargets: ['website'], logger: quiet });
+  const result = reconcileComposedWorkflows({ brandRoot, liveTargets: ['web'], logger: quiet });
 
   assert.deepEqual(result.removed, ['.github/workflows/extension-publish.yml']);
-  assert.deepEqual(jetpack.list(path.join(brandRoot, '.github', 'workflows')).sort(), ['website-build.yml']);
+  assert.deepEqual(jetpack.list(path.join(brandRoot, '.github', 'workflows')).sort(), ['web-build.yml']);
 });
 
 test('reconcile: a human-authored workflow with a colliding name is NEVER deleted', () => {
@@ -526,7 +572,7 @@ test('reconcile: a composed file carrying the LEGACY header is still recognised'
   const handWritten = `name: Extension smoke tests\n\non:\n  workflow_dispatch:\n`;
   jetpack.write(rootWorkflow(brandRoot, 'extension-smoke.yml'), handWritten);
 
-  const result = reconcileComposedWorkflows({ brandRoot, liveTargets: ['website'], logger: quiet });
+  const result = reconcileComposedWorkflows({ brandRoot, liveTargets: ['web'], logger: quiet });
 
   assert.deepEqual(result.removed, ['.github/workflows/extension-publish.yml']);
   assert.equal(jetpack.exists(rootWorkflow(brandRoot, 'extension-publish.yml')), false);
@@ -554,7 +600,7 @@ test('the {{ installFirewall }} token renders the pinned action and its cmd shim
     '',
   ].join('\n');
 
-  const composed = composeWorkflow(template, { targetPath: 'targets/website', targetName: 'website' });
+  const composed = composeWorkflow(template, { targetPath: 'targets/web', targetName: 'web' });
   const binary = `\\$\\{\\{ steps\\.${FIREWALL_STEP_ID}\\.outputs\\.firewall-path-binary \\}\\}`;
 
   // Both steps land where the token stood, spelled as list items at its indent.
@@ -574,7 +620,7 @@ test('the {{ installFirewall }} token renders the pinned action and its cmd shim
     '        shell: cmd\\n',
     // The shim is a `run:` step, so the composition scopes it like any other:
     // harmless, because the path it copies is the absolute one the action reports
-    '        working-directory: targets/website\\n',
+    '        working-directory: targets/web\\n',
     `        run: copy "${binary}" "${binary}\\.exe"\\n`,
     '      - name: Install dependencies\\n',
   ].join('')));
@@ -586,13 +632,13 @@ test('the {{ installFirewall }} token renders the pinned action and its cmd shim
   // A `uses:` step is never scoped to the target: the action runs at the root
   assert.doesNotMatch(composed, /uses: SocketDev\/action@[^\n]*\n\s+working-directory:/);
   // ...while the install it wraps still is
-  assert.match(composed, /working-directory: targets\/website\n\s+run: sfw npm ci/);
+  assert.match(composed, /working-directory: targets\/web\n\s+run: sfw npm ci/);
 });
 
 test('a template carrying no token is left exactly as it was (#872)', () => {
   const template = 'name: Build\n\njobs:\n  build:\n    steps:\n      - run: echo hi\n';
 
-  assert.equal(composeWorkflow(template, { targetPath: 'targets/website', targetName: 'website' }).includes('SocketDev'), false);
+  assert.equal(composeWorkflow(template, { targetPath: 'targets/web', targetName: 'web' }).includes('SocketDev'), false);
 });
 
 test('the REAL templates: every firewalled install job gets its binary from the pinned official action (#871)', () => {
@@ -632,35 +678,81 @@ test('the REAL templates: every firewalled install job gets its binary from the 
   }
 });
 
-test('the REAL templates: no `npx` on a runner can reach the registry (#872)', () => {
+test('the REAL templates: a framework verb runs THIS framework\'s own bin file by path, and no step runs npx ([#877](https://github.com/Omega-JS-Stack/omega/issues/877))', () => {
   const templates = frameworkTemplates();
   assert.ok(templates.length, 'no framework template found');
 
   for (const template of templates) {
     // Comments are allowed to NAME a command a human types on a laptop; steps
     // are not: this reads the executable lines only.
-    const steps = template.contents.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n');
+    const framework = template.label.split('/')[0];
+    const lines = template.contents.split('\n').filter((line) => !/^\s*#/.test(line));
+    const steps = lines.join('\n');
 
-    for (const [, invocation] of steps.matchAll(/\bnpx\s+(\S+)/g)) {
-      assert.equal(invocation, '--no-install', `${template.label}: \`npx ${invocation}\` lets npx install a stranger's package from the registry, with every secret in the job env`);
-    }
+    // npx is gone entirely (#877): `npx omega` on a runner that linked no
+    // shared bin falls through to the npm REGISTRY (the playground's first
+    // backend deploy ran a stranger's package with every secret in the job
+    // env), and `npx --no-install omega-<framework>` needed a per-framework bin
+    // that no longer exists.
+    assert.doesNotMatch(steps, /\bnpx\b/, `${template.label}: a step runs npx, which can reach the registry`);
+    assert.doesNotMatch(steps, /\bomega-(backend|web|desktop|extension)\b/, `${template.label}: names a removed per-framework bin`);
 
-    // And the bin it runs is the FRAMEWORK's own (`omega-backend`,
-    // `omega-web`, `omega-extension`, `omega-desktop`), never the shared name
-    // all four packages declare: which one a runner linked is an install-order
-    // accident, and a workflow belongs to exactly one framework.
-    for (const [, bin] of steps.matchAll(/\bnpx\s+--no-install\s+(\S+)/g)) {
-      assert.doesNotMatch(bin, /^(omega|omg|mgr)$/, `${template.label}: \`npx --no-install ${bin}\` names the shared bin, not this framework's own`);
+    // What it runs instead: the framework's own bin FILE. Which package won
+    // npm's shared-bin link is an install-order accident, so nothing here
+    // resolves a name, and the path is anchored at the workspace root because
+    // npm hoists a workspace's dependencies there, out of reach of the
+    // `./node_modules` a target-scoped step would see (#877, #898).
+    const invocations = lines.filter((line) => line.includes('bin/omega'));
+    assert.ok(invocations.length, `${template.label}: runs no framework verb at all`);
+
+    for (const line of invocations) {
+      assert.ok(line.includes(frameworkBin(framework)), `${template.label}: \`${line.trim()}\` does not run ${framework}'s own bin by path (${frameworkBin(framework)})`);
     }
   }
 });
 
-// One action-version pair across all four templates
+test('the REAL templates: every install names the ONE workspace token, and composition installs only this target ([#898](https://github.com/Omega-JS-Stack/omega/issues/898))', () => {
+  const templates = frameworkTemplates();
+  assert.ok(templates.length, 'no framework template found');
+
+  for (const template of templates) {
+    for (const line of installLines(template.contents)) {
+      // One token, rendered from ONE devkit constant, so no template hand-types
+      // a target path (a brand names its targets what it likes, #886).
+      assert.ok(line.trim().endsWith(INSTALL_WORKSPACE_TOKEN), `${template.label}: \`${line.trim()}\` installs without the ${INSTALL_WORKSPACE_TOKEN} token`);
+    }
+
+    // Composed into a brand root, every install is scoped to the target the job
+    // belongs to: at the brand root npm installs EVERY target's workspace, and
+    // the desktop job on Electron's node then installed the backend workspace
+    // whose engines.node is the Firebase pin (#898). `.` is the target dir
+    // itself: npm resolves --workspace against the cwd, and every composed run
+    // step already carries `working-directory: targets/<name>`.
+    const composed = composeWorkflow(template.contents, { targetPath: 'targets/thing', targetName: 'thing' });
+    for (const line of installLines(composed)) {
+      assert.ok(line.trim().endsWith(INSTALL_WORKSPACE_FLAG), `${template.label}: composed, \`${line.trim()}\` installs the whole brand root`);
+    }
+
+    // A STANDALONE target is its own repo root and declares no workspaces at
+    // all, so the flag would refuse the install ("No workspaces found"). The
+    // same renderer writes that copy, with the token and its space removed.
+    const standalone = renderInstallWorkspace(template.contents);
+    assert.doesNotMatch(standalone, /\{\{ installWorkspace \}\}/, `${template.label}: a standalone copy keeps the raw token`);
+    assert.doesNotMatch(standalone, /--workspace/, `${template.label}: a standalone copy passes --workspace, which has no workspaces to name`);
+    for (const line of installLines(standalone)) {
+      assert.match(line, /npm(?:\.cmd)? (?:ci|install)$/, `${template.label}: standalone, \`${line.trim()}\` is not a plain install`);
+    }
+  }
+});
+
+// One action version across all four templates
 // ([#880](https://github.com/Omega-JS-Stack/omega/issues/880)): every runner
 // checks out and sets up node with the same two actions, so four templates
-// drifting apart is four upgrades to remember instead of one.
+// drifting apart is four upgrades to remember instead of one. The majors are
+// hard-coded on purpose: a pin read off the templates themselves would agree
+// with whatever they happen to say.
 test('the REAL templates: all four pin the SAME actions/checkout and actions/setup-node (#880)', () => {
-  const EXPECTED = { 'actions/checkout': 'v7', 'actions/setup-node': 'v6' };
+  const EXPECTED = { 'actions/checkout': 'v7', 'actions/setup-node': 'v7' };
   const templates = frameworkTemplates();
   // The four frameworks, and a fifth would join this pin the day it scaffolds one
   assert.equal(templates.length, 4, `expected the four framework templates, found ${templates.map((t) => t.label).join(', ')}`);

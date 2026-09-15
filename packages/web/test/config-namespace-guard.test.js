@@ -26,7 +26,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const {
-  CONFIG_SECTIONS, SITE_FACT_KEYS, RANDOM_ID_ASSIGN_IDIOM,
+  CONFIG_SECTIONS, PAGE_OVERRIDE_SECTIONS, SITE_FACT_KEYS, RANDOM_ID_ASSIGN_IDIOM,
   templateReads, randomIdReads, assignsRandomId,
 } = require('../src/config-sections.js');
 const { buildSite, BARE } = require('./lib/build.js');
@@ -85,8 +85,13 @@ test('#607: no template reads a config section off the `site` global', () => {
   )).join('\n'));
 });
 
+// #858: a section that is ALSO a page-machinery name (`translation`, whose
+// page half is `translation.include`) reads off `resolved.<key>` legally, the
+// same way `resolved.meta` does. It is the page's own value there, never the
+// config one, which stays at `resolved.config.<key>`.
 test('#607: no template reads a config section off the old flat `resolved` path', () => {
-  const offenders = reads('resolved').filter((entry) => CONFIG_SECTIONS.has(entry.key));
+  const offenders = reads('resolved')
+    .filter((entry) => CONFIG_SECTIONS.has(entry.key) && !PAGE_OVERRIDE_SECTIONS.includes(entry.key));
 
   assert.deepEqual(offenders, [], offenders.map((entry) => (
     `${entry.file}:${entry.line} reads resolved.${entry.key} — the flat config path is gone; `

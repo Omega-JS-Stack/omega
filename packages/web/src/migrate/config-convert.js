@@ -5,7 +5,8 @@
  * produces ONE omega.json5 object per the mapping table in docs/shared/config.md:
  *
  * - Shared sections to the TOP LEVEL with unified spellings:
- *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526), `theme`, `connections`,
+ *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526, with its
+ *   route list converted from `exclude` to `include` globs, #858), `theme`, `connections`,
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment` (`processors` → `providers` — #425),
  *   `web_manager.sentry` → `monitoring.providers.sentry` (#485),
@@ -38,7 +39,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
 const JSON5 = require('json5');
-const { findSecretKeys } = require('@omega.js/config');
+const { findSecretKeys, RETIRED_PATHS } = require('@omega.js/config');
 
 // _config.yml sections that were Jekyll/UJM machinery — gone with Jekyll
 const DROPPED_JEKYLL_KEYS = [
@@ -49,10 +50,21 @@ const DROPPED_JEKYLL_KEYS = [
 
 // _config.yml sections that stay web-scoped (targets.web), in output order
 const WEB_SECTION_ORDER = [
-  'favicon', 'manifest', 'icons',
   'permalink', 'pagination',
   'defaults', 'generators', 'client',
 ];
+
+// The four schema-less presentation sections #850 retired. Everything the
+// build processes has a schema home (Ian 2026-09-09), and these had none: the
+// converter wrote them under `targets.web` and @omega.js/web kept a private
+// list so its own guard would pass them. Three are DROPPED with a note (what
+// answers them now needs no config at all), and `currency` MOVES to the
+// payment section every other surface reads it from.
+const RETIRED_WEB_SECTIONS = {
+  favicon: 'the favicon set is minted from the brand images and bridged to /assets/images/favicon; change the source image (`brand.images.favicon`), and the browser chrome color comes from `brand.color`',
+  manifest: 'nothing reads it: the web app manifest that ships is the minted set\'s own site.webmanifest',
+  icons: 'a link carries its own Font Awesome classes now (#619), e.g. `icon: \'fa-brands fa-github\'`, so there is no name-to-markup map',
+};
 
 
 // The UJM page maps #610 retired: the /download page, the /extension page and
@@ -108,7 +120,10 @@ function convertConfig({ jekyll, ujm }) {
   const config = { ...(jekyll || {}) };
   const notes = [];
   const omega = {};
-  const web = {};
+  // The target's key is its NAME and its `type` says which framework runs it
+  // ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)); a converted
+  // legacy site is the brand's `web` target
+  const web = { type: 'web' };
 
   const take = (key) => {
     const value = config[key];
@@ -138,7 +153,26 @@ function convertConfig({ jekyll, ujm }) {
   // sections — left in the target, the engine config is invisible to every
   // other target that translates (the extension's `_locales`).
   const translation = take('translation');
-  if (!isEmpty(translation)) omega.translation = translation;
+  if (!isEmpty(translation)) {
+    // ---- translation.exclude → translation.include (#858). The legacy list
+    // said what to SKIP, which is a retired key now, so carrying it through
+    // would emit a config the validator refuses. The converter is the retired
+    // row's own (@omega.js/config), never a second copy of the rule: the
+    // brand lands on `['**', '!<each>']`, translating exactly what it was
+    // translating before rather than on the new framework default.
+    if (translation.exclude !== undefined) {
+      const excluded = translation.exclude;
+      delete translation.exclude;
+      translation.include = RETIRED_PATHS['translation.exclude'].convert(excluded);
+      notes.push(
+        '`translation.exclude` → `translation.include` (#858): the route list says what to TRANSLATE now, '
+        + `so the skip list became \`${JSON.stringify(translation.include)}\` (the same pages as before). `
+        + "The framework default is ['**', '!blog/**'] for a brand that states none",
+      );
+    }
+
+    omega.translation = translation;
+  }
 
   // ---- theme (verbatim — templates read theme.nav.enabled etc.)
   const theme = take('theme');
@@ -341,6 +375,19 @@ function convertConfig({ jekyll, ujm }) {
       '_config.yml `meta` dropped (#607) — omega.json5 has no meta section. Put the site-wide title/description in '
       + '`brand.name` / `brand.description` (the head falls back to them), and anything per-page in that page\'s own `meta:` frontmatter',
     );
+  }
+
+  // ---- the four schema-less web sections #850 retired
+  for (const [key, replacement] of Object.entries(RETIRED_WEB_SECTIONS)) {
+    const value = take(key);
+    if (isEmpty(value)) continue;
+    notes.push(`_config.yml \`${key}\` dropped (#850): ${replacement}`);
+  }
+
+  const legacyCurrency = take('currency');
+  if (!isEmpty(legacyCurrency)) {
+    omega.payment = { ...(omega.payment || {}), currency: legacyCurrency };
+    notes.push('`currency` moved to `payment.currency` (#850): the price currency belongs to the payment section every surface reads it from');
   }
 
   // ---- web-scoped sections from _config.yml

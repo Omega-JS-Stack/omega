@@ -13,45 +13,45 @@ layout: backend/core/minimal
 sections:
   - id: "profile"
     name: "Profile"
-    icon: "user-circle"
+    icon: "fa-solid fa-user-circle"
   - id: "security"
     name: "Security"
-    icon: "shield-halved"
+    icon: "fa-solid fa-shield-halved"
   - id: "connections"
     name: "Connections"
-    icon: "link"
+    icon: "fa-solid fa-link"
   - id: "billing"
     name: "Billing"
-    icon: "credit-card"
+    icon: "fa-solid fa-credit-card"
   - id: "orders"
     name: "Orders"
-    icon: "receipt"
+    icon: "fa-solid fa-receipt"
   - id: "referrals"
     name: "Referrals"
-    icon: "user-plus"
+    icon: "fa-solid fa-user-plus"
   - id: "team"
     name: "Team"
-    icon: "users"
+    icon: "fa-solid fa-users"
   - id: "notifications"
     name: "Notifications"
-    icon: "bell"
+    icon: "fa-solid fa-bell"
   - id: "api-keys"
     name: "API & MCP"
-    icon: "key"
+    icon: "fa-solid fa-key"
   - id: "data-request"
     name: "Data request"
-    icon: "file-export"
+    icon: "fa-solid fa-file-export"
   - id: "delete"
     name: "Delete account"
-    icon: "trash"
+    icon: "fa-solid fa-trash"
   - id: "refund"
     name: "Refund"
-    icon: "rotate-left"
+    icon: "fa-solid fa-rotate-left"
 
 signin_methods:
   - id: "password"
     name: "Password"
-    icon: "key"
+    icon: "fa-solid fa-key"
   - id: "google"
     name: "Google"
     logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/google.svg"
@@ -59,32 +59,32 @@ signin_methods:
 badges:
   - id: "member"
     name: "Member"
-    icon: "sailboat"
+    icon: "fa-solid fa-sailboat"
     chip_class: "omega-chip"
     always_visible: true
   - id: "admin"
     name: "Admin"
-    icon: "hat-wizard"
+    icon: "fa-solid fa-hat-wizard"
     chip_class: "omega-chip omega-chip--ink"
   - id: "premium"
     name: "Premium"
-    icon: "crown"
+    icon: "fa-solid fa-crown"
     chip_class: "omega-chip omega-chip--accent"
   - id: "beta"
     name: "Beta"
-    icon: "bolt"
+    icon: "fa-solid fa-bolt"
     chip_class: "omega-chip"
   - id: "coder"
     name: "Developer"
-    icon: "code"
+    icon: "fa-solid fa-code"
     chip_class: "omega-chip"
   - id: "moderator"
     name: "Moderator"
-    icon: "shield-halved"
+    icon: "fa-solid fa-shield-halved"
     chip_class: "omega-chip"
   - id: "vip"
     name: "VIP"
-    icon: "award"
+    icon: "fa-solid fa-award"
     chip_class: "omega-chip omega-chip--accent"
 config:
   theme:
@@ -130,7 +130,7 @@ config:
                 href="#{{ section.id }}"
                 data-section="{{ section.id }}"
                 role="tab">
-                <span class="omega-side__icon"><i class="fa-solid fa-{{ section.icon }} fa-sm"></i></span>
+                <span class="omega-side__icon"><i class="{{ section.icon }} fa-sm" aria-hidden="true"></i></span>
                 <span>{{ section.name }}</span>
               </a>
             </li>
@@ -156,7 +156,7 @@ config:
 
       <!-- Profile Section -->
       <section id="profile-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="My profile" icon="user-circle" %}
+        {% include frontend/sections/account-section-header.html title="My profile" icon="fa-solid fa-user-circle" %}
 
         <form id="profile-form" novalidate data-form-state="initializing" onsubmit="return false">
           <!-- Avatar and Edit Button -->
@@ -182,7 +182,7 @@ config:
             <div id="role-badges" class="mt-2 d-flex gap-2 flex-wrap">
               {% for badge in resolved.badges %}
                 <span id="badge-{{ badge.id }}" class="{{ badge.chip_class }} {% unless badge.always_visible %}d-none{% endunless %}">
-                  <i class="fa-solid fa-{{ badge.icon }} fa-sm"></i>
+                  <i class="{{ badge.icon }} fa-sm" aria-hidden="true"></i>
                   {{ badge.name }}
                 </span>
               {% endfor %}
@@ -706,7 +706,7 @@ config:
 
       <!-- Security Section -->
       <section id="security-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Security and data" icon="shield-halved" %}
+        {% include frontend/sections/account-section-header.html title="Security and data" icon="fa-solid fa-shield-halved" %}
 
         <!-- Sign-in Methods Section -->
         <div class="card mb-3">
@@ -722,7 +722,7 @@ config:
                   <div class="d-flex align-items-center">
                     <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 {% iftruthy method.icon %}text-muted{% endiftruthy %} fa fa-3xl">
                       {% iftruthy method.icon %}
-                        <i class="fa-solid fa-{{ method.icon }} fa-3xl"></i>
+                        <i class="{{ method.icon }} fa-3xl" aria-hidden="true"></i>
                       {% endiftruthy %}
                       {% iftruthy method.logo %}
                         <img src="{{ method.logo | omega_cachebreak }}" class="object-fit-contain" alt="{{ method.name }} Logo"/>
@@ -869,7 +869,7 @@ config:
 
       <!-- Connections Section -->
       <section id="connections-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Connected accounts" icon="link" %}
+        {% include frontend/sections/account-section-header.html title="Connected accounts" icon="fa-solid fa-link" %}
 
         <div class="card">
           <div class="card-header">
@@ -885,7 +885,7 @@ config:
 
       <!-- Billing Section -->
       <section id="billing-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Billing and usage" icon="credit-card" %}
+        {% include frontend/sections/account-section-header.html title="Billing and usage" icon="fa-solid fa-credit-card" %}
 
         <!-- Plan Overview Card -->
         <div class="card mb-3">
@@ -1293,7 +1293,7 @@ config:
            page and the receipt email have always promised them (#672). Rows are
            rendered by sections/orders.js off GET /user/orders. -->
       <section id="orders-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Orders" icon="receipt" %}
+        {% include frontend/sections/account-section-header.html title="Orders" icon="fa-solid fa-receipt" %}
 
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
@@ -1315,7 +1315,7 @@ config:
 
       <!-- Referrals Section -->
       <section id="referrals-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Referrals" icon="user-plus" %}
+        {% include frontend/sections/account-section-header.html title="Referrals" icon="fa-solid fa-user-plus" %}
 
         <!-- Referral Code Card -->
         <div class="card mb-3">
@@ -1389,7 +1389,7 @@ config:
 
       <!-- Team Section -->
       <section id="team-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Team" icon="users" %}
+        {% include frontend/sections/account-section-header.html title="Team" icon="fa-solid fa-users" %}
 
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
@@ -1419,7 +1419,7 @@ config:
 
       <!-- Notifications Section -->
       <section id="notifications-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Notifications" icon="bell" %}
+        {% include frontend/sections/account-section-header.html title="Notifications" icon="fa-solid fa-bell" %}
 
         <div class="card">
           <div class="card-header">
@@ -1476,7 +1476,7 @@ config:
 
       <!-- API Keys Section -->
       <section id="api-keys-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="API & MCP" icon="key" %}
+        {% include frontend/sections/account-section-header.html title="API & MCP" icon="fa-solid fa-key" %}
 
         <!-- API Key Card -->
         <div class="card mb-4">
@@ -1729,7 +1729,7 @@ config:
 
       <!-- Data Request Section (Hidden by default) -->
       <section id="data-request-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Request your data" icon="file-export" %}
+        {% include frontend/sections/account-section-header.html title="Request your data" icon="fa-solid fa-file-export" %}
 
         <!-- Info card (always shown) -->
         <div class="card mb-4">
@@ -1863,7 +1863,7 @@ config:
 
       <!-- Delete Account Section (Hidden by default) -->
       <section id="delete-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Delete account" icon="trash" %}
+        {% include frontend/sections/account-section-header.html title="Delete account" icon="fa-solid fa-trash" %}
 
         <div class="card mb-4">
           <div class="card-header">
@@ -1962,7 +1962,7 @@ config:
 
       <!-- Refund Section (Hidden by default) -->
       <section id="refund-section" class="account-section d-none">
-        {% include frontend/sections/account-section-header.html title="Request a refund" icon="rotate-left" %}
+        {% include frontend/sections/account-section-header.html title="Request a refund" icon="fa-solid fa-rotate-left" %}
 
         <!-- Refund policy info card -->
         <div class="card mb-4">

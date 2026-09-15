@@ -17,6 +17,7 @@ const path = require('node:path');
 
 const { bundle, formatBytes } = require('../src/bundle.js');
 const { START_MARKER, END_MARKER } = require('../src/strip-dev-blocks.js');
+const { installEsmOnlyFixture, FIXTURE_NAME, NODE_MARKER, BROWSER_MARKER } = require('../src/test/esm-only-fixture.js');
 
 const TEMP = path.join(__dirname, '..', '.temp', `bundle-${process.pid}`);
 
@@ -542,6 +543,107 @@ test('a build survives the deletion of the directory the process bundled from FI
 
   assert.equal(child.status, 0, `the build after the deletion failed: ${child.stderr}`);
   assert.match(fs.readFileSync(outfile, 'utf8'), /DEAD_CWD_SENTINEL/);
+});
+
+// `import.meta.url` in CommonJS output (#906). The rule is composed from the
+// OUTPUT SHAPE, so every cjs+node caller (desktop's main and preload bundles)
+// gets it without wiring, and no browser bundle is touched. The dependency is
+// the ONE ESM-only fixture every target proves this with.
+
+// A consumer tree with that fixture installed as a real dependency, the way a
+// brand's node_modules holds one.
+function makeFixtureConsumer(entry) {
+  const dir = makeSources({ 'entry.js': entry });
+  installEsmOnlyFixture(dir);
+  return dir;
+}
+
+test('a CommonJS bundle keeps import.meta.url, so an ESM-only dependency RUNS bundled (#906)', async () => {
+  const frameworkRoot = makeFramework();
+  const sources = makeFixtureConsumer([
+    `const { fileUrl, viaRequire, marker } = require(${JSON.stringify(FIXTURE_NAME)});`,
+    'console.log(JSON.stringify({ fileUrl, viaRequire, marker }));',
+    '',
+  ].join('\n'));
+  const outfile = path.join(outdirFor('import-meta-cjs'), 'main.bundle.js');
+
+  await bundle({
+    frameworkRoot,
+    entries: [path.join(sources, 'entry.js')],
+    outfile,
+    platform: 'node',
+    format: 'cjs',
+  });
+
+  // Run it the way Electron's main process runs main.bundle.js: plain Node,
+  // from the file the build wrote.
+  const ran = spawnSync(process.execPath, [outfile], { encoding: 'utf8' });
+  assert.equal(ran.status, 0, `the bundled ESM-only dependency threw: ${ran.stderr}`);
+
+  const out = JSON.parse(ran.stdout.trim().split('\n').pop());
+  assert.equal(out.marker, NODE_MARKER, 'the node half of the fixture was bundled');
+  assert.ok(out.fileUrl && out.fileUrl.startsWith('file://'), `import.meta.url answered a file URL, got ${out.fileUrl}`);
+  assert.equal(out.viaRequire, true, 'createRequire(import.meta.url) produced a working require');
+});
+
+test('the import.meta.url rule is CommonJS-only: a browser bundle is left exactly as it was', async () => {
+  const frameworkRoot = makeFramework();
+  const sources = makeFixtureConsumer(`import { describeFixture } from '${FIXTURE_NAME}';\nglobalThis.out = describeFixture();\n`);
+
+  const read = async (options) => {
+    const outfile = path.join(outdirFor(`import-meta-${options.format}`), 'out.js');
+    await bundle({ frameworkRoot, entries: [path.join(sources, 'entry.js')], outfile, dev: true, ...options });
+    return fs.readFileSync(outfile, 'utf8');
+  };
+
+  for (const options of [{ format: 'iife', platform: 'browser' }, { format: 'esm', platform: 'browser' }, { format: 'esm' }]) {
+    const out = await read(options);
+    assert.doesNotMatch(out, /__omegaImportMetaUrl/, `${options.format}/${options.platform} took no shim`);
+    // The browser half of the fixture bundled and still evaluates.
+    assert.ok(out.includes(BROWSER_MARKER), 'the browser half of the fixture was bundled');
+  }
+});
+
+test('a caller that defines import.meta.url itself throws rather than racing the composition (#906)', async () => {
+  const frameworkRoot = makeFramework();
+  const sources = makeSources({ 'entry.js': 'export default 1;\n' });
+
+  await assert.rejects(
+    bundle({
+      frameworkRoot,
+      entries: [path.join(sources, 'entry.js')],
+      outfile: path.join(outdirFor('import-meta-conflict'), 'out.js'),
+      platform: 'node',
+      format: 'cjs',
+      define: { 'import.meta.url': '"file:///nope"' },
+    }),
+    /\[devkit bundle\].*import\.meta\.url/,
+  );
+});
+
+test("the caller's own define and banner survive the import.meta.url composition", async () => {
+  const frameworkRoot = makeFramework();
+  const sources = makeSources({ 'entry.js': 'globalThis.out = SENTINEL_DEFINE;\n' });
+  const outfile = path.join(outdirFor('import-meta-merge'), 'out.js');
+
+  await bundle({
+    frameworkRoot,
+    entries: [path.join(sources, 'entry.js')],
+    outfile,
+    platform: 'node',
+    format: 'cjs',
+    dev: true,
+    define: { SENTINEL_DEFINE: '"DEFINE_SENTINEL"' },
+    banner: { js: '/* BANNER_SENTINEL */' },
+  });
+
+  const out = fs.readFileSync(outfile, 'utf8');
+  assert.match(out, /DEFINE_SENTINEL/, "the caller's define still applied");
+  assert.match(out, /BANNER_SENTINEL/, "the caller's banner still rode along");
+  assert.ok(
+    out.indexOf('__omegaImportMetaUrl') < out.indexOf('BANNER_SENTINEL'),
+    'the shim is declared first, ahead of the caller banner',
+  );
 });
 
 // Every build lane prints what it produced, and each one used to carry its own

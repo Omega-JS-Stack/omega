@@ -11,7 +11,7 @@
       {
         label: '{{ resolved.config.brand.name }}',
         href: '/admin',
-        icon: 'circle-check'
+        icon: 'fa-solid fa-circle-check'
       },
     ]
   },
@@ -19,7 +19,7 @@
     {
       label: 'Dashboard',
       href: '/admin',
-      icon: 'gauge-high'
+      icon: 'fa-solid fa-gauge-high'
     },
     {
       header: true,
@@ -28,24 +28,24 @@
     {
       label: 'Users',
       href: null,
-      icon: 'users',
+      icon: 'fa-solid fa-users',
       dropdown: [
         {
           label: 'All users',
           href: '/admin/users',
-          icon: 'list'
+          icon: 'fa-solid fa-list'
         },
         {
           label: 'Create new',
           href: '/admin/users/new',
-          icon: 'plus'
+          icon: 'fa-solid fa-plus'
         }
       ]
     },
     {
       label: 'Firebase Explorer',
       href: '/admin/firebase',
-      icon: 'fire'
+      icon: 'fa-solid fa-fire'
     },
     {
       header: true,
@@ -54,12 +54,12 @@
     {
       label: 'Calendar',
       href: '/admin/calendar',
-      icon: 'calendar-days'
+      icon: 'fa-solid fa-calendar-days'
     },
     {
       label: 'Ads',
       href: '/admin/verts',
-      icon: 'rectangle-list'
+      icon: 'fa-solid fa-rectangle-list'
     },
     {
       header: true,
@@ -68,24 +68,24 @@
     {
       label: 'Posts',
       href: null,
-      icon: 'newspaper',
+      icon: 'fa-solid fa-newspaper',
       dropdown: [
         {
           label: 'All posts',
           href: '/admin/posts',
-          icon: 'list'
+          icon: 'fa-solid fa-list'
         },
         {
           label: 'New post',
           href: '/admin/posts/editor',
-          icon: 'plus'
+          icon: 'fa-solid fa-plus'
         }
       ]
     },
     {
       label: 'Animation Studio',
       href: '/admin/studio',
-      icon: 'clapperboard',
+      icon: 'fa-solid fa-clapperboard',
     },
     {
       header: true,
@@ -94,7 +94,7 @@
     {
       label: 'Stackblitz',
       href: '/admin/stackblitz',
-      icon: 'bolt',
+      icon: 'fa-solid fa-bolt',
     },
   ]
 }

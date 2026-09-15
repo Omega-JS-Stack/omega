@@ -1,9 +1,10 @@
 // Build-layer tests for gulp/tasks/package.js — the things a consumer's
 // packaged output lives or dies by (#46):
 //
-//   1. The packaged artifact carries NO build.js / build.json. The snapshot is
-//      baked into every bundle since #743 (build-json-bake.test.js owns what it
-//      carries); a leftover file here would be a second, staler copy of it.
+//   1. The packaged artifact carries the ONE build.js the bundle task wrote, and
+//      no build.json sidecar beside it (#743; build-json-bake.test.js owns what
+//      the file carries). A second file describing the same build is what the
+//      sidecar was, and it went stale on its own schedule.
 //   2. A versionless app FAILS the build (Chrome refuses a manifest with no
 //      version — it used to package the raw JSON5 source manifest and finish green).
 //   3. The icon prune drops only icons the build never minted, in BOTH legal
@@ -31,6 +32,8 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const SRC       = path.join(__dirname, '..', '..', '..');
 const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'package.js');
+const PUBLISH_TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'publish.js');
+const { readBakedBuildJson } = require(path.join(SRC, 'gulp', 'tasks', 'utils', 'build-json.js'));
 
 // Stage a temp extension project. `files` is a relative-path → contents map
 // written verbatim (dist/manifest.json, the minted icons, …).
@@ -76,8 +79,15 @@ const MANIFEST = (extra) => `{ manifest_version: 3, name: 'Staged', ${extra} }`;
 
 // Set env vars for one test, restoring exactly what was there (an empty string
 // means "declared but empty", the CI-with-no-.env shape) — returns the undo.
+//
+// OMEGA_ENVIRONMENT is always saved and cleared, whether or not the caller names
+// it: it is the ONE environment input
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)) and src/build.js
+// WRITES it at load from the lane, so a case that flips OMEGA_BUILD_MODE and
+// re-enters inProject() would otherwise leave the lane's word behind it.
 function withEnv(vars) {
-  const previous = {};
+  const previous = { OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT };
+  delete process.env.OMEGA_ENVIRONMENT;
   for (const [key, value] of Object.entries(vars)) {
     previous[key] = process.env[key];
     process.env[key] = value;
@@ -109,18 +119,21 @@ module.exports = async (ctx) => {
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'package task — no build.js/build.json sidecar, manifest version guard, icon prune',
+  description: 'package task: the one build.js ships, no build.json sidecar, manifest version guard, icon prune',
   tests: [
     {
-      name: 'the packaged artifact carries NO build.js and NO build.json (#743)',
+      name: 'the packaged artifact carries the ONE build.js, and no build.json (#743)',
       run: async (ctx) => {
-        // The snapshot rides in every bundle's own banner now. A JSONP file
-        // beside them would be a second copy of the same facts — regenerated on
-        // its own schedule, and the one the service worker used to trust.
+        // The snapshot is one file at the artifact's root, written by the bundle
+        // task and copied here with the rest of dist: the page template loads it
+        // with a script tag and background.js with importScripts. The build.json
+        // sidecar that used to sit beside it described the same build a second
+        // time and is gone.
         const tmp = stageProject({
-          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: {} } }`,
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
           files: {
             'dist/manifest.json': MANIFEST(`description: 'a packageable extension'`),
+            'dist/build.js': `self.OMEGA_BUILD_JSON = {"config":{"brand":{"id":"staged"}}};\nself.OMEGA_BUILD_JSON.config.dev = null;\n`,
             'dist/assets/js/components/popup.bundle.js': `globalThis.probe = 1;\n`,
             'dist/_locales/en/messages.json': `{ "appName": { "message": "Staged" } }`,
           },
@@ -130,11 +143,13 @@ module.exports = defineCases({
             const failure = await new Promise((resolve) => task.packageFn(resolve));
             ctx.expect(failure).toBe(undefined);
 
-            const raw = path.join(tmp, 'packaged', 'chromium', 'raw');
+            const raw = path.join(tmp, 'packaged', 'chrome', 'raw');
             // The package lane ran for real: the compiled manifest is there…
             ctx.expect(fs.existsSync(path.join(raw, 'manifest.json'))).toBe(true);
-            // …and neither JSONP sidecar is.
-            ctx.expect(fs.existsSync(path.join(raw, 'build.js'))).toBe(false);
+            // …and so is the one snapshot every context loads, unchanged.
+            ctx.expect(fs.existsSync(path.join(raw, 'build.js'))).toBe(true);
+            ctx.expect(readBakedBuildJson(path.join(raw, 'build.js')).config.brand.id).toBe('staged');
+            // The sidecar nothing read is gone.
             ctx.expect(fs.existsSync(path.join(raw, 'build.json'))).toBe(false);
           });
         } finally {
@@ -150,8 +165,8 @@ module.exports = defineCases({
         const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-dev-origin-brand-'));
         fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
         fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{ brand: { id: 'staged', name: 'Staged' } }`);
-        fs.mkdirSync(path.join(brand, 'targets', 'website', '.temp'), { recursive: true });
-        fs.writeFileSync(path.join(brand, 'targets', 'website', '.temp', 'ports.json'), JSON.stringify({
+        fs.mkdirSync(path.join(brand, 'targets', 'web', '.temp'), { recursive: true });
+        fs.writeFileSync(path.join(brand, 'targets', 'web', '.temp', 'ports.json'), JSON.stringify({
           ports: { website: 4001 }, origin: 'https://localhost:4001', pid: process.pid, startedAt: 'x',
         }));
 
@@ -163,7 +178,7 @@ module.exports = defineCases({
         try {
           await inProject(app, async (task) => {
             const outputDir = path.join(app, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             // Protocol AND port both follow the live dev server — the old bake
             // said http://localhost:4000 while `omega dev` served https
@@ -195,7 +210,7 @@ module.exports = defineCases({
             ctx.expect(failure.plugin).toBe('Package');
 
             // Never compiled: the packaged manifest is still the raw copied source
-            const packaged = JSON5.parse(fs.readFileSync(path.join(tmp, 'packaged', 'chromium', 'raw', 'manifest.json'), 'utf8'));
+            const packaged = JSON5.parse(fs.readFileSync(path.join(tmp, 'packaged', 'chrome', 'raw', 'manifest.json'), 'utf8'));
             ctx.expect(packaged.version).toBeUndefined();
           });
         } finally {
@@ -216,7 +231,7 @@ module.exports = defineCases({
         try {
           await inProject(missing, async (task) => {
             const outputDir = path.join(missing, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.action.default_icon).toBeUndefined();
             ctx.expect(m.version).toBe('3.1.4');
@@ -226,7 +241,7 @@ module.exports = defineCases({
 
           await inProject(minted, async (task) => {
             const outputDir = path.join(minted, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.action.default_icon).toBe(icon);
             // the 48x default in `icons` survives on the same file
@@ -254,7 +269,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             const outputDir = path.join(tmp, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.action.default_icon).toEqual({ '16': 'assets/images/icons/icon-16x.png' });
           });
@@ -279,7 +294,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             const outputDir = path.join(tmp, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.action.default_icon).toEqual({
               '32': 'assets/images/icons/icon-32x.png',
@@ -319,7 +334,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             const outputDir = path.join(tmp, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             // The dev origin the framework default carries never reaches the artifact
             ctx.expect(m.externally_connectable).toBeUndefined();
@@ -341,14 +356,14 @@ module.exports = defineCases({
         try {
           await inProject(declared, async (task) => {
             const outputDir = path.join(declared, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.externally_connectable.matches).toEqual(['https://example.com/*']);
           });
 
           await inProject(absent, async (task) => {
             const outputDir = path.join(absent, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             // No live website published an origin — the classic assumption, over
             // the protocol `omega dev` speaks by default (#262)
@@ -439,31 +454,66 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'the publish workflow uploads the zips the package task actually writes (#265)',
+      name: 'the release upload uploads the zips the package task actually writes (#265)',
       run: async (ctx) => {
-        const workflow = fs.readFileSync(path.join(SRC, 'defaults', '.github', 'workflows', 'publish.yml'), 'utf8');
-        const tmp = stageProject({});
+        // The upload used to be a shell block in the scaffolded workflow, and it
+        // named packaged/extension.zip, a path no build has ever produced, so
+        // the composed run died on its last step. It lives in the publish task
+        // now (#883), so the two halves are driven for real here: the package
+        // task writes the zips, the publish task uploads them, and a drift in
+        // either one's path is a failed copy rather than a green build.
+        const tmp = stageProject({
+          config: `{ brand: { id: 'staged', name: 'Staged' }, targets: { extension: { type: 'extension' } } }`,
+          files: {
+            'dist/manifest.json': MANIFEST(`description: 'a packageable extension'`),
+            'dist/assets/js/components/popup.bundle.js': `globalThis.probe = 1;\n`,
+            'dist/_locales/en/messages.json': `{ "appName": { "message": "Staged" } }`,
+          },
+        });
 
         try {
-          // packageZip writes packaged/<target>/extension.zip, one per target.
-          // The release step used to upload packaged/extension.zip — a path no
-          // build has ever produced, so the composed run died on its last step.
-          ctx.expect(workflow).not.toContain('packaged/extension.zip');
-
-          const referenced = [...workflow.matchAll(/packaged\/[^\s"']*extension\.zip/g)].map((match) => match[0]);
-          ctx.expect(referenced.length).toBeGreaterThan(0);
-
-          const shellGlob = referenced.find((reference) => reference.includes('*'));
-          ctx.expect(shellGlob).toBeDefined();
-
-          const matcher = new RegExp(`^${shellGlob.replace(/\./g, '\\.').replace(/\*/g, '[^/]+')}$`);
+          // No YAML names a zip path any more: the workflow calls the task.
+          const workflow = fs.readFileSync(path.join(SRC, 'defaults', '.github', 'workflows', 'publish.yml'), 'utf8');
+          ctx.expect(workflow).not.toMatch(/packaged\/[^\s"']*\.zip/);
 
           await inProject(tmp, async (task) => {
             const targets = Object.keys(task.TARGETS);
             ctx.expect(targets.length).toBeGreaterThan(0);
 
+            const failure = await new Promise((resolve) => task.packageFn(resolve));
+            ctx.expect(failure).toBe(undefined);
+
+            // The zips are a BUILD-mode artifact, and a build-mode packageFn
+            // also zips the source out of git, which a temp project has none of.
+            const restore = withEnv({ OMEGA_BUILD_MODE: 'true' });
+            try {
+              await task.packageZip();
+            } finally {
+              restore();
+            }
+
+            const calls = [];
+            const publish = require(PUBLISH_TASK_PATH);
+            await publish.publishToGitHubRelease({
+              config: { brand: { id: 'acme' }, repo: { provider: 'github', org: 'Acme-Org' } },
+              execFn: (file, args) => {
+                calls.push(args);
+                if (args[1] === 'view') throw new Error('release not found (HTTP 404)');
+                return '';
+              },
+            });
+
+            const uploaded = calls.filter((args) => args[1] === 'upload').map((args) => args[3]);
+            ctx.expect(uploaded.length).toBe(targets.length);
+
+            // Every uploaded asset IS the zip the package task just wrote
             for (const target of targets) {
-              ctx.expect(matcher.test(`packaged/${target}/extension.zip`)).toBe(true);
+              const written = path.join(tmp, 'packaged', target, 'extension.zip');
+              ctx.expect(fs.existsSync(written)).toBe(true);
+
+              const asset = uploaded.find((file) => path.basename(file) === `extension-${target}.zip`);
+              ctx.expect(asset).toBeDefined();
+              ctx.expect(fs.readFileSync(asset).equals(fs.readFileSync(written))).toBe(true);
             }
           });
         } finally {
@@ -472,7 +522,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'firefox: side_panel maps to sidebar_action, the sidePanel permission is dropped, chromium keeps both (#264)',
+      name: 'firefox: side_panel maps to sidebar_action, the sidePanel permission is dropped, chrome keeps both (#264)',
       run: async (ctx) => {
         const tmp = stageProject({
           files: {
@@ -497,13 +547,13 @@ module.exports = defineCases({
             ctx.expect(firefox.background.service_worker).toBeUndefined();
             ctx.expect(firefox.background.scripts).toContain('assets/js/components/background.bundle.js');
 
-            const chromiumDir = path.join(tmp, 'out-chromium');
-            await task.compileManifest(chromiumDir, 'chromium');
-            const chromium = JSON.parse(fs.readFileSync(path.join(chromiumDir, 'manifest.json'), 'utf8'));
+            const chromeDir = path.join(tmp, 'out-chrome');
+            await task.compileManifest(chromeDir, 'chrome');
+            const chrome = JSON.parse(fs.readFileSync(path.join(chromeDir, 'manifest.json'), 'utf8'));
 
-            ctx.expect(chromium.side_panel.default_path).toBe('views/sidepanel/index.html');
-            ctx.expect(chromium.permissions).toContain('sidePanel');
-            ctx.expect(chromium.sidebar_action).toBeUndefined();
+            ctx.expect(chrome.side_panel.default_path).toBe('views/sidepanel/index.html');
+            ctx.expect(chrome.permissions).toContain('sidePanel');
+            ctx.expect(chrome.sidebar_action).toBeUndefined();
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -525,9 +575,9 @@ module.exports = defineCases({
             ctx.expect(thrown.message).toMatch(/browser_specific_settings\.gecko\.id/);
             ctx.expect(fs.existsSync(path.join(tmp, 'out-firefox', 'manifest.json'))).toBe(false);
 
-            // The same source still packages for chromium — the gate is firefox's alone
-            await task.compileManifest(path.join(tmp, 'out-chromium'), 'chromium');
-            ctx.expect(fs.existsSync(path.join(tmp, 'out-chromium', 'manifest.json'))).toBe(true);
+            // The same source still packages for chrome: the gate is firefox's alone
+            await task.compileManifest(path.join(tmp, 'out-chrome'), 'chrome');
+            ctx.expect(fs.existsSync(path.join(tmp, 'out-chrome', 'manifest.json'))).toBe(true);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -565,6 +615,57 @@ module.exports = defineCases({
         } finally {
           fs.rmSync(withUrl, { recursive: true, force: true });
           fs.rmSync(idOnly, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'deriveFirefoxId: the url host first, the brand id next, then nothing (#893)',
+      run: (ctx) => {
+        // The derivation has ONE home (lib/listings.js), because two readers ask
+        // it the same question: the package task, for the gecko id it writes
+        // into the manifest, and the local scaffold, which pins that same value
+        // into the brand config.
+        const { deriveFirefoxId } = require(path.join(SRC, 'lib', 'listings.js'));
+
+        ctx.expect(deriveFirefoxId({ brand: { id: 'staged-brand', url: 'https://staged.example.com/app' } })).toBe('extension@staged.example.com');
+        ctx.expect(deriveFirefoxId({ brand: { id: 'staged-brand' } })).toBe('extension@staged-brand.extension');
+        ctx.expect(deriveFirefoxId({})).toBe('');
+      },
+    },
+    {
+      name: 'firefox: the CONFIG listing id is the gecko id, and a contradicting manifest fails (#893)',
+      run: async (ctx) => {
+        // One home for the AMO add-on id: a brand declares it in config and the
+        // manifest is written from it, so a publish and a package can never
+        // address two different add-ons.
+        const configured = stageProject({
+          config: `{ brand: { id: 'staged-brand', name: 'Staged', url: 'https://staged.example.com' }, targets: { extension: { type: 'extension', listings: { firefox: { id: 'addon@staged.example.com' } } } } }`,
+          files: { 'dist/manifest.json': MANIFEST(`description: 'id comes from config'`) },
+        });
+        const contradicting = stageProject({
+          config: `{ brand: { id: 'staged-brand', name: 'Staged' }, targets: { extension: { type: 'extension', listings: { firefox: { id: 'addon@staged.example.com' } } } } }`,
+          files: { 'dist/manifest.json': MANIFEST(`browser_specific_settings: { gecko: { id: 'other@staged.example.com' } }`) },
+        });
+
+        try {
+          await inProject(configured, async (task) => {
+            const outputDir = path.join(configured, 'out-firefox');
+            await task.compileManifest(outputDir, 'firefox');
+            const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
+            ctx.expect(m.browser_specific_settings.gecko.id).toBe('addon@staged.example.com');
+          });
+
+          await inProject(contradicting, async (task) => {
+            let thrown = null;
+            await task.compileManifest(path.join(contradicting, 'out-firefox'), 'firefox').catch((e) => { thrown = e; });
+            ctx.expect(thrown).toBeInstanceOf(Error);
+            ctx.expect(thrown.message).toMatch(/other@staged\.example\.com/);
+            ctx.expect(thrown.message).toMatch(/addon@staged\.example\.com/);
+            ctx.expect(fs.existsSync(path.join(contradicting, 'out-firefox', 'manifest.json'))).toBe(false);
+          });
+        } finally {
+          fs.rmSync(configured, { recursive: true, force: true });
+          fs.rmSync(contradicting, { recursive: true, force: true });
         }
       },
     },
@@ -621,7 +722,7 @@ module.exports = defineCases({
 
         try {
           // Chrome and Firefox both link the store listing's developer site from it
-          for (const target of ['chromium', 'firefox']) {
+          for (const target of ['chrome', 'firefox']) {
             await inProject(derived, async (task) => {
               const outputDir = path.join(derived, `out-${target}`);
               await task.compileManifest(outputDir, target);
@@ -632,14 +733,14 @@ module.exports = defineCases({
 
           await inProject(declared, async (task) => {
             const outputDir = path.join(declared, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.homepage_url).toBe('https://staged.example.com/chrome');
           });
 
           await inProject(noBrandUrl, async (task) => {
             const outputDir = path.join(noBrandUrl, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.homepage_url).toBeUndefined();
           });
@@ -662,7 +763,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             const outputDir = path.join(tmp, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
 
             // The published extension is reachable from the brand's own site;
@@ -686,7 +787,7 @@ module.exports = defineCases({
         try {
           await inProject(tmp, async (task) => {
             const outputDir = path.join(tmp, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
 
             // A trailing slash in brand.url is normalized to a match pattern
@@ -716,14 +817,14 @@ module.exports = defineCases({
         try {
           await inProject(declared, async (task) => {
             const outputDir = path.join(declared, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.externally_connectable.matches).toEqual(['https://partner.example.com/*']);
           });
 
           await inProject(emptied, async (task) => {
             const outputDir = path.join(emptied, 'out');
-            await task.compileManifest(outputDir, 'chromium');
+            await task.compileManifest(outputDir, 'chrome');
             const m = JSON.parse(fs.readFileSync(path.join(outputDir, 'manifest.json'), 'utf8'));
             ctx.expect(m.externally_connectable).toBeUndefined();
           });

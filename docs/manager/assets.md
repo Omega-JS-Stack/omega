@@ -13,9 +13,9 @@ it — because it is local file work the target legs consume.
 
 | Operation | What it does |
 |---|---|
-| `logo-gen` | Wordmark + combomark SVGs from the brandmark and `brand.font`, text rendered as PATH OUTLINES so the SVGs are self-contained. Missing-only: an existing (possibly hand-tuned) file is never overwritten. |
+| `logo-gen` | Wordmark + combomark SVGs from the brandmark and `brand.font`, text rendered as PATH OUTLINES so the SVGs are self-contained. Missing-only: an existing (possibly hand-tuned) file is never overwritten. The service renders the path data itself, since opentype.js rounds a coordinate sitting within float noise of an integer to NaN and truncates the glyph there ([#916](https://github.com/Omega-JS-Stack/omega/issues/916)), and a path that still carries NaN or Infinity fails the run naming the font file and the text rather than writing a sliver. |
 | `process` | Per logo source: the colour SVG as-is plus an all-black conversion, exported as SVG + PNGs at every ladder size. |
-| `templates` | Seeds the brand's PSDs from the company root when missing (company-managed brands), replaces the logo and text layers, writes the PSD back, composites and exports the PNGs. |
+| `templates` | Seeds the brand's PSDs from the company tree's `assets/templates/` when missing (a brand of a company, [#677](https://github.com/Omega-JS-Stack/omega/issues/677)), replaces the logo and text layers, writes the PSD back, composites and exports the PNGs. |
 | `icons` | macOS `.icns` and Windows `.ico`, from the composited `icon.png` the templates op produced when there is one, else the brandmark. |
 | `social-icons` | The square brandmark centred on white with padding, for profile pictures. |
 | `favicons` | The favicon PNG ladder, a multi-size `favicon.ico`, and `site.webmanifest` (content-diffed, since it derives from config rather than an image). |

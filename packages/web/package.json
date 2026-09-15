@@ -10,8 +10,7 @@
   "bin": {
     "omega": "./bin/omega",
     "omg": "./bin/omg",
-    "mgr": "./bin/omega",
-    "omega-web": "./bin/omega-web"
+    "mgr": "./bin/omega"
   },
   "files": [
     "bin/",
@@ -41,7 +40,8 @@
     "./deploy": "./dist/commands/deploy.js",
     "./service-worker": "./sw/manager.js",
     "./migrate": "./dist/migrate/index.js",
-    "./cli": "./dist/cli-run.js"
+    "./cli": "./dist/cli-run.js",
+    "./ensure-target": "./dist/commands/lib/ensure-target.js"
   },
   "projectScripts": {
     "start": "omega dev",
@@ -52,7 +52,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "prepare": "node -e \"require('../devkit/tools/prepare-guard')() && require('prepare-package')()\"",
+    "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "translate:defaults": "node src/translate/generate-defaults.js",
     "test": "node --require @omega.js/devkit/test/stdout-guard --test test/*.test.js && node --require @omega.js/devkit/test/stdout-guard --test --test-concurrency=1 test/watch/*.test.js"
@@ -64,8 +64,8 @@
     "type": "copy",
     "hooks": {
       "after": [
-        "node -e \"require('@omega.js/devkit/vendor')()\"",
-        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\""
+        "node -e \"require('@omega.js/devkit/prepare-guard').rewire()\"",
+        "node -e \"require('@omega.js/devkit/vendor')()\""
       ],
       "afterBlocking": true
     }
@@ -96,8 +96,7 @@
     "purgecss": "^8.0.0",
     "sass": "^1.101.0",
     "sharp": "^0.35.3",
-    "wonderful-fetch": "^2.0.5",
-    "yargs": "^18.0.0"
+    "wonderful-fetch": "^2.0.5"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",

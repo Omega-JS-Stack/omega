@@ -43,15 +43,15 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
           fakePng(path.join(emDefaultsRoot, 'icons', 'windows', 'icon.png'));
 
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          ctx.expect(out.macos.app).toBe(path.join(distRoot, 'config', 'icons', 'macos', 'icon.png'));
+          ctx.expect(out.mac.app).toBe(path.join(distRoot, 'config', 'icons', 'mac', 'icon.png'));
           ctx.expect(out.windows.app).toBe(path.join(distRoot, 'config', 'icons', 'windows', 'icon.png'));
-          ctx.expect(jetpack.exists(out.macos.app)).toBeTruthy();
+          ctx.expect(jetpack.exists(out.mac.app)).toBeTruthy();
           ctx.expect(jetpack.exists(out.windows.app)).toBeTruthy();
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
@@ -63,15 +63,15 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
-          const consumerIcon = path.join(projectRoot, 'config', 'icons', 'macos', 'icon.png');
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
+          const consumerIcon = path.join(projectRoot, 'config', 'icons', 'mac', 'icon.png');
           fakePng(consumerIcon);
           fs.writeFileSync(consumerIcon, Buffer.from('consumer-bytes'));
 
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          const bytes = fs.readFileSync(out.macos.app);
+          const bytes = fs.readFileSync(out.mac.app);
           ctx.expect(bytes.toString()).toBe('consumer-bytes');
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
@@ -84,7 +84,7 @@ module.exports = defineCases({
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
           // Bundled defaults exist for all three platforms — but consumer-global wins.
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
           fakePng(path.join(emDefaultsRoot, 'icons', 'windows', 'icon.png'));
 
           // Consumer ships ONE file at the global path. All three platforms pick it up.
@@ -95,7 +95,7 @@ module.exports = defineCases({
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          for (const platform of ['macos', 'windows', 'linux']) {
+          for (const platform of ['mac', 'windows', 'linux']) {
             ctx.expect(out[platform].app).toBeDefined();
             const bytes = fs.readFileSync(out[platform].app);
             ctx.expect(bytes.toString()).toBe('global-bytes');
@@ -118,14 +118,14 @@ module.exports = defineCases({
           fs.writeFileSync(globalIcon, Buffer.from('global-bytes'));
 
           // Mac-specific override exists — should win for macOS.
-          const macIcon = path.join(projectRoot, 'config', 'icons', 'macos', 'icon.png');
+          const macIcon = path.join(projectRoot, 'config', 'icons', 'mac', 'icon.png');
           fakePng(macIcon);
           fs.writeFileSync(macIcon, Buffer.from('mac-specific-bytes'));
 
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          ctx.expect(fs.readFileSync(out.macos.app).toString()).toBe('mac-specific-bytes');
+          ctx.expect(fs.readFileSync(out.mac.app).toString()).toBe('mac-specific-bytes');
           ctx.expect(fs.readFileSync(out.windows.app).toString()).toBe('global-bytes');
           ctx.expect(fs.readFileSync(out.linux.app).toString()).toBe('global-bytes');
         } finally {
@@ -200,37 +200,37 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
           // Input source files at retina (native) size. @omega.js/desktop should emit both @1x + @2x in dist.
           // Tray input is `tray.png`; @omega.js/desktop renames the dist output to `trayTemplate.png` (macOS magic).
-          await realPng(path.join(emDefaultsRoot, 'icons', 'macos', 'tray.png'), 32, 32);
-          await realPng(path.join(emDefaultsRoot, 'icons', 'macos', 'dmg.png'), 1080, 760);
+          await realPng(path.join(emDefaultsRoot, 'icons', 'mac', 'tray.png'), 32, 32);
+          await realPng(path.join(emDefaultsRoot, 'icons', 'mac', 'dmg.png'), 1080, 760);
 
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
           // Both @1x and @2x slots populated.
-          ctx.expect(out.macos.tray).toBeDefined();
-          ctx.expect(out.macos.tray2x).toBeDefined();
-          ctx.expect(out.macos.dmg).toBeDefined();
-          ctx.expect(out.macos.dmg2x).toBeDefined();
+          ctx.expect(out.mac.tray).toBeDefined();
+          ctx.expect(out.mac.tray2x).toBeDefined();
+          ctx.expect(out.mac.dmg).toBeDefined();
+          ctx.expect(out.mac.dmg2x).toBeDefined();
           // app slot has no retina flag.
-          ctx.expect(out.macos.app2x).toBeUndefined();
+          ctx.expect(out.mac.app2x).toBeUndefined();
 
           // Tray output filename is trayTemplate.png (renamed for macOS auto-inversion magic).
-          ctx.expect(path.basename(out.macos.tray)).toBe('trayTemplate.png');
-          ctx.expect(path.basename(out.macos.tray2x)).toBe('trayTemplate@2x.png');
+          ctx.expect(path.basename(out.mac.tray)).toBe('trayTemplate.png');
+          ctx.expect(path.basename(out.mac.tray2x)).toBe('trayTemplate@2x.png');
 
           // @1x derived at half the @2x dimensions.
-          const tray1xMeta = await sharp(out.macos.tray).metadata();
-          const tray2xMeta = await sharp(out.macos.tray2x).metadata();
+          const tray1xMeta = await sharp(out.mac.tray).metadata();
+          const tray2xMeta = await sharp(out.mac.tray2x).metadata();
           ctx.expect(tray1xMeta.width).toBe(16);
           ctx.expect(tray1xMeta.height).toBe(16);
           ctx.expect(tray2xMeta.width).toBe(32);
           ctx.expect(tray2xMeta.height).toBe(32);
 
-          const dmg1xMeta = await sharp(out.macos.dmg).metadata();
-          const dmg2xMeta = await sharp(out.macos.dmg2x).metadata();
+          const dmg1xMeta = await sharp(out.mac.dmg).metadata();
+          const dmg2xMeta = await sharp(out.mac.dmg2x).metadata();
           ctx.expect(dmg1xMeta.width).toBe(540);
           ctx.expect(dmg1xMeta.height).toBe(380);
           ctx.expect(dmg2xMeta.width).toBe(1080);
@@ -245,20 +245,20 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
-          await realPng(path.join(emDefaultsRoot, 'icons', 'macos', 'tray.png'), 32, 32);
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
+          await realPng(path.join(emDefaultsRoot, 'icons', 'mac', 'tray.png'), 32, 32);
           // Consumer ships ONE file as `tray.png` (at @2x native size).
-          const consumerTray = path.join(projectRoot, 'config', 'icons', 'macos', 'tray.png');
+          const consumerTray = path.join(projectRoot, 'config', 'icons', 'mac', 'tray.png');
           await realPng(consumerTray, 32, 32);
 
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          ctx.expect(out.macos.tray).toBeDefined();
-          ctx.expect(out.macos.tray2x).toBeDefined();
+          ctx.expect(out.mac.tray).toBeDefined();
+          ctx.expect(out.mac.tray2x).toBeDefined();
           // Output is still trayTemplate.png regardless of input name.
-          ctx.expect(path.basename(out.macos.tray)).toBe('trayTemplate.png');
-          const tray1xMeta = await sharp(out.macos.tray).metadata();
+          ctx.expect(path.basename(out.mac.tray)).toBe('trayTemplate.png');
+          const tray1xMeta = await sharp(out.mac.tray).metadata();
           ctx.expect(tray1xMeta.width).toBe(16);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });
@@ -270,7 +270,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
-          fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
+          fakePng(path.join(emDefaultsRoot, 'icons', 'mac', 'icon.png'));
           fakePng(path.join(emDefaultsRoot, 'icons', 'windows', 'icon.png'));
 
           // Consumer ships ONE tray file under global/.
@@ -279,13 +279,13 @@ module.exports = defineCases({
           const { resolveAndCopy } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'resolve-icons.js'));
           const out = await resolveAndCopy({ config: {}, projectRoot, distRoot, emDefaultsRoot });
 
-          ctx.expect(out.macos.tray).toBeDefined();
-          ctx.expect(out.macos.tray2x).toBeDefined();
+          ctx.expect(out.mac.tray).toBeDefined();
+          ctx.expect(out.mac.tray2x).toBeDefined();
           ctx.expect(out.windows.tray).toBeDefined();
           ctx.expect(out.linux.tray).toBeDefined();
 
           // macOS @1x derived at half size from the global @2x source.
-          const macTrayMeta = await sharp(out.macos.tray).metadata();
+          const macTrayMeta = await sharp(out.mac.tray).metadata();
           ctx.expect(macTrayMeta.width).toBe(16);
         } finally {
           fs.rmSync(root, { recursive: true, force: true });

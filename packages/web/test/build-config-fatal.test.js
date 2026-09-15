@@ -26,7 +26,7 @@ const PKG = path.resolve(__dirname, '..');
 // renamed to payment.providers in #428) — the rest of the tree is a valid
 // consumer, so nothing but that finding can fail the build. The package.json
 // declares the framework so the bin dispatches straight to this one.
-function consumer(t) {
+function consumer(t, extraFiles) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-build-config-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -34,7 +34,7 @@ function consumer(t) {
     'config/omega.json5': `{
   brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com' },
   payment: { processors: { stripe: {} } },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }`,
     'package.json': JSON.stringify({
       name: 'fixture-website',
@@ -44,7 +44,7 @@ function consumer(t) {
     'src/index.md': '# home',
   };
 
-  for (const [relative, contents] of Object.entries(files)) {
+  for (const [relative, contents] of Object.entries({ ...files, ...extraFiles })) {
     const abs = path.join(root, relative);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, contents);
@@ -80,4 +80,45 @@ test('bin: `omega build` exits non-zero on a fatal config finding (real process,
   assert.match(output, /payment\.processors is retired/, 'the finding is printed');
   assert.notStrictEqual(run.status, 0, 'CI and scripted callers must read the run as a failure');
   assert.strictEqual(fs.existsSync(path.join(root, 'dist')), false, 'a refused build writes no output');
+});
+
+/**
+ * The environment overlay is part of the build's config
+ * ([#856](https://github.com/Omega-JS-Stack/omega/issues/856)): `omega build`
+ * IS the production build, so it names `production` and the
+ * `config/omega.production.json5` beside the base composes, on a machine whose
+ * own ambient answer is `development`. Proven the way this file proves
+ * everything else about the build's config: a retired key in the file that
+ * composes is fatal, and the base here is clean, so only the overlay can throw.
+ */
+test('build: the PRODUCTION overlay composes, never the machine ambient one (#856)', async (t) => {
+  const root = consumer(t, {
+    'config/omega.json5': `{
+  brand: { id: 'fixture', name: 'Fixture', url: 'https://fixture.example.com' },
+  targets: { web: { type: 'web' } },
+}`,
+    'config/omega.production.json5': `{ payment: { processors: { stripe: {} } } }`,
+    'config/omega.development.json5': `{ theme: { id: 'classy' } }`,
+  });
+  const previous = process.cwd();
+  process.chdir(root);
+  t.after(() => process.chdir(previous));
+
+  // This machine says `development`, the way a terminal running a local build
+  // does. The lane still builds for production, which is the whole point.
+  const saved = [['ENVIRONMENT', process.env.ENVIRONMENT], ['OMEGA_TEST_MODE', process.env.OMEGA_TEST_MODE]];
+  delete process.env.OMEGA_TEST_MODE;
+  process.env.ENVIRONMENT = 'development';
+  t.after(() => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  await assert.rejects(
+    build({ logFile: false }),
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    'the production overlay is a layer of the build config, so its retired key refuses the build',
+  );
 });

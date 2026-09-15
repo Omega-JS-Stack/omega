@@ -106,6 +106,32 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'the license is seeded once and a brand\'s own is kept (#884)',
+      run: async (ctx) => {
+        // AMO wants a license on the version that CREATES a listing, and the
+        // Firefox lane reads it right here. UNLICENSED is npm's word for
+        // closed-source commercial code, which every OMEGA target starts as.
+        const fresh = stageProject(CONSUMER_PKG);
+        const declared = stageProject({ ...CONSUMER_PKG, license: 'MIT' });
+
+        try {
+          await inProject(fresh, async (setup) => {
+            setup.setupScripts();
+            ctx.expect(JSON.parse(fs.readFileSync(path.join(fresh, 'package.json'), 'utf8')).license).toBe('UNLICENSED');
+          });
+
+          // Licensing is the brand's call: a stated license is never rewritten
+          await inProject(declared, async (setup) => {
+            setup.setupScripts();
+            ctx.expect(JSON.parse(fs.readFileSync(path.join(declared, 'package.json'), 'utf8')).license).toBe('MIT');
+          });
+        } finally {
+          fs.rmSync(fresh, { recursive: true, force: true });
+          fs.rmSync(declared, { recursive: true, force: true });
+        }
+      },
+    },
+    {
       name: 'a package.json that DID change is written (#572)',
       run: async (ctx) => {
         const tmp = stageProject(CONSUMER_PKG);

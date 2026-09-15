@@ -16,6 +16,7 @@ const { test } = require('node:test');
 
 const { buildWith, miniData, MINI } = require('./lib/build.js');
 const { applyCollectionLimits, readLimits, sampleDocuments, collectionDocuments } = require('../src/limit-collections.js');
+const { setEnvironment } = require('@omega.js/config/environment');
 
 // The mini fixture's posts, newest first (dated filenames under _posts/).
 const MINI_POSTS = 17;
@@ -99,17 +100,26 @@ test('a collection reads off disk in the order it lists its documents', () => {
   assert.deepStrictEqual(collectionDocuments(MINI, 'team'), [], 'a collection the brand has no content for is empty, not an error');
 });
 
-test('a production build validates the key it will never act on', () => {
+test('a production build validates the key it will never act on', (t) => {
   // The typo has to fail on `omega build` too — production reads the key
   // only to check it, so a bad name cannot hide until someone runs dev.
   const config = { addPreprocessor: () => assert.fail('production must never skip a document') };
 
+  // The lane NAMES the environment (#817): `omega build` names production for
+  // the whole process, and this gate reads that one input.
+  const saved = process.env.OMEGA_ENVIRONMENT;
+  setEnvironment('production');
+  t.after(() => {
+    if (saved === undefined) delete process.env.OMEGA_ENVIRONMENT;
+    else process.env.OMEGA_ENVIRONMENT = saved;
+  });
+
   assert.throws(
-    () => applyCollectionLimits(config, { consumerDir: MINI, limits: { recipes: 5 }, environment: 'production' }),
+    () => applyCollectionLimits(config, { consumerDir: MINI, limits: { recipes: 5 } }),
     /not an OMEGA collection/,
   );
   assert.strictEqual(
-    applyCollectionLimits(config, { consumerDir: MINI, limits: { posts: 3 }, environment: 'production' }),
+    applyCollectionLimits(config, { consumerDir: MINI, limits: { posts: 3 } }),
     null,
     'a valid limit samples nothing in production',
   );

@@ -105,7 +105,7 @@ function seedTarget(shared, opts = {}) {
   jetpack.write(path.join(targetPath, 'config', 'omega.json5'), JSON.stringify({
     brand: { name: 'Tenant Brand' },
     cloud: shared ? { shared: true, config: { projectId: 'shared-project' } } : { config: { projectId: 'own-project' } },
-    targets: { backend: {} },
+    targets: { backend: { type: 'backend' } },
   }, null, 2));
 
   return targetPath;

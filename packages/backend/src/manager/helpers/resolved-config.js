@@ -13,21 +13,23 @@
  * module only names the group and the values that belong in it; new derived
  * values join here as real brand needs surface.
  */
-const { brandRepo } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
 
 /**
  * Build the `resolved` group for a composed config.
  *
  * @param {object} config - The composed omega config (brand + backend target layers).
- * @returns {{ github: { owner: string, name: string, repo: string } }} Derived values; each field is '' when the config cannot resolve it.
+ * @returns {{ github: { owner: string, name: string, slug: string }|null }} Derived values; `github` is null when the config names no org (or no brand id).
  */
 function resolvedConfigValues(config) {
   return {
-    // The brand's GitHub repo: `.repo` is the "owner/name" slug every GitHub API
-    // call wants, `.owner`/`.name` the same answer split. Resolves
-    // `repo.providers.github` overlaid by the backend target's own `github`
-    // block, which wins (the CMS/content repo override).
-    github: brandRepo(config),
+    // The brand's SOURCE repo, `<brand.id>-omega` under the one `repo.org`
+    // block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): where
+    // the site's content lives, so it is the repo the CMS routes commit to.
+    // `.slug` is the "owner/name" every GitHub API call wants, `.owner`/`.name`
+    // the same answer split. Null when the config names no org: half an address
+    // addresses nothing, and the routes' guards say so.
+    github: sourceRepo(config),
   };
 }
 

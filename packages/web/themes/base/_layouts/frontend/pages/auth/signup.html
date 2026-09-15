@@ -4,13 +4,13 @@ layout: frontend/core/cover
 benefits:
   - title: "Free forever"
     description: "Start free, upgrade when you're ready"
-    icon: "gift"
+    icon: "fa-solid fa-gift"
   - title: "No setup fees"
     description: "Instant start, no hidden costs"
-    icon: "credit-card"
+    icon: "fa-solid fa-credit-card"
   - title: "24/7 support"
     description: "Real humans, whenever you need them"
-    icon: "headset"
+    icon: "fa-solid fa-headset"
 
 social_signup:
   - id: "google.com"
@@ -53,7 +53,7 @@ social_signup:
                   <span class="d-inline-flex me-2" aria-hidden="true">{% omega_logo provider.logo, "brandmarks" %}</span>
                 {% endiftruthy %}
                 {% iffalsy provider.logo %}
-                  <i class="fa-solid fa-{{ provider.icon }} me-2"></i>
+                  <i class="{{ provider.icon }} me-2" aria-hidden="true"></i>
                 {% endiffalsy %}
                 <span class="button-text">Sign up with {{ provider.name }}</span>
               </button>

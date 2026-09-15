@@ -1,8 +1,8 @@
 // Build-layer pin for the verts auto-bind (ads-system phase 4): every page
 // surface (popup/options/sidepanel/page) wires lib/verts.js after
 // omega.initialize(), the binder pins the house lane (extension surfaces
-// never run AdSense — store policy + MV3 CSP), the build-JSON allowlist
-// carries advertising/company through to the client, and content/background/
+// never run AdSense: store policy + MV3 CSP), the client subset carries
+// advertising/company through to the client, and content/background/
 // offscreen deliberately do NOT bind. Surface files are browser-context ES
 // modules (window/chrome at module scope), so this pins the SOURCE text
 // rather than importing them — same model as cache-warming.test.js. The
@@ -19,8 +19,10 @@ const read = (...segments) => fs.readFileSync(path.join(ROOT, ...segments), 'utf
 const SURFACES = ['popup.js', 'options.js', 'sidepanel.js', 'page.js'];
 const NON_SURFACES = ['content.js', 'background.js', 'offscreen.js'];
 const VERTS_LIB = read('lib', 'verts.js');
-// The build snapshot is baked in by the bundle task ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)).
-const BUNDLE_TASK = read('gulp', 'tasks', 'bundle.js');
+// What the baked snapshot may carry is @omega.js/config's declaration since
+// [#894](https://github.com/Omega-JS-Stack/omega/issues/894): one row per
+// section, read by all three browser bakes.
+const { CLIENT_SECTIONS } = require('@omega.js/config');
 
 module.exports = defineCases({
   type: 'suite',
@@ -57,10 +59,13 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'build-JSON allowlist carries advertising + company to the client',
+      name: 'the client subset carries advertising + company (the house lane\'s config)',
       run: (ctx) => {
-        ctx.expect(BUNDLE_TASK).toMatch(/advertising: config\.advertising \|\| \{\},/);
-        ctx.expect(BUNDLE_TASK).toMatch(/company: config\.company \|\| \{\},/);
+        // The inhouse source 'company' derives its api URL from company.url, so
+        // both sections have to reach a browser: one schema row each, and the
+        // bake test (build/build-json-bake) proves the artifact carries them.
+        ctx.expect(CLIENT_SECTIONS.advertising).toBe(true);
+        ctx.expect(CLIENT_SECTIONS.company).toBe(true);
       },
     },
   ],

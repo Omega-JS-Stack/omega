@@ -16,7 +16,7 @@ everything that depends on a backend.
 | `project-settings` | The GCP display name matches `brand.name`, and a web app named "Web App" exists. Diffed before writing. |
 | `oauth-consent` | The OAuth consent screen (IAP brand): application title, support email, and the AUDIENCE (below). |
 | `service-account` | The Admin SDK service account with `firebase.admin`, `firebaseauth.admin`, `datastore.owner`, `serviceusage.serviceUsageConsumer`, `cloudscheduler.admin`, its key downloaded, and `iam.serviceAccountUser` on the App Engine and compute default service accounts, the grant a runner's functions deploy needs to act as them ([#878](https://github.com/Omega-JS-Stack/omega/issues/878)). Every IAM grant diffs the policy first. |
-| `hosting` | The default hosting site gets `api.{domain}`: ONE api domain, shared by every web instance the brand runs ([#588](https://github.com/Omega-JS-Stack/omega/issues/588)); DNS is written through Cloudflare. The main domain is NOT added — the website hosts on GitHub Pages. |
+| `hosting` | The default hosting site gets `api.{domain}`: ONE api domain, shared by every web target the brand runs ([#588](https://github.com/Omega-JS-Stack/omega/issues/588)); DNS is written through Cloudflare. The main domain is NOT added: the website hosts on GitHub Pages. |
 | `firestore` | The Firestore database (nam5 US multi-region) with Point-in-Time Recovery. |
 | `database` | The default Realtime Database instance (`{projectId}-default-rtdb`, us-central1). |
 | `authentication` | Identity Platform, email/password sign-in, email-enumeration privacy, anonymous auto-delete, the password policy, authorized domains — all diffed via Identity Toolkit — plus Google sign-in. |
@@ -45,7 +45,10 @@ everything that depends on a backend.
 - `cloud.messaging.vapidKey` — the public web-push key.
 - `cloud.shared: true` — the project is shared by several brands, so only the per-brand
   operations run (`service-account`, `sdk-config`): one brand never rewrites a shared
-  project's settings.
+  project's settings. The DEPLOY lane honors the same key
+  ([#882](https://github.com/Omega-JS-Stack/omega/issues/882)): the backend deploy quits with
+  one line and exit 0 on every lane, so a shared project is never deployed into
+  ([deploys.md](../shared/deploys.md)).
 
 **Credentials**: `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in the brand `.env` (OAuth2;
 tokens cache to `.omega/auth/google-tokens.json`, and the first run prints an auth URL).

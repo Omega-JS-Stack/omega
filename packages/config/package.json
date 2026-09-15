@@ -12,6 +12,8 @@
     "./validate": "./src/validate.js",
     "./load": "./src/load.js",
     "./env": "./src/env.js",
+    "./environment": "./src/environment.js",
+    "./dev-facts": "./src/dev-facts.js",
     "./env-schema": "./src/env-schema.js",
     "./env-delivery": "./src/env-delivery.js",
     "./env-rules": "./src/env-rules.js",

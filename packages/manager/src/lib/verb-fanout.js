@@ -37,7 +37,7 @@ const { resolveTargetRun } = require('./framework-bin.js');
 const { runCommand } = require('./run-command.js');
 const { PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('./target-selection.js');
 
-// Both yargs spellings of the flag this fan-out consumes (see the header)
+// Both spellings of the flag this fan-out consumes (see the header)
 const DRY_RUN_KEYS = ['dry-run', 'dryRun'];
 
 /**
@@ -78,7 +78,7 @@ async function runVerbFanout(verb, options = {}, deps = {}) {
   const forwarded = buildForwardedFlags(options, DRY_RUN_KEYS);
   const dryRun = !!(options['dry-run'] || options.dryRun);
 
-  console.log(chalk.bold(`\nOMEGA brand ${verb} — ${path.basename(brandRoot)}${dryRun ? chalk.dim(' (dry run)') : ''} ${chalk.dim(`(${selected.map((entry) => entry.target || entry.name).join(' → ')})`)}`));
+  console.log(chalk.bold(`\nOMEGA brand ${verb}: ${path.basename(brandRoot)}${dryRun ? chalk.dim(' (dry run)') : ''} ${chalk.dim(`(${selected.map((entry) => entry.name).join(' → ')})`)}`));
 
   const summary = [];
 

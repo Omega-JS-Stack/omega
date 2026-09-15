@@ -22,6 +22,8 @@ Liquid form.
 #   schema                          structured data (JSON-LD) for this page
 #   config                          per-page omega.json5 overrides (theme, client…)
 #   redirect                        url / querystring for the redirect layout
+#   catalog                         include / category for this page's pages.json entry
+#   translation                     include: true / false, this page's own translation switch
 #   templateEngineOverride          the engine, when it isn't inferred
 #   eleventyExcludeFromCollections  keep the page out of collections
 #

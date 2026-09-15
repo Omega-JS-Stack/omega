@@ -3,8 +3,8 @@
  * list is DERIVED from the packaged defaults tree — every default page's
  * layout says whether it is marketing copy or plumbing, and its permalink says
  * where it lands — so a default page that moves, arrives, or is renamed can
- * never drift out of the list. `translation.exclude` goes back to being what
- * it is for: the brand's own pages.
+ * never drift out of the list. `translation.include` is left being what it is
+ * for: the brand's own pages.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -15,7 +15,7 @@ const { test } = require('node:test');
 const { defaultExcludedRoutes, legalRoutes } = require('../src/translate/default-routes.js');
 
 // The list every brand had to hand-write before the framework owned it — the
-// playground's `translation.exclude`, verbatim (#605 deletes it there).
+// playground's old `translation.exclude`, verbatim (#605 deletes it there).
 const HAND_WRITTEN = [
   'account', 'app', 'dashboard', 'signin', 'signup', 'login', 'register',
   'forgot', 'recover', 'reset', 'reset-password', 'change-password',

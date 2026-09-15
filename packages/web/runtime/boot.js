@@ -11,7 +11,7 @@
  *
  * Handshake (UJM src/index.js parity, minus runtime module dispatch):
  *   1. main bundle  → bootMain(globalModule):
- *      omega.initialize(window.Configuration) → dev lib (development
+ *      omega.initialize(window.OMEGA_BUILD_JSON.config) → dev lib (development
  *      only) → globalModule({ manager, options }).
  *   2. page bundle  → bootPage(pageModule): awaits the main boot, then
  *      pageModule({ manager, options }). Both scripts are `type="module"`
@@ -45,8 +45,11 @@ function getContext() {
 async function initialize() {
   const { manager, options } = getContext();
 
-  // Initialize the @omega.js/client singleton with the page-baked config
-  await omega.initialize(window.Configuration);
+  // Initialize the @omega.js/client singleton with the page-baked config: the
+  // ONE snapshot name every OMEGA browser surface bakes, read the same way in
+  // the desktop renderer and in every extension context (#894).
+  const configuration = window.OMEGA_BUILD_JSON?.config;
+  await omega.initialize(configuration);
 
   // Icon upgrading (#619) — the build already inlined every icon the rendered
   // page named, so this is what covers markup JS creates afterwards and

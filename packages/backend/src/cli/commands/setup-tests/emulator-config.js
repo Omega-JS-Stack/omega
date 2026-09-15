@@ -3,18 +3,17 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const _ = require('lodash');
+const { CLASSIC_PORTS } = require('@omega.js/config');
 
-// Default emulator ports - SSOT for fallback values
-const DEFAULT_EMULATOR_PORTS = {
-  auth: 9099,
-  functions: 5001,
-  firestore: 8080,
-  database: 9000,
-  hosting: 5002,
-  storage: 9199,
-  pubsub: 8085,
-  ui: 4050,
-};
+// The emulators a brand's firebase.json must declare, and their default ports:
+// the names are this file's (firebase.json knows nothing about the website,
+// livereload or cdp entries the map also carries), the NUMBERS are
+// @omega.js/config's `CLASSIC_PORTS`, the ONE home of them
+// ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)). Hand-typed here
+// they were a second copy, free to drift from the allocator that resolves the
+// live stack off the same map.
+const EMULATOR_NAMES = ['auth', 'functions', 'firestore', 'database', 'hosting', 'storage', 'pubsub', 'ui'];
+const DEFAULT_EMULATOR_PORTS = Object.fromEntries(EMULATOR_NAMES.map((name) => [name, CLASSIC_PORTS[name]]));
 
 /**
  * Load a project's emulator ports from firebase.json, falling back to the

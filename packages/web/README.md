@@ -399,7 +399,7 @@ example, and the four questions to read a page against them:
   anywhere — is the SAME initialized singleton (webpack's single module
   graph, reproduced with `<script type="module">` semantics; both scripts are
   deferred and execute in document order). The handshake: main stub →
-  `bootMain(mod)` (omega.initialize(window.Configuration) → dev lib in
+  `bootMain(mod)` (omega.initialize(window.OMEGA_BUILD_JSON.config) → dev lib in
   development → global module), page stub → `bootPage(mod)` (awaits the main
   boot, then `mod({ manager, options })` — the UJM page-module contract,
   with `manager` the frontend Manager wrapper carrying mode helpers), layout
@@ -430,11 +430,12 @@ example, and the four questions to read a page against them:
   customization (the layered sass importer skips the requesting file, so a
   consumer main.scss configures the layers below it), page-css self-@use
   drops, liquid-lint, and legacy-file removal (Gemfile & co). `--check` runs
-  everything in memory. The ENGINE composes the runtime shape back
-  (cloud.config → `client.firebase.app.config`, payment →
-  `client.payment`, providers → the client's flat analytics) so the
-  chrome/client contract is unchanged — one home per value in the config,
-  same bridge pattern as the extension framework.
+  everything in memory. Nothing composes a runtime shape back (#894): the build
+  writes the browser subset of the resolved config as `OMEGA_BUILD_JSON.config`
+  into `/build.js` (@omega.js/config's `clientConfig`, the same file desktop's
+  renderer and every extension context load, #743), and @omega.js/client maps the
+  canonical homes onto its own contract: one home per value, one mapping for all
+  three surfaces.
 
 ## Design tokens (C3)
 
@@ -447,7 +448,7 @@ tokens — components read `var(--omega-*)`, never hardcoded values. The
 sheet emits before the theme in main.scss (themes win at equal
 specificity) and is pinned to ZERO sass deprecations — the bar for all
 new core css. `brand.color` drives the accent family: the engine derives
-a ramp ([src/brand-tokens.js](src/brand-tokens.js) — hover/active shifts,
+a ramp ([@omega.js/devkit/brand-tokens](../devkit/src/brand-tokens.js): hover/active shifts,
 WCAG-picked on-accent ink, subtle/ring alphas) and head.html emits it
 inline AFTER the bundles so the brand wins the cascade. No/invalid color
 → the sheet's neutral placeholder stands. Token VALUES are C3 scaffolding

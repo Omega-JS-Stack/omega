@@ -2,7 +2,8 @@
 const path = require('path');
 const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
-const { hasOmegaConfig, loadConfig, loadEnv, formatErrors, backendProjectType } = require('@omega.js/config');
+const { hasOmegaConfig, loadConfig, loadEnv, formatErrors, backendProjectType, envEnvironment, envPort, CLASSIC_PORTS } = require('@omega.js/config');
+const { getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment } = require('@omega.js/config/environment');
 const { resolvedConfigValues } = require('./helpers/resolved-config.js');
 const env = require('./libraries/env.js');
 const EventEmitter = require('events');
@@ -20,6 +21,39 @@ const cron = path.resolve(events, './cron');
 
 const BEM_TEMPLATES_DIR = path.resolve(__dirname, '../../templates');
 const BEM_PACKAGE = require('../../package.json');
+
+/**
+ * ONE dev port read for every local URL the Manager composes, and ONE home for
+ * the numbers it can answer with
+ * ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
+ *
+ * Channel one is the resolved map the CLI that booted this stack published:
+ * `OMEGA_<NAME>_PORT` env vars, which a functions worker inherits, so a BUMPED
+ * port (a second brand's stack already holding 5001) reaches this process (N7).
+ * Channel two is `CLASSIC_PORTS`, the one home of the classic numbers, and this
+ * IS the place they are legitimately the default: unlike a browser artifact,
+ * which carries a baked `dev.ports` map and therefore has no excuse to guess
+ * (#834), a node process booted straight onto `firebase emulators:start` has no
+ * map to read and its own firebase.json IS the classic stack. What is gone is
+ * the hand-typed literal: `|| 5001`, `|| 5002` and `|| 4000` were a fourth copy
+ * of numbers @omega.js/config owns, free to drift from the allocator that
+ * resolves them.
+ *
+ * @param {string} name - the port's name in the resolved map ('functions', 'hosting', 'website').
+ * @returns {number} the published port, else the classic default.
+ */
+function devPort(name) {
+  const classic = CLASSIC_PORTS[name];
+
+  // Loud by design: every name this is asked for is one the allocator resolves,
+  // so a typo'd name would otherwise compose a URL with `undefined` in it and
+  // fail as a connection refusal somewhere far from here.
+  if (!classic) {
+    throw new Error(`[@omega.js/backend:index] No classic port named \`${name}\` in @omega.js/config CLASSIC_PORTS (${Object.keys(CLASSIC_PORTS).join(', ')})`);
+  }
+
+  return envPort(name) || classic;
+}
 
 function Manager() {
   const self = this;
@@ -154,6 +188,19 @@ Manager.prototype.init = function (exporter, options) {
     self.ctx.error(new Error(`Failed to set up environment variables from .env file: ${e.message}`));
   }
 
+  // The environment's ONE input, for the whole process
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). The backend
+  // is the target whose deployed runtime legitimately arrives with no lane
+  // above it, so this boot resolves the answer ONCE, from the cascade it just
+  // loaded (`envEnvironment()`: the test runner's word, then FUNCTIONS_EMULATOR
+  // or an explicit ENVIRONMENT, else production for a deployed function), and
+  // every later read in the process answers that one value instead of
+  // re-sniffing. A deploy that named its own environment already set the
+  // variable, and it is left exactly as it is.
+  if (!process.env.OMEGA_ENVIRONMENT) {
+    setEnvironment(envEnvironment());
+  }
+
   // Load config — the consumer's config/omega.json5 resolved through
   // @omega.js/config (brand-monorepo aware: cwd is the functions dir, the
   // loader walks up to the brand layer when one exists). The framework
@@ -200,12 +247,6 @@ Manager.prototype.init = function (exporter, options) {
   // Manager function with .config already set — no need for setConfig() patterns.
   Manager.config = self.config;
 
-  // Set PAYPAL_CLIENT_ID from config (clientId is public, not a secret — lives in config, not .env)
-  process.env.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || self.config?.payment?.providers?.paypal?.clientId || '';
-
-  // Set CHARGEBEE_SITE from config (site is public, not a secret — lives in config, not .env)
-  process.env.CHARGEBEE_SITE = process.env.CHARGEBEE_SITE || self.config?.payment?.providers?.chargebee?.site || '';
-
   // Get brand ID
   const brandId = self.config?.brand?.id;
 
@@ -222,34 +263,28 @@ Manager.prototype.init = function (exporter, options) {
     });
   }
 
-  // Environment helpers — the Manager is the SINGLE SOURCE OF TRUTH (mirrors EM/UJM/BXM,
-  // where the Manager owns these). The resolution itself lives in the env reader
-  // (libraries/env.js, the ONLY place that reads the raw OMEGA_TEST_MODE /
-  // ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM vars) because the provider
-  // libraries need the same answer with no Manager handle (#586's dev/live
-  // payment split); the three is*() checks derive from it live on every call.
-  // They return exactly ONE of three mutually-exclusive values — testing wins,
-  // then production, else development.
+  // Environment helpers: the ONE module answers them
+  // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)):
+  // @omega.js/config's environment.js, the same four functions
+  // @omega.js/desktop, @omega.js/extension and @omega.js/web hang on their own
+  // Managers. They read ONE input, the `OMEGA_ENVIRONMENT` variable the boot
+  // above set from the .env cascade's own answer, so the
+  // `.env.<environment>` overlay that composed (#586) and this process's word
+  // are the same word by construction, and nothing re-sniffs a raw signal.
+  // The reader (libraries/env.js) re-exports the same function for the provider
+  // libraries, which hold no Manager handle (#586's dev/live payment split).
+  // They return exactly ONE of three mutually-exclusive values, and exactly one
+  // is*() is true: isDevelopment() is NOT true in testing, and isProduction()
+  // is a real positive check, never `!isDevelopment()`. Gate "anything
+  // non-production" with `!isProduction()` or `isDevelopment() || isTesting()`
+  // intentionally.
   // The ctx exposes the same methods but FORWARDS to these (ctx.isTesting()
   // → Manager.isTesting()), so request handlers can keep calling `ctx.*`.
   // Defined BEFORE the ctx is constructed so the ctx's own init() can call back.
-  self.getEnvironment = function() {
-    return env.environment();
-  };
-
-  // The three checks are mutually exclusive — each true for ONLY its own environment.
-  // isDevelopment() is NOT true in testing; isProduction() is a real positive check
-  // (never `!isDevelopment()`). Gate "anything non-production" with `!isProduction()`
-  // or `isDevelopment() || isTesting()` intentionally.
-  self.isDevelopment = function() {
-    return self.getEnvironment() === 'development';
-  };
-  self.isProduction = function() {
-    return self.getEnvironment() === 'production';
-  };
-  self.isTesting = function() {
-    return self.getEnvironment() === 'testing';
-  };
+  self.getEnvironment = getEnvironment;
+  self.isDevelopment = isDevelopment;
+  self.isProduction = isProduction;
+  self.isTesting = isTesting;
 
   // Boot guard for every REQUIRED env key (#581, superseding #569's
   // production-only unsubscribe-key branch). A process without one serves
@@ -276,7 +311,7 @@ Manager.prototype.init = function (exporter, options) {
   try {
     env.assertRules(self.config, 'backend');
   } catch (e) {
-    if (env.environment() === 'production') { throw e; }
+    if (getEnvironment() === 'production') { throw e; }
     console.warn(`[@omega.js/backend:index] ${e.message}`);
   }
 
@@ -296,11 +331,8 @@ Manager.prototype.init = function (exporter, options) {
     // to localhost. NOTE: getParentApiUrl/getParentUrl are intentionally NOT changed —
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
-    // N7: the CLI that booted the stack publishes resolved ports via
-    // OMEGA_*_PORT env (functions workers inherit them) — classic default
-    // when unset (plain local boot).
     return isDev
-      ? `http://localhost:${process.env.OMEGA_FUNCTIONS_PORT || 5001}/${self.project.projectId}/${self.project.resourceZone}`
+      ? `http://localhost:${devPort('functions')}/${self.project.projectId}/${self.project.resourceZone}`
       : `https://${self.project.resourceZone}-${self.project.projectId}.cloudfunctions.net`;
   };
 
@@ -311,10 +343,10 @@ Manager.prototype.init = function (exporter, options) {
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
     if (isDev) {
-      const httpsPort = process.env.OMEGA_HTTPS_PORT;
+      const httpsPort = envPort('https');
       return httpsPort
         ? `https://localhost:${httpsPort}`
-        : `http://localhost:${process.env.OMEGA_HOSTING_PORT || 5002}`;
+        : `http://localhost:${devPort('hosting')}`;
     }
     return `https://api.${(self.config.brand?.url || '').replace(/^https?:\/\//, '')}`;
   };
@@ -329,23 +361,20 @@ Manager.prototype.init = function (exporter, options) {
     // backend AND web dev alike, so this process's own proxy presence
     // (OMEGA_HTTPS_PORT) is the honest signal for the website's scheme too —
     // --no-https / missing mkcert drops both sides back to plain http.
-    const websiteScheme = process.env.OMEGA_HTTPS_PORT ? 'https' : 'http';
+    const websiteScheme = envPort('https') ? 'https' : 'http';
     return isDev
-      ? `${websiteScheme}://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
+      ? `${websiteScheme}://localhost:${devPort('website')}`
       : self.config.brand?.url || '';
   };
 
   // Resolve the parent @omega.js/backend's website URL (the parent's brand domain, NO `api.` subdomain).
-  // - If config.parent === 'self', THIS @omega.js/backend is the parent — returns this brand's own URL.
-  // - If config.parent is a URL, returns it as-is.
-  // - Returns '' if neither is configured.
+  // The RESOLVED company IS the topology ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)):
+  // a brand with a company resolves company.url to the PARENT's url, and a
+  // brand with none (or `company: { id: 'self' }`, the company brand itself)
+  // resolves it to its own, which is exactly what the old `parent: 'self'` said.
   // Use getParentApiUrl() for the API URL (with `api.` subdomain inserted).
   self.getParentUrl = function() {
-    const parent = self.config.parent;
-    if (parent === 'self') {
-      return self.config.brand?.url || '';
-    }
-    return parent || '';
+    return self.config.company?.url || self.config.brand?.url || '';
   };
 
   // Resolve the parent @omega.js/backend's API URL (`https://api.{parent-host}`).
@@ -358,10 +387,12 @@ Manager.prototype.init = function (exporter, options) {
     return base ? `https://api.${base}` : '';
   };
 
-  // Returns true when this @omega.js/backend IS the parent (config.parent === 'self').
-  // Gates parent-only routes like /marketing/webhook/forward.
+  // Returns true when this @omega.js/backend IS the webhook root: the brand
+  // names no company, or names itself as one (#677). Gates parent-only routes
+  // like /marketing/webhook/forward.
   self.isParent = function() {
-    return self.config.parent === 'self';
+    const id = self.config.company?.id;
+    return !id || id === 'self';
   };
 
   // Set more properties (need to wait for ctx to determine if DEV)

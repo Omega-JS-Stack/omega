@@ -21,12 +21,12 @@ const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 
 // artifact — one for mac, TWO for linux (.deb + AppImage) — and mobile derives
 // nothing while MAM is parked. Since #620 each button hands over the FILE
 // (a versionless asset on the latest release), never the releases page.
-const RELEASES = 'https://github.com/mini-org/mini-desktop/releases/latest';
+const RELEASES = 'https://github.com/mini-org/mini-releases/releases/latest';
 const DL = (asset) => `${RELEASES}/download/MiniCo-${asset}`;
 const withDownloads = {
   ...miniData,
-  repo: { providers: { github: { org: 'mini-org', repo: 'mini-site' } } },
-  targets: { web: {}, desktop: { releases: { repo: 'mini-desktop' } } },
+  repo: { provider: 'github', org: 'mini-org' },
+  targets: { web: { type: 'web' }, desktop: { type: 'desktop', releases: {} } },
 };
 
 test('#14: platform identity is the MARK — the small neutral chip is gone', async () => {
@@ -46,7 +46,7 @@ test('#14: two artifacts ride side by side — one does not', async () => {
   const splits = download.match(/omega-dl-card__actions omega-dl-card__actions--split/g) || [];
   assert.equal(splits.length, 1, 'only Linux (.deb + AppImage) splits its action row');
   assert.ok(download.includes('Debian package') && download.includes('AppImage'), 'both Linux artifacts render');
-  for (const asset of ['mac-universal.dmg', 'windows-universal.exe', 'linux-debian.deb', 'linux-appimage.AppImage']) {
+  for (const asset of ['mac-dmg.dmg', 'windows-nsis.exe', 'linux-deb.deb', 'linux-appimage.AppImage']) {
     assert.ok(download.includes(`href="${DL(asset)}"`), `${asset} is a direct download, not the releases page`);
   }
   assert.ok(!download.includes(`href="${RELEASES}"`), 'no button lands on GitHub');
@@ -168,7 +168,7 @@ test('QA: the Linux modal names the REAL deb file and instructs nothing the pipe
   // The install command is the basename of the SAME derived URL the Debian
   // button links (#620), so the file the user downloaded is the file the
   // command installs — a rename lands in both or in neither.
-  assert.ok(download.includes('value="sudo dpkg -i MiniCo-linux-debian.deb"'),
+  assert.ok(download.includes('value="sudo dpkg -i MiniCo-linux-deb.deb"'),
     'the dpkg step names the derived asset');
   assert.ok(!download.includes('_amd64.deb'), 'the hand-spelled legacy filename is gone');
 

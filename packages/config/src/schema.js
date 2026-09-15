@@ -11,6 +11,7 @@
  *     max:         Number,                // only checked when value present + number
  *     match:       RegExp,                // only checked when value present + string
  *     enum:        [...],                 // only checked when value present
+ *     itemEnum:    [...],                 // an ARRAY value's allowed members
  *     default:     <value>,               // the framework answer — see below
  *     description: 'What the field drives.',
  *   }
@@ -47,7 +48,7 @@
  * (#527 — the adsense `client` id is the ONE switch, and a materialized
  * advertising block would switch the web build's automatic vert placements on
  * for a brand that configured none). Blocks whose services gate on `enabled`
- * instead — github, cloudflare, searchConsole, slapform, chatsy, replyify —
+ * instead (cloudflare, searchConsole, slapform, chatsy, replyify)
  * DO carry the default that states the polarity (`enabled: true`, read
  * `!== false`), because presence there picks nothing. Role-level switches
  * beside any providers block (`monitoring.enabled`,
@@ -73,31 +74,44 @@
 // winback.js re-exports it, so every existing import keeps working.
 const WINBACK_DURATIONS = ['once', 'forever'];
 
-// Canonical target names — the FRAMEWORK keys allowed under `targets`.
-// Key presence in a config's `targets` object = "this brand enables this
-// target" (absorbs the legacy brand-config targets ARRAY).
+// Where a brand hosts its SOURCE, and where a web target is SERVED from
+// ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)). One value each
+// today: a second provider is a new entry here plus that provider's own helper,
+// never a reshape of the config. They live HERE, with the rules that enumerate
+// them, so repo.js can derive without a require cycle (the WINBACK_DURATIONS
+// pattern above); repo.js re-exports both, and every reader takes them there.
+const REPO_PROVIDERS = ['github'];
+const HOSTING_PROVIDERS = ['github'];
+
+// The category slugs addons.mozilla.org accepts on a listing (its live set on
+// 2026-09-11). AMO has no utilities or productivity slug, so the framework
+// default is `alerts-updates`, the most generic one that is not `other`
+// ([#884](https://github.com/Omega-JS-Stack/omega/issues/884)). It lives HERE,
+// with the rule that enumerates it (the WINBACK_DURATIONS pattern above), and
+// @omega.js/extension's Firefox lane takes the SAME list from this package when
+// it writes a first publish's `--amo-metadata` file: a slug AMO does not know
+// fails in the build instead of at the store.
+const AMO_CATEGORIES = ['alerts-updates', 'appearance', 'bookmarks', 'download-management', 'feeds-news-blogging', 'games-entertainment', 'language-support', 'photos-music-videos', 'privacy-security', 'search-tools', 'shopping', 'social-communication', 'tabs', 'web-development', 'other'];
+
+// Canonical target TYPES: the frameworks a `targets.<name>.type` may name
+// (#886). Key presence in a config's `targets` object = "this brand enables a
+// target by that name" (absorbs the legacy brand-config targets ARRAY).
 const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 
 // A brand also runs targets no framework owns — a Render API, a worker, a
-// script (#603). Those are declared under any OTHER key, and the entry must
-// say so: `targets.api: { type: 'custom' }`. The type is what separates a
-// deliberate custom target from a typo'd framework name, which stays an error.
-// Their verbs come entirely from the target's own package.json scripts; the
-// manager is the one that runs them (docs/manager/index.md).
+// script (#603). Those declare `type: 'custom'` like any other target
+// (`targets.api: { type: 'custom' }`), and their verbs come entirely from the
+// target's own package.json scripts; the manager is the one that runs them
+// (docs/manager/index.md).
 const CUSTOM_TARGET_TYPE = 'custom';
 
 /**
- * Whether a `targets.<key>` entry declares itself custom. The array
- * (multi-instance) form is custom only when EVERY instance says so — a mixed
- * array has no honest reading, so the validator fails it.
+ * Whether a `targets.<name>` entry declares itself custom.
  *
- * @param {object|Array|null|undefined} entry - The raw targets.<key> value.
+ * @param {object|null|undefined} entry - The raw targets.<name> value.
  * @returns {boolean} True when the entry is a custom target.
  */
 function isCustomTargetEntry(entry) {
-  if (Array.isArray(entry)) {
-    return entry.length > 0 && entry.every((instance) => instance?.type === CUSTOM_TARGET_TYPE);
-  }
   return entry?.type === CUSTOM_TARGET_TYPE;
 }
 
@@ -125,11 +139,63 @@ function backendProjectType(entry) {
   return entry?.projectType === 'custom' ? 'custom' : 'firebase';
 }
 
+// The page routes a brand translates when it says nothing
+// ([#858](https://github.com/Omega-JS-Stack/omega/issues/858), Ian 2026-09-13):
+// the whole site except the blog. Named here, beside the rule that defaults to
+// it, because the web build's matcher reads the same constant rather than
+// keeping a second copy of the framework's answer.
+const TRANSLATION_INCLUDE_DEFAULT = ['**', '!blog/**'];
+
 // The machine-owned top-level sections identical in every omega.json5 —
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
 const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 'forms', 'inbound', 'analytics', 'advertising', 'features', 'payment', 'monitoring', 'connections', 'theme', 'translation'];
+
+// Which config sections a BROWSER may see, and how much of each: the ONE
+// declaration behind clientConfig() ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
+// Every browser surface bakes its artifact through that function (web's page
+// chrome, desktop's renderer bundle, every extension bundle), so a value goes
+// public by gaining a row HERE, never by a per-framework list. The flag is
+// per SECTION, at the granularity the section's public half needs:
+//
+//   `client: true`        the whole section rides (its keys are public by design:
+//                         secrets never live in omega.json5, and the validator
+//                         hard-fails a secret-shaped key anywhere in the file)
+//   `client: [paths]`     only these sub-paths ride, for a section whose other
+//                         keys are provisioning-only (nothing secret, nothing a
+//                         runtime reads)
+//   no row                the browser never sees it: cloud/GCP provisioning,
+//                         the account admins, the repo and edge plumbing, every
+//                         build-only section (platforms, purgecss, collections…)
+//
+// A new section defaults to INVISIBLE, which fails as a missing feature rather
+// than a leak. The build FACTS a surface composes beside these sections
+// (runtime, version, dev, …) are client-config.js's own list.
+const CLIENT_SECTIONS = {
+  advertising: true,
+  analytics: true,
+  app:         true,
+  brand:       true,
+  captcha:     true,
+  client:      true,
+  // The Firebase WEB config is public by design (the api key included) and is
+  // what boots @omega.js/client on all three surfaces; the GCP account facts
+  // beside it (billingAccount, organizationId, apiSubdomain) are provisioning.
+  cloud:       ['config', 'messaging.vapidKey'],
+  company:     true,
+  connections: true,
+  features:    true,
+  // The contact page's endpoint, and nothing else the slapform service keeps
+  // beside it (template ids, plan, update flags).
+  forms:       ['providers.slapform.formId'],
+  // The chat widget's agent and its presentation, same rule.
+  inbound:     ['chat.providers.chatsy.enabled', 'chat.providers.chatsy.agentId', 'chat.providers.chatsy.settings'],
+  listings:    true,
+  monitoring:  true,
+  payment:     true,
+  theme:       true,
+};
 
 // brand.id's slug rule — the ONE home for the pattern. Anything that gates a
 // caller-supplied brand id (the backend verts routes' normalizeBrandId) imports
@@ -137,13 +203,26 @@ const SHARED_SECTIONS = ['brand', 'cloud', 'repo', 'edge', 'captcha', 'search', 
 const BRAND_ID_PATTERN = /^[a-z][a-z0-9+\-.]*$/;
 
 const SHARED_SCHEMA = [
-  // ── the instance's own url ───────────────────────────────────────────────
+  // ── the target's own url ─────────────────────────────────────────────────
   {
     path:        'url',
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: "This instance's own public URL, and the one key a target entry may set at the top level. A multi-instance target derives it from the instance id (`{ id: 'admin' }` → https://admin.<host of brand.url>, #588; docs/shared/config.md → Multi-instance targets); an entry's own `url` overrides it for a custom host. `brand.url` stays the BRAND's url, which is what brand-level facts (authDomain, the persona domain) read.",
+    description: "This TARGET's own public URL, and the one key a target entry may set at the top level. A target whose name is not its type derives it from the name (`admin: { type: 'web' }` → https://admin.<host of brand.url>, #588/#886; docs/shared/config.md → Targets); an entry's own `url` overrides it for a custom host. `brand.url` stays the BRAND's url, which is what brand-level facts (authDomain, the persona domain) read.",
+  },
+
+  // ── the target's own type (#886) ─────────────────────────────────────────
+  // Declared ONCE, here: every target entry carries it, whatever its
+  // framework, and a copy per TARGET_SCHEMAS would be four copies of one
+  // contract ([#911](https://github.com/Omega-JS-Stack/omega/issues/911)). It
+  // is target-entry machinery like `url`, so it names no config SECTION.
+  {
+    path:        'type',
+    type:        'string',
+    required:    false,
+    enum:        [...TARGETS, CUSTOM_TARGET_TYPE],
+    description: "The FRAMEWORK that runs this target (#886), or `custom` for a target no framework owns. Key presence in `targets` enables a target by NAME, and this is what says which code runs there, so a target named `admin` with `type: 'web'` is a web build. A resolved target config carries it at the top level like every other key in the entry.",
   },
 
   // ── brand ────────────────────────────────────────────────────────────────
@@ -178,12 +257,6 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: 'Short marketing tagline.',
-  },
-  {
-    path:        'brand.company',
-    type:        'string',
-    required:    false,
-    description: 'Parent/legal entity name ("Acme Inc"). Legal documents, receipts; falls back to brand.name.',
   },
   {
     path:        'brand.type',
@@ -265,12 +338,6 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     description: 'Brand image URLs/paths (wordmark, brandmark, combomark, icon).',
-  },
-  {
-    path:        'brand.images.companyWordmark',
-    type:        'string',
-    required:    false,
-    description: 'Parent/legal-entity wordmark (brand.company) rendered in the transactional email footer. Omitted from the footer when unset.',
   },
 
   // ── socials ──────────────────────────────────────────────────────────────
@@ -439,7 +506,7 @@ const SHARED_SCHEMA = [
     path:        'advertising.providers.inhouse.source',
     type:        'string',
     required:    false,
-    description: "In-house ads source: 'self' (this brand's backend serves its own `ads` inventory), 'company' (the parent company's api — resolved via company.url), or a full base URL used verbatim. Presence-driven — unset disables house units.",
+    description: "In-house ads source: 'self' (this brand's backend serves its own `ads` inventory), 'company' (the parent company's api, derived from the RESOLVED company.url), or a full base URL used verbatim. Presence-driven, and unset disables house units.",
   },
   {
     path:        'advertising.fallback',
@@ -454,13 +521,31 @@ const SHARED_SCHEMA = [
     description: "This brand's contextual tags (['music', 'audio-tools']) — the targeting match input a house unit sends with its serve request unless the include passes its own. No user tracking.",
   },
 
-  // ── company ──────────────────────────────────────────────────────────────
+  // ── company (ONE typed key, the rest RESOLVED) ───────────────────────────
+  // The brand's relationship to its company lives OUTSIDE `brand` (Ian
+  // 2026-09-12: "brand key is for things about this brand, and the
+  // parent/company/organization key is OUTSIDE of that"), and the loader fills
+  // the SAME key with the company's public facts (#677): `company.name`,
+  // `company.url` and `company.images.wordmark` are RESOLVED, never typed, and
+  // the loader refuses each of them in an authored file. A brand with no
+  // company resolves to its own name and url under a null id, so no reader
+  // carries a fallback.
   {
-    path:        'company.url',
+    path:        'company.id',
     type:        'string',
     required:    false,
-    match:       /^https?:\/\//,
-    description: "The parent company's canonical URL. Sub-brand surfaces derive the company api from it (e.g. advertising inhouse source 'company' → api.<company host>).",
+    description: "The company this brand belongs to, named by the parent's `brand.id` ('itw-creative-works'), or the literal 'self' on the company brand itself. The ONE key that joins a brand to a company: the parent's public facts, its config layer, its `.env`, its hooks and its signing tree all resolve from it (docs/manager/company.md).",
+  },
+  {
+    path:        'company.webhooks',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    // Resolution only: an opt-OUT written into every brand file as `true`
+    // would be noise, and the fact belongs to the brands that actually share
+    // somebody else's provider account.
+    materialize: false,
+    description: "Whether the manage walk may repoint this company's provider ACCOUNT webhooks (#677). `false` says the SendGrid Event Webhook and the Beehiiv webhook belong to someone else (a shared account whose one account-level webhook points at their production), so the campaigns and newsletter services leave them alone. The successor to the retired top-level `parent: false`.",
   },
 
   // ── features (the catalog every product prices) ──────────────────────────
@@ -468,10 +553,17 @@ const SHARED_SCHEMA = [
     path:        'features',
     type:        'object',
     required:    false,
-    description: "The feature catalog (#647): every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon, definition — and, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
+    description: "The feature catalog (#647): every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon (the full Font Awesome class string, #929), definition — and, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
   },
 
   // ── payment (role: billing; provider-discriminated) ──────────────────────
+  {
+    path:        'payment.currency',
+    type:        'string',
+    required:    false,
+    default:     'USD',
+    description: "The ISO 4217 code every price in payment.products is quoted in (#850). One currency per brand, named wherever a price is shown or recorded: the pricing page's JSON-LD, the checkout, and the backend's order history (GET /user/orders). Defaults to 'USD', the fallback its readers carried before the fact had a home. The successor to the retired targets.web.currency.",
+  },
   {
     path:        'payment.providers.stripe.publishableKey',
     type:        'string',
@@ -555,7 +647,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.monitoring.providers.sentry.dsn overrides.',
+    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<name>.monitoring.providers.sentry.dsn overrides.',
   },
   {
     path:        'monitoring.providers.sentry.environment',
@@ -668,39 +760,35 @@ const SHARED_SCHEMA = [
     description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`) — public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false — set it true to offer one; a brand's own provider is on unless this is false), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws — the CONFIG is the only card list, #793: `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. packages/backend/docs/connections.md",
   },
 
-  // ── repo (role: source hosting; provider-discriminated) ─────────────────
+  // ── repo (where the brand hosts its source; #883) ───────────────────────
+  // Two keys, and block PRESENCE is the switch, exactly as a target's key
+  // presence enables that target. Every repo NAME derives from
+  // `<brand.id>-<role>` (#809), and visibility is the brand root package.json's
+  // `private` field, so neither is configurable here.
   {
-    path:        'repo.providers.github.enabled',
-    type:        'boolean',
+    path:        'repo',
+    type:        'object',
     required:    false,
-    default:     true,
-    description: 'false = the repo service skips entirely — no org profile, no repo settings, no GitHub Pages reconciliation; the brand hosts its source somewhere the manager does not touch.',
+    description: 'Where the brand hosts its source. Presence enables the repo service; the block is provider + org and nothing else, since every repo name derives from `<brand.id>-<role>` (#883).',
   },
   {
-    path:        'repo.providers.github.org',
+    path:        'repo.provider',
+    // NO `default:`, by the presence-gate exclusion (docs/shared/config.md,
+    // Defaults & self-healing): the BLOCK's presence is what enables the repo
+    // service, so a resolved `repo: { provider: 'github' }` would say a brand
+    // hosts its source somewhere when it declared nothing. The value a missing
+    // provider reads is repo.js's DEFAULT_REPO_PROVIDER, beside the derivation
+    // that reads it.
     type:        'string',
     required:    false,
-    description: "GitHub org/user the brand monorepo lives in. No org → the repo service skips and the site's desktop release URLs stay underived.",
+    enum:        REPO_PROVIDERS,
+    description: 'Which host serves the brand source (default `github`, the only one built). A second provider is a new row here plus its own helper, never a reshape of this block.',
   },
   {
-    path:        'repo.providers.github.repo',
+    path:        'repo.org',
     type:        'string',
     required:    false,
-    description: 'Brand repo name, or an "owner/name" slug when the repo lives under a different org than repo.providers.github.org. Defaults to <brand.id>-omega (the <brand.id>-<role> repo rule).',
-  },
-  {
-    path:        'repo.providers.github.shared',
-    type:        'boolean',
-    required:    false,
-    default:     false,
-    description: 'true = the org is shared with other brands; org-level reconciliation is skipped.',
-  },
-  {
-    path:        'repo.providers.github.private',
-    type:        'boolean',
-    required:    false,
-    default:     true,
-    description: 'Brand repo visibility (default true).',
+    description: "GitHub org/user every repo the brand owns lives in: `<brand.id>-omega` (source), `<brand.id>-releases` (public artifacts), `<brand.id>-<name>` (one per GitHub-hosted web target). No org → the repo service skips and the site's desktop release URLs stay underived.",
   },
 
   // ── domain (two roles: registrar + mailbox; provider-keyed, #425) ────────
@@ -964,6 +1052,14 @@ const SHARED_SCHEMA = [
     description: "Certificate types managed for the Apple Developer account ([{ type, manual }]) — `manual: true` marks the ones Apple's API cannot create, which the Account Holder downloads from the portal. Unset uses the framework set.",
   },
 
+  // ── publishing (role: ship credentials; no provider) ─────────────────
+  {
+    path:        'publishing.enabled',
+    type:        'boolean',
+    required:    false,
+    description: "The manage walk's ship-credential gate ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): the `publishing` service asks for every developer key and listing id the brand's declared formats need (`targets.<name>.platforms.<platform>.formats`). `false` is the permanent opt-out the gate's Disable lands; absence means ask, and no default is materialized. Dropping ONE store is the declaration's job (`platforms.<store>.formats.store: false`), never this switch.",
+  },
+
   // ── devlog (role: commit-digest publishing; provider-discriminated) ──────
   {
     path:        'devlog',
@@ -994,28 +1090,12 @@ const SHARED_SCHEMA = [
     description: "Managed Firebase Auth accounts (@omega.js/manager account service): enabled + admins ([{ email, account, marketing }]; '{domain}' templates to the brand domain). Owner-defined — typically set once in the COMPANY omega.json5 (arrays replace, so the company list wins whole). Passwords NEVER live here: per-account OMEGA_ACCOUNT_PASSWORD__* env vars, the config/hooks/account/password.js hook, or the ACCOUNT_PASSWORD_SEED derivation.",
   },
 
-  // ── parent ───────────────────────────────────────────────────────────────
-  // parent … dataRequest are brand-level sections the manager reads UNFOLDED
+  // ── reviews ──────────────────────────────────────────────────────────────
+  // reviews … dataRequest are brand-level sections the manager reads UNFOLDED
   // (#277): a website-only brand has no targets.backend to hold them, and
   // adding one purely as a config home would falsely enable the target. A
   // targets.backend block still overrides any of them: that comes free from
   // the merge chain.
-  {
-    path:        'parent',
-    type:        'string|boolean',
-    required:    false,
-    description: "Webhook parent topology: 'self' when this brand IS the parent, a parent URL otherwise, or false to deliberately opt out (shared webhook account owned elsewhere).",
-  },
-
-  // ── github ───────────────────────────────────────────────────────────────
-  {
-    path:        'github',
-    type:        'object',
-    required:    false,
-    description: 'GitHub identity for the brand (user, website repo URL).',
-  },
-
-  // ── reviews ──────────────────────────────────────────────────────────────
   {
     path:        'reviews',
     type:        'object',
@@ -1141,7 +1221,7 @@ const SHARED_SCHEMA = [
     path:        'directory',
     type:        'object',
     required:    false,
-    description: "Directory participation (@omega.js/manager directory service): { enabled } — opt in to push this brand's entry into the parent project's `brands` collection. Absent or false never pushes. Needs `parent` to name the relationship and DIRECTORY_SERVICE_ACCOUNT in the brand .env.",
+    description: "Directory participation (@omega.js/manager directory service): { enabled } opts in to pushing this brand's entry into the parent project's `brands` collection. Absent or false never pushes. Needs `company.id` to name a parent (#677) and DIRECTORY_SERVICE_ACCOUNT in the brand .env.",
   },
   {
     path:        'directory.enabled',
@@ -1242,10 +1322,15 @@ const SHARED_SCHEMA = [
     description: "Model override for the chosen provider (defaults: claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano').",
   },
   {
-    path:        'translation.exclude',
+    path:        'translation.include',
     type:        'array',
     required:    false,
-    description: 'Web only: extra page paths/folders to skip (system pages like checkout/legal/auth are always skipped).',
+    default:     TRANSLATION_INCLUDE_DEFAULT,
+    // Resolution only: the list is the FRAMEWORK's answer to "what is worth
+    // paying a provider for", and a copy in every brand config is a copy that
+    // drifts from it (#793). A brand that wants a different answer writes one.
+    materialize: false,
+    description: "Web only: the page routes to translate, as globs with `!` negation, read in order like a .gitignore: the LAST pattern that matches a route decides it, and a route no pattern matches is not translated. A folder pattern covers the folder itself (`!blog/**` excludes `/blog` and everything under it). The default ['**', '!blog/**'] translates the whole site except the blog, which is where the words (and the cost) pile up. A brand list REPLACES the default outright. A page overrides it for itself with `translation.include: true`/`false` in its own frontmatter, the same key name one level down (docs/web/frontmatter.md). The framework's own default pages carry their own exclusion and are never in this list's hands.",
   },
 
   // ── client (the @omega.js/client runtime blob) ───────────────────────────
@@ -1306,7 +1391,7 @@ const SHARED_SCHEMA = [
     path:        'targets',
     type:        'object',
     required:    false,
-    description: "Key presence = target enabled; values = target-scoped config (any shared key inside overrides it) — an object, or an array of id'd instances (multi-instance targets). Framework keys are web/backend/desktop/extension/mobile; any other key must declare `type: 'custom'` (#603), a target the manager drives entirely through its own package.json scripts. Anything else is an error.",
+    description: "Every key is a target NAME, which is the folder `targets/<name>`, the `--target=<name>` word and the derived-repo suffix (#886). Key presence = target enabled; the value is an object of target-scoped config (any shared key inside overrides it) and MUST declare `type`: web/backend/desktop/extension/mobile, or `custom` (#603) for a target the manager drives entirely through its own package.json scripts. Anything else is an error.",
   },
 ];
 
@@ -1316,6 +1401,22 @@ const TARGET_SCHEMAS = {
   // Grows with @omega.js/web's design: distribute, purgecss safelist,
   // workflows land as their features do.
   web: [
+    {
+      path:        'hosting',
+      type:        'object',
+      required:    false,
+      description: 'Where this web target is SERVED from (#883). Web targets only: a non-web target carrying it is a validation error.',
+    },
+    {
+      path:        'hosting.provider',
+      // No `default:` either, for the same reason as `repo.provider`: the value
+      // is read off the TARGET's own entry (repo.js `hostingProvider`), where a
+      // resolved top-level default never reaches.
+      type:        'string',
+      required:    false,
+      enum:        HOSTING_PROVIDERS,
+      description: "Who serves the built site. `github` publishes it to the target's own `<brand.id>-<name>` repo and serves it from GitHub Pages at the target's url; a second provider is a new row here plus its own deploy helper.",
+    },
     {
       path:        'meta',
       type:        'object',
@@ -1387,9 +1488,8 @@ const TARGET_SCHEMAS = {
 
   // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).
   backend: [
-    // parent, github, reviews, marketing, blog, dataRequest moved to
-    // SHARED_SCHEMA (#277); a targets.backend block still overrides them
-    // through the merge chain.
+    // reviews, marketing, blog, dataRequest moved to SHARED_SCHEMA (#277); a
+    // targets.backend block still overrides them through the merge chain.
     {
       path:        'projectType',
       type:        'string',
@@ -1416,12 +1516,157 @@ const TARGET_SCHEMAS = {
       enum:        ['productivity', 'developer-tools', 'utilities', 'media', 'social', 'network'],
       description: 'Generic high-level category. Maps to per-platform UTI + freedesktop strings.',
     },
+    // ── the rest of app.* (#911) ─────────────────────────────────────────
+    // The three DERIVED fields carry no schema `default:`: their answer comes
+    // from the brand (the bundle-id policy, brand.name, the year), so a
+    // materialized null would be a brand file restating "derive it".
     {
-      path:        'platforms.win.signing.strategy',
+      path:        'app.appId',
+      type:        'string',
+      required:    false,
+      description: "The bundle identifier the app is signed and registered under. Unset, it derives as `certificates.providers.apple.bundleIdPrefix` plus `brand.id` with the dashes as dots ([#909](https://github.com/Omega-JS-Stack/omega/issues/909)), the very id the certificates service registers; a brand with no prefix falls back to the reverse-domain of `brand.url`, then `app.<brand.id>`. Set it only to stay on an id already-shipped builds carry.",
+    },
+    {
+      path:        'app.productName',
+      type:        'string',
+      required:    false,
+      description: 'The product name the installer, the app menu and the artifact names carry. Unset, it is `brand.name`.',
+    },
+    {
+      path:        'app.copyright',
+      type:        'string',
+      required:    false,
+      description: 'The copyright string baked into the mac plist and the Windows version resource. A `{YEAR}` token expands at build time. Unset, it is `© {YEAR}, <brand.name>`.',
+    },
+    {
+      path:        'app.languages',
+      type:        'array',
+      required:    false,
+      description: "The languages the mac build ships (electron-builder's `mac.electronLanguages`). Unset reads as ['en'].",
+    },
+    {
+      path:        'app.darkModeSupport',
+      type:        'boolean',
+      required:    false,
+      description: 'Whether the mac build declares dark-mode support (NSRequiresAquaSystemAppearance). Unset reads as true; windows and linux ignore it.',
+    },
+    {
+      path:        'omega.authPersistence',
+      type:        'string',
+      required:    false,
+      description: "Where @omega.js/client's auth session is kept in the main process: `safeStorage` (the default, the OS keychain through Electron safeStorage), `none` (in-memory, the explicit opt-out), or the name of a strategy the consumer registered before `initialize()`. A test run is always `none`, whatever this says.",
+    },
+    // ── the shipping declaration (#867) ──────────────────────────────────
+    // The SAME shape the extension target declares below: presence is the
+    // switch, every platform and every format defaults ON, and the only thing
+    // that drops one is a literal `false` (the `certificates: false` idiom).
+    // Per-format settings live INSIDE the format. The vocabulary is the
+    // client's (mac, windows, linux), and @omega.js/config's platforms.js is
+    // the format table every reader derives from.
+    {
+      path:        'platforms',
+      type:        'object',
+      required:    false,
+      description: "What this desktop target SHIPS, plus each platform's install knobs (#867): `platforms.<mac|windows|linux>.formats.<dmg|nsis|deb|appimage|snap>`. Presence = enabled; drop a default with `false`. The install knobs beside `formats` (arch, the NSIS flags, mac entitlements) map onto the same electron-builder concepts, which @omega.js/desktop owns the target list of.",
+    },
+    {
+      path:        'platforms.mac',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The mac leg: `false` ships no mac build at all (no dmg, no auto-update zip).',
+    },
+    {
+      path:        'platforms.mac.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which mac formats ship. `dmg` is the only one a brand declares; the auto-update zip is not a format (electron-updater fetches it from the feed and nobody links it).',
+    },
+    {
+      path:        'platforms.mac.formats.dmg',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The macOS disk image, and the download `/download/mac/dmg` hands over. `false` drops it.',
+    },
+    {
+      path:        'platforms.windows',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The windows leg: `false` ships no windows build and skips the signing jobs with it.',
+    },
+    {
+      path:        'platforms.windows.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which windows formats ship. `nsis` is the one installer, and it merges every declared arch into one file.',
+    },
+    {
+      path:        'platforms.windows.formats.nsis',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The NSIS installer, and the download `/download/windows/nsis` hands over. `false` drops it. Its installer UX knobs (oneClick, shortcuts, perMachine) sit on `platforms.windows` itself.',
+    },
+    {
+      path:        'platforms.windows.signing.strategy',
       type:        'string',
       required:    false,
       enum:        ['self-hosted', 'cloud', 'local'],
-      description: 'Windows code-signing path. self-hosted = EV USB token on a runner; cloud = provider CLI; local = developer signs manually.',
+      description: 'Windows code-signing path. self-hosted = EV USB token on a runner; cloud = provider CLI; local = developer signs manually. The env schema gates each signing credential on this value, so the walk only ever asks for the set this strategy uses.',
+    },
+    {
+      path:        'platforms.linux',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The linux leg: `false` ships no linux build at all.',
+    },
+    {
+      path:        'platforms.linux.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which linux formats ship: `deb` and `appimage` are release assets, `snap` publishes to the Snap Store instead.',
+    },
+    {
+      path:        'platforms.linux.formats.deb',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Debian package, and the download `/download/linux/deb` hands over. It needs `brand.url` and `brand.contact.email` (electron-builder refuses a deb with no homepage or maintainer).',
+    },
+    {
+      path:        'platforms.linux.formats.appimage',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The AppImage, and the download `/download/linux/appimage` hands over. `false` drops it.',
+    },
+    {
+      path:        'platforms.linux.formats.snap',
+      type:        'object|boolean',
+      required:    false,
+      description: "The Snap Store publish (never a release asset: the store holds the file, and `/download/linux/snap` is the listing). Needs SNAPCRAFT_STORE_CREDENTIALS, which the env schema gates on this very key, so declaring it is what makes the walk ask.",
+    },
+    {
+      path:        'platforms.linux.formats.snap.channels',
+      type:        'array',
+      required:    false,
+      description: "Snap Store channels the publish pushes to. Unset, the publish uses ['stable']; ['edge'] is the pre-release lane. No schema `default:` on any of these four: materializing one would declare the snap format on every brand that never mentioned it, and the declaration is what makes its credentials mandatory.",
+    },
+    {
+      path:        'platforms.linux.formats.snap.confinement',
+      type:        'string',
+      required:    false,
+      enum:        ['strict', 'classic', 'devmode'],
+      description: 'Snap confinement. Unset reads as strict, which is what the store reviews fastest; classic needs manual store approval.',
+    },
+    {
+      path:        'platforms.linux.formats.snap.grade',
+      type:        'string',
+      required:    false,
+      enum:        ['stable', 'devel'],
+      description: 'Snap grade. Unset reads as stable; a devel snap cannot be released to a stable channel.',
+    },
+    {
+      path:        'platforms.linux.formats.snap.autoStart',
+      type:        'boolean',
+      required:    false,
+      description: 'Whether the snap registers the app to start on login. Unset reads as true.',
     },
     {
       path:        'startup.mode',
@@ -1430,11 +1675,69 @@ const TARGET_SCHEMAS = {
       enum:        ['normal', 'hidden'],
       description: 'normal = main window appears at launch; hidden = bakes LSUIElement=true on macOS (no dock, no Cmd+Tab).',
     },
+    // ── the OTHER startup knob (#911): what an OS LOGIN launch does ──────
+    {
+      path:        'startup.openAtLogin.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'Whether the app registers with the OS to auto-launch at login. Unset reads as true.',
+    },
+    {
+      path:        'startup.openAtLogin.mode',
+      type:        'string',
+      required:    false,
+      enum:        ['normal', 'hidden'],
+      description: 'How an AT-LOGIN launch behaves, independently of `startup.mode` (which owns user-direct launches). Unset reads as hidden, so a normal app still starts quietly at login and surfaces when the user opens it.',
+    },
+    // ── the auto-updater block (#911) ────────────────────────────────────
+    // Its runtime answers live in the lib's own DEFAULTS, which every
+    // unset key falls through to; the cadences are two separate timers on
+    // purpose (a feed poll is network, an idle evaluation is arithmetic).
+    {
+      path:        'autoUpdate.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'One switch for the auto-updater. Unset reads as true; `false` leaves the whole lane inert (no feed poll, no idle evaluator, no install).',
+    },
+    {
+      path:        'autoUpdate.autoDownload',
+      type:        'boolean',
+      required:    false,
+      description: 'Whether a found update downloads on its own. Unset reads as true; false leaves the download to `manager.autoUpdater` being asked for it.',
+    },
+    {
+      path:        'autoUpdate.startupDelayMs',
+      type:        'integer',
+      required:    false,
+      min:         0,
+      description: 'How long after the app is ready the FIRST update check fires. Unset reads as 10000 (10s), which keeps the check off the boot path.',
+    },
+    {
+      path:        'autoUpdate.feedCheckIntervalMs',
+      type:        'integer',
+      required:    false,
+      min:         0,
+      description: 'How often the update feed is polled. Network-bound, so keep it slow: unset reads as 3600000 (1h), the cadence Discord, Slack and VS Code use.',
+    },
+    {
+      path:        'autoUpdate.idleEvalIntervalMs',
+      type:        'integer',
+      required:    false,
+      min:         0,
+      description: 'How often a DOWNLOADED update re-asks "is the user idle enough to install". In-process arithmetic, so it is cheap: unset reads as 60000 (1m).',
+    },
+    {
+      path:        'autoUpdate.maxAgeMs',
+      type:        'integer',
+      required:    false,
+      min:         0,
+      description: 'How long a downloaded update may sit pending before the install stops waiting for an idle moment. Unset reads as 2592000000 (30d).',
+    },
     {
       path:        'cdp.readySignal',
       type:        'string',
       required:    false,
-      description: 'Boot-complete signal for `mgr cdp relaunch` — a URL substring matched against CDP page targets.',
+      description: 'Boot-complete signal for `mgr cdp relaunch`: a URL substring matched against CDP page targets.',
     },
     {
       path:        'releases.enabled',
@@ -1443,16 +1746,10 @@ const TARGET_SCHEMAS = {
       description: 'One switch for the release surface: false suppresses the site\'s derived download links AND desktop publishing (electron-builder publish). Site derivation defaults true only when the releases block exists; desktop publishing defaults true regardless.',
     },
     {
-      path:        'releases.owner',
-      type:        'string',
+      path:        'releases',
+      type:        'object',
       required:    false,
-      description: 'GitHub owner of the releases repo; defaults to the brand repo owner.',
-    },
-    {
-      path:        'releases.repo',
-      type:        'string',
-      required:    false,
-      description: 'GitHub repo where built artifacts + the auto-update feed live. Defaults to `<brand.id>-releases`.',
+      description: "Presence opts the brand into the release surface (the site's download links, desktop publishing). WHICH repo is not configurable: it is the brand's one public `<brand.id>-releases` (#883).",
     },
     {
       path:        'restartManager.enabled',
@@ -1473,6 +1770,20 @@ const TARGET_SCHEMAS = {
       required:    false,
       match:       /^[\w.-]+$/,
       description: 'GitHub repo of the RM release feed.',
+    },
+    // ── hot config (#911): the JSON the app re-reads without a release ───
+    {
+      path:        'remoteConfig.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'The remote-config document, polled at the auto-updater feed cadence so app behavior (a force-update gate, a kill switch) flips without shipping a build. Unset reads as true.',
+    },
+    {
+      path:        'remoteConfig.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Where that document is fetched from. Unset, it derives as `${brand.url}/data/resources/main.json`.',
     },
     {
       path:        'remoteScripts.enabled',
@@ -1499,6 +1810,109 @@ const TARGET_SCHEMAS = {
   // Store listings ARE the extension page's declaration and the curated
   // site.targets.extension view (#85, #610 — no second copy in web config).
   extension: [
+    // ── the shipping declaration (#867) ──────────────────────────────────
+    // The SAME shape the desktop target declares above, in the browser half of
+    // the client's vocabulary (chrome, firefox, edge). `edge` ships the CHROME
+    // build: two stores, one chromium artifact.
+    {
+      path:        'platforms',
+      type:        'object',
+      required:    false,
+      description: 'What this extension target SHIPS (#867): `platforms.<chrome|firefox|edge>.formats.<zip|store>`. Presence = enabled; drop a default with `false`. The zip is attached to the release, the store is published to, and @omega.js/config\'s platforms.js says which credentials each store cannot ship without.',
+    },
+    {
+      path:        'platforms.chrome',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Chrome leg (the chromium build every Chromium browser installs): `false` ships nothing for it.',
+    },
+    {
+      path:        'platforms.chrome.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which chrome formats ship: `zip` (attached to the release) and `store` (published to the Chrome Web Store).',
+    },
+    {
+      path:        'platforms.chrome.formats.zip',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The packaged zip, attached to the brand releases repo so anyone can install it unpacked.',
+    },
+    {
+      path:        'platforms.chrome.formats.store',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Chrome Web Store publish. Needs the CHROME_* API credentials plus `listings.chrome.id` (the walk asks for both, #893).',
+    },
+    {
+      path:        'platforms.firefox',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Firefox leg (its own build: scripts instead of a service worker, sidebar_action instead of side_panel).',
+    },
+    {
+      path:        'platforms.firefox.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which firefox formats ship: `zip` (attached to the release) and `store` (published to addons.mozilla.org).',
+    },
+    {
+      path:        'platforms.firefox.formats.zip',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The packaged zip, attached to the brand releases repo.',
+    },
+    {
+      path:        'platforms.firefox.formats.store',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The addons.mozilla.org publish. Needs FIREFOX_API_KEY + FIREFOX_API_SECRET; the add-on id is the manifest gecko id (`listings.firefox.id`), which the local scaffold pins into config when the brand declares none.',
+    },
+    {
+      path:        'platforms.firefox.formats.store.channel',
+      type:        'string',
+      required:    false,
+      enum:        ['listed', 'unlisted'],
+      description: 'Which AMO channel the publish signs into. Unset reads as listed; `unlisted` self-distributes (signed, never listed on the store). No schema `default:`, for the same reason as the snap options: a materialized default would declare the format on a brand that never asked for it.',
+    },
+    {
+      path:        'platforms.edge',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Edge leg. It ships the CHROME build, so dropping chrome while keeping edge still packages the chromium artifact.',
+    },
+    {
+      path:        'platforms.edge.formats',
+      type:        'object',
+      required:    false,
+      description: 'Which edge formats ship: `zip` (attached to the release) and `store` (published to Edge Add-ons).',
+    },
+    {
+      path:        'platforms.edge.formats.zip',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The packaged zip, attached to the brand releases repo.',
+    },
+    {
+      path:        'platforms.edge.formats.store',
+      type:        'object|boolean',
+      required:    false,
+      description: 'The Edge Add-ons publish. Needs EDGE_CLIENT_ID + EDGE_API_KEY plus `listings.edge.id` (the Partner Center product id, #893).',
+    },
+    {
+      path:        'categories',
+      type:        'array',
+      required:    false,
+      itemEnum:    AMO_CATEGORIES,
+      default:     ['alerts-updates'],
+      description: "The AMO categories a FIRST Firefox publish lists the add-on under (#884): addons.mozilla.org requires them on a new listing, and the Firefox lane writes them into the `--amo-metadata` file it hands `web-ext sign`. Slugs come from AMO's own set; the default is `alerts-updates`, the most generic one that is not `other`. Chrome and Edge pick their category in their own dashboards.",
+    },
+    {
+      path:        'listings.chrome.id',
+      type:        'string',
+      required:    false,
+      description: "The Chrome Web Store ITEM ID the publish uploads to, the 32-letter id in the listing URL (#893). Public by design, so it lives here and not in .env; the manage walk asks for it.",
+    },
     {
       path:        'listings.chrome.url',
       type:        'string',
@@ -1513,6 +1927,12 @@ const TARGET_SCHEMAS = {
       description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
     },
     {
+      path:        'listings.firefox.id',
+      type:        'string',
+      required:    false,
+      description: "The addons.mozilla.org ADD-ON ID, which IS the manifest's browser_specific_settings.gecko.id (AMO uses it as the add-on guid, #893). Declared here it is authoritative: the firefox package writes it into the manifest. A brand that declares none gets the derived id pinned here by the extension's local scaffold, never by a publish.",
+    },
+    {
       path:        'listings.firefox.url',
       type:        'string',
       required:    false,
@@ -1524,6 +1944,12 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       description: 'Listing state note (e.g. live, pending review). Display-safe, informational only.',
+    },
+    {
+      path:        'listings.edge.id',
+      type:        'string',
+      required:    false,
+      description: "The Microsoft Edge Partner Center PRODUCT ID (a GUID) the publish uploads to (#893). Public by design, so it lives here and not in .env; the manage walk asks for it.",
     },
     {
       path:        'listings.edge.url',
@@ -1584,10 +2010,10 @@ const TARGET_SCHEMAS = {
 };
 
 // Declared top-level keys that are NOT config sections: `targets` is scoping
-// machinery, and `url` is this instance's RESOLVED public url (#588): a value
+// machinery, and `url` is this target's RESOLVED public url (#588): a value
 // the loader derives, carried to templates as the `site.url` build fact, never
 // a namespace a page's `config:` block overrides.
-const NON_SECTION_KEYS = ['targets', 'url'];
+const NON_SECTION_KEYS = ['targets', 'url', 'type'];
 
 /** The top-level sections a rule array declares (machinery keys excluded). */
 const sectionsOf = (rules) => [...new Set(rules.map((rule) => rule.path.split('.')[0]))].filter((section) => !NON_SECTION_KEYS.includes(section));
@@ -1607,4 +2033,4 @@ function configSections(target) {
   return [...new Set([...sectionsOf(SHARED_SCHEMA), ...sectionsOf(TARGET_SCHEMAS[target] || [])])].sort();
 }
 
-module.exports = { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN, WINBACK_DURATIONS, configSections };
+module.exports = { TRANSLATION_INCLUDE_DEFAULT, TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES, backendProjectType, SHARED_SECTIONS, CLIENT_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS, BRAND_ID_PATTERN, WINBACK_DURATIONS, REPO_PROVIDERS, HOSTING_PROVIDERS, AMO_CATEGORIES, configSections };

@@ -89,7 +89,7 @@
   features: {
     requests: {
       name: 'API Requests',
-      icon: 'bolt',
+      icon: 'fa-solid fa-bolt',
       definition: 'Calls this project may make per month.',
       usage: {},
     },
@@ -194,7 +194,7 @@
   // Enabled targets for this brand (key presence = enabled). Type-wide
   // settings live in each target's own config/omega.json5.
   targets: {
-    web: {},
-    backend: {},
+    web: { type: 'web' },
+    backend: { type: 'backend' },
   },
 }

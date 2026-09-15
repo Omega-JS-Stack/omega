@@ -1,7 +1,7 @@
 // The env schema is the ONE declaration of how a key reaches the extension
 // ([#627](https://github.com/Omega-JS-Stack/omega/issues/627)): the publish
 // workflow's secrets block, the build's bake list, and `omega deploy`'s
-// push-secrets step all read `delivery: { extension: … }` and nothing else.
+// secrets step all read `delivery: { extension: … }` and nothing else.
 // Before this, each of the three carried its own hand-kept list and they drifted
 // (the #582 fix had to be made in the workflow by hand, one key at a time).
 //
@@ -19,7 +19,7 @@ const { scaffoldDefaults } = require(path.join(SRC, 'gulp', 'tasks', 'defaults.j
 // The bake seam is the BUNDLE's since #743 — the snapshot is baked into every
 // emitted bundle, so the schema's bake list and its guard live with it.
 const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
-const { publishEnvSecrets } = require(path.join(SRC, 'commands', 'lib', 'push-secrets.js'));
+const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { STEPS } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
@@ -32,14 +32,17 @@ function tmpTarget(env) {
   return tmp;
 }
 
-/** Declare the brand's own GitHub repo — the publish precondition. */
-function declareRepo(dir, slug) {
+/**
+ * Declare the brand's org, the publish precondition. Secrets belong to the
+ * SOURCE repo (#883), which derives as `<brand.id>-omega` under it.
+ */
+function declareRepo(dir, org) {
   fs.mkdirSync(path.join(dir, 'config'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'config', 'omega.json5'), [
     '{',
     "  brand: { id: 'my-brand', name: 'My Brand', url: 'https://my.brand' },",
-    `  repo: { providers: { github: { repo: '${slug}' } } },`,
-    '  targets: { extension: {} },',
+    `  repo: { provider: 'github', org: '${org}' },`,
+    '  targets: { extension: { type: "extension" } },',
     '}',
   ].join('\n'));
 }
@@ -64,7 +67,7 @@ function gitStub(remote) {
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
-  description: 'env delivery (#627) — the workflow block, the bake list, and push-secrets from ONE schema',
+  description: 'env delivery (#627): the workflow block, the bake list, and the secrets publish from ONE schema',
   tests: [
     {
       name: 'the publish workflow renders the schema block — every CI key, no token left (#627, #582)',
@@ -86,8 +89,13 @@ module.exports = defineCases({
           // secret and sent no events, silently.
           ctx.expect(workflow).toContain('GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}');
 
-          // GITHUB_TOKEN is the runner's own, not a schema key — still literal.
-          ctx.expect(workflow).toContain('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+          // GH_TOKEN is the BRAND's cross-repo token, declared in the schema for
+          // this target and workflow-owned (the template writes the line, so the
+          // rendered block never restates it), never the run-scoped
+          // `secrets.GITHUB_TOKEN` (#883): the publish uploads its zips to
+          // `<brand.id>-releases`, a repo this run does not own.
+          ctx.expect(workflow).toContain('GH_TOKEN: ${{ secrets.GH_TOKEN }}');
+          ctx.expect(workflow.includes('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}')).toBe(false);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -168,56 +176,67 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'push-secrets publishes the schema set, valued from the composed env, on stdin',
+      name: 'the secrets publish sends the schema set, valued from the composed env, on stdin',
       run: (ctx) => {
-        const tmp = tmpTarget('CHROME_CLIENT_ID=chrome-id\nGOOGLE_ANALYTICS_SECRET_EXTENSION=mp-secret\nMY_CUSTOM_THING=custom\n');
-        declareRepo(tmp, 'acme/ext');
+        const tmp = tmpTarget('CHROME_CLIENT_ID=chrome-id\nGH_TOKEN=brand-token\nGOOGLE_ANALYTICS_SECRET_EXTENSION=mp-secret\nMY_CUSTOM_THING=custom\n');
+        declareRepo(tmp, 'acme');
         const gh = [];
 
         try {
-          const result = publishEnvSecrets({
+          const result = publishTargetSecrets({
             targetDir: tmp,
+            target: 'extension',
             logger: quiet,
             env: {},
-            gitExecFn: () => 'git@github.com:acme/ext.git\n',
+            gitExecFn: () => 'git@github.com:acme/my-brand-omega.git\n',
             execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
           });
 
           // The brand-level GOOGLE_ANALYTICS_SECRET_EXTENSION lands under its
-          // DELIVERED name; the undeclared key is nobody's secret.
-          ctx.expect(result.published).toEqual(['CHROME_CLIENT_ID', 'GOOGLE_ANALYTICS_SECRET']);
+          // DELIVERED name; the key the schema never declared is the CONSUMER's
+          // own and travels too ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)),
+          // because their own workflow step is the only thing that reads it.
+          // GH_TOKEN is the extension's OWN delivery (#883): the publish uploads
+          // its zips to `<brand.id>-releases`, so this push has to arm the repo
+          // with the brand token rather than wait for a sibling target's push.
+          ctx.expect(result.published).toEqual(['CHROME_CLIENT_ID', 'GH_TOKEN', 'GOOGLE_ANALYTICS_SECRET', 'MY_CUSTOM_THING']);
           ctx.expect(gh.map((c) => c.args.join(' '))).toEqual([
             'auth status',
-            'secret set CHROME_CLIENT_ID --repo acme/ext',
-            'secret set GOOGLE_ANALYTICS_SECRET --repo acme/ext',
+            'secret set CHROME_CLIENT_ID --repo acme/my-brand-omega',
+            'secret set GH_TOKEN --repo acme/my-brand-omega',
+            'secret set GOOGLE_ANALYTICS_SECRET --repo acme/my-brand-omega',
+            'secret set MY_CUSTOM_THING --repo acme/my-brand-omega',
           ]);
-          ctx.expect(gh.slice(1).map((c) => c.input)).toEqual(['chrome-id', 'mp-secret']);
+          ctx.expect(gh.slice(1).map((c) => c.input)).toEqual(['chrome-id', 'brand-token', 'mp-secret', 'custom']);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
       },
     },
     {
-      name: 'push-secrets skips LOUDLY on CI, an empty cascade, no remote, and a stranger\'s repo',
+      name: 'the secrets publish skips LOUDLY on CI, an empty cascade, no remote, and a stranger\'s repo',
       run: (ctx) => {
         const noGh = () => { throw new Error('gh must not run'); };
         const messages = [];
         const loud = { log: (m) => messages.push(m), warn: (m) => messages.push(m), error: (m) => messages.push(m) };
 
-        const empty = tmpTarget('MY_CUSTOM_THING=custom\n');
-        declareRepo(empty, 'acme/ext');
+        // A key the schema DECLARES for another target: nothing composes here.
+        // (A key the schema does not know at all now would, #835.)
+        const empty = tmpTarget('OMEGA_ADMIN_KEY=backend-only\n');
+        declareRepo(empty, 'acme');
 
         try {
-          ctx.expect(publishEnvSecrets({ targetDir: empty, logger: loud, env: { CI: 'true' }, execFn: noGh, gitExecFn: noGh }))
+          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: { CI: 'true' }, execFn: noGh, gitExecFn: noGh }))
             .toEqual({ skipped: 'ci' });
 
-          ctx.expect(publishEnvSecrets({ targetDir: empty, logger: loud, env: {}, execFn: noGh, gitExecFn: noGh }))
+          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: {}, execFn: noGh, gitExecFn: noGh }))
             .toEqual({ skipped: 'no-secrets' });
 
           const keyed = tmpTarget('CHROME_CLIENT_ID=chrome-id\n');
-          declareRepo(keyed, 'acme/ext');
-          ctx.expect(publishEnvSecrets({
+          declareRepo(keyed, 'acme');
+          ctx.expect(publishTargetSecrets({
             targetDir: keyed,
+            target: 'extension',
             logger: loud,
             env: {},
             execFn: noGh,
@@ -226,8 +245,9 @@ module.exports = defineCases({
 
           // The enclosing checkout is not the brand's repo — never arm a
           // stranger's Actions with this brand's store credentials.
-          ctx.expect(publishEnvSecrets({
+          ctx.expect(publishTargetSecrets({
             targetDir: keyed,
+            target: 'extension',
             logger: loud,
             env: {},
             execFn: noGh,
@@ -240,16 +260,19 @@ module.exports = defineCases({
           ctx.expect(said).toContain('CI already has the repo secrets');
           ctx.expect(said).toContain('no keys composed for this target');
           ctx.expect(said).toContain('no GitHub remote');
-          ctx.expect(said).toContain("this brand's repo is acme/ext");
+          ctx.expect(said).toContain("this brand's repo is acme/my-brand-omega");
         } finally {
           fs.rmSync(empty, { recursive: true, force: true });
         }
       },
     },
     {
-      name: 'the deploy precheck runs push-secrets after the freshness check (#680)',
+      name: 'the deploy precheck runs push-secrets after the freshness check (#680), and it is FATAL (#891)',
       run: (ctx) => {
         ctx.expect(STEPS.map((step) => step.name)).toEqual(['framework-freshness', 'push-secrets']);
+        // The dispatched publish reads what this step sends, so a refused or
+        // half publish stops the deploy on all four frameworks.
+        ctx.expect(STEPS.find((step) => step.name === 'push-secrets').fatal).toBe(true);
       },
     },
   ],

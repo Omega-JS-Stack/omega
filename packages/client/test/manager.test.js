@@ -15,6 +15,23 @@ describe('Manager Methods', () => {
     assert.strictEqual(Manager.isDevelopment(), false);
   });
 
+  it('#817: the full environment surface, derived from the ONE baked input', async () => {
+    const Manager = getManager();
+
+    // The same four calls every other OMEGA target answers, from the same
+    // module. The three checks DERIVE from getEnvironment(), so exactly one is
+    // true in each lane and isProduction() is a real positive check.
+    for (const name of ['development', 'testing', 'production']) {
+      await Manager.initialize({ ...TEST_CONFIG, environment: name });
+      assert.strictEqual(Manager.getEnvironment(), name);
+      assert.strictEqual(Manager.isDevelopment(), name === 'development', `isDevelopment in ${name}`);
+      assert.strictEqual(Manager.isTesting(), name === 'testing', `isTesting in ${name}`);
+      assert.strictEqual(Manager.isProduction(), name === 'production', `isProduction in ${name}`);
+      const trueCount = [Manager.isDevelopment(), Manager.isTesting(), Manager.isProduction()].filter(Boolean).length;
+      assert.strictEqual(trueCount, 1, `exactly one is*() true in ${name}`);
+    }
+  });
+
   it('should validate redirect URLs for current host', async () => {
     const Manager = getManager();
     await Manager.initialize(TEST_CONFIG);
@@ -81,6 +98,9 @@ describe('Manager Methods', () => {
       ...TEST_CONFIG,
       environment: 'development',
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
+      // The resolved map is the only source of a dev port (#834): a real dev
+      // build always bakes one, so a test that wants a number states one.
+      dev: { ports: { functions: 5001 } },
     });
     assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
   });
@@ -90,8 +110,31 @@ describe('Manager Methods', () => {
     await Manager.initialize({
       ...TEST_CONFIG,
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
+      dev: { ports: { functions: 5001 } },
     });
     assert.strictEqual(Manager.getFunctionsUrl('development'), 'http://localhost:5001/my-project/us-central1');
+  });
+
+  it('#925: a testing run talks to the local stack only when it was handed a dev port map', async () => {
+    const Manager = getManager();
+    const firebase = { app: { enabled: false, config: { projectId: 'my-project' } } };
+
+    // A testing page with no map has no local stack to reach: live, as before.
+    await Manager.initialize({ ...TEST_CONFIG, firebase });
+    assert.strictEqual(Manager._localStack(), false);
+    assert.strictEqual(Manager.getFunctionsUrl(), 'https://us-central1-my-project.cloudfunctions.net');
+
+    // The desktop boot lane and the extension's emulator run bake one: local.
+    await Manager.initialize({ ...TEST_CONFIG, firebase, dev: { ports: { functions: 5001 } } });
+    assert.strictEqual(Manager._localStack(), true);
+    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
+
+    // Development is local with or without the question; production never is.
+    await Manager.initialize({ ...TEST_CONFIG, firebase, environment: 'development' });
+    assert.strictEqual(Manager._localStack(), true);
+    await Manager.initialize({ ...TEST_CONFIG, firebase, environment: 'production', dev: { ports: { functions: 5001 } } });
+    assert.strictEqual(Manager._localStack(), false);
+    assert.strictEqual(Manager.getFunctionsUrl(), 'https://us-central1-my-project.cloudfunctions.net');
   });
 
   it('should throw when getFunctionsUrl called without projectId', async () => {
@@ -102,7 +145,11 @@ describe('Manager Methods', () => {
 
   it('should return API URL for development', async () => {
     const Manager = getManager();
-    await Manager.initialize({ ...TEST_CONFIG, environment: 'development' });
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { https: 5002 } },
+    });
     assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5002');
   });
 
@@ -169,41 +216,41 @@ describe('Dev ports (N7)', () => {
     global.window.__OMEGA_DEV_PORTS__ = { functions: 5103, hosting: 5104, auth: 9199 };
     assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5003/my-project/us-central1');
     assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5004');
-    assert.strictEqual(Manager._devPorts().auth, 9199, 'a key the chrome omits still comes from the fallback');
+    assert.strictEqual(Manager._devPort('auth'), 9199, 'a key the chrome omits still comes from the runtime channel');
   });
 
-  it('should say out loud which dev ports are assumptions, and stay quiet when every one is resolved (#300)', async () => {
+  it('should throw, naming the build step, for a dev port nobody resolved (#834)', async () => {
     const Manager = getManager();
-    const realWarn = console.warn;
-    let warnings = [];
-    console.warn = (...args) => warnings.push(args.join(' '));
-    const portLines = () => warnings.filter((line) => line.includes('No resolved dev port'));
 
-    try {
-      // Only this server's own port resolved — every emulator number is a guess
-      await Manager.initialize({
-        ...TEST_CONFIG,
-        environment: 'development',
-        dev: { ports: { website: 4001 } },
-      });
-      Manager._warnClassicPortAssumption();
-      assert.strictEqual(portLines().length, 1, 'ONE line, not one per port');
-      assert.match(portLines()[0], /^\[@omega\.js\/client:firebase\]/, 'through the client logger (the tag contract)');
-      assert.match(portLines()[0], /auth, firestore, functions, hosting/);
-      assert.match(portLines()[0], /auth :9099/);
-      assert.match(portLines()[0], /talking to IT, not your stack/);
+    // Only this server's own port resolved: every emulator number used to be
+    // an assumed classic with a warning beside it. The classics are gone: a
+    // number nobody resolved is a guess about somebody else's stack, so the
+    // read fails at the call that needed it and names where the map comes from.
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { website: 4001 } },
+    });
 
-      warnings = [];
-      await Manager.initialize({
-        ...TEST_CONFIG,
-        environment: 'development',
-        dev: { ports: { auth: 9100, firestore: 8081, functions: 5002, hosting: 5003 } },
-      });
-      Manager._warnClassicPortAssumption();
-      assert.strictEqual(portLines().length, 0, 'a fully resolved map says nothing');
-    } finally {
-      console.warn = realWarn;
+    for (const name of ['auth', 'firestore', 'functions', 'hosting']) {
+      assert.throws(() => Manager._devPort(name), (error) => {
+        assert.match(error.message, new RegExp(`dev port for \`${name}\``), 'names the port it wanted');
+        assert.match(error.message, /OMEGA_BUILD_JSON\.config\.dev/, 'names the channel');
+        assert.match(error.message, /bundle tasks at build time/, 'names the build step that writes it');
+        return true;
+      }, `${name} throws rather than assuming a classic`);
     }
+
+    // A resolved map answers every one of them, with no warning and no guess.
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { auth: 9100, firestore: 8081, functions: 5002, hosting: 5003 } },
+    });
+    assert.strictEqual(Manager._devPort('auth'), 9100);
+    assert.strictEqual(Manager._devPort('firestore'), 8081);
+    assert.strictEqual(Manager._devPort('functions'), 5002);
+    assert.strictEqual(Manager._devPort('hosting'), 5003);
   });
 
   it('should answer the dev website origin from the resolved map, and say so when it has to assume (#262)', async () => {
@@ -224,14 +271,18 @@ describe('Dev ports (N7)', () => {
       assert.strictEqual(Manager.getDevWebsiteOrigin(), 'https://localhost:4001');
       assert.strictEqual(originLines().length, 0, 'a resolved fact says nothing');
 
-      // Nothing published one: the classic assumption, out loud
+      // Nothing published one: the classic https://localhost:4000 assumption is
+      // gone (#834). A wrong dev origin fails as a silent connection refusal,
+      // so the miss is loud at the read instead.
       warnings = [];
       await Manager.initialize({ ...TEST_CONFIG, environment: 'development' });
-      assert.strictEqual(Manager.getDevWebsiteOrigin(), 'https://localhost:4000');
-      assert.strictEqual(originLines().length, 1, 'ONE line');
-      assert.match(originLines()[0], /^\[@omega\.js\/client:firebase\]/, 'through the client logger (the tag contract)');
-      assert.match(originLines()[0], /assuming the classic https:\/\/localhost:4000/);
-      assert.match(originLines()[0], /Boot the website with `omega dev`/);
+      assert.throws(() => Manager.getDevWebsiteOrigin(), (error) => {
+        assert.match(error.message, /dev website origin/);
+        assert.match(error.message, /OMEGA_BUILD_JSON\.config\.dev/, 'names the channel');
+        assert.match(error.message, /`omega dev` \(into the page chrome, per response\)/, 'names the build step that writes it');
+        return true;
+      });
+      assert.strictEqual(originLines().length, 0, 'nothing is assumed, so nothing is warned about');
     } finally {
       console.warn = realWarn;
     }
@@ -269,15 +320,21 @@ describe('Dev ports (N7)', () => {
     assert.strictEqual(Manager._authEmulatorUrl(), 'http://localhost:9199');
   });
 
-  it('should keep the classic assumptions when no map is provided', async () => {
+  it('should throw, naming the build step, when no dev map was baked at all (#834)', async () => {
     const Manager = getManager();
     await Manager.initialize({
       ...TEST_CONFIG,
       environment: 'development',
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
     });
-    assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5002');
-    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
+
+    // The two URL getters that used to answer with a classic number.
+    assert.throws(() => Manager.getApiUrl(), /dev `https` or `hosting` port/);
+    assert.throws(() => Manager.getApiUrl(), /OMEGA_BUILD_JSON\.config\.dev/);
+    assert.throws(() => Manager.getFunctionsUrl(), /dev port for `functions`/);
+
+    // Production is untouched: it has no local stack to resolve and never did.
+    assert.match(Manager.getApiUrl('production'), /^https:\/\/api\./);
   });
 
   it('should version-check /build.json only — the retired npm-build shape carries no timestamp (#148)', async () => {

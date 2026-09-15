@@ -1,6 +1,6 @@
 /**
  * Land each target project's DSN in
- * targets.<type>.monitoring.providers.sentry.dsn (#425) — the
+ * targets.<name>.monitoring.providers.sentry.dsn (#425): the
  * per-surface override every framework reads through the config merge
  * chain. DSNs are public by design (schema-pinned), so config is their
  * home; the writeback is comment-preserving and a converged rerun leaves

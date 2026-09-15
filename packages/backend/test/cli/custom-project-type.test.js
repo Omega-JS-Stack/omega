@@ -56,7 +56,7 @@ const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
  */
 function targetDir({ projectType }) {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-project-type-')));
-  const backend = projectType ? { projectType } : {};
+  const backend = projectType ? { type: 'backend', projectType } : { type: 'backend' };
 
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'fixture-backend', version: '0.0.0' }));
   fs.mkdirSync(path.join(dir, 'config'));

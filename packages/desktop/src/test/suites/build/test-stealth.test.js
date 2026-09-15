@@ -2,13 +2,15 @@
 // invisible and non-intrusive". Consumed by window-manager (stealth surfacing),
 // main.js (macOS app-activation suppression), and the test harness.
 //
-// Build layer runs in plain Node, so the env-var contract (OMEGA_TEST_MODE /
+// Build layer runs in plain Node, so the env-var contract (OMEGA_ENVIRONMENT,
+// the ONE environment input since
+// [#817](https://github.com/Omega-JS-Stack/omega/issues/817), plus
 // OMEGA_TEST_SHOW) is exercised directly with save/restore around each case.
 
 const isTestStealth = require('../../../utils/test-stealth.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-// Run fn with OMEGA_TEST_MODE / OMEGA_TEST_SHOW set to the given values (undefined = unset),
+// Run fn with OMEGA_ENVIRONMENT / OMEGA_TEST_SHOW set to the given values (undefined = unset),
 // restoring the real environment afterwards so other build suites are unaffected.
 function withEnv(vars, fn) {
   const saved = {};
@@ -41,7 +43,7 @@ module.exports = defineCases({
     {
       name: 'true in testing mode without OMEGA_TEST_SHOW',
       run: (ctx) => {
-        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_TEST_SHOW: undefined }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'testing', OMEGA_TEST_SHOW: undefined }, () => {
           ctx.expect(isTestStealth()).toBe(true);
         });
       },
@@ -49,7 +51,7 @@ module.exports = defineCases({
     {
       name: 'OMEGA_TEST_SHOW=1 opts out even in testing mode',
       run: (ctx) => {
-        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_TEST_SHOW: '1' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'testing', OMEGA_TEST_SHOW: '1' }, () => {
           ctx.expect(isTestStealth()).toBe(false);
         });
       },
@@ -57,24 +59,28 @@ module.exports = defineCases({
     {
       name: 'false outside testing mode regardless of OMEGA_TEST_SHOW',
       run: (ctx) => {
-        withEnv({ OMEGA_TEST_MODE: undefined, OMEGA_TEST_SHOW: undefined, OMEGA_BUILD_MODE: undefined, NODE_ENV: 'development' }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: 'development', OMEGA_TEST_SHOW: undefined }, () => {
+          ctx.expect(isTestStealth()).toBe(false);
+        });
+        withEnv({ OMEGA_ENVIRONMENT: 'production', OMEGA_TEST_SHOW: '1' }, () => {
           ctx.expect(isTestStealth()).toBe(false);
         });
       },
     },
     {
-      name: 'a provided manager is authoritative over the env fallback',
+      name: 'a provided manager answers from the config IT was baked with',
       run: (ctx) => {
-        // Build-time Manager carries the same mode-helpers mixin as the runtime
-        // Managers — config.em.environment overrides the env detection.
+        // The build-time Manager carries the same mixin as the runtime Managers,
+        // and since #817 they all read the ONE input: the process variable, or
+        // the baked `config.environment` when the process has none.
         const Manager = require('../../../build.js');
-        withEnv({ OMEGA_TEST_MODE: undefined, OMEGA_TEST_SHOW: undefined }, () => {
+        withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_TEST_SHOW: undefined }, () => {
           const testing = new Manager();
-          testing.config = { em: { environment: 'testing' } };
+          testing.config = { environment: 'testing' };
           ctx.expect(isTestStealth(testing)).toBe(true);
 
           const production = new Manager();
-          production.config = { em: { environment: 'production' } };
+          production.config = { environment: 'production' };
           ctx.expect(isTestStealth(production)).toBe(false);
         });
       },

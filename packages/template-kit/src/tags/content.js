@@ -123,8 +123,13 @@ const omegaLanguage = {
   },
 };
 
-// {% omega_translation_url lang, page.url %} — language-prefixed URL honoring
-// site.translation { default, languages, exclude }
+// {% omega_translation_url lang, page.url %} - language-prefixed URL honoring
+// site.translation { default, languages }.
+// It does NOT answer exclusion (#858): `translation.exclude` is retired, and
+// the include list that replaced it is glob-matched against the framework's
+// own derived exclusions, the socials redirects and each page's own stamp,
+// none of which a template tag can see. The ONE honest answer lives in the
+// build's link rewriter (@omega.js/web src/translate/index.js).
 const omegaTranslationUrl = {
   block: false,
   render(ctx, markup) {
@@ -144,11 +149,6 @@ const omegaTranslationUrl = {
 
     const normalizedPath = normalizePath(urlPath);
 
-    const excludes = translation.exclude || [];
-    if (pageExcluded(normalizedPath, excludes)) {
-      return normalizedPath === '' ? '/' : `/${normalizedPath}`;
-    }
-
     if (languageCode === defaultLanguage) {
       return normalizedPath === '' ? '/' : `/${normalizedPath}`;
     }
@@ -165,11 +165,6 @@ function normalizePath(path) {
   clean = clean.replace(/^blog\/index\.html$/, 'blog');
   clean = clean.replace(/^blog\/page\/(\d+)\.html$/, 'blog/page/$1');
   return clean;
-}
-
-function pageExcluded(normalizedPath, excludes) {
-  if (!excludes.length || !normalizedPath) return false;
-  return excludes.some((exclude) => normalizedPath === exclude || normalizedPath.startsWith(`${exclude}/`));
 }
 
 module.exports = { omegaReadtime, omegaFakeComments, omegaExternal, omegaSocial, omegaLanguage, omegaTranslationUrl, stripHtml };

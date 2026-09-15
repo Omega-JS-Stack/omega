@@ -26,7 +26,11 @@
  * PRESENCE ONLY, never a value shape (Ian 2026-08-26): a rule fires when the
  * key is empty, never because a value "looks wrong". `requiredWhen` is
  * one-directional — a truthy config path makes the key mandatory; an empty key
- * never says anything about the config.
+ * never says anything about the config. A rule may PIN the path to one value
+ * (`platforms.windows.signing.strategy=self-hosted`,
+ * [#891](https://github.com/Omega-JS-Stack/omega/issues/891)), because an
+ * enum's value is what decides which credentials exist: the EV token belongs to
+ * the self-hosted strategy, never to the cloud one.
  *
  * The checker NEVER throws and never logs. It returns the violations and the
  * caller decides the severity (build mode and production boot fail loudly,
@@ -51,6 +55,21 @@ function hasValue(env, entry) {
   if (env[entry.name]) return true;
 
   return Boolean(entry.deliverAs && env[entry.deliverAs]);
+}
+
+/**
+ * Whether a `requiredWhen` expression holds for a config: a truthy path, or an
+ * exact match when the expression pins one (`<path>=<value>`).
+ *
+ * @param {object} config - The resolved omega.json5 config.
+ * @param {string} expression - The schema entry's `requiredWhen`.
+ * @returns {boolean}
+ */
+function requiredWhenHolds(config, expression) {
+  const [path, expected] = String(expression).split('=');
+  const value = getPath(config, path);
+
+  return expected === undefined ? Boolean(value) : String(value) === expected;
 }
 
 /**
@@ -82,7 +101,7 @@ function checkEnvRules(config, env, { target, schema = ENV_SCHEMA } = {}) {
 
     if (entry.required) {
       violations.push({ key: entry.name, rule: 'required', path: null });
-    } else if (getPath(config, entry.requiredWhen)) {
+    } else if (requiredWhenHolds(config, entry.requiredWhen)) {
       violations.push({ key: entry.name, rule: 'requiredWhen', path: entry.requiredWhen });
     }
   }
@@ -90,4 +109,4 @@ function checkEnvRules(config, env, { target, schema = ENV_SCHEMA } = {}) {
   return violations;
 }
 
-module.exports = { checkEnvRules };
+module.exports = { checkEnvRules, requiredWhenHolds };

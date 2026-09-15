@@ -124,7 +124,7 @@ function seedTarget(prefix, brandSource) {
   jetpack.write(path.join(targetPath, 'config', 'omega.json5'), JSON.stringify({
     brand: { name: 'Rules Compile', url: 'https://rules-compile.test' },
     cloud: { config: { projectId: 'demo-rules-compile' } },
-    targets: { backend: {} },
+    targets: { backend: { type: 'backend' } },
   }, null, 2));
   jetpack.write(path.join(targetPath, 'firebase.json'), JSON.stringify({ firestore: { rules: COMPILED_RULES_FILE } }, null, 2));
 

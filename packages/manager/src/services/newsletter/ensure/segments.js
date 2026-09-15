@@ -3,7 +3,7 @@
  *
  * Beehiiv has NO segment-create API — the read side lists what exists,
  * and creation happens through the dashboard UI. Interactive runs offer
- * to drive that UI via the companion Chrome extension (trusted-event
+ * to drive that UI via the OMEGA Companion extension (trusted-event
  * browser automation; see lib/segment-automation.js) or to open the
  * dashboard for manual creation, then RE-verify against the API so
  * "created" means Beehiiv says so. Non-interactive and dry runs never

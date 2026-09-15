@@ -50,6 +50,10 @@ require.cache[runCommandPath] = {
   exports: { runCommand: async () => ({ success: true }) },
 };
 
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const manageCommand = require('../src/commands/manage.js');
 const buildCommand = require('../src/commands/build.js');
 const cleanCommand = require('../src/commands/clean.js');
@@ -65,7 +69,7 @@ function stageBrand() {
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
 
@@ -79,7 +83,8 @@ function write(filePath, content) {
 
 /**
  * A brand the FAN-OUT verbs can walk: one framework target (a fake
- * @omega.js/web whose bin the climb finds) and one custom target with its own
+ * @omega.js/web whose bin the climb finds, and whose `./ensure-target` the
+ * deploy's in-process scaffold calls, #901) and one custom target with its own
  * scripts, so both lanes are represented in every summary.
  */
 function stageFanoutBrand() {
@@ -88,10 +93,10 @@ function stageFanoutBrand() {
   write(path.join(root, 'package.json'), { name: 'fixture-brand', private: true, workspaces: ['targets/*'] });
   write(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, api: { type: 'custom' } },
+  targets: { web: { type: 'web' }, api: { type: 'custom' } },
 }
 `);
-  write(path.join(root, 'targets', 'website', 'package.json'), { name: 'website', private: true, devDependencies: { '@omega.js/web': '*' } });
+  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, devDependencies: { '@omega.js/web': '*' } });
   write(path.join(root, 'targets', 'api', 'package.json'), {
     name: 'api', private: true, scripts: { build: 'tsc', clean: 'rm -rf dist', deploy: 'echo publish' },
   });
@@ -99,6 +104,7 @@ function stageFanoutBrand() {
   const pkgDir = path.join(root, 'node_modules', '@omega.js', 'web');
   write(path.join(pkgDir, 'package.json'), { name: '@omega.js/web', bin: { omega: './bin.js' } });
   write(path.join(pkgDir, 'bin.js'), '#!/usr/bin/env node\n');
+  write(path.join(pkgDir, 'ensure-target.js'), 'exports.ensureTarget = async () => ({ written: [], merged: [], changed: [] });\n');
 
   return root;
 }

@@ -19,7 +19,7 @@ Four defaults, ready on install day:
 | `chrome-devtools` | A private, isolated, throwaway-profile Chrome per session | auto |
 | `chrome-devtools-electron` | Attaches to an already-running omega desktop dev app on `$OMEGA_CDP_PORT` | auto |
 | `chrome-devtools-extension` | Chrome for Testing with the unpacked extension at `$OMEGA_EXTENSION_PATH` pre-loaded | on-demand |
-| `omega-extension` | The extension automation server inside `@omega.js/manager` | auto |
+| `omega-extension` | The automation bridge to the OMEGA Companion extension, shipped here in `servers/omega-extension/` | auto |
 
 An `on-demand` upstream stays invisible until a session asks for it — that is how a noisy 34-tool server costs nothing until it is wanted.
 

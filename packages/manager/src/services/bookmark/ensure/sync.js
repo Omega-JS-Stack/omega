@@ -1,5 +1,5 @@
 /**
- * Sync the brand's bookmarks to the companion Chrome extension.
+ * Sync the brand's bookmarks to the OMEGA Companion extension.
  *
  * Starts the WebSocket server the extension auto-connects to (it retries
  * every 5s), sends one OMEGA_BOOKMARK_SYNC message, and waits for the
@@ -14,7 +14,7 @@
 const { execFileSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const { WebSocketServer } = require('ws');
-const { brandRepo } = require('@omega.js/config');
+const { sourceRepo } = require('@omega.js/config');
 const { isInteractive } = require('@omega.js/devkit/prompt');
 const { resolveExtensionPort } = require('../../../lib/automation-client.js');
 
@@ -53,7 +53,7 @@ function generateLinks(brandConfig, targets = [], extras = {}) {
   const domain = brandUrl?.replace(/^https?:\/\//, '');
   const firebaseProjectId = brandConfig.cloud?.config?.projectId;
   const google = brandConfig.analytics?.providers?.google || {};
-  const github = brandConfig.repo?.providers?.github || {};
+  const source = sourceRepo(brandConfig);
   const deployedFunctions = extras.deployedFunctions || [];
 
   // Cloud Console
@@ -127,14 +127,11 @@ function generateLinks(brandConfig, targets = [], extras = {}) {
     ];
   }
 
-  // GitHub — one brand monorepo
-  if (github.org) {
-    // BOTH halves from the one derivation: an `owner/name` slug houses the repo
-    // under its own owner, which `repo.providers.github.org` does not name.
-    const { repo } = brandRepo(brandConfig);
+  // GitHub: the brand's SOURCE monorepo (#883)
+  if (source) {
     links.GitHub = [
-      { title: 'Repository', url: `https://github.com/${repo}` },
-      { title: 'Actions', url: `https://github.com/${repo}/actions` },
+      { title: 'Repository', url: `https://github.com/${source.slug}` },
+      { title: 'Actions', url: `https://github.com/${source.slug}/actions` },
     ];
   }
 
@@ -203,7 +200,7 @@ module.exports = async function ensureSync(context) {
     };
 
     const timeout = setTimeout(() => {
-      console.log(`      ${chalk.yellow('⚠')} Extension not connected (timeout) — install/enable it from ${chalk.cyan('extension/')} (chrome://extensions → Load unpacked → extension/dist)`);
+      console.log(`      ${chalk.yellow('⚠')} Extension not connected (timeout): install the OMEGA Companion from the Chrome Web Store, or load ${chalk.cyan('omega-omega/targets/extension/packaged/chrome/raw/')} unpacked (chrome://extensions → Load unpacked)`);
       cleanup({ status: 'warned', reason: 'extension not connected', output: { sync: { reason: 'extension not connected' } } });
     }, connectTimeout);
 

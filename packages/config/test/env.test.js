@@ -1,19 +1,21 @@
 /**
- * .env cascade tests for @omega.js/config — chain resolution (local/brand/
- * company via the .omega/company.json marker), precedence (shell > local >
- * brand > company), and loading tolerances (missing files, malformed
- * markers, vanished company roots).
+ * .env cascade tests for @omega.js/config: chain resolution (local/brand/
+ * company, the last through the brand's `company: { id }` and the machine
+ * registry, #677), precedence (shell > local > brand > company), and loading
+ * tolerances (missing files, a company that is not on this machine).
  *
  * Fixtures are built under packages/config/.temp/ (gitignored), matching the
  * devkit test convention. Tests mutate process.env through dotenv, so every
- * test uses its own key prefix and clears its keys when done.
+ * test uses its own key prefix and clears its keys when done. A fixture that
+ * names a company points OMEGA_HOME at its own temp home, so no test reads or
+ * writes the developer's real registry.
  */
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadEnv, reloadEnv, resolveEnvChain, loadEnvChain, loadEnvRoots, readCompanyRoot, composeTargetEnv, artifactEnvValues, serializeEnv, ENV_ENVIRONMENTS, envEnvironment } = require('../src/index.js');
+const { loadEnv, reloadEnv, resolveEnvChain, loadEnvChain, loadEnvRoots, recordBrand, composeTargetEnv, artifactEnvValues, serializeEnv, ENV_ENVIRONMENTS, envEnvironment } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -36,21 +38,35 @@ function cleanup(t, root, envKeys = []) {
   });
 }
 
+// A fixture's own machine home, plus the registry line the parent brand's own
+// run would have written (#677): the company layer resolves from those two.
+function useCompany(t, root, { parentRoot = path.join(root, 'parent'), id = 'acme-co', register = true } = {}) {
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = path.join(root, 'home');
+  t.after(() => {
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  });
+
+  if (register) recordBrand({ id, root: parentRoot, name: 'Acme Co', url: 'https://acme.test' });
+
+  return path.join(parentRoot, 'company');
+}
+
 // ─── Full cascade ───
 
-test('local in a company-stamped brand: shell > local .env > brand .env > company .env', (t) => {
+test('local in a brand with a company: shell > local .env > brand .env > company .env', (t) => {
   const root = makeFixture('env-full', {
-    'company/.env': 'ENVT1_B=company\nENVT1_C=company\nENVT1_S=company\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co', name: 'Acme Co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'ENVT1_B=company\nENVT1_C=company\nENVT1_S=company\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
     'brand/.env': 'ENVT1_A=brand\nENVT1_B=brand\nENVT1_S=brand\n',
     'brand/targets/site/.env': 'ENVT1_A=local\nENVT1_S=local\n',
   });
   cleanup(t, root, ['ENVT1_A', 'ENVT1_B', 'ENVT1_C', 'ENVT1_S']);
 
   const brandRoot = path.join(root, 'brand');
-  const companyRoot = path.join(root, 'company');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+  const companyRoot = useCompany(t, root);
 
   process.env.ENVT1_S = 'shell';
 
@@ -134,61 +150,58 @@ test('standalone project: local .env only; a project with no .env at all loads n
   assert.deepStrictEqual(bare.loaded, []);
 });
 
-test('brand root as startDir (the manager shape): its own .env is the local layer, its marker supplies the company layer', (t) => {
+test('brand root as startDir (the manager shape): its own .env is the local layer, its company.id supplies the company layer', (t) => {
   const root = makeFixture('env-brand-root', {
-    'company/.env': 'ENVT4_B=company\nENVT4_C=company\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'ENVT4_B=company\nENVT4_C=company\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
     'brand/.env': 'ENVT4_B=brand\n',
   });
   cleanup(t, root, ['ENVT4_B', 'ENVT4_C']);
 
   const brandRoot = path.join(root, 'brand');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+  const companyRoot = useCompany(t, root);
 
   const { chain } = loadEnv(brandRoot);
 
   assert.strictEqual(chain.local, path.join(brandRoot, '.env'));
   assert.strictEqual(chain.brand, null);
-  assert.strictEqual(chain.company, path.join(root, 'company', '.env'));
+  assert.strictEqual(chain.company, path.join(companyRoot, '.env'));
 
   assert.strictEqual(process.env.ENVT4_B, 'brand');
   assert.strictEqual(process.env.ENVT4_C, 'company');
 });
 
-// ─── Marker tolerances ───
+// ─── Company tolerances (#677) ───
 
-test('marker pointing at a vanished company root: the chain names it, loading skips it silently', (t) => {
-  const root = makeFixture('env-vanished', {
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+test('a company that is not on this machine: no company layer, the rest loads', (t) => {
+  const root = makeFixture('env-company-missing', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'ghost-env-co' } }`,
     'brand/targets/site/.env': 'ENVT5_X=local\n',
   });
   cleanup(t, root, ['ENVT5_X']);
+  useCompany(t, root, { register: false });
 
-  const brandRoot = path.join(root, 'brand');
-  const gone = path.join(root, 'company-gone');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: gone }));
+  const { chain, loaded } = loadEnv(path.join(root, 'brand', 'targets', 'site'));
 
-  const { chain, loaded } = loadEnv(path.join(brandRoot, 'targets', 'site'));
-
-  assert.strictEqual(chain.company, path.join(gone, '.env'));
+  assert.strictEqual(chain.company, null);
   assert.deepStrictEqual(loaded, [chain.local]);
   assert.strictEqual(process.env.ENVT5_X, 'local');
 });
 
-test('malformed or rootless markers read as unstamped', (t) => {
-  const root = makeFixture('env-bad-marker', {
-    'a/.omega/company.json': 'not json{{{',
-    'b/.omega/company.json': JSON.stringify({ something: 'else' }),
-    'c/.omega/company.json': JSON.stringify({ root: '' }),
+test('a registry line pointing at a vanished root: no company layer, loading is silent', (t) => {
+  const root = makeFixture('env-vanished', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
+    'brand/targets/site/.env': 'ENVT5B_X=local\n',
   });
-  cleanup(t, root);
+  cleanup(t, root, ['ENVT5B_X']);
+  useCompany(t, root, { parentRoot: path.join(root, 'parent-gone') });
 
-  assert.strictEqual(readCompanyRoot(path.join(root, 'a')), null);
-  assert.strictEqual(readCompanyRoot(path.join(root, 'b')), null);
-  assert.strictEqual(readCompanyRoot(path.join(root, 'c')), null);
-  assert.strictEqual(readCompanyRoot(path.join(root, 'missing')), null);
+  const { chain, loaded } = loadEnv(path.join(root, 'brand', 'targets', 'site'));
+
+  assert.strictEqual(chain.company, null);
+  assert.deepStrictEqual(loaded, [chain.local]);
+  assert.strictEqual(process.env.ENVT5B_X, 'local');
 });
 
 // ─── loadEnvChain directly ───
@@ -283,15 +296,15 @@ test('empty local-layer values (KEY= / KEY="") never shadow the brand layer; she
 
 test('composeTargetEnv: the schema filters the company + brand layers by target', (t) => {
   const root = makeFixture('env-compose-filter', {
-    'company/.env': 'ANTHROPIC_API_KEY=company-anthropic\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
-    'brand/.env': 'GH_TOKEN=brand-gh\nRECAPTCHA_SITE_KEY=brand-site-key\nANTHROPIC_API_KEY=brand-anthropic\n',
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'ANTHROPIC_API_KEY=company-anthropic\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
+    'brand/.env': 'GH_TOKEN=brand-gh\nCHROME_CLIENT_ID=brand-chrome-client\nANTHROPIC_API_KEY=brand-anthropic\nACME_WEBHOOK_KEY=brand-custom\n',
   });
   cleanup(t, root);
 
   const brandRoot = path.join(root, 'brand');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+  useCompany(t, root);
 
   const { values, sources } = composeTargetEnv({
     targetDir: path.join(brandRoot, 'targets', 'backend'),
@@ -302,20 +315,57 @@ test('composeTargetEnv: the schema filters the company + brand layers by target'
   assert.strictEqual(sources.GH_TOKEN, 'brand');
   assert.strictEqual(values.ANTHROPIC_API_KEY, 'brand-anthropic', 'the brand layer beats the company layer');
   assert.strictEqual(sources.ANTHROPIC_API_KEY, 'brand');
-  assert.strictEqual(values.RECAPTCHA_SITE_KEY, undefined, 'a key the schema names for web only never reaches the backend');
+  assert.strictEqual(values.CHROME_CLIENT_ID, undefined, 'a key the schema names for the extension only never reaches the backend');
+  // #835: the filter is on DECLARED keys only. A key the schema does not know
+  // is the consumer's own, has no target of its own to be filtered by, and
+  // rides down to every target (a consumer who wants one on a single target
+  // puts it in that target's own .env, which already passes unfiltered).
+  assert.strictEqual(values.ACME_WEBHOOK_KEY, 'brand-custom', "a key the schema does not know is the consumer's own and rides down");
+  assert.strictEqual(sources.ACME_WEBHOOK_KEY, 'brand');
+});
+
+test('composeTargetEnv: a custom brand-root key reaches every target, from the base .env and the overlay (#835)', (t) => {
+  const root = makeFixture('env-compose-custom', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ACME_WEBHOOK_KEY=base-custom\nACME_PARTNER_ID=base-partner\nCSC_KEY_PASSWORD=desktop-only\n',
+    'brand/.env.production': 'ACME_WEBHOOK_KEY=production-custom\n',
+  });
+  cleanup(t, root);
+
+  for (const [target, dir] of [['backend', 'backend'], ['web', 'website'], ['desktop', 'desktop'], ['extension', 'extension']]) {
+    const { values, sources } = composeTargetEnv({
+      targetDir: path.join(root, 'brand', 'targets', dir),
+      target,
+      environment: 'production',
+    });
+
+    assert.strictEqual(values.ACME_WEBHOOK_KEY, 'production-custom', `${target}: the production overlay wins for a custom key too`);
+    assert.strictEqual(values.ACME_PARTNER_ID, 'base-partner', `${target}: a custom key set only in the base .env still composes`);
+    assert.strictEqual(sources.ACME_WEBHOOK_KEY, 'brand');
+  }
+
+  // And the declared half is untouched: a key the schema targets at desktop
+  // stays there.
+  const web = composeTargetEnv({
+    targetDir: path.join(root, 'brand', 'targets', 'website'),
+    target: 'web',
+    environment: 'production',
+  });
+
+  assert.strictEqual(web.values.CSC_KEY_PASSWORD, undefined, 'a DECLARED key is still filtered by the target it names');
 });
 
 test('composeTargetEnv: the company layer fills the gaps the brand layer leaves', (t) => {
   const root = makeFixture('env-compose-company', {
-    'company/.env': 'ANTHROPIC_API_KEY=company-anthropic\nRECAPTCHA_SITE_KEY=company-site-key\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'ANTHROPIC_API_KEY=company-anthropic\nCHROME_CLIENT_ID=company-chrome-client\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
     'brand/.env': 'GH_TOKEN=brand-gh\n',
   });
   cleanup(t, root);
 
   const brandRoot = path.join(root, 'brand');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+  useCompany(t, root);
 
   const { values, sources } = composeTargetEnv({
     targetDir: path.join(brandRoot, 'targets', 'backend'),
@@ -324,7 +374,7 @@ test('composeTargetEnv: the company layer fills the gaps the brand layer leaves'
 
   assert.strictEqual(values.ANTHROPIC_API_KEY, 'company-anthropic');
   assert.strictEqual(sources.ANTHROPIC_API_KEY, 'company');
-  assert.strictEqual(values.RECAPTCHA_SITE_KEY, undefined, 'the company layer is filtered by the same schema');
+  assert.strictEqual(values.CHROME_CLIENT_ID, undefined, 'the company layer is filtered by the same schema');
 });
 
 test('composeTargetEnv: the target layer wins per key, and an empty value never claims one', (t) => {
@@ -350,7 +400,7 @@ test('composeTargetEnv: the target layer passes through unfiltered — placement
   const root = makeFixture('env-compose-passthrough', {
     'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
     'brand/.env': 'SOME_BESPOKE_KEY=brand-value\n',
-    'brand/targets/backend/.env': 'SOME_BESPOKE_KEY=target-value\nRECAPTCHA_SITE_KEY=target-site-key\n',
+    'brand/targets/backend/.env': 'SOME_BESPOKE_KEY=target-value\nCHROME_CLIENT_ID=target-chrome-client\n',
   });
   cleanup(t, root);
 
@@ -361,7 +411,7 @@ test('composeTargetEnv: the target layer passes through unfiltered — placement
 
   assert.strictEqual(values.SOME_BESPOKE_KEY, 'target-value', 'a key the schema does not know still passes through');
   assert.strictEqual(sources.SOME_BESPOKE_KEY, 'target');
-  assert.strictEqual(values.RECAPTCHA_SITE_KEY, 'target-site-key', 'a web-named key placed in the backend .env by hand is delivered');
+  assert.strictEqual(values.CHROME_CLIENT_ID, 'target-chrome-client', 'an extension-named key placed in the backend .env by hand is delivered');
 });
 
 test('composeTargetEnv: a pattern entry composes (CONNECTIONS_<PROVIDER>_CLIENT_*)', (t) => {
@@ -563,7 +613,7 @@ test('reloadEnv: a shell-set source key still beats the file that declares the s
 // vocabulary with the runtime's own (`development` | `testing` | `production`).
 
 test('envEnvironment(): one vocabulary — testing wins, then production, else development, and no signal is production', (t) => {
-  const saved = { OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT, FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR, TERM_PROGRAM: process.env.TERM_PROGRAM };
+  const saved = { OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT, OMEGA_TEST_MODE: process.env.OMEGA_TEST_MODE, ENVIRONMENT: process.env.ENVIRONMENT, FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR, TERM_PROGRAM: process.env.TERM_PROGRAM };
   t.after(() => {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];
@@ -576,6 +626,11 @@ test('envEnvironment(): one vocabulary — testing wins, then production, else d
     Object.assign(process.env, vars);
     return envEnvironment();
   };
+
+  // The one input (#817) wins outright: the ambient answer is the PRODUCER of
+  // OMEGA_ENVIRONMENT, so once a lane has named one, the sniff never contradicts it.
+  assert.strictEqual(only({ OMEGA_ENVIRONMENT: 'development', OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }), 'development', 'the named input wins over every sniff');
+  assert.strictEqual(only({ OMEGA_ENVIRONMENT: 'staging' }), 'production', 'a fourth word is not an input, so the sniff answers');
 
   assert.strictEqual(only({ OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }), 'testing', 'testing wins over everything');
   assert.strictEqual(only({ ENVIRONMENT: 'production' }), 'production');
@@ -592,9 +647,10 @@ test('envEnvironment(): one vocabulary — testing wins, then production, else d
 
 test('loadEnv: .env.<environment> overlays the .env beside it, at every layer', (t) => {
   const root = makeFixture('env-overlay-load', {
-    'company/.env': 'ENVO1_C=company\nENVO1_B=company\nENVO1_L=company\n',
-    'company/.env.development': 'ENVO1_C=company-dev\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'ENVO1_C=company\nENVO1_B=company\nENVO1_L=company\n',
+    'parent/company/.env.development': 'ENVO1_C=company-dev\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
     'brand/.env': 'ENVO1_B=brand\nENVO1_L=brand\n',
     'brand/.env.development': 'ENVO1_B=brand-dev\n',
     'brand/targets/site/.env': 'ENVO1_L=local\n',
@@ -603,8 +659,7 @@ test('loadEnv: .env.<environment> overlays the .env beside it, at every layer', 
   cleanup(t, root, ['ENVO1_C', 'ENVO1_B', 'ENVO1_L']);
 
   const brandRoot = path.join(root, 'brand');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+  useCompany(t, root);
 
   const { loaded } = loadEnv(path.join(brandRoot, 'targets', 'site'), { environment: 'development' });
 
@@ -616,8 +671,8 @@ test('loadEnv: .env.<environment> overlays the .env beside it, at every layer', 
     path.join(brandRoot, 'targets', 'site', '.env'),
     path.join(brandRoot, '.env.development'),
     path.join(brandRoot, '.env'),
-    path.join(root, 'company', '.env.development'),
-    path.join(root, 'company', '.env'),
+    path.join(root, 'parent', 'company', '.env.development'),
+    path.join(root, 'parent', 'company', '.env'),
   ], 'each layer contributes its overlay first, then its base');
 });
 
@@ -656,9 +711,10 @@ test('loadEnv: no overlay file leaves the chain exactly as it was', (t) => {
 
 test('composeTargetEnv: the environment overlay overrides the base within each layer', (t) => {
   const root = makeFixture('env-overlay-compose', {
-    'company/.env': 'GH_TOKEN=company\nOMEGA_ADMIN_KEY=company\n',
-    'company/.env.testing': 'GH_TOKEN=company-testing\n',
-    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'parent/config/omega.json5': `{ brand: { id: 'acme-co' }, company: { id: 'self' } }`,
+    'parent/company/.env': 'GH_TOKEN=company\nOMEGA_ADMIN_KEY=company\n',
+    'parent/company/.env.testing': 'GH_TOKEN=company-testing\n',
+    'brand/config/omega.json5': `{ brand: { id: 'acme' }, company: { id: 'acme-co' } }`,
     'brand/.env': 'OMEGA_ADMIN_KEY=brand\nOMEGA_WEBHOOK_KEY=brand\n',
     'brand/.env.testing': 'OMEGA_ADMIN_KEY=brand-testing\n',
     'brand/targets/backend/.env': 'OMEGA_WEBHOOK_KEY=target\n',
@@ -667,8 +723,7 @@ test('composeTargetEnv: the environment overlay overrides the base within each l
   cleanup(t, root);
 
   const brandRoot = path.join(root, 'brand');
-  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
-  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: path.join(root, 'company') }));
+  useCompany(t, root);
 
   const { values, sources } = composeTargetEnv({
     targetDir: path.join(brandRoot, 'targets', 'backend'),

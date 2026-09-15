@@ -10,7 +10,7 @@ Manager.isTesting()         // true ONLY in testing
 Manager.isProduction()      // true ONLY in production
 ```
 
-**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / `ENVIRONMENT` / `FUNCTIONS_EMULATOR` / `TERM_PROGRAM`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
+**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` is `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/desktop, @omega.js/extension, @omega.js/web and @omega.js/client all answer from. It reads the `OMEGA_ENVIRONMENT` variable and nothing else, and a process whose lane never named one **throws**, naming the variable. `Manager.init()` sets it ONCE, right after the `.env` cascade loads, from `envEnvironment()`, the AMBIENT answer, whose rules are the ones this file always described (below). Nothing re-sniffs a raw signal at read time. The three `is*()` checks **derive** from it live on every call, so they can never disagree with `getEnvironment()`.
 
 **the route context (ctx) forwards to the Manager.** Request handlers receive an `ctx`, so the same methods are exposed there and return identical results — call whichever is in scope:
 
@@ -21,15 +21,15 @@ ctx.isTesting()       // === Manager.isTesting()
 
 (An ctx always has a Manager — `init()` throws without one. The `ctx.meta.environment` field is still populated for code that reads it, but the `is*()` checks no longer depend on that snapshot.)
 
-**Resolution order:** testing wins first, then production, else development. The three checks are mutually exclusive — exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
+**The three checks are mutually exclusive**: exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
 
 ## Available helpers
 
 | Helper | Returns |
 |---|---|
-| `getEnvironment()` | `'development' \| 'testing' \| 'production'` — the SSOT resolver; the only reader of raw signals. |
+| `getEnvironment()` | `'development' \| 'testing' \| 'production'`: the one reader of the one input; throws when it is absent. |
 | `isDevelopment()` | `true` ONLY in development (local Firebase emulator / dev), and NOT testing. Derives from `getEnvironment()`. |
-| `isTesting()` | `true` ONLY in testing (`OMEGA_TEST_MODE === 'true'`). **Takes precedence** — a test run is not development. |
+| `isTesting()` | `true` ONLY in testing. Derives from `getEnvironment()`. |
 | `isProduction()` | `true` ONLY in production (deployed Cloud Functions). A **real positive check** — NOT `!isDevelopment()`. |
 
 ## Gating side effects — use the INTENTIONAL check
@@ -65,16 +65,27 @@ Resolving local in test mode is required because tests hit the local emulator �
 
 ## Where they live
 
-Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a single Manager (no multi-context mixin like EM/UJM/BXM), so `getEnvironment()` + `is*()` + the URL helpers live directly on the Manager. The `ctx` exposes the same methods and forwards each to its Manager (`ctx.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
+Source: `@omega.js/config`'s [environment.js](../../config/src/environment.js) for the four environment calls, assigned onto the Manager in [src/manager/index.js](../src/manager/index.js) beside the URL helpers (@omega.js/backend has a single Manager, no multi-context mixin). The env reader re-exports the same function as `env.getEnvironment()` for the provider libraries, which hold no Manager handle. The `ctx` exposes the same methods and forwards each to its Manager (`ctx.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
 
 ## How detection works
 
-`getEnvironment()` resolves in this precedence order:
+`getEnvironment()` reads ONE input, `process.env.OMEGA_ENVIRONMENT`, and throws
+when it is absent ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
+@omega.js/backend is the target whose deployed runtime legitimately arrives with
+no lane above it, so `Manager.init()` resolves that input ONCE, from
+`@omega.js/config`'s `envEnvironment()`: the AMBIENT answer, whose precedence is
+unchanged:
 
 1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'` (set by the test runner / emulator). A test run is a test run regardless of any other signal.
 2. **Production** — `process.env.ENVIRONMENT === 'production'`.
 3. **Development** — `process.env.ENVIRONMENT === 'development'`, or `FUNCTIONS_EMULATOR` is set, or `TERM_PROGRAM` is `Apple_Terminal` / `vscode` (running locally).
-4. **Default** — production. @omega.js/backend's deployed *runtime* can legitimately lack a dev signal (a live Cloud Function has no `FUNCTIONS_EMULATOR`), so "no signal" IS the normal production state. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. EM defaults to production for the same reason as @omega.js/backend.)
+4. **Else**: production. A deployed Cloud Function has no `FUNCTIONS_EMULATOR` and often no `ENVIRONMENT`, so "no signal" IS the normal production state.
+
+A deploy that named its own environment already set `OMEGA_ENVIRONMENT`, and the
+boot leaves it exactly as it is. `envEnvironment()` is the PRODUCER of the input,
+never a second reader of it, and it honors an already-set value first so the two
+can never disagree inside one process. The whole table of who names what across
+the frameworks lives in [docs/shared/config.md](../../../docs/shared/config.md).
 
 ## Adding a new helper
 
@@ -86,7 +97,7 @@ If you need a new environment-derived helper, add it next to the others on the M
 
 **Sub-modules check the same signal.** When framework code (an analytics flush, a webhook fan-out) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
-**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals, there is exactly one definition of "what environment is this," and a wrong-but-confident gate (leaking real emails during a test run) is structurally impossible.
+**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals, there is exactly one definition of "what environment is this," and a wrong-but-confident gate (leaking real emails during a test run) is structurally impossible. Since #817 that holds ACROSS frameworks too: the resolver is one shared module, so no two OMEGA targets can answer differently from the same inputs.
 
 ## See also
 

@@ -33,7 +33,7 @@ function consumer(t, { theme = 'classy', extra = {} } = {}) {
       brand: { id: 'fixture', name: 'Fixture' },
       url: 'https://fixture.example.com',
       theme: { id: theme },
-      targets: { web: {} },
+      targets: { web: { type: 'web' } },
     }),
     'package.json': '{}',
     'src/pages/.keep': '',

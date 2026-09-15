@@ -3,14 +3,16 @@
  * parent @omega.js/backend's forwarder.
  *
  * Publications can be shared across sibling brands, so the webhook always
- * points at the parent (`parent` in omega.json5, 'self' for the parent
- * brand) — the parent reads the brands collection and fans each event out.
- * The webhook is matched by its managed description first (stable across
- * parent moves), then by URL; drift in url/event_types/enabled is patched
- * with the minimum diff.
+ * points at the parent: the RESOLVED `company.url`
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)), which is this
+ * brand's own url when it names no company. The parent reads the brands
+ * collection and fans each event out. The webhook is matched by its managed
+ * description first (stable across parent moves), then by URL; drift in
+ * url/event_types/enabled is patched with the minimum diff.
  */
 const chalk = require('chalk').default;
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { resolveParentHost } = require('../../../lib/company-webhook.js');
 
 // Subscription events @omega.js/backend's consent pipeline consumes (they flip
 // consent.marketing.status to 'revoked' and propagate the unsub to SendGrid)
@@ -23,7 +25,7 @@ const DESIRED_EVENT_TYPES = [
 const WEBHOOK_DESCRIPTION = '@omega.js/backend consent pipeline (managed by OMEGA — do not edit manually)';
 
 module.exports = async function ensureWebhook(context) {
-  const { beehiivApi: api, brandConfig, domain, serviceData, options = {} } = context;
+  const { beehiivApi: api, brandConfig, serviceData, options = {} } = context;
 
   const publicationId = serviceData.publicationId;
   if (!publicationId) {
@@ -31,15 +33,10 @@ module.exports = async function ensureWebhook(context) {
     return {};
   }
 
-  const parent = brandConfig.parent;
-  if (parent === false) {
-    // Tri-state: explicit false = deliberate opt-out, no nudge
-    console.log(chalk.dim('      ⊘ parent = false — webhook opted out'));
-    return {};
-  }
-  if (!parent) {
-    console.log(chalk.dim('      ⊘ No parent configured — nothing to point the webhook at'));
-    console.log(chalk.dim("      → Set parent in omega.json5 ('self' when this brand runs the central backend)"));
+  // The opt-out, the no-parent refusal and the host are the shared helper's
+  // (#677): the campaigns service's Event Webhook answers all three identically.
+  const parent = resolveParentHost(brandConfig.company, 'webhook');
+  if (parent.skip) {
     return {};
   }
 
@@ -50,9 +47,7 @@ module.exports = async function ensureWebhook(context) {
     throw new Error('OMEGA_WEBHOOK_KEY absent after the newsletter setup ran — its REQUIRES entry or its requestServiceInput call is missing');
   }
 
-  const parentHost = parent === 'self'
-    ? domain
-    : parent.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const { parentHost } = parent;
   const desiredUrl = `https://api.${parentHost}/omega/marketing/webhook/forward?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 
   const webhooks = await api.listWebhooks(publicationId);

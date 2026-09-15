@@ -52,8 +52,13 @@ test('ai: the registry declares both provider keys as OPTIONAL inputs', () => {
   for (const entry of declaration.env) {
     assert.equal(entry.prompted, true, `${entry.name} is collected mid-run on a TTY`);
     assert.equal(entry.gates, false, `${entry.name} is optional — preflight never gates on it`);
-    assert.match(entry.url, /^https:\/\//, `${entry.name} names the page that mints it`);
-    assert.ok(entry.hint, `${entry.name} says what to make there`);
+  }
+
+  // What each key IS and where it is minted comes from the env SCHEMA, its one
+  // home (#867); the spec is where the schema's half meets the registry's
+  for (const input of serviceInputSpec('ai').inputs) {
+    assert.match(input.url, /^https:\/\//, `${input.name} names the page that mints it`);
+    assert.ok(input.hint, `${input.name} says what to make there`);
   }
 
   // The when clause mirrors the service's own gate — absence means ask

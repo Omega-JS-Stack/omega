@@ -14,7 +14,7 @@
 // Retina (@2x) variants are DERIVED. Consumers ship ONE file at the @2x (native) size.
 // @omega.js/desktop downscales it to write the @1x sibling. So `tray.png` is the 32x32 native retina
 // source (consumer-facing input name), and @omega.js/desktop emits both `trayTemplate.png` (16x16)
-// and `trayTemplate@2x.png` (32x32) into `dist/config/icons/macos/`. The output name
+// and `trayTemplate@2x.png` (32x32) into `dist/config/icons/mac/`. The output name
 // diverges from the input on macOS because the `Template` suffix is a system magic
 // marker that triggers auto-inversion in dark mode. Same retina derivation for
 // `dmg.png` (1080x760 native → emits 540x380 + 1080x760, no name change).
@@ -28,7 +28,7 @@ const jetpack = require('fs-jetpack');
 const sharp   = require('sharp');
 
 // Slot defs: per platform, a list of { slot, file, outFile, retina } entries.
-//   slot    = key under resolved[platform] (e.g. 'app' → resolved.macos.app)
+//   slot    = key under resolved[platform] (e.g. 'app' → resolved.mac.app)
 //   file    = INPUT filename — what consumers ship in config/icons/<platform>/ (or global/)
 //   outFile = OUTPUT filename written into dist/config/icons/<platform>/.
 //             Defaults to `file`. Diverges only when the on-disk runtime name
@@ -37,8 +37,10 @@ const sharp   = require('sharp');
 //             @omega.js/desktop owns that detail so consumers can just call it `tray.png`).
 //   retina  = if set, the SOURCE file is treated as @2x (native). @omega.js/desktop downscales it
 //             to produce the @1x sibling. Both files are written into dist/.
+// The platform keys are OMEGA's vocabulary (#867): `mac`, never `macos`, both
+// as the consumer's `config/icons/<platform>/` dir and as the dist output dir.
 const SLOTS = {
-  macos: [
+  mac: [
     { slot: 'app',   file: 'icon.png' },
     { slot: 'tray',  file: 'tray.png', outFile: 'trayTemplate.png', retina: true },
     { slot: 'dmg',   file: 'dmg.png',                                retina: true },
@@ -123,7 +125,7 @@ async function resolveAndCopy({ config, projectRoot, distRoot, emDefaultsRoot })
   const distIconsRoot = path.join(distRoot, 'config', 'icons');
   jetpack.dir(distIconsRoot);
 
-  const resolved = { macos: {}, windows: {}, linux: {} };
+  const resolved = { mac: {}, windows: {}, linux: {} };
 
   // First pass: resolve each platform/slot. For retina slots, source file is treated as
   // @2x; @omega.js/desktop emits both <slot>.png (downscaled) and <slot>@2x.png (the source) into dist.

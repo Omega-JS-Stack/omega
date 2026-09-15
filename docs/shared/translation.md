@@ -16,7 +16,7 @@ translation: {
   languages: ['es', 'fr'],// target codes — EMPTY/ABSENT = translation off
   providers: { claude: {} },// the engine is a KEY (#425): claude | chatgpt. Absent block = claude
   model: null,            // optional override for the chosen engine (claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano')
-  exclude: [],            // web only: BRAND page routes/folders to skip (the framework's own default pages are already excluded — #605)
+  include: ['**', '!blog/**'], // web only: globs over BRAND page routes, `!` negates; this is the framework default, a brand list replaces it (#858; the framework's own default pages are excluded on their own, #605)
 }
 ```
 
@@ -112,7 +112,13 @@ string. Committed to git — that's the whole point:
   re-translation. Everything else is a cache hit (zero provider calls).
 - **Survives clones/CI**: a warm cache builds a fully-translated site with NO
   AI credentials (kills the BXM parked finding where fresh clones burned live
-  Claude calls).
+  Claude calls). No AI key is delivered to CI by default
+  ([#819](https://github.com/Omega-JS-Stack/omega/issues/819), Ian 2026-09-13):
+  translation runs on the developer's machine and a runner reads the committed
+  cache, which is why `OPENAI_API_KEY` is an `env` delivery on every target that
+  names it and no workflow carries a line for it
+  ([#905](https://github.com/Omega-JS-Stack/omega/issues/905) owns the one
+  system, cloud translation included).
 - **Human-overridable**: hand-edit a translation VALUE in the cache file and
   it sticks for as long as the source is unchanged (the value is the
   translation; the key only changes when the SOURCE changes).
@@ -172,10 +178,44 @@ The list is DERIVED from the packaged defaults tree
 never typed out, so a default page that moves or arrives cannot drift out of it,
 and each excluded route guards its subtree too. On top of that: socials
 redirects (config `socials` keys), the `admin`/`test`/`team`/`updates` folders,
-every known language-code folder, plus config `translation.exclude` — which is
-for the BRAND's own pages, and only those. A brand that lists `signin` or
-`account` is listing something the framework already skips.
-Element opt-out: `data-omega-no-translate`. Collector fixes vs UJM:
+every known language-code folder.
+
+**Which of the BRAND's own pages are translated is `translation.include`**
+([#858](https://github.com/Omega-JS-Stack/omega/issues/858), Ian 2026-09-13,
+the same-name ruling): a list of route GLOBS read like a `.gitignore`, where
+`!` negates and the LAST pattern that matches a route decides it. A route no
+pattern matches is not translated, so an empty list translates nothing. A
+folder pattern covers the folder itself as well as its contents, so
+`!blog/**` takes `/blog` out along with every post under it. The framework
+default lives in the DEFAULTS layer of the merge chain (the schema's own
+`default:`, resolution-only so no brand file carries a copy of it):
+
+```json5
+translation: { include: ['**', '!blog/**'] }   // the default: the whole site except the blog
+```
+
+A brand list **REPLACES** it outright rather than adding to it (arrays replace
+at every level of the merge chain), so a brand that writes `['docs/**']` gets
+docs and nothing else. It is for the brand's own pages only: the framework's
+derived exclusions above are not in its hands, and a brand that names `signin`
+or `account` is naming something already skipped.
+
+**A page overrides the list for itself**, under the same key name one level
+down: `translation: { include: true }` in its frontmatter translates a page the
+list left out, `false` takes one out that the list would have covered. The
+build stamps that answer on `<html data-omega-translate>` (the seam #355's base
+path already uses), because the pass runs post-build over `dist/` and
+`omega translate` runs with no build in reach. `include` is the only key a page
+may write under a bare `translation:`; anything else is a config section
+restated bare and fails the build.
+
+**`translation.exclude` is RETIRED** with it. There is no dual-read: a config
+still carrying it fails validation naming its replacement, and
+`omega migrate` at the brand root CONVERTS the list (`exclude: ['docs']`
+becomes `include: ['**', '!docs']`, which keeps translating exactly what the
+brand was translating before) and deletes the old key in the same run.
+
+Element opt-out: `data-omega-no-translate`, unchanged. Collector fixes vs UJM:
 `aria-describedby`/`aria-labelledby` are NOT collected (ID refs), `value`
 only on button-type inputs (hidden-input tokens stay intact).
 
@@ -213,7 +253,9 @@ alike, since it never touches a provider:
   `terms`/`privacy`/`cookies` are deliberately not generated.
 - A configured language the package does not ship is one log line for the whole
   run, not an error — those routes stay in the source language.
-- A route the brand named in `translation.exclude` is left alone entirely.
+- A brand's `translation.include` list never touches the framework's default
+  pages: it scopes the brand's OWN pages, and the framework's chrome is
+  translated once, on the framework side.
 
 **Shipped set: `es`, `fa`.** Regenerating, or extending the set, is one command
 in `packages/web` (the ONLY place the framework's own pages ever reach a

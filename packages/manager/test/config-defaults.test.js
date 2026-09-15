@@ -15,7 +15,7 @@ const defaultsOp = require('../src/services/workspace/ensure/defaults.js');
 
 // A hand-authored brand config: comments and blank lines are load-bearing,
 // marketing is switched OFF against the schema default, and whole sections
-// (repo, search, monitoring, …) have never been written.
+// (search, monitoring, …) have never been written.
 const AUTHORED = `// Fixture Brand — hand-edited
 {
   brand: {
@@ -31,7 +31,7 @@ const AUTHORED = `// Fixture Brand — hand-edited
   },
 
   targets: {
-    web: {},
+    web: { type: 'web' },
   },
 }
 `;
@@ -55,7 +55,7 @@ test('defaults: a config missing a schema-defaulted block gains it, comments int
   const parsed = JSON5.parse(source);
 
   assert.equal(parsed.marketing.campaigns.enabled, true, 'the missing sibling block materialized');
-  assert.equal(parsed.repo.providers.github.private, true, 'a whole missing section materialized');
+  assert.equal(parsed.search.providers.searchConsole.enabled, true, 'a whole missing section materialized');
   assert.deepEqual(parsed.search.providers.searchConsole.sitemapPaths, ['/sitemap.xml']);
 
   // Every authored byte survives: comments, quote style, blank lines
@@ -65,10 +65,10 @@ test('defaults: a config missing a schema-defaulted block gains it, comments int
 
   // Every materialized key carries the schema's own guiding comment, wrapped
   // at its own indent
-  assert.match(source, /\n {8}\/\/ Brand repo visibility \(default true\)\.\n {8}private: true,/);
+  assert.match(source, /\n {8}\/\/ false = skip sitemap submission to Google Search Console\.\n {8}submitSitemap: true,/);
   assert.match(source, /\/\/ Role-level switch for email marketing[\s\S]*?\n {6}enabled: true,/);
 
-  assert.ok(result.output.defaults.materialized.includes('repo'), 'the run output names what was healed');
+  assert.ok(result.output.defaults.materialized.includes('search'), 'the run output names what was healed');
 });
 
 test('#793: a resolution-only default (connections) is never written into the brand file', async () => {
@@ -85,7 +85,19 @@ test('#793: a resolution-only default (connections) is never written into the br
   assert.equal(parsed.connections, undefined, `the brand file gained no connections block: ${source}`);
   assert.ok(!source.includes('Per-provider user-connection settings'), 'nor its schema description as a comment');
   assert.ok(!result.output.defaults.materialized.includes('connections'), 'and the run never claims to have healed one');
-  assert.ok(result.output.defaults.materialized.includes('repo'), 'while the ordinary blocks still materialize');
+  assert.ok(result.output.defaults.materialized.includes('search'), 'while the ordinary blocks still materialize');
+});
+
+test('#883: the repo block is never materialized, because its presence IS the switch', async () => {
+  // A defaulted `repo: { provider: 'github' }` would say every brand hosts its
+  // source somewhere, and the repo service would run for a brand that declared
+  // nothing.
+  const root = makeBrand();
+
+  const result = await defaultsOp({ brandRoot: root, options: {} });
+
+  assert.equal(JSON5.parse(read(root)).repo, undefined);
+  assert.ok(!result.output.defaults.materialized.includes('repo'));
 });
 
 test('defaults: a value the brand authored is never overwritten', async () => {
@@ -128,7 +140,7 @@ test('defaults: a dry run reports the blocks and writes nothing', async () => {
   const result = await defaultsOp({ brandRoot: root, options: { dryRun: true } });
 
   assert.equal(read(root), before, 'a dry run never touches the file');
-  assert.ok(result.output.defaults.planned.includes('repo'));
+  assert.ok(result.output.defaults.planned.includes('search'));
 });
 
 test('defaults: a brand root with no config/omega.json5 steps aside', async () => {
@@ -150,7 +162,7 @@ test('manager DEFAULTS derive from the schema — one home per default', () => {
   const { schemaDefaults } = require('@omega.js/config');
 
   // The schema answer reaches every manager read site through DEFAULTS…
-  assert.equal(DEFAULTS.repo.providers.github.private, schemaDefaults().repo.providers.github.private);
+  assert.equal(DEFAULTS.search.providers.searchConsole.enabled, schemaDefaults().search.providers.searchConsole.enabled);
   assert.equal(DEFAULTS.marketing.prune.enabled, true);
   assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
 

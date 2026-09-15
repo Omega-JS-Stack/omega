@@ -72,7 +72,7 @@ test('discoverBrandTargets returns package.json-bearing target dirs in journey o
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'journey-unit-'));
   assert.deepEqual(discoverBrandTargets(root), []); // no targets/ at all
 
-  for (const name of ['extension', 'backend', 'website', 'desktop', 'website-docs']) {
+  for (const name of ['extension', 'backend', 'web', 'desktop', 'docs']) {
     fs.mkdirSync(path.join(root, 'targets', name), { recursive: true });
     fs.writeFileSync(path.join(root, 'targets', name, 'package.json'), '{}');
   }
@@ -80,7 +80,7 @@ test('discoverBrandTargets returns package.json-bearing target dirs in journey o
 
   assert.deepEqual(
     discoverBrandTargets(root).map((dir) => path.basename(dir)),
-    ['website', 'backend', 'desktop', 'extension', 'website-docs'],
+    ['web', 'backend', 'desktop', 'extension', 'docs'],
   );
 
   fs.rmSync(root, { recursive: true, force: true });

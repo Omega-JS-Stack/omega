@@ -1503,8 +1503,9 @@ function updateUsageInfo(account) {
 // day bar when the feature is paced, and the month bar always.
 function renderUsageFeature(feature) {
   const escape = omega.utilities().escapeHTML;
+  // The catalog's `icon` IS the class string (#929), emitted verbatim.
   const icon = feature.icon
-    ? `<i class="fa-solid fa-${escape(feature.icon)} fa-sm me-1 text-muted"></i>`
+    ? `<i class="${escape(feature.icon)} fa-sm me-1 text-muted"></i>`
     : '';
   const name = feature.definition
     ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${escape(feature.definition)}">${escape(feature.name)}</span>`

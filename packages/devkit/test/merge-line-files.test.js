@@ -20,12 +20,21 @@ test('adds new framework default keys the user does not have', () => {
   assert.match(merged, /NEW_KEY=""/);
 });
 
-test('migrates user-added default-section keys to the custom section', () => {
+test('.env: a VALUED retired default-section key migrates to the custom section', () => {
   const existing = `${DEFAULT_MARKER}\nFRAMEWORK_KEY=""\nUSER_KEY="mine"\n${CUSTOM_MARKER}\n`;
   const incoming = `${DEFAULT_MARKER}\nFRAMEWORK_KEY=""\n${CUSTOM_MARKER}\n`;
   const merged = mergeLineBasedFiles(existing, incoming, '.env');
   const customPart = merged.slice(merged.indexOf(CUSTOM_MARKER));
   assert.match(customPart, /USER_KEY="mine"/);
+});
+
+test('.env: an EMPTY retired default-section key drops instead of migrating (#926)', () => {
+  const existing = `${DEFAULT_MARKER}\nFRAMEWORK_KEY=""\nRETIRED_BARE=\nRETIRED_QUOTED=""\nUSER_KEY="mine"\n${CUSTOM_MARKER}\n`;
+  const incoming = `${DEFAULT_MARKER}\nFRAMEWORK_KEY=""\n${CUSTOM_MARKER}\n`;
+  const merged = mergeLineBasedFiles(existing, incoming, '.env');
+  assert.doesNotMatch(merged, /RETIRED_BARE/, 'an empty retired key carries no data to keep');
+  assert.doesNotMatch(merged, /RETIRED_QUOTED/);
+  assert.match(merged.slice(merged.indexOf(CUSTOM_MARKER)), /USER_KEY="mine"/, 'a valued one still migrates');
 });
 
 test('custom section is preserved verbatim (env values normalized to quotes)', () => {
@@ -68,14 +77,32 @@ test('hasSectionMarkers: true only when both markers present', () => {
   assert.equal(hasSectionMarkers(''), false);
 });
 
-test('.gitignore merges line-based: new defaults win, user lines migrate to custom', () => {
-  const existing = `${DEFAULT_MARKER}\nnode_modules/\nmy-custom-dir/\n${CUSTOM_MARKER}\n*.log\n`;
-  const incoming = `${DEFAULT_MARKER}\nnode_modules/\ndist/\n${CUSTOM_MARKER}\n`;
+test('.gitignore: a retired Default-block line DROPS, the Custom section is untouched (#926)', () => {
+  const existing = `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/\n${CUSTOM_MARKER}\n*.log\n`;
+  const incoming = `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/*\n!config/certs/README.md\n${CUSTOM_MARKER}\n`;
   const merged = mergeLineBasedFiles(existing, incoming, '.gitignore');
   const customPart = merged.slice(merged.indexOf(CUSTOM_MARKER));
-  assert.match(merged, /dist\//);
-  assert.match(customPart, /my-custom-dir\//);
+  assert.doesNotMatch(merged, /^config\/certs\/$/m, 'the retired line leaves the file entirely');
+  assert.match(merged, /^config\/certs\/\*$/m);
+  assert.match(merged, /^!config\/certs\/README\.md$/m);
   assert.match(customPart, /\*\.log/);
+});
+
+test('.gitignore: the new rule is idempotent (second pass identical) (#926)', () => {
+  const existing = `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/\n${CUSTOM_MARKER}\n*.log\n`;
+  const incoming = `${DEFAULT_MARKER}\nnode_modules/\nconfig/certs/*\n${CUSTOM_MARKER}\n`;
+  const once = mergeLineBasedFiles(existing, incoming, '.gitignore');
+  const twice = mergeLineBasedFiles(once, incoming, '.gitignore');
+  assert.equal(twice, once);
+});
+
+test('AGENTS.md: a retired framework line DROPS, consumer notes below Custom stay (#926)', () => {
+  const existing = `${DEFAULT_MARKER}\nRead the framework docs first.\nRun the retired verb.\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`;
+  const incoming = `${DEFAULT_MARKER}\nRead the framework docs first.\nRun the current verb.\n${CUSTOM_MARKER}\n`;
+  const merged = mergeLineBasedFiles(existing, incoming, 'AGENTS.md');
+  assert.doesNotMatch(merged, /retired verb/, 'the framework block is exactly the new one');
+  assert.match(merged, /Run the current verb\./);
+  assert.match(merged.slice(merged.indexOf(CUSTOM_MARKER)), /VPN/);
 });
 
 test('merge is idempotent: second pass returns identical content', () => {

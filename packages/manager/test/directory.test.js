@@ -18,7 +18,7 @@ const { OWNED_SECTIONS } = require('../src/services/directory/lib/blocks.js');
 delete process.env.DIRECTORY_SERVICE_ACCOUNT;
 
 const BRAND = { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' };
-const PARENT = 'https://parent-brand.test';
+const COMPANY = { id: 'parent-brand', name: 'Parent Brand', url: 'https://parent-brand.test', images: {} };
 const SPONSORSHIPS = {
   acceptable: ['tech', 'marketing'],
   unacceptable: ['gambling'],
@@ -28,18 +28,18 @@ const DOC_PATH = `brands/${BRAND.id}`;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ directory = { enabled: true }, parent = PARENT, sponsorships = SPONSORSHIPS, projectId = 'fixture-brand-prod' } = {}) {
+function brandConfig({ directory = { enabled: true }, company = COMPANY, sponsorships = SPONSORSHIPS, projectId = 'fixture-brand-prod' } = {}) {
   const config = {
     brand: structuredClone(BRAND),
     cloud: { config: { projectId } },
-    repo: { providers: { github: { org: 'fixture-org', repo: 'fixture-org/fixture-brand', shared: false, private: true } } },
-    targets: { web: {}, backend: {} },
+    repo: { provider: 'github', org: 'fixture-org' },
+    targets: { web: { type: 'web' }, backend: { type: 'backend' } },
     // Never publishable — the entry carries identity + declared blocks only
     payment: { products: [{ id: 'premium' }] },
     analytics: { providers: { google: { id: 'G-FIXTURE' } } },
   };
   if (directory !== null) config.directory = structuredClone(directory);
-  if (parent !== null) config.parent = parent;
+  if (company !== null) config.company = structuredClone(company);
   if (sponsorships !== null) config.sponsorships = structuredClone(sponsorships);
   return config;
 }
@@ -48,7 +48,7 @@ function brandConfig({ directory = { enabled: true }, parent = PARENT, sponsorsh
 function desiredEntry() {
   return {
     brand: structuredClone(BRAND),
-    github: { owner: 'fixture-org', name: 'fixture-brand', repo: 'fixture-org/fixture-brand' },
+    github: { owner: 'fixture-org', name: 'fixture-brand-omega', slug: 'fixture-org/fixture-brand-omega' },
     sponsorships: structuredClone(SPONSORSHIPS),
   };
 }
@@ -119,23 +119,23 @@ test('directory: an empty directory block is not opt-in', async () => {
   assert.match(result.reason, /directory\.enabled/);
 });
 
-// ─── Gate 2: a parent to push into ───────────────────────────────────────────
+// ─── Gate 2: a company to push into (#677) ───────────────────────────────────
 
-test('directory: no parent means there is no directory to push into', async () => {
-  const result = await runService(brandConfig({ parent: null }), { db: fakeDb() });
+test('directory: a brand naming no company has no directory to push into', async () => {
+  const result = await runService(brandConfig({ company: null }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /parent/);
+  assert.match(result.reason, /company/);
 });
 
-test('directory: parent = false (deliberate opt-out) skips the service', async () => {
-  const result = await runService(brandConfig({ parent: false }), { db: fakeDb() });
+test('directory: a standalone resolution (id null) skips the same way', async () => {
+  const result = await runService(brandConfig({ company: { id: null, name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /parent/);
+  assert.match(result.reason, /company/);
 });
 
-test("directory: parent = 'self' still participates (the parent is in its own directory)", async () => {
+test("directory: company.id 'self' still participates (the company is in its own directory)", async () => {
   const db = fakeDb({ getDoc: desiredEntry() });
-  const result = await runService(brandConfig({ parent: 'self' }), { db });
+  const result = await runService(brandConfig({ company: { id: 'self', name: 'Fixture Brand', url: BRAND.url, images: {} } }), { db });
   assert.equal(result.status, 'success');
   assert.deepEqual(db.reads(), [DOC_PATH]);
 });
@@ -182,7 +182,7 @@ test('directory: key order differences are not drift', async () => {
         unacceptable: ['gambling'],
         acceptable: ['tech', 'marketing'],
       },
-      github: { repo: 'fixture-org/fixture-brand', name: 'fixture-brand', owner: 'fixture-org' },
+      github: { slug: 'fixture-org/fixture-brand-omega', name: 'fixture-brand-omega', owner: 'fixture-org' },
       brand: { url: BRAND.url, name: BRAND.name, id: BRAND.id },
     },
   });
@@ -270,24 +270,25 @@ test('directory: an empty sponsorships block is not a declared block', async () 
   assert.deepEqual(Object.keys(db.mutations()[0].args[1]), ['brand', 'github']);
 });
 
-test('directory: repo slugs come from the shared derivation, not a local one', async () => {
+test('directory: the repo slug comes from the shared derivation, not a local one', async () => {
   const config = brandConfig();
-  // Bare name + org: the #290 derivation resolves the owner from repo.providers.github.org
-  config.repo.providers.github.repo = 'renamed-repo';
+  // The org is the only half configured: the name is `<brand.id>-omega`, the
+  // SOURCE role's derivation (#883), never a value the entry re-invents.
+  config.repo.org = 'Renamed-Org';
   const db = fakeDb({ getDoc: null, patchDoc: {} });
 
   await runService(config, { db });
 
   assert.deepEqual(db.mutations()[0].args[1].github, {
-    owner: 'fixture-org',
-    name: 'renamed-repo',
-    repo: 'fixture-org/renamed-repo',
+    owner: 'Renamed-Org',
+    name: 'fixture-brand-omega',
+    slug: 'Renamed-Org/fixture-brand-omega',
   });
 });
 
 test('directory: an unresolvable repo is omitted rather than pushed half-formed', async () => {
   const config = brandConfig();
-  delete config.repo; // no org, no slug → owner cannot resolve
+  delete config.repo; // no org means no address at all
   const db = fakeDb({ getDoc: null, patchDoc: {} });
 
   await runService(config, { db });

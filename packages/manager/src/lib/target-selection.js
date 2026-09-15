@@ -24,10 +24,11 @@ const PICKER_FLAG = 'target';
 const RETIRED_PICKERS = ['only', 'except'];
 
 // Brand-level flags consumed by the fan-out — everything else forwards to the
-// targets. `_`/`$0` are yargs bookkeeping; continue-on-error is the
-// manage-parity bail switch; --target is the target picker. A caller adds
-// the flags IT consumes (verb-fanout's --dry-run) per call.
-const CONSUMED_KEYS = new Set(['_', '$0', PICKER_FLAG, 'continue-on-error', 'continueOnError']);
+// targets. `_` is the positionals; continue-on-error is the manage-parity bail
+// switch; --target is the target picker. A caller adds the flags IT consumes
+// (verb-fanout's --dry-run) per call. yargs' `$0` went with yargs (#920): the
+// parse mints no such key now.
+const CONSUMED_KEYS = new Set(['_', PICKER_FLAG, 'continue-on-error', 'continueOnError']);
 
 /**
  * Refuse a retired picker (#780), loudly: silently ignoring `--only` would run
@@ -42,7 +43,7 @@ function assertPickerFlags(options = {}) {
   const used = RETIRED_PICKERS.filter((flag) => options[flag] !== undefined);
   if (used.length === 0) return;
 
-  const error = new Error(`${used.map((flag) => `--${flag}`).join(' and ')} ${used.length > 1 ? 'are' : 'is'} retired: pick targets with --${PICKER_FLAG}=<target|targetDir>[,…] instead (firebase's own --only hosting runs from targets/backend).`);
+  const error = new Error(`${used.map((flag) => `--${flag}`).join(' and ')} ${used.length > 1 ? 'are' : 'is'} retired: pick targets with --${PICKER_FLAG}=<name>[,…] instead (firebase's own --only hosting runs from targets/backend).`);
   error.refusal = true;
   throw error;
 }
@@ -53,7 +54,7 @@ function assertPickerFlags(options = {}) {
  * verb a green exit would stand for work that never ran. The whole run stops,
  * naming the token and what the brand actually has.
  *
- * The MATCHING is the caller's (a fan-out matches key-or-dir, `omega dev`
+ * The MATCHING is the caller's (a fan-out matches the name, `omega dev`
  * matches the targets that have a dev leg); the refusal is one implementation.
  *
  * @param {string[]} unknown - the tokens that matched nothing
@@ -79,25 +80,26 @@ function parseTargetTokens(value) {
 }
 
 /**
- * Does this target answer to this token? A target is named by its KEY ('web')
- * or by its dir name ('website') — the ONE matcher every brand-root picker
- * uses, so `--target=` cannot mean one thing on `deploy` and another on `test`.
+ * Does this target answer to this token? A target has exactly ONE word (#886):
+ * its NAME, which is also its folder under targets/. That is the ONE matcher
+ * every brand-root picker uses, so `--target=` cannot mean one thing on
+ * `deploy` and another on `test`.
  *
- * @param {{ target: string|null, name: string }} entry - a discovered target
+ * @param {{ name: string }} entry - a discovered target
  * @param {string} token - the picker token
  * @returns {boolean}
  */
 function targetMatches(entry, token) {
-  return entry.target === token || entry.name === token;
+  return entry.name === token;
 }
 
 /**
  * Pure target selection — which targets run for a given picker, in order.
- * Picker tokens match a target's key ('web') or its dir name ('website'); no
- * picker means every target.
+ * Picker tokens are target NAMES ('web', 'admin'); no picker means every
+ * target.
  *
  * @param {object} input
- * @param {Array<{ name: string, target: string|null }>} input.targets - the target-mapped target dirs
+ * @param {Array<{ name: string, target: string|null }>} input.targets - the discovered targets ({ name, target: the type })
  * @param {string} [input.target] - the --target= comma list: the exact set to run
  * @returns {{ selected: Array }}
  * @throws {Error} when a token matches no target
@@ -106,7 +108,7 @@ function selectTargets({ targets, target }) {
   const tokens = parseTargetTokens(target);
   assertKnownTargets(
     tokens.filter((token) => !targets.some((entry) => targetMatches(entry, token))),
-    targets.map((entry) => entry.target || entry.name),
+    targets.map((entry) => entry.name),
   );
 
   const selected = targets
@@ -123,11 +125,11 @@ function selectTargets({ targets, target }) {
 }
 
 /**
- * Rebuild forwardable CLI flags from the yargs-parsed options: brand-level
- * keys are consumed, camelCase twins of kebab-case flags are skipped (yargs
- * mints both), booleans re-spell as --flag/--no-flag, values as --flag=value.
+ * Rebuild forwardable CLI flags from the parsed options: brand-level keys are
+ * consumed, camelCase twins of kebab-case flags are skipped (the parse mints
+ * both), booleans re-spell as --flag/--no-flag, values as --flag=value.
  *
- * @param {object} options - the yargs-parsed options
+ * @param {object} options - the parsed CLI options (`@omega.js/devkit/argv`)
  * @param {string[]} [alsoConsumed] - extra keys THIS fan-out consumes (both spellings)
  * @returns {string[]}
  */
@@ -138,7 +140,7 @@ function buildForwardedFlags(options, alsoConsumed = []) {
   for (const [key, value] of Object.entries(options)) {
     if (consumed.has(key)) continue;
     if (value === undefined || value === null) continue;
-    // Skip yargs' camelCase duplicate when the kebab-case original exists
+    // Skip the camelCase duplicate when the kebab-case original exists
     if (/[A-Z]/.test(key) && key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`) in options) continue;
 
     const values = Array.isArray(value) ? value : [value];

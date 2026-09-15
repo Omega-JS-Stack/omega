@@ -67,7 +67,7 @@ module.exports = function generateReadme(data) {
   lines.push('Download the app for your platform.');
   lines.push('');
   lines.push(`<a href="${downloadUrl}?download=windows"><img src="https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=data:image/svg+xml;base64,${ICON_WINDOWS}" alt="Windows"></a>&nbsp;`);
-  lines.push(`<a href="${downloadUrl}?download=macos"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS"></a>&nbsp;`);
+  lines.push(`<a href="${downloadUrl}?download=mac"><img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS"></a>&nbsp;`);
   lines.push(`<a href="${downloadUrl}?download=linux"><img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>`);
   lines.push('');
   lines.push('### Option 2: From source');

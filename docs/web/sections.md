@@ -809,7 +809,9 @@ playlisteer ports found, each closed in the library rather than brand-side:
   (`omega-tile__ordinal`, tokens only), so reordering a process band
   renumbers itself. Default band unchanged.
 - `marketing/stats` item `icon` + `color` (#518) — the glyph rides the ONE
-  icon mechanism (native `fa-*` markup in the shared `omega-icon-chip` idiom); `color`
+  icon mechanism (native `fa-*` markup in the shared `omega-icon-chip` idiom): the
+  arg carries the FULL class string (`icon: 'fa-brands fa-figma'`, #929) and the
+  band emits it verbatim, like every other icon arg in the library; `color`
   names a slot in the categorical token palette (`tone-1`…`tone-6` — the same
   ramp charts and tone chips read, [theming](../shared/theming.md)) and is
   WHITELISTED: anything else — a hex, a Bootstrap name — paints nothing, so a

@@ -29,7 +29,7 @@ const SITEMAP_URL = `https://${DOMAIN}/sitemap.xml`;
 
 // `gaLinked` = the brand has already confirmed the Search Console ↔ GA
 // association. It has no read API on either side, so config is its home (#434).
-function brandConfig({ url = `https://${DOMAIN}`, targets = { web: {} }, gaProperty = GA_PROPERTY, gaLinked = false } = {}) {
+function brandConfig({ url = `https://${DOMAIN}`, targets = { web: { type: 'web' } }, gaProperty = GA_PROPERTY, gaLinked = false } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     search: { providers: { searchConsole: { ...structuredClone(DEFAULTS.search.providers.searchConsole), ...(gaLinked ? { gaLinked: true } : {}) } } },
@@ -375,7 +375,7 @@ test('search: brands without a web target have no sitemap to submit', async () =
     listSites: [{ siteUrl: PROPERTY_URL, permissionLevel: 'siteOwner' }],
   });
 
-  const result = await runService(brandConfig({ targets: { backend: {} }, gaLinked: true }), {
+  const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } }, gaLinked: true }), {
     gsc,
   });
 

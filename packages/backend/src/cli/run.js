@@ -1,11 +1,15 @@
 /**
- * run() — the omega-backend bin body, shared by bin/omega-backend (via
- * dist/omega-bin.js) and cross-framework dispatch ('@omega.js/backend/cli').
+ * run(): the CLI body, shared by bin/omega (via dist/omega-bin.js, the
+ * dispatcher) and cross-framework dispatch ('@omega.js/backend/cli').
  */
 async function run() {
   // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
   // invocation re-execs once, so no command ever runs stale framework code
   require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/backend' });
+
+  // Boot preludes: the cheap, non-interactive checks every verb passes through,
+  // filtered by the verb about to run (#890)
+  require('@omega.js/devkit/preludes').runPreludes({ verb: process.argv[2], targetDir: process.cwd() });
 
   const Main = new (require('./index.js'))(process.argv);
 

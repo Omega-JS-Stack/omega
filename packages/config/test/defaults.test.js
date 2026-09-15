@@ -35,8 +35,12 @@ test('schemaDefaults: every schema `default:` lands at its own dot-path', () => 
   const defaults = schemaDefaults();
 
   assert.equal(defaults.marketing.campaigns.enabled, true);
-  assert.equal(defaults.repo.providers.github.private, true);
   assert.deepEqual(defaults.search.providers.searchConsole.sitemapPaths, ['/sitemap.xml']);
+
+  // The `repo` block carries none (#883): its PRESENCE enables the repo
+  // service, so a defaulted provider would say a brand hosts its source
+  // somewhere when it declared nothing at all.
+  assert.equal(defaults.repo, undefined);
 });
 
 test('schemaDefaults: marketing.prune.enabled defaults TRUE (Ian 2026-08-22)', () => {
@@ -87,18 +91,26 @@ test('schemaDefaults: every default satisfies its own rule (the schema validates
   assert.deepEqual(validateConfig(config).errors, []);
 });
 
-test('schemaDefaults: a target overlays its own refinements on the shared set', () => {
-  const targetRules = Object.values(TARGET_SCHEMAS).flat().filter((rule) => Object.prototype.hasOwnProperty.call(rule, 'default'));
-  const web = schemaDefaults('web');
+test('schemaDefaults: a target overlays its OWN refinements on the shared set', () => {
+  assert.equal(schemaDefaults('web').marketing.prune.enabled, true, 'the shared set always applies');
 
-  assert.equal(web.marketing.prune.enabled, true, 'the shared set always applies');
-  for (const rule of targetRules) {
-    assert.notEqual(
-      rule.path.split('.').reduce((node, key) => (node == null ? undefined : node[key]), web),
-      undefined,
-      `targets.web.${rule.path} default did not land`,
-    );
+  // Each target's own defaults, never another target's: the rules overlay the
+  // same top-level namespace, so `categories` is the extension's answer and a
+  // web resolve must not carry it.
+  for (const [target, rules] of Object.entries(TARGET_SCHEMAS)) {
+    const defaults = schemaDefaults(target);
+
+    for (const rule of rules.filter((entry) => Object.prototype.hasOwnProperty.call(entry, 'default'))) {
+      assert.deepEqual(
+        rule.path.split('.').reduce((node, key) => (node == null ? undefined : node[key]), defaults),
+        rule.default,
+        `targets.${target}.${rule.path} default did not land`,
+      );
+    }
   }
+
+  assert.equal(schemaDefaults('web').categories, undefined, "a target never inherits a sibling's refinements");
+  assert.deepEqual(schemaDefaults('extension').categories, ['alerts-updates'], 'the AMO default a first Firefox publish lists under (#884)');
 });
 
 // ─── The merge chain's lowest layer ───
@@ -107,7 +119,7 @@ test('loadConfig: schema defaults are the LOWEST layer — a brand value beats t
   const root = makeBrand('defaults-lowest', `{
   brand: { id: 'mini', name: 'MiniCo' },
   marketing: { prune: { enabled: false } },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
   cleanup(t, root);
@@ -116,13 +128,13 @@ test('loadConfig: schema defaults are the LOWEST layer — a brand value beats t
 
   assert.equal(config.marketing.prune.enabled, false, 'the brand file wins');
   assert.equal(config.marketing.campaigns.enabled, true, 'the untouched default still lands');
-  assert.equal(config.repo.providers.github.private, true);
+  assert.equal(config.repo, undefined, 'a brand that declares no repo block resolves none (#883)');
 });
 
 test('loadConfig: framework defaults still layer ON TOP of the schema defaults', (t) => {
   const root = makeBrand('defaults-framework', `{
   brand: { id: 'mini', name: 'MiniCo' },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
   cleanup(t, root);
@@ -130,6 +142,43 @@ test('loadConfig: framework defaults still layer ON TOP of the schema defaults',
   const { config } = loadConfig(root, 'web', { defaults: { marketing: { prune: { enabled: false } } } });
 
   assert.equal(config.marketing.prune.enabled, false, 'a genuine framework difference overrides the schema default');
+});
+
+// ─── translation.include (#858) ───
+
+// Ian 2026-09-13: the translation route list is an INCLUDE list of globs now,
+// and its framework answer lives in the DEFAULTS layer like every other
+// default. A brand list REPLACES it: arrays replace at every level of the
+// merge chain (src/merge.js), so no brand ever inherits half of it.
+test('#858: `translation.include` defaults to everything but the blog, in the defaults layer', () => {
+  assert.deepEqual(schemaDefaults().translation.include, ['**', '!blog/**']);
+  assert.deepEqual(schemaDefaults('web').translation.include, ['**', '!blog/**']);
+});
+
+test('#858: the include default RESOLVES but is never materialized into a brand file', () => {
+  // A framework presentation fact (#793): writing it into every brand config
+  // would hand each one a copy to drift from the framework's own answer.
+  const rule = SHARED_SCHEMA.find((entry) => entry.path === 'translation.include');
+
+  assert.equal(rule.materialize, false);
+
+  const block = missingDefaults({ brand: { id: 'mini' } }).find((entry) => entry.path === 'translation');
+  assert.ok(block, 'the translation block still materializes');
+  assert.equal(block.value.include, undefined, 'but never with the include list inside it');
+});
+
+test('#858: a brand include list REPLACES the default rather than merging with it', (t) => {
+  const root = makeBrand('translation-include', `{
+  brand: { id: 'mini', name: 'MiniCo' },
+  translation: { languages: ['es'], include: ['docs/**'] },
+  targets: { web: { type: 'web' } },
+}
+`);
+  cleanup(t, root);
+
+  const { config } = loadConfig(root, 'web');
+
+  assert.deepEqual(config.translation.include, ['docs/**'], 'the brand list wins whole');
 });
 
 // ─── missingDefaults (the heal list) ───
@@ -219,7 +268,7 @@ test('#793: the validator accepts the connections defaults, and a brand override
     twitch: { enabled: true, logo: 'https://cdn.example.com/twitch.svg' },
     'house-sso': { enabled: true, name: 'House SSO', logo: 'house' },
   },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
   cleanup(t, root);

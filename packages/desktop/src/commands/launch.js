@@ -10,7 +10,7 @@
 //   honors by running as plain Node: no `app` API, no BrowserWindow, no window. The
 //   app exits cleanly with code 0 and no error. Total invisible silent failure.
 //
-//   `bin/omega-desktop` and `src/gulp/main.js` already strip ELECTRON_RUN_AS_NODE
+//   `src/cli-run.js` and `src/gulp/main.js` already strip ELECTRON_RUN_AS_NODE
 //   at the boundary so anything launched THROUGH mgr or gulp is fine. But the manual
 //   smoke-test flow (`open -n release/mac-arm64/MyApp.app`) bypasses both. This
 //   command is the manual-launch equivalent of those boundary strips.
@@ -21,7 +21,7 @@
 //   npx omega launch /Applications/MyApp.app                        # an installed .app
 //
 // Forwarding argv to the app (for hidden-mode tests, custom flags, etc.):
-//   npx omega launch --args="--omega-launched-at-login"                # single flag (quoted to keep yargs from eating it)
+//   npx omega launch --args="--omega-launched-at-login"                # single flag (quoted to keep the parse from eating it)
 //   npx omega launch --args="--foo=bar --baz"                       # multiple, space-separated inside the quotes
 //
 // Aliases: `npx omega open`, `npx omega --launch`.
@@ -62,8 +62,8 @@ module.exports = async function (options) {
   const childEnv = { ...process.env };
   delete childEnv.ELECTRON_RUN_AS_NODE;
 
-  // Forward extra argv to the app via `--args`. yargs splits the rest of argv into
-  // options._ when no flag matches; everything after the app path goes through.
+  // Forward extra argv to the app via `--args`. The parse puts every unmatched
+  // token in options._; everything after the app path goes through.
   const extraArgs = options._.slice(2);
   // Also accept --args as an explicit array/string.
   if (typeof options.args === 'string') extraArgs.push(...options.args.split(/\s+/).filter(Boolean));
@@ -79,7 +79,7 @@ module.exports = async function (options) {
     // routes to this instance for activate events). Pass extra argv via --args.
     cmd = 'open';
     args = ['-n', appPath, ...(extraArgs.length ? ['--args', ...extraArgs] : [])];
-    logHint = `open -n ${shellEscape(appPath)}${extraArgs.length ? ' --args ' + extraArgs.map(shellEscape).join(' ') : ''}`;
+    logHint = `open -n ${shellEscape(appPath)}${extraArgs.length ? ` --args ${extraArgs.map(shellEscape).join(' ')}` : ''}`;
   } else {
     // Direct binary launch — Windows .exe, Linux binary, or running the .app's MacOS
     // binary directly (rare, used to bypass LaunchServices for diagnosis).
@@ -88,7 +88,7 @@ module.exports = async function (options) {
       cmd = path.join(appPath, 'Contents', 'MacOS', path.basename(appPath, '.app'));
     }
     args = extraArgs;
-    logHint = `${shellEscape(cmd)}${args.length ? ' ' + args.map(shellEscape).join(' ') : ''}`;
+    logHint = `${shellEscape(cmd)}${args.length ? ` ${args.map(shellEscape).join(' ')}` : ''}`;
   }
 
   logger.log(`launching with clean env (ELECTRON_RUN_AS_NODE stripped)...`);
@@ -111,11 +111,16 @@ module.exports = async function (options) {
   logger.log('launched.');
 };
 
+// electron-builder's own output-dir words, keyed by OMEGA's (#867). This is the
+// ONE place the release dir's spelling is translated: `release/win-<arch>` is
+// electron-builder's name for the directory, not a platform OMEGA calls `win`.
+const RELEASE_DIRS = { mac: 'mac', windows: 'win', linux: 'linux' };
+
 // Auto-discover a packaged app under release/<platform>-<arch>/ — matches the output
 // directory of `mgr package:quick` for the host platform/arch.
 function autoDiscoverApp() {
   const projectRoot = process.cwd();
-  const platform    = process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'win' : 'linux';
+  const platform    = RELEASE_DIRS[require('../utils/platform.js').desktopPlatform()] || 'linux';
   const arch        = process.arch;
   const releaseDir  = path.join(projectRoot, 'release', `${platform}-${arch}`);
 

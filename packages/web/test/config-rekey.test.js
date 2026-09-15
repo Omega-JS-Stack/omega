@@ -4,7 +4,7 @@
  * runtime read.
  *
  * D3: a configured slapform form id reaches the contact page's read path —
- *     config → toSiteGlobal → the Configuration blob → the exact string the
+ *     config → toSiteGlobal → the OMEGA_BUILD_JSON snapshot → the exact string the
  *     page reads (`omega.config.forms?.providers?.slapform?.formId`).
  * D4: the chat widget's agent id + settings ride ONE home
  *     (`inbound.chat.providers.chatsy`) — the same dotted path the manager
@@ -19,7 +19,7 @@ const { test } = require('node:test');
 
 const { toSiteGlobal } = require('@omega.js/config');
 
-const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
+const { buildWith: sharedBuildWith, readBuildJson, readPageConfig, miniData, PKG } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'config-rekey-test');
 
@@ -67,11 +67,8 @@ test('D3: the configured formId reaches the page as omega.config.forms.providers
   });
   const html = pages.get('/blog');
 
-  const match = html.match(/var Configuration = \{([\s\S]*?)\n {2}\};/);
-  assert.ok(match, 'the Configuration blob renders');
-
-  // eslint-disable-next-line no-new-func
-  const configuration = new Function(`${match[0]} return Configuration;`)();
+  const configuration = readPageConfig(pages, html);
+  assert.ok(configuration, 'the OMEGA_BUILD_JSON snapshot is written');
   assert.equal(
     configuration.forms.providers.slapform.formId,
     FORM_ID,
@@ -128,11 +125,8 @@ test('D4: agentId + settings reach the page under the one chatsy home', async ()
   });
   const html = pages.get('/blog');
 
-  const match = html.match(/var Configuration = \{([\s\S]*?)\n {2}\};/);
-  assert.ok(match, 'the Configuration blob renders');
-
-  // eslint-disable-next-line no-new-func
-  const configuration = new Function(`${match[0]} return Configuration;`)();
+  const configuration = readPageConfig(pages, html);
+  assert.ok(configuration, 'the OMEGA_BUILD_JSON snapshot is written');
   const chatsy = configuration.inbound.chat.providers.chatsy;
   assert.equal(chatsy.enabled, true);
   assert.equal(chatsy.agentId, AGENT_ID);
@@ -164,4 +158,40 @@ test('D5: an absent section logs "not configured", a disabled one logs "disabled
     !main.includes('config section enables it'),
     'the old one-message-for-both wording is gone',
   );
+});
+
+// ─── #894: the browser subset is the gate, on the page like everywhere else ──
+
+test('#894: the page bakes the ONE wrapper, and no credential section reaches it', async () => {
+  const pages = await buildWith({
+    ...miniData,
+    // The public halves the browser really reads…
+    cloud: { provider: 'firebase', config: { apiKey: 'AIza-rekey', projectId: 'demo-rekey' }, billingAccount: '01ABCD-234567-89EFGH', organizationId: '123456789' },
+    captcha: { providers: { recaptcha: { siteKey: 'site-key-rekey' } } },
+    // …and the sections that provision the brand, which never do
+    repo: { provider: 'github', org: 'Rekey-Org' },
+    certificates: { providers: { apple: { teamId: 'TEAMREKEY' } } },
+    account: { enabled: true, admins: [{ email: 'root@rekey.example.com' }] },
+    edge: { providers: { cloudflare: { zone: 'rekey.example.com' } } },
+  });
+  const html = pages.get('/blog');
+  const buildJson = readBuildJson(pages);
+
+  // One wrapper, desktop's names, on every OMEGA browser surface
+  assert.deepEqual(Object.keys(buildJson).sort(), ['builtAt', 'config', 'license', 'mode', 'package']);
+
+  const config = buildJson.config;
+  assert.equal(config.runtime, 'web');
+  assert.equal(config.cloud.config.apiKey, 'AIza-rekey', 'the Firebase WEB config is public by design');
+  assert.equal(config.captcha.providers.recaptcha.siteKey, 'site-key-rekey');
+
+  // Absent from the bake, and absent from the PAGE: a value that never enters
+  // the blob cannot leak through some other line of the chrome either.
+  for (const section of ['repo', 'certificates', 'account', 'edge']) {
+    assert.equal(config[section], undefined, `${section} must never reach a browser`);
+  }
+  assert.equal(config.cloud.billingAccount, undefined, 'nor the GCP account facts beside the web config');
+  assert.ok(!html.includes('01ABCD-234567-89EFGH'), 'the billing account is nowhere on the page');
+  assert.ok(!html.includes('TEAMREKEY'), 'nor the signing team id');
+  assert.ok(!html.includes('root@rekey.example.com'), 'nor the account admins');
 });

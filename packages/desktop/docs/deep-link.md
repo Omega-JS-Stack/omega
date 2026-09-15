@@ -17,7 +17,7 @@ Cross-platform deep-link handling that's simple to use and hard to get wrong. @o
 | Platform | Cold-start (app not running) | Warm-start (app already running) |
 |---|---|---|
 | **macOS** | `app.on('open-url')` — queued before `whenReady`, drained after | `app.on('open-url')` |
-| **Windows** | URL appended to `process.argv`; @omega.js/desktop extracts it | OS forwards argv to the existing instance via `app.on('second-instance')` |
+| **Windows** | URL appended to `process.argv`; @omega.js/desktop extracts it | OS forwards argv to the existing instance via `app.on('second-instance')`; @omega.js/desktop reads the duplicate's real argv from that event's `additionalData` |
 | **Linux** | Same as Windows | Same as Windows |
 
 @omega.js/desktop handles all of these and dispatches them through the same `manager.deepLink.on()` event registry. Your code looks identical regardless of platform or cold/warm start. Single-instance lock is acquired automatically (via `lib/protocol.js`); duplicate launches exit cleanly and forward their argv to the original instance.
@@ -51,8 +51,8 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
   ctx.params    // { id: '42' }
   ctx.query     // { ref: 'tray' }
   ctx.source    // 'cold-start' | 'warm-start' | 'manual'
-  ctx.argv      // process.argv (cold) or second-instance argv (warm)
-  ctx.cwd       // working directory
+  ctx.argv      // process.argv (cold) or the duplicate's real argv (warm, from additionalData)
+  ctx.cwd       // working directory (the duplicate's on warm-start)
   ctx.handled   // mutable: set true to suppress remaining handlers (including built-ins)
 });
 ```
@@ -142,9 +142,17 @@ Every dispatch is held until `manager.initialize()` completes (main.js calls `de
 1. The new instance loses the lock.
 2. The OS forwards its argv to the original instance.
 3. The new instance's `Manager.initialize()` returns early (after `protocol.hasSingleInstanceLock() === false`).
-4. The original instance's `app.on('second-instance')` fires with the new argv.
+4. The original instance's `app.on('second-instance')` fires with the Chromium-processed argv as its second argument AND the duplicate's real argv as its fourth, `additionalData` (@omega.js/desktop passes `{ argv, cwd }` to `app.requestSingleInstanceLock()` for you).
 5. @omega.js/desktop extracts the deep-link URL from that argv and dispatches normally — but as `source: 'warm-start'`.
 6. @omega.js/desktop also focuses the existing main window automatically (consumer can override by registering a route handler that does its own thing).
+
+Reading the duplicate's own flags (a CLI-shaped app, a `--open <file>` handler) means reading that fourth argument:
+
+```js
+app.on('second-instance', (event, argv, cwd, additionalData) => additionalData.argv);
+```
+
+Never parse the event's own `argv` for flags: Chromium re-serializes it (switches first, Chromium's own switches spliced in, the values detached at the end), so a `--message two` launch arrives with the value detached from the flag.
 
 ## Linking with `appState`
 

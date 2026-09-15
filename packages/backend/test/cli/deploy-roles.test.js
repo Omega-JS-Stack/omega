@@ -55,7 +55,7 @@ function seedBrand({ key = true, projectId = true } = {}) {
   jetpack.write(path.join(root, 'config', 'omega.json5'), JSON.stringify({
     brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.test' },
     ...(projectId ? { cloud: { config: { projectId: PROJECT } } } : {}),
-    targets: { backend: {} },
+    targets: { backend: { type: 'backend' } },
   }));
   jetpack.dir(targetDir);
   if (key) {

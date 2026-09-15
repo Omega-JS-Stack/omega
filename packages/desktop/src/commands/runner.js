@@ -57,6 +57,7 @@ function ghRunnerName(org) {
 // — is `<home>\.env`, read here before anything looks at process.env, so every
 // subcommand works from any directory (utils/runner-env.js).
 const { defaultRunnerHome, runnerEnvFile, runnerLogFile, loadRunnerEnv, ensureRunnerConfig, reconfigureRunnerEnv, runnerEnvReport, parseRunnerOrgs, sameRunnerOrgs, isTestRun, isScratchRunnerHome, assertTestSafeRunnerHome, runnerPrivateHome, ensureRunnerPrivateHome, ensureRunnerDirEnv } = require('../utils/runner-env.js');
+const { ensureRunnerJobGuard, jobGuardListFiles } = require('../utils/runner-job-guard.js');
 const attachLogFile = require('../utils/attach-log-file.js');
 const RUNNER_HOME = process.env.OMEGA_RUNNER_HOME || defaultRunnerHome();
 loadRunnerEnv({ home: RUNNER_HOME });
@@ -480,9 +481,27 @@ async function registerOrg(options) {
   // runner's `<runner dir>\.env`, which the listener reads at startup and
   // applies to every job, so the detached spawn and the Startup shortcut both
   // get it from one write.
+  //
+  // The job guard travels the same way
+  // ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)): the hook the
+  // listener runs before a job's first step, refusing anything that is not a
+  // dispatch from a listed repo by a listed actor. The actor list starts as the
+  // `GH_TOKEN` user, which is this box owner's account and the account a
+  // `workflow_dispatch` from the deploy token carries (Ian 2026-09-13); a
+  // lookup that does not answer leaves the file for the operator rather than
+  // failing a registration over it.
   const privateHome = ensureRunnerPrivateHome(home, { logger });
-  ensureRunnerDirEnv(runnerDir, { HOME: privateHome.home });
+  let actor;
+  try {
+    const { data } = await octokit.rest.users.getAuthenticated();
+    actor = data.login;
+  } catch (e) {
+    logger.warn(`  Could not read the GH_TOKEN user for the job guard's actor list: ${e.message}`);
+  }
+  const guard = ensureRunnerJobGuard(home, { orgs: [org], actor, logger });
+  ensureRunnerDirEnv(runnerDir, { HOME: privateHome.home, ACTIONS_RUNNER_HOOK_JOB_STARTED: guard.hook });
   logger.log(`  HOME for ${org}: ${privateHome.home}`);
+  logger.log(`  Job guard for ${org}: ${guard.hook}`);
 
   // Write the .cmd shortcut in the user's Startup folder so Explorer auto-runs
   // it at every interactive logon (Session 1). No Task Scheduler, no admin
@@ -518,10 +537,21 @@ async function startPreflight(options) {
   // an install that predates it, or a runner dir whose `.env` was replaced, has
   // no HOME line, and the job it picks up then dies inside `actions/checkout`.
   // Every registered dir gets it here, before a single listener comes up.
+  //
+  // And the job guard with it
+  // ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)): a box that
+  // installed before the guard existed, or a runner dir whose `.env` lost the
+  // line, would otherwise come online signing for anything. The hook script is
+  // rewritten from this package, so a framework update reaches the box on the
+  // next start; the allow lists are the operator's and are only appended to,
+  // and this path asks GitHub nothing, so `start` still works offline.
   const privateHome = ensureRunnerPrivateHome(home, { logger: log });
-  for (const { org, dir } of listOrgRunnerDirs(home)) {
-    ensureRunnerDirEnv(dir, { HOME: privateHome.home });
+  const dirs = listOrgRunnerDirs(home);
+  const guard = ensureRunnerJobGuard(home, { orgs: dirs.map(({ org }) => org), logger: log });
+  for (const { org, dir } of dirs) {
+    ensureRunnerDirEnv(dir, { HOME: privateHome.home, ACTIONS_RUNNER_HOOK_JOB_STARTED: guard.hook });
     log.log(`HOME for ${org}: ${privateHome.home}`);
+    log.log(`Job guard for ${org}: ${guard.hook}`);
   }
 
   const named      = parseRunnerOrgs(env.OMEGA_RUNNER_ORGS);
@@ -966,7 +996,13 @@ async function removeRunnerHomeWithRetry(keepDirs, home) {
   // open by the tee while the removal runs.
   const envFile = runnerEnvFile(root);
   const logsDir = path.dirname(runnerLogFile(root));
-  const keep = new Set([...(keepDirs || []), envFile, logsDir]);
+  // The job guard's two allow lists are configuration too
+  // ([#875](https://github.com/Omega-JS-Stack/omega/issues/875)): a list an
+  // operator narrowed by hand outlives an uninstall exactly as the `.env` does.
+  // The hook SCRIPT is install state and goes with the rest; the next install
+  // writes it back from the package.
+  const guardLists = jobGuardListFiles(root);
+  const keep = new Set([...(keepDirs || []), envFile, logsDir, ...guardLists]);
   const targets = (jetpack.list(root) || [])
     .map((name) => path.join(root, name))
     .filter((entry) => !keep.has(entry));
@@ -974,7 +1010,8 @@ async function removeRunnerHomeWithRetry(keepDirs, home) {
   // Nothing kept survives on disk: the home itself goes too.
   const kept = [...(keepDirs || [])].length > 0
             || jetpack.exists(envFile) === 'file'
-            || jetpack.exists(logsDir) === 'dir';
+            || jetpack.exists(logsDir) === 'dir'
+            || guardLists.some((file) => jetpack.exists(file) === 'file');
   if (!kept) targets.push(root);
 
   for (const target of targets) {

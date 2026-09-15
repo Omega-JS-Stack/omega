@@ -20,7 +20,7 @@ const FULL_CONFIG = {
   brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' },
   cloud: { config: { projectId: 'fixture-project' } },
   analytics: { providers: { google: { accountId: '111', propertyId: '222' } } },
-  repo: { providers: { github: { org: 'fixture-org' } } },
+  repo: { provider: 'github', org: 'fixture-org' },
   payment: { providers: { stripe: { publishableKey: 'pk_fixture' } } },
 };
 
@@ -68,7 +68,7 @@ test('bookmark: full config derives every group with new-world shapes', () => {
   // Stripe links carry NO account slug (per-brand keys)
   assert.ok(links.Stripe.every((l) => l.url.startsWith('https://dashboard.stripe.com/')));
 
-  // GitHub: the ONE brand monorepo (repo defaults to `<brand.id>-omega`)
+  // GitHub: the brand's SOURCE monorepo, always `<brand.id>-omega`
   assert.deepEqual(links.GitHub.map((l) => l.url), [
     'https://github.com/fixture-org/fixture-omega',
     'https://github.com/fixture-org/fixture-omega/actions',
@@ -82,28 +82,28 @@ test('bookmark: groups with unmet inputs are absent', () => {
   const links = generateLinks({ brand: { id: 'bare', name: 'Bare' } }, []);
   assert.deepEqual(links, {});
 
-  // github.repo overrides the derived repo name; no backend target → no API link
+  // The source repo derives from the org plus the brand id; no backend target
+  // means no API link
   const partial = generateLinks(
-    { brand: { id: 'p', url: 'https://p.example' }, repo: { providers: { github: { org: 'o', repo: 'custom-repo' } } } },
+    { brand: { id: 'p', url: 'https://p.example' }, repo: { org: 'o' } },
     [{ name: 'web', target: 'web' }],
   );
   assert.deepEqual(Object.keys(partial), ['Search', 'GitHub', 'Live']);
-  assert.equal(partial.GitHub[0].url, 'https://github.com/o/custom-repo');
+  assert.equal(partial.GitHub[0].url, 'https://github.com/o/p-omega');
   assert.deepEqual(partial.Live.map((l) => l.title), ['Website']);
 });
 
-test('bookmark: an owner/name slug carries its OWN owner, never repo.providers.github.org', () => {
-  // The real shape this protects: ../omega-omega declares org Omega-JS-Stack and
-  // repo "itw-creative-works/omega-omega", so an owner read off `org` links to a
-  // repo that does not exist.
+test('bookmark: the links address the SOURCE repo the one derivation names (#883)', () => {
+  // No repo name is configurable anywhere: the org plus `<brand.id>-omega` IS
+  // the address, so a link can never point at a repo that does not exist.
   const links = generateLinks(
-    { brand: { id: 'acme', url: 'https://acme.example' }, repo: { providers: { github: { org: 'Acme-Org', repo: 'itw-creative-works/acme-app' } } } },
+    { brand: { id: 'acme', url: 'https://acme.example' }, repo: { org: 'Acme-Org' } },
     [{ name: 'web', target: 'web' }],
   );
 
   assert.deepEqual(links.GitHub.map((l) => l.url), [
-    'https://github.com/itw-creative-works/acme-app',
-    'https://github.com/itw-creative-works/acme-app/actions',
+    'https://github.com/Acme-Org/acme-omega',
+    'https://github.com/Acme-Org/acme-omega/actions',
   ]);
 });
 
@@ -140,7 +140,7 @@ test('bookmark: extension ack lands the sync as success', async () => {
   process.env.OMEGA_EXTENSION_PORT = String(port);
 
   // No cloud.config.projectId → no gcloud shell-out during the test
-  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, repo: { providers: { github: { org: 'o' } } } };
+  const config = { brand: { id: 'fixture', name: 'Fixture Brand', url: 'https://fixture.example' }, repo: { org: 'o' } };
 
   const tty = openTtyPrompt();
   try {

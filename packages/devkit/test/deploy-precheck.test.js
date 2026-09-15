@@ -4,8 +4,11 @@
  * ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)).
  *
  * The STEPS are each framework's; the guarantees tested here are the runner's:
- * the `--no-secrets` opt-out, list order, and a soft failure (a throwing step
- * warns and the run continues — a precheck reports, it never blocks a deploy).
+ * the `--no-secrets` opt-out, list order, a soft failure (a throwing step warns
+ * and the run continues, because a precheck reports), a FATAL step that stops
+ * the run instead ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)),
+ * and the `dryRun` every step receives
+ * ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)).
  */
 
 const { test } = require('node:test');
@@ -77,4 +80,32 @@ test('every step gets the projectDir and the two loggers', async () => {
   assert.equal(seen[0].projectDir, '/tmp/target');
   assert.deepEqual(lines.log, ['hi']);
   assert.deepEqual(lines.warn, ['careful']);
+});
+
+test('a FATAL step STOPS the run: the deploy never reaches its dispatch (#891)', async () => {
+  const { logger } = recorder();
+  const ran = [];
+  const list = [
+    { name: 'first', run: () => ran.push('first') },
+    { name: 'push-secrets', fatal: true, run: () => { throw new Error('3 secret(s) are empty'); } },
+    { name: 'third', run: () => ran.push('third') },
+  ];
+
+  await assert.rejects(
+    () => runDeployPrecheck({ projectDir: '/tmp/x', options: {}, logger, steps: list }),
+    /push-secrets failed during the deploy precheck: 3 secret\(s\) are empty/,
+  );
+
+  assert.deepEqual(ran, ['first'], 'nothing after the fatal step runs');
+});
+
+test('dryRun reaches every step, and defaults to false (#895)', async () => {
+  const { logger } = recorder();
+  const seen = [];
+  const list = [{ name: 'probe', run: ({ dryRun }) => seen.push(dryRun) }];
+
+  await runDeployPrecheck({ projectDir: '/tmp/x', options: {}, logger, steps: list, dryRun: true });
+  await runDeployPrecheck({ projectDir: '/tmp/x', options: {}, logger, steps: list });
+
+  assert.deepEqual(seen, [true, false]);
 });

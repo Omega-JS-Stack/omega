@@ -18,6 +18,11 @@ const Manager = new (require('../../build.js'));
 
 const logger = Manager.logger('release');
 
+// The two warnings electron-publish prints when it uploads nothing: one per
+// release (`gitHubPublisher.getOrCreateRelease` returns null with its reason)
+// and one per file that never left the machine.
+const SKIP_WARNINGS = ['skipped publishing', 'GitHub release not created'];
+
 module.exports = function release(done) {
   const projectRoot = process.cwd();
   const config = path.join(require('../../utils/dist-root.js')(projectRoot), 'electron-builder.yml');
@@ -40,12 +45,25 @@ module.exports = function release(done) {
   const relConfig = path.relative(projectRoot, config);
   logger.log(`Releasing via electron-builder (config=${relConfig}, publish=always)...`);
 
-  builder.build({
+  // electron-publish reports a skipped upload through THIS logger and nowhere
+  // else, and a release that uploaded nothing must never print a success line,
+  // so the logger is a requirement of the task, not a nicety. It comes off
+  // electron-builder's OWN export, which re-exports the one `builder-util`
+  // instance electron-publish writes to: a bare require of `builder-util` names
+  // a package this manifest never declares (#872) and could resolve a SECOND
+  // copy whose log nothing ever writes to.
+  recordSkippedPublishes(builder.log, () => builder.build({
     config,
     publish: 'always',
-  })
-    .then((artifacts) => {
-      const list = (artifacts || []).map((a) => path.relative(projectRoot, a));
+  }))
+    .then(({ result, skips }) => {
+      const skipped = skippedUploadError(skips);
+      if (skipped) {
+        logger.error(skipped.message);
+        return done(skipped);
+      }
+
+      const list = (result || []).map((a) => path.relative(projectRoot, a));
       logger.log(`Released ${list.length} artifact(s):`);
       list.forEach((a) => logger.log(`  • ${a}`));
       done();
@@ -55,3 +73,67 @@ module.exports = function release(done) {
       done(e);
     });
 };
+
+/**
+ * Run the build with electron-builder's OWN logger watched, and hand back what
+ * it published NOTHING for. The promise `build()` returns resolves with the
+ * local artifact paths whether or not a byte was uploaded, so the resolve value
+ * says nothing about the release: the skip is announced only as a warning on
+ * electron-builder's log (the `builder-util` instance it re-exports), carrying
+ * the reason and the tag as fields. The wrapper
+ * is put back in a `finally`, so a build that throws leaves the logger the way
+ * it found it. Exported for tests.
+ *
+ * @param {{ warn: Function }} log - electron-builder's logger.
+ * @param {Function} fn - The build to run.
+ * @returns {Promise<{ result: *, skips: object[] }>} What the build resolved with, and every skip it logged.
+ */
+async function recordSkippedPublishes(log, fn) {
+  const skips = [];
+  const owned = Object.prototype.hasOwnProperty.call(log, 'warn');
+  const original = log.warn;
+
+  log.warn = function (messageOrFields, message) {
+    // `warn(message)` and `warn(fields, message)` are both legal on this logger.
+    const text = String(message === undefined ? messageOrFields : message);
+    const fields = message === undefined ? {} : (messageOrFields || {});
+    if (SKIP_WARNINGS.some((warning) => text.includes(warning))) {
+      skips.push({ message: text, ...fields });
+    }
+    return original.call(this, messageOrFields, message);
+  };
+
+  try {
+    const result = await fn();
+    return { result, skips };
+  } finally {
+    if (owned) {
+      log.warn = original;
+    } else {
+      delete log.warn;
+    }
+  }
+}
+
+/**
+ * The verdict on a build's recorded skips: a release that uploaded nothing is a
+ * failed release, named by electron-builder's own reason. Exported for tests.
+ *
+ * @param {object[]} skips - What recordSkippedPublishes collected.
+ * @returns {Error|null} The failure, or null when everything published.
+ */
+function skippedUploadError(skips) {
+  if (skips.length === 0) {
+    return null;
+  }
+
+  const reason = skips.find((skip) => skip.reason)?.reason || 'electron-builder gave no reason';
+  const tag = skips.find((skip) => skip.tag)?.tag || 'the configured tag';
+  const files = skips.map((skip) => skip.file).filter(Boolean);
+  const what = files.length > 0 ? `${files.length} artifact(s) (${files.join(', ')})` : 'every artifact';
+
+  return new Error(`Nothing was uploaded: electron-builder skipped publishing ${what} to ${tag} (${reason}). Bump the version in package.json: a release that already exists is never re-uploaded.`);
+}
+
+module.exports.recordSkippedPublishes = recordSkippedPublishes;
+module.exports.skippedUploadError = skippedUploadError;

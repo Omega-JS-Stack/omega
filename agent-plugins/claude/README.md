@@ -27,7 +27,7 @@ agent-plugins/
     ├── .claude-plugin/plugin.json   the manifest
     ├── .mcp.json                    the one MCP declaration — the @omega.js/mcp-router endpoint
     ├── README.md                    this file
-    ├── hooks/                       hooks.json, the inject/gate/guard/shape/quality hooks, and lib/ (the shared scope guard, skill map, and gate-marker naming)
+    ├── hooks/                       hooks.json, the inject/gate/guard/npx/shape/quality hooks, and lib/ (the shared scope guard, skill map, and gate-marker naming)
     └── skills/                      the skills, one directory each (see skills/README.md)
 ```
 
@@ -59,7 +59,7 @@ Each skill is asked for once per session per SKILL (a marker file under `TMPDIR`
 
 ## The gate hook
 
-Injecting a line only SUGGESTS a skill, and a session that skipped the line built a whole `targets/website` app without ever loading `omega:web` — hand-rolled markup, and a documented validator rule filed as a framework bug. So the skills are enforced. `hooks/gate/run.sh` serves two events from one script — the surface question has ONE answer — and refuses a write to a surface whose skill was never invoked:
+Injecting a line only SUGGESTS a skill, and a session that skipped the line built a whole `targets/web` app without ever loading `omega:web`: hand-rolled markup, and a documented validator rule filed as a framework bug. So the skills are enforced. `hooks/gate/run.sh` serves two events from one script (the surface question has ONE answer) and refuses a write to a surface whose skill was never invoked:
 
 | Surface written or edited | Gated on |
 |---|---|
@@ -114,6 +114,23 @@ Two exemption sets, both by name and both traceable to a document:
 `omega customize` closes the loop from the other side: materializing a file writes the `omega:consumer-override:` marker into its own provenance header (`packages/web/src/overrides.js` `provenanceHeader()`), so the sanctioned way to take a copy produces a file the guard already accepts.
 
 The monorepo itself is exempt — `packages/` is the framework's own source and `brands/` are the crew's fixtures — found by walking to the git root for a manifest named `omega` beside a `packages/` directory, which is what keeps a brand fixture from answering first. Everything else fails open: no `jq`, no brand root, no framework in the target's manifest, no install to read, and the write goes through. Covered by the guard cases in `scripts/agent-plugins.test.js`.
+
+## The npx hook
+
+`npx omega` with no local bin is a registry fetch. npx downloads the public npm package named `omega`, a stranger's project, and runs it with the shell's environment. A human gets npx's own "Need to install omega@1.1.1, ok to proceed?" prompt; an agent's Bash tool has no terminal, so npx auto-installs instead of asking, which is how a runner spent 30 minutes running a stranger's CLI with the workflow secrets in env ([#872](https://github.com/Omega-JS-Stack/omega/issues/872), [#881](https://github.com/Omega-JS-Stack/omega/issues/881)).
+
+`hooks/npx/run.sh` runs on `PreToolUse` with matcher `Bash`, its own entry beside the `Write|Edit` one. It reads `tool_input.command`, splits it on the shell's separators so each segment starts with the program it runs, and refuses when a segment invokes `omega`, `omg` or `mgr` through `npx` or `npm exec` and no `node_modules/.bin/omega` resolves walking up from the working directory to the git root:
+
+```
+omega:npx: no framework installed here, so this would be a registry fetch.
+Looked for node_modules/.bin/omega from <dir> up to the git root.
+Fix: run the install first, or run the package's own bin by path.
+The local-install contract: docs/shared/local-dev.md.
+```
+
+The working directory is the one a leading absolute `cd <dir> &&` lands in, else the `cwd` the event carries, else the hook's own. Flags between the runner and the bin name are skipped (`npx --no-install omega`, `npx -y omega`, `npm exec -- omega`), and leading `VAR=value` assignments too. A VERSION spec rides the bin name (`npx omega@latest`, `npm exec -- mgr@1.2.3`), which is the most direct registry fetch of the lot, so it is refused on the same terms. The monorepo is not exempt: an installed tree passes there like anywhere else, and a bare `npx omega` inside `packages/<framework>` is a session rule the hook does not try to replace.
+
+Everything else fails open: no `jq`, no command, unparsable stdin, a working directory that is not absolute, a relative `cd` hop the hook cannot resolve, and a runner form it does not parse (`npx -p <pkg> omega`, where the bin name is not the first non-flag word). It never reads inside quotes or heredocs either, so a command that merely MENTIONS `npx omega` in an argument passes, while a heredoc body whose own line starts with `npx omega` is refused like a command: best-effort tokenization, erring toward the refusal a missing install deserves. Covered by the npx cases in `scripts/agent-plugins.test.js`.
 
 ## The quality hook
 

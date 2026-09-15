@@ -13,14 +13,14 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { recordDeploy, readDeployRecord, deployKey } = require('../src/deploy-record.js');
+const { recordDeploy, readDeployRecord } = require('../src/deploy-record.js');
 const { stripAnsi } = require('../src/attach-log-file.js');
 
 function makeBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-record-'));
   fs.writeFileSync(path.join(root, 'package.json'), '{"name":"brand"}');
-  fs.mkdirSync(path.join(root, 'targets', 'website'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'targets', 'website', 'package.json'), '{"name":"brand-website"}');
+  fs.mkdirSync(path.join(root, 'targets', 'web'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'targets', 'web', 'package.json'), '{"name":"brand-web"}');
   return root;
 }
 
@@ -56,7 +56,7 @@ function capture(fn) {
 
 test('recordDeploy resolves to the brand root from a target dir; readDeployRecord sees it from anywhere', () => {
   const root = makeBrand();
-  const targetDir = path.join(root, 'targets', 'website');
+  const targetDir = path.join(root, 'targets', 'web');
 
   assert.equal(readDeployRecord({ dir: targetDir, target: 'web' }), null);
 
@@ -73,21 +73,17 @@ test('recordDeploy resolves to the brand root from a target dir; readDeployRecor
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('instance keys (multi-instance targets): main stays the bare target, other instances key <target>:<id>', () => {
+test('the record key is the target NAME, so sibling web targets never share a stamp (#886)', () => {
   const root = makeBrand();
 
-  assert.equal(deployKey('web'), 'web');
-  assert.equal(deployKey('web', 'main'), 'web', 'main IS the bare key — existing records stay valid');
-  assert.equal(deployKey('web', 'admin'), 'web:admin');
+  recordDeploy({ dir: root, target: 'web', detail: { method: 'dispatch' } });
+  recordDeploy({ dir: root, target: 'admin', detail: { method: 'direct' } });
 
-  recordDeploy({ dir: root, target: 'web', instance: 'main', detail: { method: 'dispatch' } });
-  recordDeploy({ dir: root, target: 'web', instance: 'admin', detail: { method: 'direct' } });
+  assert.deepEqual(Object.keys(readRecords(root)).sort(), ['admin', 'web'], 'per-target records, distinct keys');
 
-  assert.deepEqual(Object.keys(readRecords(root)).sort(), ['web', 'web:admin'], 'per-target records, distinct keys');
-
-  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch', 'instance-less read = the primary');
-  assert.equal(readDeployRecord({ dir: root, target: 'web', instance: 'admin' }).method, 'direct');
-  assert.equal(readDeployRecord({ dir: root, target: 'web', instance: 'cdn' }), null, 'instance-scoped');
+  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch');
+  assert.equal(readDeployRecord({ dir: root, target: 'admin' }).method, 'direct');
+  assert.equal(readDeployRecord({ dir: root, target: 'cdn' }), null, 'a name the brand never deployed');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -34,9 +34,9 @@ test('an off config never loads an SDK — not @sentry/node, not @sentry/electro
   assert.deepEqual(sentryModulesLoaded(), [], 'nothing is loaded before the first initialize');
 
   quiet(() => {
-    assert.strictEqual(node.initialize({ config: { providers: { sentry: { dsn: '' } } } }), null, 'the node entry hands back no SDK');
-    main.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } }, getVersion: () => '1.0.0' });
-    preload.initialize({ config: { monitoring: { providers: { sentry: { dsn: '' } } } } });
+    assert.strictEqual(node.initialize({ config: { providers: { sentry: { dsn: '' } } }, isProduction: false }), null, 'the node entry hands back no SDK');
+    main.initialize({ config: { environment: 'testing', monitoring: { providers: { sentry: { dsn: '' } } } }, getVersion: () => '1.0.0' });
+    preload.initialize({ config: { environment: 'testing', monitoring: { providers: { sentry: { dsn: '' } } } } });
   });
 
   assert.strictEqual(main._enabled, false);
@@ -88,9 +88,12 @@ function withStubbedElectronSDK(entry, run) {
     stubbed.push(file);
   }
 
+  // A packaged production artifact: nothing kills reporting, and the process
+  // names no environment, so the gates read the environment the BUILD baked
+  // into the host's config (#817) the way a renderer bundle does.
   delete process.env.OMEGA_SENTRY_ENABLED;
   delete process.env.OMEGA_TEST_RUNNER;
-  process.env.OMEGA_BUILD_MODE = 'true';
+  delete process.env.OMEGA_ENVIRONMENT;
 
   try {
     quiet(run);
@@ -98,7 +101,7 @@ function withStubbedElectronSDK(entry, run) {
   } finally {
     entry.shutdown();
     for (const file of stubbed) delete require.cache[file];
-    for (const key of ['OMEGA_SENTRY_ENABLED', 'OMEGA_TEST_RUNNER', 'OMEGA_BUILD_MODE']) {
+    for (const key of ['OMEGA_SENTRY_ENABLED', 'OMEGA_TEST_RUNNER', 'OMEGA_ENVIRONMENT']) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
@@ -107,7 +110,10 @@ function withStubbedElectronSDK(entry, run) {
 
 test('the electron entries tag the release brand.id@version, the one format every target uses', () => {
   const host = {
-    config:     { brand: { id: 'paperloom' }, monitoring: { providers: { sentry: { dsn: 'https://key@o1.ingest.sentry.io/1' } } } },
+    // The environment is the artifact's own baked fact (#817): it is what the
+    // gates read on a surface that passes no runtime production signal, and
+    // reporting is live here because that fact says production.
+    config:     { environment: 'production', brand: { id: 'paperloom' }, monitoring: { providers: { sentry: { dsn: 'https://key@o1.ingest.sentry.io/1' } } } },
     getVersion: () => '1.4.2',
   };
 

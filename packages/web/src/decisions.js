@@ -21,7 +21,7 @@ const Logger = require('@omega.js/devkit/logger');
 const reads = require('@omega.js/devkit/reads');
 const { scanConsumerPages, findPermalinkCollisions } = require('./consumer-scan.js');
 const { hasOwnContent } = require('./sample-content.js');
-const { isProduction } = require('./mode-helpers.js');
+const { isProduction } = require('@omega.js/config/environment');
 
 const logger = new Logger('decisions');
 
@@ -78,7 +78,7 @@ function createDecisions(options) {
     // A shipped site cannot have two files at one URL — one of them silently
     // wins and the other is simply gone. Dev says it loudly and keeps serving;
     // a production build stops.
-    if (isProduction.call(options)) throw new Error(messages.join('\n'));
+    if (isProduction()) throw new Error(messages.join('\n'));
     messages.forEach((message) => log(message));
   }
 

@@ -33,10 +33,16 @@ The SCSS load path is set up by [src/gulp/tasks/sass.js](../src/gulp/tasks/sass.
 So this just works in a consumer's `src/assets/css/main.scss`:
 
 ```scss
+// 0. Resolves to the partial the sass task generates from `brand.color` (#912)
+@use 'brand';
+
 // 1. Resolves to @omega.js/extension's main entry — sets up Bootstrap, utilities, etc.
 @use 'omega-extension' as * with (
-  $primary: #2563EB,
+  $primary: brand.$primary,
 );
+
+// The runtime --omega-accent ramp, after the framework import so it wins the cascade
+@include brand.ramp;
 
 // 2. Resolves to the active theme's _theme.scss
 @use 'theme' as *;

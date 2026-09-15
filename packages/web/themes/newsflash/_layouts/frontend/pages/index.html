@@ -9,11 +9,11 @@ hero:
   description: "Sharp reporting and zero noise: the stories that matter, delivered before your coffee gets cold."
   primary_button:
     text: "Read the latest"
-    icon: "bolt"
+    icon: "fa-solid fa-bolt"
     href: "/blog"
   secondary_button:
     text: "Get the newsletter"
-    icon: "envelope"
+    icon: "fa-solid fa-envelope"
     href: "#signup"
 
 # The Latest — the front-page feed (posts-driven; newsflash-specific section)
@@ -63,20 +63,20 @@ desks:
   subheadline: "Three desks, one standard: report it right, write it sharp."
   cta_button:
     text: "Browse all stories"
-    icon: "arrow-right"
+    icon: "fa-solid fa-arrow-right"
     href: "/blog"
   items:
     - title: "Tech"
       description: "The machines, the makers, and the money rewiring how we live and work."
-      icon: "microchip"
+      icon: "fa-solid fa-microchip"
       href: "/blog/categories/tech"
     - title: "Culture"
       description: "What we watch, wear, and argue about, and why it matters more than you think."
-      icon: "masks-theater"
+      icon: "fa-solid fa-masks-theater"
       href: "/blog/categories/culture"
     - title: "Money"
       description: "Markets, paychecks, and the economics hiding inside everyday decisions."
-      icon: "chart-line"
+      icon: "fa-solid fa-chart-line"
       href: "/blog/categories/money"
 
 # Stats Section — the masthead numbers
@@ -103,11 +103,11 @@ cta:
   subheadline: "Join the readers who start their day with {{ resolved.config.brand.name }}: reporting with teeth, context with heart, and zero filler."
   primary_button:
     text: "Start reading"
-    icon: "bolt"
+    icon: "fa-solid fa-bolt"
     href: "/blog"
   secondary_button:
     text: "Get the newsletter"
-    icon: "envelope"
+    icon: "fa-solid fa-envelope"
     href: "#signup"
 ---
 
@@ -156,12 +156,12 @@ cta:
         <div class="d-flex flex-wrap gap-3">
           {% iftruthy resolved.hero.primary_button %}
             <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-primary btn-lg">
-              <i class="fa-solid fa-{{ resolved.hero.primary_button.icon }} me-2"></i>{{ resolved.hero.primary_button.text }}
+              <i class="{{ resolved.hero.primary_button.icon }} me-2" aria-hidden="true"></i>{{ resolved.hero.primary_button.text }}
             </a>
           {% endiftruthy %}
           {% iftruthy resolved.hero.secondary_button %}
             <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-dark btn-lg">
-              <i class="fa-solid fa-{{ resolved.hero.secondary_button.icon }} me-2"></i>{{ resolved.hero.secondary_button.text }}
+              <i class="{{ resolved.hero.secondary_button.icon }} me-2" aria-hidden="true"></i>{{ resolved.hero.secondary_button.text }}
             </a>
           {% endiftruthy %}
         </div>

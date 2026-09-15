@@ -253,9 +253,10 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2) }) {
   const target = findTarget(process.cwd());
 
   // No context — the bootstrap case (a verb run in a fresh directory has
-  // no framework dep yet, by definition). Run the HOST framework's CLI, exactly
-  // like the pre-dispatcher bins did, and say which one so a hoist-winner at a
-  // brand root is never a silent mystery.
+  // no framework dep yet, by definition). Run the INSTALLED @omega.js/manager
+  // when one resolves, else the HOST framework's CLI exactly like the
+  // pre-dispatcher bins did, and say which one so a hoist-winner at a brand
+  // root is never a silent mystery.
   if (!target) {
     // …but ONLY for a verb that cannot write. The fallback hands a mutating verb
     // to whichever framework won npm's bin link, and that verb scaffolds its own
@@ -277,6 +278,20 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2) }) {
       console.error(`omega: refusing to run "${verb}" — ${process.cwd()} is not inside an OMEGA target (no framework dependency and no config/omega.json5 above it). Nothing was scaffolded.`);
       console.error('Run it from a target directory, or `npx omega onboard` to create one here. Without a target, only onboard (create, new), help, version, cwd and logs run; the signing box\'s runner and sign-windows run through @omega.js/desktop.');
       process.exit(1);
+    }
+
+    // The manager wins a contextless run whenever the install carries one: the
+    // verbs that survive the refusal above are the ones that run where no
+    // target exists yet (onboard, create, new), and those are the manager's own.
+    // Without this, a fresh brand-template clone that installed ONLY
+    // @omega.js/manager still ran the backend, because the manager DEPENDS on
+    // the backend and npm's arbitrary hoist winner linked the backend's bin:
+    // `npx omega onboard` answered `Unknown command`
+    // ([#908](https://github.com/Omega-JS-Stack/omega/issues/908)).
+    const manager = tryResolveCli(MANAGER, process.cwd());
+    if (manager.cliPath) {
+      console.error(`omega: no target context found from ${process.cwd()}: running ${MANAGER}`);
+      return require(manager.cliPath).run();
     }
 
     console.error(`omega: no target context found from ${process.cwd()} — running ${hostName}`);

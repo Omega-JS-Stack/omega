@@ -11,8 +11,10 @@ node_modules/
 *.log
 /logs/
 
-# Apple signing artifacts — never commit these
-config/certs/
+# Signing artifacts: never commit these. config/certs/ keeps its README, the one
+# tracked explanation of where the real material lives.
+config/certs/*
+!config/certs/README.md
 *.p12
 *.cer
 *.mobileprovision

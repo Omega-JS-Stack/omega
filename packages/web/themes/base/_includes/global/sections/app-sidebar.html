@@ -12,6 +12,10 @@
                | { label, icon, dropdown: [ …links, nested dropdowns… ] }]
     bottom:   { vert: { enabled } }                                                      (optional)
 
+  An `icon` carries its OWN Font Awesome classes (#619, #850, #903):
+  `icon: 'fa-brands fa-github'`. Every icon site below emits that string
+  verbatim and adds only its size.
+
   Anything textual wears .omega-shell__label so the rail collapse hides it
   (core/css/shell). Active detection via urlmatches, including nested groups.
 
@@ -62,7 +66,7 @@
             {% else %}
               <li>
                 <a class="dropdown-item" href="{{ item.href | default: '#' }}">
-                  {% if item.icon %}<i class="fa-solid fa-{{ item.icon }} fa-sm me-2"></i>{% endif %}
+                  {% if item.icon %}<i class="{{ item.icon }} fa-sm me-2" aria-hidden="true"></i>{% endif %}
                   {{ item.label | omega_liquify }}
                 </a>
               </li>
@@ -104,7 +108,7 @@
           <li>
             <button class="omega-side__item {% if dropdown_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
               {% if link.icon %}
-                <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
+                <span class="omega-side__icon"><i class="{{ link.icon }} fa-sm" aria-hidden="true"></i></span>
               {% endif %}
               <span class="omega-shell__label">{{ link.label }}</span>
               <span class="omega-side__chevron"><i class="fa-solid fa-chevron-right fa-xs"></i></span>
@@ -127,7 +131,7 @@
                     <li>
                       <button class="omega-side__item {% if nested_has_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
                         {% if child.icon %}
-                          <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
+                          <span class="omega-side__icon"><i class="{{ child.icon }} fa-sm" aria-hidden="true"></i></span>
                         {% endif %}
                         <span class="omega-shell__label">{{ child.label }}</span>
                         <span class="omega-side__chevron"><i class="fa-solid fa-chevron-right fa-xs"></i></span>
@@ -142,7 +146,7 @@
                               <li>
                                 <a href="{{ grandchild.href }}" class="omega-side__item {{ grandchild_active }}">
                                   {% if grandchild.icon %}
-                                    <span class="omega-side__icon"><i class="fa-solid fa-{{ grandchild.icon }} fa-sm"></i></span>
+                                    <span class="omega-side__icon"><i class="{{ grandchild.icon }} fa-sm" aria-hidden="true"></i></span>
                                   {% endif %}
                                   <span class="omega-shell__label">{{ grandchild.label }}</span>
                                 </a>
@@ -159,7 +163,7 @@
                       {% iftruthy child.href %}
                         <a href="{{ child.href }}" class="omega-side__item {{ child_active }}" {{ child_attributes }}>
                           {% if child.icon %}
-                            <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
+                            <span class="omega-side__icon"><i class="{{ child.icon }} fa-sm" aria-hidden="true"></i></span>
                           {% endif %}
                           <span class="omega-shell__label">{{ child.label }}</span>
                           {% if child.badge %}
@@ -170,7 +174,7 @@
                       {% iffalsy child.href %}
                         <button type="button" class="omega-side__item {% if child.class %}{{ child.class }}{% endif %}" {{ child_attributes }}>
                           {% if child.icon %}
-                            <span class="omega-side__icon"><i class="fa-solid fa-{{ child.icon }} fa-sm"></i></span>
+                            <span class="omega-side__icon"><i class="{{ child.icon }} fa-sm" aria-hidden="true"></i></span>
                           {% endif %}
                           <span class="omega-shell__label">{{ child.label }}</span>
                         </button>
@@ -189,7 +193,7 @@
             {% iftruthy link.href %}
               <a href="{{ link.href }}" class="omega-side__item {{ link_active }}" {{ link_attributes }}>
                 {% if link.icon %}
-                  <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
+                  <span class="omega-side__icon"><i class="{{ link.icon }} fa-sm" aria-hidden="true"></i></span>
                 {% endif %}
                 <span class="omega-shell__label">{{ link.label }}</span>
                 {% if link.badge %}
@@ -200,7 +204,7 @@
             {% iffalsy link.href %}
               <button type="button" class="omega-side__item" {{ link_attributes }}>
                 {% if link.icon %}
-                  <span class="omega-side__icon"><i class="fa-solid fa-{{ link.icon }} fa-sm"></i></span>
+                  <span class="omega-side__icon"><i class="{{ link.icon }} fa-sm" aria-hidden="true"></i></span>
                 {% endif %}
                 <span class="omega-shell__label">{{ link.label }}</span>
               </button>

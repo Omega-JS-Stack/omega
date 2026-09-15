@@ -47,8 +47,8 @@ module.exports = async function ensureLogoGen(context) {
     return { output: { logos: { planned: missing.map(([name]) => name) } } };
   }
 
-  const font = loadFont(fontName, brandRoot);
-  if (!font) {
+  const loaded = loadFont(fontName, brandRoot);
+  if (!loaded) {
     console.log(`      ${chalk.red('✗')} Font ${chalk.cyan(fontName)} not found in ${chalk.dim('assets/fonts/')} or the system font dirs`);
     return { status: 'error', error: `font "${fontName}" not found` };
   }
@@ -56,9 +56,11 @@ module.exports = async function ensureLogoGen(context) {
   const generated = [];
 
   for (const [name, path] of missing) {
+    // An unusable outline throws (#916) and the runner turns that into a
+    // service error: a wordmark carrying NaN is never written
     const svg = name === 'wordmark'
-      ? generateWordmark(brandName, font)
-      : generateCombomark(brandName, jetpack.read(brandmarkPath), font);
+      ? generateWordmark(brandName, loaded.font, loaded.fontPath)
+      : generateCombomark(brandName, jetpack.read(brandmarkPath), loaded.font, loaded.fontPath);
     jetpack.write(path, svg);
     console.log(`      ${chalk.green('✓')} Generated ${chalk.cyan(`${name}.svg`)}`);
     generated.push(name);

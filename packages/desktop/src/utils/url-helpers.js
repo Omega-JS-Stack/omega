@@ -11,6 +11,10 @@
 // callers normally pass NO argument. An explicit `environment` arg is an override
 // (used mainly by tests to pin a specific environment's mapping).
 
+// The missing-fact error is the ONE shared one (#834). Its module requires
+// nothing, so it rides the renderer bundle exactly as this file does.
+const { devFactMissing } = require('@omega.js/config/dev-facts');
+
 // Guarded the way @omega.js/extension's twin is: the renderer bundle is a
 // browser context, and only the Node-side contexts (main, preload, build, the
 // test harness) carry the resolved-port env channel.
@@ -20,14 +24,9 @@ function envPort(name) {
     : undefined;
 }
 
-// The classic dev WEBSITE ORIGIN: a lockstep copy of @omega.js/config's
-// CLASSIC_DEV_ORIGIN, which is the SSOT. This module is attached in the RENDERER
-// too (src/renderer.js), so it rides the browser bundle and cannot require that
-// Node-only package (fs, net, json5); @omega.js/client mirrors the same constant
-// for the same reason. The build suite pins this copy to the config package's
-// value, so a drift fails a test instead of a user
-// ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)).
-const CLASSIC_DEV_ORIGIN = 'https://localhost:4000';
+// The step that writes the resolved dev map into this surface's artifact, named
+// in every missing-fact error below (#834).
+const DEV_FACT_WRITER = "@omega.js/desktop's bundle task, from the live stack's ports file plus the OMEGA_*_PORT env channel";
 
 // One local port, from whichever channel this context has: the env var first
 // (the CLI that booted the stack publishes it, N7), then the `dev.ports` map
@@ -35,8 +34,24 @@ const CLASSIC_DEV_ORIGIN = 'https://localhost:4000';
 // parent env, so a bumped emulator port reaches it only that way
 // ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)). Same helper,
 // same order as @omega.js/extension's src/utils/url-helpers.js.
+//
+// There is no third step any more (#834): the classic numbers used to be
+// hand-typed here as a last resort for "a build made with no stack up", which
+// is a guess about a port nothing identity-checks. A miss is loud instead.
 function localPort(context, envName, name) {
   return envPort(envName) || context?.config?.dev?.ports?.[name];
+}
+
+// The same read, REQUIRED: the one every URL getter below uses, because every
+// one of them is answering with a real local address or not at all.
+function requiredPort(context, envName, name) {
+  const port = localPort(context, envName, name);
+
+  if (!port) {
+    throw devFactMissing(`dev port for \`${name}\``, DEV_FACT_WRITER);
+  }
+
+  return port;
 }
 
 function getFunctionsUrl(environment) {
@@ -51,7 +66,7 @@ function getFunctionsUrl(environment) {
   // same three-step chain getApiUrl() walks: the OMEGA_*_PORT env channel (N7),
   // then the baked map, then the classic default.
   if (env === 'development' || env === 'testing') {
-    const port = localPort(this, 'OMEGA_FUNCTIONS_PORT', 'functions') || 5001;
+    const port = requiredPort(this, 'OMEGA_FUNCTIONS_PORT', 'functions');
     return `http://localhost:${port}/${projectId}/us-central1`;
   }
 
@@ -64,12 +79,13 @@ function getApiUrl(environment) {
   // Local for development OR testing; production otherwise. Mirrors
   // @omega.js/backend's getApiUrl (N7): a resolved OMEGA_HTTPS_PORT means
   // `mgr serve`'s mkcert proxy is up (https); otherwise plain http to the
-  // hosting emulator (env port, baked port, or classic 5002).
+  // hosting emulator (env port, then baked port). Neither resolved is a broken
+  // build, not a case to assume the classic 5002 through (#834).
   if (env === 'development' || env === 'testing') {
     const httpsPort = localPort(this, 'OMEGA_HTTPS_PORT', 'https');
     return httpsPort
       ? `https://localhost:${httpsPort}`
-      : `http://localhost:${localPort(this, 'OMEGA_HOSTING_PORT', 'hosting') || 5002}`;
+      : `http://localhost:${requiredPort(this, 'OMEGA_HOSTING_PORT', 'hosting')}`;
   }
 
   // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
@@ -89,9 +105,10 @@ function getApiUrl(environment) {
 // ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)): the baked
 // `dev.origin` the live website published (scheme, host AND port, the complete
 // fact) wins, else a port from the usual chain (OMEGA_WEBSITE_PORT, then the baked
-// `dev.ports.website`) composed over https, else the classic dev origin. The scheme
-// is https because `omega dev` fronts its public port with the mkcert proxy by
-// default, so a port alone can never say it
+// `dev.ports.website`) composed over https. There is no classic-origin fallback
+// any more (#834): a wrong dev origin fails as a silent connection refusal. The
+// scheme is https because `omega dev` fronts its public port with the mkcert
+// proxy by default, so a port alone can never say it
 // ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)).
 // Prod → `config.brand.url`. Use this whenever app code wants to link out to "the
 // website" (Help → Website tray/menu items, "Open in browser," billing portal
@@ -106,8 +123,7 @@ function getWebsiteUrl(environment) {
       return origin;
     }
 
-    const port = localPort(this, 'OMEGA_WEBSITE_PORT', 'website');
-    return port ? `https://localhost:${port}` : CLASSIC_DEV_ORIGIN;
+    return `https://localhost:${requiredPort(this, 'OMEGA_WEBSITE_PORT', 'website')}`;
   }
 
   const url = this?.config?.brand?.url;
@@ -160,8 +176,8 @@ function attachTo(Manager) {
 
 module.exports = {
   attachTo,
-  CLASSIC_DEV_ORIGIN,
   localPort,
+  requiredPort,
   getFunctionsUrl,
   getApiUrl,
   getWebsiteUrl,

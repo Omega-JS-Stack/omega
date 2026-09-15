@@ -1,7 +1,7 @@
 /**
  * Shared gitignore ensure — the secrets store, the environment env files, run
  * output, and the run logs never get committed. Used by the workspace service
- * (brand roots) and runCompany (the company root, which no service pass touches).
+ * at every brand root.
  *
  * The scaffold writes every entry into a NEW brand's .gitignore; this heals
  * every root that predates an entry, on its next manage run (#197: `logs/`;

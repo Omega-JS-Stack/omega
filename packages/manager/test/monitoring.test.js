@@ -21,7 +21,7 @@ const DOWN = '\x1B[B';
 delete process.env.SENTRY_AUTH_TOKEN;
 
 const ORG = { slug: 'fixture-org', links: { regionUrl: 'https://us.sentry.io' } };
-const ALL_TARGETS = { web: {}, backend: {}, desktop: {}, extension: {} };
+const ALL_TARGETS = { web: { type: 'web' }, backend: { type: 'backend' }, desktop: { type: 'desktop' }, extension: { type: 'extension' } };
 const PLATFORMS = { web: 'javascript', backend: 'node', desktop: 'electron', extension: 'javascript' };
 
 function dsnOf(target) {
@@ -52,10 +52,10 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
     },
   },
   targets: {
-    web: {},
-    backend: {},
-    desktop: {},
-    extension: {},
+    web: { type: 'web' },
+    backend: { type: 'backend' },
+    desktop: { type: 'desktop' },
+    extension: { type: 'extension' },
   },
 }
 `;
@@ -190,10 +190,35 @@ test('monitoring: only enabled targets get projects', async () => {
     getProjectKeys: keysFor('web'),
   });
 
-  const result = await runService(brandConfig({ targets: { web: {} } }), { sentry: api });
+  const result = await runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api });
 
   assert.equal(result.output.projects.created, 1);
   assert.deepEqual(api.callsTo('createProject').map(({ args }) => args[2].slug), ['fixture-brand-web']);
+});
+
+// A target answers to the NAME its brand gave it (#886): the TYPE picks the
+// Sentry platform, the NAME is the project slug and the config key.
+test('monitoring: a web target named `site` gets its own project, and its DSN lands under targets.site', async () => {
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const api = fakeSentry({
+    getOrganizations: [ORG],
+    getTeams: [{ slug: 'fixture-brand' }],
+    getProjects: [],
+    createProject: (org, team, { slug }) => ({ id: `proj-${slug}`, slug }),
+    getProjectKeys: keysFor('site'),
+  });
+
+  const result = await runService(brandConfig({ targets: { site: { type: 'web' } } }), { sentry: api, brandRoot });
+
+  assert.equal(result.status, 'success');
+  const [{ args }] = api.callsTo('createProject');
+  assert.equal(args[2].slug, 'fixture-brand-site', 'the project is named for the target');
+  assert.equal(args[2].platform, 'javascript', 'and platformed by its type');
+  assert.equal(result.state.projectMap.site.slug, 'fixture-brand-site');
+
+  const written = readConfigSource(brandRoot);
+  assert.match(written, /site: \{\s*\n\s*monitoring:/, 'the DSN lands under targets.site');
+  assert.ok(written.includes(dsnOf('site')));
 });
 
 // ─── Convergence ─────────────────────────────────────────────────────────────
@@ -204,14 +229,14 @@ test('monitoring: a fully converged brand is a zero-mutation no-op and the file 
   brand: { id: 'fixture-brand' },
   monitoring: { providers: { sentry: { org: "fixture-org" } } },
   targets: {
-    web: { monitoring: { providers: { sentry: { dsn: "${dsnOf('web')}" } } } },
+    web: { type: 'web', monitoring: { providers: { sentry: { dsn: "${dsnOf('web')}" } } } },
   },
 }
 `;
   const brandRoot = makeBrandRoot(configured);
   const config = brandConfig({
     monitoring: { providers: { sentry: { org: 'fixture-org' } } },
-    targets: { web: { monitoring: { providers: { sentry: { dsn: dsnOf('web') } } } } },
+    targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: dsnOf('web') } } } } },
   });
   const api = fakeSentry({
     getOrganizations: [ORG],
@@ -232,7 +257,7 @@ test('monitoring: a hand-set stale DSN is drift and gets patched', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const config = brandConfig({
     monitoring: { providers: { sentry: { org: 'fixture-org' } } },
-    targets: { web: { monitoring: { providers: { sentry: { dsn: 'https://stale@old.ingest.sentry.io/1' } } } } },
+    targets: { web: { type: 'web', monitoring: { providers: { sentry: { dsn: 'https://stale@old.ingest.sentry.io/1' } } } } },
   });
   const api = fakeSentry({
     getOrganizations: [ORG],
@@ -275,7 +300,7 @@ test('monitoring: an ambiguous org is ASKED for and the pick lands in omega.json
 
   const tty = openTtyPrompt();
   try {
-    const run = runService(brandConfig({ targets: { web: {} } }), { sentry: api, brandRoot });
+    const run = runService(brandConfig({ targets: { web: { type: 'web' } } }), { sentry: api, brandRoot });
     await tty.answer('Select Sentry organization:', `${DOWN}\r`); // org-b
     const result = await run;
 

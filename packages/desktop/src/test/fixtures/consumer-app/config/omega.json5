@@ -33,6 +33,7 @@
   cloud: { provider: 'firebase', config: {} },
   targets: {
     desktop: {
+      type: 'desktop',
       startup: {
         mode: 'normal',
       },

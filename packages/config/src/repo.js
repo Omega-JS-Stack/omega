@@ -1,142 +1,264 @@
 /**
- * @omega.js/config repo — the SINGLE derivation of the brand's GitHub repo
- * (owner + name), shared by every surface that targets the brand repo (web
- * `omega deploy --direct`, the manager's github service setup/repo/pages,
- * the backend CMS routes that commit posts).
+ * @omega.js/config repo: the ONE derivation of every repo a brand owns
+ * ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
  *
- * One optional key: `repo.providers.github.repo` (or, on a backend load, the
- * target-overlaid `targets.backend.github.repo`, which wins) — either a bare name
- * ("omega-omega") or an "owner/name" slug ("itw-creative-works/omega-omega").
- * Defaults: name falls to `<brand.id>-omega`, owner falls to `repo.providers.github.org`.
- * That name is the `<brand.id>-<role>` repo rule (Ian 2026-09-07,
- * [#809](https://github.com/Omega-JS-Stack/omega/issues/809)): every repo a brand
- * owns is its id plus the role it plays, `omega` for the source monorepo beside
- * the `releases` one below, so nobody types a repo name to get the right one.
- * The slug's owner slot carries the legacy omega-manager orgMain/orgWebsite
- * split (Ian 2026-07-19): most ITW brands house the brand repo under the paid
- * company org (itw-creative-works) while `repo.providers.github.org` keeps
- * naming the brand's own org for org-profile reconciliation. The retired `repoWebsite` URL key
- * (2026-07-19, Ian: "we no longer need it — that was for when the website
- * lived NOT in the monorepo") is superseded by this slug: one repo per
- * brand, named by the brand.
+ * ONE config block says where a brand hosts its code:
  *
- * Born from the 2026-07-18 launch-night collision: the bare brand-id
- * fallback resolved brand "omega" to Omega-JS-Stack/omega — the framework
- * MONOREPO — instead of the brand repo.
+ *   repo: { provider: 'github', org: 'Acme-Org' }
+ *
+ * and nothing else. Presence of the block enables the repo service, exactly
+ * as a target's key presence enables a target; `provider` defaults to `github`
+ * and `org` is the only typed value. No repo NAME is ever configured: every
+ * name derives from the `<brand.id>-<role>` rule (Ian 2026-09-07,
+ * [#809](https://github.com/Omega-JS-Stack/omega/issues/809)), one function per
+ * role, so nobody types a repo name to get the right one:
+ *
+ *   - `<brand.id>-omega`    the SOURCE monorepo (`sourceRepo`)
+ *   - `<brand.id>-releases` the public release channel (`releasesRepo`)
+ *   - `<brand.id>-<name>`   one per web target that GitHub hosts (`websiteRepo`)
+ *
+ * A repo name that must differ is a brand id that must differ: the override
+ * keys (`repo.providers.github.repo`, the top-level `github` block,
+ * `targets.<name>.github.repo`, `targets.desktop.releases.owner/repo`) are
+ * retired, each with a row in retired-keys.js.
+ *
+ * Visibility is NOT in omega.json5 either: the brand root's package.json
+ * `private` field is the one statement of it (`brandVisibility`), absent
+ * meaning private, because every brand monorepo is private by default
+ * (Ian 2026-09-11).
  */
 
-/**
- * Parse a `repo.providers.github.repo` value: "owner/name" slug or bare "name".
- *
- * @param {string} value - e.g. "itw-creative-works/omega-omega" or "omega-omega"
- * @returns {{ owner: string, name: string }} owner is '' for bare names.
- */
-function parseRepoSlug(value) {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return { owner: '', name: '' };
-  const slash = trimmed.indexOf('/');
-  if (slash === -1) return { owner: '', name: trimmed };
-  return { owner: trimmed.slice(0, slash), name: trimmed.slice(slash + 1) };
-}
+const fs = require('node:fs');
+const path = require('node:path');
+
+const { isPlainObject } = require('./merge.js');
+const { targetUrl, brandHost } = require('./targets.js');
+// The two provider lists live in schema.js, with the rules that enumerate
+// them (the WINBACK_DURATIONS pattern), and are re-exported here: this module
+// is where every reader takes them from.
+const { REPO_PROVIDERS, HOSTING_PROVIDERS } = require('./schema.js');
+
+const DEFAULT_REPO_PROVIDER = 'github';
+
+// Every GitHub default Pages host (`<owner>.github.io`, and the bare form): a
+// url naming one is an ADDRESS, never a custom domain (#366).
+const DEFAULT_PAGES_HOST = /(^|\.)github\.io$/i;
+const DEFAULT_HOSTING_PROVIDER = 'github';
 
 /**
- * The github keys the derivation reads: the shared `repo.providers.github`
- * block, overlaid by the target's own `github` entry (a backend load composes
- * `targets.backend.github` — the CMS's content identity — onto the top level,
- * and per the merge chain the target wins).
+ * The brand's repo block: `{ provider, org }`, with the provider defaulted.
+ *
+ * Null when the config carries no `repo` block, and null when the block names
+ * no org: half an address addresses nothing, and the validator fails an
+ * org-less block on its own (an error here would be a second, quieter copy of
+ * that rule).
  *
  * @param {object} config - Composed omega config (brand + local layers).
- * @returns {object} Merged `{ org, repo, … }` keys.
+ * @returns {{ provider: string, org: string }|null}
  */
-function githubKeys(config) {
-  return { ...(config?.repo?.providers?.github || {}), ...(config?.github || {}) };
+function repoBlock(config) {
+  const repo = config ? config.repo : undefined;
+  if (!isPlainObject(repo)) return null;
+
+  const org = typeof repo.org === 'string' ? repo.org.trim() : '';
+  if (!org) return null;
+
+  return { provider: repo.provider || DEFAULT_REPO_PROVIDER, org };
 }
 
 /**
- * The brand repo's bare name (no owner): a typed slug or bare name, else the
- * `<brand.id>-omega` default of the `<brand.id>-<role>` rule.
- *
- * @param {object} config - Composed omega config (brand + local layers).
- * @returns {string} Repo name ('' when nothing in the chain resolves).
+ * The brand's id, trimmed: the role suffix is appended to it, so untrimmed
+ * whitespace would sit INSIDE the derived name.
+ * @param {object} config - Composed omega config.
+ * @returns {string} '' when the config names no brand id.
  */
-function brandRepoName(config) {
-  const github = githubKeys(config);
-  // The id half is trimmed like a typed slug: the role suffix is appended to
-  // it, so untrimmed whitespace would sit INSIDE the composed name.
-  const id = (config?.brand?.id || '').trim();
-
-  return parseRepoSlug(github.repo).name
-    || (id ? `${id}-omega` : '');
+function brandId(config) {
+  const id = config && config.brand ? config.brand.id : undefined;
+  return typeof id === 'string' ? id.trim() : '';
 }
 
 /**
- * The brand repo's owner (GitHub org or user).
- *
- * @param {object} config - Composed omega config (brand + local layers).
- * @returns {string} Owner ('' when nothing in the chain resolves).
+ * A derived repo as one finished value, or null when either half is missing.
+ * @param {object} config - Composed omega config.
+ * @param {string} role - The role suffix ('omega', 'releases', a target name).
+ * @returns {{ owner: string, name: string, slug: string }|null}
  */
-function brandRepoOwner(config) {
-  const github = githubKeys(config);
-  return parseRepoSlug(github.repo).owner || github.org || '';
+function derivedRepo(config, role) {
+  const block = repoBlock(config);
+  const id = brandId(config);
+  if (!block || !id) return null;
+
+  const name = `${id}-${role}`;
+
+  return { owner: block.org, name, slug: `${block.org}/${name}` };
 }
 
 /**
- * The brand repo as ONE finished value: owner, name, and the "owner/name" slug
- * the GitHub API takes. This is the form a FRAMEWORK hands to consumer code —
- * @omega.js/backend exposes it as `config.resolved.github` ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)),
- * because a brand target cannot require this private package and must never
- * re-derive the merge rules for itself.
+ * The brand's SOURCE monorepo: `<brand.id>-omega` under the declared org. This
+ * is the repo every SOURCE fact addresses: the workflow dispatch, the repo
+ * Actions secrets, the CMS content commits, the scaffolded workflows.
  *
- * @param {object} config - Composed omega config (brand + local layers).
- * @returns {{ owner: string, name: string, repo: string }} `repo` is the slug, '' unless BOTH halves resolve (half an address addresses nothing).
+ * Its visibility is the brand root's `private` field (`brandVisibility`), not a
+ * config key.
+ *
+ * @param {object} config - Composed omega config.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id.
  */
-function brandRepo(config) {
-  const owner = brandRepoOwner(config);
-  const name = brandRepoName(config);
-
-  return { owner, name, repo: owner && name ? `${owner}/${name}` : '' };
+function sourceRepo(config) {
+  return derivedRepo(config, 'omega');
 }
 
 /**
- * The releases keys the derivation reads: the desktop target's own `releases`
- * block, overlaid by the top-level one a desktop-resolved config carries (the
- * merge chain overlays `targets.desktop` onto the top level, so the overlay is
- * the resolved value). Both shapes are live: the site global reads a raw config,
- * where the block sits under the target, while every desktop verb reads the
- * resolved one.
+ * The brand's ONE public releases repo: `<brand.id>-releases` under the same
+ * org, ALWAYS public, because the desktop updater polls it with no token
+ * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620),
+ * [#799](https://github.com/Omega-JS-Stack/omega/issues/799)).
  *
- * @param {object} config - Composed omega config (raw or desktop-resolved).
- * @returns {object} Merged `{ enabled, owner, repo }` keys.
- */
-function releasesKeys(config) {
-  const target = config?.targets?.desktop;
-  const entry = target && typeof target === 'object' && !Array.isArray(target) ? target.releases : undefined;
-
-  return { ...(entry || {}), ...(config?.releases || {}) };
-}
-
-/**
- * The brand's ONE public releases repo: where the versioned `v<x.y.z>` releases
- * that feed electron-updater live, and where the website's versionless
- * `/releases/latest/download/<asset>` links point ([#620](https://github.com/Omega-JS-Stack/omega/issues/620),
- * [#799](https://github.com/Omega-JS-Stack/omega/issues/799)). One repo per
- * brand, named after it: `<brand.id>-releases` by default, under the brand
- * repo's own owner, so a brand that declares nothing still has an address.
+ * It is the release channel for EVERY target's built artifacts (desktop
+ * installers and the extension's zips alike, tagged per target) and the one
+ * home of that address: the site's download links, @omega.js/desktop's
+ * electron-builder publish block and its finalize-release upload all read it
+ * here, so the feed a shipped app polls can never disagree with the URL a
+ * download button carries.
  *
- * This is the ONE home of that rule. Every reader takes it from here (the site
- * global's download links, @omega.js/desktop's electron-builder publish block,
- * its release-repo provisioning, its finalize-release upload), so the feed a
- * shipped app polls and the URL a download button carries can never disagree.
- *
- * @param {object} config - Composed omega config (raw or desktop-resolved).
- * @returns {{ owner: string, name: string, repo: string }} `repo` is the slug, '' unless BOTH halves resolve (half an address addresses nothing).
+ * @param {object} config - Composed omega config.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id.
  */
 function releasesRepo(config) {
-  const releases = releasesKeys(config);
-  const owner = releases.owner || brandRepoOwner(config);
-  const name = releases.repo || (config?.brand?.id ? `${config.brand.id}-releases` : '');
-
-  return { owner, name, repo: owner && name ? `${owner}/${name}` : '' };
+  return derivedRepo(config, 'releases');
 }
 
-module.exports = { parseRepoSlug, brandRepoName, brandRepoOwner, brandRepo, releasesRepo };
+/**
+ * A declared target's entry, by name.
+ * @param {object} config - Composed omega config carrying `targets`.
+ * @param {string} name - The target name.
+ * @returns {object} The entry.
+ * @throws {Error} When the config declares no target of that name.
+ */
+function targetEntry(config, name) {
+  const targets = config && config.targets;
+  const entry = isPlainObject(targets) ? targets[name] : undefined;
+
+  if (!isPlainObject(entry)) {
+    const declared = isPlainObject(targets) ? Object.keys(targets) : [];
+    throw new Error(`No target "${name}" is declared: this brand declares [${declared.join(', ')}]`);
+  }
+
+  return entry;
+}
+
+/**
+ * Where a WEB target is served from: its own `hosting.provider`, else the
+ * default `github`.
+ * @param {object} config - Composed omega config carrying `targets`.
+ * @param {string} name - The target name.
+ * @returns {string} A HOSTING_PROVIDERS value.
+ * @throws {Error} When the config declares no target of that name.
+ */
+function hostingProvider(config, name) {
+  const entry = targetEntry(config, name);
+  const hosting = isPlainObject(entry.hosting) ? entry.hosting : {};
+
+  return hosting.provider || DEFAULT_HOSTING_PROVIDER;
+}
+
+/**
+ * A web target's own repo: `<brand.id>-<target name>` under the brand's org,
+ * holding the BUILT site only (one force-orphan commit on `gh-pages`, served
+ * by Pages at the target's url). The source monorepo stays private in a free
+ * org this way, which is what a shared `gh-pages` branch on it made impossible.
+ *
+ * Only the target's NAME distinguishes it, per the `<brand.id>-<role>` rule, so
+ * a second web target named `community` publishes to `<brand.id>-community`.
+ *
+ * @param {object} config - Composed omega config carrying `targets`.
+ * @param {string} name - The web target's name.
+ * @returns {{ owner: string, name: string, slug: string }|null} Null when the config names no org or no brand id, and null when another provider hosts this target (there is no GitHub repo to address then).
+ * @throws {Error} When the name is not declared, or names a target that is not web.
+ */
+function websiteRepo(config, name) {
+  const entry = targetEntry(config, name);
+
+  if (entry.type !== 'web') {
+    throw new Error(`targets.${name} is a ${entry.type} target: only a web target is served from its own website repo`);
+  }
+
+  if (hostingProvider(config, name) !== 'github') return null;
+
+  return derivedRepo(config, name);
+}
+
+/**
+ * The GitHub Pages custom domain a web target serves at: the bare host of its
+ * `targetUrl`. The ONE derivation of it, asked by the manage walk (which sets
+ * the domain on the repo) and by the web deploy (which writes the CNAME file
+ * the push publishes) alike, so the two can never claim different domains for
+ * one site.
+ *
+ * A `*.github.io` host is NOT a custom domain
+ * ([#366](https://github.com/Omega-JS-Stack/omega/issues/366)): a project
+ * site's url names its PAGES address, and reading that as a domain would have
+ * the deploy claim `<owner>.github.io` in a CNAME and mount the build at `/`,
+ * where every asset 404s.
+ *
+ * @param {object} config - Composed omega config carrying `brand` and `targets`.
+ * @param {string} name - The web target's name.
+ * @returns {string} The bare host, or '' when the target has no custom domain (or no url at all).
+ */
+function pagesHost(config, name) {
+  const targets = config && config.targets;
+  // A target the config does not declare has no derivable url of its own: a
+  // standalone project scaffolded before its first manage walk is the whole
+  // site, so the brand's own url is the answer rather than a `<name>.` host
+  // invented for a sibling that does not exist.
+  const url = isPlainObject(targets) && isPlainObject(targets[name])
+    ? targetUrl(config, name)
+    : (config && config.brand ? config.brand.url : '');
+
+  const host = brandHost(String(url || ''));
+
+  return DEFAULT_PAGES_HOST.test(host) ? '' : host;
+}
+
+/**
+ * The brand monorepo's visibility, from the ONE place that states it: the brand
+ * root's `package.json` `private` field. `true` or ABSENT is private (every
+ * monorepo is private by default, Ian 2026-09-11); only a literal `false` is a
+ * public brand. The manage walk reconciles the repo to this in both directions.
+ *
+ * @param {string} brandRoot - The brand root directory.
+ * @returns {string} 'private' | 'public'.
+ */
+function brandVisibility(brandRoot) {
+  let contents;
+
+  try {
+    contents = fs.readFileSync(path.join(brandRoot, 'package.json'), 'utf8');
+  } catch (e) {
+    // A brand with no manifest at all is private like any other: the default is
+    // the safe half of the question, and the walk never guesses public. Any
+    // OTHER read failure (a permission error, a directory in its place) is this
+    // machine being broken, and answering 'private' for it would hide the break
+    // behind a plausible answer.
+    if (e.code === 'ENOENT') return 'private';
+    throw e;
+  }
+
+  // A manifest that does not parse is a brand nobody can build: it fails here,
+  // loudly, rather than reporting a visibility read off a file nothing read.
+  const manifest = JSON.parse(contents);
+
+  return manifest && manifest.private === false ? 'public' : 'private';
+}
+
+module.exports = {
+  REPO_PROVIDERS,
+  HOSTING_PROVIDERS,
+  repoBlock,
+  sourceRepo,
+  releasesRepo,
+  websiteRepo,
+  hostingProvider,
+  pagesHost,
+  brandVisibility,
+};

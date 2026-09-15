@@ -13,6 +13,10 @@ function stageProject(opts = {}) {
     fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), opts.config);
   }
+  for (const [environment, contents] of Object.entries(opts.overlays || {})) {
+    fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'config', `omega.${environment}.json5`), contents);
+  }
   if (opts.manifest !== undefined) {
     fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'src', 'manifest.json'), opts.manifest);
@@ -21,6 +25,24 @@ function stageProject(opts = {}) {
     fs.writeFileSync(path.join(tmp, 'package.json'), opts.pkg);
   }
   return tmp;
+}
+
+// Runs `fn` with the env vars in `vars` set (undefined = deleted); the
+// originals come back after.
+function withEnv(vars, fn) {
+  const saved = Object.keys(vars).map((key) => [key, process.env[key]]);
+  try {
+    for (const [key, value] of Object.entries(vars)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    return fn();
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 // Runs `fn` with process.cwd() pinned to `dir`. Manager.getConfig() / getManifest()
@@ -52,7 +74,7 @@ module.exports = defineCases({
           brand: { id: 'somiibo', name: 'Somiibo' },
           theme: { id: 'classy' },
           liveReloadPort: 40000,
-          targets: { extension: { theme: { id: 'custom' } } },
+          targets: { extension: { type: 'extension', theme: { id: 'custom' } } },
         }` });
         try {
           inDir(tmp, (Manager) => {
@@ -85,7 +107,7 @@ module.exports = defineCases({
     {
       name: 'getConfig hard-fails on secret-shaped keys',
       run: (ctx) => {
-        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, analytics: { providers: { google: { id: '', secret: 'leak' } } }, targets: { extension: {} } }` });
+        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, analytics: { providers: { google: { id: '', secret: 'leak' } } }, targets: { extension: { type: 'extension' } } }` });
         try {
           inDir(tmp, (Manager) => {
             let threw = null;
@@ -107,7 +129,7 @@ module.exports = defineCases({
       // reading the broken config in silence.
       name: 'getConfig hard-fails on a retired key — every call, not once per process',
       run: (ctx) => {
-        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, payment: { processors: { stripe: {} } }, targets: { extension: {} } }` });
+        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, payment: { processors: { stripe: {} } }, targets: { extension: { type: 'extension' } } }` });
         try {
           inDir(tmp, (Manager) => {
             let first = null;
@@ -117,6 +139,48 @@ module.exports = defineCases({
             let second = null;
             try { Manager.getConfig(); } catch (e) { second = e; }
             ctx.expect(second ? second.message : '').toMatch(/payment\.processors is retired/);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      // #856: the environment overlay a BUILD composes is the one the lane
+      // names, not the one the machine answers. OMEGA_BUILD_MODE is the lane's
+      // own word for a production bake (`omega build` sets it for the whole
+      // gulp tree), and a dev boot is development
+      // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). Same rule,
+      // same shape, in @omega.js/desktop.
+      name: 'getConfig composes the PRODUCTION overlay in a build, the ambient one in a dev boot (#856)',
+      run: (ctx) => {
+        const tmp = stageProject({
+          config: `{ brand: { id: 'somiibo', name: 'Somiibo' }, theme: { id: 'base' }, targets: { extension: { type: 'extension' } } }`,
+          overlays: {
+            production: `{ theme: { id: 'production' } }`,
+            development: `{ theme: { id: 'development' } }`,
+          },
+        });
+        try {
+          // A fresh lane each time: OMEGA_ENVIRONMENT is the ONE input (#817) and
+          // src/build.js sets it at LOAD from the build-mode flag, so each
+          // sub-case re-enters inDir (which busts the module cache) inside its
+          // own env rather than reusing a Manager loaded under the other lane.
+          const freshLane = { OMEGA_ENVIRONMENT: undefined, OMEGA_TEST_MODE: undefined, ENVIRONMENT: undefined, FUNCTIONS_EMULATOR: undefined, TERM_PROGRAM: undefined };
+
+          withEnv({ ...freshLane, OMEGA_BUILD_MODE: 'true' }, () => {
+            inDir(tmp, (Manager) => {
+              ctx.expect(Manager.getConfig().theme.id).toBe('production');
+              ctx.expect(Manager.getEnvironment()).toBe('production');
+            });
+          });
+          // A dev boot names nothing and resolves development, rather than the
+          // machine-sniffed answer the old copy gave (#817).
+          withEnv({ ...freshLane, OMEGA_BUILD_MODE: undefined }, () => {
+            inDir(tmp, (Manager) => {
+              ctx.expect(Manager.getConfig().theme.id).toBe('development');
+              ctx.expect(Manager.getEnvironment()).toBe('development');
+            });
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -176,52 +240,43 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getEnvironment returns "testing" when OMEGA_TEST_MODE === "true" (takes precedence)',
+      // The environment reads ONE input, `OMEGA_ENVIRONMENT`
+      // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and
+      // src/build.js sets it at LOAD from the lane: OMEGA_BUILD_MODE means a
+      // production bake, an inherited variable is kept, and a bare dev boot is
+      // development. The manifest / NODE_ENV / OMEGA_TEST_MODE sniffs are gone.
+      name: 'getEnvironment answers the one input the lane set',
       run: (ctx) => {
-        const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const origTest = process.env.OMEGA_TEST_MODE;
-        const origBuild = process.env.OMEGA_BUILD_MODE;
-        process.env.OMEGA_TEST_MODE = 'true';
-        process.env.OMEGA_BUILD_MODE = 'true'; // even with build mode set, testing wins
-        try {
-          ctx.expect(Manager.getEnvironment()).toBe('testing');
-        } finally {
-          if (origTest === undefined) delete process.env.OMEGA_TEST_MODE; else process.env.OMEGA_TEST_MODE = origTest;
-          if (origBuild === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = origBuild;
-        }
+        const buildPath = path.join(__dirname, '..', '..', '..', 'build.js');
+        const lane = (vars) => withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_BUILD_MODE: undefined, OMEGA_TEST_MODE: undefined, NODE_ENV: undefined, ...vars }, () => {
+          for (const key of Object.keys(require.cache)) {
+            if (key.includes('/build.js')) delete require.cache[key];
+          }
+          return require(buildPath).getEnvironment();
+        });
+
+        ctx.expect(lane({ OMEGA_BUILD_MODE: 'true' })).toBe('production');
+        ctx.expect(lane({})).toBe('development');
+        ctx.expect(lane({ OMEGA_ENVIRONMENT: 'testing' })).toBe('testing');
+        // A production build spawned from a test run still bakes production.
+        ctx.expect(lane({ OMEGA_ENVIRONMENT: 'testing', OMEGA_BUILD_MODE: 'true' })).toBe('production');
       },
     },
     {
-      name: 'getEnvironment returns "development" when OMEGA_BUILD_MODE !== "true" (and not testing)',
+      name: 'the three checks derive from it, and a missing input is a loud error',
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const original = process.env.OMEGA_BUILD_MODE;
-        const origTest = process.env.OMEGA_TEST_MODE;
-        delete process.env.OMEGA_BUILD_MODE;
-        delete process.env.OMEGA_TEST_MODE;
-        try {
-          ctx.expect(Manager.getEnvironment()).toBe('development');
-        } finally {
-          if (original !== undefined) process.env.OMEGA_BUILD_MODE = original;
-          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
+        for (const name of ['development', 'testing', 'production']) {
+          withEnv({ OMEGA_ENVIRONMENT: name }, () => {
+            ctx.expect(Manager.getEnvironment()).toBe(name);
+            ctx.expect(Manager.isDevelopment()).toBe(name === 'development');
+            ctx.expect(Manager.isTesting()).toBe(name === 'testing');
+            ctx.expect(Manager.isProduction()).toBe(name === 'production');
+          });
         }
-      },
-    },
-    {
-      name: 'getEnvironment returns "production" when OMEGA_BUILD_MODE === "true" (and not testing)',
-      run: (ctx) => {
-        const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const original = process.env.OMEGA_BUILD_MODE;
-        const origTest = process.env.OMEGA_TEST_MODE;
-        delete process.env.OMEGA_TEST_MODE;
-        process.env.OMEGA_BUILD_MODE = 'true';
-        try {
-          ctx.expect(Manager.getEnvironment()).toBe('production');
-        } finally {
-          if (original === undefined) delete process.env.OMEGA_BUILD_MODE;
-          else                        process.env.OMEGA_BUILD_MODE = original;
-          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
-        }
+        withEnv({ OMEGA_ENVIRONMENT: undefined }, () => {
+          ctx.expect(() => Manager.getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
+        });
       },
     },
     {

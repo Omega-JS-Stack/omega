@@ -46,11 +46,14 @@ function findFontFile(name, brandRoot) {
 }
 
 /**
- * Load and parse a font.
+ * Load and parse a font. The resolved PATH rides along with the parsed
+ * font: the generator names the file it read when a glyph outline comes
+ * out unusable (#916), and a font name alone never says which of the
+ * search dirs won.
  *
  * @param {string} name - Font filename without extension
  * @param {string} brandRoot - Brand repo root
- * @returns {Object|null} opentype.js Font, or null when no file was found
+ * @returns {Object|null} `{ font, fontPath }`, or null when no file was found
  */
 function loadFont(name, brandRoot) {
   const fontPath = findFontFile(name, brandRoot);
@@ -61,7 +64,7 @@ function loadFont(name, brandRoot) {
   const buffer = jetpack.read(fontPath, 'buffer');
   // opentype.parse expects an ArrayBuffer
   const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-  return opentype.parse(arrayBuffer);
+  return { font: opentype.parse(arrayBuffer), fontPath };
 }
 
 module.exports = { loadFont, findFontFile };

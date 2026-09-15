@@ -25,7 +25,7 @@ module.exports = ({ manager, tray }) => {
 
   // ───────── Examples (uncomment to use) ─────────
   //
-  // // Override the icon path (otherwise auto-resolved from config/icons/macos/tray.png).
+  // // Override the icon path (otherwise auto-resolved from config/icons/mac/tray.png).
   // // On macOS, the filename MUST end in `Template.png` for OS dark-mode auto-inversion.
   // tray.icon('src/assets/icons/my-trayTemplate.png');
   //

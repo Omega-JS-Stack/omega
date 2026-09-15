@@ -1,0 +1,278 @@
+/**
+ * Brand accent ramp — derives the accent token family from ONE brand color
+ * (C3/D6: `brand.color` drives the accent everywhere via CSS custom
+ * properties; the static token sheet's neutral placeholder stands when the
+ * brand has no usable color).
+ *
+ * Pure math, dependency-free: hex → RGB → HSL round-trips plus WCAG
+ * relative luminance for the on-accent ink pick. Every output value is
+ * regenerated from parsed numbers, so nothing from config reaches the
+ * emitted <style> block verbatim.
+ *
+ * ONE home for three surfaces ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)):
+ * @omega.js/web inlines the ramp into <head> after its bundles, and
+ * @omega.js/desktop and @omega.js/extension write `renderBrandScss()` below to
+ * a generated `_brand.scss` their sass tasks compile. Same hex in, same ramp
+ * out, on every target.
+ */
+
+const INK_DARK = '#111213';
+const INK_LIGHT = '#ffffff';
+
+// WCAG contrast-vs-white beats contrast-vs-black below this luminance
+const INK_LUMINANCE_THRESHOLD = 0.1791;
+
+// Accents darker than this lightness brighten on hover instead of darkening
+const HOVER_LIGHTEN_THRESHOLD = 0.25;
+
+// Dark-mode variant: accents at/above this lightness are already legible on
+// charcoal and pass through; darker ones lift into the floor..ceil band.
+const DARK_KEEP_THRESHOLD = 0.66;
+const DARK_LIGHTNESS_FLOOR = 0.55;
+const DARK_LIGHTNESS_CEIL = 0.78;
+
+/**
+ * Parse a 3- or 6-digit hex color.
+ * @param {*} value - candidate color
+ * @returns {{ r: number, g: number, b: number }|null} channels 0-255, or null
+ */
+function parseHex(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const match = value.trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) {
+    return null;
+  }
+
+  let hex = match[1].toLowerCase();
+  if (hex.length === 3) {
+    hex = hex.split('').map((c) => c + c).join('');
+  }
+
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+/**
+ * WCAG 2.x relative luminance.
+ * @param {{ r: number, g: number, b: number }} rgb - channels 0-255
+ * @returns {number} 0 (black) to 1 (white)
+ */
+function relativeLuminance({ r, g, b }) {
+  const linearize = (channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : (((c + 0.055) / 1.055) ** 2.4);
+  };
+  return (0.2126 * linearize(r)) + (0.7152 * linearize(g)) + (0.0722 * linearize(b));
+}
+
+/**
+ * RGB (0-255) → HSL (h 0-360, s/l 0-1).
+ */
+function rgbToHsl({ r, g, b }) {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l };
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === rn) {
+    h = ((gn - bn) / d) + (gn < bn ? 6 : 0);
+  } else if (max === gn) {
+    h = ((bn - rn) / d) + 2;
+  } else {
+    h = ((rn - gn) / d) + 4;
+  }
+
+  return { h: h * 60, s, l };
+}
+
+/**
+ * HSL (h 0-360, s/l 0-1) → RGB (0-255).
+ */
+function hslToRgb({ h, s, l }) {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return { r: v, g: v, b: v };
+  }
+
+  const hueToChannel = (p, q, t) => {
+    let tn = t;
+    if (tn < 0) tn += 1;
+    if (tn > 1) tn -= 1;
+    if (tn < 1 / 6) return p + ((q - p) * 6 * tn);
+    if (tn < 1 / 2) return q;
+    if (tn < 2 / 3) return p + ((q - p) * ((2 / 3) - tn) * 6);
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - (l * s);
+  const p = (2 * l) - q;
+  const hn = h / 360;
+
+  return {
+    r: Math.round(hueToChannel(p, q, hn + (1 / 3)) * 255),
+    g: Math.round(hueToChannel(p, q, hn) * 255),
+    b: Math.round(hueToChannel(p, q, hn - (1 / 3)) * 255),
+  };
+}
+
+/**
+ * RGB → #rrggbb.
+ */
+function toHex({ r, g, b }) {
+  const pair = (v) => v.toString(16).padStart(2, '0');
+  return `#${pair(r)}${pair(g)}${pair(b)}`;
+}
+
+/**
+ * Shift an accent's lightness for hover/active states — darker accents
+ * brighten, everything else deepens, clamped to [0, 1].
+ * @param {{ h: number, s: number, l: number }} hsl - base accent
+ * @param {number} amount - lightness delta (positive magnitude)
+ * @returns {string} #rrggbb
+ */
+function shiftLightness(hsl, amount) {
+  const direction = hsl.l < HOVER_LIGHTEN_THRESHOLD ? 1 : -1;
+  const l = Math.min(1, Math.max(0, hsl.l + (direction * amount)));
+  return toHex(hslToRgb({ ...hsl, l }));
+}
+
+/**
+ * Compose one accent ramp from resolved channels.
+ * @param {{ r: number, g: number, b: number }} rgb - accent channels
+ * @param {{ h: number, s: number, l: number }} hsl - same accent in HSL
+ * @param {number} subtleAlpha - alpha for the subtle wash (mode-specific)
+ * @returns {object} { accent, accentHover, accentActive, accentSubtle, accentInk, accentRing }
+ */
+function composeRamp(rgb, hsl, subtleAlpha) {
+  const luminance = relativeLuminance(rgb);
+
+  return {
+    accent: toHex(rgb),
+    accentHover: shiftLightness(hsl, 0.07),
+    accentActive: shiftLightness(hsl, 0.11),
+    accentSubtle: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${subtleAlpha})`,
+    accentInk: luminance > INK_LUMINANCE_THRESHOLD ? INK_DARK : INK_LIGHT,
+    accentRing: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`,
+  };
+}
+
+/**
+ * Compose the accent token families from a brand color: the light ramp plus
+ * a dark-mode variant (darker brand colors lift so they stay legible on the
+ * charcoal ground — the classy v2 per-mode accent).
+ * @param {string} color - brand color (#rgb or #rrggbb)
+ * @returns {object|null} ramps for the head emitter, or null when unusable:
+ *   { accent, accentHover, accentActive, accentSubtle, accentInk, accentRing,
+ *     dark: { …same shape… } }
+ */
+function composeBrandTokens(color) {
+  const rgb = parseHex(color);
+  if (!rgb) {
+    return null;
+  }
+
+  const hsl = rgbToHsl(rgb);
+  const darkHsl = hsl.l >= DARK_KEEP_THRESHOLD
+    ? hsl
+    : { ...hsl, l: Math.min(Math.max(hsl.l + 0.1, DARK_LIGHTNESS_FLOOR), DARK_LIGHTNESS_CEIL) };
+  const darkRgb = hslToRgb(darkHsl);
+
+  return {
+    ...composeRamp(rgb, hsl, 0.12),
+    dark: composeRamp(darkRgb, darkHsl, 0.16),
+  };
+}
+
+/**
+ * The ONE accent default. `brand.color` unset (or unusable) lands here, and the
+ * classy theme's `$primary: … !default` carries the same hex purely as the Sass
+ * mechanism that lets this partial win: the VALUE is decided here.
+ */
+const DEFAULT_BRAND_COLOR = '#2563EB';
+
+/** The six properties, in the order head.html emits them on web. */
+const RAMP_PROPERTIES = [
+  ['--omega-accent', 'accent'],
+  ['--omega-accent-hover', 'accentHover'],
+  ['--omega-accent-active', 'accentActive'],
+  ['--omega-accent-subtle', 'accentSubtle'],
+  ['--omega-accent-ink', 'accentInk'],
+  ['--omega-accent-ring', 'accentRing'],
+];
+
+/**
+ * One `selector { … }` block of the ramp, indented for the mixin body.
+ * @param {string} selector - the rule's selector
+ * @param {object} ramp - one ramp (the light half, or `.dark`)
+ * @param {number} depth - indent depth in 2-space steps
+ * @returns {string} the rule text
+ */
+function renderRampBlock(selector, ramp, depth) {
+  const pad = '  '.repeat(depth);
+  const declarations = RAMP_PROPERTIES.map(([property, key]) => `${pad}  ${property}: ${ramp[key]};`);
+
+  return [`${pad}${selector} {`, ...declarations, `${pad}}`].join('\n');
+}
+
+/**
+ * Render the generated `_brand.scss` a target's sass task writes beside its
+ * compile: `$primary` for the compile-time accent Bootstrap derives from, plus
+ * a `ramp` mixin carrying the runtime `--omega-accent` family under the SAME
+ * three stamps the token sheet uses (bare `:root`, the OS preference, the
+ * explicit `data-bs-theme` stamp both ways).
+ *
+ * The css rides a MIXIN rather than the file root on purpose: a used module's
+ * css is emitted at its LOAD position, which is ahead of the framework module's
+ * token sheet and theme, so a root-level rule here would lose the cascade to
+ * the very placeholders it replaces. The consumer's `@include brand.ramp;` puts
+ * it after both.
+ *
+ * @param {object|null} tokens - composeBrandTokens() output, or null for the default
+ * @returns {string} the partial's full text
+ */
+function renderBrandScss(tokens) {
+  const ramp = tokens || composeBrandTokens(DEFAULT_BRAND_COLOR);
+
+  return `// AUTO-GENERATED by the sass task from \`brand.color\` in omega.json5.
+// Every build rewrites it: edit the config, not this file.
+//
+// \`$primary\` is the compile-time accent (Bootstrap's color ramp compiles from
+// it) and \`ramp\` is the runtime --omega-accent family, the same light and dark
+// ramps @omega.js/web inlines into <head>. Include the mixin AFTER the
+// framework module so the ramp wins the cascade over the token sheet's
+// placeholders.
+
+$primary: ${ramp.accent};
+
+@mixin ramp {
+${renderRampBlock(':root', ramp, 1)}
+
+  // The OS preference carries when no explicit choice is stamped...
+  @media (prefers-color-scheme: dark) {
+${renderRampBlock(':root', ramp.dark, 2)}
+  }
+
+  // ...and the appearance stamp beats the OS in BOTH directions.
+${renderRampBlock(":root[data-bs-theme='dark']", ramp.dark, 1)}
+
+${renderRampBlock(":root[data-bs-theme='light']", ramp, 1)}
+}
+`;
+}
+
+module.exports = { composeBrandTokens, parseHex, relativeLuminance, renderBrandScss, DEFAULT_BRAND_COLOR };

@@ -16,10 +16,11 @@ const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 const { slugify } = require('@omega.js/template-kit/jekyll-compat');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
-const { resolveWinbackOffer } = require('@omega.js/config/winback');
+const { clientConfig } = require('@omega.js/config');
 const Logger = require('@omega.js/devkit/logger');
 const reads = require('@omega.js/devkit/reads');
 const { KEYLESS_STAMP } = require('@omega.js/devkit/license');
+const buildJsonKit = require('@omega.js/devkit/build-json');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { applyMarkdownImages } = require('./markdown-images.js');
@@ -37,10 +38,10 @@ const { resolvePageAsset } = require('./assets.js');
 const { resolvePathPrefix, prefixHtml } = require('./path-prefix.js');
 const { SAMPLE_SETS, resolveAnchor, generateSampleSet } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
-const { composeBrandTokens } = require('./brand-tokens.js');
+const { composeBrandTokens } = require('@omega.js/devkit/brand-tokens');
 const { resolveFontAwesomeRoots, createIconLoader } = require('@omega.js/devkit/icons');
 const { inlineIcons } = require('./inline-icons.js');
-const { getEnvironment } = require('./mode-helpers.js');
+const { getEnvironment, setEnvironment } = require('@omega.js/config/environment');
 const { ogLocale } = require('@omega.js/devkit/translate');
 const { PATHS } = require('./paths.js');
 const {
@@ -86,12 +87,25 @@ const RESOLVED_SITE_EXCLUDE = new Set(['data', 'omega', 'time']);
 // layout's target — docs/web/index.md) is layout MACHINERY a page configures
 // the same way: shipped contracts that worked only from defaults/ and
 // _layouts/ until #247 — a consumer page lost them silently.
+// `catalog` is the page's entry in `pages.json`, the catalog the site's own
+// search box reads (#858, Ian 2026-09-13): `catalog.include: false` keeps a
+// page out of it and `catalog.category` names its section. It is page-only:
+// omega.json5 has no catalog section, so there is no site-wide default and
+// `search` in config means Search Console and nothing else.
+// `translation` is the one name here that IS a config section, deliberately
+// (#858, the 2026-09-09 same-name ruling): `translation.include: true`/`false`
+// is a page's own override of the site's include LIST, spelled exactly as the
+// site spells it one level up. Only that key: anything else under it is a
+// config section restated bare, and the guard below says so.
 // `sitemap` is NOT here: #564 folded `sitemap.include` into `meta.index`, so
 // there is no longer a way to be indexable and out of the sitemap.
 const PAGE_FRONTMATTER_ALLOW = new Set([
   'config', 'meta',
-  'schema', 'redirect', 'templateEngineOverride', 'eleventyExcludeFromCollections',
+  'schema', 'redirect', 'catalog', 'translation', 'templateEngineOverride', 'eleventyExcludeFromCollections',
 ]);
+
+// The ONE key a page may write under the bare `translation:` above.
+const PAGE_TRANSLATION_KEYS = new Set(['include']);
 
 // Deep merge shared with the section tag's defaults ← data ← args chain —
 // one semantics for both override lanes (see src/merge.js).
@@ -143,10 +157,12 @@ function deadConfigValueRead(node, trail = []) {
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {object} [options.assetManifest] - js/css manifest from the asset build
- * @param {string} [options.version] - the website target's own package version (site.omega.version → the Configuration block)
+ * @param {string} [options.version] - the website target's own package version (site.omega.version → the OMEGA_BUILD_JSON bake)
+ * @param {string} [options.packageName] - the website target's own package name (the bake's `package` block)
  * @param {string} [options.pathPrefix] - the base path the built site is served under (#355) — default the domain root
  * @param {string} [options.sampleAnchor] - YYYY-MM-DD rolling-date anchor for sample content (default: OMEGA_SAMPLE_ANCHOR env, then today)
  * @param {object} [options.license] - the deploy-time license stamp (#320) → site.license (default: the keyless stamp)
+ * @param {object|function} [options.dev] - the local stack's live dev map (`omega dev` only): its presence is what makes this run a dev run rather than a build
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function configureOmega(eleventyConfig, options) {
@@ -178,11 +194,11 @@ function configureOmega(eleventyConfig, options) {
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function buildConfig(eleventyConfig, options) {
-  // The environment (#717): read ONCE, from the one surface every OMEGA
-  // framework answers with. `options.environment` is still the deliberate
-  // override the verbs thread (`omega build` → production) — it just arrives
-  // through getEnvironment() now instead of being compared as a loose string.
-  const environment = getEnvironment.call(options);
+  // The environment (#717, one module since #817): read ONCE, from the one
+  // module every OMEGA target answers with. A caller that threads the verb's
+  // own word (`omega build` names production) sets the process input with it;
+  // inside a build, buildSite already did, and this reads the same answer.
+  const environment = options.environment ? setEnvironment(options.environment) : getEnvironment();
   const themesDir = options.themesDir || PATHS.themes;
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
@@ -199,8 +215,18 @@ function buildConfig(eleventyConfig, options) {
   // the one thing toSiteGlobal derives that IS a build fact, so it moves
   // across; src/config-sections.js names both sets.
   const config = toSiteGlobal(options.siteData);
-  const site = { targets: config.targets };
+  const site = {
+    targets: config.targets,
+    // WHICH target this build IS (#887), beside the MAP of every target the
+    // brand declares: a brand can run several websites, so the page that has
+    // to name its own site (the admin post editor, through the
+    // OMEGA_BUILD_JSON bake) reads this. The name is the loader's resolved one (loadSiteData);
+    // a caller that resolved none states that as null rather than guessing
+    // `web`, and the backend's one-web-target default then applies.
+    target: { name: (config.target && config.target.name) || null, type: 'web' },
+  };
   delete config.targets;
+  delete config.target;
 
   // The config-VALUE half of the #611 read guard (#671), before anything reads
   // one: a dead read here is ONE key in omega.json5 and it silently drains the
@@ -231,37 +257,12 @@ function buildConfig(eleventyConfig, options) {
   const dynamicCollections = readCollections(config.collections);
   const allCollections = [...BUILT_IN_COLLECTIONS, ...dynamicCollections];
 
-  // ---- Runtime composition: omega.json5 keeps ONE home per shared section
-  // (cloud, payment at the top level); the chrome + @omega.js/client contract
-  // reads them through resolved.config.client — the client settings blob (#1:
-  // renamed from the legacy `web_manager`; WebManager is not an OMEGA concept).
-  // Pricing loops over config.client.payment.products and the Configuration
-  // spread feeds the client. Compose here — same bridge pattern as extension's
-  // package.js mapping analytics.providers → the client's flat shape.
-  config.client = config.client || {};
-  if (config.cloud && config.cloud.config) {
-    config.client.firebase = config.client.firebase || {};
-    config.client.firebase.app = config.client.firebase.app || {};
-    config.client.firebase.app.config = config.cloud.config;
-  }
-  if (config.cloud && config.cloud.messaging && config.cloud.messaging.vapidKey) {
-    config.client.firebase = config.client.firebase || {};
-    config.client.firebase.messaging = config.client.firebase.messaging || {};
-    config.client.firebase.messaging.config = config.client.firebase.messaging.config || {};
-    config.client.firebase.messaging.config.vapidKey = config.cloud.messaging.vapidKey;
-  }
-  // The cancel-flow save offer (#268) is RESOLVED here, not in the browser: the
-  // framework default (50% off the next cycle) has ONE home in @omega.js/config,
-  // and the backend's apply route resolves the same section through the same
-  // function — so the dialog the customer reads and the coupon the provider
-  // creates can never name different numbers. The spread leaves config.payment
-  // itself alone; templates and the pricing composer read the brand's section.
-  if (config.payment) config.client.payment = { ...config.payment, winback: resolveWinbackOffer(config.payment) };
-
-  // The FEATURES CATALOG rides the same bridge (#647): the account page's usage
-  // bars and plan bullets read names, icons and definitions from it, and a
-  // feature is DEFINED in exactly one place for the server and the browser both.
-  if (config.features) config.client.features = config.features;
+  // ---- No runtime composition ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)):
+  // the page bakes the browser subset of the resolved config whole
+  // (OMEGA_BUILD_JSON below) and @omega.js/client maps the canonical homes onto
+  // its own contract. The four bridges that lived here (cloud → client.firebase,
+  // the vapid key, payment, features) were each a second home for a value the
+  // browser already had.
 
   // Pricing view-model (C2): payment.products is the ONLY plan source — the
   // seed surfaces as resolved.pricing (cascade still lets consumer frontmatter
@@ -745,7 +746,7 @@ function buildConfig(eleventyConfig, options) {
           + `${strays.length > 1 ? 'keys' : 'a key'} ${strays.map((key) => `\`${key}\``).join(', ')} that omega.json5 has no `
           + `${strays.length > 1 ? 'sections' : 'section'} for, so nothing reads `
           + `${strays.length > 1 ? 'them' : 'it'}. \`config:\` holds omega.json5 sections ONLY `
-          + `(${[...CONFIG_SECTIONS].join(', ')}); page machinery (meta, schema, redirect) stays bare, and page `
+          + `(${[...CONFIG_SECTIONS].join(', ')}); page machinery (meta, schema, redirect, catalog, translation.include) stays bare, and page `
           + 'CONTENT lives in {% section %} calls in the page body (docs/web/frontmatter.md).',
         );
       }
@@ -780,12 +781,43 @@ function buildConfig(eleventyConfig, options) {
         );
       }
 
+      // `translation` is a config SECTION name opened to bare page frontmatter
+      // for exactly ONE key (#858): the page's own `include` switch. Anything
+      // else under it is the bare restate the check above refuses for every
+      // other section, and it would reach nothing.
+      const pageTranslation = own && own.translation;
+      const isTranslationBlock = pageTranslation && typeof pageTranslation === 'object' && !Array.isArray(pageTranslation);
+
+      // A SCALAR `translation:` (`translation: false`) is the same mistake one
+      // shape up: it looks like the page's own answer and reaches nothing, so
+      // it is refused by name rather than stamping silently.
+      if (pageTranslation !== undefined && !isTranslationBlock) {
+        throw new Error(
+          `[@omega.js/web:engine] ${inputPath}: bare \`translation:\` in page frontmatter is `
+          + `${JSON.stringify(pageTranslation)}, and the page-level shape is \`translation: { include: true|false }\` `
+          + "(this page's own answer to the site's `translation.include` list); the rest of the section is "
+          + 'omega.json5 config, overridden under a `config:` parent (docs/web/frontmatter.md).',
+        );
+      }
+
+      const strayTranslation = isTranslationBlock
+        ? Object.keys(pageTranslation).filter((key) => !PAGE_TRANSLATION_KEYS.has(key))
+        : [];
+      if (strayTranslation.length) {
+        throw new Error(
+          `[@omega.js/web:engine] ${inputPath}: bare \`translation:\` in page frontmatter carries `
+          + `${strayTranslation.map((key) => `\`${key}\``).join(', ')}. The only page-level translation key is `
+          + '`include` (true/false, this page\'s own answer to the site\'s `translation.include` list); the rest of '
+          + 'the section is omega.json5 config, overridden under a `config:` parent (docs/web/frontmatter.md).',
+        );
+      }
+
       const contentKeys = ownKeys.filter((key) => !isConfigSection(key));
       if (contentKeys.length) {
         for (const key of contentKeys) delete data[key];
         logger.warn(
           `${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
-          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, config); `
+          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, config, catalog, translation); `
           + `content lives in {% section %} calls in the page body (docs/web/sections.md).`,
         );
       }
@@ -1159,7 +1191,7 @@ function buildConfig(eleventyConfig, options) {
   // every post. `site.omega.date.iso` is the same instant by construction.
   site.time = buildTime.toISOString();
   // site.omega carries UJM-runtime site values the core includes read
-  // (cache_breaker in the @omega.js/client Configuration, date.year in the
+  // (cache_breaker in the @omega.js/client bake, date.year in the
   // copyright meta, date.iso as the sitemap/feed build stamp,
   // placeholder.src in lazy-loaded imgs).
   site.omega = {
@@ -1169,7 +1201,7 @@ function buildConfig(eleventyConfig, options) {
     cache_breaker: CACHE_TIMESTAMP,
     // The WEBSITE TARGET's own package version, read by the caller off the target
     // root's package.json (the engine only ever sees the src dir). It rides the
-    // Configuration block as `version`, which is the release tag every error
+    // OMEGA_BUILD_JSON bake as `version`, which is the release tag every error
     // report carries — `brand.id@version` (#380). null (a caller that hands
     // none) leaves @omega.js/client on its build-stamp fallback.
     version: options.version || null,
@@ -1199,21 +1231,78 @@ function buildConfig(eleventyConfig, options) {
   // code → locale map is the devkit language SSOT — the head include cannot
   // derive it in Liquid, so it arrives as a computed global.
   eleventyConfig.addGlobalData('ogLocale', ogLocale(config.translation?.default || 'en'));
-  // `dev` rides the jekyll global into the Configuration chrome (N7): `omega
-  // dev` passes { ports } with the resolved map; production builds pass
-  // nothing → null, and @omega.js/client falls back to the classic ports.
+  // `jekyll.environment` is the build's verdict for templates (the root layout's
+  // `data-environment`, the draft filters). The local stack's `dev` map is NOT
+  // here any more (#743): it rides the one build snapshot below, which is the
+  // only thing a browser reads it from.
+  eleventyConfig.addGlobalData('jekyll', { environment });
+  // OMEGA_BUILD_JSON: the ONE build snapshot every OMEGA browser surface reads
+  // ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)) and the ONLY
+  // thing the page hands @omega.js/client, delivered the ONE way every surface
+  // delivers it ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)): a
+  // `build.js` at the site root, which head.html loads with its first script tag
+  // and the service worker with `importScripts`. @omega.js/devkit composes the
+  // wrapper and writes the file; what goes INSIDE `config` is @omega.js/config's
+  // call (clientConfig, off the schema's own `client` flag), never a subset this
+  // engine wires together.
   //
-  // A FUNCTION `dev` is a LIVE map, re-read on every render — the sibling
-  // backend's ports file is pid-stamped and deleted on shutdown, so the map a
-  // boot-time read produced is wrong the moment the emulator boots late or
-  // restarts on bumped numbers, and the browser has no other channel
-  // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). Global data
-  // registered as a function is evaluated per build, so every re-render bakes
-  // what is running RIGHT NOW.
-  eleventyConfig.addGlobalData('jekyll', () => ({
-    environment,
-    dev: (typeof options.dev === 'function' ? options.dev() : options.dev) || null,
-  }));
+  // Composed ONCE per build, on the way IN: the dev map is read at that moment
+  // (a LIVE read, #300) and `omega dev` rewrites that one line per response
+  // (#346), so a site built before the emulator came up still serves the map of
+  // the stack running right now.
+  const composeSiteBuildJson = () => buildJsonKit.composeBuildJson({
+    config,
+    pkg: { name: options.packageName || null, version: options.version || null },
+    // The same three keys every surface records: a dev/watch run is not a build,
+    // and web publishes through the deploy lane rather than the build (#894).
+    mode: { environment, build: !options.dev, publish: false },
+    license: site.license,
+    facts: {
+      runtime: 'web',
+      environment,
+      // The website target's own package version: the release tag every error
+      // report carries as `<brand.id>@<version>` (#380)
+      version: options.version || null,
+      // A NUMBER, like every other surface bakes it: @omega.js/client derives
+      // buildTimeISO from it, and a string date is an Invalid Date.
+      buildTime: Number(CACHE_TIMESTAMP) || 0,
+      // WHICH target this site IS (#887): the CMS routes the admin pages call
+      // take it, because one backend serves every website the brand runs
+      target: site.target.name,
+      dev: (typeof options.dev === 'function' ? options.dev() : options.dev) || null,
+    },
+  });
+  // Written on the way IN, to the run's REAL output dir: `directories.output`
+  // is what the Eleventy instance was constructed with (the `dir` the event
+  // carries is the config's own default, `_site`, which no OMEGA lane uses).
+  eleventyConfig.on('eleventy.before', () => {
+    buildJsonKit.writeBuildJs(path.resolve(eleventyConfig.directories.output), composeSiteBuildJson());
+  });
+
+  // A page's own `config:` block is part of the answer too (#607):
+  // `resolved.config` is the merged view for THIS page, so a page (or a layout
+  // in its chain) that switches the chat widget off has to reach the widget's
+  // RUNTIME read. The file is the whole site's, so a page whose merged view
+  // DIFFERS emits one line after the loader tag with exactly the sections that
+  // differ, through the same subset gate. A page that changes nothing emits
+  // nothing, which is most of them.
+  let siteClient = null;
+  eleventyConfig.addFilter('omega_page_config', (pageConfig, pageBlock) => {
+    const sections = Object.keys(pageBlock || {});
+    if (!sections.length) return null;
+
+    siteClient = siteClient || clientConfig(config);
+    const merged = clientConfig(pageConfig || config);
+    const delta = {};
+    for (const section of sections) {
+      if (!(section in merged)) continue;
+      if (JSON.stringify(merged[section]) === JSON.stringify(siteClient[section])) continue;
+      delta[section] = merged[section];
+    }
+
+    return Object.keys(delta).length ? delta : null;
+  });
+
   // The manifest is a FUNCTION for the same reason (#765): an object handed to
   // addGlobalData is snapshotted into the data cascade at registration, so a
   // dev rebuild that folds a new font-preload list into the live manifest was

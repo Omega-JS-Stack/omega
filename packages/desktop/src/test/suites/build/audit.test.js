@@ -31,7 +31,7 @@ function stageConsumer(overrides = {}, desktopOverrides = {}) {
     brand: { id: 'testapp', name: 'TestApp', images: { icon: '' } },
     app:   { appId: 'com.test.app', productName: 'TestApp' },
   };
-  const merged = { ...baseConfig, ...overrides, targets: { desktop: desktopOverrides } };
+  const merged = { ...baseConfig, ...overrides, targets: { desktop: { type: 'desktop', ...desktopOverrides } } };
   jetpack.write(path.join(tmp, 'config', 'omega.json5'), JSON.stringify(merged));
 
   return tmp;
@@ -42,7 +42,12 @@ function runAudit(cwd, env = {}) {
     const origCwd = process.cwd();
     // Force build/publish env off — minimal scaffolds don't include icons/cert files.
     // Tests that want to exercise publish-mode checks pass env explicitly.
-    const baseEnv = { OMEGA_BUILD_MODE: '', OMEGA_IS_PUBLISH: '', OMEGA_IS_SERVER: '' };
+    // OMEGA_ENVIRONMENT is NAMED here, not blanked: it is the ONE environment
+    // input ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), every
+    // lane sets it, and an audit run is a dev-lane read. Naming it also keeps
+    // the value from leaking between cases, because src/build.js writes it at
+    // load from whichever lane flags were set when it was required.
+    const baseEnv = { OMEGA_ENVIRONMENT: 'development', OMEGA_BUILD_MODE: '', OMEGA_IS_PUBLISH: '', OMEGA_IS_SERVER: '' };
     const allEnv  = { ...baseEnv, ...env };
     const origEnv = {};
     for (const k of Object.keys(allEnv)) {
@@ -64,6 +69,22 @@ function runAudit(cwd, env = {}) {
   });
 }
 
+// The audit REPORTS through the logger, so a case that reads the report reads
+// the console the logger writes to (warnings on `warn`, the ok line on `log`).
+async function runAuditCapturing(cwd, env = {}) {
+  const lines = [];
+  const original = { log: console.log, warn: console.warn };
+  console.log = (...args) => lines.push(args.join(' '));
+  console.warn = (...args) => lines.push(args.join(' '));
+
+  try {
+    const err = await runAudit(cwd, env);
+    return { err, output: lines.join('\n') };
+  } finally {
+    Object.assign(console, original);
+  }
+}
+
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
@@ -76,6 +97,24 @@ module.exports = defineCases({
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeNull();
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      // #911: the task took only `errors` off validateConfig, so a consumer
+      // read `audit ok (0 warnings)` while the validator's list named real
+      // findings (a key the schema does not declare, which is what a typo
+      // looks like). The report is both lists now.
+      name: 'prints the validator\'s warnings and counts them (#911)',
+      run: async (ctx) => {
+        const tmp = stageConsumer({ brand: { id: 'testapp', name: 'TestApp' } }, { notAKey: true });
+        try {
+          const { err, output } = await runAuditCapturing(tmp);
+          ctx.expect(err).toBeNull();
+          ctx.expect(output).toMatch(/notAKey/);
+          ctx.expect(output).toMatch(/audit ok \(1 warning\)/);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -121,10 +160,10 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'publish mode: no releases.repo still passes, since the default names `<brand.id>-releases` (#799)',
+      name: 'publish mode: a bare `releases: {}` passes, since the repo derives as `<brand.id>-releases` (#799, #883)',
       run: async (ctx) => {
         const tmp = stageConsumer(
-          { brand: { id: 'acme', name: 'Acme', images: { icon: 'icon.png' } }, repo: { providers: { github: { org: 'Acme-Org' } } } },
+          { brand: { id: 'acme', name: 'Acme', images: { icon: 'icon.png' } }, repo: { provider: 'github', org: 'Acme-Org' } },
           { releases: {} },
         );
         jetpack.write(path.join(tmp, 'icon.png'), 'stub');
@@ -219,12 +258,12 @@ module.exports = defineCases({
       run: async (ctx) => {
         const tmp = stageConsumer(
           { brand: { id: 'testapp', name: 'TestApp' }, app: { appId: 'com.test.app', productName: 'TestApp' } },
-          { platforms: { win: { signing: { strategy: 'banana' } } } },
+          { platforms: { windows: { signing: { strategy: 'banana' } } } },
         );
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeDefined();
-          ctx.expect(err.message).toMatch(/platforms\.win\.signing\.strategy "banana" is not allowed/);
+          ctx.expect(err.message).toMatch(/platforms\.windows\.signing\.strategy "banana" is not allowed/);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

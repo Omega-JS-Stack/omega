@@ -13,11 +13,12 @@ const { buildWith, miniData } = require('./lib/build.js');
 // only download/extension facts in the config are inside `targets`.
 const withTargets = {
   ...miniData,
-  repo: { providers: { github: { org: 'mini-org', repo: 'mini-site' } } },
+  repo: { provider: 'github', org: 'mini-org' },
   targets: {
-    web: {},
-    desktop: { releases: { repo: 'mini-desktop' } },
+    web: { type: 'web' },
+    desktop: { type: 'desktop', releases: {} },
     extension: {
+      type: 'extension',
       listings: {
         chrome: { url: 'https://chrome.example.com/mini' },
         firefox: { url: 'https://firefox.example.com/mini' },
@@ -26,7 +27,7 @@ const withTargets = {
   },
 };
 
-const RELEASES = 'https://github.com/mini-org/mini-desktop/releases/latest';
+const RELEASES = 'https://github.com/mini-org/mini-releases/releases/latest';
 
 test('#26: declared targets fill the download page — every desktop card gets its link', async () => {
   const pages = await buildWith(withTargets, {}, 'targets-download');

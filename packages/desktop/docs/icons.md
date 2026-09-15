@@ -9,7 +9,7 @@ config/icons/
   global/             ← used by any platform with no platform-specific override
     icon.png
     tray.png
-  macos/              ← macOS overrides (beats global)
+  mac/                ← macOS overrides (beats global)
     icon.png
     tray.png          ← 32×32 native; @omega.js/desktop renames to trayTemplate.png in dist
     dmg.png           ← 1080×760 DMG installer background
@@ -39,9 +39,9 @@ Retina slots (macOS tray, macOS dmg) take ONE source file at the native (@2x) si
 
 | Slot | Native size | @omega.js/desktop emits |
 |---|---|---|
-| `macos/tray.png` | 32×32 | `trayTemplate.png` (16×16) + `trayTemplate@2x.png` (32×32) |
-| `macos/dmg.png` | 1080×760 | `dmg.png` (540×380) + `dmg@2x.png` (1080×760) |
-| `macos/icon.png` | 1024×1024 | `icon.png` (unchanged; electron-builder converts to `.icns`) |
+| `mac/tray.png` | 32×32 | `trayTemplate.png` (16×16) + `trayTemplate@2x.png` (32×32) |
+| `mac/dmg.png` | 1080×760 | `dmg.png` (540×380) + `dmg@2x.png` (1080×760) |
+| `mac/icon.png` | 1024×1024 | `icon.png` (unchanged; electron-builder converts to `.icns`) |
 | `windows/icon.png` | 1024×1024 | `icon.png` (unchanged; electron-builder converts to `.ico`) |
 | `linux/icon.png` | 1024×1024 | `icon.png` (unchanged) |
 
@@ -64,9 +64,9 @@ config/icons/global/tray.png    # mac + win + linux
 
 ```
 config/icons/global/icon.png    # win + linux use this
-config/icons/macos/icon.png     # mac override
-config/icons/macos/tray.png     # mac-specific tray (will become trayTemplate.png in dist)
-config/icons/macos/dmg.png      # mac-only by definition
+config/icons/mac/icon.png     # mac override
+config/icons/mac/tray.png     # mac-specific tray (will become trayTemplate.png in dist)
+config/icons/mac/dmg.png      # mac-only by definition
 ```
 
 ## Source files

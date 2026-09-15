@@ -134,11 +134,21 @@ test('pipeline: the manage child names the verb — a bare CLI walks nothing now
   );
 });
 
-test('pipeline: every value-less pipeline flag is declared boolean (yargs would eat the next positional)', () => {
+test('pipeline: the value-less flags are declared, and its value flags keep their values undeclared', () => {
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+
   for (const flag of ['dry-run', 'verify', 'publish']) {
-    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value — it must be declared boolean`);
+    assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
   }
+
+  // The value flags need no list: the parse's rule carries them, in the space
+  // form and the `=` form alike.
+  const argv = parseArgv(['pipeline', '--service', 'payment', '--require=sendgrid,captcha', '--verify'], { booleans: BOOLEAN_FLAGS });
+  assert.equal(argv.service, 'payment');
+  assert.equal(argv.require, 'sendgrid,captcha');
+  assert.equal(argv.verify, true);
+  assert.deepEqual(argv._, ['pipeline']);
 });
 
 test('pipeline: verify rows land AFTER the deploy legs and ride the same judging rules', async () => {

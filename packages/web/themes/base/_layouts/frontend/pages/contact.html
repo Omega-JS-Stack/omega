@@ -11,12 +11,12 @@ hero:
 contact_methods:
   - title: "Email support"
     description: "Get help within 24 hours"
-    icon: "envelope"
+    icon: "fa-solid fa-envelope"
     value: "Email us"
     link: "#form"
   - title: "Live chat"
     description: "Chat with our team now 24/7"
-    icon: "comments"
+    icon: "fa-solid fa-comments"
     value: "Chat now"
     link: "#chat"
 
@@ -82,7 +82,7 @@ bands below keep the reveal lane. {% endcomment %}
         <div class="mb-5">
           {% for method in resolved.contact_methods %}
             <a href="{{ method.link }}" class="omega-channel" data-omega-reveal>
-              <span class="omega-icon-chip"><i class="fa-solid fa-{{ method.icon }} fa-sm"></i></span>
+              <span class="omega-icon-chip"><i class="{{ method.icon }} fa-sm" aria-hidden="true"></i></span>
               <span class="omega-channel__body">
                 <span class="omega-channel__title d-block">{{ method.title }}</span>
                 <span class="omega-channel__desc d-block">{{ method.description }}</span>

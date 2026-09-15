@@ -12,7 +12,8 @@ const service = require('../src/services/captcha/index.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 
 // Tests must never see real credentials from the shell environment; non-skip
-// tests set fixture values explicitly (the site key is handler data)
+// tests set fixture values explicitly. The SITE key is config now (#893), so
+// only the secret half is ever read from the environment.
 delete process.env.RECAPTCHA_SITE_KEY;
 delete process.env.RECAPTCHA_SECRET_KEY;
 
@@ -31,7 +32,7 @@ function brandConfig({ url = `https://${DOMAIN}`, siteKey = SITE_KEY } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
     captcha: { providers: { recaptcha } },
-    targets: { web: {} },
+    targets: { web: { type: 'web' } },
   };
 }
 
@@ -60,10 +61,8 @@ function fakeRecaptcha({ errorCodes = ['invalid-input-response'] } = {}) {
 
 function runService(config, { recaptcha, options = {}, env = true, brandRoot } = {}) {
   if (env) {
-    process.env.RECAPTCHA_SITE_KEY = SITE_KEY;
     process.env.RECAPTCHA_SECRET_KEY = 'fixture-secret-key';
   } else {
-    delete process.env.RECAPTCHA_SITE_KEY;
     delete process.env.RECAPTCHA_SECRET_KEY;
   }
 
@@ -83,16 +82,16 @@ function runService(config, { recaptcha, options = {}, env = true, brandRoot } =
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('captcha: skips without the shared keys in .env', async () => {
+test('captcha: skips without the secret key in .env', async () => {
   const result = await runService(brandConfig({ siteKey: null }), { env: false });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /RECAPTCHA_SITE_KEY, RECAPTCHA_SECRET_KEY/);
-  // cp114: the skip is machine-readable — the 🔑 summary aggregates it
-  assert.deepEqual(result.missingEnv, ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
+  assert.match(result.reason, /RECAPTCHA_SECRET_KEY/);
+  // cp114: the skip is machine-readable (the 🔑 summary aggregates it). The
+  // site key is never in that list: it is config, not a credential (#893)
+  assert.deepEqual(result.missingEnv, ['RECAPTCHA_SECRET_KEY']);
 });
 
 test('captcha: skip reason names only the missing key', async () => {
-  process.env.RECAPTCHA_SITE_KEY = SITE_KEY;
   delete process.env.RECAPTCHA_SECRET_KEY;
 
   const result = await service.run({
@@ -162,7 +161,6 @@ test('captcha: the config site key without the secret is the SHARED rule now —
   const config = brandConfig();
   config.cloud = { provider: 'firebase', config: { projectId: 'fixture-brand-cloud' } };
 
-  process.env.RECAPTCHA_SITE_KEY = SITE_KEY;
   delete process.env.RECAPTCHA_SECRET_KEY;
 
   const result = await service.run({
@@ -208,6 +206,29 @@ test('captcha: invalid secret fails the service with .env guidance', async () =>
 
   assert.equal(result.status, 'error');
   assert.match(result.error, /RECAPTCHA_SECRET_KEY is invalid/);
+});
+
+// ─── The site key is CONFIG (#893) ───────────────────────────────────────────
+
+test('captcha: the site key comes from config, and a stale env var is not read', async () => {
+  // The env key is retired: a brand that still exports the old name gets the
+  // config value anyway, because there is no dual-read anywhere in OMEGA.
+  process.env.RECAPTCHA_SITE_KEY = 'stale-env-value';
+
+  // The deep link is built FROM the site key, so the console URL is where the
+  // value the service resolved is visible
+  const config = brandConfig();
+  config.cloud = { provider: 'firebase', config: { projectId: 'fixture-brand-cloud' } };
+
+  try {
+    const result = await runService(config, { recaptcha: fakeRecaptcha() });
+
+    assert.equal(result.status, 'success');
+    assert.match(result.output.siteKey.consoleUrl, new RegExp(SITE_KEY));
+    assert.doesNotMatch(result.output.siteKey.consoleUrl, /stale-env-value/);
+  } finally {
+    delete process.env.RECAPTCHA_SITE_KEY;
+  }
 });
 
 // ─── Console URL (de-ITW'd) ──────────────────────────────────────────────────
@@ -275,6 +296,38 @@ test('captcha: dry-run behaves identically — the probe is a pure read', async 
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
+test('site-key: an interactive run ASKS for the site key and lands it in omega.json5 (#893)', async () => {
+  // "nothing like this should be left for the consumer to remember" (#867):
+  // the value has a config home, so the service asks for it there and writes
+  // it, rather than printing a key name and skipping.
+  const api = fakeRecaptcha();
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+  const brandRoot = makeBrandRoot(fixtureConfigSource({ domainsConfirmed: [DOMAIN] }));
+
+  try {
+    // The domain list is already confirmed, so the ONLY prompt this run opens
+    // is the site-key ask
+    const config = brandConfig({ siteKey: null });
+    config.captcha.providers.recaptcha.domainsConfirmed = [DOMAIN];
+    const run = runService(config, { recaptcha: api, brandRoot });
+
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('reCAPTCHA site key (the public half):', `${SITE_KEY}\r`);
+
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.match(readConfigSource(brandRoot), new RegExp(`siteKey:\\s*['"]${SITE_KEY}['"]`));
+    // The ask opens the console the key is minted at, and nothing else does
+    assert.deepEqual(opened, ['https://www.google.com/recaptcha/admin']);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
 test('site-key: interactive run opens the console and stamps the confirmed domain list', async () => {
   const api = fakeRecaptcha(); // invalid-input-response = valid secret
   const opened = [];
@@ -309,14 +362,21 @@ test('site-key: interactive run opens the console and stamps the confirmed domai
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { REQUIRES } = require('../src/config.js');
+const { REQUIRES, serviceInputSpec } = require('../src/config.js');
 
 test("requires: RECAPTCHA_* walkthrough mints at the GCP reCAPTCHA console (the brand's own project)", () => {
   const env = REQUIRES.captcha.env;
-  assert.deepEqual(env.map((e) => e.name), ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
+  // The SITE key left the env registry with #893: it is config now, asked for
+  // through the config flow, so the only credential here is the secret half
+  assert.deepEqual(env.map((e) => e.name), ['RECAPTCHA_SECRET_KEY']);
   for (const entry of env) {
-    assert.equal(entry.url, 'https://console.cloud.google.com/security/recaptcha');
     assert.equal(entry.prompted, true);
+  }
+
+  // The mint page is the env SCHEMA's, its one home (#867): the registry keeps
+  // the manager's own fields and the spec is where the two halves meet
+  for (const input of serviceInputSpec('captcha').inputs) {
+    assert.equal(input.url, 'https://console.cloud.google.com/security/recaptcha');
   }
 });
 

@@ -24,6 +24,11 @@ const { applyRules, applyJsRules, applyJsonRules, runCodemod } = require('../src
 const { convertConfig, serializeOmega } = require('../src/migrate/config-convert.js');
 const { lintText } = require('../src/migrate/lint.js');
 const { runMigration } = require('../src/migrate/index.js');
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { configureOmega } = require('../src/index.js');
 
 const PKG = path.resolve(__dirname, '..');
@@ -1410,6 +1415,28 @@ test('config: the retired adsense gates are DROPPED with the note (#628)', () =>
   }
 });
 
+test('config: the four schema-less web sections retire on the way in (#850)', () => {
+  // Three are DROPPED with a note (nothing answers them with config any more)
+  // and `currency` MOVES into the payment section, so a converted brand never
+  // carries a key its own validator refuses.
+  const jekyll = structuredClone(LEGACY_JEKYLL);
+  jekyll.favicon = { path: 'https://cdn.sample.test/favicon', 'theme-color': '#ffffff' };
+  jekyll.manifest = { name: 'Sample' };
+  jekyll.icons = { style: 'solid' };
+  jekyll.currency = 'EUR';
+
+  const { omega, notes } = convertConfig({ jekyll, ujm: null });
+
+  for (const key of ['favicon', 'manifest', 'icons', 'currency']) {
+    assert.strictEqual(omega.targets.web[key], undefined, `targets.web.${key} is a retired path, so nothing writes it`);
+    assert.strictEqual(omega[key], undefined, `${key} never lands at the root either`);
+    const note = notes.find((entry) => entry.includes(`\`${key}\``) && entry.includes('#850'));
+    assert.ok(note, `the move is announced, not silent: ${notes.join(' | ')}`);
+  }
+
+  assert.strictEqual(omega.payment.currency, 'EUR', 'the currency lands beside the providers that charge in it');
+});
+
 test('config: a gates-ONLY adsense block converts to no advertising section (#628)', () => {
   // The note itself says "omit the block to serve no ads": a legacy block whose
   // whole content was the two retired gates converts to nothing at all, not to
@@ -1447,10 +1474,18 @@ test('config: socials lands at the ROOT, its schema home (#483)', () => {
 });
 
 test('config: translation lands at the ROOT, its schema home (#526)', () => {
-  const { omega } = convertConfig({ jekyll: structuredClone(LEGACY_JEKYLL), ujm: null });
+  const { omega, notes } = convertConfig({ jekyll: structuredClone(LEGACY_JEKYLL), ujm: null });
 
-  assert.deepStrictEqual(omega.translation, { languages: ['es'], exclude: ['account'] }, 'translation is a SHARED_SECTIONS key — disperse copies it from the root to every target');
+  assert.deepStrictEqual(omega.translation, { languages: ['es'], include: ['**', '!account'] }, 'translation is a SHARED_SECTIONS key: disperse copies it from the root to every target');
   assert.strictEqual(omega.targets.web.translation, undefined, 'and it never rides the web target as well');
+
+  // #858: the legacy route list said what to SKIP, and that key is retired, so
+  // carrying it through would emit a config the validator refuses. It converts
+  // on the way out, translating exactly what the brand was translating before.
+  assert.ok(
+    notes.some((note) => /translation\.exclude/.test(note) && /translation\.include/.test(note)),
+    'the conversion is a note, not a silent rewrite',
+  );
 });
 
 test('config: web_manager.sentry becomes monitoring.providers.sentry (#485)', () => {
@@ -1651,7 +1686,7 @@ test('e2e: check mode reports the config-value rewrite and writes NOTHING (#671)
       '{',
       "  brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' },",
       '  // The default <title> every page falls through to',
-      '  targets: { web: { meta: { title: \'Creative agency - {{ site.brand.name }}\' } } },',
+      '  targets: { web: { type: \'web\', meta: { title: \'Creative agency - {{ site.brand.name }}\' } } },',
       '}',
       '',
     ].join('\n');
@@ -1754,9 +1789,9 @@ test('e2e: a consumer with no package.json to judge against reports no bare requ
 function stagePreConvertedBrandTarget() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-preconverted-'));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
 
-  const targetDir = path.join(root, 'targets', 'website');
+  const targetDir = path.join(root, 'targets', 'web');
   fs.mkdirSync(path.join(targetDir, 'src', 'pages'), { recursive: true });
   fs.writeFileSync(path.join(targetDir, 'src', 'pages', 'index.html'), [
     '---',
@@ -1811,7 +1846,7 @@ test('e2e: a pre-converted app whose config does NOT load fails loudly instead o
 test('e2e: legacy configs beside an existing omega.json5 still convert', () => {
   const root = stageLegacyConsumer();
   try {
-    fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'stale', name: 'Stale' }, targets: { web: {} } }\n");
+    fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'stale', name: 'Stale' }, targets: { web: { type: 'web' } } }\n");
 
     const report = runMigration(root, {});
 
@@ -1852,7 +1887,7 @@ test('e2e: neither a legacy config nor a resolvable omega.json5 still fails loud
 function stageClientRuntimeConsumer() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-migrate-client-'));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
 
   fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
   fs.writeFileSync(path.join(root, 'src', 'pages', 'account.html'), [
@@ -1995,8 +2030,10 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
     analytics: { providers: { google: { id: 'G-COMPOSE1' } } },
   };
 
+  const OUT = path.join(PKG, '.omega', 'migrate-test-out');
+  setEnvironment('development');
   const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(MINI, path.join(PKG, '.omega', 'migrate-test-out'), {
+  const elev = new Eleventy(MINI, OUT, {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
@@ -2011,11 +2048,22 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
   const pages = new Map((await elev.toJSON()).map((result) => [result.url, result.content]));
   const html = pages.get('/');
 
-  // The id reaches the page as CONFIG and nothing else (#383): the chrome no
-  // longer emits a loader, so the runtime gate decides whether gtag.js is ever
-  // fetched. Configuration.analytics is the whole contract now.
-  assert.ok(html.includes('"google":{"id":"G-COMPOSE1"}'), 'Configuration.analytics carries the canonical providers shape (flat bridge dead — cp106a)');
+  // The delivery is ONE FILE (#894, #743): the run writes `build.js` at the site
+  // root and the chrome loads it with its FIRST script tag, so what a browser
+  // reads of these three homes is read out of that snapshot, never out of the
+  // page. The engine composes it on `eleventy.before`, so a toJSON run writes it
+  // like any other.
+  const buildJs = fs.readFileSync(path.join(OUT, 'build.js'), 'utf8');
+  assert.ok(html.includes('<script src="/build.js'), 'the chrome loads the one snapshot');
+
+  // The id reaches the browser as CONFIG and nothing else (#383): no loader is
+  // emitted anywhere, so the runtime gate decides whether gtag.js is ever
+  // fetched. `analytics` is the whole contract now.
+  assert.ok(buildJs.includes('"google":{"id":"G-COMPOSE1"}'), 'the snapshot carries the canonical providers shape (flat bridge dead, cp106a)');
+  assert.ok(!html.includes('G-COMPOSE1'), 'and the chrome bakes no second copy of the id');
   assert.ok(!html.includes('googletagmanager.com/gtag/js'), 'and no loader ships with the chrome');
-  assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into client.firebase.app.config');
-  assert.ok(html.includes('"site":"compose"'), 'payment composed into client.payment');
+  // The canonical homes ride as they are authored (#894): @omega.js/client
+  // boots Firebase from `cloud.config`, and nothing composes a second copy.
+  assert.ok(buildJs.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config reaches the browser');
+  assert.ok(buildJs.includes('"site":"compose"'), 'and so does the payment section');
 });

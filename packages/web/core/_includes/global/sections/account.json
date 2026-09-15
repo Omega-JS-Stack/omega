@@ -3,7 +3,7 @@
     {
       label: 'Account',
       href: '/dashboard/account#profile',
-      icon: 'user-gear'
+      icon: 'fa-solid fa-user-gear'
     },
     {
       divider: true,
@@ -14,7 +14,7 @@
     {
       label: 'Admin panel',
       href: '/admin',
-      icon: 'shield-halved',
+      icon: 'fa-solid fa-shield-halved',
       attributes: [
         ['data-omega-bind', '@show auth.account.roles.admin']
       ]
@@ -24,7 +24,7 @@
     },
     {
       label: 'Sign out',
-      icon: 'arrow-right-from-bracket',
+      icon: 'fa-solid fa-arrow-right-from-bracket',
       class: 'omega-signout text-danger'
     }
   ]

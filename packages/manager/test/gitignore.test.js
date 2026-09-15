@@ -1,6 +1,6 @@
 // Tests for src/lib/gitignore.js — the idempotent .gitignore healer the
-// workspace service (brand roots) and runCompany (company roots) share. Real
-// files in a temp dir, no mocks. #197 added `logs/`: a brand scaffolded before
+// workspace service applies at every brand root. Real files in a temp dir, no
+// mocks. #197 added `logs/`: a brand scaffolded before
 // the run-log lane exists on disk without it, so the healer is what gets every
 // EXISTING root there.
 

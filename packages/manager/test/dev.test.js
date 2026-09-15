@@ -2,7 +2,7 @@
 // (freshness sweep, manage cycle, then the target legs). The spawn plumbing is composition of
 // tested pieces (discoverTargets, resolveTargetNode, watch-all's forwarding
 // pattern); the SELECTION is the behavior with rules worth pinning: default
-// set, --target=/--all, unknowns, missing targets, backend-first ordering.
+// set, --target=/--all, unknown tokens, backend-first ordering.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -129,27 +129,34 @@ require.cache[managePath] = {
   },
 };
 
+// The machine registry is per-machine state: this file's fixtures write into a
+// temp home, never the developer's ~/.omega (#677).
+require('./lib/temp-home.js');
+
 const devCommand = require('../src/commands/dev.js');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
-const ALL_TARGETS = ['web', 'backend', 'desktop', 'extension'];
+// The selector takes DISCOVERED targets ({ name, target: the type }): the name
+// is the picker word, the type is what orders the boot (#886).
+const ALL_TARGETS = ['web', 'backend', 'desktop', 'extension'].map((type) => ({ name: type, target: type }));
+const named = (...pairs) => pairs.map(([name, target]) => ({ name, target }));
 
-/** Stage a brand monorepo with a single website target. */
+/** Stage a brand monorepo with a single web target. */
 function stageBrand() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
 
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {} },
+  targets: { web: { type: 'web' } },
 }
 `);
 
-  const website = path.join(root, 'targets', 'website');
-  fs.mkdirSync(website, { recursive: true });
-  fs.writeFileSync(path.join(website, 'package.json'), JSON.stringify({
-    name: 'fixture-website',
+  const web = path.join(root, 'targets', 'web');
+  fs.mkdirSync(web, { recursive: true });
+  fs.writeFileSync(path.join(web, 'package.json'), JSON.stringify({
+    name: 'fixture-web',
     private: true,
     dependencies: { '@omega.js/web': '*' }, // the target declares its framework, as every real one does
   }));
@@ -176,11 +183,18 @@ async function bootDev(cwd, options = {}) {
 }
 
 test('default set is the local web loop — web + backend, GUI targets stay down', () => {
-  const { selected, missing } = selectDevTargets({ available: ALL_TARGETS });
+  const { selected } = selectDevTargets({ available: ALL_TARGETS });
 
   assert.deepStrictEqual(selected, ['backend', 'web'], 'backend boots first (publishes the port map)');
   assert.deepStrictEqual(DEFAULT_TARGETS, ['web', 'backend']);
-  assert.deepStrictEqual(missing, []);
+});
+
+test('the boot order is by TYPE: a backend NAMED api still boots first', () => {
+  const available = named(['site', 'web'], ['api', 'backend']);
+
+  assert.deepStrictEqual(selectDevTargets({ available, target: 'site,api' }).selected, ['api', 'site'],
+    'the emulator publishes the port map the web leg reads, whatever it is called');
+  assert.deepStrictEqual(selectDevTargets({ available, all: true }).selected, ['api', 'site']);
 });
 
 test('--target= is the exact set; --all boots every leg', () => {
@@ -202,28 +216,39 @@ test('--target= is the exact set; --all boots every leg', () => {
 
 test('a token naming no dev leg STOPS the boot — never a matched subset', () => {
   assert.throws(
-    () => selectDevTargets({ available: ['web'], target: 'web,mobile' }),
+    () => selectDevTargets({ available: named(['web', 'web']), target: 'web,mobile' }),
     (error) => {
       assert.strictEqual(error.refusal, true);
       assert.match(error.message, /Unknown --target token "mobile"/, 'no mobile dev leg exists (MAM parked)');
-      assert.match(error.message, /web, backend, desktop, extension/, 'the error names the legs that DO exist');
+      assert.match(error.message, /this brand's targets are web/, 'the error names the legs this brand HAS');
       return true;
     },
   );
 });
 
-test('a named target with no dir in this brand goes to missing, and the rest still boot', () => {
-  const result = selectDevTargets({ available: ['web'], target: 'web,backend' });
+// The vocabulary is the brand's declared NAMES, the same list `test`, `deploy`
+// and `update` take (#886): a type word this brand never named is a typo, and
+// a typo stops the boot instead of quietly booting the rest.
+test('a type word that names no target in THIS brand is refused, not skipped', () => {
+  assert.throws(
+    () => selectDevTargets({ available: named(['web', 'web']), target: 'web,backend' }),
+    (error) => {
+      assert.strictEqual(error.refusal, true);
+      assert.match(error.message, /Unknown --target token "backend"/);
+      assert.match(error.message, /this brand's targets are web/);
+      return true;
+    },
+  );
 
-  assert.deepStrictEqual(result.selected, ['web']);
-  assert.deepStrictEqual(result.missing, ['backend'], 'requested but no dir in this brand');
+  // A brand whose web target is NAMED site answers to `site`, never to `web`
+  assert.deepStrictEqual(selectDevTargets({ available: named(['site', 'web']), target: 'site' }).selected, ['site']);
+  assert.throws(() => selectDevTargets({ available: named(['site', 'web']), target: 'web' }), /Unknown --target token "web"/);
 });
 
 test('a web-only brand defaults to just web — no phantom backend leg', () => {
-  const { selected, missing } = selectDevTargets({ available: ['web'] });
+  const { selected } = selectDevTargets({ available: named(['web', 'web']) });
 
-  assert.deepStrictEqual(selected, ['web']);
-  assert.deepStrictEqual(missing, [], 'the default set adapts to the brand instead of warning');
+  assert.deepStrictEqual(selected, ['web'], 'the default set adapts to the brand instead of warning');
 });
 
 // The retired pickers (#780) — refused before anything boots, never ignored
@@ -253,7 +278,7 @@ test('boot opens with the manage cycle, THEN spawns the target legs — brand as
   const outcome = await bootDev(root, { target: 'web' });
 
   assert.strictEqual(outcome, 'running', 'the orchestrator stays alive after booting');
-  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:web'],
     'the full service walk runs against the brand root before any target leg starts');
 });
 
@@ -309,7 +334,7 @@ test('the non-interactive switch is restored before any leg spawns — the dev s
 
   await bootDev(root, { target: 'web' });
 
-  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'], 'the boot still runs manage, then the leg');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:web'], 'the boot still runs manage, then the leg');
   assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
   assert.deepStrictEqual(nonInteractiveAt.spawnEnv, [undefined], "the leg's inherited env carries no switch");
   assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, undefined, 'and nothing leaks past the boot');
@@ -332,20 +357,20 @@ test('a clean report with pending human gates still boots the legs — pending i
   const outcome = await bootDev(root, { target: 'web' });
 
   assert.strictEqual(outcome, 'running');
-  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:web'],
     "the summary's ⚑ pending list is the report — the stack boots regardless");
 });
 
-test('--target= takes a target DIR name too, exactly like every other verb (#780)', async () => {
+test('--target= takes the target NAME, the one token every brand-root verb takes (#780, #886)', async () => {
   resetRecorders();
   manageReport = { hasErrors: false, results: {}, brand: {} };
   const root = stageBrand();
 
-  const outcome = await bootDev(root, { target: 'website' });
+  const outcome = await bootDev(root, { target: 'web' });
 
   assert.strictEqual(outcome, 'running');
-  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'],
-    "the dir name picks the same leg its key does — one token vocabulary on every brand-root verb");
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:web'],
+    'the name IS the folder, so one word picks the leg');
 });
 
 test('a pre-existing OMEGA_NON_INTERACTIVE survives the boot — the restore is not a blind delete', async () => {
@@ -377,7 +402,7 @@ test('the boot walks the LOCAL lane only, and says where the full setup lives', 
   assert.deepStrictEqual(manageOptions, [{ lane: 'boot' }],
     'the dev legs consume the local slice — the slow services must not hold the boot');
   assert.match(log, /npm run manage/, 'and the boot names the one command that runs the rest');
-  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:website'], 'still manage, then the legs');
+  assert.deepStrictEqual(boot, ['sweep:@omega.js/web', `manage:${root}`, 'spawn:web'], 'still manage, then the legs');
 });
 
 test('omega dev --full boots on the whole manage walk instead of the lane', async () => {
@@ -392,30 +417,34 @@ test('omega dev --full boots on the whole manage walk instead of the lane', asyn
   assert.ok(!/local lane/.test(log), 'nothing to point at — this run WAS the full setup');
 });
 
-test('omega dev --full is declared boolean (yargs would otherwise eat the next positional)', () => {
+test('omega dev --full is declared boolean, so it never eats the next token', () => {
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  assert.ok(BOOLEAN_FLAGS.includes('full'), '--full takes no value — it must be declared boolean');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  assert.ok(BOOLEAN_FLAGS.includes('full'), '--full takes no value, so it must be declared boolean');
+  assert.deepEqual(parseArgv(['dev', '--full', 'web'], { booleans: BOOLEAN_FLAGS })._, ['dev', 'web']);
 });
 
-test('omega manage --execute is declared boolean (yargs would otherwise eat the next positional)', () => {
+test('omega manage --execute is declared boolean, so it never eats the next token', () => {
   const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
-  assert.ok(BOOLEAN_FLAGS.includes('execute'), '--execute takes no value — it must be declared boolean');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  assert.ok(BOOLEAN_FLAGS.includes('execute'), '--execute takes no value, so it must be declared boolean');
+  assert.deepEqual(parseArgv(['manage', '--execute', 'users'], { booleans: BOOLEAN_FLAGS })._, ['manage', 'users']);
 });
 
 // ─── Hoisted freshness sweep (#340) ──────────────────────────────────────────
 
-/** Stage a brand with a website AND a backend target, each declaring its framework. */
+/** Stage a brand with a web AND a backend target, each declaring its framework. */
 function stageFanOutBrand() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
 
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: {}, backend: {} },
+  targets: { web: { type: 'web' }, backend: { type: 'backend' } },
 }
 `);
 
-  for (const [dir, framework] of [['website', '@omega.js/web'], ['backend', '@omega.js/backend']]) {
+  for (const [dir, framework] of [['web', '@omega.js/web'], ['backend', '@omega.js/backend']]) {
     const targetPath = path.join(root, 'targets', dir);
     fs.mkdirSync(targetPath, { recursive: true });
     fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
@@ -446,7 +475,7 @@ test('the freshness sweep runs ONCE, before the manage cycle and before any leg 
     'sweep:@omega.js/backend,@omega.js/web',
     `manage:${root}`,
     'spawn:backend',
-    'spawn:website',
+    'spawn:web',
   ], 'one check pass covers every lane — a lane that rebuilds after the fan-out purges a sibling\'s dispatcher');
   assert.strictEqual(sweepHosts.length, 1, 'ONE sweep, not one per lane');
 });
@@ -461,7 +490,7 @@ test('the sweep is handed each selected lane\'s framework host, resolved from it
 
   assert.deepStrictEqual(sweepHosts[0], [
     { packageName: '@omega.js/backend', fromDir: path.join(root, 'targets', 'backend') },
-    { packageName: '@omega.js/web', fromDir: path.join(root, 'targets', 'website') },
+    { packageName: '@omega.js/web', fromDir: path.join(root, 'targets', 'web') },
   ], 'each host resolves from the target that declares it — the same chain the lane itself would walk');
 });
 
@@ -593,7 +622,7 @@ test('#587: a locally-linked brand boots the monorepo watch — after the manage
       `manage:${root}`,
       `spawn:${path.basename(monorepo)}`,
       'spawn:backend',
-      'spawn:website',
+      'spawn:web',
     ], 'the watch starts after the sweep has settled every dist, and before any leg reads one');
     assert.strictEqual(spawned.length, 3, 'ONE watch child, plus the two legs');
   } finally {
@@ -648,7 +677,7 @@ test('#587: a watch already running is reused, never doubled', async () => {
       'sweep:@omega.js/backend,@omega.js/web',
       `manage:${root}`,
       'spawn:backend',
-      'spawn:website',
+      'spawn:web',
     ], 'the lock says a watch is already on the job — the legs boot, nothing else spawns');
   } finally {
     realLocal.releaseWatchLock(monorepo);
@@ -702,7 +731,7 @@ test('#622: an already-running watch mid-prepare still holds the legs — the bo
       'sweep:@omega.js/backend,@omega.js/web',
       `manage:${root}`,
       'spawn:backend',
-      'spawn:website',
+      'spawn:web',
     ], 'the pass landed in the log — the legs boot, and nothing extra spawned');
   } finally {
     realLocal.releaseWatchLock(monorepo);
@@ -729,7 +758,7 @@ test('#622: a long-idle watch costs the boot nothing — its log says every pack
       'sweep:@omega.js/backend,@omega.js/web',
       `manage:${root}`,
       'spawn:backend',
-      'spawn:website',
+      'spawn:web',
     ], 'nothing is in flight — the gate reads the log and lets the boot straight through');
   } finally {
     realLocal.releaseWatchLock(monorepo);
@@ -750,7 +779,7 @@ test('#587: a registry-installed brand spawns no watch, and says so once', async
     'sweep:@omega.js/backend,@omega.js/web',
     `manage:${root}`,
     'spawn:backend',
-    'spawn:website',
+    'spawn:web',
   ], 'nothing to watch — the frameworks came from the registry');
   assert.match(log, /registry/, 'the skip is stated, not silent');
   assert.strictEqual(log.match(/registry/g).length, 1, 'one line, not one per target');
@@ -989,7 +1018,7 @@ test('a drifted @omega.js version REFUSES the boot before anything runs — no s
 
   // The target's installed framework is a release behind the manager: what
   // `omega update --apply` exists to fix, and what nothing downstream can see
-  const installed = path.join(root, 'targets', 'website', 'node_modules', '@omega.js', 'web');
+  const installed = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web');
   fs.mkdirSync(installed, { recursive: true });
   fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.1' }));
 

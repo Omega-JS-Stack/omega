@@ -1,52 +1,64 @@
-// release — trigger the GitHub Actions Build & Release workflow + stream logs locally.
+// release: trigger the GitHub Actions Build & Release workflow, then follow the
+// run it started.
 //
 // Replaces the old "do it from my laptop" release flow with "let CI do it, but make it
 // feel local." User runs `npm run release` (or `npx omega release`) and gets:
 //   1. The ONE deploy lane every target takes (`@omega.js/devkit/deploy`'s
-//      deployViaDispatch, #872): the brand is delivered to its repo (packed +
-//      snapshot-pushed when it is nested or linked, committed + pushed when it
-//      is neither, and BOTH when it is linked and owns its repo, because GitHub
-//      registers a workflow from the default branch), and the workflow is
-//      dispatched on the ref that lane chose (the brand's own repo and the
-//      composed workflow name: see dispatchTarget).
-//   2. A few seconds of waiting while GH spins up the run.
-//   3. Live polling of every job's logs at 5s intervals, printing NEW lines as they
-//      arrive (job-prefixed) so it looks like streaming.
-//   4. Everything teed to <root>/logs/ci.log with ANSI codes preserved on stdout
-//      and stripped from the file (matches the dev/build log convention).
-//   5. Exit 0 on success, 1 on any job failure.
-//
-// Why poll instead of stream? GH Actions doesn't expose live stdout — logs are only
-// fetchable AFTER each STEP completes. So "streaming" is a polite fiction: every 5s
-// we re-fetch each job's logs and diff against what we already printed.
+//      deployViaDispatch, #872, #915): the composed workflow files reach the
+//      default branch when they differ there (GitHub registers a workflow from
+//      that branch), the brand folder is force-pushed to `omega-deploy` (packed
+//      when it is linked), and the workflow is dispatched on that ref (the
+//      brand's own repo and the composed workflow name: devkit's
+//      dispatchTarget, #847).
+//   2. The ONE run follower every dispatched deploy uses
+//      (`@omega.js/devkit/deploy-follow`, [#873](https://github.com/Omega-JS-Stack/omega/issues/873)):
+//      it finds the run, polls it, prints each job's log with the job's name in
+//      front, and exits 1 on any conclusion but success. This file owned that
+//      follower alone until #873 gave the other three targets the same one.
+//   3. Everything teed to <root>/logs/deploy.log, the one name every target's
+//      deploy writes (docs/shared/logging.md), ANSI stripped from the file.
 
 const path     = require('path');
-const fs       = require('fs');
-const jetpack  = require('fs-jetpack');
 
-const { getOctokit } = require('../utils/github.js');
-const { deployViaDispatch, dispatchRepo } = require('@omega.js/devkit/deploy');
+const attachLogFile = require('../utils/attach-log-file.js');
+const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
+const { followRun } = require('@omega.js/devkit/deploy-follow');
+const { targetNameFromDir } = require('@omega.js/config');
 const Manager = new (require('../build.js'));
 
 const logger = Manager.logger('release');
 
-const POLL_INTERVAL_MS = 5000;
-
 module.exports = async function release(options = {}) {
   const projectRoot = process.cwd();
+  // The DRY RUN arrives here too ([#895](https://github.com/Omega-JS-Stack/omega/issues/895)):
+  // this verb is desktop's one dispatch call site, so the plan a preview prints
+  // is built by the very call a real run sends, threading the ref and the
+  // snapshot sha the same way.
+  const dryRun = !!(options.dryRun || options['dry-run']);
 
-  if (!process.env.GH_TOKEN) {
-    throw new Error('GH_TOKEN not set in env. Set it in .env (or shell) so we can dispatch the workflow.');
+  // The whole verb in one file, from its first line (#873), the token refusal
+  // below included: a caller that hands the writers back afterwards then pops
+  // THIS layer, never the one under it. A no-op when `omega deploy` delegated
+  // here and already attached this exact path.
+  const logPath = path.join(projectRoot, 'logs', 'deploy.log');
+  attachLogFile(logPath);
+
+  // The ONE token chain devkit resolves for every target, `GH_TOKEN` →
+  // `GITHUB_TOKEN` → `gh auth token`, and the very one the follower below is
+  // handed: testing the bare variable refused a machine signed in with `gh`
+  // and holding no variable at all, which is most of them. A dry run needs
+  // none: every step under it is a read or a plan.
+  if (!dryRun && !resolveToken()) {
+    throw new Error('No GitHub token: set GH_TOKEN in .env (or GITHUB_TOKEN in the shell), or sign in with `gh auth login`, so we can dispatch the workflow.');
   }
 
-  // silent: true — suppress octokit's default console output for transient 404s
-  // (in-progress job logs return 404 until the step completes).
-  const octokit = getOctokit({ silent: true });
-  if (!octokit) {
-    throw new Error('Failed to create octokit (missing GH_TOKEN?).');
-  }
-
-  const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: Manager.getConfig() });
+  // The CI dispatch address, from the config and the scaffold: the brand's own
+  // repo and the workflow file the target's ensure-target pass actually wrote
+  // (composed as `desktop-build.yml` at the brand root inside a monorepo, plain
+  // `build.yml` standalone). ONE helper for all four targets
+  // ([#847](https://github.com/Omega-JS-Stack/omega/issues/847)), where this
+  // file used to keep desktop's own copy of it.
+  const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: Manager.getConfig(), workflow: 'build.yml' });
 
   // Optional --platforms / --platform flag forwarded as a workflow input. Accepts a
   // single value ('windows') or comma-separated list ('mac,linux'). Special value
@@ -56,233 +68,66 @@ module.exports = async function release(options = {}) {
   const platforms = options.platforms || options.platform || null;
 
   const platformsLabel = platforms ? ` (platforms=${platforms})` : '';
-  logger.log(`Triggering ${owner}/${repo} workflow ${WORKFLOW_FILE}${platformsLabel}...`);
+  if (!dryRun) {
+    logger.log(`Triggering ${owner}/${repo} workflow ${WORKFLOW_FILE}${platformsLabel}...`);
+  }
 
-  // 1. Mark a "before" timestamp so we can identify the new run we just dispatched.
-  const before = new Date();
+  // 1. Mark a "before" timestamp so the follower identifies the run we just
+  // dispatched rather than the one before it.
+  const since = new Date();
 
-  // 2. Deliver the brand and dispatch, through the ONE lane (#872). The ref is
-  // the lane's to choose (`main` for a nested brand's mirror repo, the
-  // snapshot branch for a linked one, the current branch on the push lane),
-  // and an explicit `--ref` still wins.
-  const { lane } = await deployViaDispatch({
+  // 2. Deliver the brand and dispatch, through the ONE lane (#872, #915): the
+  // composed workflows to the repo's default branch when they differ, the brand
+  // folder to `omega-deploy`, which is the ref this dispatches. An explicit
+  // `--ref` still wins.
+  const { plan, lane, sha } = await deployViaDispatch({
     workflow: WORKFLOW_FILE,
     owner,
     repo,
     dir: projectRoot,
     ref: options.ref,
     inputs: platforms ? { platforms: String(platforms) } : undefined,
-    sync: options.sync !== false,
+    // The brand root's one snapshot for the whole fan-out, when a brand-root
+    // deploy spawned this verb (#901): the push is done, so this run
+    // dispatches against that sha instead of pushing over it. Nobody types it.
+    snapshot: options.snapshot,
+    dryRun,
     logger,
   });
-  logger.log(`Dispatched ${WORKFLOW_FILE} (${lane.mode} lane, ref ${lane.ref}): CI builds, signs, and publishes the release artifacts.`);
 
-  // 3. Wait for the new run to appear (GH Actions takes a few seconds to register it).
-  const run = await waitForNewRun({ octokit, owner, repo, after: before, workflowFile: WORKFLOW_FILE });
-  if (!run) {
-    throw new Error('Workflow dispatch succeeded but no new run appeared after 60s. Check GitHub Actions UI.');
+  // The plan IS the dry run: what would be sent, and nothing sent.
+  if (dryRun) {
+    logger.log(`DRY RUN (${laneLabel(lane)}), would send:`);
+    logger.log(`  ${plan.method} ${plan.url}`);
+    logger.log(`  body: ${JSON.stringify(plan.body)}`);
+    logger.log(`  then watch: ${plan.runsUrl}`);
+    return;
   }
 
-  logger.log(`Run started: ${run.html_url}`);
-  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: projectRoot, target: 'desktop', detail: { method: 'release-dispatch' } });
+  logger.log(`Dispatched ${WORKFLOW_FILE} (${laneLabel(lane, sha)}): CI builds, signs, and publishes the release artifacts.`);
+  // The ONE runs-url formula is the plan's (`buildDispatch`), the same line
+  // backend, web and the extension print: rebuilt by hand here, it was a second
+  // copy of an address the dispatch already answered.
+  logger.log(`Watch: ${plan.runsUrl}`);
 
-  // 4. Set up the CI log tee.
-  const logsDir = path.join(projectRoot, 'logs');
-  jetpack.dir(logsDir);
-  const ciLogPath = path.join(logsDir, 'ci.log');
-  // Truncate so each release run starts fresh.
-  fs.writeFileSync(ciLogPath, `# release run ${run.html_url}\n# started ${new Date().toISOString()}\n\n`);
-  const logFile = fs.createWriteStream(ciLogPath, { flags: 'a' });
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: projectRoot, target: targetNameFromDir(projectRoot) || 'desktop', detail: { method: 'release-dispatch' } });
 
-  // Spinner state. We tick every 250ms even between polls so the terminal feels alive.
-  // The spinner line uses \r to overwrite itself; before printing real content we clear
-  // the line, write content, then re-render the spinner. File output is unaffected.
-  const startedAt   = Date.now();
-  const isTty       = process.stdout.isTTY === true;
-  const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  let spinnerFrame = 0;
-  let pollCount    = 0;
-  let latestState  = null;
-  let latestJobs   = [];
-
-  function clearSpinner() {
-    if (!isTty) return;
-    process.stdout.write('\r\x1b[2K');
-  }
-
-  function renderSpinner() {
-    if (!isTty || !latestState) return;
-    const frame   = SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length];
-    const elapsed = formatElapsed(Date.now() - startedAt);
-    const status  = `${latestState.status}${latestState.conclusion ? ` (${latestState.conclusion})` : ''}`;
-    const jobBits = latestJobs.map((j) => `${jobSymbol(j)} ${j.name}`).join(' ');
-    const line    = `${frame}  ${status} · ${elapsed} · ${pollCount} polls · ${jobBits}`;
-    // Truncate so we never wrap (which breaks the \r overwrite).
-    const cols    = process.stdout.columns || 120;
-    const safe    = line.length > cols - 1 ? line.slice(0, cols - 2) + '…' : line;
-    process.stdout.write(`\r${safe}`);
-  }
-
-  // Print line(s) to stdout AND tee to file. Clears spinner first; spinner re-renders next tick.
-  function print(line) {
-    clearSpinner();
-    process.stdout.write(line);
-    logFile.write(stripAnsi(line));
-  }
-
-  // Tick the spinner ~4 times/sec so it animates between polls.
-  const spinnerTimer = isTty ? setInterval(() => {
-    spinnerFrame += 1;
-    renderSpinner();
-  }, 250) : null;
-
-  // 5. Poll until completion. Track byte offsets per job so we only print new lines.
-  const printedByJob = new Map(); // jobId -> chars printed so far
-  let lastStatusLine = '';
-
-  try {
-    while (true) {
-      pollCount += 1;
-      const { data: state } = await octokit.rest.actions.getWorkflowRun({
-        owner, repo, run_id: run.id,
-      });
-
-      // Pull all jobs. Each job has steps; each step has a step-level status.
-      const { data: jobsResp } = await octokit.rest.actions.listJobsForWorkflowRun({
-        owner, repo, run_id: run.id, per_page: 100,
-      });
-      const jobs = jobsResp.jobs || [];
-      latestState = state;
-      latestJobs  = jobs;
-
-      // For each job, fetch its logs (only available once steps complete; for in-progress
-      // jobs, GH returns 404 or partial — we tolerate both).
-      for (const job of jobs) {
-        // Skip queued jobs entirely (no logs yet).
-        if (job.status === 'queued') continue;
-
-        let logsText = '';
-        try {
-          const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs', {
-            owner, repo, job_id: job.id,
-          });
-          // Octokit returns the raw text content here.
-          logsText = typeof data === 'string' ? data : Buffer.from(data || '').toString('utf8');
-        } catch (e) {
-          // 404 = logs not ready yet. Other errors we just skip until next tick.
-          continue;
-        }
-
-        const printed = printedByJob.get(job.id) || 0;
-        if (logsText.length > printed) {
-          const fresh = logsText.slice(printed);
-          // Prefix each line with the job name so interleaved output is readable.
-          const prefix = `[${job.name}] `;
-          for (const rawLine of fresh.split('\n')) {
-            if (!rawLine) continue;
-            print(`${prefix}${rawLine}\n`);
-          }
-          printedByJob.set(job.id, logsText.length);
-        }
-      }
-
-      // Print a one-line status banner if it changed (no spam — only on transition).
-      const banner = formatStatusBanner(state, jobs);
-      if (banner !== lastStatusLine) {
-        print(`\n${banner}\n`);
-        lastStatusLine = banner;
-      }
-
-      if (state.status === 'completed') {
-        clearSpinner();
-        logFile.end();
-        const success = state.conclusion === 'success';
-        const symbol  = success ? '✓' : '✗';
-        logger.log(`${symbol} Run ${state.conclusion} — ${state.html_url}`);
-        logger.log(`Logs: ${path.relative(projectRoot, ciLogPath)}`);
-        if (!success) {
-          process.exitCode = 1;
-          throw new Error(`Release run failed (conclusion=${state.conclusion}). See ${ciLogPath} or ${state.html_url}.`);
-        }
-        return;
-      }
-
-      await sleep(POLL_INTERVAL_MS);
-    }
-  } finally {
-    if (spinnerTimer) clearInterval(spinnerTimer);
-    clearSpinner();
-  }
-};
-
-// The CI dispatch address, from the config and the scaffold: the brand's APP
-// repo (`@omega.js/devkit/deploy`'s dispatchRepo, the one call web and the
-// extension deploy verbs make too) and the workflow file the target's
-// ensure-target pass actually wrote (composed as `desktop-build.yml` at the
-// brand root inside a monorepo, plain `build.yml` standalone:
-// `@omega.js/devkit/ci-workflows` owns that name for all four frameworks).
-// Never the git remote: a brand nested in another repo would dispatch on the
-// enclosing one, which for the playground is the framework monorepo itself.
-// Exported for tests.
-function dispatchTarget({ projectRoot, config }) {
-  const { composedWorkflowName } = require('@omega.js/devkit/ci-workflows');
-  const { resolveSeedMode } = require('@omega.js/config');
-  const { owner, repo } = dispatchRepo(config);
-
-  return {
+  // 3. Follow the run to its verdict: the jobs' logs stream in here, and a red
+  // run throws, so this verb exits 1 on anything but success (#873). The run
+  // also has to be building the tree this deploy pushed (#902): on the push
+  // lane there is no sha and the check is off, because that lane's run head is
+  // the developer's own commit.
+  const { conclusion } = await followRun({
     owner,
     repo,
-    workflow: composedWorkflowName({
-      targetDir: projectRoot,
-      brandRoot: resolveSeedMode(projectRoot).brandRoot,
-      workflow: 'build.yml',
-    }),
-  };
-}
+    workflow: WORKFLOW_FILE,
+    since,
+    headSha: sha,
+    token: resolveToken(),
+    logger,
+  });
 
-function formatElapsed(ms) {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
-}
+  logger.log(`Logs: ${path.relative(projectRoot, logPath)}`);
 
-function jobSymbol(j) {
-  if (j.status === 'completed') return j.conclusion === 'success' ? '✓' : '✗';
-  if (j.status === 'in_progress') return '…';
-  if (j.status === 'queued') return '·';
-  return '?';
-}
-
-async function waitForNewRun({ octokit, owner, repo, after, workflowFile }) {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const { data } = await octokit.rest.actions.listWorkflowRuns({
-      owner, repo, workflow_id: workflowFile, per_page: 5, event: 'workflow_dispatch',
-    });
-    const runs = data.workflow_runs || [];
-    // The newest run created strictly after our dispatch timestamp.
-    const fresh = runs.find((r) => new Date(r.created_at).getTime() >= after.getTime() - 1000);
-    if (fresh) return fresh;
-    await sleep(2000);
-  }
-  return null;
-}
-
-function formatStatusBanner(run, jobs) {
-  const parts = jobs.map((j) => `${jobSymbol(j)} ${j.name}`);
-  return `── ${run.status}${run.conclusion ? ` (${run.conclusion})` : ''} ── ${parts.join('  |  ')}`;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function stripAnsi(s) {
-  // Minimal ANSI stripper — handles CSI sequences (colors, cursor moves).
-  return String(s).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
-}
-
-// Exported for tests + `omega deploy`, which prints the exact dispatch this
-// sends before delegating here.
-module.exports.dispatchTarget = dispatchTarget;
+  return conclusion;
+};

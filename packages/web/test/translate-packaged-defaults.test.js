@@ -281,17 +281,22 @@ test('#621: a default-page copy joins the sitemap like any other produced page',
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('#621: a route the brand excluded by hand is left alone, packaged translations and all', async () => {
+test('#621: a brand\'s include list never touches the framework\'s own default pages', async () => {
   const { root, dist, packaged } = stage();
   packageStrings(packaged, 'es', 'signin', { 'Email address': 'Correo electrónico' });
 
+  // The narrowest brand list there is: the brand's own pages are scoped to its
+  // docs, and the framework's chrome is still translated once, on the framework
+  // side (#858's ruling, the shape closed #621 shipped).
   const stats = await translateSite({
     root, outDir: dist, packagedRoot: packaged, cachedOnly: true, send: refuse,
-    config: { ...CONFIG, translation: { languages: ['es'], exclude: ['signin'] } },
+    config: { ...CONFIG, translation: { languages: ['es'], include: ['docs/**'] } },
   });
 
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'signin')), 'an explicit exclude outranks the packaged cache');
-  assert.strictEqual(stats.defaultPages, 0);
+  const copy = fs.readFileSync(path.join(dist, 'es', 'signin', 'index.html'), 'utf8');
+  assert.ok(copy.includes('Correo electrónico'), 'the packaged copy still ships');
+  assert.strictEqual(stats.defaultPages, 1);
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), "the brand's own pages still obey its list");
 
   fs.rmSync(root, { recursive: true, force: true });
 });

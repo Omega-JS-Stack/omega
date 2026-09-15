@@ -10,6 +10,10 @@
 
     <!-- Per-page CSS — present only on this view (compiled from src/assets/scss/pages/{{ page.name }}.scss). -->
     <link href="../../assets/css/components/{{ page.name }}.bundle.css?cb={{ cacheBust }}" rel="stylesheet">
+
+    <!-- The ONE build snapshot (#743): dist/build.js, the same file every OMEGA
+         browser surface loads, ahead of any bundle that reads OMEGA_BUILD_JSON. -->
+    <script src="../../build.js?cb={{ cacheBust }}"></script>
   </head>
   <body>
     <!--

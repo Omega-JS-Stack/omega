@@ -150,19 +150,21 @@ function button(btn) {
 /**
  * Full footer — company wordmark, footer text, divider, links, copyright, address.
  *
- * The parent/legal entity comes from config: `brand.company` (falling back to
- * `brand.name`, the documented schema chain) and `brand.images.companyWordmark`.
+ * The parent/legal entity is the RESOLVED company
+ * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): `company.name`
+ * and `company.images.wordmark`, filled by the loader from the brand's
+ * `company: { id }`, where a brand with no company resolves to its own name.
  * An unset wordmark renders NO wordmark — never another company's logo.
  */
-function footer(brand, email) {
+function footer(brand, email, company) {
   const brandUrl = brand?.url || '#';
   const addr = brand?.address || {};
   const address = [addr.line1, addr.line2, addr.city, addr.region, addr.postalCode].filter(Boolean).join(' · ');
   const footerText = email?.footer?.text || 'You are receiving this email because you recently interacted with our website.';
   const unsubscribeUrl = email?.unsubscribeUrl || `${brandUrl}/portal/email-preferences`;
   const year = new Date().getFullYear();
-  const companyName = brand?.company || brand?.name || '';
-  const companyWordmark = brand?.images?.companyWordmark || '';
+  const companyName = company?.name || brand?.name || '';
+  const companyWordmark = company?.images?.wordmark || '';
 
   const wordmarkSection = companyWordmark
     ? `

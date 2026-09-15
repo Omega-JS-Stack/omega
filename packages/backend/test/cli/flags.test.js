@@ -1,25 +1,26 @@
 /**
- * Test: the universal boolean flags are DECLARED to yargs
- * ([#51](https://github.com/Omega-JS-Stack/omega/issues/51)).
+ * Test: the universal CLI flags are DECLARED to the parse
+ * ([#51](https://github.com/Omega-JS-Stack/omega/issues/51),
+ * [#920](https://github.com/Omega-JS-Stack/omega/issues/920)).
  *
- * An undeclared boolean makes yargs eat the next positional as the flag's
- * value — `firestore:delete --production users/abc123` would lose the doc
- * path and fall through to the usage error. The parse and this test share
- * one list (src/cli/flags.js) so they cannot drift.
+ * The parse's rule is that every flag NOT declared value-less takes the next
+ * token as its value, so a value flag needs no declaration at all and an
+ * undeclared BOOLEAN eats the next positional. The list of value-less flags
+ * and this test share one home (src/cli/flags.js).
  *
  * Run: npx omega test backend:cli/flags
  */
-const yargs = require('yargs');
-const { BOOLEAN_FLAGS } = require('../../dist/cli/flags.js');
+const { parseArgv } = require('../../dist/vendor/devkit/argv.js');
+const { BOOLEAN_FLAGS, MULTIPLE_FLAGS } = require('../../dist/cli/flags.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The same parse shape src/cli/index.js builds.
 function parse(argvLine) {
-  return yargs(argvLine).boolean(BOOLEAN_FLAGS).version(false).help(false).argv;
+  return parseArgv(argvLine, { booleans: BOOLEAN_FLAGS, multiples: MULTIPLE_FLAGS });
 }
 
 module.exports = defineCases({
-  description: 'CLI boolean flag declarations — flags never swallow positionals',
+  description: 'CLI flag declarations: flags never swallow positionals, values never fall through',
   type: 'group',
 
   tests: [
@@ -51,13 +52,58 @@ module.exports = defineCases({
     },
 
     {
-      name: 'an-undeclared-boolean-would-swallow-the-positional',
+      name: 'an-undeclared-flag-still-takes-its-value',
       async run({ assert }) {
-        // The failure mode the declaration prevents, pinned so the list's
-        // purpose stays visible: parse WITHOUT declarations.
-        const argv = yargs(['firestore:delete', '--production', 'users/abc123']).version(false).help(false).argv;
-        assert.equal(argv.production, 'users/abc123', 'undeclared, yargs eats the positional as the value');
-        assert.deepEqual(argv._, ['firestore:delete'], 'undeclared, the doc path is gone');
+        // The value rule needs no list: nothing declares --only, and
+        // `omega deploy --only hosting` is a documented spelling.
+        const argv = parse(['deploy', '--only', 'hosting']);
+        assert.equal(argv.only, 'hosting');
+        assert.deepEqual(argv._, ['deploy']);
+        assert.equal(BOOLEAN_FLAGS.includes('only'), false, 'declaring it value-less is what WOULD break it');
+      },
+    },
+
+    {
+      name: 'the-update-flags-are-value-less-and-keep-the-next-token',
+      async run({ assert }) {
+        // `--apply`, `--major` and `--force-fresh` take no value (devkit's
+        // runUpdate reads all three as booleans), so none may eat a positional.
+        for (const flag of ['apply', 'major', 'force-fresh']) {
+          assert.equal(BOOLEAN_FLAGS.includes(flag), true, `--${flag} must be declared boolean`);
+        }
+        const argv = parse(['update', '--apply', 'out']);
+        assert.equal(argv.apply, true);
+        assert.deepEqual(argv._, ['update', 'out']);
+      },
+    },
+
+    {
+      name: 'a-declared-boolean-before-a-value-flag-keeps-both',
+      async run({ assert }) {
+        const argv = parse(['deploy', '--dry-run', '--only', 'functions']);
+        assert.equal(argv.dryRun, true);
+        assert.equal(argv.only, 'functions');
+        assert.deepEqual(argv._, ['deploy']);
+      },
+    },
+
+    {
+      name: 'where-accumulates-and-a-single-clause-stays-a-string',
+      async run({ assert }) {
+        assert.deepEqual(parse(['firestore:query', '--where', 'a==1', '--where', 'b==2']).where, ['a==1', 'b==2']);
+        assert.equal(parse(['firestore:query', '--where', 'a==1']).where, 'a==1');
+      },
+    },
+
+    {
+      name: 'no-negation-sets-the-positive-flag-false',
+      async run({ assert }) {
+        // `argv.https !== false` / `argv.seed !== false` / `argv.merge !== false`
+        // are how the emulator and firestore commands read these.
+        const argv = parse(['emulator', '--no-https', '--no-seed', '--no-merge']);
+        assert.equal(argv.https, false);
+        assert.equal(argv.seed, false);
+        assert.equal(argv.merge, false);
       },
     },
   ],

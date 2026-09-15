@@ -19,6 +19,7 @@ const ALIASES = {
   clean: ['--clean'], // brand-root clean fan-out, every target type (#603)
   update: ['--update', 'outdated', 'out'], // brand-root dependency-freshness fan-out (devkit update per target)
   test: ['--test'],
+  bump: ['--bump'], // brand-root version writer: the root and every target move together (#869)
   version: ['-v', '--version'],
 };
 

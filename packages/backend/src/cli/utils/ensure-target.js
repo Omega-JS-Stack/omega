@@ -183,7 +183,8 @@ function scaffoldConfigs(projectDir, result) {
 }
 
 /**
- * Sync the TARGET manifest — the engines pin and the standard verb scripts.
+ * Sync the TARGET manifest: the engines pin, the standard verb scripts and the
+ * license.
  *
  * engines.node: the stage step carries it into the derived dist/package.json
  * (Cloud Functions runtime detection). Derived from the FRAMEWORK's pinned
@@ -200,6 +201,12 @@ function scaffoldConfigs(projectDir, result) {
  * are the consumer's own and are never touched; a custom-server backend keeps
  * the ones its mode refuses (frameworkOwnedScripts is the one home of that).
  *
+ * license: stated once, when the manifest states none
+ * ([#884](https://github.com/Omega-JS-Stack/omega/issues/884)), exactly as the
+ * three sibling frameworks' ensure-target passes do. UNLICENSED is npm's word
+ * for closed-source commercial code; a brand that authored its own keeps it,
+ * licensing being the brand's call.
+ *
  * Identical content is not a write.
  *
  * @param {string} projectDir - The target root.
@@ -215,6 +222,11 @@ function scaffoldPackageJson(projectDir, result) {
     manifest.engines = manifest.engines || {};
     manifest.engines.node = nodeVersion;
     changes.push(`engines.node = ${nodeVersion}`);
+  }
+
+  if (!manifest.license) {
+    manifest.license = 'UNLICENSED';
+    changes.push('license = UNLICENSED');
   }
 
   const owned = frameworkOwnedScripts(projectDir);
@@ -241,8 +253,9 @@ function scaffoldPackageJson(projectDir, result) {
  *
  * @param {string} projectDir - The target root.
  * @param {{ written: string[], merged: string[] }} result - Collector.
+ * @param {function} warn - The caller's warning logger (the engine's own).
  */
-function copyDefaults(projectDir, result) {
+function copyDefaults(projectDir, result, warn) {
   const defaultsDir = path.resolve(__dirname, '../../defaults');
 
   // Optional — older @omega.js/backend versions shipped no defaults tree
@@ -250,7 +263,7 @@ function copyDefaults(projectDir, result) {
 
   const applied = scaffoldDefaults({
     outputDir: projectDir,
-    logger: { log: () => {}, warn: () => {}, error: () => {} },
+    logger: { log: () => {}, warn, error: warn },
   });
 
   result.written.push(...applied.written);
@@ -278,12 +291,14 @@ function cleanupGeneratedArtifacts(projectDir) {
  * @param {object} options
  * @param {string} options.projectDir - The target root.
  * @param {function} [options.log] - Line logger (silent by default).
+ * @param {function} [options.warn] - Warning logger (silent by default).
  * @returns {{ written: string[], merged: string[], changed: string[] }}
  *   Target-relative paths per outcome — empty on a no-op run.
  */
 function ensureTarget(options) {
   const projectDir = options.projectDir;
   const log = options.log || (() => {});
+  const warn = options.warn || (() => {});
   const result = { written: [], merged: [], changed: [] };
 
   // The framework's own tree is not a consumer target. Running the framework's
@@ -301,7 +316,7 @@ function ensureTarget(options) {
 
   scaffoldConfigs(projectDir, result);
   scaffoldPackageJson(projectDir, result);
-  copyDefaults(projectDir, result);
+  copyDefaults(projectDir, result, warn);
   cleanupGeneratedArtifacts(projectDir);
 
   for (const [label, files] of [['Created', result.written], ['Merged', result.merged], ['Synced', result.changed]]) {

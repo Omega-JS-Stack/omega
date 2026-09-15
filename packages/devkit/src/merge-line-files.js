@@ -23,8 +23,16 @@
 //   - The Default section is replaced with the new framework's defaults.
 //   - Keys that already had values (in either Default or Custom) keep those values
 //     in the same section they were in.
-//   - Keys the user added to the Default section that are NOT in the new framework's
-//     defaults migrate to the Custom section (so framework cleanups don't lose user data).
+//   - The Default section is COMPLETELY managed ([#926](https://github.com/Omega-JS-Stack/omega/issues/926)):
+//     a line the new framework block no longer carries LEAVES the consumer, so a
+//     rule the framework retires or rewrites actually takes effect everywhere. A
+//     retired framework line and a line a user typed inside the framework block
+//     cannot be told apart, and the block header already says it is overwritten on
+//     every setup, so `.gitignore` and `AGENTS.md` drop it. Lines a user owns
+//     belong under the Custom marker, which stays verbatim.
+//   - .env is the one exception: a retired key holding a NON-EMPTY value migrates
+//     to the Custom section (that value is data, not a rule), while an empty
+//     retired key (`KEY=` / `KEY=""`) drops like any other retired line.
 //   - .env values are normalized to **double-quoted** form on every merge:
 //       KEY=raw-value         →   KEY="raw-value"
 //       KEY="already-quoted"  →   KEY="already-quoted"  (left alone)
@@ -110,23 +118,22 @@ function mergeLineBasedFiles(existingContent, newContent, fileName) {
     }
   }
 
-  // User-added stuff in their Default section that the new framework doesn't know about
-  // → migrate to Custom so it's preserved without being clobbered next setup.
+  // Anything in the existing Default section the new framework block no longer
+  // carries. The block is COMPLETELY managed (#926), so it DROPS: a retired
+  // framework line and a line the user typed into the framework block cannot be
+  // told apart, and the block header already says it is overwritten on every
+  // setup. The one exception is an .env key holding a real value, which is the
+  // user's DATA rather than a rule, so it migrates down to Custom; an empty one
+  // drops with the rest. .gitignore and AGENTS.md migrate nothing.
   const migratedToCustom = [];
-  for (const line of existingDefault) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+  if (isEnvFile) {
+    for (const line of existingDefault) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
 
-    if (isEnvFile) {
       const key = trimmed.split('=')[0].trim();
-      if (key && !newDefaultKeys.has(key) && !existingCustomKeys.has(key)) {
+      if (key && !newDefaultKeys.has(key) && !existingCustomKeys.has(key) && !envValueIsEmpty(trimmed)) {
         migratedToCustom.push(normalizeEnvLine(line));
-      }
-    } else {
-      // .gitignore: line not in new defaults → migrate.
-      const inNew = newLines.some((nl) => nl.trim() === trimmed);
-      if (!inNew) {
-        migratedToCustom.push(line);
       }
     }
   }
@@ -186,7 +193,7 @@ function normalizeEnvLine(line) {
   if (eqIdx < 0) return line; // no `=` — not a KEY=VALUE line
 
   const key = trimmed.slice(0, eqIdx).trim();
-  let value = trimmed.slice(eqIdx + 1);
+  const value = trimmed.slice(eqIdx + 1);
 
   // Strip trailing whitespace + inline comment-after-value (rare; we only strip a # that follows a space).
   // We do NOT strip # inside quoted values. Detect that by checking if value starts with a quote.

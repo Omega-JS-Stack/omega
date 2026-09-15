@@ -14,6 +14,8 @@ const { execFileSync } = require('node:child_process');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
+const { certificateExpiry } = require('@omega.js/devkit/certs');
+
 const { isStale } = require('../../../lib/stale.js');
 const { API_BASE } = require('./apple-api.js');
 
@@ -74,23 +76,24 @@ function generateCSR(emailAddress, commonName, outputDir) {
 }
 
 /**
- * Get CSR content for a cert type, reusing an existing CSR when found.
+ * Get CSR content for a cert type, reusing an existing CSR when found: the
+ * company tier first, then the brand's own (#892). A NEW one is generated in
+ * the tree's write dir.
  *
- * IMPORTANT: CSR private keys must be preserved across runs — they're
- * paired with the issued certificate. Deleting a CSR private key while a
+ * IMPORTANT: CSR private keys must be preserved across runs. They are
+ * paired with the issued certificate, so deleting a CSR private key while a
  * matching cert is active makes the cert unusable for signing.
  */
-function getCSRContent(type, appleDir, teamId) {
-  const csrDir = `${appleDir}/csr/${type}`;
-  const csrPath = `${csrDir}/request.csr`;
+function getCSRContent(type, tree, teamId) {
+  const existing = tree.find(`csr/${type}/request.csr`);
 
-  if (jetpack.exists(csrPath)) {
-    console.log(`        ${chalk.gray('ℹ')} Reusing existing CSR from ${csrPath}`);
-    return cleanCSR(jetpack.read(csrPath));
+  if (existing) {
+    console.log(`        ${chalk.gray('ℹ')} Reusing existing CSR from ${existing.path}`);
+    return cleanCSR(jetpack.read(existing.path));
   }
 
   console.log(`        Generating new CSR...`);
-  return generateCSR(`${teamId}@apple.com`, `${type} Certificate`, csrDir);
+  return generateCSR(`${teamId}@apple.com`, `${type} Certificate`, tree.path(`csr/${type}`));
 }
 
 function cleanCSR(csrContent) {
@@ -103,40 +106,77 @@ function cleanCSR(csrContent) {
 /**
  * Export the .cer + private.key pair to a Keychain-importable .p12.
  *
- * No-ops when the .cer is missing or when the .p12 is already fresher than
- * the .cer (mtime diff — a converged brand runs zero openssl execs). A cert
- * WITHOUT its paired key warns instead of silently skipping: that cert
- * can't sign anything until csr/{TYPE}/private.key arrives from the machine
- * whose CSR created it.
+ * Both halves resolve through the TWO tiers (company first, brand second,
+ * #892); the .p12 is written where the tree writes. The key is not merely
+ * PRESENT, it is PAIRED: the modulus of each candidate key is compared with the
+ * certificate's, so the answer is the key that can actually sign, wherever it
+ * lives.
+ *
+ * No-ops when the .cer is missing or when the .p12 is already fresher than the
+ * .cer (mtime diff, so a converged brand runs zero openssl execs). It REPORTS
+ * instead of printing: whether a configured type ends up with signing material
+ * is the walk's verdict to give ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)),
+ * and a cert with no paired key is an error there, never a warning.
+ *
+ * @param {string} type - Certificate type (DEVELOPER_ID_APPLICATION_G2, ...).
+ * @param {object} tree - The brand's signing tree (@omega.js/devkit/signing-tree).
+ * @param {string} [certificatePassword] - Password the .p12 carries.
+ * @returns {{ exported: boolean, keyPath: string|null, p12Path: string|null, reason: string|null }}
+ *   `reason` is null on a real export, else one of `no-certificate`,
+ *   `current`, `no-paired-key`, `export-failed: <message>`.
  */
-function exportToP12(type, appleDir, certificatePassword = '') {
-  const certPath = `${appleDir}/certificates/${type}.cer`;
-  const keyPath = `${appleDir}/csr/${type}/private.key`;
-  const p12Path = `${appleDir}/certificates/${type}.p12`;
+function exportToP12(type, tree, certificatePassword = '') {
+  const cert = tree.find(`certificates/${type}.cer`);
+  const p12Path = tree.path(`certificates/${type}.p12`);
 
-  if (!jetpack.exists(certPath)) {
-    return;
+  if (!cert) {
+    return { exported: false, keyPath: null, p12Path, reason: 'no-certificate' };
   }
-  if (!jetpack.exists(keyPath)) {
-    console.log(`        ${chalk.yellow('⚠')} No local private key for ${type} — .p12 not exported (copy csr/${type}/private.key from the machine that created the CSR, then re-run)`);
-    return;
+
+  const existing = tree.find(`certificates/${type}.p12`);
+  if (existing && !isStale(cert.path, existing.path)) {
+    return { exported: false, keyPath: null, p12Path: existing.path, reason: 'current' };
   }
-  if (!isStale(certPath, p12Path)) {
-    return;
+
+  const keyPath = findPairedKey(cert.path, type, tree);
+  if (!keyPath) {
+    return { exported: false, keyPath: null, p12Path, reason: 'no-paired-key' };
   }
 
   try {
     // -legacy: macOS `security import` requires the old PKCS12 format.
-    // Password rides an env var (-passout env:) — never argv, never a shell string.
+    // Password rides an env var (-passout env:), never argv, never a shell string.
     execFileSync(
       'openssl',
-      ['pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', certPath, '-out', p12Path, '-passout', 'env:OMEGA_P12_PASSWORD'],
+      ['pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', cert.path, '-out', p12Path, '-passout', 'env:OMEGA_P12_PASSWORD'],
       { stdio: 'pipe', env: { ...process.env, OMEGA_P12_PASSWORD: certificatePassword } },
     );
-    console.log(`        ${chalk.green('✓')} Exported .p12 ${chalk.gray(p12Path)}`);
   } catch (error) {
-    console.log(`        ${chalk.yellow('⚠')} Failed to export .p12: ${chalk.gray(error.message)}`);
+    return { exported: false, keyPath, p12Path, reason: `export-failed: ${error.message}` };
   }
+
+  return { exported: true, keyPath, p12Path, reason: null };
+}
+
+/**
+ * The private key that PAIRS with a certificate, company tier first: proof the
+ * cert was issued from a CSR this pipeline holds the key for, and the answer to
+ * "can this type sign anything". Null when no tier holds a pairing key.
+ *
+ * @param {string} certPath - The certificate.
+ * @param {string} type - Certificate type (names the csr/ dir).
+ * @param {object} tree - The brand's signing tree.
+ * @returns {string|null}
+ */
+function findPairedKey(certPath, type, tree) {
+  for (const dir of tree.readDirs) {
+    const candidate = `${dir}/csr/${type}/private.key`;
+    if (jetpack.exists(candidate) && certificateMatchesKey(certPath, candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -160,38 +200,30 @@ function findValidCertificate(existingCerts, type) {
 }
 
 /**
- * Validate a manually-downloaded .cer via openssl (exists + not expired).
- * Manual types (DEVELOPER_ID_*) can only be downloaded from the developer
- * portal — the API doesn't allow creating them.
+ * Validate a manually-downloaded .cer (exists + not expired) through the ONE
+ * expiry reader (`@omega.js/devkit/certs`, #892). Manual types (DEVELOPER_ID_*)
+ * can only be downloaded from the developer portal, the API cannot create them.
  *
- * @returns {{ valid: boolean, expirationDate: Date|null, reason: string|null }}
+ * @param {string} certPath - The .cer.
+ * @returns {{ valid: boolean, expiresAt: Date|null, daysLeft: number|null, reason: string|null }}
  */
 function validateManualCertificate(certPath) {
-  if (!jetpack.exists(certPath)) {
-    return { valid: false, expirationDate: null, reason: 'file not found' };
+  if (!certPath || !jetpack.exists(certPath)) {
+    return { valid: false, expiresAt: null, daysLeft: null, reason: 'file not found' };
   }
 
+  let expiry;
   try {
-    const endDateOutput = execFileSync(
-      'openssl',
-      ['x509', '-enddate', '-noout', '-in', certPath],
-      { encoding: 'utf8', stdio: 'pipe' },
-    ).trim();
-
-    const dateMatch = endDateOutput.match(/notAfter=(.+)/);
-    if (!dateMatch) {
-      return { valid: false, expirationDate: null, reason: 'could not parse expiration date' };
-    }
-
-    const expirationDate = new Date(dateMatch[1]);
-    if (expirationDate <= new Date()) {
-      return { valid: false, expirationDate, reason: 'expired' };
-    }
-
-    return { valid: true, expirationDate, reason: null };
+    expiry = certificateExpiry(certPath);
   } catch (error) {
-    return { valid: false, expirationDate: null, reason: error.message };
+    return { valid: false, expiresAt: null, daysLeft: null, reason: error.message };
   }
+
+  if (expiry.daysLeft < 0) {
+    return { valid: false, ...expiry, reason: 'expired' };
+  }
+
+  return { valid: true, ...expiry, reason: null };
 }
 
 /**
@@ -249,4 +281,5 @@ module.exports = {
   validateManualCertificate,
   getCertificateCommonName,
   certificateMatchesKey,
+  findPairedKey,
 };

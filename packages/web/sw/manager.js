@@ -3,9 +3,11 @@
  * Bundled (esbuild iife) from the consumer's src/service-worker.js entry
  * (or the packaged default) to dist root /service-worker.js.
  *
- * Config transport: the build emits /build.js (`self.OMEGA_BUILD_JSON = {…}`)
- * with the brand id, environment, version, cacheBreaker, main asset URLs and
- * firebase config — imported synchronously below, BEFORE the class reads it.
+ * Config transport: the ONE build snapshot every OMEGA browser surface loads
+ * (#743), `/build.js` (`self.OMEGA_BUILD_JSON = {…}`), imported synchronously
+ * below, BEFORE the class reads it. The same file the pages load, so the worker
+ * and the page can never disagree: `config.brand.id`, `config.environment`,
+ * `config.buildTime` and `config.cloud.config` are the keys read here.
  * Because the registration uses `updateViaCache: 'none'`, a changed /build.js
  * (new build, or a DIFFERENT project on the same localhost port) makes the
  * browser install this worker fresh: skipWaiting + clients.claim take the
@@ -54,7 +56,7 @@ setupGlobalHandlers();
 // failed CDN fetch (offline, CSP, blocked gstatic) must never abort script
 // evaluation and take down the SW's cache-eviction/takeover role.
 let firebaseScriptsLoaded = false;
-if (sw.OMEGA_BUILD_JSON && sw.OMEGA_BUILD_JSON.firebase) {
+if (sw.OMEGA_BUILD_JSON && sw.OMEGA_BUILD_JSON.config?.cloud?.config) {
   try {
     importScripts(
       `https://www.gstatic.com/firebasejs/${__OMEGA_FIREBASE_VERSION__}/firebase-app-compat.js`,
@@ -72,14 +74,16 @@ class Manager {
     // Properties
     this.serviceWorker = null;
 
-    // Load config from the emitted /build.js
-    this.config = sw.OMEGA_BUILD_JSON || {};
+    // The one snapshot /build.js assigned, the same `config` blob the pages
+    // hand @omega.js/client (#743).
+    this.config = sw.OMEGA_BUILD_JSON?.config || {};
 
     // Defaults
-    this.brand = this.config.brand || 'default';
+    this.brand = this.config.brand?.id || 'default';
     this.environment = this.config.environment || 'production';
     this.cache = {
-      breaker: this.config.cacheBreaker || new Date().getTime(),
+      // The build stamp every surface spells `buildTime` (#896)
+      breaker: this.config.buildTime || new Date().getTime(),
     };
     this.cache.name = `${this.brand}-${this.cache.breaker}`;
 
@@ -149,8 +153,9 @@ class Manager {
 
   // Setup Firebase init
   initializeFirebase() {
-    // Get Firebase config
-    const firebaseConfig = this.config.firebase;
+    // The Firebase WEB config, at the canonical home @omega.js/client boots
+    // from too (#894): one home, never a second `firebase` blob beside it.
+    const firebaseConfig = this.config.cloud?.config;
 
     // Check if Firebase config is available
     if (!firebaseConfig) {
@@ -220,9 +225,11 @@ class Manager {
       return Promise.resolve();
     }
 
-    // Set default resources to cache: the home page + the main bundles
-    // (their URLs ride /build.js — hashed names in production builds)
-    const defaults = ['/', this.config.assets?.js, this.config.assets?.css].filter(Boolean).map(sitePath);
+    // Set default resources to cache: the home page, plus whatever the caller
+    // passes. The main bundles' hashed URLs are in /build.json (the build
+    // manifest), not in the client snapshot, so reviving this lane means
+    // fetching that first.
+    const defaults = ['/'].map(sitePath);
 
     // Ensure pages is an array, mounted the same way the defaults are: the
     // update-cache caller supplies SITE-relative pages (it knows nothing about

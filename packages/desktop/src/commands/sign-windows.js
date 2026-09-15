@@ -1,6 +1,6 @@
 // Strategy-aware Windows code signer.
 //
-// Reads strategy from config platforms.win.signing.strategy:
+// Reads strategy from config platforms.windows.signing.strategy:
 //   self-hosted — sign with signtool against an EV USB token (typically on a self-hosted runner)
 //   cloud       — shell out to a cloud signing provider's CLI (Azure / SSL.com / DigiCert)
 //   local       — no-op (developer signs manually on their own Windows box)
@@ -142,9 +142,9 @@ async function runSignCommand(options) {
   }
 
   if (strategy === 'cloud') {
-    const provider = config.platforms?.win?.signing?.cloud?.provider;
+    const provider = config.platforms?.windows?.signing?.cloud?.provider;
     if (!provider) {
-      throw new Error('strategy=cloud but no provider set (config platforms.win.signing.cloud.provider).');
+      throw new Error('strategy=cloud but no provider set (config platforms.windows.signing.cloud.provider).');
     }
     await signWithCloudProvider(provider, targets, inDir, outDir);
     return;
@@ -344,7 +344,17 @@ async function signWithRetry(cmd, options) {
   throw new Error(`signWithRetry exhausted ${attempts} attempts without a verdict`);
 }
 
-async function signWithSigntool(targets, inDir, outDir) {
+// The signing loop. Both of its shell-outs and every line it prints sit behind
+// one seam (`deps.exec` runs signtool, `deps.logger` prints), so the ORDER that
+// makes the proof line true (sign, verify, THEN the line) is provable without a
+// Windows box. Production passes neither: the real signtool and the real logger
+// are the defaults, and the deliberate end-to-end sign is sign-windows-e2e.
+async function signWithSigntool(targets, inDir, outDir, deps) {
+  deps = deps || {};
+  const exec = deps.exec;
+  const runVerify = exec || ((command) => execute(command, { log: false }));
+  const log = deps.logger || logger;
+
   const projectRoot = process.cwd();
   const { tokenRef, password, useThumbprint, signtool, timestampUrl } = resolveSigntoolEnv();
 
@@ -368,7 +378,7 @@ async function signWithSigntool(targets, inDir, outDir) {
 
     const cmd = buildSignCommand({ signtool, tokenRef, password, timestampUrl, outPath });
 
-    logger.log(`Signing ${path.relative(projectRoot, outPath)}${useThumbprint ? ' (thumbprint mode)' : ''}...`);
+    log.log(`Signing ${path.relative(projectRoot, outPath)}${useThumbprint ? ' (thumbprint mode)' : ''}...`);
 
     const fileBytes = (() => { try { return fs.statSync(outPath).size; } catch (_) { return null; } })();
     signEvents.emit('sign-start', {
@@ -385,6 +395,7 @@ async function signWithSigntool(targets, inDir, outDir) {
     try {
       await signWithRetry(cmd, {
         file: path.basename(outPath),
+        exec,
         startUnlock: () => (useThumbprint ? startAutoUnlock({ password, logger }) : { stop: () => {} }),
       });
     } catch (e) {
@@ -400,7 +411,7 @@ async function signWithSigntool(targets, inDir, outDir) {
     // Verify is a local check with no third party in it — one shot.
     const verifyCmd = buildVerifyCommand({ signtool, outPath });
     try {
-      await execute(verifyCmd, { log: false });
+      await runVerify(verifyCmd);
     } catch (e) {
       signEvents.emit('sign-fail', {
         file: path.basename(outPath),
@@ -414,7 +425,11 @@ async function signWithSigntool(targets, inDir, outDir) {
       file: path.basename(outPath),
       duration_ms: Date.now() - fileStart,
     });
-    logger.log(logger.format.green(`✓ Signed: ${path.relative(projectRoot, outPath)}`));
+    // The proof line, in the mac lane's shape (hooks/notarize.js): the verify
+    // above aborts the job on a failure, so this line names the check that ran
+    // rather than claiming a signature nobody checked
+    // ([#918](https://github.com/Omega-JS-Stack/omega/issues/918)).
+    log.log(`Signed and verified: signtool verify /pa accepts ${path.basename(outPath)}.`);
 
     if (outPath.toLowerCase().endsWith('.exe')) {
       signedExes.push({ filePath: outPath, urlName: path.basename(outPath) });
@@ -429,9 +444,9 @@ async function signWithSigntool(targets, inDir, outDir) {
     const pkg = Manager.getPackage('project') || {};
     const version = pkg.version;
     if (!version) {
-      logger.warn('Could not determine version from package.json — skipping latest.yml generation.');
+      log.warn('Could not determine version from package.json; skipping latest.yml generation.');
     } else {
-      logger.log(`Generating Windows auto-updater feed (latest.yml) for ${signedExes.length} installer(s)...`);
+      log.log(`Generating Windows auto-updater feed (latest.yml) for ${signedExes.length} installer(s)...`);
       try {
         await writeUpdateInfo({
           signedExes,
@@ -443,8 +458,8 @@ async function signWithSigntool(targets, inDir, outDir) {
         // Don't fail the whole sign step if yml generation hits something unexpected —
         // the signed exe is still valid + uploadable. But this IS a real problem
         // because auto-updates won't work, so log loudly.
-        logger.error(`latest.yml generation failed: ${e.message}`);
-        logger.error('  Signed binary is OK but Windows auto-updater will not see this release.');
+        log.error(`latest.yml generation failed: ${e.message}`);
+        log.error('  Signed binary is OK but Windows auto-updater will not see this release.');
       }
     }
   }

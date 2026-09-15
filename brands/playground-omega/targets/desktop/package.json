@@ -1,16 +1,15 @@
 {
   "name": "playground-desktop",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "author": "OMEGA Playground",
   "private": true,
   "description": "OMEGA desktop app",
   "devDependencies": {
     "@omega.js/desktop": "file:../../../../packages/desktop",
     "electron": "^42.6.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^26.16.1",
     "gulp": "^5.0.1"
   },
-  "dependencies": {},
   "scripts": {
     "start": "omega clean && npm run gulp --",
     "gulp": "gulp",
@@ -24,5 +23,7 @@
     "test": "omega test",
     "electron": "electron ."
   },
-  "main": "dist/main.bundle.js"
+  "main": "dist/main.bundle.js",
+  "license": "UNLICENSED",
+  "dependencies": {}
 }

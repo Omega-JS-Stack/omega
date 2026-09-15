@@ -4,7 +4,7 @@
  * that renders it, and a layout says which side of the line the page is on:
  * the auth flows, the user app, the account/payment/portal screens, the legal
  * boilerplate, and the redirect stubs are plumbing, and no brand should have to
- * name any of them in `translation.exclude` — that key is for the brand's OWN
+ * name any of them in `translation.include`: that list is for the brand's OWN
  * pages. Deriving means a default page that moves, arrives, or is renamed can
  * never drift out of the list.
  */

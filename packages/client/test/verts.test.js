@@ -1,10 +1,11 @@
 const { describe, it, before } = require('node:test');
 const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
-// Config with an in-house source + company layer for source resolution
+// Config with an in-house source + the RESOLVED company section (#677: the
+// brand types `company: { id }` and the loader fills the rest)
 const ADS_CONFIG = {
   ...TEST_CONFIG,
-  company: { url: 'https://parentco.example.com' },
+  company: { id: 'parentco', name: 'ParentCo', url: 'https://parentco.example.com', images: {} },
   advertising: {
     providers: {
       inhouse: { source: 'https://verts.example.com/' },
@@ -85,11 +86,11 @@ describe('Verts Module', () => {
       assert(url.includes('api.'));
     });
 
-    it("'company' resolves the config company layer's url through the api derivation", () => {
+    it("'company' resolves the RESOLVED company url through the api derivation", () => {
       assert.strictEqual(getManager().verts().resolveSource('company'), 'https://api.parentco.example.com');
     });
 
-    it("'company' without config.company.url resolves null", async () => {
+    it("'company' with no resolved company url resolves null", async () => {
       const saved = getManager().config.company;
       getManager().config.company = undefined;
       assert.strictEqual(getManager().verts().resolveSource('company'), null);

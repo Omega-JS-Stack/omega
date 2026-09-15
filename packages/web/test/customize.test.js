@@ -23,6 +23,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 
+// The lane NAMES the environment
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)): the engine reads
+// that ONE input instead of a loose `options.environment`, and a fixture build
+// with no verb above it is a development build, which is what it always was.
+const { setEnvironment } = require('@omega.js/config/environment');
 const { configureOmega } = require('../src/index.js');
 const { resolveCustomization, materialize, listCustomizable } = require('../src/customize.js');
 const { miniData, PKG } = require('./lib/build.js');
@@ -35,6 +40,7 @@ const SCRATCH = path.join(PKG, '.omega', 'customize-consumer');
  * shape, but with a caller-owned consumer dir).
  */
 async function buildConsumer(consumerDir, name, siteData = miniData) {
+  setEnvironment('development');
   const Eleventy = require('@11ty/eleventy').default;
   const elev = new Eleventy(consumerDir, path.join(PKG, '.omega', `${name}-out`), {
     quietMode: true,

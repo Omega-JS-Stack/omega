@@ -43,13 +43,15 @@ const NO_ENV = { OMEGA_HOSTING_PORT: null, OMEGA_HTTPS_PORT: null };
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'utils/url-helpers — getApiUrl resolves env → baked dev.ports → classic',
+  description: 'utils/url-helpers: getApiUrl resolves env, then the baked dev.ports, then throws',
   tests: [
     {
-      name: 'exports { attachTo, getApiUrl }',
+      name: 'exports { attachTo, getApiUrl, localPort, requiredPort }',
       run: (ctx) => {
         ctx.expect(typeof helpers.attachTo).toBe('function');
         ctx.expect(typeof helpers.getApiUrl).toBe('function');
+        ctx.expect(typeof helpers.localPort).toBe('function');
+        ctx.expect(typeof helpers.requiredPort).toBe('function');
       },
     },
     {
@@ -80,12 +82,32 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'neither channel → the classic hosting port 5002',
+      // The classic 5002 used to answer here
+      // ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)). It is gone:
+      // a dev build always bakes the resolved map, so neither channel answering
+      // means the artifact is broken, and a wrong API base is a silent
+      // connection refusal or a hit on a neighbouring project's stack.
+      name: 'neither channel → a throw naming the port and the bundle task',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(helpers.getApiUrl.call(fakeManager('testing'))).toBe('http://localhost:5002');
-          ctx.expect(helpers.getApiUrl.call(fakeManager('development'))).toBe('http://localhost:5002');
+          for (const environment of ['testing', 'development']) {
+            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment))).toThrow(/dev port for `hosting`/);
+            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment))).toThrow(/bundle task/);
+          }
         });
+      },
+    },
+    {
+      // No copy of the classic numbers lives in this module any more (#834):
+      // they are defined once, in @omega.js/config, and reach a browser context
+      // only through the map the bundle task bakes.
+      name: 'no classic constants live in this module (#834)',
+      run: (ctx) => {
+        const source = require('fs').readFileSync(require.resolve('../../../utils/url-helpers.js'), 'utf8');
+        const code = source.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+        for (const classic of ['4000', '5001', '5002', '9099']) {
+          ctx.expect(code.includes(classic)).toBe(false);
+        }
       },
     },
     {

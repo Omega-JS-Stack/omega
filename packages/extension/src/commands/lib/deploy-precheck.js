@@ -13,17 +13,19 @@
  *                        which the dispatched workflow's generated env block
  *                        consumes ([#680](https://github.com/Omega-JS-Stack/omega/issues/680))
  *
- * Every step is soft: a precheck reports, the deploy proceeds. `--no-secrets`
- * skips the whole precheck — the same opt-out name on web, desktop and
- * extension (parity).
+ * The freshness check is soft (it reports); `push-secrets` is FATAL on all four
+ * frameworks ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the
+ * dispatched publish reads what it sends, so a refused or half publish stops
+ * the deploy. `--no-secrets` skips the whole precheck, the same opt-out name on
+ * web, desktop and extension (parity).
  *
  * The RUNNER is `@omega.js/devkit/deploy-precheck` (one copy for every
  * framework); this file is the extension's STEPS.
  */
 const Manager = new (require('../../build.js'));
 const { runDeployPrecheck } = require('@omega.js/devkit/deploy-precheck');
+const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { updateManager } = require('./dependencies.js');
-const { publishEnvSecrets } = require('./push-secrets.js');
 
 const package = Manager.getPackage('main');
 
@@ -38,7 +40,13 @@ const STEPS = [
   },
   {
     name: 'push-secrets',
-    run: ({ projectDir, log, warn }) => publishEnvSecrets({ targetDir: projectDir, logger: { log, warn, error: warn } }),
+    fatal: true,
+    run: ({ projectDir, log, warn, dryRun }) => publishTargetSecrets({
+      targetDir: projectDir,
+      target: 'extension',
+      logger: { log, warn, error: warn },
+      dryRun,
+    }),
   },
 ];
 
@@ -48,10 +56,11 @@ const STEPS = [
  * @param {object} input.options - The parsed CLI options (`secrets: false` = opted out).
  * @param {object} input.logger - `{ log, warn, error }`.
  * @param {Array} [input.steps] - Injectable step list (tests).
+ * @param {boolean} [input.dryRun] - Plan only; handed to every step (#895).
  * @returns {Promise<{ skipped: string }|{ ran: string[] }>} The steps that ran, or the opt-out marker.
  */
-function deployPrecheck({ projectDir, options, logger, steps }) {
-  return runDeployPrecheck({ projectDir, options, logger, steps: steps || STEPS });
+function deployPrecheck({ projectDir, options, logger, steps, dryRun }) {
+  return runDeployPrecheck({ projectDir, options, logger, steps: steps || STEPS, dryRun });
 }
 
 module.exports = { deployPrecheck, STEPS };

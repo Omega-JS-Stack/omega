@@ -74,7 +74,7 @@ test('a pre-converted target exits ZERO so scripted pipelines survive (#297)', (
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-web-migrate-converted-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   fs.mkdirSync(path.join(root, 'src', 'pages'), { recursive: true });
   fs.writeFileSync(path.join(root, 'src', 'pages', 'index.html'), '<h1>{{ page.resolved.meta.title }}</h1>\n');
 

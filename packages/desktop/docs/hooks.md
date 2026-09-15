@@ -23,9 +23,10 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 | `hooks/build/post.js`    | After the build pipeline finishes, before `electron-builder` packages anything | `{ manager, projectRoot, mode }` |
 | `hooks/release/pre.js`   | Before `electron-builder build --publish always` | `{ manager, projectRoot, mode }` |
 | `hooks/release/post.js`  | After the release publishes | `{ manager, projectRoot, mode }` |
+| `hooks/deploy/pre.js`    | Inside `omega deploy`, after the local scaffold and before the network precheck, on both lanes (the dispatch and `--direct`); a dry run skips it, because a hook may act on the world ([#900](https://github.com/Omega-JS-Stack/omega/issues/900): the playground's prunes its release family down to the newest, so two releases stay live; the VERSION comes from `omega bump` at the brand root, [#869](https://github.com/Omega-JS-Stack/omega/issues/869), never from a hook) | `{ manager, projectRoot, mode: 'production' }` |
 | `hooks/notarize/post.js` | After @omega.js/desktop's built-in macOS notarization completes (extension only — @omega.js/desktop's notarize is the real entrypoint) | electron-builder afterSign context |
 
-`mode` is `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`.
+`mode` is `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`. A deploy hook always reads `'production'`: the verb runs outside a build, and what it is about to publish is a release.
 
 ## Why this design
 
@@ -84,4 +85,5 @@ module.exports = async (context) => {
 ## Tests
 
 - `src/test/suites/build/run-consumer-hook.test.js` — silent skip, invocation with args, error swallowing.
+- `src/test/suites/build/deploy-hook.test.js`: `omega deploy` runs `hooks/deploy/pre.js` after the scaffold and before the precheck; a dry run skips it.
 - `src/test/suites/build/build-config.test.js` — `injectAfterSign` always points at @omega.js/desktop's notarize.

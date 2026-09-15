@@ -24,7 +24,7 @@ function stage(configProjectId, firebasercProjectId) {
     '{',
     '  brand: { id: "pid-brand", name: "PID Brand" },',
     `  cloud: { provider: "firebase", config: { projectId: "${configProjectId}" } },`,
-    '  targets: { backend: {} },',
+    '  targets: { backend: { type: "backend" } },',
     '}',
   ].join('\n'));
   jetpack.write(path.join(tmp, '.firebaserc'), `${JSON.stringify({ projects: { default: firebasercProjectId } }, null, 2)}\n`);

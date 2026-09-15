@@ -72,7 +72,7 @@ test('configured advertising: the verts/unit section renders its host — values
   const html = pages.get('/vert');
 
   assert.ok(html.includes('data-omega-vert="in-article"'), 'section host renders with the type');
-  // The id/slot reach the page ONLY through the baked window.Configuration
+  // The id/slot reach the page ONLY through the OMEGA_BUILD_JSON snapshot
   // (the channel the client verts module reads) — never as legacy unit markup
   assert.ok(!html.includes('data-ad-client'), 'no legacy data-ad-* unit markup');
   assert.ok(!html.includes('vert.bundle'), 'no legacy vert bundle script');

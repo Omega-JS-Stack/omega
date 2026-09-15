@@ -56,11 +56,11 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'platforms.win.signing.strategy enum enforced under desktop',
+      name: 'platforms.windows.signing.strategy enum enforced under desktop',
       run: (ctx) => {
-        const cfg = { ...VALID, platforms: { win: { signing: { strategy: 'banana' } } } };
+        const cfg = { ...VALID, platforms: { windows: { signing: { strategy: 'banana' } } } };
         const { errors } = validateConfig(cfg, { target: 'desktop' });
-        ctx.expect(errors.some((e) => e.includes('platforms.win.signing.strategy'))).toBe(true);
+        ctx.expect(errors.some((e) => e.includes('platforms.windows.signing.strategy'))).toBe(true);
       },
     },
     {

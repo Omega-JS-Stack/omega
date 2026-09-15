@@ -3,6 +3,10 @@
   app topbar (global/sections/app-topbar.html) but keep their frontmatter API:
   resolved.config.theme.header.{title, actions} render here.
 
+  An `icon` (the title's, an action's, a dropdown item's) carries its OWN Font
+  Awesome classes (#619, #850, #903): `icon: 'fa-brands fa-github'`. Every icon
+  site below emits that string verbatim and adds only its size and spacing.
+
   action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else renders
   no size class. NEVER test it for truthiness: Liquid answers `.size` on a hash
   with its KEY COUNT, so every action would "have" a size (#43).
@@ -15,7 +19,7 @@
         {% unless resolved.config.theme.header.title.enabled == false %}
           <h1 class="page-title mb-0 d-flex align-items-center {{ resolved.config.theme.header.title.class }}">
             {% if resolved.config.theme.header.title.icon %}
-              <span class="omega-icon-chip omega-icon-chip--neutral me-2"><i class="fa-solid fa-{{ resolved.config.theme.header.title.icon }} fa-sm"></i></span>
+              <span class="omega-icon-chip omega-icon-chip--neutral me-2"><i class="{{ resolved.config.theme.header.title.icon }} fa-sm" aria-hidden="true"></i></span>
             {% endif %}
             {{- resolved.config.theme.header.title.content | default: resolved.meta.title | omega_liquify -}}
           </h1>
@@ -46,7 +50,7 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false">
                       {% if action.icon %}
-                        <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+                        <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
                       {% endif %}
                       {{ action.label }}
                     </button>
@@ -58,7 +62,7 @@
                           <li>
                             <a class="dropdown-item" href="{{ item.href | default: '#' }}">
                               {% if item.icon %}
-                                <i class="fa-solid fa-{{ item.icon }} fa-sm me-2"></i>
+                                <i class="{{ item.icon }} fa-sm me-2" aria-hidden="true"></i>
                               {% endif %}
                               {{ item.label }}
                             </a>
@@ -73,7 +77,7 @@
                   {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
                   {% capture action_content %}
                     {% if action.icon %}
-                      <i class="fa-solid fa-{{ action.icon }} fa-sm me-2"></i>
+                      <i class="{{ action.icon }} fa-sm me-2" aria-hidden="true"></i>
                     {% endif %}
                     {{ action.label }}
                   {% endcapture %}

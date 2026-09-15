@@ -6,13 +6,11 @@ const { ensureTarget } = require('./lib/ensure-target.js');
 
 // The consumer's `build` script is `omega build` — this verb owns the
 // pipeline and the build-mode flag; it must never shell back to that script.
-// `certs` delivers the Apple artifacts first (#678).
 function plan() {
   return {
     env: { OMEGA_BUILD_MODE: 'true' },
     steps: [
       { type: 'clean' },
-      { type: 'certs' },
       { type: 'gulp', task: 'build' },
     ],
   };

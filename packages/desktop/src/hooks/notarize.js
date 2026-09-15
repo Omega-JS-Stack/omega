@@ -9,23 +9,32 @@
 //   APPLE_API_KEY_ID  — 10-char Key ID (matches the XXXXXXXXXX in the filename)
 //   APPLE_API_ISSUER  — issuer UUID from App Store Connect → Users and Access → Keys
 //
-// Skipped automatically when:
-//   - building for a non-darwin platform
-//   - any of the env vars above is missing (warns, doesn't fail — useful for dev builds without certs)
-//   - the packaged app carries no Developer ID signature (#872): electron-builder
-//     SKIPS signing when it finds no identity and leaves an ad-hoc signature
-//     behind, and notarytool rejects one ("Failed to codesign your application"),
-//     so a brand with a notarization key but no signing cert failed the whole
-//     mac leg after a clean build
+// Skipped ONLY when building for a non-darwin platform. Every other state is a
+// THROW ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): a mac
+// build that reaches this hook is a mac build this framework ships, and a build
+// that cannot be signed and notarized must not become a release.
+//   - missing APPLE_API_KEY / _ID / _ISSUER: nothing can notarize it
+//   - no Developer ID signature (#872): electron-builder SKIPS signing when it
+//     finds no identity and leaves an ad-hoc signature behind, which notarytool
+//     rejects ("Failed to codesign your application"). That state used to warn
+//     and carry on, and the release published an app Gatekeeper refuses on every
+//     other Mac.
+//
+// After notarization the ticket is STAPLED and the result PROVED (stapler
+// validate + spctl --assess): the hook returns only when the .app on disk is
+// one a user's Mac will open offline. The DMG gets the same treatment in its
+// own hook (notarize-artifacts.js, artifactBuildCompleted), because the ticket
+// stapled to the app inside an image is not stapled to the image.
 
 const path = require('path');
 const fs   = require('fs');
 const { execute } = require('node-powertools');
 const Logger = require('../lib/logger');
+const { stapleAndProve, toolRunner } = require('./lib/notarize-tools.js');
 
 const logger = new Logger('notarize');
 
-module.exports = async function notarize(context) {
+module.exports = async function notarize(context, { run = toolRunner() } = {}) {
   const { electronPlatformName, appOutDir } = context;
 
   if (electronPlatformName !== 'darwin') {
@@ -37,8 +46,7 @@ module.exports = async function notarize(context) {
   const appleApiIssuer = process.env.APPLE_API_ISSUER;
 
   if (!appleApiKey || !appleApiKeyId || !appleApiIssuer) {
-    logger.warn('Skipping — set APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER to notarize.');
-    return;
+    throw new Error('[notarize] APPLE_API_KEY, APPLE_API_KEY_ID and APPLE_API_ISSUER are required to notarize a mac build. Run `omega deploy` (its precheck pushes them for CI) or set them in the target .env.');
   }
 
   const apiKeyPath = path.isAbsolute(appleApiKey)
@@ -55,9 +63,8 @@ module.exports = async function notarize(context) {
   // Notarization verifies a Developer ID signature; an ad-hoc one (what
   // electron-builder leaves when it finds no identity) fails the submission
   // instead ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).
-  if (!isDeveloperIdSigned(await readCodesign(appPath))) {
-    logger.warn(`Skipping: ${appName}.app is not Developer ID signed, so it cannot be notarized. Set CSC_LINK + CSC_KEY_PASSWORD (or install a Developer ID Application identity) to sign it first.`);
-    return;
+  if (!isDeveloperIdSigned(await readCodesign(appPath, run))) {
+    throw new Error(`[notarize] ${appName}.app is NOT Developer ID signed, so it cannot be notarized and every other Mac would refuse it. Set CSC_LINK + CSC_KEY_PASSWORD (or install a Developer ID Application identity) and build again.`);
   }
 
   const { notarize } = require('@electron/notarize');
@@ -74,7 +81,12 @@ module.exports = async function notarize(context) {
   });
 
   const duration = Math.round((Date.now() - start) / 1000);
-  logger.log(`Done in ${duration}s.`);
+  logger.log(`Notarized in ${duration}s.`);
+
+  // The ticket, stapled and PROVED: a notarized app whose ticket never landed
+  // still fails on a Mac that is offline when the user opens it (#891).
+  await stapleAndProve({ filePath: appPath, kind: 'app', run });
+  logger.log(`Stapled and verified: stapler validate + spctl --assess both accept ${appName}.app.`);
 
   // After @omega.js/desktop's real notarization, optionally invoke the consumer's hooks/notarize/post.js as
   // an extension point. The consumer hook can do post-notarize work (custom stapling,

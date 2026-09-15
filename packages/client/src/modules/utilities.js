@@ -391,7 +391,12 @@ class Utilities {
     return null;
   }
 
-  // Get runtime environment
+  // Get runtime environment: 'web' | 'browser-extension' | 'electron'
+  //
+  // The BAKED fact wins (#896). A surface whose runtime cannot be sniffed from
+  // inside the page bakes it into OMEGA_BUILD_JSON.config.runtime, which is how
+  // a packaged Electron renderer (a browser with no Electron globals of its
+  // own) says what it is instead of reading as plain 'web'.
   getRuntime = () => {
     // Use config runtime if provided
     if (this.manager?.config?.runtime) {

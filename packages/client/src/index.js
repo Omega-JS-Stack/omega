@@ -13,27 +13,38 @@ import Verts from './modules/verts.js';
 import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
 import { createLogger } from './modules/logger.js';
 import { pathPrefix } from './modules/path-prefix.js';
+// The environment is the ONE module's, vendored in at prepare time like every
+// other shared contract this runtime hosts
+// ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). Its one input in
+// a browser is `config.environment`, the build fact every OMEGA surface bakes.
+import { getEnvironment, isDevelopment, isProduction, isTesting } from '@omega.js/config/environment';
+import { devFactMissing } from '@omega.js/config/dev-facts';
 
 const firebaseLogger = createLogger('firebase');
 const analyticsLogger = createLogger('analytics');
 const chatsyLogger = createLogger('chatsy');
 const versionLogger = createLogger('version');
 
-// Classic dev ports (N7) — the browser-side fallbacks when no resolved map is
-// provided. Lockstep with @omega.js/config's CLASSIC_PORTS: browser code can't
-// import that Node module (fs/net), so the numbers live here too.
-const DEV_PORT_FALLBACKS = {
-  auth: 9099,
-  firestore: 8080,
-  functions: 5001,
-  hosting: 5002,
-};
+// The classic dev ports and the classic dev origin used to be repeated HERE as
+// browser-side fallbacks, in lockstep with @omega.js/config's CLASSIC_PORTS.
+// They are gone ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)):
+// the numbers are DEFINED once, in @omega.js/config, and every surface bakes the
+// resolved map into `OMEGA_BUILD_JSON.config.dev` for the browser to read. A
+// real dev build always carries it, so a missing map is a broken build, not a
+// case to assume through. `_devFactMissing` below is what a missing one raises,
+// and it names the step that writes it.
+// This runtime is embedded in all three browser surfaces, so the step that
+// wrote the map depends on which one is hosting it.
+const DEV_FACT_WRITER = '`omega dev` (into the page chrome, per response) on a website, and the @omega.js/desktop and @omega.js/extension bundle tasks at build time';
 
-// The classic dev WEBSITE ORIGIN (#262) — the same lockstep-with-@omega.js/config
-// deal as the ports above (its CLASSIC_DEV_ORIGIN). Protocol included, because a
-// port alone cannot say it: `omega dev` fronts the public port with the mkcert
-// proxy by default, so the assumption is https.
-const DEV_ORIGIN_FALLBACK = 'https://localhost:4000';
+/**
+ * The missing-dev-fact error, from the ONE home of it (#834).
+ * @param {string} what - the fact that is missing, named as the caller needs it.
+ * @returns {Error} the error to throw.
+ */
+function _devFactMissing(what) {
+  return devFactMissing(what, DEV_FACT_WRITER);
+}
 
 class Manager {
   constructor() {
@@ -260,7 +271,11 @@ class Manager {
     // Default configuration structure
     const defaults = {
       runtime: null, // Auto-detect if not provided (web, browser-extension, electron, node)
-      environment: 'production',
+      // NO `environment` default (#817). It used to default to 'production'
+      // here, which is a fourth surface quietly deciding the answer: a page
+      // whose build forgot to bake the fact read as production and talked to
+      // the LIVE stack. The fact is baked by every OMEGA build, so its absence
+      // is a broken artifact, and getEnvironment() says so by name.
       buildTime: Date.now(),
       brand: {
         id: 'brand',
@@ -423,7 +438,7 @@ class Manager {
     };
 
     // Deep merge configuration with defaults
-    const merged = this._deepMerge(defaults, configuration);
+    const merged = this._deepMerge(defaults, this._canonicalConfiguration(configuration));
 
     // Evaluate string expressions for timeout values
     if (merged.exitPopup?.config?.timeout) {
@@ -445,6 +460,40 @@ class Manager {
 
     // Return merged configuration
     return merged;
+  }
+
+  /**
+   * The ONE bridge from omega.json5's CANONICAL shape to this contract
+   * ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
+   *
+   * Every surface hands over the same browser-safe subset of its resolved
+   * config now (`OMEGA_BUILD_JSON.config`, @omega.js/config's clientConfig),
+   * so the two mappings that used to be copied into web's engine.js, web's
+   * foot.html and the extension's bundle task live here instead:
+   *
+   *   `client`                       the settings blob's home in omega.json5 IS
+   *                                  this contract's top level (auth, consent,
+   *                                  exitPopup, serviceWorker, env, …)
+   *   `monitoring.providers.sentry`  the one error-reporting home (#425): a DSN
+   *                                  there IS the switch, and it outranks a
+   *                                  legacy `client.sentry` blob (#485 part 3),
+   *                                  which still reports until a brand migrates
+   *
+   * `cloud.config` needs no bridge: _resolveFirebaseConfig() reads the
+   * canonical home first already.
+   * @param {object} configuration - the resolved subset a surface baked.
+   * @returns {object} the same facts in this contract's shape.
+   */
+  _canonicalConfiguration(configuration) {
+    const { client, ...config } = configuration || {};
+    const sentry = config.monitoring?.providers?.sentry;
+
+    // The off state rides BEFORE the blob, so a brand parked at the legacy home
+    // keeps its own switch; a real DSN rides AFTER it and wins.
+    const base = sentry?.dsn ? config : this._deepMerge(config, { sentry: { enabled: false, config: {} } });
+    const merged = this._deepMerge(base, client || {});
+
+    return sentry?.dsn ? this._deepMerge(merged, { sentry: { enabled: true, config: sentry } }) : merged;
   }
 
   _deepMerge(target, source) {
@@ -563,28 +612,31 @@ class Manager {
     this._firebaseAuth = getAuth(app);
     this._firebaseFirestore = initializeFirestore(app, {});
 
-    // Connect to the local emulator suite in development — ZERO flags (N5): dev mode
-    // means LOCAL Firebase, period. environment=development (what `omega dev` injects)
-    // auto-connects so dev can mutate data, test rules instantly, and seed the
-    // frontend; production builds (environment=production) never connect. There is
-    // deliberately NO live-Firebase opt-out for dev — build production locally if you
-    // truly need live. Ports come from the resolved dev map when one was provided
-    // (N7: the `dev.ports` chrome, then `window.__OMEGA_DEV_PORTS__` for the keys it
-    // omits), classic defaults otherwise — and an assumed port says so out loud.
+    // Connect to the local emulator suite whenever this page runs against a LOCAL
+    // stack (`_localStack()`), ZERO flags (N5): development means LOCAL Firebase,
+    // period, so `omega dev` pages mutate data, test rules instantly and seed the
+    // frontend; a testing run handed a dev port map (the desktop boot lane, the
+    // extension's emulator run, whose renderers answer the running word since #925)
+    // connects the same way, as the desktop client-bridge and the extension worker
+    // already do for their own auth. Production builds (environment=production)
+    // never connect. There is deliberately NO live-Firebase opt-out for dev: build
+    // production locally if you truly need live. Ports come from the resolved dev
+    // map, and ONLY
+    // from it (#834): the `dev.ports` chrome, then `window.__OMEGA_DEV_PORTS__`
+    // for the keys it omits. A key nobody resolved throws by name.
     // Both connects live HERE, immediately after the instances are created: the auth
     // module reads accounts via `manager.firebaseFirestore` directly, so connecting
     // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
     // Auth warnings banner disabled: it injects a DOM overlay that interferes with
     // page content in automated flows.
-    if (this.isDevelopment()) {
-      const ports = this._devPorts();
+    if (this._localStack()) {
+      const firestorePort = this._devPort('firestore');
       const authEmulatorUrl = this._authEmulatorUrl();
-      this._warnClassicPortAssumption();
-      firebaseLogger.log(`Connecting to emulators (auth ${authEmulatorUrl}, firestore :${ports.firestore})`);
+      firebaseLogger.log(`Connecting to emulators (auth ${authEmulatorUrl}, firestore :${firestorePort})`);
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
       connectAuthEmulator(this._firebaseAuth, authEmulatorUrl, { disableWarnings: true });
-      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', ports.firestore);
+      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', firestorePort);
       firebaseLogger.log('Emulators connected');
     }
 
@@ -672,20 +724,56 @@ class Manager {
   get firebaseFirestore() { return this._firebaseFirestore; }
   get firebaseMessaging() { return this._firebaseMessaging; }
 
-  isDevelopment() {
-    return this.config.environment === 'development';
+  // The environment surface (#817): ONE implementation, shared with every other
+  // OMEGA target, reading ONE input. In this runtime that input is
+  // `this.config.environment`, the build fact the page's OMEGA_BUILD_JSON
+  // carries; a config without it throws by name rather than quietly reading as
+  // "not development". The three checks DERIVE from getEnvironment(), so they
+  // can never disagree with it, and isProduction() is a real positive check.
+  getEnvironment() {
+    return getEnvironment.call(this);
   }
 
-  // The dev port map a page was actually GIVEN (N7), without fallbacks — two
-  // channels, and the BAKED CHROME WINS: `config.dev.ports` is written by
+  isDevelopment() {
+    return isDevelopment.call(this);
+  }
+
+  isProduction() {
+    return isProduction.call(this);
+  }
+
+  isTesting() {
+    return isTesting.call(this);
+  }
+
+  // Whether this page talks to a LOCAL stack: the emulators, and the API on the
+  // hosting or https port. Development always (a dev build always carries the
+  // resolved map, and a key nobody resolved throws by name). A testing run only
+  // when it was HANDED a dev port map: the desktop boot lane and the extension's
+  // emulator run bake one, and their renderers answer the running word (#925),
+  // while a testing page with no map (a unit lane, a static build under a
+  // driver) has no local stack to reach and stays live, as it always did.
+  // Production never. The `environment` argument lets the url getters honor
+  // the word a caller passed ahead of the running one.
+  _localStack(environment) {
+    const env = environment || this.getEnvironment();
+
+    if (env === 'development') return true;
+    if (env !== 'testing') return false;
+
+    return Object.keys(this._providedDevPorts()).length > 0;
+  }
+
+  // The dev port map a page was GIVEN (N7), and the only one there is (#834):
+  // two channels, and the BAKED CHROME WINS: `config.dev.ports` is written by
   // `omega dev` at render time, so it is the live map of the stack this page
   // was served by. `window.__OMEGA_DEV_PORTS__` is a driver-injected fallback
   // for pages whose chrome carries nothing — a statically built site the
   // devkit e2e harness serves, say — and it must not be able to OVERRIDE the
   // real channel, or a green suite proves only the side channel
   // ([#300](https://github.com/Omega-JS-Stack/omega/issues/300)). Presence of
-  // a key means a RESOLVED fact about a live stack; absence means "assume the
-  // classics".
+  // a key means a RESOLVED fact about a live stack; absence used to mean
+  // "assume the classics", and now means the build is broken.
   _providedDevPorts() {
     return {
       ...(typeof window !== 'undefined' && window.__OMEGA_DEV_PORTS__ || {}),
@@ -694,26 +782,22 @@ class Manager {
   }
 
   _devPorts() {
-    return { ...DEV_PORT_FALLBACKS, ...this._providedDevPorts() };
+    return this._providedDevPorts();
   }
 
-  // One loud line, dev only, when a port is an ASSUMPTION rather than a
-  // resolved fact (#300). Nothing identity-checks what answers on a classic
-  // port, so a neighbouring project's emulator holding it reads as an auth
-  // mystery (`auth/user-not-found` for hours) instead of a port problem. This
-  // says which numbers are guesses, before the first connect.
-  _warnClassicPortAssumption() {
-    const provided = this._providedDevPorts();
-    const assumed = Object.keys(DEV_PORT_FALLBACKS).filter((name) => !provided[name]);
-    if (!assumed.length) {
-      return;
+  // ONE port, by name, from the resolved map (#834). No fallback: a classic
+  // number nobody resolved is a guess, nothing identity-checks what answers on
+  // it, and a neighbouring project's emulator holding it reads as an auth
+  // mystery (`auth/user-not-found` for hours) instead of a port problem. So the
+  // guess is gone and the miss is loud, at the call that needed the number.
+  _devPort(name) {
+    const port = this._providedDevPorts()[name];
+
+    if (!port) {
+      throw _devFactMissing(`dev port for \`${name}\``);
     }
 
-    firebaseLogger.warn(
-      `No resolved dev port for ${assumed.join(', ')}; assuming the classic ${assumed.map((name) => `${name} :${DEV_PORT_FALLBACKS[name]}`).join(', ')}. `
-      + 'If another project\'s emulator holds those ports, this page is talking to IT, not your stack. '
-      + 'Boot the backend with `omega dev` (or `omega emulator`) so the resolved map reaches the page.',
-    );
+    return port;
   }
 
   // Where the dev WEBSITE answers — the one shared answer for every surface
@@ -726,23 +810,14 @@ class Manager {
   getDevWebsiteOrigin() {
     const provided = this.config.dev?.origin;
 
-    if (provided) {
-      return provided;
+    if (!provided) {
+      // The classic `https://localhost:4000` assumption is gone (#834): a wrong
+      // dev origin fails as a silent connection refusal, which is the worst
+      // possible way for a guess to be wrong.
+      throw _devFactMissing('dev website origin');
     }
 
-    this._warnClassicOriginAssumption();
-    return DEV_ORIGIN_FALLBACK;
-  }
-
-  // The origin's half of the classic-assumption warning (#300's pattern, #262):
-  // one loud line when the answer is a guess rather than a published fact,
-  // because a wrong dev origin fails as a silent connection refusal.
-  _warnClassicOriginAssumption() {
-    firebaseLogger.warn(
-      `No resolved dev website origin; assuming the classic ${DEV_ORIGIN_FALLBACK}. `
-      + 'If your `omega dev` bumped its port (or runs without mkcert), this is the wrong origin. '
-      + 'Boot the website with `omega dev` so the resolved origin reaches this surface.',
-    );
+    return provided;
   }
 
   // Where the auth emulator answers FROM THE BROWSER'S POINT OF VIEW (#156).
@@ -759,39 +834,43 @@ class Manager {
       return window.location.origin;
     }
 
-    return `http://localhost:${this._devPorts().auth}`;
+    return `http://localhost:${this._devPort('auth')}`;
   }
 
   getFunctionsUrl(environment) {
-    const env = environment || this.config.environment;
+    const env = environment || this.getEnvironment();
     const projectId = this._resolveFirebaseConfig()?.projectId;
 
     if (!projectId) {
       throw new Error('Firebase project ID not configured');
     }
 
-    if (env === 'development') {
-      return `http://localhost:${this._devPorts().functions}/${projectId}/us-central1`;
+    if (this._localStack(env)) {
+      return `http://localhost:${this._devPort('functions')}/${projectId}/us-central1`;
     }
 
     return `https://us-central1-${projectId}.cloudfunctions.net`;
   }
 
   getApiUrl(environment, url) {
-    // Precedence: passed environment > query string > config.environment
+    // Precedence: passed environment > query string > the one environment
+    // surface (#817), which reads the same baked `config.environment` this used
+    // to compare by hand.
     const searchParams = new URLSearchParams(window.location.search);
     const queryEnv = searchParams.get('_dev_apiEnvironment');
     const env = environment
       || queryEnv
-      || this.config.environment;
+      || this.getEnvironment();
 
-    if (env === 'development') {
+    if (this._localStack(env)) {
       // Scheme follows what the provided dev map says is actually running (N7):
       // - `https` key → `mgr serve`'s mkcert proxy (it owns publishing that key).
       // - `hosting` key → an allocator-booted emulator stack; the hosting
       //   emulator speaks plain http on 127.0.0.1 (rewrites /omega/** to the API).
-      // - no map → classic assumption: `mgr serve`'s HTTPS proxy on 5002
-      //   (since @omega.js/backend 5.7.0) — plain http:// cannot connect to it.
+      // - no map → nothing to assume (#834). The classic
+      //   `https://localhost:5002` guess is gone: a dev build always carries the
+      //   resolved map, and a wrong API base fails as a silent connection
+      //   refusal or, worse, as a hit on a neighbouring project's stack.
       const provided = this._providedDevPorts();
       if (provided.https) {
         return `https://localhost:${provided.https}`;
@@ -799,7 +878,7 @@ class Manager {
       if (provided.hosting) {
         return `http://127.0.0.1:${provided.hosting}`;
       }
-      return 'https://localhost:5002';
+      throw _devFactMissing('dev `https` or `hosting` port');
     }
 
     // The API rides the BRAND domain (api.<brand host>). Never derive from

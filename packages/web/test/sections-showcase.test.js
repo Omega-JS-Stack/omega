@@ -11,7 +11,7 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
+const { buildWith: sharedBuildWith, readPageConfig, miniData } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'showcase-test');
 const nfData = { ...miniData, theme: { id: 'newsflash' } };
@@ -25,9 +25,11 @@ const entryUrls = (pages) => showcaseUrls(pages).filter((url) => !url.includes('
 const frameUrls = (pages) => showcaseUrls(pages).filter((url) => url.includes('/frames/'));
 
 // The page-baked client config, as the browser reads it: both overlays gate on
-// it (`consent` → main.js's conditional walk, `inbound.chat…` → the client's
-// chatsy init), so this IS what decides whether either one mounts.
-const configOf = (html) => new Function(`return ${html.match(/var Configuration = (\{[\s\S]*?\n {2}\});/)[1]};`)();
+// it (`client.consent` → main.js's conditional walk, `inbound.chat…` → the
+// client's chatsy init), so this IS what decides whether either one mounts.
+// The client blob rides under its own key since #894: @omega.js/client is the
+// one place that flattens it onto its contract.
+const configOf = (pages, html) => readPageConfig(pages, html);
 
 test('cp219: the classy showcase — index + one page per resolved entry, docs from the schemas', async () => {
   const pages = await buildWith(miniData);
@@ -161,26 +163,26 @@ test('#555: a variant frame boots without the consent banner or the chat widget'
   };
   const pages = await buildWith(overlayData);
 
-  const frame = configOf(pages.get('/test/sections/marketing/hero/frames/default'));
-  assert.equal(frame.consent.enabled, false, 'the frame bakes the consent gate off, so main.js never loads the banner');
+  const frame = configOf(pages, pages.get('/test/sections/marketing/hero/frames/default'));
+  assert.equal(frame.client.consent.enabled, false, 'the frame bakes the consent gate off, so main.js never loads the banner');
   assert.equal(frame.inbound.chat.providers.chatsy.enabled, false, 'and the chat widget off, so the client never mounts chatsy');
 
   // Every variant frame, not just the one — and the component gallery's frames
   // are these same documents, so both galleries are covered by one fix.
   for (const url of frameUrls(pages)) {
-    const config = configOf(pages.get(url));
-    assert.ok(!config.consent.enabled && !config.inbound.chat.providers.chatsy.enabled, `${url}: no overlay chrome in any frame`);
+    const config = configOf(pages, pages.get(url));
+    assert.ok(!config.client.consent.enabled && !config.inbound.chat.providers.chatsy.enabled, `${url}: no overlay chrome in any frame`);
   }
   assert.ok(pages.get('/test/components/heading/masthead').includes('src="/test/components/heading/masthead/frames/eyebrow-accent-sub"'), 'the component gallery\'s entry pages carry frames of their own, on the same lane');
 
   // …and a NORMAL render is untouched: both overlays still ship, hints included.
   const home = pages.get('/');
-  assert.equal(configOf(home).consent.enabled, true, 'a real page still ships the consent banner');
-  assert.equal(configOf(home).inbound.chat.providers.chatsy.enabled, true, 'and still mounts the chat widget');
+  assert.equal(configOf(pages, home).client.consent.enabled, true, 'a real page still ships the consent banner');
+  assert.equal(configOf(pages, home).inbound.chat.providers.chatsy.enabled, true, 'and still mounts the chat widget');
   assert.ok(home.includes('chatsy.ai') && !pages.get('/test/sections/marketing/hero/frames/default').includes('chatsy.ai'), 'the chat preconnect hints ride the page, not the frame');
 
   // The gallery PAGE around the frames is a page like any other.
-  assert.equal(configOf(pages.get('/test/sections/marketing/hero')).consent.enabled, true, 'the gallery page itself is not a frame');
+  assert.equal(configOf(pages, pages.get('/test/sections/marketing/hero')).client.consent.enabled, true, 'the gallery page itself is not a frame');
 });
 
 test('cp219: the newsflash showcase — overrides and fallthroughs chip their owning layer', async () => {

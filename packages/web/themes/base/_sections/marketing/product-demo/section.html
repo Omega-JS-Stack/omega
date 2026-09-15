@@ -20,7 +20,7 @@
               aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
             >
               {% iftruthy tab.icon %}
-                <i class="fa-solid fa-{{ tab.icon }} fa-sm me-2"></i>
+                <i class="{{ tab.icon }} fa-sm me-2" aria-hidden="true"></i>
               {% endiftruthy %}
               {{ tab.label }}
             </button>

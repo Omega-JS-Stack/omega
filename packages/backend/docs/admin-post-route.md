@@ -6,6 +6,25 @@ The `POST /admin/post` route creates blog posts via GitHub's API. It handles ima
 
 **Ghostii is unopinionated about @omega.js/backend.** Its `/write/article` response is a generic article — a `json` block array (`[{ name, content }]` where name ∈ `heading-1..6`/`image`/`paragraph`/`blockquote`/`list`) plus top-level `title`/`description`/`headerImageUrl`/`images`/`categories`/`keywords`. @omega.js/backend owns the transform into this route's shape: `blocksToPost(article.json)` extracts the `heading-1` as the title, the first `image` block as `headerImageURL`, and joins every remaining block as the `body` (content only — NO title, NO header image embedded, since this route adds those itself; section images stay in the body and are extracted normally). Older Ghostii responses without `json` fall back to the flat `article.{title,body,headerImageUrl}` fields.
 
+## Which website: the `target` parameter
+
+A brand's website lives at `targets/<name>/` inside the source monorepo, and ONE backend serves every website the brand runs ([#887](https://github.com/Omega-JS-Stack/omega/issues/887)). So every CMS route that touches repo content takes a `target` naming the web target (the `targets` key, [#886](https://github.com/Omega-JS-Stack/omega/issues/886)): `POST`/`PUT /admin/post`, `POST /admin/repo/content`, and `GET /content/post`.
+
+The one-or-many rule, in `src/manager/helpers/web-target.js` (`resolveWebTarget`), is the same on all four:
+
+- A brand with exactly ONE web target may omit it, and that target is the answer.
+- A brand with SEVERAL requires it: a missing name answers 400 listing the declared web targets, and so does a name nobody declared. Nothing is guessed.
+- A brand with no web target at all answers 400 too: content has nowhere to land.
+
+The path rule: the repo path is `targetPath(config, target)` (@omega.js/config's one derivation, `targets/<name>`) plus the SITE-relative path each route already composed. So a post is `targets/<target>/src/_posts/<year>/<postPath>/<date>-<url>.md`, its images are `targets/<target>/src/assets/images/blog/post-<id>/`, and `POST /admin/repo/content` keeps the caller's site-relative `path` and reports where it landed as `repoPath`. No route composes `targets/` by hand.
+
+Two consequences worth knowing:
+
+- `GET /content/post` scopes its code search to `targets/<target>/src/_posts` AND refuses a hit outside that folder, so two websites with the same slug can never answer for each other (a `path:` qualifier narrows a GitHub code search, it does not bind it).
+- The D13 publish dispatch names the target's own workflow. A brand monorepo composes one workflow per target ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)), so the post's target decides: `web-build.yml`, `community-build.yml`, and so on.
+
+The repo is still never part of the request: it is the brand's SOURCE monorepo, derived from the one `repo` block ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
+
 ## Image Processing Flow
 
 1. Receives markdown body with external image URLs (e.g., `![alt](https://images.unsplash.com/...)`)
@@ -13,7 +32,7 @@ The `POST /admin/post` route creates blog posts via GitHub's API. It handles ima
 3. Downloads each image to a tmp dir
 4. **Converts** png/webp sources to progressive JPEG in place (`convertToJpeg` — alpha flattened onto white); other non-JPG formats are rejected, naming the offending URL
 5. **Resizes** each image in place if its long edge exceeds `IMAGE_MAX_DIMENSION` (see below)
-6. Commits all images to `src/assets/images/blog/post-{id}/` on GitHub (single commit via Git Trees API)
+6. Commits all images to `targets/<target>/src/assets/images/blog/post-{id}/` on GitHub (single commit via Git Trees API)
 7. **Rewrites the body** to replace external URLs with `@post/{filename}` format
 8. The `@post/` prefix is resolved at Jekyll build time by `jekyll-uj-powertools` to the full path
 
@@ -55,3 +74,5 @@ If these need to become configurable later, promote to `config/omega.json5` rath
 - `src/manager/routes/admin/post/post.js` — POST handler (create), includes `downloadImage()` + `resizeImage()` helpers
 - `src/manager/routes/admin/post/put.js` — PUT handler (edit) — does NOT download images, just edits frontmatter/body in place
 - `src/manager/routes/admin/post/templates/post.html` — Post template
+- `src/manager/helpers/web-target.js`: `resolveWebTarget()`, the one-or-many rule every CMS route resolves its target through, and `cmsContext()`, the one call each route makes for both facts it needs before touching content (the source repo it commits to, and that target): a response-shaped 500 when the brand names no repo, the same 400s otherwise
+- `test/helpers/web-target.test.js`, `test/routes/admin/cms-target-paths.test.js`, `test/routes/content/post-target-scope.test.js`: the target rule, the committed paths, and the scoped read

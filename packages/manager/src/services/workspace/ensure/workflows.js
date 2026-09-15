@@ -28,8 +28,10 @@ const { reconcileComposedWorkflows } = require('@omega.js/devkit/ci-workflows');
 module.exports = async ({ brandRoot, brand, targets, options }) => {
   const dryRun = options?.dryRun || false;
 
+  // LIVE = the brand still declares this dir's NAME (#886), which is the same
+  // word the composed workflow files are named for
   const liveTargets = targets
-    .filter((entry) => entry.custom || (entry.target && brand.enabledTargets.includes(entry.target)))
+    .filter((entry) => entry.custom || (entry.target && brand.enabledTargets.includes(entry.name)))
     .map((entry) => entry.name);
 
   const { removed } = reconcileComposedWorkflows({

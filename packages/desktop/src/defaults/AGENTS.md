@@ -52,6 +52,7 @@ npx omega install live # restore the published @omega.js/desktop from npm
 ## Where things live
 
 - `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, analytics, payment, cloud, monitoring, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, remoteConfig, restartManager) under `targets.desktop`.
+  - What the app SHIPS is one declaration: `platforms.<mac|windows|linux>.formats.<dmg|nsis|deb|appimage|snap>`. Presence = enabled, every platform and format is on by default, and `false` drops one (`snap: false`). Per-format settings live inside the format.
 - Packaging config: fully generated. @omega.js/desktop produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + @omega.js/desktop's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
 - `hooks/notarize/post.js`: optional post-notarize extension hook (@omega.js/desktop owns the actual `afterSign` notarize step).
 - `src/main.js`: main-process entry. One-line bootstrap of `@omega.js/desktop/main`.
@@ -62,7 +63,7 @@ npx omega install live # restore the published @omega.js/desktop from npm
 - `src/views/<window>/index.html`: per-window HTML.
 - `src/assets/js/components/<window>/index.js`: renderer entry per window.
 - `src/assets/scss/main.scss`: shared SCSS.
-- `config/icons/<platform>/<slot>.png`: optional icon overrides (`macos/icon.png`, `macos/tray.png`, `macos/dmg.png`, `windows/icon.png`, etc.).
+- `config/icons/<platform>/<slot>.png`: optional icon overrides (`mac/icon.png`, `mac/tray.png`, `mac/dmg.png`, `windows/icon.png`, etc.; the platform words are `mac`, `windows`, `linux`).
   - Ship ONE file per slot at the native (retina) size; @omega.js/desktop auto-downscales @1x variants.
   - macOS tray must be 32×32 (@omega.js/desktop renames to `trayTemplate.png` in dist for the OS dark-mode magic).
   - Missing slots fall back to @omega.js/desktop bundled defaults; Linux falls back to Windows resolution.
@@ -85,7 +86,7 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 
 In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
 
-In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `OMEGA_BUILD_JSON.config`.
+In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `window.OMEGA_BUILD_JSON.config` (the one `build.js` the view's shell loads).
 
 ## Dependency resolution
 

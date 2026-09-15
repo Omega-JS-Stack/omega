@@ -18,6 +18,7 @@ An unknown `--migration=<name>` lists the available ones and skips.
 | Migration | What it converges |
 |---|---|
 | `targets-rename` (local) | A pre-[#443](https://github.com/Omega-JS-Stack/omega/issues/443) brand's `apps/` folder → `targets/`, moving the folder and flipping the root `workspaces` glob together. |
+| `platform-names` (local) | A brand's retired platform keys onto the one vocabulary ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): `platforms.win` → `platforms.windows`, `platforms.linux.snap.*` → `platforms.linux.formats.snap.*` (the `enabled` flag becoming presence, so `enabled: false` lands as `formats.snap: false`), and `config/icons/macos/` → `config/icons/mac/`. Swept across every omega.json5 and icon dir the brand owns, the brand file and each target's own. |
 | `notifications` | Push-subscription docs to the canonical shape: `uid` → `owner`, flattened `owner.uid`, legacy timestamps → `metadata.*`, `url` → `context.client.url`, the legacy `attribution.utm` blob folded into `first`/`last`, string trimming — then schema validation. |
 | `users` | The canonical user schema: orphan docs deleted, `plan` → `subscription`, flat `subscription.id` → `subscription.product`, `oauth2.<provider>` → `connections.<provider>` with a `type: 'oauth2'` stamp and the original deleted ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)), each moved record gaining the `identity.id` the connections route matches on — from Google's `sub` or Kick's `user_id`, as a string, deleting nothing ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)), deprecated fields removed, timestamps reconciled against Firebase Auth's canonical creation time, auth/consent/attribution backfills, dynamic values generated, sentinels (`''`, `127.0.0.1`, `ZZ`, `Unknown`) normalized to null, `usage.*.period` → `usage.*.monthly`. |
 | `orders` | `payments-orders`: the legacy `attribution.utm` blob → first/last touches. |
@@ -32,7 +33,7 @@ Register a new one by adding a handler in `src/services/migrations/ensure/` and 
 
 No config of its own. The Firestore migrations need a `backend` target and the brand's own
 service account at `.omega/secrets/service-account.json` (Identity Toolkit + `FirestoreREST`,
-not `firebase-admin`). The two `local: true` migrations need NEITHER — they only touch the
+not `firebase-admin`). The three `local: true` migrations need NEITHER: they only touch the
 brand's own files.
 
 ## Gotchas
@@ -41,6 +42,9 @@ brand's own files.
   discovery FAILS LOUD on the old shape, so `runManage` runs it ALONE, ahead of the load that
   would throw. A brand carrying BOTH folders is FATAL, not merged — which copy is real is a
   guess. Run `npm install` afterwards so npm re-links `node_modules/<target>` at the new path.
+- **`platform-names` runs BEFORE `omega migrate`.** Both keys it moves are registered retired
+  paths, and `omega migrate` DELETES a retired key rather than moving it: run the migration
+  first and the settings travel; run the converter first and they are gone.
 - **Migrations without schema validation are deliberate.** The payment collections' shapes are
   owned by the webhook pipeline, so `orders`, `payments-intents` and `payment-provider` touch
   their one field and declare nothing else.

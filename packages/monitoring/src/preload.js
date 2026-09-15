@@ -21,7 +21,7 @@ const preload = {
    * @param {object} host - the desktop Manager: { config }
    */
   initialize(host) {
-    const { shouldEnable, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates());
+    const { shouldEnable, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates(host));
     preload._enabled = shouldEnable;
     if (!shouldEnable) logger.log(`disabled — ${reason}`);
   },

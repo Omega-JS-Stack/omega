@@ -27,10 +27,10 @@ The plain `chrome-devtools` browser has NO extension in it — and `--load-exten
 
 The recipe:
 
-1. **Build the loadable output**: `npm run build` → `packaged/chromium/raw/` (strict-JSON manifest; `dist/` is NOT Chrome-loadable — its manifest is JSON5).
+1. **Build the loadable output**: `npm run build` → `packaged/chrome/raw/` (strict-JSON manifest; `dist/` is NOT Chrome-loadable: its manifest is JSON5).
 2. **Launch the session with the extension path** (env is expanded ONCE at session start — set it BEFORE `claude`):
    ```bash
-   OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude
+   OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chrome/raw" claude
    ```
 3. **In the session, enable the upstream** (it's on-demand): `router__enable_upstream { name: "chrome-devtools-extension" }`. The first tool call launches CfT with the extension loaded. Tools are namespaced `chrome-devtools-extension__*` (34 tools — the base set + extension tools).
 4. **Rebuild loop**: after `npm run build`, `router__disable_upstream` + `router__enable_upstream` → fresh browser with the rebuilt extension (the profile is ephemeral; the extension loads at launch).

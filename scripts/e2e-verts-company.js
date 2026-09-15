@@ -48,7 +48,7 @@ if (process.env.OMEGA_SKIP_E2E === '1') {
 
 const ROOT = path.join(__dirname, '..');
 const PLAYGROUND_BACKEND = path.join(ROOT, 'brands', 'playground-omega', 'targets', 'backend');
-const NEWSFLASH_WEBSITE = path.join(ROOT, 'brands', 'newsflash-brand', 'targets', 'website');
+const NEWSFLASH_WEBSITE = path.join(ROOT, 'brands', 'newsflash-brand', 'targets', 'web');
 const CLIENT_SRC = path.join(ROOT, 'packages', 'client', 'src');
 const LOG_DIR = path.join(ROOT, '.temp', 'verts-e2e');
 

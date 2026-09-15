@@ -35,7 +35,7 @@ const SUBSCRIPTION_FIELD_PATHS = [
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ slapform = {}, targets = { web: {}, backend: {} } } = {}) {
+function brandConfig({ slapform = {}, targets = { web: { type: 'web' }, backend: { type: 'backend' } } } = {}) {
   return {
     brand: { id: 'fixture-brand', name: BRAND_NAME, url: 'https://fixture-brand.test' },
     forms: {
@@ -135,9 +135,16 @@ test('forms: scalar slapform: false skips the service', async () => {
 });
 
 test('forms: skips without a web target (the form lives on the website)', async () => {
-  const result = await runService(brandConfig({ targets: { backend: {} } }), { db: fakeDb() });
+  const result = await runService(brandConfig({ targets: { backend: { type: 'backend' } } }), { db: fakeDb() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /no web target/);
+});
+
+// The gate is by TYPE (#886): a brand may name its web target anything
+test('forms: a web target named `site` runs the service, key spelling is not the gate', async () => {
+  const result = await runService(brandConfig({ targets: { site: { type: 'web' }, api: { type: 'backend' } } }), { db: fakeDb(convergedResponses()) });
+
+  assert.notEqual(result.status, 'skipped');
 });
 
 test('forms: skips without slapform.formId', async () => {

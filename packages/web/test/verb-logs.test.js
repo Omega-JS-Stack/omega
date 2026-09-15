@@ -25,7 +25,7 @@ function tmpTarget(t) {
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'config', 'omega.json5'),
-    '{ brand: { name: "Verb Logs", id: "verb-logs" }, targets: { web: {} } }\n',
+    '{ brand: { name: "Verb Logs", id: "verb-logs" }, targets: { web: { type: "web" } } }\n',
   );
   return root;
 }

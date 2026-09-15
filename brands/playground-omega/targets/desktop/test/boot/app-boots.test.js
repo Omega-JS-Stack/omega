@@ -73,6 +73,24 @@ module.exports = {
     },
 
     {
+      description: 'this boot never asked the OS keychain: auth persistence resolved to none',
+      inspect: async ({ expect, projectRoot }) => {
+        const path = require('path');
+        const fs = require('fs');
+
+        // This project declares no `omega.authPersistence`, so a real launch takes the
+        // safeStorage default and reads the OS vault. A test run must not: the boot
+        // lane spawns an unsigned Electron, which has no keychain ACL and parks the
+        // whole run behind a SecurityAgent prompt (#907). The booted app's own log is
+        // the proof, written by the bundle under test.
+        const log = fs.readFileSync(path.join(projectRoot, 'logs', 'runtime.log'), 'utf8');
+
+        expect(log.includes('auth persistence: none (test mode)')).toBe(true);
+        expect(log.includes('strategy "safeStorage" active')).toBe(false);
+      },
+    },
+
+    {
       description: 'the boot build left this project\'s real dist/ byte-for-byte unchanged',
       inspect: async ({ expect, projectRoot, frameworkDistRoot, distSnapshotBefore }) => {
         const path = require('path');

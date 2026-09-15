@@ -13,10 +13,13 @@ const { get, set } = require('lodash');
 
 const deduplicateImageAlts = require('./deduplicate-image-alts');
 const dispatchDeploy = require('./dispatch-deploy');
-const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+const { commitTreeToDeployBranch } = require('../lib/deploy-branch.js');
+const { cmsContext } = require('../../../helpers/web-target.js');
 const env = require('../../../libraries/env.js');
 
 const POST_TEMPLATE = jetpack.read(`${__dirname}/templates/post.html`);
+// SITE-relative, like every path here: the web target's folder is prefixed at
+// composition time (#887)
 const IMAGE_PATH_SRC = `src/assets/images/blog/post-{id}/`;
 const IMAGE_REGEX = /(?:!\[(.*?)\]\((.*?)\))/img;
 
@@ -49,14 +52,20 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
     return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
-  if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return ctx.respond('GitHub repo not configured (set targets.backend.github.repo — "owner/name" or bare name — or repo.providers.github.org + brand.id).', { code: 500 });
+  // The SOURCE repo this commits to, and WHICH website inside it (#887): the
+  // brand's one web target by default, the named one when it runs several
+  let source;
+  let target;
+  try {
+    ({ source, target } = cmsContext(Manager.config, settings.target));
+  } catch (e) {
+    return ctx.respond(e.message, { code: e.code });
   }
 
   ctx.log('main(): settings', settings);
 
   const now = ctx.meta.startTime.timestamp;
-  const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
+  const bemRepo = { user: source.owner, name: source.name };
 
   // Setup Octokit
   const octokit = new Octokit({
@@ -98,7 +107,8 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   settings.source = settings.source || null;
   settings.date = moment(settings.date || now).subtract(1, 'days').format('YYYY-MM-DD');
   settings.id = settings.id || Math.round(new Date(now).getTime() / 1000);
-  settings.directory = `src/_posts/${moment(now).format('YYYY')}/${settings.postPath}`;
+  settings.target = target.name;
+  settings.directory = `${target.path}/src/_posts/${moment(now).format('YYYY')}/${settings.postPath}`;
   // Always the brand's own repo — caller-supplied values would let a blogger-role
   // user point the shared GH_TOKEN at any repo it can write
   settings.githubUser = bemRepo.user;
@@ -107,7 +117,7 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   ctx.log('main(): Creating post...', settings);
 
   // Download all images and collect file data
-  const imageFiles = await downloadImages(ctx, settings).catch(e => e);
+  const imageFiles = await downloadImages(ctx, settings, target).catch(e => e);
   if (imageFiles instanceof Error) {
     return ctx.respond(imageFiles.message, { code: 400 });
   }
@@ -158,9 +168,9 @@ module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 };
 
 // Helper: Download all images and return file data (no GitHub uploads)
-async function downloadImages(ctx, settings) {
+async function downloadImages(ctx, settings, target) {
   const files = [];
-  const assetsPath = powertools.template(IMAGE_PATH_SRC, settings);
+  const assetsPath = `${target.path}/${powertools.template(IMAGE_PATH_SRC, settings)}`;
 
   const matches = settings.body.matchAll(IMAGE_REGEX);
   const images = Array.from(matches).map(match => ({
@@ -440,10 +450,11 @@ async function commitAll(ctx, octokit, settings, files) {
 
   // Create the commit
   const postPath = files[files.length - 1].path;
+  const message = `📦 admin/post:create ${postPath}`;
   const newCommit = await octokit.rest.git.createCommit({
     owner: owner,
     repo: repo,
-    message: `📦 admin/post:create ${postPath}`,
+    message: message,
     tree: newTree.data.sha,
     parents: [latestCommitSha],
   });
@@ -459,6 +470,23 @@ async function commitAll(ctx, octokit, settings, files) {
   });
 
   ctx.log('commitAll(): Updated ref', updateResult.data.object.sha);
+
+  // The same files, on the branch CI builds (#919). The blobs above are
+  // repo-level objects, so the tree items are reused as they are and nothing
+  // uploads twice; only the tree, the commit and the ref differ, because the
+  // two branches hold different history. A brand with no deploy branch yet
+  // keeps the commit above and is told so.
+  const deployed = await commitTreeToDeployBranch({
+    ctx,
+    octokit,
+    owner: owner,
+    repo: repo,
+    tree: treeItems,
+    message: message,
+    what: postPath,
+  });
+
+  settings.deployBranch = deployed.deployBranch;
 
   return updateResult;
 }
@@ -478,6 +506,7 @@ function formatClone(payload) {
 }
 
 // Expose helpers + constants for tests
+module.exports.commitAll = commitAll;
 module.exports.resizeImage = resizeImage;
 module.exports.convertToJpeg = convertToJpeg;
 module.exports.formatImageDownloadError = formatImageDownloadError;
