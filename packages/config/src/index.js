@@ -43,7 +43,7 @@ const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
 const { PLATFORMS, FORMATS, enabledFormats, formatKeys, desktopProductName, sanitizeProductName, desktopArtifactName, desktopArtifactNames } = require('./platforms.js');
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
-const { REPO_PROVIDERS, HOSTING_PROVIDERS, repoBlock, sourceRepo, releasesRepo, websiteRepo, hostingProvider, pagesHost, brandVisibility } = require('./repo.js');
+const { REPO_PROVIDERS, HOSTING_PROVIDERS, repoBlock, sourceRepo, repoDrift, releasesRepo, websiteRepo, hostingProvider, pagesHost, brandVisibility } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { deriveBundleIdPrefix, composeBundleId } = require('./bundle-id.js');
 const { DEV_FACT_CHANNEL, devFactMissing } = require('./dev-facts.js');
@@ -222,6 +222,10 @@ module.exports = {
   // The SOURCE monorepo `<brand.id>-omega`: the dispatch, the repo secrets, the
   // scaffolded workflows and the CMS commits all address this one
   sourceRepo,
+  // Whether the repo `origin` names IS that source repo (#934): the one
+  // comparison and the one drift line, stated at boot and refused on by the
+  // verbs that act on the derived repo
+  repoDrift,
   // The brand's ONE public releases repo `<brand.id>-releases`, always public:
   // the one home every release reader takes its address from
   releasesRepo,

@@ -92,7 +92,7 @@ Every verb runs `ensureTarget()` first ([#675](https://github.com/Omega-JS-Stack
 `npx omega deploy` adds the network half as a precheck (`--no-secrets` opts out):
 
 - Validates signing prereqs (warns if missing — non-fatal).
-- Pushes the composed `.env` → GitHub Actions secrets over the `gh` CLI (`gh auth login`; a CI run, an empty cascade, no remote, or a checkout that is not the brand's declared repo skips loudly).
+- Pushes the composed `.env` → GitHub Actions secrets over the `gh` CLI (`gh auth login`; a CI run, an empty cascade, or no GitHub remote skips loudly, and a checkout whose `origin` is not the derived source repo refuses on the one drift line, `origin is <slug> but config derives <derived>: fix repo.org in config/omega.json5 or move the repo`, [#934](https://github.com/Omega-JS-Stack/omega/issues/934)).
 
 Now drop your cert files:
 
@@ -174,7 +174,9 @@ build             needs setup; matrix over the resolved OSes: npm ci, then
                   `npm run release:local` on mac and linux (sign, notarize, and
                   electron-builder publishes the DRAFT release in the brand's releases
                   repo), and `npm run package` on windows, whose unsigned output uploads
-                  as the `windows-unsigned` artifact
+                  as the `windows-unsigned` artifact, a one-day intermediate that
+                  windows-sign consumes in the same run (the releases repo is the
+                  durable home)
 windows-strategy  needs [setup, build]; reads platforms.windows.signing.strategy from config
                   (only when windows is in the matrix)
 windows-sign      the self-hosted EV-token box, hosted windows-latest for the cloud

@@ -1,11 +1,11 @@
 {
   "name": "playground-desktop",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "author": "OMEGA Playground",
   "private": true,
   "description": "OMEGA desktop app",
   "devDependencies": {
-    "@omega.js/desktop": "file:../../../../packages/desktop",
+    "@omega.js/desktop": "0.51.0",
     "electron": "^42.6.0",
     "electron-builder": "^26.16.1",
     "gulp": "^5.0.1"

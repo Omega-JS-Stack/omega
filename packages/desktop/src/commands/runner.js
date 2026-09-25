@@ -14,18 +14,20 @@
 //                        the defaults — and the orgs it serves. How a value that
 //                        is already there gets changed.
 //   register-org <org>   Register the runner against one specific GH org.
-//   start                Bring EVERY registered org's runner online, detached,
-//                        in Startup-shortcut order. An org already alive is
-//                        named and skipped; the terminal is never taken over.
+//   start                The one command: installs a bare box, refreshes a stale
+//                        actions/runner download in place, registers any admin
+//                        org the box does not serve yet, then brings EVERY
+//                        registered org online, detached, in Startup-shortcut
+//                        order. An org already alive is named and skipped; the
+//                        terminal is never taken over.
 //   restart              stop, wait for every listener to go, then start.
 //   stop                 Kill every Runner.Listener.exe under RUNNER_HOME.
 //   status               Registered orgs, Startup shortcuts, live listeners.
 //   uninstall            Remove everything — legacy services and tasks, and the
 //                        electron-manager era's em-runner install, included.
-//   self-update          Force an immediate self-update of @omega.js/desktop (npm i -g @omega.js/desktop@latest).
 //   monitor              Tail the JSONL signing event log, pretty-printed.
 //
-// Every subcommand except `self-update` and `monitor` refuses on non-Windows
+// Every subcommand except `monitor` refuses on non-Windows
 // (set OMEGA_RUNNER_FORCE=1 to override — testing only).
 
 const path     = require('path');
@@ -35,7 +37,6 @@ const jetpack  = require('fs-jetpack');
 
 const Manager  = new (require('../build.js'));
 const logger   = Manager.logger('runner');
-const { safeInstall } = require('../utils/safe-install');
 
 const RUNNER_LABELS = ['self-hosted', 'windows', 'ev-token'];
 
@@ -103,8 +104,8 @@ function orgRunnerDir(org, home) {
 }
 const ACTIONS_RUNNER_VERSION = '2.319.1';   // pinned; bump intentionally
 
-// The subcommands, and the two of them that run on any platform: self-update is
-// an npm install, monitor only reads a log file. Every other one is the box's.
+// The subcommands, and the one of them that runs on any platform: monitor only
+// reads a log file. Every other one is the box's.
 const SUBCOMMANDS = {
   'install':      install,
   'config':       configureRunner,
@@ -114,17 +115,16 @@ const SUBCOMMANDS = {
   'stop':         stopServices,
   'status':       statusServices,
   'uninstall':    uninstall,
-  'self-update':  selfUpdate,
   'monitor':      monitor,
 };
-const ANY_PLATFORM_SUBCOMMANDS = new Set(['self-update', 'monitor']);
+const ANY_PLATFORM_SUBCOMMANDS = new Set(['monitor']);
 
 // The ones that CHANGE the machine: they register, deregister, download, delete,
-// kill listeners, rewrite the box's own configuration, or run a global npm
-// install. A test process may only point these at a scratch home
+// kill listeners, or rewrite the box's own configuration. A test process may
+// only point these at a scratch home
 // ([#337](https://github.com/Omega-JS-Stack/omega/issues/337) — the suite once
 // ran a real install against the box). `status` and `monitor` only read.
-const MUTATING_SUBCOMMANDS = new Set(['install', 'config', 'register-org', 'start', 'restart', 'stop', 'uninstall', 'self-update']);
+const MUTATING_SUBCOMMANDS = new Set(['install', 'config', 'register-org', 'start', 'restart', 'stop', 'uninstall']);
 
 module.exports = async function (options) {
   options = options || {};
@@ -261,7 +261,7 @@ async function install(options) {
   // admin orgs on a tick ran as NT AUTHORITY\NETWORK SERVICE in Session 0, so
   // the runners it spawned could not see the user's cert store and the Startup
   // shortcuts it wrote landed in the wrong profile. Adding a new org is a
-  // `mgr runner install` away; uninstall() still tears down any leftover
+  // `npx omega runner start` away; uninstall() still tears down any leftover
   // watcher service from an older install.
 
   // 5. Save install metadata.
@@ -304,7 +304,7 @@ async function install(options) {
     logger.log('');
     logger.log(`Bringing every registered runner (${succeeded.length}) online in the background. 'npx omega runner status' shows them, 'npx omega runner monitor' tails the log.`);
     logger.log('');
-    await startServices({ ...options, _home: home });
+    await startServices({ ...options, _home: home, _reconcileDone: true });
   }
 }
 
@@ -416,7 +416,7 @@ async function registerOrg(options) {
   const runnerDir   = orgRunnerDir(org, home);
   const templateDir = options._templateDir || path.join(home, '_template');
   if (!jetpack.exists(path.join(templateDir, 'config.cmd'))) {
-    throw new Error(`actions/runner template not found at ${templateDir}. Run 'npx omega runner install' first.`);
+    throw new Error(`actions/runner template not found at ${templateDir}. Run 'npx omega runner start' first.`);
   }
   if (jetpack.exists(runnerDir)) {
     logger.log(`  Removing stale actions-runner-${org.toLowerCase()}/ before re-clone…`);
@@ -528,7 +528,8 @@ async function registerOrg(options) {
 // What `start` settles before it touches a listener: the box's required keys —
 // asked in a terminal and refused without one, exactly like install — and then
 // the orgs the .env names against the orgs this install actually registered.
-// start registers nothing; it names the command that would.
+// start only ever ADDS a named admin org (reconcileRunnerInstall); reshaping the
+// box to the list is install's, so the mismatch names it.
 async function startPreflight(options) {
   const { home, env = process.env, logger: log = logger, prompt, interactive } = options || {};
   await ensureRunnerConfig({ home, env, logger: log, prompt, interactive });
@@ -557,7 +558,7 @@ async function startPreflight(options) {
   const named      = parseRunnerOrgs(env.OMEGA_RUNNER_ORGS);
   const registered = readConfig(home).registeredOrgs || [];
   if (named.length > 0 && !sameRunnerOrgs(named, registered)) {
-    log.warn(`OMEGA_RUNNER_ORGS names ${named.join(', ')} but this install registered ${registered.join(', ') || '(none)'}. Run \`npx omega runner install\` to apply.`);
+    log.warn(`OMEGA_RUNNER_ORGS names ${named.join(', ')} but this install registered ${registered.join(', ') || '(none)'}. \`start\` registers a named admin org it does not serve yet and keeps the rest; \`npx omega runner install\` reshapes the box to the list.`);
   }
 }
 
@@ -572,6 +573,92 @@ function runnerStartupTargets(home) {
     const orgName = runnerName.toLowerCase().startsWith(hostPrefix) ? runnerName.slice(hostPrefix.length) : null;
     return { runnerName, orgName, runnerDir: orgName ? orgRunnerDir(orgName, home) : null };
   });
+}
+
+// What `start` settles between the preflight and the spawns
+// ([#937](https://github.com/Omega-JS-Stack/omega/issues/937)), so a box never
+// needs a second verb to catch up:
+//  1. a stale actions/runner download is refreshed IN PLACE: the template is
+//     re-downloaded and laid over each org dir whose listener is down. The
+//     registration (`.runner`, `.credentials`, `.env`) is never in the
+//     template, so it survives the copy. A live listener holds its binaries
+//     open, so that org is skipped and named with `restart`, and the new
+//     version is recorded only once every org dir took it. No teardown. A
+//     download or a copy that fails is one warn and a skipped refresh, never
+//     a failed start: the next start tries again.
+//  2. an admin org the box does not serve yet (OMEGA_RUNNER_ORGS honoured) is
+//     registered, Startup shortcut and all. The only step that needs GitHub,
+//     so discovery that fails is one line and the box still comes online.
+//     GH_TOKEN is never missing here: it is a required key, and the preflight
+//     refuses a box without one. Orgs registered outside the filter stay;
+//     reshaping the box to the list is install's.
+//
+// `_download`, `_discoverOrgs` and `_registerOrg` are the tests' seams, the way
+// `_spawn` is. Registration is not home-scoped (it acts on GitHub with the real
+// token, whatever scratch home a case made), so a test run that has not
+// injected both GitHub seams skips the org check instead of reaching it.
+async function reconcileRunnerInstall(options) {
+  const home        = options._home;
+  const env         = options._env;
+  const log         = options._logger;
+  const listen      = options._listeners;
+  const download    = options._download || downloadActionsRunner;
+  const templateDir = path.join(home, '_template');
+
+  const installed = readConfig(home).actionsRunnerVersion;
+  if (installed !== ACTIONS_RUNNER_VERSION) {
+    log.log(`actions/runner ${installed || '(unrecorded)'} is installed and ${ACTIONS_RUNNER_VERSION} is pinned: refreshing in place.`);
+    let downloaded = true;
+    try {
+      await download(templateDir, home);
+    } catch (e) {
+      log.warn(`✗ actions/runner ${ACTIONS_RUNNER_VERSION} download failed (${e.message}): refresh skipped until the next start.`);
+      downloaded = false;
+    }
+    if (downloaded) {
+      let skipped = 0;
+      for (const { org, dir } of listOrgRunnerDirs(home)) {
+        if (listen(dir).length > 0) {
+          log.warn(`· ${org} is running, so its actions/runner files are locked and were not refreshed. Run \`npx omega runner restart\` to refresh it.`);
+          skipped++;
+          continue;
+        }
+        try {
+          jetpack.copy(templateDir, dir, { overwrite: true });
+          log.log(`✓ ${org} refreshed to actions/runner ${ACTIONS_RUNNER_VERSION}`);
+        } catch (e) {
+          log.warn(`✗ ${org} was not refreshed (${e.message}): the next start tries again.`);
+          skipped++;
+        }
+      }
+      if (skipped === 0) saveConfig({ actionsRunnerVersion: ACTIONS_RUNNER_VERSION }, home);
+    }
+  }
+
+  if (isTestRun() && !(options._discoverOrgs && options._registerOrg)) {
+    log.log('Org check skipped: a test run never asks GitHub unless both _discoverOrgs and _registerOrg are injected.');
+    return;
+  }
+  const discover = options._discoverOrgs || discoverAdminOrgs;
+  const register = options._registerOrg || registerOrg;
+  let adminOrgs;
+  try {
+    adminOrgs = await discover();
+  } catch (e) {
+    log.warn(`Org check skipped: could not list your admin orgs (${e.message}).`);
+    return;
+  }
+  const { orgs } = selectRunnerOrgs(adminOrgs, env.OMEGA_RUNNER_ORGS);
+  const served   = new Set((readConfig(home).registeredOrgs || []).map((org) => org.toLowerCase()));
+  for (const org of orgs.filter((o) => !served.has(o.toLowerCase()))) {
+    log.log(`Registering ${org}: an admin org this box does not serve yet.`);
+    try {
+      await register({ ...options, _: ['runner', 'register-org', org], _templateDir: templateDir });
+    } catch (e) {
+      log.warn(`✗ register ${org}: ${e.message}`);
+      process.exitCode = 1;
+    }
+  }
 }
 
 // Every registered org, brought online detached, in Startup-shortcut order.
@@ -589,7 +676,15 @@ function runnerStartupTargets(home) {
 // `_spawn` and `_listeners` are injected by the tests, the same way `_home` and
 // `_logger` are: neither cmd.exe nor the process scan exists off Windows.
 // `_preflightDone` is `restart`'s: it settles the box config BEFORE it kills
-// anything, so the walk must not run a second time here.
+// anything, so the walk must not run a second time here. The reconcile is NOT
+// gated on it: after restart's stop is exactly when nothing is locked.
+// `_reconcileDone` is install's alone: it just downloaded and registered, so the
+// reconcile is skipped there.
+//
+// A bare box (no template to clone from) is handed to install, `_install` in
+// the tests, which ends by calling this function again with the template in
+// place. A test run without `_install` refuses: the real install downloads,
+// discovers and registers against GitHub, and no scratch home scopes that.
 async function startServices(options) {
   options = options || {};
   ensureWindows();
@@ -597,8 +692,23 @@ async function startServices(options) {
   const log     = options._logger || logger;
   const spawnIt = options._spawn || spawnRunnerDetached;
   const listen  = options._listeners || listRunnerListenerProcessesUnder;
+  if (!jetpack.exists(path.join(home, '_template', 'config.cmd'))) {
+    if (isTestRun() && !options._install) {
+      throw new Error(
+        `Refusing to install onto the bare runner home ${home}: this is a test run `
+        + '(OMEGA_TEST_RUNNER / OMEGA_TEST_MODE) and the call did not inject `_install`. The real install '
+        + 'downloads actions/runner and registers every admin org against GitHub with GH_TOKEN.',
+      );
+    }
+    log.log(`No runner install under ${home}: running the full install.`);
+    return (options._install || install)(options);
+  }
+  const env = options._env || process.env;
   if (!options._preflightDone) {
-    await startPreflight({ home, env: options._env || process.env, logger: log, prompt: options._prompt, interactive: options._interactive });
+    await startPreflight({ home, env, logger: log, prompt: options._prompt, interactive: options._interactive });
+  }
+  if (!options._reconcileDone) {
+    await reconcileRunnerInstall({ ...options, _home: home, _env: env, _logger: log, _listeners: listen });
   }
   const targets = runnerStartupTargets(home);
   if (targets.length === 0) {
@@ -762,7 +872,7 @@ async function statusServices(options) {
   logger.log('');
   const report = orgRunnerReport({ home });
   if (report.length === 0) {
-    logger.warn('No orgs registered. Run `npx omega runner install`.');
+    logger.warn('No orgs registered. Run `npx omega runner start`.');
   } else {
     logger.log(`Per-org runner state (${report.length}):`);
     for (const { state, lines } of report) {
@@ -1158,19 +1268,6 @@ function identifyHandleHolders(targetPath) {
     for (const line of out.split(/\r?\n/).slice(0, 30)) logger.warn(`  ${line}`);
   } else {
     logger.warn(`handle.exe ran but reported no holders for ${targetPath}. The lock may be at the directory level (e.g. another shell's cwd is set inside it) — try closing all cmd windows and re-running.`);
-  }
-}
-
-// ─── self-update ────────────────────────────────────────────────────────────────
-async function selfUpdate() {
-  const { execute } = require('node-powertools');
-  logger.log('Updating @omega.js/desktop to latest…');
-  try {
-    const out = await safeInstall('npm i -g @omega.js/desktop@latest');
-    logger.log(out);
-    logger.log('✓ @omega.js/desktop updated.');
-  } catch (e) {
-    logger.warn(`Self-update failed: ${e.message}`);
   }
 }
 
@@ -1571,8 +1668,8 @@ function listLegacyRunnerStartupShortcuts(startupDir) {
 // wrapper that blocks for the lifetime of the listener with cwd = runnerDir;
 // a long-lived cmd.exe holding cwd inside RUNNER_HOME blocks every later
 // uninstall with EPERM. Bypassing run.cmd loses its self-update relaunch
-// path, but `mgr runner install` refreshing the runner binary is the
-// preferred update mechanism in @omega.js/desktop anyway.
+// path, but `npx omega runner start` refreshing the runner binary in place
+// is the update mechanism in @omega.js/desktop anyway.
 //
 // Detached + windowsHide + ignored stdio = no console window flashes during
 // install and the listener survives the install command's exit. UAC-
@@ -1733,7 +1830,7 @@ async function monitor(options) {
   // exactly which orgs the monitor will pick up signing events from.
   const report = orgRunnerReport({ home });
   if (report.length === 0) {
-    logger.log('(no orgs registered yet — run `npx omega runner install` first)');
+    logger.log('(no orgs registered yet: run `npx omega runner start` first)');
   } else {
     logger.log(`Monitoring signing requests across ${report.length} org(s):`);
     for (const { state, lines } of report) {

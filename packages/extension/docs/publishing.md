@@ -105,7 +105,7 @@ What happens:
 2. `gulp/tasks/package.js` detects `OMEGA_IS_PUBLISH=true`
 3. For each browser, reads the store credentials from `.env` and the listing id from config
 4. Uploads the `.zip` via each declared store's API. A missing developer key refuses before anything uploads; a missing listing id prints the manual step (create the listing, upload the zip that is already on the release, set the config path, re-run) and the rest of the run continues
-5. Logs success / failure per store; exits non-zero if any upload fails
+5. Logs success / failure per store, each failed store with its reason (a version the store already holds says to bump `version` in package.json and deploy again); exits non-zero if any upload fails
 
 ## Manual upload
 

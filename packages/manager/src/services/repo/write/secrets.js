@@ -56,7 +56,6 @@ module.exports = async function ensureSecrets(context) {
         logger,
         dryRun: options.dryRun,
         ...(context.execFn ? { execFn: context.execFn } : {}),
-        ...(context.gitExecFn ? { gitExecFn: context.gitExecFn } : {}),
       });
     } catch (error) {
       console.log(`      ${chalk.red('✗')} ${entry.dir}${chalk.dim(`: ${error.message}`)}`);

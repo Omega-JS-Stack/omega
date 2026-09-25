@@ -58,6 +58,53 @@ function stageGeckoManifest(dir, geckoId) {
   }));
 }
 
+// chrome-webstore-upload-cli's shape for a rejected item (its errorHandler):
+// `Error: <error_code>`, then `<error_detail>`, both on stderr, under the
+// warning npx prints before it installs the CLI (#940).
+const CHROME_ITEM_DETAIL = 'The manifest could not be parsed.';
+const CHROME_ITEM_ERROR = [
+  'npm warn exec The following package was not found and will be installed: chrome-webstore-upload-cli@3.3.0',
+  'Error: PKG_MANIFEST_PARSE_ERROR',
+  CHROME_ITEM_DETAIL,
+].join('\n');
+
+// Run the task's store runner over `stores` in a staged 3.1.4 project, with
+// ONE injected shell exec rejecting each lane's command with `stderr(command)`
+// (#940). Returns the thrown error and every logged line.
+async function publishRejected(stores, stderr) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-publish-rejected-'));
+  fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'staged-ext', version: '3.1.4' }));
+  stageGeckoManifest(tmp, 'extension@acme.com');
+
+  const env = { ...process.env };
+  Object.assign(process.env, {
+    CHROME_CLIENT_ID: 'client', CHROME_CLIENT_SECRET: 'secret', CHROME_REFRESH_TOKEN: 'refresh',
+    FIREFOX_API_KEY: 'user:key', FIREFOX_API_SECRET: 'secret',
+  });
+
+  const lines = [];
+  const { log, error } = console;
+  console.log = (...args) => lines.push(args.join(' '));
+  console.error = (...args) => lines.push(args.join(' '));
+
+  let thrown = null;
+  try {
+    await inProject(tmp, async (task) => {
+      await task.publishStores(stores, {
+        config: { listings: { chrome: { id: 'chrome-item-id' }, firefox: { id: 'extension@acme.com' } } },
+        executeFn: async (command) => { throw new Error(stderr(command)); },
+      }).catch((e) => { thrown = e; });
+    });
+  } finally {
+    console.log = log;
+    console.error = error;
+    process.env = env;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+
+  return { thrown, lines };
+}
+
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
@@ -499,6 +546,93 @@ module.exports = defineCases({
 
         ctx.expect(message).toContain('repo.org');
         fs.rmSync(tmp, { recursive: true, force: true });
+      },
+    },
+
+    // #940: a store that already holds the version FAILS the publish (a
+    // republish of a live version is not a publish), and the report says why
+    // and that a bump fixes it. Run 35982804637 printed only `Firefox Add-ons:
+    // ✗ Failed` and `Publish failed for: firefox`, with web-ext's whole stderr
+    // (npm warnings first) scrolled above it. This is that stderr, verbatim in
+    // shape, thrown by the real firefox lane through the task's store runner.
+    {
+      name: 'a duplicate version FAILS, and the table line and the throw name the version and the bump (#940)',
+      run: async (ctx) => {
+        const conflict = [
+          'npm warn exec The following package was not found and will be installed: web-ext@10.7.0',
+          'npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation',
+          'npm warn deprecated eslint@9.39.4: This version is no longer supported. Please see https://eslint.org/version-support for other options.',
+          '',
+          'WebExtError: Submission failed (2): Conflict',
+          '{',
+          '  "version": [',
+          '    "Version 3.1.4 already exists."',
+          '  ]',
+          '}',
+          '    at file:///home/runner/.npm/_npx/43d181ce0e38748d/node_modules/web-ext/lib/cmd/sign.js:101:13',
+        ].join('\n');
+
+        const { thrown, lines } = await publishRejected(['firefox'], () => conflict);
+        const reason = 'version 3.1.4 already exists on Firefox Add-ons. Bump version in package.json and deploy again.';
+
+        // No pass path: the store kept its old version, so the publish failed
+        ctx.expect(thrown instanceof Error).toBe(true);
+        ctx.expect(thrown.message).toBe(`Publish failed for firefox: ${reason}`);
+        ctx.expect(thrown.message).toContain('already exists');
+        ctx.expect(thrown.message).toContain('Bump version in package.json');
+
+        const row = lines.find((line) => line.includes('Firefox Add-ons: ✗ Failed'));
+        ctx.expect(row).toContain(`Firefox Add-ons: ✗ Failed: ${reason}`);
+      },
+    },
+
+    // Every OTHER rejection keeps the store's own words, trimmed to the line a
+    // human reads: the last line that is not npm's, a JSON body or a stack
+    // frame, which is web-ext's `WebExtError:` line on firefox and the
+    // itemError detail on chrome. The npm warnings are never it.
+    {
+      name: 'any other rejection FAILS with the store\'s own last line as the reason, never the npm noise (#940)',
+      run: async (ctx) => {
+        const firefoxRejection = [
+          'npm warn exec The following package was not found and will be installed: web-ext@10.7.0',
+          'WebExtError: Submission failed (2): Bad Request',
+          '{',
+          '  "non_field_errors": ["Invalid manifest"]',
+          '}',
+          '    at file:///home/runner/.npm/_npx/43d181ce0e38748d/node_modules/web-ext/lib/cmd/sign.js:101:13',
+        ].join('\n');
+
+        const { thrown, lines } = await publishRejected(['chrome', 'firefox'], (command) => (
+          command.includes('web-ext') ? firefoxRejection : CHROME_ITEM_ERROR
+        ));
+
+        ctx.expect(thrown instanceof Error).toBe(true);
+        ctx.expect(thrown.message).toContain(`Publish failed for chrome: ${CHROME_ITEM_DETAIL}`);
+        ctx.expect(thrown.message).toContain('firefox: WebExtError: Submission failed (2): Bad Request');
+        ctx.expect(thrown.message).not.toContain('npm warn');
+        ctx.expect(thrown.message).not.toContain('Bump version');
+
+        const chromeRow = lines.find((line) => line.includes('Chrome Web Store: ✗ Failed'));
+        ctx.expect(chromeRow).toContain(`Chrome Web Store: ✗ Failed: ${CHROME_ITEM_DETAIL}`);
+        const firefoxRow = lines.find((line) => line.includes('Firefox Add-ons: ✗ Failed'));
+        ctx.expect(firefoxRow).toContain('Firefox Add-ons: ✗ Failed: WebExtError: Submission failed (2): Bad Request');
+      },
+    },
+
+    // chrome-webstore-upload-cli writes a rejected item as `Error: <code>`
+    // then the detail line, on stderr, and npx's own warning sits above it:
+    // the detail is the reason, never the npm line.
+    {
+      name: 'a chrome itemError rejection reads its detail line, never npx\'s warning (#940)',
+      run: async (ctx) => {
+        const { thrown, lines } = await publishRejected(['chrome'], () => CHROME_ITEM_ERROR);
+
+        ctx.expect(thrown instanceof Error).toBe(true);
+        ctx.expect(thrown.message).toBe(`Publish failed for chrome: ${CHROME_ITEM_DETAIL}`);
+        ctx.expect(thrown.message).not.toContain('npm warn');
+
+        const row = lines.find((line) => line.includes('Chrome Web Store: ✗ Failed'));
+        ctx.expect(row).toContain(`Chrome Web Store: ✗ Failed: ${CHROME_ITEM_DETAIL}`);
       },
     },
   ],

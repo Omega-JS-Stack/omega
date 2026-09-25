@@ -73,7 +73,7 @@ jobs:
 
       - name: Run node install
         working-directory: targets/web
-        run: sfw npm install --workspace .
+        run: sfw npm ci --workspace .
 
       # No npx on a runner, in any spelling (#877): which package won npm's
       # shared `omega` bin link is an install-order accident, and an `npx omega`

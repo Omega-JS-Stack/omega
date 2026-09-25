@@ -231,17 +231,20 @@ function stageBrandTree({ linked }) {
 }
 
 /**
- * The NETWORK steps every delivery now starts with (#915, #922), recorded
- * rather than run: the default-branch read, the gh-pages heal of the name that
- * read returned, and the composed workflows' compare and push to that branch.
- * The behind check is git's, so it is recorded here too and a case that wants a
- * refusal overrides it.
+ * The steps every delivery now starts with (#915, #922, #934, #938), recorded
+ * rather than run: the origin gate every lane passes, the registry lane's
+ * lockfile gate, the default-branch read,
+ * the gh-pages heal of the name that read returned, and the composed
+ * workflows' compare and push to that branch. The behind check is git's, so it
+ * is recorded here too and a case that wants a refusal overrides it.
  *
  * @param {string[]} order - The run's step log.
  * @returns {object} The steps to inject.
  */
 function laneSteps(order) {
   return {
+    origin: (options) => order.push(`origin:${options.root}`),
+    lockfile: (options) => order.push(`lockfile:${options.root}`),
     defaultBranch: async () => { order.push('defaultBranch'); return 'main'; },
     heal: async (options) => { order.push('heal'); return options.current; },
     behind: (options) => order.push(`behind:${options.branch}`),
@@ -353,6 +356,9 @@ test('deployViaDispatch: the snapshot lane checks, composes, packs, pushes, rest
     });
 
     assert.deepStrictEqual(order, [
+      // The origin gate runs on every lane (#934); a nested brand has no origin
+      // of its own, which the real gate answers as nothing to compare.
+      `origin:${nested.brandRoot}`,
       'defaultBranch',
       'heal',
       // A nested brand's git toplevel is the enclosing repo's, so there is no
@@ -400,7 +406,7 @@ test('deployViaDispatch: a failed snapshot restores the tree and never dispatche
       /remote rejected the snapshot/,
     );
 
-    assert.deepStrictEqual(order, ['defaultBranch', 'heal', 'workflows:main', 'restore'], 'the tree goes back, and nothing else runs');
+    assert.deepStrictEqual(order, [`origin:${nested.brandRoot}`, 'defaultBranch', 'heal', 'workflows:main', 'restore'], 'the tree goes back, and nothing else runs');
   } finally {
     fs.rmSync(nested.scratch, { recursive: true, force: true });
   }
@@ -435,6 +441,10 @@ test('deployViaDispatch: a PLAIN brand takes the same one lane, and a brand outs
     // never committed for it.
     const result = await deployViaDispatch({ ...base });
     assert.deepStrictEqual(order, [
+      // The origin gate, on every lane (#934)
+      `origin:${plain.brandRoot}`,
+      // Registry-clean: the brand's own lock ships, so the gate runs next (#938)
+      `lockfile:${plain.brandRoot}`,
       'defaultBranch',
       'heal',
       'behind:main',
@@ -451,7 +461,7 @@ test('deployViaDispatch: a PLAIN brand takes the same one lane, and a brand outs
     // is the whole lane, never a raw `fatal: not a git repository`.
     order.length = 0;
     const loose = await deployViaDispatch({ ...base, execFn: () => { throw new Error('not a git repository'); } });
-    assert.deepStrictEqual(order, ['wait', 'dispatch'], 'no repo: no delivery at all, and no git error');
+    assert.deepStrictEqual(order, [`origin:${plain.brandRoot}`, 'wait', 'dispatch'], 'no repo: no delivery at all, and no git error; the origin gate still runs, because the dispatch still acts on the derived repo (#934)');
     assert.strictEqual(loose.lane.mode, 'dispatch');
     assert.strictEqual(loose.plan.body.ref, 'omega-deploy', 'and it dispatches the one branch CI builds');
   } finally {
@@ -471,6 +481,7 @@ test('deliverLane: a checkout BEHIND the default branch refuses, naming the fix 
       repo: 'acme-omega',
       token: 'tok',
       steps: {
+        lockfile: () => {},
         defaultBranch: async () => 'main',
         behind: (options) => assertNotBehind({
           ...options,
@@ -551,7 +562,7 @@ test('deliverLane: a NESTED brand skips the behind check: its git toplevel is so
     },
   });
 
-  assert.deepStrictEqual(order, ['defaultBranch', 'heal', 'workflows:main', 'waitRef'], 'no behind check ran');
+  assert.deepStrictEqual(order, ['origin:/brand', 'lockfile:/brand', 'defaultBranch', 'heal', 'workflows:main', 'waitRef'], 'no behind check ran');
 });
 
 test('deliverLane: a gh-pages default is HEALED before anything is written to it (#922)', async () => {
@@ -566,6 +577,7 @@ test('deliverLane: a gh-pages default is HEALED before anything is written to it
     repo: 'acme-omega',
     token: 'tok',
     steps: {
+      lockfile: () => {},
       defaultBranch: async () => { order.push('defaultBranch'); return 'gh-pages'; },
       // The heal takes the name the read returned and answers with the branch
       // the rest of the lane uses: published output is never composed onto.
@@ -607,7 +619,7 @@ test('deployViaDispatch: a dry run reports the lane and touches neither git nor 
       },
     });
 
-    assert.deepStrictEqual(order, [], 'a dry run runs no step at all, the gh-pages heal included (#922)');
+    assert.deepStrictEqual(order, [`origin:${nested.brandRoot}`], 'a dry run runs the read-only origin gate (#934) and no other step, the gh-pages heal included (#922)');
     assert.strictEqual(result.dispatched, false);
     assert.strictEqual(result.lane.mode, 'snapshot');
     assert.strictEqual(result.plan.body.ref, 'omega-deploy');
@@ -676,6 +688,7 @@ test('deployViaDispatch: a LINKED brand that owns its repo checks it is current,
     });
 
     assert.deepStrictEqual(order, [
+      `origin:${linked.brandRoot}`,
       'defaultBranch',
       'heal',
       'behind:main',
@@ -779,6 +792,8 @@ test('deliverLane: the one lane checks, composes, packs, pushes, restores, and r
   const composed = [];
   const lane = { mode: 'snapshot', ref: 'omega-deploy', nested: false, linked: true, repo: true, brandRoot: '/brand' };
   const steps = {
+    // A linked lane regenerates its lock in the pack step: no gate (#938)
+    lockfile: () => order.push('lockfile'),
     defaultBranch: async (options) => { order.push(`defaultBranch:${options.owner}/${options.repo}`); return 'main'; },
     heal: async (options) => { order.push(`heal:${options.current}`); return options.current; },
     behind: (options) => order.push(`behind:${options.cwd}@${options.branch}`),
@@ -832,6 +847,8 @@ test('deliverLane: a brand outside git delivers NOTHING (#915)', async () => {
   const { deliverLane } = require('../src/deploy.js');
   const lane = { mode: 'dispatch', ref: 'omega-deploy', nested: false, linked: false, repo: false, brandRoot: '/brand' };
   const steps = {
+    origin: () => order.push('origin'),
+    lockfile: () => order.push('lockfile'),
     defaultBranch: async () => { order.push('defaultBranch'); return 'main'; },
     heal: async () => { order.push('heal'); return 'main'; },
     behind: () => order.push('behind'),
@@ -843,6 +860,164 @@ test('deliverLane: a brand outside git delivers NOTHING (#915)', async () => {
   };
 
   const result = await deliverLane({ lane, logger: { log: () => {} }, steps });
-  assert.deepStrictEqual(order, [], 'no index to snapshot from: not one step, and no git error');
+  assert.deepStrictEqual(order, ['origin'], 'no index to snapshot from: the origin gate alone (the dispatch still acts on the derived repo, #934), and no git error');
   assert.strictEqual(result.sha, null, 'and no snapshot for anyone to dispatch against');
+});
+
+// ---- #938: the registry lane's lockfile gate
+
+test('deliverLane: the REGISTRY lane gates the brand lockfile first, and a refusal stops before any network step (#938)', async () => {
+  const { deliverLane } = require('../src/deploy.js');
+  const order = [];
+  const lane = { mode: 'snapshot', ref: 'omega-deploy', nested: true, linked: false, repo: true, brandRoot: '/brand' };
+
+  await assert.rejects(
+    () => deliverLane({
+      lane,
+      owner: 'acme',
+      repo: 'acme-omega',
+      token: 'tok',
+      steps: {
+        ...laneSteps(order),
+        lockfile: (options) => {
+          order.push(`lockfile:${options.root}`);
+          throw new Error('/brand/package-lock.json disagrees with the manifests; run `omega i live`');
+        },
+        push: () => order.push('push'),
+      },
+    }),
+    /omega i live/,
+  );
+
+  assert.deepStrictEqual(order, ['origin:/brand', 'lockfile:/brand'], 'no default-branch read, no heal, no workflow push, no snapshot');
+});
+
+test('deployViaDispatch: a DRY RUN on the registry lane runs the real lockfile gate, and a linked one does not (#938)', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const plain = stageBrandTree({ linked: false });
+  const linked = stageBrandTree({ linked: true });
+  const base = {
+    workflow: 'web-build.yml',
+    owner: 'acme',
+    repo: 'acme-omega',
+    dryRun: true,
+    fetchFn: async () => { throw new Error('a dry run never fetches'); },
+  };
+
+  try {
+    // No lock at all: the runner's `npm ci` would die, so the plan refuses now.
+    await assert.rejects(
+      deployViaDispatch({ ...base, dir: plain.targetDir, execFn: () => `${plain.scratch}\n` }),
+      (error) => {
+        assert.strictEqual(error.refusal, true);
+        assert.match(error.message, /has no package-lock\.json/);
+        assert.match(error.message, /omega i live/);
+        return true;
+      },
+    );
+
+    // The local era's link in the lock: refused by name.
+    const lockPath = path.join(plain.brandRoot, 'package-lock.json');
+    const lock = (web) => JSON.stringify({ lockfileVersion: 3, packages: { '': {}, 'node_modules/@omega.js/web': web } });
+    fs.writeFileSync(lockPath, lock({ resolved: '../../packages/web', link: true }));
+    await assert.rejects(
+      deployViaDispatch({ ...base, dir: plain.targetDir, execFn: () => `${plain.scratch}\n` }),
+      /targets\/site: @omega\.js\/web \^0\.1\.0 is locked as a link to \.\.\/\.\.\/packages\/web/,
+    );
+
+    // A registry entry satisfying `^0.1.0`: the plan goes through.
+    fs.writeFileSync(lockPath, lock({ version: '0.1.4', resolved: 'https://registry.npmjs.org/@omega.js/web/-/web-0.1.4.tgz' }));
+    const result = await deployViaDispatch({ ...base, dir: plain.targetDir, execFn: () => `${plain.scratch}\n` });
+    assert.strictEqual(result.dispatched, false);
+    assert.strictEqual(result.lane.linked, false);
+
+    // Linked, no lock at all: the pack step writes that lane's lock, so no gate.
+    const linkedResult = await deployViaDispatch({ ...base, dir: linked.targetDir, execFn: () => `${linked.scratch}\n` });
+    assert.strictEqual(linkedResult.lane.linked, true);
+    assert.strictEqual(linkedResult.dispatched, false);
+  } finally {
+    fs.rmSync(plain.scratch, { recursive: true, force: true });
+    fs.rmSync(linked.scratch, { recursive: true, force: true });
+  }
+});
+
+// ---- #934: the origin gate
+
+test('deliverLane: an origin that is not the derived source repo REFUSES first, before the lockfile, a read or a push (#934)', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const { deliverLane } = require('../src/deploy.js');
+  const { assertOriginMatches } = require('../src/git-remote.js');
+  const plain = stageBrandTree({ linked: false });
+  const order = [];
+
+  // A real checkout whose origin a transfer left behind: the config derives
+  // Acme-Org/acme-omega, and the snapshot would be pushed there.
+  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { org: \'Acme-Org\' } }');
+  execFileSync('git', ['-C', plain.brandRoot, 'init', '-q']);
+  execFileSync('git', ['-C', plain.brandRoot, 'remote', 'add', 'origin', 'https://github.com/Other-Org/acme-omega.git']);
+
+  try {
+    await assert.rejects(
+      () => deliverLane({
+        lane: { mode: 'snapshot', ref: 'omega-deploy', nested: false, linked: false, repo: true, brandRoot: plain.brandRoot },
+        owner: 'Acme-Org',
+        repo: 'acme-omega',
+        token: 'tok',
+        steps: {
+          ...laneSteps(order),
+          // The REAL gate, recorded: the steps seam carries the order, git and
+          // the config load are real.
+          origin: (options) => {
+            order.push('origin');
+            assertOriginMatches({ dir: options.root });
+          },
+          push: () => order.push('push'),
+          waitRef: async () => order.push('waitRef'),
+        },
+      }),
+      (error) => {
+        assert.strictEqual(error.message, 'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+        return true;
+      },
+    );
+
+    assert.deepStrictEqual(order, ['origin'], 'no lockfile gate, no default-branch read, no workflow push, no snapshot');
+  } finally {
+    fs.rmSync(plain.scratch, { recursive: true, force: true });
+  }
+});
+
+test('deliverLane: the DEFAULT origin step is the real gate: a drifted checkout refuses with no step injected (#934)', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const { deliverLane } = require('../src/deploy.js');
+  const plain = stageBrandTree({ linked: false });
+
+  fs.writeFileSync(path.join(plain.brandRoot, 'config', 'omega.json5'), '{ brand: { id: \'acme\' }, repo: { org: \'Acme-Org\' } }');
+  execFileSync('git', ['-C', plain.brandRoot, 'init', '-q']);
+  execFileSync('git', ['-C', plain.brandRoot, 'remote', 'add', 'origin', 'git@github.com:Acme-Org/acme-site.git']);
+
+  try {
+    // No `steps` at all: LANE_STEPS as shipped. Were the origin step not wired
+    // to the gate, the real lockfile gate would refuse next (this fixture has
+    // no lock), with another message, and nothing here reaches the network.
+    await assert.rejects(
+      () => deliverLane({
+        lane: { mode: 'snapshot', ref: 'omega-deploy', nested: false, linked: false, repo: true, brandRoot: plain.brandRoot },
+        owner: 'Acme-Org',
+        repo: 'acme-omega',
+        token: 'tok',
+      }),
+      (error) => {
+        assert.strictEqual(error.message, 'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+        return true;
+      },
+    );
+  } finally {
+    fs.rmSync(plain.scratch, { recursive: true, force: true });
+  }
 });

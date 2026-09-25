@@ -72,7 +72,7 @@ function checkJob(env, lists) {
     return { allowed: false, line: `Refusing this job: GITHUB_EVENT_NAME is "${event}", and this runner serves ${DISPATCH_EVENTS.join(' and ')} only.` };
   }
   if (repos.length === 0) {
-    return { allowed: false, line: `Refusing this job: ${reposFile} lists no repository, so this runner allows none. Run \`npx omega runner install\` on the box, or add one \`owner/name\` per line.` };
+    return { allowed: false, line: `Refusing this job: ${reposFile} lists no repository, so this runner allows none. Run \`npx omega runner start\` on the box, or add one \`owner/name\` per line.` };
   }
   if (!repos.some((entry) => repoMatches(repository, entry))) {
     return { allowed: false, line: `Refusing this job: GITHUB_REPOSITORY is "${repository}", which is not listed in ${reposFile}.` };

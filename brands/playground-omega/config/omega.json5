@@ -78,7 +78,7 @@
   },
 
   // One repo block (#883): the org that holds every derived repo. Source
-  // `playground-omega` (private, from package.json `private`), `playground-releases`
+  // `playground-omega` (public, from package.json `private: false`, so Actions do not count against the org storage), `playground-releases`
   // (public, the artifact channel), `playground-web` (the built site, public on a
   // free org). Nothing else about repos is typed here.
   repo: {
@@ -366,6 +366,13 @@
       // default) or 'forever' (a permanent price cut).
       duration: "once",
     },
+    // The ISO 4217 code every price in payment.products is quoted in (#850).
+    // One currency per brand, named wherever a price is shown or recorded: the
+    // pricing page's JSON-LD, the checkout, and the backend's order history
+    // (GET /user/orders). Defaults to 'USD', the fallback its readers carried
+    // before the fact had a home. The successor to the retired
+    // targets.web.currency.
+    currency: "USD",
   },
 
   connections: {

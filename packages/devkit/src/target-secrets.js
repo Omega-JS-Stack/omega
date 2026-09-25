@@ -31,7 +31,10 @@
  *      config (`repo.org`, the SOURCE repo). An inferred git remote is not proof: a
  *      target vendored into a framework/test monorepo, a cloned starter still
  *      pointing at the template author, or any fork would publish this brand's
- *      `.env` to a stranger's Actions.
+ *      `.env` to a stranger's Actions. A checkout that could be the brand's own
+ *      and whose origin names another repo REFUSES on `repoDrift`'s one line
+ *      ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)), the
+ *      same refusal the deploy lane and the manage walk make.
  *   4. PUBLISH — each collected key becomes a repo Actions secret via devkit's
  *      `gh` boundary (values on stdin, never logged).
  *
@@ -70,11 +73,12 @@
  * sends nothing. The refusal still THROWS in a dry run: a plan that cannot be
  * made is loud.
  */
-const { composeTargetEnv, loadConfig } = require('@omega.js/config');
+const { composeTargetEnv, loadConfig, sourceRepo } = require('@omega.js/config');
 const { publishSecretKeys } = require('@omega.js/config/env-delivery');
 const { checkEnvRules } = require('@omega.js/config/env-rules');
 const { publishActionsSecrets } = require('./actions-secrets.js');
-const { resolveRepo, resolveDeployLane } = require('./deploy.js');
+const { assertOriginMatches } = require('./git-remote.js');
+const { findBrandRoot } = require('./local.js');
 const { targetSeams } = require('./target-seams.js');
 
 /**
@@ -200,26 +204,18 @@ function missingRequiredSecrets(options) {
 }
 
 /**
- * The brand's SOURCE repo as `owner/name`, from the target's resolved config:
- * the one the workflows and their secrets live on, derived as
- * `<brand.id>-omega` under `repo.org` (#883). Null when the config declares
- * nothing usable or doesn't load.
+ * The target's resolved PRODUCTION config, like every other read this publish
+ * makes (#895): the repo a release's secrets belong to is the one the
+ * production config names. Null when it doesn't load.
  *
  * @param {object} options
  * @param {string} options.targetDir - The target root.
  * @param {string} options.target - Target name ('web', 'extension', …).
- * @returns {string|null}
+ * @returns {object|null}
  */
-function declaredBrandRepo(options) {
+function productionConfig(options) {
   try {
-    const { loadConfig, sourceRepo } = require('@omega.js/config');
-    // PRODUCTION, like every other read this publish makes (#895): the repo a
-    // release's secrets belong to is the one the production config names.
-    const { config } = loadConfig(options.targetDir, options.target, { environment: 'production' });
-    if (!config) return null;
-
-    const source = sourceRepo(config);
-    return source ? source.slug : null;
+    return loadConfig(options.targetDir, options.target, { environment: 'production' }).config || null;
   } catch (e) {
     return null;
   }
@@ -241,7 +237,6 @@ function declaredBrandRepo(options) {
  * @param {Object<string, string>} [options.extraSecrets] - Override for the
  *   target's already-valued keys, merged OVER the composed set (tests).
  * @param {function} [options.execFn] - Injectable `gh` exec (tests).
- * @param {function} [options.gitExecFn] - Injectable `git` exec for remote discovery (tests).
  * @returns {{ skipped: string }|{ planned: string[] }|{ published: string[], failed: Array<object> }}
  */
 function publishTargetSecrets(options) {
@@ -297,37 +292,31 @@ function publishTargetSecrets(options) {
     return { skipped: 'no-secrets' };
   }
 
-  const declared = declaredBrandRepo({ targetDir, target });
-  if (!declared) {
+  const config = productionConfig({ targetDir, target });
+  const source = config ? sourceRepo(config) : null;
+  if (!source) {
     logger.warn('Skipping secret publication: this brand names no GitHub repo in config (repo.org). Set it, then re-run `omega deploy`.');
     return { skipped: 'no-declared-repo' };
   }
 
-  // A NESTED brand (its root is not the toplevel of the git repo it sits in)
-  // has a remote that answers the ENCLOSING repo by construction, and its
-  // deploy pushes a snapshot to the DECLARED repo regardless
-  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), so the
-  // mismatch guard would only ever skip a publish that is correct. Every other
-  // guard stays: what the guard protects against is a checkout that COULD have
-  // been the brand's own and is not.
-  const { nested } = resolveDeployLane({ dir: targetDir, execFn: options.gitExecFn });
-  const repo = declared;
-
-  if (!nested) {
-    let remote;
-    try {
-      const { owner, repo: name } = resolveRepo({ cwd: targetDir, execFn: options.gitExecFn });
-      remote = `${owner}/${name}`;
-    } catch (e) {
-      logger.warn(`Skipping secret publication — no GitHub remote here (${e.message})`);
-      return { skipped: 'no-remote' };
-    }
-
-    if (declared.toLowerCase() !== remote.toLowerCase()) {
-      logger.warn(`Skipping secret publication — the git remote here is ${remote}, but this brand's repo is ${declared}. Run \`omega deploy\` from the brand's own checkout.`);
-      return { skipped: 'repo-mismatch' };
-    }
+  // The ONE origin gate the deploy lane and the manage walk use
+  // ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): the brand
+  // root's own origin (the local remote, which the boot prelude has already
+  // healed onto GitHub's redirect) must BE the derived source repo, or the
+  // publish REFUSES on the one drift line, because arming a repo that is not
+  // the derived one is the harm itself. No `.git` AT the brand root is nothing
+  // to compare: a NESTED brand's remote is the enclosing repo's by
+  // construction, and its deploy pushes to the derived repo regardless
+  // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)). A checkout
+  // with no GitHub origin (nobody pushed it yet, or it is hosted elsewhere) has
+  // no repo to arm, so it skips.
+  const origin = assertOriginMatches({ dir: findBrandRoot(targetDir), config });
+  if (origin.reason === 'no-origin' || origin.reason === 'foreign-remote') {
+    logger.warn(`Skipping secret publication: no GitHub remote here (${origin.reason})`);
+    return { skipped: 'no-remote' };
   }
+
+  const repo = source.slug;
 
   // The PLAN, and nothing else (#895): what the composition answered, by NAME.
   // It runs after the refusal and the two guards above on purpose, so a dry run
@@ -347,4 +336,4 @@ function publishTargetSecrets(options) {
   return result;
 }
 
-module.exports = { collectTargetSecrets, declaredBrandRepo, missingRequiredSecrets, publishTargetSecrets };
+module.exports = { collectTargetSecrets, missingRequiredSecrets, publishTargetSecrets };

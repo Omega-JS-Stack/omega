@@ -141,7 +141,7 @@ module.exports = defineCases({
         // The firewall step is the pinned action, rendered from devkit's ONE
         // declaration, and the install it wraps runs through it.
         assert.ok(/uses: SocketDev\/action@v\d+\.\d+\.\d+/.test(workflow), 'the pinned firewall action is rendered');
-        assert.ok(workflow.includes('sfw npm install'), 'the install runs behind the firewall');
+        assert.ok(workflow.includes('sfw npm ci'), 'the install runs behind the firewall, as `npm ci` (#938)');
 
         // A STANDALONE target is its own repo root and declares no workspaces,
         // so the workspace flag a composed brand job carries renders to nothing
@@ -284,7 +284,7 @@ module.exports = defineCases({
 
         // …and installs only this target's workspace, so the runner's node
         // never installs another target's engines pin ([#898](https://github.com/Omega-JS-Stack/omega/issues/898)).
-        assert.ok(composed.includes('sfw npm install --workspace .'), 'the composed job installs the whole brand root');
+        assert.ok(composed.includes('sfw npm ci --workspace .'), 'the composed job installs only this target, as `npm ci` (#938)');
       },
     },
     {

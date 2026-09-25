@@ -32,21 +32,22 @@
  *   - anything else: the remote is rewritten to the answered `full_name`,
  *     keeping its own url form, and the heal is stated in one line.
  *
- * Then DRIFT, on whatever the answer was: `repo.org` stays the one typed value
- * in `config/omega.json5`, and an owner GitHub reports that differs from it is
- * stated in one line and nothing more. The prelude never writes config: which
- * of the two is wrong (the config, or where the repo lives) is a human's call,
- * and the manager's repo service only ensures repos UNDER `repo.org`.
+ * Then DRIFT, on whatever the answer was: the WHOLE slug GitHub answers against
+ * the source repo the config derives (`@omega.js/config`'s `repoDrift`, so a
+ * rename drifts as surely as a transfer,
+ * [#934](https://github.com/Omega-JS-Stack/omega/issues/934)), stated in one
+ * line and nothing more. Never fatal: this runs before every verb, and a fatal
+ * boot would lock out the verbs that fix the mismatch. The verbs that ACT on
+ * the derived repo (the manage walk, the deploy) refuse on the same line
+ * instead. The prelude never writes config: which of the two is wrong (the
+ * config, or where the repo lives) is a human's call.
  *
  * The WRITE is the one thing that fails loudly: a `git remote set-url` refused
  * after a `get-url` just answered is not an external condition, it is a broken
  * invariant, and the runner stops the boot on it.
  */
 
-const path = require('node:path');
-const jetpack = require('fs-jetpack');
-
-const { parseRemoteUrl, retargetRemoteUrl, remoteUrl, setRemoteUrl } = require('../git-remote.js');
+const { readOrigin, retargetRemoteUrl, setRemoteUrl } = require('../git-remote.js');
 const github = require('../github-repo.js');
 
 // The one network read runs on EVERY verb boot, so a network that hangs (a
@@ -61,7 +62,7 @@ const GITHUB_READ_TIMEOUT_MS = 10000;
  * @param {function} [context.execFn] - Injectable git exec (tests).
  * @param {function} [context.resolveRepo] - Injectable `(owner, name) => repo|null` (tests).
  * @param {function} [context.log] - Injectable line printer (tests).
- * @returns {{ healed: boolean, reason?: string, from?: string, to?: string, drift?: { owner: string, org: string } }}
+ * @returns {{ healed: boolean, reason?: string, from?: string, to?: string, drift?: { origin: string, derived: string } }}
  */
 function run(context = {}) {
   const { brandRoot, execFn } = context;
@@ -72,21 +73,12 @@ function run(context = {}) {
 
   if (!brandRoot) return { healed: false, reason: 'no-brand' };
 
-  // One stat, before anything else: most boots in this monorepo's own trees and
-  // in every fixture brand end here.
-  if (!jetpack.exists(path.join(brandRoot, '.git'))) return { healed: false, reason: 'no-git' };
+  // One stat before anything else (most boots in this monorepo's own trees and
+  // in every fixture brand end there), then the remote itself.
+  const current = readOrigin({ dir: brandRoot, execFn });
+  if (!current.slug) return { healed: false, reason: current.reason };
 
-  let url;
-  try {
-    url = remoteUrl({ dir: brandRoot, execFn });
-  } catch (e) {
-    return { healed: false, reason: 'no-origin' };
-  }
-
-  const current = parseRemoteUrl(url);
-  if (!current) return { healed: false, reason: 'foreign-remote' };
-
-  const from = `${current.owner}/${current.repo}`;
+  const { url, slug: from } = current;
 
   // The ONE network read, on the slug the checkout carries: GitHub follows its
   // own redirect and names where that repo lives now.
@@ -109,44 +101,38 @@ function run(context = {}) {
     result = { healed: true, from, to };
   }
 
-  const drift = configDrift(brandRoot, context.config, to.split('/')[0]);
+  const config = composedConfig(brandRoot, context.config);
+  const { repoDrift, sourceRepo } = require('@omega.js/config');
+  const drift = config ? repoDrift(to, config) : null;
+
   if (drift) {
-    log(`omega: origin lives under ${drift.owner} but repo.org is ${drift.org}: fix repo.org in config/omega.json5 or move the repo`);
-    result.drift = drift;
+    log(`omega: ${drift}`);
+    result.drift = { origin: to, derived: sourceRepo(config).slug };
   }
 
   return result;
 }
 
 /**
- * The gap between where the repo LIVES and the org the config types, or null
- * when there is none to state. The config is loaded here when the caller has
- * none, and an unloadable one answers "no drift": a config the boot cannot read
- * is the VERB's failure to report, in its own words, never a prelude's. A brand
- * declaring no `repo` block types no org, so there is nothing to disagree with.
+ * The composed config the drift is read against: the caller's when it has one,
+ * else loaded here, and an unloadable one answers null ("no drift"): a config
+ * the boot cannot read is the VERB's failure to report, in its own words, never
+ * a prelude's.
  *
  * @param {string} brandRoot - The brand root.
  * @param {object} [config] - The composed config, when the caller has it.
- * @param {string} owner - The owner GitHub resolved the repo under.
- * @returns {{ owner: string, org: string }|null}
+ * @returns {object|null}
  */
-function configDrift(brandRoot, config, owner) {
-  const { loadConfig, repoBlock } = require('@omega.js/config');
+function composedConfig(brandRoot, config) {
+  if (config) return config;
 
-  let block;
-  if (config) {
-    block = repoBlock(config);
-  } else {
-    try {
-      block = repoBlock(loadConfig(brandRoot).config);
-    } catch (e) {
-      return null;
-    }
+  const { loadConfig } = require('@omega.js/config');
+
+  try {
+    return loadConfig(brandRoot).config;
+  } catch (e) {
+    return null;
   }
-
-  if (!block || block.org.toLowerCase() === owner.toLowerCase()) return null;
-
-  return { owner, org: block.org };
 }
 
 module.exports = {

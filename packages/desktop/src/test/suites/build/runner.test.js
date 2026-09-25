@@ -78,8 +78,8 @@ module.exports = defineCases({
         jetpack.remove(realish);                                    // a RED run of this case is what would create it
         try {
           // Every verb that CHANGES the machine — stop kills real listeners under
-          // the home, self-update runs a global npm install.
-          for (const sub of ['install', 'config', 'register-org', 'start', 'restart', 'stop', 'uninstall', 'self-update']) {
+          // the home.
+          for (const sub of ['install', 'config', 'register-org', 'start', 'restart', 'stop', 'uninstall']) {
             let threw;
             try {
               // `_env: {}` is a fixture for the config walk. It is NOT an answer
@@ -1720,6 +1720,9 @@ module.exports = defineCases({
         const logged = [];
         const logger = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           let threw;
           try {
             await runner({ _: ['runner', 'start'], _home: home, _env: {}, _logger: logger, _prompt: {}, _interactive: false });
@@ -1814,6 +1817,9 @@ module.exports = defineCases({
         const spawned = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           for (const org of orgs) jetpack.dir(path.join(home, `actions-runner-${org}`));
           for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
 
@@ -1863,6 +1869,9 @@ module.exports = defineCases({
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         const aliveDir = path.join(home, 'actions-runner-acme');
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           for (const org of orgs) jetpack.dir(path.join(home, `actions-runner-${org}`));
           for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
 
@@ -1907,6 +1916,9 @@ module.exports = defineCases({
         const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           for (const org of orgs) jetpack.dir(path.join(home, `actions-runner-${org}`));
           for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
 
@@ -1949,6 +1961,9 @@ module.exports = defineCases({
         const spawned = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           jetpack.dir(path.join(home, 'actions-runner-acme'));
           jetpack.write(shortcut, '@echo off\r\n');
 
@@ -2043,6 +2058,9 @@ module.exports = defineCases({
         const waits   = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           jetpack.dir(path.join(home, 'actions-runner-acme'));
           jetpack.write(shortcut, '@echo off\r\n');
 
@@ -2092,6 +2110,9 @@ module.exports = defineCases({
         const waits   = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           jetpack.dir(path.join(home, 'actions-runner-acme'));
           jetpack.write(shortcut, '@echo off\r\n');
 
@@ -2130,7 +2151,7 @@ module.exports = defineCases({
         ctx.expect(startSrc.includes("stdio: 'inherit'")).toBe(false);
         ctx.expect(startSrc.includes('spawnSync')).toBe(false);
         // ...and install hands off to it rather than foregrounding one org.
-        ctx.expect(src).toContain('await startServices({ ...options, _home: home })');
+        ctx.expect(src).toContain('await startServices({ ...options, _home: home, _reconcileDone: true })');
 
         // The spawn's own options, pinned the same way: the listener is handed
         // the runner's private HOME ([#807](https://github.com/Omega-JS-Stack/omega/issues/807))
@@ -2166,6 +2187,9 @@ module.exports = defineCases({
         const spawned = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           for (const org of orgs) jetpack.dir(path.join(home, `actions-runner-${org}`));
           for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
 
@@ -2218,6 +2242,9 @@ module.exports = defineCases({
         const spawned = [];
         const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           jetpack.dir(path.join(home, 'actions-runner-acme'));
           jetpack.write(shortcut, '@echo off\r\n');
 
@@ -2585,6 +2612,9 @@ module.exports = defineCases({
         const logger = { log: (m) => logged.push(String(m)), warn: (m) => logged.push(String(m)), error: (m) => logged.push(String(m)) };
         const filled = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
         try {
+          // Installed and current, so `start` goes straight to its spawns (#937).
+          jetpack.write(path.join(home, '_template', 'config.cmd'), '@echo off\r\n');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION });
           for (const org of orgs) jetpack.write(path.join(home, `actions-runner-${org}`, 'config.cmd'), '@echo off\r\n');
           for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
           ctx.expect(jetpack.exists(path.join(home, 'home'))).toBe(false);
@@ -2614,6 +2644,583 @@ module.exports = defineCases({
         } finally {
           if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
           for (const file of shortcuts) jetpack.remove(file);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` on a bare box installs: a home with no `_template/config.cmd` hands the whole run to install, once',
+      run: async (ctx) => {
+        // `start` is the one command (#937). A box with nothing installed gets
+        // the install, which itself ends by bringing every org online, so
+        // nothing else of `start` runs: no config walk of its own, no refresh,
+        // no org check, no spawn.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const logged = [];
+        const logger = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const installs = [];
+        const spawned  = [];
+        let downloads = 0;
+        let discovers = 0;
+        let registers = 0;
+        try {
+          const options = {
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 1 }; },
+            _install:      async (o) => { installs.push(o); },
+            _download:     async () => { downloads++; },
+            _discoverOrgs: async () => { discovers++; return []; },
+            _registerOrg:  async () => { registers++; },
+          };
+          await runner(options);
+
+          ctx.expect(installs.length).toBe(1);
+          ctx.expect(installs[0]).toBe(options);                          // the same options, untouched
+          ctx.expect(spawned).toEqual([]);
+          ctx.expect(downloads).toBe(0);
+          ctx.expect(discovers).toBe(0);
+          ctx.expect(registers).toBe(0);
+          ctx.expect(jetpack.exists(path.join(home, '.env'))).toBe(false); // start's own config walk never ran
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` refreshes a stale actions/runner in place: the template is re-downloaded and copied over each stopped org, its registration kept',
+      run: async (ctx) => {
+        // A bumped ACTIONS_RUNNER_VERSION used to mean `install`, which tears
+        // the box down. The template is re-downloaded and laid over each org dir
+        // instead; `.runner`, `.credentials` and `.env` are the registration and
+        // the template never carries them, so they come through byte-identical.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const shortcut = path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}acme.cmd`);
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const templateDir = path.join(home, '_template');
+        const orgDir      = path.join(home, 'actions-runner-acme');
+        const downloads = [];
+        const spawned   = [];
+        // The registration files, exactly as the preflight leaves `.env`, so a
+        // byte change can only have come from the copy.
+        const kept = {
+          '.runner':      '{"agentName":"omega-runner-box-acme"}',
+          '.credentials': '{"scheme":"OAuth"}',
+          '.env':         `https_proxy=http://proxy\nHOME=${path.join(home, 'home')}\nACTIONS_RUNNER_HOOK_JOB_STARTED=${path.join(home, 'job-started.js')}\n`,
+        };
+        try {
+          jetpack.write(path.join(templateDir, 'config.cmd'), 'old config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: '2.300.0', registeredOrgs: ['acme'] });
+          jetpack.write(path.join(orgDir, 'config.cmd'), 'old config');
+          jetpack.write(path.join(orgDir, 'bin', 'Runner.Listener.exe'), 'old listener');
+          for (const [name, content] of Object.entries(kept)) jetpack.write(path.join(orgDir, name), content);
+          jetpack.write(shortcut, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 5150 }; },
+            _download:     async (dir, h) => {
+              downloads.push([dir, h]);
+              jetpack.write(path.join(dir, 'config.cmd'), 'new config');
+              jetpack.write(path.join(dir, 'bin', 'Runner.Listener.exe'), 'new listener');
+            },
+            _discoverOrgs: async () => ['acme'],
+            _registerOrg:  async () => { throw new Error('nothing to register'); },
+          });
+
+          ctx.expect(downloads).toEqual([[templateDir, home]]);
+          ctx.expect(fs.readFileSync(path.join(orgDir, 'config.cmd'), 'utf8')).toBe('new config');
+          ctx.expect(fs.readFileSync(path.join(orgDir, 'bin', 'Runner.Listener.exe'), 'utf8')).toBe('new listener');
+          for (const [name, content] of Object.entries(kept)) {
+            ctx.expect(fs.readFileSync(path.join(orgDir, name), 'utf8')).toBe(content);
+          }
+          ctx.expect(jetpack.read(path.join(home, 'config.json'), 'json').actionsRunnerVersion).toBe(runner.ACTIONS_RUNNER_VERSION);
+          ctx.expect(spawned).toEqual([orgDir]);                          // and the org still comes online
+          ctx.expect(process.exitCode).toBe(origExit);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(shortcut);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` never refreshes an org whose listener is alive: its binaries are locked, so it names `restart` and the version stays unrecorded',
+      run: async (ctx) => {
+        // A live listener holds its dir's binaries open. Copying over them is a
+        // half-updated runner, so that org is skipped with the command that
+        // stops it first, and the box is not called refreshed until every org
+        // dir took the new version.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const orgs      = ['acme', 'zeta'];
+        const shortcuts = orgs.map((org) => path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}${org}.cmd`));
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const templateDir = path.join(home, '_template');
+        const aliveDir    = path.join(home, 'actions-runner-acme');
+        const stoppedDir  = path.join(home, 'actions-runner-zeta');
+        try {
+          jetpack.write(path.join(templateDir, 'config.cmd'), 'old config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: '2.300.0', registeredOrgs: orgs });
+          for (const dir of [aliveDir, stoppedDir]) jetpack.write(path.join(dir, 'config.cmd'), 'old config');
+          for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    (dir) => (dir === aliveDir ? [{ pid: 4242, sessionId: 1, execPath: path.join(aliveDir, 'bin', 'Runner.Listener.exe') }] : []),
+            _spawn:        () => ({ ok: true, pid: 6000 }),
+            _download:     async (dir) => { jetpack.write(path.join(dir, 'config.cmd'), 'new config'); },
+            _discoverOrgs: async () => orgs,
+            _registerOrg:  async () => { throw new Error('nothing to register'); },
+          });
+
+          ctx.expect(fs.readFileSync(path.join(aliveDir, 'config.cmd'), 'utf8')).toBe('old config');     // untouched
+          ctx.expect(fs.readFileSync(path.join(stoppedDir, 'config.cmd'), 'utf8')).toBe('new config');   // the stopped one took it
+          const skip = logged.map((l) => l[1]).filter((l) => l.includes('npx omega runner restart'));
+          ctx.expect(skip.length).toBe(1);
+          ctx.expect(skip[0]).toContain('acme');
+          ctx.expect(jetpack.read(path.join(home, 'config.json'), 'json').actionsRunnerVersion).toBe('2.300.0');
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          for (const file of shortcuts) jetpack.remove(file);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` downloads nothing when the recorded actions/runner version is the pinned one',
+      run: async (ctx) => {
+        // The refresh is for a stale box only: a current one never pays for a
+        // 150 MB download on every start.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const shortcut = path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}acme.cmd`);
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const orgDir  = path.join(home, 'actions-runner-acme');
+        const spawned = [];
+        let downloads = 0;
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION, registeredOrgs: ['acme'] });
+          jetpack.write(path.join(orgDir, 'config.cmd'), 'config');
+          jetpack.write(shortcut, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 7 }; },
+            _download:     async () => { downloads++; },
+            _discoverOrgs: async () => ['acme'],
+            _registerOrg:  async () => { throw new Error('nothing to register'); },
+          });
+
+          ctx.expect(downloads).toBe(0);
+          ctx.expect(spawned).toEqual([orgDir]);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(shortcut);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` registers an admin org the box does not serve yet, honouring OMEGA_RUNNER_ORGS, and nothing already registered',
+      run: async (ctx) => {
+        // A new admin org used to need `install` again. `start` registers the
+        // missing one itself: named by the filter, not yet in registeredOrgs.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const shortcut = path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}acme.cmd`);
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const registered = [];
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION, registeredOrgs: ['acme'] });
+          jetpack.write(path.join(home, 'actions-runner-acme', 'config.cmd'), 'config');
+          jetpack.write(shortcut, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: { ...filled, OMEGA_RUNNER_ORGS: 'acme, Beta' }, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        () => ({ ok: true, pid: 8 }),
+            _download:     async () => { throw new Error('the version matches: no download'); },
+            _discoverOrgs: async () => ['acme', 'beta', 'gamma'],
+            _registerOrg:  async (o) => { registered.push({ org: o._[2], home: o._home }); },
+          });
+
+          // beta is named and new; acme is already served; gamma is not named.
+          ctx.expect(registered).toEqual([{ org: 'beta', home }]);
+          ctx.expect(process.exitCode).toBe(origExit);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(shortcut);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` works offline: an org discovery that throws is ONE skip line, and every registered org still comes up',
+      run: async (ctx) => {
+        // The org check is the only part of `start` that needs GitHub. A box
+        // with no network still gets its listeners.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const orgs      = ['acme', 'zeta'];
+        const shortcuts = orgs.map((org) => path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}${org}.cmd`));
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const spawned = [];
+        let registers = 0;
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION, registeredOrgs: orgs });
+          for (const org of orgs) jetpack.write(path.join(home, `actions-runner-${org}`, 'config.cmd'), 'config');
+          for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 9 }; },
+            _download:     async () => { throw new Error('the version matches: no download'); },
+            _discoverOrgs: async () => { throw new Error('getaddrinfo ENOTFOUND api.github.com'); },
+            _registerOrg:  async () => { registers++; },
+          });
+
+          const skips = logged.map((l) => l[1]).filter((l) => /org check skipped/i.test(l));
+          ctx.expect(skips.length).toBe(1);
+          ctx.expect(skips[0]).toContain('ENOTFOUND');
+          ctx.expect(registers).toBe(0);
+          ctx.expect(spawned).toEqual(orgs.map((org) => path.join(home, `actions-runner-${org}`)));
+          ctx.expect(process.exitCode).toBe(origExit);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          for (const file of shortcuts) jetpack.remove(file);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` in a test run never asks GitHub unless both GitHub seams are injected',
+      run: async (ctx) => {
+        // Registration is not home-scoped: a real `registerOrg` with a real
+        // token registers the org on GitHub whatever scratch home the case
+        // made. A test run without `_discoverOrgs` AND `_registerOrg` skips
+        // the org check on one line, the way `uninstall` skips the surfaces no
+        // path redirects.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        let discovers = 0;
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: runner.ACTIONS_RUNNER_VERSION, registeredOrgs: [] });
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        () => ({ ok: true, pid: 10 }),
+            _discoverOrgs: async () => { discovers++; return ['acme']; },   // no _registerOrg
+          });
+
+          ctx.expect(discovers).toBe(0);
+          const skips = logged.map((l) => l[1]).filter((l) => /org check skipped/i.test(l));
+          ctx.expect(skips.length).toBe(1);
+          ctx.expect(skips[0]).toContain('_registerOrg');
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`self-update` is gone: the dispatcher calls it an unknown subcommand',
+      run: async (ctx) => {
+        // Every runner verb runs as `npx omega runner <verb>` from the box's
+        // clone, so there is no global package for it to update (#937). The
+        // home is one the test guard refuses, so no build of this command,
+        // however old, can run a global npm install from this case.
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const realish = path.join(os.homedir(), 'omega-runner-NOT-A-SCRATCH');
+        let threw;
+        try {
+          await runner({ _: ['runner', 'self-update'], _home: realish });
+        } catch (e) { threw = e; }
+        ctx.expect(threw).toBeDefined();
+        ctx.expect(threw.message).toBe('Unknown runner subcommand: self-update');
+        ctx.expect(jetpack.exists(realish)).toBe(false);
+      },
+    },
+    {
+      name: '`start` called from install (`_reconcileDone`) skips the reconcile: no download and no org check, even on a stale version with a missing org',
+      run: async (ctx) => {
+        // install has just downloaded the template and registered every org, so
+        // its closing start has nothing to reconcile, and a retry of an org that
+        // failed there would print its error a second time.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const shortcut = path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}acme.cmd`);
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const orgDir  = path.join(home, 'actions-runner-acme');
+        const spawned = [];
+        let downloads = 0;
+        let discovers = 0;
+        let registers = 0;
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: '2.300.0', registeredOrgs: ['acme'] });
+          jetpack.write(path.join(orgDir, 'config.cmd'), 'config');
+          jetpack.write(shortcut, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _reconcileDone: true,
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 11 }; },
+            _download:     async () => { downloads++; },
+            _discoverOrgs: async () => { discovers++; return ['acme', 'beta']; },
+            _registerOrg:  async () => { registers++; },
+          });
+
+          ctx.expect(downloads).toBe(0);
+          ctx.expect(discovers).toBe(0);
+          ctx.expect(registers).toBe(0);
+          ctx.expect(jetpack.read(path.join(home, 'config.json'), 'json').actionsRunnerVersion).toBe('2.300.0');
+          ctx.expect(spawned).toEqual([orgDir]);                          // the spawns still run
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(shortcut);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` survives a refresh download that fails: one warn, no version recorded, every org still comes up',
+      run: async (ctx) => {
+        // A stale box with no network must still come online: the refresh is
+        // skipped until the next start, never the whole run.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const orgs      = ['acme', 'zeta'];
+        const shortcuts = orgs.map((org) => path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}${org}.cmd`));
+        const logged  = [];
+        const logger  = { log: (m) => logged.push(['log', String(m)]), warn: (m) => logged.push(['warn', String(m)]), error: (m) => logged.push(['error', String(m)]) };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const spawned = [];
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'old config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: '2.300.0', registeredOrgs: orgs });
+          for (const org of orgs) jetpack.write(path.join(home, `actions-runner-${org}`, 'config.cmd'), 'old config');
+          for (const file of shortcuts) jetpack.write(file, '@echo off\r\n');
+
+          await runner({
+            _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _listeners:    () => [],
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 12 }; },
+            _download:     async () => { throw new Error('curl exit 6'); },
+            _discoverOrgs: async () => orgs,
+            _registerOrg:  async () => { throw new Error('nothing to register'); },
+          });
+
+          const warns = logged.filter((l) => l[0] === 'warn' && l[1].includes('curl exit 6'));
+          ctx.expect(warns.length).toBe(1);
+          ctx.expect(jetpack.read(path.join(home, 'config.json'), 'json').actionsRunnerVersion).toBe('2.300.0');
+          for (const org of orgs) ctx.expect(fs.readFileSync(path.join(home, `actions-runner-${org}`, 'config.cmd'), 'utf8')).toBe('old config');
+          ctx.expect(spawned).toEqual(orgs.map((org) => path.join(home, `actions-runner-${org}`)));
+          ctx.expect(process.exitCode).toBe(origExit);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          for (const file of shortcuts) jetpack.remove(file);
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`start` on a bare box in a test run refuses without an injected `_install`, and installs nothing',
+      run: async (ctx) => {
+        // The real install downloads, discovers and registers against GitHub.
+        // A test run reaches it only through the seam, the way deregistration
+        // refuses without its own.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const logger = { log: () => {}, warn: () => {}, error: () => {} };
+        const filled = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        try {
+          let threw;
+          try {
+            await runner({ _: ['runner', 'start'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {}, _listeners: () => [], _spawn: () => ({ ok: true, pid: 13 }) });
+          } catch (e) { threw = e; }
+          ctx.expect(threw).toBeDefined();
+          ctx.expect(threw.message).toContain('_install');
+          ctx.expect(jetpack.exists(path.join(home, '_template'))).toBe(false);
+          ctx.expect(jetpack.exists(path.join(home, '.env'))).toBe(false);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          jetpack.remove(home);
+        }
+      },
+    },
+    {
+      name: '`restart` refreshes a stale actions/runner AFTER its stop, once the listener is gone, and records the version',
+      run: async (ctx) => {
+        // The reconcile is not gated on restart's preflight: after the stop is
+        // exactly when an org's binaries are free to be replaced.
+        const fs = require('fs');
+        const os = require('os');
+        const jetpack = require('fs-jetpack');
+        const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
+
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-runner-home-'));
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        const origExit  = process.exitCode;
+        process.env.OMEGA_RUNNER_FORCE = '1';
+        const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
+        const shortcut = path.join(SCRATCH_STARTUP_DIR, `${hostPrefix}acme.cmd`);
+        const order   = [];
+        const logger  = {
+          log:   (m) => { if (String(m).includes('already stopped')) order.push('stop'); },
+          warn:  () => {},
+          error: () => {},
+        };
+        const filled  = { GH_TOKEN: 'ghp_from_the_box', WIN_EV_TOKEN_PATH: 'a'.repeat(40), WIN_CSC_KEY_PASSWORD: '1234', SIGNTOOL_PATH: 'C:/sdk/signtool.exe' };
+        const orgDir  = path.join(home, 'actions-runner-acme');
+        const spawned = [];
+        try {
+          jetpack.write(path.join(home, '_template', 'config.cmd'), 'old config');
+          jetpack.write(path.join(home, 'config.json'), { actionsRunnerVersion: '2.300.0', registeredOrgs: ['acme'] });
+          jetpack.write(path.join(orgDir, 'config.cmd'), 'old config');
+          jetpack.write(shortcut, '@echo off\r\n');
+
+          // Alive for the first two polls, gone after.
+          let looks = 0;
+          await runner({
+            _: ['runner', 'restart'], _home: home, _env: filled, _logger: logger, _interactive: false, _prompt: {},
+            _delay:        async () => {},
+            _listeners:    () => {
+              const alive = ++looks <= 2;
+              order.push(alive ? 'alive' : 'gone');
+              return alive ? [{ pid: 909, sessionId: 1, execPath: path.join(orgDir, 'bin', 'Runner.Listener.exe') }] : [];
+            },
+            _spawn:        (dir) => { spawned.push(dir); return { ok: true, pid: 14 }; },
+            _download:     async (dir) => { order.push('download'); jetpack.write(path.join(dir, 'config.cmd'), 'new config'); },
+            _discoverOrgs: async () => ['acme'],
+            _registerOrg:  async () => { throw new Error('nothing to register'); },
+          });
+
+          ctx.expect(order.indexOf('stop')).toBeGreaterThan(-1);
+          ctx.expect(order.indexOf('download')).toBeGreaterThan(order.indexOf('stop'));
+          ctx.expect(order.indexOf('download')).toBeGreaterThan(order.lastIndexOf('alive'));
+          ctx.expect(fs.readFileSync(path.join(orgDir, 'config.cmd'), 'utf8')).toBe('new config');
+          ctx.expect(jetpack.read(path.join(home, 'config.json'), 'json').actionsRunnerVersion).toBe(runner.ACTIONS_RUNNER_VERSION);
+          ctx.expect(spawned).toEqual([orgDir]);
+          ctx.expect(process.exitCode).toBe(origExit);
+        } finally {
+          if (origForce === undefined) delete process.env.OMEGA_RUNNER_FORCE; else process.env.OMEGA_RUNNER_FORCE = origForce;
+          process.exitCode = origExit;
+          jetpack.remove(shortcut);
           jetpack.remove(home);
         }
       },

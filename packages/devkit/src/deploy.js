@@ -14,6 +14,7 @@ const { execSync, execFileSync } = require('node:child_process');
 
 const { findBrandRoot, discoverTargets, frameworkPackagesOf } = require('./local.js');
 const { stageLocalPackages, STAGING_DIR } = require('./pack-local.js');
+const { assertBrandLockfile } = require('./brand-version.js');
 const {
   pushSnapshot,
   pushWorkflowFiles,
@@ -27,7 +28,8 @@ const {
 } = require('./deploy-snapshot.js');
 // The remote-url parse this module published before the boot prelude needed it
 // too (#890): it lives in the remote boundary now, re-exported here unchanged.
-const { parseRemoteUrl } = require('./git-remote.js');
+// The origin gate (#934) lives there too, beside the one origin read.
+const { parseRemoteUrl, assertOriginMatches } = require('./git-remote.js');
 
 const API_BASE = 'https://api.github.com';
 
@@ -213,6 +215,8 @@ function laneLabel(lane, snapshot) {
 // `deploy-precheck` uses): the tests drive the order without a push, a pack or
 // a network call, and the defaults are the real modules.
 const LANE_STEPS = {
+  origin: (options) => assertOriginMatches({ dir: options.root }),
+  lockfile: assertBrandLockfile,
   defaultBranch: defaultBranchOf,
   heal: healDefaultBranch,
   behind: assertNotBehind,
@@ -224,6 +228,42 @@ const LANE_STEPS = {
 };
 
 /**
+ * The origin gate ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)):
+ * a brand whose `origin` names another repo than the source repo its config
+ * derives refuses, because every lane acts on the DERIVED repo (the snapshot
+ * push, the workflow compose, the dispatch). It runs on every lane, the
+ * dispatch-only one included: a brand outside git has no origin to disagree,
+ * which the gate answers as nothing to compare. Read-only, so the dry run runs
+ * it too.
+ *
+ * @param {object} lane - The resolved lane.
+ * @param {object} steps - The lane steps (`origin` is the gate).
+ * @returns {void}
+ * @throws {Error} The drift line, naming `repo.org`.
+ */
+function checkLaneOrigin(lane, steps) {
+  steps.origin({ root: lane.brandRoot });
+}
+
+/**
+ * The lockfile gate, where the lane ships the brand's OWN lock
+ * ([#938](https://github.com/Omega-JS-Stack/omega/issues/938)): a registry
+ * (unlinked) snapshot. A linked lane regenerates its lock in the pack step, and
+ * a lane with no snapshot ships nothing, so neither has a lock of its own to
+ * check. Read-only, so the dry run runs it too.
+ *
+ * @param {object} lane - The resolved lane.
+ * @param {object} steps - The lane steps (`lockfile` is the gate).
+ * @returns {void}
+ * @throws {Error} The gate's refusal, naming `omega i live`.
+ */
+function checkLaneLockfile(lane, steps) {
+  if (lane.mode === 'snapshot' && !lane.linked) {
+    steps.lockfile({ root: lane.brandRoot });
+  }
+}
+
+/**
  * The DELIVERY half of a lane: how this brand's code reaches GitHub before the
  * dispatch that runs it. ONE implementation for its two callers
  * ([#901](https://github.com/Omega-JS-Stack/omega/issues/901)): a target's own
@@ -233,6 +273,13 @@ const LANE_STEPS = {
  *
  * What the lane delivers, in order
  * ([#915](https://github.com/Omega-JS-Stack/omega/issues/915)):
+ * 0. on EVERY lane, the ORIGIN gate
+ *    ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): a checkout
+ *    whose `origin` is not the derived source repo refuses before this lane
+ *    writes to that repo; then, on a registry (unlinked) lane, the LOCKFILE gate
+ *    ([#938](https://github.com/Omega-JS-Stack/omega/issues/938)): the runner's
+ *    `npm ci` installs the brand's lock as pushed, so one that disagrees with
+ *    the manifests refuses here, before a branch is healed or a file written;
  * 1. the DEFAULT branch read once, and healed when published output has taken
  *    it over ([#922](https://github.com/Omega-JS-Stack/omega/issues/922)): a
  *    `gh-pages` default moves back to `main` here, before step 2 writes a
@@ -271,9 +318,13 @@ async function deliverLane(options) {
   const steps = { ...LANE_STEPS, ...(options.steps || {}) };
   const ref = options.ref || lane.ref;
 
+  checkLaneOrigin(lane, steps);
+
   if (lane.mode !== 'snapshot') {
     return { sha: null };
   }
+
+  checkLaneLockfile(lane, steps);
 
   // Read ONCE, used twice: the branch a behind checkout is measured against,
   // and the branch the composed workflows are pushed to. Null is a repo GitHub
@@ -428,9 +479,19 @@ async function deployViaDispatch(options) {
     inputs: options.inputs,
   });
 
+  const steps = { ...LANE_STEPS, ...(options.steps || {}) };
+
   if (options.dryRun) {
+    // The origin and lockfile gates only read, so a dry run refuses what the
+    // real run would (#934, #938), as the version gate already does.
+    if (lane) {
+      checkLaneOrigin(lane, steps);
+      checkLaneLockfile(lane, steps);
+    }
+
     // The plan IS the dry run, the lane included: what would happen, with
-    // neither git nor the network touched. The workflow half of it is read off
+    // nothing written to git and the network untouched (the gates above only
+    // read). The workflow half of it is read off
     // DISK (the scaffold has already composed this run's files), so the preview
     // names them and the branch they would go to without asking GitHub which of
     // them differ (#915).
@@ -446,7 +507,6 @@ async function deployViaDispatch(options) {
   }
 
   const token = options.token || resolveToken({ env: options.env, execFn: options.execFn });
-  const steps = { ...LANE_STEPS, ...(options.steps || {}) };
 
   if (lane && lane.mode === 'snapshot' && options.snapshot) {
     // The brand root pushed this run's snapshot ONCE, before it spawned a
@@ -539,7 +599,7 @@ function findLocalSpecs(options = {}) {
  * - NESTED: the brand root is not the toplevel of the git repo it sits in (a
  *   brand inside this monorepo), so its git toplevel is somebody else's repo:
  *   the behind check has nothing to compare, and the secrets publisher skips
- *   its remote-mismatch guard.
+ *   its origin gate.
  * - LINKED: the brand tree carries a `file:` @omega.js spec anywhere. A runner
  *   can install none of those, so the packed tarballs have to travel with the
  *   snapshot.

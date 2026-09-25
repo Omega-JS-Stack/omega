@@ -63,6 +63,9 @@ function recordStep(name, brandRoot) {
 }
 
 const laneSteps = {
+  // The registry lane's lockfile gate (#938) runs first in the ONE delivery;
+  // devkit's own tests hold its verdicts, so here it only says WHEN it ran.
+  lockfile: (options) => recordStep('lockfile-gate', options.root),
   defaultBranch: async () => 'main',
   behind: (options) => recordStep('behind-check', options.cwd),
   // The ONE write a deploy makes to the default branch (#915): the composed
@@ -424,7 +427,7 @@ test('the delivery lane runs ONCE, before the first target — brand inputs land
   const { brand } = stageBrand();
   await runDeployCommand(brand);
 
-  assert.deepEqual(readSequence(brand), ['delivery-lane', 'backend:scaffold', 'web:scaffold', 'behind-check', 'compose-workflows', 'snapshot-push', 'snapshot-wait-ref', 'backend:deploy', 'web:deploy']);
+  assert.deepEqual(readSequence(brand), ['delivery-lane', 'backend:scaffold', 'web:scaffold', 'lockfile-gate', 'behind-check', 'compose-workflows', 'snapshot-push', 'snapshot-wait-ref', 'backend:deploy', 'web:deploy']);
   assert.equal(manageCalls.length, 1, 'one lane pass for the whole fan-out, not one per target');
   assert.equal(manageCalls[0].startDir, brand);
 });
@@ -545,10 +548,12 @@ test('the root checks it is current and composes the workflows ONCE, before the 
   const sequence = readSequence(brand);
   const firstDeploy = sequence.findIndex((entry) => entry.endsWith(':deploy'));
   assert.ok(
-    sequence.indexOf('behind-check') < sequence.indexOf('compose-workflows')
+    sequence.indexOf('lockfile-gate') !== -1
+    && sequence.indexOf('lockfile-gate') < sequence.indexOf('behind-check')
+    && sequence.indexOf('behind-check') < sequence.indexOf('compose-workflows')
     && sequence.indexOf('compose-workflows') < sequence.indexOf('snapshot-push')
     && sequence.indexOf('snapshot-push') < firstDeploy,
-    `check, compose, push, then the targets (got ${JSON.stringify(sequence)})`,
+    `gate the lockfile, check, compose, push, then the targets (got ${JSON.stringify(sequence)})`,
   );
 
   for (const call of readCalls(brand)) {
@@ -648,8 +653,8 @@ test('every selected target is SCAFFOLDED first, in order, before the push and b
     'backend:scaffold',
     'web:scaffold',
     'desktop:scaffold',
+    'lockfile-gate',
     'behind-check',
-    'compose-workflows',
   ], 'every scaffold ran, in DEPLOY_ORDER, before the run\'s one delivery');
 
   for (const call of readCalls(brand, { verb: 'scaffold' })) {

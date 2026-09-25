@@ -54,7 +54,7 @@ jobs:
       {{ installFirewall }}
 
       - name: Run node install
-        run: sfw npm install {{ installWorkspace }}
+        run: sfw npm ci {{ installWorkspace }}
 
       # No npx on a runner, in any spelling (#877): which package won npm's
       # shared `omega` bin link is an install-order accident, and an `npx omega`

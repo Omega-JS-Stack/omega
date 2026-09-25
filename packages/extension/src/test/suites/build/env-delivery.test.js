@@ -5,12 +5,15 @@
 // Before this, each of the three carried its own hand-kept list and they drifted
 // (the #582 fix had to be made in the workflow by hand, one key at a time).
 //
-// Offline by construction: the scaffold writes into a temp dir and the `gh`/
-// `git` boundaries are injected — no network, no real repo.
+// Offline by construction: the scaffold writes into a temp dir, the `gh`
+// boundary is injected, and a checkout is a real `git init` with a real
+// `origin` in that temp dir (the origin gate reads it, #934): no network, no
+// remote.
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const { publishSecretKeys, bakeKeys, renderSecretsBlock, WORKFLOW_OWNED_KEYS } = require('@omega.js/config/env-delivery');
 
@@ -48,20 +51,20 @@ function declareRepo(dir, org) {
 }
 
 /**
- * A `git` stub that answers PER COMMAND. The publisher resolves the deploy lane
- * before it guards ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)),
- * so `rev-parse --show-toplevel` has to answer that this checkout IS the brand
- * root: an UNPLACED answer reads as a nested brand, whose remote is the
- * enclosing repo by construction and whose mismatch guard is therefore skipped.
+ * A real checkout AT `dir` (a standalone target is its own brand root): `git
+ * init`, plus an `origin` when one is given. The publisher's origin gate reads
+ * the brand root's own `.git` and remote
+ * ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)), so a fixture is
+ * a repo, never a stubbed answer. Re-running it on the same dir re-inits
+ * harmlessly and adds the origin the first call left out.
  *
- * @param {string|function} remote - What `git config --get remote.origin.url` answers (or throws).
- * @returns {function} `(command, options) => string`
+ * @param {string} dir - The directory to make a checkout.
+ * @param {string} [remote] - The `origin` url; omitted, the checkout has none.
+ * @returns {void}
  */
-function gitStub(remote) {
-  return (command, options) => {
-    if (command.includes('rev-parse')) return `${options.cwd}\n`;
-    return typeof remote === 'function' ? remote() : remote;
-  };
+function checkout(dir, remote) {
+  execFileSync('git', ['-C', dir, 'init', '-q']);
+  if (remote) execFileSync('git', ['-C', dir, 'remote', 'add', 'origin', remote]);
 }
 
 module.exports = defineCases({
@@ -180,6 +183,7 @@ module.exports = defineCases({
       run: (ctx) => {
         const tmp = tmpTarget('CHROME_CLIENT_ID=chrome-id\nGH_TOKEN=brand-token\nGOOGLE_ANALYTICS_SECRET_EXTENSION=mp-secret\nMY_CUSTOM_THING=custom\n');
         declareRepo(tmp, 'acme');
+        checkout(tmp, 'git@github.com:acme/my-brand-omega.git');
         const gh = [];
 
         try {
@@ -188,7 +192,6 @@ module.exports = defineCases({
             target: 'extension',
             logger: quiet,
             env: {},
-            gitExecFn: () => 'git@github.com:acme/my-brand-omega.git\n',
             execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
           });
 
@@ -214,8 +217,8 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'the secrets publish skips LOUDLY on CI, an empty cascade, no remote, and a stranger\'s repo',
-      run: (ctx) => {
+      name: 'the secrets publish skips LOUDLY on CI, an empty cascade and no remote, and REFUSES a stranger\'s repo (#934)',
+      run: async (ctx) => {
         const noGh = () => { throw new Error('gh must not run'); };
         const messages = [];
         const loud = { log: (m) => messages.push(m), warn: (m) => messages.push(m), error: (m) => messages.push(m) };
@@ -226,33 +229,35 @@ module.exports = defineCases({
         declareRepo(empty, 'acme');
 
         try {
-          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: { CI: 'true' }, execFn: noGh, gitExecFn: noGh }))
+          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: { CI: 'true' }, execFn: noGh }))
             .toEqual({ skipped: 'ci' });
 
-          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: {}, execFn: noGh, gitExecFn: noGh }))
+          ctx.expect(publishTargetSecrets({ targetDir: empty, target: 'extension', logger: loud, env: {}, execFn: noGh }))
             .toEqual({ skipped: 'no-secrets' });
 
           const keyed = tmpTarget('CHROME_CLIENT_ID=chrome-id\n');
           declareRepo(keyed, 'acme');
+          // A checkout nobody has pushed yet: no origin at all.
+          checkout(keyed);
           ctx.expect(publishTargetSecrets({
             targetDir: keyed,
             target: 'extension',
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: gitStub(() => { throw new Error('fatal: no such remote'); }),
           })).toEqual({ skipped: 'no-remote' });
 
-          // The enclosing checkout is not the brand's repo — never arm a
-          // stranger's Actions with this brand's store credentials.
-          ctx.expect(publishTargetSecrets({
+          // The enclosing checkout is not the brand's repo: never arm a
+          // stranger's Actions with this brand's store credentials. It REFUSES
+          // on the one drift line (#934), and gh never runs.
+          checkout(keyed, 'git@github.com:Omega-JS-Stack/omega.git');
+          await ctx.expect(() => publishTargetSecrets({
             targetDir: keyed,
             target: 'extension',
             logger: loud,
             env: {},
             execFn: noGh,
-            gitExecFn: gitStub('git@github.com:Omega-JS-Stack/omega.git\n'),
-          })).toEqual({ skipped: 'repo-mismatch' });
+          })).toThrow('origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.org in config/omega.json5 or move the repo');
 
           fs.rmSync(keyed, { recursive: true, force: true });
 
@@ -260,7 +265,6 @@ module.exports = defineCases({
           ctx.expect(said).toContain('CI already has the repo secrets');
           ctx.expect(said).toContain('no keys composed for this target');
           ctx.expect(said).toContain('no GitHub remote');
-          ctx.expect(said).toContain("this brand's repo is acme/my-brand-omega");
         } finally {
           fs.rmSync(empty, { recursive: true, force: true });
         }

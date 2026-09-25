@@ -1,7 +1,7 @@
 {
   "name": "playground-omega",
-  "version": "0.0.3",
-  "private": true,
+  "version": "0.0.5",
+  "private": false,
   "description": "OMEGA Playground — the in-monorepo rehearsal brand: one brand config, every target (web, backend, desktop, browser extension). Test infrastructure, never production.",
   "workspaces": [
     "targets/*"
@@ -14,6 +14,6 @@
     "pipeline": "omega pipeline --require=analytics,disperse,update,bookmark"
   },
   "devDependencies": {
-    "@omega.js/manager": "file:../../packages/manager"
+    "@omega.js/manager": "0.51.0"
   }
 }

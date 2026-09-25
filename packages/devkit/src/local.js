@@ -262,6 +262,33 @@ function relativeSpecPath(fromDir, target) {
 }
 
 /**
+ * Regenerate the install root's OWN lockfile after a flip (#938): inside the
+ * omega monorepo the tree install climbs to the monorepo root and writes that
+ * lockfile, so the brand's would stay stale. Loaded here rather than at the top:
+ * this module runs at every CLI boot (freshnessBoot), and the lockfile read
+ * pulls in @omega.js/config, which the boot has no use for.
+ * @param {string} installRoot - The brand root (or standalone target).
+ * @param {object} [logger] - Logger with log (silent when omitted).
+ * @returns {Promise<void>}
+ */
+function regenerateBrandLockfile(installRoot, logger) {
+  const { regenerateLockfile } = require('./lockfile.js');
+  return regenerateLockfile({ root: installRoot, log: logger ? (line) => logger.log(line) : undefined });
+}
+
+/**
+ * Whether the install root's lockfile is missing or disagrees with its
+ * manifests' @omega.js registry specs: the deploy gate's own read (#938).
+ * @param {string} installRoot - The brand root (or standalone target).
+ * @returns {boolean}
+ */
+function brandLockfileStale(installRoot) {
+  const { brandLockfileDrift } = require('./brand-version.js');
+  const { lock, drift } = brandLockfileDrift({ root: installRoot });
+  return !lock || drift.length > 0;
+}
+
+/**
  * file:-install a brand's @omega.js dependencies from the local monorepo.
  *
  * Tree-wide by construction: npm resolves the WHOLE workspace tree on any
@@ -275,7 +302,8 @@ function relativeSpecPath(fromDir, target) {
  * targets degenerate to themselves.
  *
  * Idempotent: dependencies already resolving to the monorepo copy are
- * skipped, and when nothing needs linking no install runs.
+ * skipped, and when nothing needs linking no install runs. An install is
+ * followed by the brand's OWN lockfile regeneration (#938).
  * @param {object} options
  * @param {string} options.dir - Target directory to link from (any target in the brand).
  * @param {string} options.monorepoRoot - Monorepo root path.
@@ -347,6 +375,11 @@ async function linkLocalPackages(options) {
       logger && logger.warn(`install failed — restored ${manifestBackups.size} manifest(s) to their pre-link specs`);
       throw error;
     }
+
+    // Outside the rollback: the install succeeded, so the manifests and the
+    // tree already agree, and restoring the manifests now would split them.
+    // A failed regeneration puts the lock back itself and throws as what it is.
+    await regenerateBrandLockfile(installRoot, logger);
   }
 
   return actions;
@@ -364,7 +397,9 @@ async function linkLocalPackages(options) {
  * @omega.js/client in one brand. An explicit `range` still wins verbatim — the
  * caller owns that string. Idempotent: registry-spec'd entries are untouched;
  * nothing to flip → no install. Same transactional manifest restore as the
- * linker when the install fails.
+ * linker when the install fails. Either way the brand's OWN lockfile ends up
+ * agreeing with the manifests (#938): regenerated after the install, and
+ * regenerated alone when nothing flipped but the lock still disagrees.
  * @param {object} options
  * @param {string} options.dir - Any directory inside the brand.
  * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
@@ -416,7 +451,11 @@ async function restoreRegistrySpecs(options) {
     }
   }
 
-  if (installNeeded && !dryRun) {
+  if (dryRun) {
+    return actions;
+  }
+
+  if (installNeeded) {
     try {
       await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
     } catch (error) {
@@ -426,6 +465,15 @@ async function restoreRegistrySpecs(options) {
       logger && logger.warn(`install failed — restored ${manifestBackups.size} manifest(s) to their file: specs`);
       throw error;
     }
+
+    // Outside the rollback, as in linkLocalPackages: the flipped manifests and
+    // the installed tree agree, so only the lock is left to heal.
+    await regenerateBrandLockfile(installRoot, logger);
+  } else if (brandLockfileStale(installRoot)) {
+    // Nothing to flip, but the lock still disagrees (the specs were flipped
+    // before the lock was ever regenerated): this verb is the fix the deploy's
+    // lockfile gate names, so it heals the lock here too (#938).
+    await regenerateBrandLockfile(installRoot, logger);
   }
 
   return actions;

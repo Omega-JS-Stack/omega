@@ -23,6 +23,7 @@
     "./icons": "./src/icons.js",
     "./actions-secrets": "./src/actions-secrets.js",
     "./github-repo": "./src/github-repo.js",
+    "./git-remote": "./src/git-remote.js",
     "./target-secrets": "./src/target-secrets.js",
     "./service-account": "./src/service-account.js",
     "./ci-workflows": "./src/ci-workflows.js",

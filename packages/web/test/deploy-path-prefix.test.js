@@ -123,7 +123,7 @@ test('the scaffolded CI workflow derives the same value before its build step', 
     'derived BEFORE the build+deploy step that consumes it',
   );
   assert.ok(
-    workflow.indexOf('sfw npm install') < workflow.indexOf('OMEGA_PATH_PREFIX'),
+    workflow.indexOf('sfw npm ci') !== -1 && workflow.indexOf('sfw npm ci') < workflow.indexOf('OMEGA_PATH_PREFIX'),
     'derived AFTER the install that puts @omega.js/web on disk',
   );
 

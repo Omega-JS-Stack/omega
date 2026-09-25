@@ -47,6 +47,7 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const chalk = require('chalk').default;
+const { regenerateLockfile } = require('./lockfile.js');
 
 // Constants
 const STAGING_DIR = 'omega_modules';
@@ -369,15 +370,11 @@ async function stageLocalPackages({ dir, log = () => {} }) {
     }
 
     // A remote install runs `npm ci`, so the uploaded lockfile must match the
-    // staged shape. `--prefix` is what makes npm treat THIS dir as the install
-    // root: run inside a workspace it would otherwise climb to the workspace
-    // root and write that one's lockfile instead.
+    // staged shape, regenerated from scratch (the one helper keeps it THIS
+    // dir's lock, never an enclosing workspace root's).
     log(`  ${chalk.dim('→')} Regenerating package-lock.json for the staged shape...`);
     jetpack.remove(lockPath);
-    await powertools.execute(
-      `npm install --package-lock-only --ignore-scripts --no-audit --no-fund --prefix "${root}"`,
-      { log: false, config: { cwd: root } },
-    );
+    await regenerateLockfile({ root });
   } catch (error) {
     // Loud and clean: the deploy stops here, and the tree goes back exactly as
     // it was rather than sitting half-staged.

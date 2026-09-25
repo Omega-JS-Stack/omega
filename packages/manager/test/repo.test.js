@@ -219,6 +219,27 @@ test('repo service: an org with no brand.id fails loudly instead of ensuring hal
   await assert.rejects(() => run(config, client(fakeGh())), /brand\.id/);
 });
 
+test('repo service: an origin that is not the derived source repo REFUSES before anything is ensured (#934)', async () => {
+  // A real checkout, with the remote a rename leaves behind: same org, another
+  // name, so the owner-only compare this replaced would have walked on and
+  // ensured fixture-org/fixture-brand-omega beside the repo origin points at.
+  const root = brandRoot(true);
+  const { execFileSync } = require('node:child_process');
+  execFileSync('git', ['-C', root, 'init', '-q']);
+  execFileSync('git', ['-C', root, 'remote', 'add', 'origin', 'https://github.com/fixture-org/fixture-brand-site.git']);
+
+  const execFn = fakeGh();
+
+  await assert.rejects(
+    () => run(brandConfig(), client(execFn), { root }),
+    (error) => {
+      assert.equal(error.message, `origin is fixture-org/fixture-brand-site but config derives ${SOURCE}: fix repo.org in config/omega.json5 or move the repo`);
+      return true;
+    },
+  );
+  assert.deepEqual(execFn.calls, [], 'not one gh call: nothing read, nothing ensured');
+});
+
 test('repo service: the operations are the two roles, the runner check, then the secrets push', () => {
   // `secrets` is LAST (#891): it publishes into the repos the roles above make.
   assert.deepEqual(OPERATIONS.repo.map((op) => op.name), ['repo', 'website', 'runners', 'secrets']);
@@ -745,12 +766,14 @@ function brandWithTarget({ target, brandEnv = '', extra = {} }) {
   const targetPath = path.join(root, 'targets', target);
   jetpack.write(path.join(targetPath, 'package.json'), { name: `fixture-brand-${target}`, private: true });
 
+  // A real checkout of the brand's own SOURCE repo: the origin gate the walk's
+  // setup and the publisher share reads it (#934), and it agrees.
+  const { execFileSync } = require('node:child_process');
+  execFileSync('git', ['-C', root, 'init', '-q']);
+  execFileSync('git', ['-C', root, 'remote', 'add', 'origin', `https://github.com/${SOURCE}.git`]);
+
   return { root, targets: [{ name: target, dir: `targets/${target}`, path: targetPath, target }] };
 }
-
-// The git boundary, answering per command: a single answer reads as a NESTED
-// brand and skips the very guard the publisher applies.
-const gitStub = (root) => (command) => (command.includes('--show-toplevel') ? `${root}\n` : 'git@github.com:fixture-org/fixture-brand-omega.git\n');
 
 test('secrets: a dry run plans the target\'s key NAMES and issues no gh call', async () => {
   const { root, targets } = brandWithTarget({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
@@ -768,7 +791,6 @@ test('secrets: a dry run plans the target\'s key NAMES and issues no gh call', a
     serviceData: {},
     githubApi: client(execFn),
     execFn: (file, args) => { ghCalls.push(args); return ''; },
-    gitExecFn: gitStub(root),
   });
 
   assert.equal(result.status, 'success');
@@ -797,7 +819,6 @@ test('secrets: a REFUSED target is the operation\'s error, with the key and its 
     serviceData: {},
     githubApi: client(fakeGh(convergedWorld())),
     execFn: (file, args) => { ghCalls.push(args); return ''; },
-    gitExecFn: gitStub(root),
   });
 
   assert.equal(result.status, 'error');

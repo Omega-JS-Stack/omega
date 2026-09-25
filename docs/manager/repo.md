@@ -118,18 +118,29 @@ after a transfer or a rename, and points the remote at the address that answer c
 in one line (`origin healed from <old> to <new>`).
 
 The redirect is the authority there, not the config, so the heal runs config or no
-config. `repo.org` stays the one typed value: an owner GitHub serves the repo from that
-differs from it is stated in one line (`origin lives under <owner> but repo.org is
-<org>`) and nothing more. The prelude never writes config, and this service only ensures
-repos UNDER `repo.org`, so a brand that really did move orgs is a `repo.org` edit by
-hand.
+config. Then the WHOLE slug GitHub answered is compared with the source repo the config
+derives, case-insensitively ([#934](https://github.com/Omega-JS-Stack/omega/issues/934),
+`@omega.js/config`'s `repoDrift`), so a rename drifts as surely as a transfer. A mismatch
+is stated in one line and nothing more at boot (`origin is <slug> but config derives
+<derived>: fix repo.org in config/omega.json5 or move the repo`): the prelude runs before
+every verb, and a fatal boot would lock out the verbs that fix it. The prelude never
+writes config, so a brand that really did move orgs is a `repo.org` edit by hand, and a
+renamed repo is a brand id that must differ or a rename back.
 
-That is why the walk needs no origin step of its own, and why a converged brand reports
-zero mutations here: by the time the walk runs, the boot has already settled the remote,
-and the service reconciles the repo that remote points AT. The prelude is a no-op on
-everything else, silently: no `.git` at the brand root (so an in-repo fixture brand like
-`brands/sandbox-brand` never has this monorepo's own remote touched), no `origin`, a
-non-GitHub remote, a repo GitHub answers 404 for, or no network.
+**This service REFUSES on that same line, before any ensure** (dry runs included, since
+the check only reads): it reads the brand's own `origin` (`@omega.js/devkit/git-remote`'s
+`assertOriginMatches`) and throws when it is not `<brand.id>-omega` under `repo.org`,
+because the walk would otherwise ensure the derived repo beside the one the checkout
+points at. `omega deploy` refuses the same way ([deploys.md](../shared/deploys.md#the-origin-gate-934)).
+No `origin` at all (a brand nobody has pushed yet) and no `.git` at the brand root are
+nothing to compare, and the walk proceeds.
+
+That is why a converged brand reports zero mutations here: by the time the walk runs,
+the boot has already settled the remote, and the service reconciles the repo that remote
+points AT. The prelude is a no-op on everything else, silently: no `.git` at the brand
+root (so an in-repo fixture brand like `brands/sandbox-brand` never has this monorepo's
+own remote touched), no `origin`, a non-GitHub remote, a repo GitHub answers 404 for, or
+no network.
 
 A repo this service just CREATED has no local remote yet, which is why the create line
 prints the `git remote add origin` command: the heal retargets a remote, it never adds

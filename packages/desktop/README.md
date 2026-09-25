@@ -152,7 +152,7 @@ Each subsystem has its own API reference under [`docs/`](docs/):
 - [installer-options](docs/installer-options.md) — installer/distribution config: NSIS one-click defaults, ia32 inclusion, app.category mapping, `{YEAR}` copyright token, snap publishing (default-on with cred-gated auto-skip), MAS roadmap
 - [signing](docs/signing.md) — macOS + Windows code signing reference, cert files, env vars
 - [releasing](docs/releasing.md) — end-to-end release walkthrough (`.env` → GitHub Release)
-- [runner](docs/runner.md) — Windows EV-token signing runner — `npx omega runner install`, auto-onboards new GH orgs, `npx omega runner monitor` for a live signing event tail
+- [runner](docs/runner.md) — Windows EV-token signing runner — `npx omega runner start`, which onboards new GH orgs, `npx omega runner monitor` for a live signing event tail
 - [test-framework](docs/test-framework.md) — writing tests, running them, layers
 - [test-boot-layer](docs/test-boot-layer.md) — boot test layer (spawns the consumer's actual built bundle for end-to-end smoke tests)
 - [build-system](docs/build-system.md) — gulp, esbuild, electron-builder pipeline

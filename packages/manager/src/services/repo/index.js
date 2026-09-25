@@ -14,9 +14,16 @@
  * The org profile reconcile is gone with the `shared` switch that guarded it:
  * one org hosts as many brands as it likes, so no brand rewrites an org's
  * name, email or description (2026-09-11).
+ *
+ * A checkout whose `origin` names another repo than the derived source repo
+ * REFUSES before anything is ensured
+ * ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): the walk would
+ * otherwise ensure `<brand.id>-omega` beside the repo the brand actually lives
+ * in. The boot prelude already stated the same line; this is where it harms.
  */
 const chalk = require('chalk').default;
 const { repoBlock, sourceRepo, brandVisibility } = require('@omega.js/config');
+const { assertOriginMatches } = require('@omega.js/devkit/git-remote');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { createGitHub } = require('./lib/github.js');
 
@@ -35,6 +42,10 @@ module.exports.run = createServiceRunner({
     if (!source) {
       throw new Error(`repo.org is ${block.org} but the config names no brand.id: every repo derives from <brand.id>-<role>, so there is no repo to ensure`);
     }
+
+    // Before any ensure, and on a dry run too (it only reads): a plan against
+    // a repo the checkout does not point at is the same mistake, previewed.
+    assertOriginMatches({ dir: context.brandRoot, config: context.brandConfig });
 
     const visibility = brandVisibility(context.brandRoot);
     console.log(`    Repo: ${chalk.cyan(source.slug)} ${chalk.dim(`(${visibility})`)}`);

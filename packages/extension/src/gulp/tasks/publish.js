@@ -247,6 +247,56 @@ async function publish(complete) {
 
   logger.log(`Publishing to: ${enabledStores.join(', ')}`);
 
+  await publishStores(enabledStores);
+
+  // Log
+  logger.log('');
+  logger.log('Publish finished!');
+
+  // Complete
+  return complete();
+}
+
+/**
+ * The one line a failed store prints on its table row and in the task's throw
+ * ([#940](https://github.com/Omega-JS-Stack/omega/issues/940)).
+ *
+ * A store that already holds this version is a FAILED publish, never a pass:
+ * the code being published did not land. Its line says why and that a version
+ * bump is the fix. Every other rejection keeps the store's own words, trimmed
+ * to the line a human reads: the last non-empty line that is not npm's own, a
+ * JSON body or a stack frame (web-ext's `WebExtError:` line, the detail line
+ * of chrome-webstore-upload-cli's itemError), else the first non-empty line,
+ * so a JSON-only body never lands a whole block on the table row.
+ *
+ * @param {string} store - The store key (`chrome`, `firefox`, `edge`).
+ * @param {string} message - The store lane's error message.
+ * @returns {string} The reason line.
+ */
+function failureReason(store, message) {
+  // AMO's answer to a republish: `{"version": ["Version 0.0.4 already exists."]}`
+  if (/Version \S+ already exists/.test(message)) {
+    return `version ${project.version} already exists on ${STORES[store].name}. Bump version in package.json and deploy again.`;
+  }
+
+  const lines = message.split('\n').map((line) => line.trim()).filter(Boolean);
+  const human = lines.filter((line) => !/^npm (warn|error|notice)\b/.test(line) && !/^[{}[\]"]/.test(line) && !line.startsWith('at '));
+
+  return human[human.length - 1] || lines[0] || message;
+}
+
+/**
+ * Publish to each store in parallel, print the store table, and fail the task
+ * when any store rejected the upload.
+ *
+ * @param {string[]} stores - The store lanes to publish to (storeLanes().publish).
+ * @param {object} [options] - Passed straight to each store lane (`config`, `executeFn`).
+ * @returns {Promise<void>}
+ * @throws {Error} When any store failed.
+ */
+async function publishStores(stores, options) {
+  const publishers = { chrome: publishToChrome, firefox: publishToFirefox, edge: publishToEdge };
+
   // Track results
   const results = {
     success: [],
@@ -254,24 +304,14 @@ async function publish(complete) {
   };
 
   // Run publish tasks in parallel
-  const publishTasks = enabledStores.map(async (store) => {
+  const publishTasks = stores.map(async (store) => {
     try {
-      switch (store) {
-        case 'chrome':
-          await publishToChrome();
-          break;
-        case 'firefox':
-          await publishToFirefox();
-          break;
-        case 'edge':
-          await publishToEdge();
-          break;
-      }
+      await publishers[store](options);
       logger.log(`[${store}] Published successfully`);
       results.success.push(store);
     } catch (e) {
       logger.error(`[${store}] Publish failed: ${e.message}`);
-      results.failed.push(store);
+      results.failed.push({ store, reason: failureReason(store, e.message) });
     }
   });
 
@@ -281,11 +321,12 @@ async function publish(complete) {
   logger.log('');
   logger.log('Store URLs:');
   Object.entries(STORES).forEach(([key, store]) => {
+    const failure = results.failed.find((entry) => entry.store === key);
     let status = '○ Manual';
     if (results.success.includes(key)) {
       status = '✓ Published';
-    } else if (results.failed.includes(key)) {
-      status = '✗ Failed';
+    } else if (failure) {
+      status = `✗ Failed: ${failure.reason}`;
     } else if (store.note) {
       status = `○ ${store.note.split('.')[0]}`; // First sentence of note
     }
@@ -298,15 +339,8 @@ async function publish(complete) {
 
   // Throw error if any failed
   if (results.failed.length > 0) {
-    throw new Error(`Publish failed for: ${results.failed.join(', ')}`);
+    throw new Error(`Publish failed for ${results.failed.map((entry) => `${entry.store}: ${entry.reason}`).join('; ')}`);
   }
-
-  // Log
-  logger.log('');
-  logger.log('Publish finished!');
-
-  // Complete
-  return complete();
 }
 
 /**
@@ -661,6 +695,7 @@ async function publishToEdge(options) {
 // Export task
 module.exports = series(publish);
 module.exports.storeLanes = storeLanes;
+module.exports.publishStores = publishStores;
 module.exports.publishToGitHubRelease = publishToGitHubRelease;
 module.exports.publishToChrome = publishToChrome;
 module.exports.publishToFirefox = publishToFirefox;

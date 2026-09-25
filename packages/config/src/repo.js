@@ -109,6 +109,29 @@ function sourceRepo(config) {
 }
 
 /**
+ * Whether the repo a brand's `origin` names IS the source repo its config
+ * derives ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): the ONE
+ * comparison, and the ONE wording of its answer, for every reader that holds
+ * the two side by side. The boot prelude states it in one line; the manage walk
+ * and the deploy, which act ON the derived repo, refuse with it.
+ *
+ * The WHOLE slug is compared, case-insensitively (GitHub's own comparison), so
+ * a rename drifts as surely as a transfer: an owner-only compare let a renamed
+ * repo through while every reader kept deriving the old name.
+ *
+ * @param {string} originSlug - The origin's `Owner/name`.
+ * @param {object} config - Composed omega config.
+ * @returns {string|null} The drift line, or null when the two agree or the
+ *   config derives no source repo (no org, or no brand id: nothing to compare).
+ */
+function repoDrift(originSlug, config) {
+  const derived = sourceRepo(config);
+  if (!derived || derived.slug.toLowerCase() === originSlug.toLowerCase()) return null;
+
+  return `origin is ${originSlug} but config derives ${derived.slug}: fix repo.org in config/omega.json5 or move the repo`;
+}
+
+/**
  * The brand's ONE public releases repo: `<brand.id>-releases` under the same
  * org, ALWAYS public, because the desktop updater polls it with no token
  * ([#620](https://github.com/Omega-JS-Stack/omega/issues/620),
@@ -256,6 +279,7 @@ module.exports = {
   HOSTING_PROVIDERS,
   repoBlock,
   sourceRepo,
+  repoDrift,
   releasesRepo,
   websiteRepo,
   hostingProvider,

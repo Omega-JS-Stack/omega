@@ -204,7 +204,7 @@ Behavior:
 - Files only — the shell is never a source — and an empty value never claims a key, so unset keys simply don't publish.
 - Auto-detects "is this a path?" — relative or absolute paths ending in `.p12`/`.pem`/`.cer`/`.p8`/`.provisionprofile`/`.crt`/`.key`/`.json` that exist on disk (target root first, brand root second) get base64-encoded.
 - Publishes to the brand's SOURCE repo (`repo.org` + `brand.id` → `<brand.id>-omega`), and REFUSES unless the checkout's own remote IS that repo: a fork, a template clone or a vendored target never arms a stranger's Actions with your certificates.
-- No PAT: the credential is `gh`'s auth session. A missing or signed-out `gh` fails loudly with install/auth instructions; a CI run, an empty cascade, a remote-less checkout or a repo mismatch skips loudly.
+- No PAT: the credential is `gh`'s auth session. A missing or signed-out `gh` fails loudly with install/auth instructions; a CI run, an empty cascade or a remote-less checkout skips loudly, and a checkout whose `origin` is not the derived source repo refuses on the one drift line (`origin is <slug> but config derives <derived>: ...`, [#934](https://github.com/Omega-JS-Stack/omega/issues/934)).
 - `CSC_LINK` and `APPLE_API_KEY` are DERIVED, never typed ([#891](https://github.com/Omega-JS-Stack/omega/issues/891)): the env load resolved them from the signing tree, so the publish sends those files' bytes. A typed value still wins, and a key the config REQUIRES that neither the tree nor the `.env` answers STOPS the deploy (the step is `fatal`), naming both tier paths it looked in and `omega manage --service certificates`, publishing nothing.
 - Logs key NAMES only; never a value.
 

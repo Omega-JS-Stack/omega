@@ -190,7 +190,7 @@ Full guide: [docs/auth.md](docs/auth.md).
 
 ## 🔒 Supply-chain security
 
-All `npm install` calls in @omega.js/extension CLI commands (the peer-dependency step every verb runs, `npx omega install`) route through [Socket Firewall](https://socket.dev/) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm install`.
+All `npm install` calls in @omega.js/extension CLI commands (the peer-dependency step every verb runs, `npx omega install`) route through [Socket Firewall](https://socket.dev/) when installed, blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm ci`.
 
 ## 📚 Documentation
 

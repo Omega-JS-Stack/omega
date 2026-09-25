@@ -21,12 +21,21 @@
  * mixed @omega.js FAMILY. Same verdict, different subject: that one is about
  * the framework packages a brand installed, this one about the brand's own
  * release number.
+ *
+ * Beside it, the LOCKFILE gate
+ * ([#938](https://github.com/Omega-JS-Stack/omega/issues/938)): the registry
+ * deploy lane ships the brand's own `package-lock.json`, and the runner's
+ * `npm ci` installs exactly what it says, so `assertBrandLockfile` refuses a
+ * lock that disagrees with the manifests' @omega.js specs before anything is
+ * pushed. `brandLockfileDrift` is the read both the gate and the lock
+ * regeneration (`lockfile.js`) share.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const { resolveBrandRoot } = require('@omega.js/config');
 const Logger = require('./logger.js');
+const { isRegistrySpec, resolveWanted } = require('./update.js');
 
 const defaultLogger = new Logger('brand-version');
 
@@ -261,4 +270,156 @@ function assertBrandVersion({ dir }) {
   return { brandRoot, name, version };
 }
 
-module.exports = { readBrandVersion, listTargetPackages, bumpBrandVersion, assertBrandVersion, KINDS };
+// The family's scope: the only dependencies the lockfile gate reads.
+const SCOPE = '@omega.js/';
+
+// A registry entry's `resolved` is a URL; a link target, a packed tarball or a
+// directory is a path, which a runner has nothing at.
+const REGISTRY_RESOLVED = /^https?:\/\//;
+
+/**
+ * The lock entry npm would use for `name` as declared by the manifest at
+ * `where`: its own nested copy first, then the hoisted one at the root, the
+ * order node resolves in.
+ *
+ * @param {object} packages - The lock's `packages` map.
+ * @param {string} where - The manifest's dir relative to the root ('' for the root).
+ * @param {string} name - The dependency name.
+ * @returns {string|null} The lock key, or null when neither slot exists.
+ */
+function lockKeyFor(packages, where, name) {
+  const keys = where ? [`${where}/node_modules/${name}`, `node_modules/${name}`] : [`node_modules/${name}`];
+  return keys.find((key) => packages[key]) || null;
+}
+
+/**
+ * Why a lock entry cannot satisfy a registry spec on a runner, or null when it
+ * does.
+ *
+ * @param {object|undefined} entry - The lock entry.
+ * @param {string} spec - The manifest's registry spec.
+ * @returns {string|null} The reason, worded to follow `<name> <spec> `.
+ */
+function entryDrift(entry, spec) {
+  if (!entry) return 'is not in the lock';
+  if (entry.link) return `is locked as a link to ${entry.resolved}`;
+  if (entry.resolved && !REGISTRY_RESOLVED.test(entry.resolved)) return `is locked at the path ${entry.resolved}`;
+  if (resolveWanted(spec, [entry.version]) !== entry.version) return `is locked at ${entry.version || 'no version'}`;
+  return null;
+}
+
+/**
+ * The lock's STALE path entries: a key that names a folder under the root (a
+ * workspace, or a link target) rather than a `node_modules/` slot, where that
+ * folder is not on disk. A renamed target leaves one behind (`targets/website`
+ * after the move to `targets/web`), and npm keeps honoring the dependencies it
+ * declares on every lock-only run.
+ *
+ * @param {object} options
+ * @param {string} options.root - The install root the lock's keys are relative to.
+ * @param {object} options.packages - The lock's `packages` map.
+ * @returns {string[]} The stale keys, nested ones included.
+ */
+function staleLockPaths({ root, packages }) {
+  return Object.keys(packages).filter((key) => key !== ''
+    && !key.split('/').includes('node_modules')
+    && !jetpack.exists(path.join(root, key)));
+}
+
+/**
+ * Every @omega.js registry spec in the brand's manifests (the root and each
+ * `targets/<name>/package.json`) that the brand's OWN lockfile does not
+ * satisfy. Read-only. `file:`/`link:`/git specs are the linked lane's, which
+ * regenerates its lock in the pack step, so only registry specs are read. A
+ * STALE lock entry (`staleLockPaths`) declaring an @omega.js spec that is NOT a
+ * registry one is drift too: npm would re-create the link it names on the next
+ * lock-only run.
+ *
+ * @param {object} options
+ * @param {string} options.root - The install root (a brand root, or a standalone target).
+ * @returns {{ lockPath: string, lock: object|null, drift: Array<{ manifest: string, name: string, spec: string, key: string|null, entry: object|undefined, reason: string }> }}
+ *   `lock` is null when the root has none; `manifest` is the declaring
+ *   manifest's dir relative to the root, `package.json` for the root itself.
+ */
+function brandLockfileDrift({ root }) {
+  const lockPath = path.join(root, 'package-lock.json');
+  const lock = jetpack.exists(lockPath) === 'file' ? jetpack.read(lockPath, 'json') : null;
+  const packages = (lock && lock.packages) || {};
+
+  const manifests = [
+    { where: '', file: path.join(root, 'package.json') },
+    ...listTargetPackages({ brandRoot: root }).map((target) => ({ where: `targets/${target.name}`, file: target.manifest })),
+  ];
+
+  const drift = [];
+
+  for (const { where, file } of manifests) {
+    const pkg = jetpack.read(file, 'json') || {};
+    const declared = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+
+    for (const [name, spec] of Object.entries(declared)) {
+      if (!name.startsWith(SCOPE) || !isRegistrySpec(spec)) continue;
+
+      const key = lockKeyFor(packages, where, name);
+      const entry = key ? packages[key] : undefined;
+      const reason = entryDrift(entry, spec);
+
+      if (reason) drift.push({ manifest: where || 'package.json', name, spec, key, entry, reason });
+    }
+  }
+
+  for (const stale of staleLockPaths({ root, packages })) {
+    const declared = { ...(packages[stale].dependencies || {}), ...(packages[stale].devDependencies || {}) };
+
+    for (const [name, spec] of Object.entries(declared)) {
+      if (!name.startsWith(SCOPE) || isRegistrySpec(spec)) continue;
+
+      // No key: nothing here is the dependency's own entry, and the pruning
+      // of stale paths (lockfile.js) is what removes this one.
+      drift.push({ manifest: stale, name, spec, key: null, entry: undefined, reason: `is declared by a stale lock entry (${stale} is not on disk)` });
+    }
+  }
+
+  return { lockPath, lock, drift };
+}
+
+/**
+ * The deploy gate on the registry lane: the brand's lockfile must exist and
+ * carry every @omega.js registry spec of its manifests as a registry entry at
+ * a version that satisfies it. Read-only, so a dry run runs it too. Agreement
+ * says nothing.
+ *
+ * @param {object} options
+ * @param {string} options.root - The brand root the lane snapshots.
+ * @returns {void}
+ * @throws {Error} A refusal naming each disagreeing entry and `omega i live`.
+ */
+function assertBrandLockfile({ root }) {
+  const { lockPath, lock, drift } = brandLockfileDrift({ root });
+  const fix = '  fix: run `omega i live` in the brand, which regenerates the brand\'s own lockfile from its manifests (#938)';
+
+  if (!lock) {
+    throw refusal(
+      `${root} has no package-lock.json, and the deploy runner installs with \`npm ci\`, which needs one.\n${fix}`,
+    );
+  }
+
+  if (drift.length) {
+    throw refusal(
+      `${lockPath} disagrees with the manifests, and the deploy runner's \`npm ci\` installs the lock:\n`
+      + drift.map((item) => `  ${item.manifest}: ${item.name} ${item.spec} ${item.reason}\n`).join('')
+      + fix,
+    );
+  }
+}
+
+module.exports = {
+  readBrandVersion,
+  listTargetPackages,
+  bumpBrandVersion,
+  assertBrandVersion,
+  staleLockPaths,
+  brandLockfileDrift,
+  assertBrandLockfile,
+  KINDS,
+};

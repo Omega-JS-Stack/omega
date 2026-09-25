@@ -294,7 +294,7 @@ test('no repo block: the heal still runs, and nothing can drift from an org nobo
   assert.match(lines[0], /origin healed from/);
 });
 
-test('drift: an origin GitHub serves under another owner than `repo.org` is stated, never rewritten', (t) => {
+test('drift: an origin GitHub serves under another owner than the derived source repo is stated, never rewritten', (t) => {
   const { calls, lines, seams: injected } = seams({
     origin: `https://github.com/${CURRENT}.git\n`,
     resolved: { full_name: CURRENT },
@@ -307,9 +307,24 @@ test('drift: an origin GitHub serves under another owner than `repo.org` is stat
   });
 
   assert.deepEqual(calls.filter((call) => call.includes('set-url')), [], 'the remote is right: it is the config that is wrong');
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /origin lives under Acme-Org but repo\.org is Other-Org/);
-  assert.deepEqual(result, { healed: false, reason: 'converged', drift: { owner: 'Acme-Org', org: 'Other-Org' } });
+  assert.deepEqual(lines, ['omega: origin is Acme-Org/acme-omega but config derives Other-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo']);
+  assert.deepEqual(result, { healed: false, reason: 'converged', drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
+});
+
+test('drift: a RENAME is drift too, the whole slug compared, not the owner alone (#934)', (t) => {
+  // GitHub redirects the old name to the new one under the SAME owner: the
+  // heal follows it, and every reader still derives `<brand.id>-omega`.
+  const { lines, seams: injected } = seams({
+    origin: `https://github.com/${CURRENT}.git\n`,
+    resolved: { full_name: 'Acme-Org/acme-site' },
+  });
+
+  const result = originHeal.run({ brandRoot: brandRoot(t), config: CONFIG, ...injected });
+
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /origin healed from Acme-Org\/acme-omega to Acme-Org\/acme-site/);
+  assert.equal(lines[1], 'omega: origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo');
+  assert.deepEqual(result.drift, { origin: 'Acme-Org/acme-site', derived: CURRENT });
 });
 
 test('a heal and a drift are two lines, the heal first', (t) => {
@@ -326,8 +341,8 @@ test('a heal and a drift are two lines, the heal first', (t) => {
 
   assert.equal(lines.length, 2);
   assert.match(lines[0], /origin healed from Old-Org\/acme-omega to Acme-Org\/acme-omega/);
-  assert.match(lines[1], /origin lives under Acme-Org but repo\.org is Other-Org/);
-  assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT, drift: { owner: 'Acme-Org', org: 'Other-Org' } });
+  assert.match(lines[1], /origin is Acme-Org\/acme-omega but config derives Other-Org\/acme-omega/);
+  assert.deepEqual(result, { healed: true, from: STALE, to: CURRENT, drift: { origin: CURRENT, derived: 'Other-Org/acme-omega' } });
 });
 
 test('a repo GitHub does not have is left alone, silently', (t) => {
@@ -438,7 +453,7 @@ test('a real CLI boot heals a redirected origin before the verb runs', (t) => {
   assert.equal(first.status, 0, `the verb ran: ${first.stderr}`);
   assert.match(first.stdout, /origin healed from Old-Org\/sandbox-brand-omega to Omega-JS-Stack\/sandbox-brand-omega/);
   assert.match(first.stdout, /@omega\.js\/manager v/, 'the verb itself still ran');
-  assert.doesNotMatch(first.stdout, /origin lives under/, 'the config names the org GitHub serves it from');
+  assert.doesNotMatch(first.stdout, /config derives/, 'the config derives the repo GitHub serves it from');
   assert.equal(git('remote', 'get-url', 'origin'), 'https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
 
   // A converged brand: the second boot mutates nothing and says nothing, which
@@ -447,6 +462,6 @@ test('a real CLI boot heals a redirected origin before the verb runs', (t) => {
 
   assert.equal(second.status, 0);
   assert.doesNotMatch(second.stdout, /origin healed/);
-  assert.doesNotMatch(second.stdout, /origin lives under/);
+  assert.doesNotMatch(second.stdout, /config derives/);
   assert.equal(git('remote', 'get-url', 'origin'), 'https://github.com/Omega-JS-Stack/sandbox-brand-omega.git');
 });

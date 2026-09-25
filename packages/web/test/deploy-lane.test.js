@@ -56,6 +56,19 @@ function linkedBrand({ version = '1.0.0', linked = true } = {}) {
     devDependencies: { '@omega.js/web': linked ? 'file:../../../../packages/web' : '^1.0.0' },
   }, null, 2));
 
+  // A registry brand ships its OWN lockfile, and the lane refuses one that is
+  // missing or disagrees with the manifests before anything is pushed (#938),
+  // so the plain fixture carries a registry entry satisfying its spec.
+  if (!linked) {
+    fs.writeFileSync(path.join(brandRoot, 'package-lock.json'), JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+        'node_modules/@omega.js/web': { version: '1.0.0', resolved: 'https://registry.npmjs.org/@omega.js/web/-/web-1.0.0.tgz' },
+      },
+    }));
+  }
+
   // A real (empty) repo: a linked brand SNAPSHOTS, and a snapshot is built out
   // of a git index, so the lane refuses a tree with no repo by name
   // ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)). Nothing here

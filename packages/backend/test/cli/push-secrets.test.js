@@ -16,18 +16,20 @@
  * list. The transport, the loud skips, the declared-repo guard and the seam
  * table itself are pinned once in @omega.js/devkit's target-secrets suite.
  *
- * Offline by construction: the brand is a temp dir and the `gh`/`git`
- * boundaries are injected, so the real send shape is proven without a repo, a
- * credential or a network.
+ * Offline by construction: the brand is a temp dir, the `gh` boundary is
+ * injected, and the checkout is a real `git init` with a real `origin` in that
+ * temp dir (the origin gate reads it, #934), so the real send shape is proven
+ * without a remote, a credential or a network.
  *
  * Run: npx omega test backend:cli/push-secrets
  */
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const jetpack = require('fs-jetpack');
 
-const { collectTargetSecrets, declaredBrandRepo, publishTargetSecrets } = require('../../dist/vendor/devkit/target-secrets.js');
+const { collectTargetSecrets, publishTargetSecrets } = require('../../dist/vendor/devkit/target-secrets.js');
 const { serviceAccountSecret } = require('../../dist/vendor/devkit/target-seams.js');
 const { deployPrecheck, STEPS } = require('../../dist/cli/utils/deploy-precheck.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -60,29 +62,20 @@ function seedBrand({ brandEnv, org } = {}) {
 }
 
 /**
- * A `git` stub that answers PER COMMAND. The publisher resolves the deploy lane
- * before it guards (#872), so `rev-parse --show-toplevel` has to answer that
- * this checkout IS the brand root: an unplaced answer reads as a NESTED brand,
- * whose mismatch guard is skipped by design.
- *
- * @param {string} remote - What `git config --get remote.origin.url` answers.
- * @returns {function} `(command, options) => string`
+ * Publish from a real checkout of the brand's own SOURCE repo, `gh` injected,
+ * returning the recorded `gh` calls. The fixture carries no package.json, so
+ * the brand root the origin gate reads (#934) is the target dir itself: the
+ * checkout goes THERE, with the origin the config derives.
  */
-function gitStub(remote) {
-  return (command, options) => {
-    if (command.includes('rev-parse')) return `${options.cwd}\n`;
-    return remote;
-  };
-}
-
-/** Publish with both boundaries injected, returning the recorded `gh` calls. */
 function publish(targetDir, gh) {
+  execFileSync('git', ['-C', targetDir, 'init', '-q']);
+  execFileSync('git', ['-C', targetDir, 'remote', 'add', 'origin', 'git@github.com:acme/fixture-omega.git']);
+
   return publishTargetSecrets({
     targetDir,
     target: 'backend',
     logger: quiet,
     env: {},
-    gitExecFn: gitStub('git@github.com:acme/fixture-omega.git\n'),
     execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
   });
 }
@@ -150,24 +143,6 @@ module.exports = defineCases({
           assert.equal(secrets.OMEGA_SERVICE_ACCOUNT_JSON, '{"type":"service_account"}', 'the key FILE rides as one more secret');
         } finally {
           jetpack.remove(root);
-        }
-      },
-    },
-
-    {
-      name: 'declaredBrandRepo-reads-the-config-and-is-null-when-nothing-is-declared',
-      auth: 'none',
-
-      async run({ assert }) {
-        const declared = seedBrand({ org: 'acme' });
-        const undeclared = seedBrand();
-
-        try {
-          assert.equal(declaredBrandRepo({ targetDir: declared.targetDir, target: 'backend' }), 'acme/fixture-omega');
-          assert.equal(declaredBrandRepo({ targetDir: undeclared.targetDir, target: 'backend' }), null, 'an inferred remote is never a declaration');
-        } finally {
-          jetpack.remove(declared.root);
-          jetpack.remove(undeclared.root);
         }
       },
     },

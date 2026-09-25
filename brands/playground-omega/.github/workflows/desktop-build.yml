@@ -284,6 +284,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-unsigned
+          # An intermediate windows-sign consumes in this same run; the releases repo is the durable home.
+          retention-days: 1
           # Capture installer + auto-updater feed + blockmap so windows-sign can re-upload them all.
           path: |
             targets/desktop/release/*.exe

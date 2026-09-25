@@ -1433,6 +1433,13 @@ of any kind exists: a repo name that must differ is a brand id that must differ.
 | Releases | `releasesRepo(config)` → `<repo.org>/<brand.id>-releases` | always public (the desktop updater polls it with no token) | every target's built artifacts: desktop installers, the extension's zips, tagged per target |
 | Website, one per GitHub-hosted web target | `websiteRepo(config, name)` → `<repo.org>/<brand.id>-<target name>` | private only when the brand is private AND the org's plan allows Pages from a private repo, else public, and the manage walk says which | the BUILT site only, one force-orphan commit on `gh-pages`, served by Pages at the target's url |
 
+**`repoDrift(originSlug, config)`** is the one comparison of a checkout's `origin` with
+the source repo ([#934](https://github.com/Omega-JS-Stack/omega/issues/934)): the whole
+slug, case-insensitive, null when they agree or the config derives no source repo, else
+the line `origin is <slug> but config derives <derived>: fix repo.org in
+config/omega.json5 or move the repo`. The boot prelude prints it; `omega manage` and
+`omega deploy` refuse with it ([deploys.md](deploys.md#the-origin-gate-934)).
+
 **Visibility lives in the brand root's `package.json`**, never in omega.json5
 (`brandVisibility(brandRoot)`): `private: true` or the field ABSENT is a private brand
 (every brand monorepo is private by default, Ian 2026-09-11), and only a literal `false`

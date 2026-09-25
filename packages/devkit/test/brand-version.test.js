@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { readBrandVersion, listTargetPackages, bumpBrandVersion, assertBrandVersion } = require('../src/brand-version.js');
+const { readBrandVersion, listTargetPackages, bumpBrandVersion, assertBrandVersion, assertBrandLockfile } = require('../src/brand-version.js');
 
 /**
  * A brand tree: the root (config + package.json), three targets, and the brand
@@ -265,6 +265,165 @@ test('a DRIFTED target is refused, naming the target and `omega bump`', () => {
 
   // The brand ROOT itself is not a target: there is nothing to compare there.
   assert.strictEqual(assertBrandVersion({ dir: root }), null);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+// ---- The lockfile gate (#938): the registry lane ships the brand's OWN lock,
+// and the runner's `npm ci` installs exactly what it says.
+
+/**
+ * A registry-spec brand: the root declares the manager, `targets/web` the web
+ * framework, `targets/desktop` nothing of the family. `lock` is the brand lock
+ * as written, or null for none at all.
+ *
+ * @param {object|null} lock - The package-lock.json content.
+ * @returns {string} The brand root.
+ */
+function makeRegistryBrand(lock) {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'brand-lockfile-')));
+
+  writeJson(path.join(root, 'package.json'), {
+    name: 'fixture-brand', version: '0.51.0', private: true, workspaces: ['targets/*'],
+    devDependencies: { '@omega.js/manager': '0.51.0' },
+  });
+  writeJson(path.join(root, 'targets', 'web', 'package.json'), {
+    name: 'fixture-website', version: '0.51.0', dependencies: { '@omega.js/web': '0.51.0', lodash: '^4.17.0' },
+  });
+  writeJson(path.join(root, 'targets', 'desktop', 'package.json'), { name: 'fixture-desktop', version: '0.51.0' });
+
+  if (lock) writeJson(path.join(root, 'package-lock.json'), lock);
+
+  return root;
+}
+
+/** A lock whose two @omega.js entries are the given ones. */
+function lockWith(manager, web) {
+  return {
+    name: 'fixture-brand',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'fixture-brand', version: '0.51.0', devDependencies: { '@omega.js/manager': '0.51.0' } },
+      'node_modules/@omega.js/manager': manager,
+      'node_modules/@omega.js/web': web,
+      'node_modules/lodash': { version: '4.17.21', resolved: 'https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz' },
+    },
+  };
+}
+
+const REGISTRY_MANAGER = { version: '0.51.0', resolved: 'https://registry.npmjs.org/@omega.js/manager/-/manager-0.51.0.tgz', dev: true };
+const REGISTRY_WEB = { version: '0.51.0', resolved: 'https://registry.npmjs.org/@omega.js/web/-/web-0.51.0.tgz' };
+
+test('#938: a lock that matches the manifests at registry versions passes the gate', () => {
+  const root = makeRegistryBrand(lockWith(REGISTRY_MANAGER, REGISTRY_WEB));
+
+  assert.doesNotThrow(() => assertBrandLockfile({ root }));
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a copy npm NESTED under the target counts, the hoisted slot is not the only one', () => {
+  const lock = lockWith(REGISTRY_MANAGER, { resolved: '../../packages/web', link: true });
+  lock.packages['targets/web/node_modules/@omega.js/web'] = REGISTRY_WEB;
+  const root = makeRegistryBrand(lock);
+
+  assert.doesNotThrow(() => assertBrandLockfile({ root }));
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a lock still carrying the local era\'s LINK entries is refused, naming each and `omega i live`', () => {
+  const root = makeRegistryBrand(lockWith(
+    { resolved: '../../packages/manager', link: true },
+    { resolved: '../../packages/web', link: true },
+  ));
+
+  assert.throws(
+    () => assertBrandLockfile({ root }),
+    (error) => {
+      assert.strictEqual(error.refusal, true, 'a refusal prints its message alone');
+      assert.match(error.message, /package\.json: @omega\.js\/manager 0\.51\.0 is locked as a link to \.\.\/\.\.\/packages\/manager/);
+      assert.match(error.message, /targets\/web: @omega\.js\/web 0\.51\.0 is locked as a link to \.\.\/\.\.\/packages\/web/);
+      assert.match(error.message, /omega i live/, 'names the fix');
+      return true;
+    },
+  );
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a lock at 0.50.0 for a 0.51.0 spec is refused, naming the locked version', () => {
+  const root = makeRegistryBrand(lockWith(
+    REGISTRY_MANAGER,
+    { version: '0.50.0', resolved: 'https://registry.npmjs.org/@omega.js/web/-/web-0.50.0.tgz' },
+  ));
+
+  assert.throws(
+    () => assertBrandLockfile({ root }),
+    (error) => {
+      assert.match(error.message, /targets\/web: @omega\.js\/web 0\.51\.0 is locked at 0\.50\.0/);
+      assert.doesNotMatch(error.message, /@omega\.js\/manager/, 'the entry that agrees is not named');
+      assert.match(error.message, /omega i live/);
+      return true;
+    },
+  );
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a PATH resolved entry (a packed tarball) and an ABSENT entry are refused too', () => {
+  const lock = lockWith(REGISTRY_MANAGER, { version: '0.51.0', resolved: 'file:omega_modules/omega.js-web-0.51.0.tgz' });
+  const root = makeRegistryBrand(lock);
+
+  assert.throws(() => assertBrandLockfile({ root }), /@omega\.js\/web 0\.51\.0 is locked at the path file:omega_modules\/omega\.js-web-0\.51\.0\.tgz/);
+
+  delete lock.packages['node_modules/@omega.js/manager'];
+  writeJson(path.join(root, 'package-lock.json'), lock);
+  assert.throws(() => assertBrandLockfile({ root }), /package\.json: @omega\.js\/manager 0\.51\.0 is not in the lock/);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a brand with NO lockfile is refused the same way', () => {
+  const root = makeRegistryBrand(null);
+
+  assert.throws(
+    () => assertBrandLockfile({ root }),
+    (error) => {
+      assert.strictEqual(error.refusal, true);
+      assert.match(error.message, /has no package-lock\.json/);
+      assert.match(error.message, /omega i live/);
+      return true;
+    },
+  );
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('#938: a STALE workspace entry (a folder no longer on disk) declaring an @omega.js file: spec is refused, with or without its link', () => {
+  const lock = lockWith(REGISTRY_MANAGER, REGISTRY_WEB);
+  lock.packages['targets/website'] = { name: 'fixture-website', extraneous: true, dependencies: { '@omega.js/web': 'file:../../../../packages/web' } };
+  const root = makeRegistryBrand(lock);
+
+  assert.throws(
+    () => assertBrandLockfile({ root }),
+    (error) => {
+      assert.match(error.message, /targets\/website: @omega\.js\/web file:\.\.\/\.\.\/\.\.\/\.\.\/packages\/web is declared by a stale lock entry \(targets\/website is not on disk\)/);
+      assert.match(error.message, /omega i live/);
+      return true;
+    },
+  );
+
+  // The shape `omega i live` met: the stale entry re-created the link, which is refused on its own too.
+  lock.packages['node_modules/@omega.js/web'] = { resolved: '../../packages/web', link: true };
+  writeJson(path.join(root, 'package-lock.json'), lock);
+  assert.throws(() => assertBrandLockfile({ root }), /targets\/web: @omega\.js\/web 0\.51\.0 is locked as a link to \.\.\/\.\.\/packages\/web/);
+
+  // A stale entry declaring only registry specs is not the gate's business.
+  lock.packages['node_modules/@omega.js/web'] = REGISTRY_WEB;
+  lock.packages['targets/website'].dependencies = { '@omega.js/web': '0.51.0' };
+  writeJson(path.join(root, 'package-lock.json'), lock);
+  assert.doesNotThrow(() => assertBrandLockfile({ root }));
 
   fs.rmSync(root, { recursive: true, force: true });
 });

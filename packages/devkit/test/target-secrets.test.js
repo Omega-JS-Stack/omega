@@ -2,9 +2,10 @@
  * The shared `.env` → Actions secrets publisher (#627 review) — web's and the
  * extension's ONE copy of derive → collect → guard → publish.
  *
- * Offline by construction: the brand and target are temp dirs, and the `gh`/
- * `git` boundaries are injected in every test — the suite never touches a real
- * repo. What it pins is the orchestration each framework binds: the SCHEMA
+ * Offline by construction: the brand and target are temp dirs, the `gh`
+ * boundary is injected in every test, and a checkout is a real `git init` with
+ * a real `origin` in that temp dir (the origin gate reads it the way a deploy
+ * does, #934), so no test touches a remote or the network. What it pins is the orchestration each framework binds: the SCHEMA
  * decides the key set, the COMPOSED env supplies the values, the brand's
  * DECLARED repo gates the send, and every skip is loud.
  */
@@ -14,7 +15,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { collectTargetSecrets, declaredBrandRepo, publishTargetSecrets } = require('../src/target-secrets.js');
+const { execFileSync } = require('node:child_process');
+
+const { collectTargetSecrets, publishTargetSecrets } = require('../src/target-secrets.js');
 
 const quiet = { log() {}, warn() {}, error() {} };
 const noExec = () => { throw new Error('the boundary must not run'); };
@@ -22,10 +25,11 @@ const noExec = () => { throw new Error('the boundary must not run'); };
 /**
  * A brand root with one target under targets/<target>, the brand .env holding
  * `brandEnv`, and the brand's repo ORG declared when `org` is given (the SOURCE
- * repo derives from it as `my-brand-omega`, #883).
+ * repo derives from it as `my-brand-omega`, #883). `parent` places it inside
+ * another directory (a nested brand's enclosing checkout); default the tmpdir.
  */
-function tmpBrand({ target, brandEnv, org }) {
-  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'devkit-target-secrets-'));
+function tmpBrand({ target, brandEnv, org, parent }) {
+  const brand = fs.mkdtempSync(path.join(parent || os.tmpdir(), 'devkit-target-secrets-'));
   fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
   fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), [
     '{',
@@ -47,15 +51,16 @@ function tmpBrand({ target, brandEnv, org }) {
 }
 
 /**
- * The `git` boundary, answering PER COMMAND. A single-answer stub hands the
- * `rev-parse --show-toplevel` probe a remote URL, which reads as a NESTED brand
- * and skips the very guard a test means to exercise (#872).
- * @param {string} brandRoot - What `--show-toplevel` answers (the repo's root).
- * @param {string} remote - What `git config --get remote.origin.url` answers.
- * @returns {Function} The stub to inject as `gitExecFn`.
+ * A real checkout AT `dir`: `git init`, plus an `origin` when one is given. The
+ * origin gate reads the brand root's own `.git` and remote (#934), so a fixture
+ * is a repo, never a stubbed answer.
+ * @param {string} dir - The directory to make a checkout.
+ * @param {string} [remote] - The `origin` url; omitted, the checkout has none.
+ * @returns {void}
  */
-function gitStub(brandRoot, remote) {
-  return (command) => (command.includes('--show-toplevel') ? `${brandRoot}\n` : `${remote}\n`);
+function checkout(dir, remote) {
+  execFileSync('git', ['-C', dir, 'init', '-q']);
+  if (remote) execFileSync('git', ['-C', dir, 'remote', 'add', 'origin', remote]);
 }
 
 // #586 — the `.env.<environment>` overlay reaches this lane too. What a runner
@@ -150,22 +155,6 @@ test('collect: backend publishes the CONNECTIONS family and the custom key, neve
   }
 });
 
-test('declaredBrandRepo: the brand\'s own config, never an inferred remote', () => {
-  const declared = tmpBrand({ target: 'web', org: 'acme' });
-  const silent = tmpBrand({ target: 'web' });
-
-  try {
-    assert.strictEqual(declaredBrandRepo({ targetDir: declared.targetDir, target: 'web' }), 'acme/my-brand-omega');
-    // No repo declared and no brand.id-shaped owner — nothing to trust.
-    assert.strictEqual(declaredBrandRepo({ targetDir: silent.targetDir, target: 'web' }), null);
-    // An unloadable dir is a null, never a throw: the caller skips loudly.
-    assert.strictEqual(declaredBrandRepo({ targetDir: os.tmpdir(), target: 'web' }), null);
-  } finally {
-    fs.rmSync(declared.brand, { recursive: true, force: true });
-    fs.rmSync(silent.brand, { recursive: true, force: true });
-  }
-});
-
 test('publish: the collected keys go to the declared repo, values on stdin', () => {
   const { brand, targetDir } = tmpBrand({
     target: 'web',
@@ -174,13 +163,13 @@ test('publish: the collected keys go to the declared repo, values on stdin', () 
   });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     const result = publishTargetSecrets({
       targetDir,
       target: 'web',
       logger: quiet,
       env: {},
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ file, args, input: options.input }); return ''; },
     });
 
@@ -209,6 +198,7 @@ test('publish: a resolveValue seam transforms each value, and a falsy return dro
   });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     // The seam sees the composed value and its DELIVERED key.
     assert.deepStrictEqual(
@@ -222,7 +212,6 @@ test('publish: a resolveValue seam transforms each value, and a falsy return dro
       logger: quiet,
       env: {},
       resolveValue: (value, key) => (key === 'OMEGA_LICENSE_KEY' ? Buffer.from(value).toString('base64') : null),
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -238,7 +227,7 @@ test('publish: a resolveValue seam transforms each value, and a falsy return dro
   }
 });
 
-test('publish: the five skips are loud, and none of them touches gh', () => {
+test('publish: the four skips are loud, and none of them touches gh', () => {
   const said = [];
   const loud = { log: (m) => said.push(m), warn: (m) => said.push(m), error: (m) => said.push(m) };
 
@@ -251,21 +240,21 @@ test('publish: the five skips are loud, and none of them touches gh', () => {
   try {
     // 1. CI already has the repo secrets, and the runner token can't write them.
     assert.deepStrictEqual(
-      publishTargetSecrets({ targetDir: keyed.targetDir, target: 'web', logger: loud, env: { CI: 'true' }, execFn: noExec, gitExecFn: noExec }),
+      publishTargetSecrets({ targetDir: keyed.targetDir, target: 'web', logger: loud, env: { CI: 'true' }, execFn: noExec }),
       { skipped: 'ci' },
     );
 
     // 2. Nothing composed for this target.
     assert.deepStrictEqual(
-      publishTargetSecrets({ targetDir: empty.targetDir, target: 'web', logger: loud, env: {}, execFn: noExec, gitExecFn: noExec }),
+      publishTargetSecrets({ targetDir: empty.targetDir, target: 'web', logger: loud, env: {}, execFn: noExec }),
       { skipped: 'no-secrets' },
     );
 
-    // 3. No GitHub remote to publish to.
+    // 3. No GitHub remote to publish to: a checkout nobody has pushed yet.
+    checkout(keyed.brand);
     assert.deepStrictEqual(
       publishTargetSecrets({
         targetDir: keyed.targetDir, target: 'web', logger: loud, env: {}, execFn: noExec,
-        gitExecFn: () => { throw new Error('fatal: no such remote'); },
       }),
       { skipped: 'no-remote' },
     );
@@ -274,20 +263,8 @@ test('publish: the five skips are loud, and none of them touches gh', () => {
     assert.deepStrictEqual(
       publishTargetSecrets({
         targetDir: undeclared.targetDir, target: 'web', logger: loud, env: {}, execFn: noExec,
-        gitExecFn: gitStub(undeclared.brand, 'git@github.com:acme/my-brand-omega.git'),
       }),
       { skipped: 'no-declared-repo' },
-    );
-
-    // 5. The enclosing checkout is a stranger's — never arm its Actions with
-    // this brand's credentials. The brand root IS that checkout's toplevel, so
-    // this is a brand that could have been its own and is not (#872).
-    assert.deepStrictEqual(
-      publishTargetSecrets({
-        targetDir: keyed.targetDir, target: 'web', logger: loud, env: {}, execFn: noExec,
-        gitExecFn: gitStub(keyed.brand, 'git@github.com:Omega-JS-Stack/omega.git'),
-      }),
-      { skipped: 'repo-mismatch' },
     );
 
     const heard = said.join('\n');
@@ -295,22 +272,53 @@ test('publish: the five skips are loud, and none of them touches gh', () => {
     assert.match(heard, /no keys composed for this target/);
     assert.match(heard, /no GitHub remote/);
     assert.match(heard, /names no GitHub repo in config/);
-    assert.match(heard, /this brand's repo is acme\/my-brand-omega/);
   } finally {
     for (const { brand } of [empty, keyed, undeclared]) fs.rmSync(brand, { recursive: true, force: true });
+  }
+});
+
+// #934: the checkout's origin is not the source repo the config derives. The
+// brand root IS that checkout's toplevel, so this is a brand that could have
+// been its own and is not (#872): publishing would arm a repo that is not the
+// derived one, which is the harm, so it REFUSES on the one drift line.
+test('publish: an origin that is not the derived source repo REFUSES with the one drift line, and publishes nothing (#934)', () => {
+  const keyed = tmpBrand({ target: 'web', brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n', org: 'acme' });
+  const gh = [];
+  checkout(keyed.brand, 'git@github.com:Omega-JS-Stack/omega.git');
+
+  try {
+    assert.throws(
+      () => publishTargetSecrets({
+        targetDir: keyed.targetDir, target: 'web', logger: quiet, env: {},
+        execFn: (file, args) => { gh.push(args.join(' ')); return ''; },
+      }),
+      (error) => {
+        assert.strictEqual(error.message, 'origin is Omega-JS-Stack/omega but config derives acme/my-brand-omega: fix repo.org in config/omega.json5 or move the repo');
+        return true;
+      },
+    );
+    assert.deepStrictEqual(gh, [], 'not one gh call: no auth check, no secret set');
+  } finally {
+    fs.rmSync(keyed.brand, { recursive: true, force: true });
   }
 });
 
 // #872: a NESTED brand (a brand that is a folder of a bigger repo, the way
 // this monorepo's playground is) has a remote that answers the ENCLOSING repo
 // by construction, and its deploy snapshots the folder to the DECLARED repo.
-// The mismatch guard would skip every one of those publishes, so it does not
-// run there; the run's secrets have to be on the repo the workflow runs from.
+// The origin gate reads only a `.git` AT the brand root (#934), never walking
+// up, so it has nothing to compare there; the run's secrets have to be on the
+// repo the workflow runs from.
 test('publish: a NESTED brand publishes to its DECLARED repo, remote mismatch and all', () => {
-  const { brand, targetDir } = tmpBrand({
+  // The brand folder sits inside a bigger checkout, whose remote is the
+  // monorepo's: exactly the shape a walk-up read would take for a stranger's.
+  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'devkit-target-secrets-outer-'));
+  checkout(outer, 'git@github.com:Omega-JS-Stack/omega.git');
+  const { targetDir } = tmpBrand({
     target: 'web',
     brandEnv: 'OMEGA_LICENSE_KEY=omg_live_fixture\n',
     org: 'Omega-JS-Stack',
+    parent: outer,
   });
   const gh = [];
 
@@ -320,9 +328,6 @@ test('publish: a NESTED brand publishes to its DECLARED repo, remote mismatch an
       target: 'web',
       logger: quiet,
       env: {},
-      // The brand folder sits inside a bigger checkout, whose remote is the
-      // monorepo's: exactly the shape the guard used to read as a stranger's.
-      gitExecFn: gitStub(path.dirname(brand), 'git@github.com:Omega-JS-Stack/omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -332,7 +337,7 @@ test('publish: a NESTED brand publishes to its DECLARED repo, remote mismatch an
       'secret set OMEGA_LICENSE_KEY --repo Omega-JS-Stack/my-brand-omega',
     ]);
   } finally {
-    fs.rmSync(brand, { recursive: true, force: true });
+    fs.rmSync(outer, { recursive: true, force: true });
   }
 });
 
@@ -348,6 +353,7 @@ test('publish: extraSecrets ride the publish, over the composed values and past 
   });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     const result = publishTargetSecrets({
       targetDir,
@@ -363,7 +369,6 @@ test('publish: extraSecrets ride the publish, over the composed values and past 
       },
       // The value seam is the COMPOSED half's: an extra is published verbatim
       resolveValue: (value) => `resolved:${value}`,
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -389,6 +394,7 @@ test('publish: an extra secret ALONE is a publish, never the empty-set skip', ()
   const { brand, targetDir } = tmpBrand({ target: 'web', brandEnv: 'CHROME_CLIENT_ID=chrome-id\n', org: 'acme' });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     const result = publishTargetSecrets({
       targetDir,
@@ -396,7 +402,6 @@ test('publish: an extra secret ALONE is a publish, never the empty-set skip', ()
       logger: quiet,
       env: {},
       extraSecrets: { OMEGA_SERVICE_ACCOUNT_JSON: '{"type":"service_account"}' },
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -418,6 +423,7 @@ test('seams: desktop base64s a file-path secret, and an ABSOLUTE tree path resol
   const { brand, targetDir } = tmpBrand({ target: 'desktop', org: 'acme' });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     // The derived signing paths are ABSOLUTE (they point into the signing tree,
     // outside the target), so an absolute value must resolve as given.
@@ -440,7 +446,6 @@ test('seams: desktop base64s a file-path secret, and an ABSOLUTE tree path resol
       target: 'desktop',
       logger: quiet,
       env: {},
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -464,6 +469,7 @@ test('seams: backend brings the service-account key as an extra secret, from the
   });
   const gh = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     fs.mkdirSync(path.join(brand, '.omega', 'secrets'), { recursive: true });
     fs.writeFileSync(path.join(brand, '.omega', 'secrets', 'service-account.json'), '{"type":"service_account"}');
@@ -473,7 +479,6 @@ test('seams: backend brings the service-account key as an extra secret, from the
       target: 'backend',
       logger: quiet,
       env: {},
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
     });
 
@@ -494,13 +499,13 @@ test('seams: web and the extension bring none, so a value travels verbatim', () 
     });
     const gh = [];
 
+    checkout(brand, 'git@github.com:acme/my-brand-omega.git');
     try {
       publishTargetSecrets({
         targetDir,
         target,
         logger: quiet,
         env: {},
-        gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
         execFn: (file, args, options) => { gh.push({ args, input: options.input }); return ''; },
       });
 
@@ -522,6 +527,7 @@ test('dry run: the key NAMES print and nothing reaches gh', () => {
   });
   const lines = [];
 
+  checkout(brand, 'git@github.com:acme/my-brand-omega.git');
   try {
     const result = publishTargetSecrets({
       targetDir,
@@ -531,7 +537,6 @@ test('dry run: the key NAMES print and nothing reaches gh', () => {
       dryRun: true,
       // The guards run under a dry run too (#895), so the checkout has to be
       // the brand's own for a plan to be printed at all.
-      gitExecFn: gitStub(brand, 'git@github.com:acme/my-brand-omega.git'),
       execFn: noExec,
     });
 
@@ -560,7 +565,7 @@ test('dry run: a refusal still THROWS, because a plan that cannot be made is lou
     ].join('\n'));
 
     assert.throws(
-      () => publishTargetSecrets({ targetDir, target: 'desktop', logger: quiet, env: {}, dryRun: true, gitExecFn: noExec, execFn: noExec }),
+      () => publishTargetSecrets({ targetDir, target: 'desktop', logger: quiet, env: {}, dryRun: true, execFn: noExec }),
       (error) => {
         assert.match(error.message, /Nothing was published/);
         assert.match(error.message, /CSC_LINK/);
@@ -604,7 +609,7 @@ test('refusals are judged against the PRODUCTION config, never this shell\'s ove
     process.env.ENVIRONMENT = 'development';
 
     assert.throws(
-      () => publishTargetSecrets({ targetDir, target: 'desktop', logger: quiet, env: {}, dryRun: true, gitExecFn: noExec, execFn: noExec }),
+      () => publishTargetSecrets({ targetDir, target: 'desktop', logger: quiet, env: {}, dryRun: true, execFn: noExec }),
       (error) => {
         assert.match(error.message, /Nothing was published/);
         assert.match(error.message, /CSC_LINK/, 'the production declaration is what the publish owes');
@@ -623,25 +628,27 @@ test('refusals are judged against the PRODUCTION config, never this shell\'s ove
 // #895: a dry run is the REAL preview, refusals included: the guards above the
 // send are reads, so a plan that names keys the real run would never publish is
 // a promise the deploy cannot keep.
-test('dry run: a guard that would SKIP the publish skips the plan too', () => {
+test('dry run: a guard that would SKIP or REFUSE the publish does the same to the plan', () => {
   const mismatched = tmpBrand({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n', org: 'acme' });
   const silent = tmpBrand({ target: 'extension', brandEnv: 'CHROME_CLIENT_ID=client-id\n' });
   const lines = [];
   const logger = { log: (line) => lines.push(line), warn: (line) => lines.push(line), error: (line) => lines.push(line) };
+  checkout(mismatched.brand, 'git@github.com:stranger/other.git');
 
   try {
-    const result = publishTargetSecrets({
-      targetDir: mismatched.targetDir,
-      target: 'extension',
-      logger,
-      env: {},
-      dryRun: true,
-      gitExecFn: gitStub(mismatched.brand, 'git@github.com:stranger/other.git'),
-      execFn: noExec,
-    });
-
-    assert.deepStrictEqual(result, { skipped: 'repo-mismatch' }, 'the preview carries the refusal, not a plan');
-    assert.ok(lines.some((line) => line.includes('stranger/other')), 'and says which checkout it is standing in');
+    // A drifted origin refuses the plan exactly as it refuses the send (#934)
+    assert.throws(
+      () => publishTargetSecrets({
+        targetDir: mismatched.targetDir,
+        target: 'extension',
+        logger,
+        env: {},
+        dryRun: true,
+        execFn: noExec,
+      }),
+      /^Error: origin is stranger\/other but config derives acme\/my-brand-omega: /,
+      'the preview carries the refusal, naming the checkout it is standing in',
+    );
     assert.ok(!lines.some((line) => line.includes('DRY RUN')), 'no plan is printed for a publish that would not happen');
 
     // A brand naming no repo at all skips the same way under a dry run
@@ -652,7 +659,6 @@ test('dry run: a guard that would SKIP the publish skips the plan too', () => {
       logger,
       env: {},
       dryRun: true,
-      gitExecFn: noExec,
       execFn: noExec,
     });
 

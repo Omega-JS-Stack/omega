@@ -199,7 +199,7 @@ test('the REAL extension template: the git config step stays at the root, the bu
 
   // Post-checkout `run:` steps carry the scope, in both YAML shapes, and the
   // install is scoped a second way, to this target's workspace alone (#898).
-  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm install --workspace \.\n/);
+  assert.match(composed, / {6}- name: Install dependencies\n {8}working-directory: targets\/extension\n {8}run: sfw npm ci --workspace \.\n/);
   assert.match(composed, / {6}- name: Build and publish extension\n {8}working-directory: targets\/extension\n {8}run: \|\n/);
 
   // `uses:` steps are never scoped: checkout and friends want the repo root.
@@ -259,6 +259,9 @@ test('the REAL desktop template: artifact paths ride the target dir, in both YAM
   // download-artifact lands where the (target-scoped) signing run step looks
   assert.match(composed, /^ {10}path: targets\/desktop\/release$/m);
   assert.match(composed, /^ {10}name: windows-unsigned$/m);
+
+  // the unsigned upload is an in-run intermediate: kept one day, not GitHub's 90 (#939)
+  assert.match(composed, /^ {10}retention-days: 1$/m);
 
   // checkout's own inputs are never rewritten — they are not paths in the tree
   // (the depth itself went shallow in #880; the point here is that composition
@@ -740,7 +743,29 @@ test('the REAL templates: every install names the ONE workspace token, and compo
     assert.doesNotMatch(standalone, /\{\{ installWorkspace \}\}/, `${template.label}: a standalone copy keeps the raw token`);
     assert.doesNotMatch(standalone, /--workspace/, `${template.label}: a standalone copy passes --workspace, which has no workspaces to name`);
     for (const line of installLines(standalone)) {
-      assert.match(line, /npm(?:\.cmd)? (?:ci|install)$/, `${template.label}: standalone, \`${line.trim()}\` is not a plain install`);
+      assert.match(line, /npm(?:\.cmd)? ci$/, `${template.label}: standalone, \`${line.trim()}\` is not a plain \`npm ci\``);
+    }
+  }
+});
+
+// One install step on every lane
+// ([#938](https://github.com/Omega-JS-Stack/omega/issues/938)): the runner
+// installs the brand's lockfile as pushed, `npm ci`, on all four frameworks.
+// `npm install` re-resolves around a stale lock instead of refusing it, which
+// is how web deployed off local-era link entries while desktop refused them.
+test('the REAL templates: all four install with `npm ci`, composed as `sfw npm ci --workspace .` (#938)', () => {
+  const templates = frameworkTemplates();
+  assert.equal(templates.length, 4, `expected the four framework templates, found ${templates.map((t) => t.label).join(', ')}`);
+
+  for (const template of templates) {
+    const composed = composeWorkflow(template.contents, { targetPath: 'targets/thing', targetName: 'thing' });
+    const lines = installLines(composed).map((line) => line.trim().replace(/^(?:- )?run: /, ''));
+
+    assert.ok(lines.includes('sfw npm ci --workspace .'), `${template.label}: no \`sfw npm ci --workspace .\` install (got ${JSON.stringify(lines)})`);
+    for (const line of lines) {
+      // The cmd-shelled Windows legs spell it npm.cmd, and the self-hosted
+      // signing box installs without the firewall (see deploys.md); still `ci`.
+      assert.match(line, /^(?:sfw )?npm(?:\.cmd)? ci --workspace \.$/, `${template.label}: \`${line}\` is not \`npm ci\``);
     }
   }
 });

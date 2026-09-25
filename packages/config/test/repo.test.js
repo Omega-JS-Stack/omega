@@ -15,6 +15,7 @@ const {
   repoBlock,
   sourceRepo,
   releasesRepo,
+  repoDrift,
   websiteRepo,
   hostingProvider,
   pagesHost,
@@ -76,6 +77,30 @@ test('sourceRepo/releasesRepo: half an address addresses nothing', () => {
   assert.equal(sourceRepo({}), null);
   assert.equal(releasesRepo({ brand: { id: 'acme' } }), null);
   assert.equal(releasesRepo({ repo: { org: 'Acme-Org' } }), null);
+});
+
+test('repoDrift: an origin that IS the derived source repo is no drift, compared case-insensitively (#934)', () => {
+  assert.equal(repoDrift('Acme-Org/acme-omega', BRAND), null);
+  assert.equal(repoDrift('acme-org/ACME-Omega', BRAND), null, 'GitHub\'s own comparison ignores case, and so does this one');
+});
+
+test('repoDrift: another owner OR another name is the one drift line, naming both slugs (#934)', () => {
+  // A transfer: the name agrees, the owner does not.
+  assert.equal(
+    repoDrift('Other-Org/acme-omega', BRAND),
+    'origin is Other-Org/acme-omega but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo',
+  );
+  // A rename: the owner agrees, the name does not. The owner-only compare this
+  // replaced let this one through silently.
+  assert.equal(
+    repoDrift('Acme-Org/acme-site', BRAND),
+    'origin is Acme-Org/acme-site but config derives Acme-Org/acme-omega: fix repo.org in config/omega.json5 or move the repo',
+  );
+});
+
+test('repoDrift: a config that derives no source repo has nothing to disagree with (#934)', () => {
+  assert.equal(repoDrift('Acme-Org/acme-omega', { brand: { id: 'acme' } }), null, 'no org');
+  assert.equal(repoDrift('Acme-Org/acme-omega', { repo: { org: 'Acme-Org' } }), null, 'no brand id');
 });
 
 test('websiteRepo: a web target publishes to `<brand.id>-<its name>`', () => {
