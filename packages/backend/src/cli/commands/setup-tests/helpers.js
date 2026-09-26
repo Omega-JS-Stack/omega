@@ -33,10 +33,6 @@ function hasContent(object) {
   return Object.keys(object).length > 0;
 }
 
-function isLocal(name) {
-  return name && name.indexOf('file:') > -1;
-}
-
 /**
  * The install line for the JDK the Firebase emulators need, for THIS host.
  * Every platform gets openjdk from a different manager — Homebrew on macOS,
@@ -67,6 +63,5 @@ module.exports = {
   loadJSON,
   saveJSON5,
   hasContent,
-  isLocal,
   javaInstallHint,
 };

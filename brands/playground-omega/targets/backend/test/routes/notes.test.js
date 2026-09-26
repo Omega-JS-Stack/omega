@@ -14,6 +14,9 @@ const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-ca
 const ROUTE = 'notes';
 const WELCOME_TEXT = 'Welcome to the playground';
 
+// Resolves once the wall clock has entered the next UNIX second
+const nextSecond = () => new Promise((resolve) => setTimeout(resolve, 1000 - (Date.now() % 1000)));
+
 module.exports = defineCases({
   description: 'Notes routes: create, list, delete, and their gates',
   type: 'suite',
@@ -49,6 +52,12 @@ module.exports = defineCases({
       name: 'create-stores-the-note-under-the-caller',
 
       async run({ http, assert, firestore, accounts, state }) {
+        // The list orders by metadata.created.timestampUNIX, the family's order
+        // key, which has one-second resolution: a note created in the same
+        // second as an earlier one (the MCP suite's) ties, and the tie breaks
+        // by id. Landing this note in a fresh second is what makes it newest.
+        await nextSecond();
+
         const response = await http.as('notes-owner').post(ROUTE, { text: '  First note  ', id: 'caller-picked-id' });
 
         assert.isSuccess(response, 'a signed-in caller creates a note');

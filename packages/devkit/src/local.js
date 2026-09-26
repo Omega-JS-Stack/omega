@@ -1981,6 +1981,8 @@ module.exports = {
   findBrandRoot,
   discoverTargets,
   frameworkPackagesOf,
+  resolvePackageRealDir,
+  isLocalCheckout,
   linkLocalPackages,
   restoreRegistrySpecs,
   resolveLinkedMonorepo,

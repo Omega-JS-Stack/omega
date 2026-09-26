@@ -136,7 +136,6 @@ async function runTargetChecks(main) {
     packageJSON: main.packageJSON,
     gitignore: main.gitignore,
     hasContent: helpers.hasContent,
-    isLocal: helpers.isLocal,
     loadJSON: helpers.loadJSON,
   });
 
