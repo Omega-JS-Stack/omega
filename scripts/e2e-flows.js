@@ -360,7 +360,9 @@ async function readAccountPage(page, siteUrl) {
   await page.waitForFunction(
     () => {
       const element = document.querySelector('[data-omega-bind="@text auth.user.email"]');
-      return !!element && element.textContent.includes('@');
+      // The theme ships `email@example.com` as the binding's static text, so an
+      // '@' alone is the placeholder, not the bound account
+      return !!element && element.textContent.includes('@') && !element.textContent.includes('example.com');
     },
     { timeout: 60000 },
   ).catch(() => {});
