@@ -25,6 +25,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { get: _get, set: _set } = require('lodash');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const AUTH_ENTRY = path.join(CORE_DIR, 'js', 'core', 'auth.js');
@@ -53,7 +54,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -97,14 +98,14 @@ async function sendMetadata({ cookie = '', attribution = STORED_ATTRIBUTION } = 
   globalThis.__omegaClient = {
     config: { environment: 'production', analytics: { providers: {} } },
     isDevelopment: () => false,
-    storage: () => ({
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
-    }),
-    utilities: () => ({
+    },
+    utilities: {
       getContext: () => ({ client: { platform: 'macos' } }),
       showNotification: () => {},
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
       return { signedUp: true };
@@ -116,7 +117,7 @@ async function sendMetadata({ cookie = '', attribution = STORED_ATTRIBUTION } = 
   delete require.cache[require.resolve(BUNDLE)];
   const auth = require(BUNDLE);
 
-  await auth.sendUserSignupMetadata({ flags: { signupProcessed: false } });
+  await auth.sendUserSignupMetadata(globalThis.__omegaClient, new User({ flags: { signupProcessed: false } }));
 
   return { request: requests.at(-1), payload: requests.at(-1)?.options?.body, storage: storage };
 }
@@ -175,7 +176,7 @@ test('signup metadata: an already-processed account posts nothing', async () => 
 
   delete require.cache[require.resolve(BUNDLE)];
   const auth = require(BUNDLE);
-  await auth.sendUserSignupMetadata({ flags: { signupProcessed: true } });
+  await auth.sendUserSignupMetadata(globalThis.__omegaClient, new User({ flags: { signupProcessed: true } }));
 
   assert.deepStrictEqual(requests, [], 'a processed account never posts again');
 });

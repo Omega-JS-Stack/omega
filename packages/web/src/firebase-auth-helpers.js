@@ -1,7 +1,7 @@
 /**
  * Self-host Firebase's OAuth helper files into the built site: /__/auth/*
  * plus /__/firebase/init.json, fetched from {projectId}.firebaseapp.com at
- * production build time (UJM fetchFirebaseAuth parity). This is what lets
+ * production build time. This is what lets
  * authDomain be the BRAND host on static hosting with no proxy (GitHub
  * Pages): the sign-in redirect stays first-party — which keeps
  * signInWithRedirect working under browser storage partitioning — and

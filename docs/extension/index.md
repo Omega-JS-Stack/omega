@@ -2,11 +2,11 @@
 
 > **Note for contributors and Claude:** This file is the guide for `@omega.js/extension` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the package's own [`docs/<topic>.md`](../../packages/extension/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
-> **Mirrored structure:** the four framework guides — `docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md` — mirror each other (the legacy UJM/BEM/BXM/EM lineage): shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** the four framework guides (`docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md`) mirror each other: shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them. Each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`, beside its one-line `@AGENTS.md` `CLAUDE.md` pointer) mirrors its guide the same way.
 
 ## Identity
 
-OMEGA Extension (@omega.js/extension) is a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave). Sister project to @omega.js/desktop and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per extension context, a component-based architecture, a multi-browser build/release pipeline, config-driven auto-translation (`translation.languages`), cross-context auth synchronization, and a built-in four-layer test framework.
+OMEGA Extension (@omega.js/extension) is a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave), the extension of the OMEGA family beside @omega.js/web, @omega.js/desktop and @omega.js/backend. Each context module's default export is ONE ready-made instance, `omega`. It provides one-line-import bootstrap per extension context, a component-based architecture, a multi-browser build/release pipeline, config-driven auto-translation (`translation.languages`), cross-context auth synchronization, and a built-in four-layer test framework.
 
 ## Recommended skills
 
@@ -15,7 +15,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
+**@omega.js/extension's page contexts extend `@omega.js/client`'s base class**: the popup, options, sidepanel and page instances carry the client's modules (`omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore`, ...) as properties, and background carries its own `omega.auth`. The client powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
 
 **Required reading:**
 - **`docs/client/index.md`** (in the framework monorepo) — the client guide: identity, module list, conventions
@@ -52,28 +52,35 @@ To load the unpacked extension in Chrome: point chrome://extensions → "Load un
 
 ## Architecture
 
-### Per-context Manager singletons
+### The consumer entry
 
-Each extension context has its own one-line bootstrap. Eight contexts total — see [docs/managers.md](../../packages/extension/docs/managers.md):
+Each extension context's module exports ONE ready-made instance, `omega`; the class is exported by name (`Omega`) for tests only, and a consumer never writes `new`. Seven contexts, one shape; see [docs/contexts.md](../../packages/extension/docs/contexts.md):
 
 ```js
 // src/assets/js/components/popup/index.js
-import Manager from '@omega.js/extension/popup';
-await new Manager().initialize();
+import omega from '@omega.js/extension/popup';
+await omega.initialize();
 
-// src/assets/js/components/background.js  (service worker)
-import Manager from '@omega.js/extension/background';
-await new Manager().initialize();
+// src/assets/js/components/background/index.js  (service worker)
+import omega from '@omega.js/extension/background';
+await omega.initialize();
 
-// Same shape for options / sidepanel / content / page / offscreen
+// Same shape for options / sidepanel / page / content / offscreen
 ```
 
-After `initialize()`, the Manager exposes:
-- `manager.extension` — cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension.md](../../packages/extension/docs/extension.md))
-- `manager.logger` — per-context logger stamping the ONE identity tag, `[@omega.js/extension:<context>]`, with NO timestamp (devtools stamps runtime lines; only the build-time devkit logger prefixes `[HH:MM:SS]`) — [#12](https://github.com/Omega-JS-Stack/omega/issues/12)
-- `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive bindings)
-- `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
-- `manager.isDevelopment() / isProduction() / isTesting() / getVersion()` — cross-context helpers ([docs/environment-detection.md](../../packages/extension/docs/environment-detection.md))
+`initialize()` returns the instance, and `omega.ready` is the same promise, so a module that did not call it can still await it.
+
+### The instance (`omega`)
+
+Every context's `omega` carries the same core:
+- `omega.context`: the context name (`background`, `popup`, `options`, `sidepanel`, `page`, `content`, `offscreen`)
+- `omega.extension`: cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension.md](../../packages/extension/docs/extension.md))
+- `omega.logger`: per-context logger stamping the ONE identity tag, `[@omega.js/extension:<context>]`, with NO timestamp (devtools stamps runtime lines; only the build-time devkit logger prefixes `[HH:MM:SS]`)
+- `omega.messenger`: the one lane between contexts, `send({ destination, command, payload })` and `onMessage(handler)` (returns the unsubscribe)
+- `omega.config` (the `OMEGA_BUILD_JSON.config` snapshot), `omega.version`, `omega.getApiUrl()`
+- `omega.getEnvironment()` / `isDevelopment()` / `isProduction()` / `isTesting()`: cross-context helpers ([docs/environment-detection.md](../../packages/extension/docs/environment-detection.md))
+
+The four page contexts (popup, options, sidepanel, page) are ONE subclass of `@omega.js/client`'s base class, told apart by the context name, so they also carry `omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore`, `omega.analytics`, `omega.utilities` and the rest of the client ([client guide](../client/index.md)). `omega.auth.user` is always a `User`, and `omega.auth.openPage()` opens the brand site's sign-in page in a new tab. Background carries its own `omega.auth`, desktop main's `omega.auth` shape (its Firebase app, `.user`, `.listen()`, `.signOut()`, and `.getIdToken()`, the session's fresh ID token or `null` signed out), and `omega.request()`, the page contexts' API fetch on background's own session; content and offscreen have no auth.
 
 ### Component architecture
 
@@ -98,9 +105,9 @@ Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/component
 
 ### Cross-context auth sync
 
-Background.js is the source of truth for authentication. Other contexts compare their UID with background's on load and sync up — sign-ins / sign-outs broadcast across all open contexts via `chrome.runtime` messaging. No `chrome.storage` involved; Firebase persists per-context sessions in IndexedDB.
+Background's `omega.auth` is the source of truth for authentication. The page contexts compare their UID with background's on load and sync up, pushing their account document so background's `omega.auth.user` is the same `User`. Sign-ins and sign-outs broadcast across all open contexts over `omega.messenger`, the one lane between contexts. No `chrome.storage` involved; Firebase persists per-context sessions in IndexedDB.
 
-Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.omega-signin`, `.omega-signout`, `.omega-account`) wire UI without writing JS — they are click triggers on @omega.js/client's shared registry ([client guide](../client/index.md#click-triggers-modulestriggersjs)), with the extension registering `omega-signin` and `omega-account` itself. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user"`) handle DOM state.
+Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.omega-signin`, `.omega-signout`, `.omega-account`) wire UI without writing JS: they are click triggers on @omega.js/client's shared registry ([client guide](../client/index.md#click-triggers-modulestriggersjs)), with the extension registering `omega-signin` and `omega-account` itself. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user.authenticated"`) handle DOM state.
 
 Required setup: `brand.url` in config (background.js watches that host for the /token redirect), `tabs` permission in manifest. See [docs/auth.md](../../packages/extension/docs/auth.md).
 
@@ -129,7 +136,7 @@ See [docs/build-system.md](../../packages/extension/docs/build-system.md).
 - **A declared store with a missing developer key**: the publish REFUSES, naming the key, the declaration that requires it (`platforms.edge.formats.store`), and the ONE walk that collects it, `omega manage --service publishing`. Nothing is uploaded to any store. Dropping the store (`platforms.edge.formats.store: false`) is how a brand says it does not ship there; a store that quietly fell off the run because a key was empty is what this replaced.
 - **Keys present, no listing id yet**: ONE manual step prints (create the listing at the store's console, upload `extension-<build>.zip` from the release, set `targets.<name>.listings.<browser>.id`, re-run) and the run finishes green. The zips are already on the release by then: that upload runs FIRST, so the file a human uploads by hand is published no matter which stores went through.
 
-- `OMEGA_TEST_MODE=true` — running inside @omega.js/extension's test framework. Powers `Manager.isTesting()`.
+- `OMEGA_TEST_MODE=true`: running inside @omega.js/extension's test framework. Powers `omega.isTesting()` in the test harness.
 - `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task
 - `OMEGA_LOG_FILE` — override the gulp stdout/stderr tee path, or `false` to disable it
 
@@ -158,15 +165,15 @@ Three lifecycle hooks let consumers run custom logic while the extension is pack
 
 The NESTED path is the one the defaults scaffold writes and `npx omega migrate` moves flat files to; the package task resolves it first and falls back to the flat pre-migration `hooks/build:pre.js` during the transition. It used to resolve ONLY the flat path, so every migrated consumer's hooks were dead and the miss printed an untagged `console.warn` ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
 
-All three receive the ONE hook-argument shape every OMEGA framework passes: `{ manager, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)), and everything else comes off `manager` (`getManifest()`, `getConfig()`, `getPackage('project')`). The package task used to pass its internal watch counter while both docs described an `index` build-info object nothing ever built, so a hook written from the docs read `undefined` at its first property ([#591](https://github.com/Omega-JS-Stack/omega/issues/591)). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
+All three receive the ONE hook-argument shape every OMEGA framework passes: `{ build, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)), and everything else comes off `build`, the plain build module (`getManifest()`, `getConfig()`, `getPackage('project')`). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
 
 ### Cross-context helpers
 
-Every Manager (build + 7 runtime contexts) has the same set of static + instance helpers via `attachTo(Manager)` mixin from `src/utils/mode-helpers.js`:
+The build module and all seven runtime contexts answer the same helpers from `src/utils/mode-helpers.js`: the build module exports them as plain functions (`require('@omega.js/extension/build').isProduction()`), and every context's `omega` carries them as methods (`omega.isProduction()`):
 
-- `Manager.getEnvironment()`: `'development' | 'testing' | 'production'` (mutually exclusive)
-- `Manager.isDevelopment()` / `Manager.isTesting()` / `Manager.isProduction()`: each DERIVES from `getEnvironment()`, so exactly one is true and `isProduction()` is a real positive check, NOT `!isDevelopment()`
-- `Manager.getVersion()` — extension version (`chrome.runtime.getManifest().version` in browser, `package.json#version` in Node)
+- `getEnvironment()`: `'development' | 'testing' | 'production'` (mutually exclusive)
+- `isDevelopment()` / `isTesting()` / `isProduction()`: each DERIVES from `getEnvironment()`, so exactly one is true and `isProduction()` is a real positive check, NOT `!isDevelopment()`
+- `getVersion()` on the build module and `omega.version` in a context: the extension version (`chrome.runtime.getManifest().version` in browser, `package.json#version` in Node)
 
 **The environment four are `@omega.js/config`'s ONE module** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in full: [docs/shared/config.md](../shared/config.md)): this file re-exports them beside the extension's own `getVersion()`, so `@omega.js/extension`, `@omega.js/desktop`, `@omega.js/web` and `@omega.js/backend` all hang the identical functions. They read ONE input and never guess: `OMEGA_ENVIRONMENT` in build-time Node, and the baked `OMEGA_BUILD_JSON.config.environment` in an extension context (which has no `process.env`). Nothing sniffs `manifest.update_url` or `NODE_ENV` any more, so what an artifact WAS BUILT AS is what it answers, wherever it is loaded from, and a context with neither input throws by name rather than defaulting. `src/build.js` names the input at load, from the lane: `OMEGA_BUILD_MODE` (the `omega build` flag) is production and wins over an inherited value, the `test` verb names `testing`, and a bare dev boot is `development`.
 
@@ -179,9 +186,9 @@ Gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isD
 - `<cwd>/test/**/*.js` — consumer suites
 
 Four layers:
-- **build** — plain Node, fast. Manager API, config validation, manifest shape, lib utilities.
+- **build**: plain Node, fast. The build module, config validation, manifest shape, lib utilities.
 - **background** — real MV3 service worker via Puppeteer + CDP. Boot sequence, `chrome.runtime` surface, storage round-trips, messaging.
-- **view** — Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html`. DOM bindings, Manager surface, popup ↔ background messaging.
+- **view**: Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html`. DOM bindings, the `omega` surface, popup ↔ background messaging.
 - **boot** — real headless Chromium loading the **consumer's** `packaged/<browser>/raw/` as an unpacked extension. End-to-end: does the real packaged extension boot?
 
 The boot layer SKIPS when the consumer has not built: a candidate directory qualifies only when its `manifest.json` is strict JSON, so the intermediate `dist/` (JSON5, and present after any dev run or `omega clean`) is passed over and named in the skip instead of loading and failing every boot test ([#575](https://github.com/Omega-JS-Stack/omega/issues/575)). An explicitly named `OMEGA_TEST_BOOT_DIR` still fails loudly — that one is a decision, not a fallback.
@@ -190,7 +197,7 @@ A boot test's per-test timeout defaults to **45000ms** — sized for the FIRST r
 
 Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/test-framework.md](../../packages/extension/docs/test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
 
-**NEVER mock — test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a `mockManager`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --extended` or `TEST_EXTENDED_MODE=true`) — normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/test-framework.md](../../packages/extension/docs/test-framework.md).
+**NEVER mock: test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a mock `omega`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --extended` or `TEST_EXTENDED_MODE=true`): normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/test-framework.md](../../packages/extension/docs/test-framework.md).
 
 See [docs/test-framework.md](../../packages/extension/docs/test-framework.md) and [docs/test-boot-layer.md](../../packages/extension/docs/test-boot-layer.md).
 
@@ -220,8 +227,7 @@ See [docs/cli.md](../../packages/extension/docs/cli.md).
 
 - **Consumer code can `require()` any @omega.js/extension dependency** — the bundler's framework-deps resolve hook re-resolves every name the framework DECLARES from the framework's own installation. Consumer projects do NOT need to `npm install firebase`, `@omega.js/client`, or any other @omega.js/extension dep. If a dep doesn't resolve, the fix is in @omega.js/extension's `package.json` — not the consumer's.
 - **The framework's copy wins ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** A consumer that declares its own version of a framework dependency still bundles ONE copy — the framework's — the same guarantee @omega.js/web and @omega.js/desktop give, through the same @omega.js/devkit hook since [#738](https://github.com/Omega-JS-Stack/omega/issues/738). The DECLARED set is the list, so — unlike webpack's `resolve.modules` order, which this replaced — a package the framework merely carries TRANSITIVELY no longer wins: it resolves the way node resolves it. Same shape in [docs/desktop/index.md](../desktop/index.md); pinned by `src/test/suites/build/framework-deps.test.js` in both.
-- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import omega from '@omega.js/client'` → `omega.auth()`, `omega.firestore()`. Same rule in EM and UJM.
-- **`Manager.require(name)`** resolves from @omega.js/extension's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). The bundler's framework-deps hook handles the bundled case.
+- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use the context's instance: `omega.auth`, `omega.firestore`. Same rule on every OMEGA browser surface.
 
 ## Development Workflow
 
@@ -237,15 +243,15 @@ All `npm install` calls in CLI commands (`npx omega i`, the peer-dependency step
 
 ## File Conventions
 
-- **CommonJS** (`require()`) for build-time + Node code (gulp, CLI, tests). **ES modules** (`import`/`export default class`) for browser-context Manager files (`background.js`, `popup.js`, etc.) — they go through esbuild.
+- **CommonJS** (`require()`) for build-time + Node code (gulp, CLI, tests). **ES modules** (`import`/`export default omega`) for the browser-context modules (`background.js`, `popup.js`, etc.): they go through esbuild.
 - One `module.exports = ...` per file (CommonJS).
 - Logical operators at the **start** of continuation lines.
 - Short-circuit early returns rather than nested ifs.
 - Prefer **`fs-jetpack`** over `fs-extra`.
 - **No backwards compatibility** unless explicitly requested.
 - **No paranoid `?.`** — see [the defensive-coding rule](https://anthropic.com/claude-code) (also enforced in `~/.claude/skills/js:patterns`). Framework internals deref directly; `?.` is for genuinely-uncertain values (user config sub-fields, `chrome.*` APIs that may be absent, regex matches, caught exceptions).
-- **Browser-context modules are ES-module.** esbuild compiles them. Don't try to `require()` them from Node — they reference `window`, `document`, `chrome` at module-load time. Build-layer tests should target `lib/*.js` (Node-safe) or use @omega.js/extension's public Manager API (`require('@omega.js/extension/build').getConfig()`).
-- **Consumer pattern: use the public Manager API in tests.** Don't `require('json5')` or other transitive @omega.js/extension deps directly from consumer test files — they're not in the consumer's `package.json` and resolution is fragile. Use `Manager.getConfig()` / `Manager.getManifest()` / `Manager.require('json5')`.
+- **Browser-context modules are ES-module.** esbuild compiles them. Don't try to `require()` them from Node: they reference `window`, `document`, `chrome` at module-load time. Build-layer tests should target `lib/*.js` (Node-safe) or use @omega.js/extension's build module (`require('@omega.js/extension/build').getConfig()`).
+- **Consumer pattern: use the build module in tests.** Don't `require('json5')` or other transitive @omega.js/extension deps directly from consumer test files: they're not in the consumer's `package.json` and resolution is fragile. Use `build.getConfig()` / `build.getManifest()` (`const build = require('@omega.js/extension/build')`).
 
 ## Doc-update parity
 
@@ -266,8 +272,8 @@ API references for each subsystem live in `docs/`:
 
 ### Architecture
 - [docs/components.md](../../packages/extension/docs/components.md) — seven component contexts, three-part structure (view + styles + script), manifest wiring
-- [docs/managers.md](../../packages/extension/docs/managers.md) — one-line bootstrap per context, import paths, `initialize()` flow
-- [docs/environment-detection.md](../../packages/extension/docs/environment-detection.md) — `Manager.isTesting / isDevelopment / isProduction / getVersion`
+- [docs/contexts.md](../../packages/extension/docs/contexts.md): the one instance per context, import paths, `initialize()` flow
+- [docs/environment-detection.md](../../packages/extension/docs/environment-detection.md): `omega.isTesting / isDevelopment / isProduction`, the build module's `getVersion`
 
 ### Runtime
 - [docs/extension.md](../../packages/extension/docs/extension.md) — cross-browser `chrome.*` / `browser.*` API wrapper

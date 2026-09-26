@@ -21,6 +21,7 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { get: _get, set: _set } = require('lodash');
 const { resolvedBrandHost } = require('@omega.js/config');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const PALETTE_DIR = path.join(CORE_DIR, 'js', 'core');
@@ -78,7 +79,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -161,9 +162,9 @@ function makeClient(storage, roster, signedInAtBoot, config) {
     // The roster answer, MUTABLE: the retry loop (#402) asks again, and a test
     // that swaps this between attempts is an emulator finishing its boot.
     roster,
-    user: signedInAtBoot ? { email: signedInAtBoot } : null,
     config,
-    auth: () => ({
+    auth: {
+      user: signedInAtBoot ? new User({}, { uid: 'u1', email: signedInAtBoot }) : new User(),
       // The real listener hands over the settled auth state the moment it is
       // registered. `signedInAtBoot` is that case, and it lands while the
       // roster fetch is still in flight.
@@ -174,19 +175,18 @@ function makeClient(storage, roster, signedInAtBoot, config) {
           handler();
         }
       },
-      getUser: () => client.user,
       signInWithEmailAndPassword: async (email, password) => { signIns.push({ email, password }); },
-    }),
+    },
     // Lodash-pathed exactly like the real one (@omega.js/client's Storage), so
     // a nested path behaves as it does in a browser: no path reads (or wipes)
     // the WHOLE blob, and every write persists through JSON — which is what
     // makes a key removed by setting it undefined actually leave the object.
-    storage: () => ({
+    storage: {
       get: (keyPath, defaultValue) => (keyPath ? _get(storage, keyPath, defaultValue) : storage),
       set: (keyPath, value) => { _set(storage, keyPath, value); persist(); },
       remove: (keyPath) => { _set(storage, keyPath, undefined); persist(); },
       clear: () => { Object.keys(storage).forEach((key) => delete storage[key]); },
-    }),
+    },
     // The roster route answers the persona list the palette builds its dropdown
     // from; an emulator that is not up rejects, which is what `roster` carries
     // when it is an Error.
@@ -288,7 +288,7 @@ async function boot(storage = {}, { pathname = '/', roster = ROSTER, signedInAtB
     open: () => tab.click(),
     // The auth readout the palette registered — the panel's live state.
     signedInAs: (email) => {
-      client.user = email ? { email } : null;
+      client.auth.user = email ? new User({}, { uid: 'u1', email }) : new User();
       client.listeners[0]();
     },
   };
@@ -571,11 +571,11 @@ test('dev palette: the placeholder does nothing, and a failed switch stays usabl
   await dropdown.change();
   assert.deepStrictEqual(client.signIns, [], 'landing back on the placeholder is not a sign-in');
 
-  client.auth = () => ({
+  client.auth = {
+    user: new User(),
     listen: () => {},
-    getUser: () => null,
     signInWithEmailAndPassword: async () => { throw new Error('auth/network-request-failed'); },
-  });
+  };
   dropdown.value = '_test.premium-active';
   await dropdown.change();
 

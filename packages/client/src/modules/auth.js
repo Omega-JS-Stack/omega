@@ -1,11 +1,9 @@
-// The account schema + subscription derivation live in @omega.js/account — the
-// single source of truth shared with @omega.js/backend, so a doc resolved here is
-// byte-identical to one resolved by the backend. No generators are injected:
-// $uuid/$randomId/$apiKey fields resolve to null (real values always come from
-// the backend-written doc).
-import { resolveAccount, resolveSubscription } from '@omega.js/account';
+// The account is a `User` from @omega.js/account, the same class the backend
+// builds, so a document resolved here is byte-identical to one resolved there.
+// The browser never assigns `User.generators`: $uuid/$randomId/$apiKey fields
+// resolve to null (real values always come from the backend-written doc).
+import { User } from '@omega.js/account';
 import { resolveFeatures } from '@omega.js/account/features';
-import { registerTrigger } from './triggers.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('auth');
@@ -22,29 +20,46 @@ const TRANSIENT_PROBE_CODES = new Set([
 ]);
 
 class Auth {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this._authStateCallbacks = [];
-    this._hasProcessedStateChange = false;
 
-    // Bumped by every auth state change so emissions stay strictly ordered: a
-    // signed-in emission awaits its account fetch while a signed-out one fires
-    // instantly, so a slow fetch would otherwise deliver a STALE signed-in
-    // state after a newer signed-out one (#196).
+    // Bumped by every auth state change so builds stay strictly ordered: a
+    // signed-in build awaits its account fetch while a signed-out one lands
+    // instantly, so a slow fetch would otherwise land a STALE signed-in state
+    // after a newer signed-out one (#196).
     this._stateGeneration = 0;
+
+    // The newest build's promise (see _buildState), or null before the first
+    this._newestBuild = null;
 
     // The one probe in flight, or null (#798; see probeSession)
     this._sessionProbe = null;
+
+    // The account as one `User`, never null: signed out until Firebase settles,
+    // then replaced once per auth state change, before anything reads it
+    this.user = new User();
+
+    // The newest LANDED state, `{ user, denied }`, or null until the first one
+    // lands. Every consumer of one auth state change reads this same object.
+    this.state = null;
+
+    // Resolves the first time a state lands and never rejects: once listeners
+    // wait on it, then read the newest landed state
+    this._settledResolve = null;
+    this.settled = new Promise((resolve) => {
+      this._settledResolve = resolve;
+    });
   }
 
-  // Check if user is authenticated
-  isAuthenticated() {
-    return !!this.getUser();
-  }
-
-  // Get current user
-  getUser() {
-    const user = this.manager.firebaseAuth?.currentUser;
+  /**
+   * The sign-in's view of a Firebase user: the identity a `User` is built from.
+   * displayName and photoURL fall back to the provider entries, then to the
+   * email prefix and a generated initials avatar, so a profile always has both.
+   * @param {object|null} user - the Firebase user, or null when signed out
+   * @returns {{ uid: string, email: string|null, displayName: string, photoURL: string, emailVerified: boolean }|null}
+   */
+  _identity(user) {
     if (!user) return null;
 
     // Get displayName and photoURL from providerData if not set on main user
@@ -83,13 +98,13 @@ class Auth {
       email: user.email,
       displayName: displayName,
       photoURL: photoURL,
-      emailVerified: user.emailVerified,
-      metadata: user.metadata,
-      providerData: user.providerData,
+      emailVerified: user.emailVerified === true,
     };
   }
 
-  // Listen for auth state changes (waits for settled state before first callback)
+  // Listen for auth state changes. Every listener receives the state
+  // _landState built, never a build of its own: one account fetch
+  // and one `User` per auth state change, however many listen.
   listen(options = {}, callback) {
     // Handle overloaded signatures - if first param is a function, it's the callback
     if (typeof options === 'function') {
@@ -97,103 +112,41 @@ class Auth {
       options = {};
     }
 
-    // If Firebase can't boot, call callback immediately with null. Same
-    // condition as initialize(): a projectId-only blob resolves (URL
-    // derivation) but never registers onAuthStateChanged, so _authReady
-    // would never settle and listeners would hang forever.
-    if (!this.manager._resolveFirebaseConfig()?.apiKey) {
+    // If Firebase can't boot, call back immediately with the signed-out user.
+    // Same condition as initialize(): a projectId-only blob resolves (URL
+    // derivation) but never registers onAuthStateChanged, so no state would
+    // ever land and listeners would hang forever.
+    if (!this.omega._resolveFirebaseConfig()?.apiKey) {
       callback({
-        user: null,
-        account: resolveAccount({}),
+        user: new User(),
+        denied: false,
       });
 
       return () => {};
     }
 
-    // Build auth state and call the provided callback.
-    // Returns true when it delivered, false when a newer state superseded it.
-    const run = async (user) => {
-      const generation = this._stateGeneration;
-      const state = { user: this.getUser() };
-
-      // Fetch account data if the user is logged in and Firestore is available
-      // (every failure but a denied read is captured inside _getAccountData and
-      // degrades to null)
-      if (user && this.manager.firebaseFirestore) {
-        try {
-          state.account = await this._getAccountData(user.uid);
-        } catch (error) {
-          // The one failure _getAccountData rethrows: rules denied the read.
-          // Consumers branch on THIS flag and never on an empty account — a doc
-          // that is not written yet is the normal state right after signup
-          // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). The
-          // account still resolves to the empty shape below, so nothing
-          // downstream has to null-check.
-          logger.warn('Account read denied — flagging the state as denied:', error.message);
-          state.accountDenied = true;
-        }
-      }
-
-      // A newer auth state change owns the truth now — delivering this one
-      // would hand consumers a stale user out of order. Drop it entirely; the
-      // newer run updates the bindings, the storage and the callback.
-      if (generation !== this._stateGeneration) {
-        logger.warn('Dropping a superseded auth state emission — a newer state change owns the truth');
-        return false;
-      }
-
-      // Ensure account is always a resolved object
-      state.account = state.account || resolveAccount({}, { user: { uid: user?.uid } });
-
-      // Derive resolved subscription state for bindings and consumers
-      state.resolved = this.resolveSubscription(state.account);
-
-      // Update bindings and storage once per auth state change
-      if (!this._hasProcessedStateChange) {
-        this.manager.bindings().update({
-          auth: state,
-          usage: this._resolveUsage(state),
-        });
-        this.manager.storage().set('auth', state);
-
-        this._hasProcessedStateChange = true;
-      }
-
-      callback(state);
-
-      return true;
-    };
-
-    // Once listeners: wait for auth to settle, fire once, done.
-    // A superseded run must be RE-DELIVERED here: a once listener holds no
-    // subscription, so nothing would ever re-issue it and every awaiting caller
-    // (checkout boot, the extension auth helpers) would hang forever. Each retry
-    // re-reads the current user, so the loop settles as soon as auth stops
-    // changing. The persistent path below needs no loop — it IS subscribed, so
-    // the superseding state change re-issues through _authStateCallbacks.
+    // Once listeners: the first landed state settles them, and they read the
+    // newest landed state at that moment, so a state superseded mid-fetch is
+    // never theirs and nothing re-runs
     if (options.once) {
-      this.manager._authReady.then(async () => {
-        let delivered = false;
-
-        while (!delivered) {
-          delivered = await run(this.manager.firebaseAuth?.currentUser || null);
-
-          if (!delivered) {
-            logger.warn('Re-running a superseded once listener with the newest auth state');
-          }
-        }
-      });
+      this.settled.then(() => callback(this.state));
 
       return () => {};
     }
 
-    // Persistent listeners: subscribe to all auth state changes (initial + future)
-    // If auth already settled, fire the first callback via the promise to catch up
-    const unsubscribe = this._subscribe(run);
+    // Persistent listeners: every future state change, plus a catch-up with the
+    // state already landed. The catch-up is async so a listener always hears
+    // about its state after listen() returns, and it is skipped when the
+    // listener unsubscribed or a newer state reached it through the loop first.
+    const unsubscribe = this._subscribe(callback);
 
-    if (this.manager._firebaseAuthInitialized) {
-      this.manager._authReady.then(() => {
-        run(this.manager.firebaseAuth?.currentUser || null);
+    if (this.state) {
+      const landed = this.state;
+
+      Promise.resolve().then(() => {
+        if (this.state === landed && this._authStateCallbacks.includes(callback)) {
+          this._deliver(callback);
+        }
       });
     }
 
@@ -212,34 +165,103 @@ class Auth {
     };
   }
 
-  // Called by Manager when Firebase auth state changes
-  _handleAuthStateChange(user) {
-    // Supersede any in-flight emission before starting this one
-    this._stateGeneration++;
+  // Hand the landed state to one persistent listener; a throwing listener never
+  // stops the others
+  _deliver(callback) {
+    try {
+      callback(this.state);
+    } catch (error) {
+      console.error('Auth state callback error:', error);
+    }
+  }
 
-    // Reset state processing flag for new auth state
-    this._hasProcessedStateChange = false;
+  // Called by the Omega instance when Firebase auth state changes. Not awaited
+  // by the caller, since the account fetch must never block Firebase's callback.
+  _handleAuthStateChange(firebaseUser) {
+    return this._buildState(firebaseUser);
+  }
 
-    // Call all persistent listener callbacks
-    this._authStateCallbacks.forEach(callback => {
+  /** Re-read the account for the current Firebase user and land it as a new state: resolves with the newest landed `{ user, denied }`. */
+  async reload() {
+    let landed = await this._buildState(this.omega.firebaseAuth?.currentUser || null);
+
+    // Superseded mid-fetch: follow the newest build until one lands. Never
+    // spins on the same build: a build only reports false when a newer
+    // _buildState bumped the generation, and that call replaced _newestBuild.
+    while (!landed) {
+      landed = await this._newestBuild;
+    }
+
+    return this.state;
+  }
+
+  // Start a state build for this Firebase user, superseding any in flight, and
+  // record it as the newest so a superseded reload() can follow it
+  _buildState(firebaseUser) {
+    const generation = ++this._stateGeneration;
+
+    this._newestBuild = this._landState(generation, firebaseUser);
+
+    return this._newestBuild;
+  }
+
+  // The ONE place an auth state is built and landed. Resolves true when it
+  // landed, false when a newer build superseded it.
+  async _landState(generation, firebaseUser) {
+    const identity = this._identity(firebaseUser);
+    let document = {};
+    let denied = false;
+
+    // Fetch the account document if the user is logged in and Firestore is
+    // available (every failure but a denied read is captured inside
+    // _getAccountData and degrades to null)
+    if (firebaseUser && this.omega.firebaseFirestore) {
       try {
-        callback(user);
+        document = (await this._getAccountData(firebaseUser.uid)) || {};
       } catch (error) {
-        console.error('Auth state callback error:', error);
+        // The one failure _getAccountData rethrows: rules denied the read.
+        // Consumers branch on `denied` and never on an empty account, since a
+        // doc that is not written yet is the normal state right after signup
+        // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). The
+        // User still builds from the identity below, so nothing downstream
+        // has to null-check.
+        logger.warn('Account read denied, flagging the state as denied:', error.message);
+        denied = true;
       }
+    }
+
+    // A newer auth state change owns the truth now: landing this one would
+    // hand consumers a stale user out of order. Drop it entirely; the newer
+    // build updates the bindings, the storage and the listeners.
+    if (generation !== this._stateGeneration) {
+      logger.warn('Dropping a superseded auth state emission: a newer state change owns the truth');
+      return false;
+    }
+
+    // The one User for this state change, in place before anything reads it
+    this.user = new User(document, identity);
+    this.state = { user: this.user, denied };
+
+    // Bindings read the live User, so `auth.user.plan` resolves through its
+    // getter; storage serializes it to the stored document (User.toJSON)
+    this.omega.bindings.update({
+      auth: { user: this.user },
+      usage: this._resolveUsage(this.user),
     });
+    this.omega.storage.set('auth', this.state);
+
+    this._settledResolve();
+
+    // Iterate a copy: a listener may unsubscribe while it is being called
+    for (const callback of [...this._authStateCallbacks]) {
+      this._deliver(callback);
+    }
+
+    return true;
   }
 
-  // Resolves calculated subscription fields that require derivation logic
-  // (shared @omega.js/account implementation — same math as the backend).
-  // Returns: { plan, active, trialing, cancelling, everPaid }
-  // Falls back to the stored auth state when no account is passed.
-  resolveSubscription(account) {
-    return resolveSubscription(account || this.manager.storage().get('auth', {})?.account);
-  }
-
-  // Resolve usage bindings from account data + the EFFECTIVE limits of the
-  // resolved plan ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
+  // Resolve usage bindings from the User's stored usage + the EFFECTIVE limits
+  // of its plan, `user.plan` ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
   // Returns, per counted feature:
   //   { monthly, daily, total, limit, left, day: { limit, used, left }, override }
   //
@@ -250,16 +272,16 @@ class Auth {
   // share of a month limit — is @omega.js/account's, the same module the
   // backend's `consume` gate reads, so a bar can never draw a limit the gate
   // would not enforce.
-  _resolveUsage(state) {
-    const accountUsage = state.account?.usage || {};
-    const productId    = state.resolved?.plan || 'basic';
-    const products     = this.manager.config.payment?.products || [];
+  _resolveUsage(user) {
+    const accountUsage = user.usage || {};
+    const productId    = user.plan;
+    const products     = this.omega.config.payment?.products || [];
     const product      = products.find(p => p.id === productId) || {};
-    const catalog      = this.manager.config.features || {};
+    const catalog      = this.omega.config.features || {};
 
     const usage = {};
 
-    for (const resolved of resolveFeatures({ catalog, product, account: state.account })) {
+    for (const resolved of resolveFeatures({ catalog, product, account: user })) {
       if (!resolved.counted) {
         continue;
       }
@@ -287,7 +309,7 @@ class Auth {
   // Get ID token for the current user
   async getIdToken(forceRefresh = false) {
     try {
-      const user = this.manager.firebaseAuth.currentUser;
+      const user = this.omega.firebaseAuth.currentUser;
 
       const { getIdToken } = await import('firebase/auth');
       return await getIdToken(user, forceRefresh);
@@ -309,7 +331,9 @@ class Auth {
   // Resolves 'signed-out' | 'alive' | 'gone' | 'unknown', and never rejects on
   // the classification itself: callers fire it and move on.
   probeSession() {
-    if (!this.isAuthenticated()) {
+    // The Firebase session itself, not `this.user`: the probe refreshes that
+    // session's token, and it runs whether or not anything listens to auth
+    if (!this.omega.firebaseAuth?.currentUser) {
       return Promise.resolve('signed-out');
     }
 
@@ -353,12 +377,12 @@ class Auth {
   // Sign in with custom token
   async signInWithCustomToken(token) {
     try {
-      if (!this.manager.firebaseAuth) {
+      if (!this.omega.firebaseAuth) {
         throw new Error('Firebase Auth is not initialized');
       }
 
       const { signInWithCustomToken } = await import('firebase/auth');
-      const userCredential = await signInWithCustomToken(this.manager.firebaseAuth, token);
+      const userCredential = await signInWithCustomToken(this.omega.firebaseAuth, token);
       return userCredential.user;
     } catch (error) {
       console.error('Sign in with custom token error:', error);
@@ -369,12 +393,12 @@ class Auth {
   // Sign in with email and password
   async signInWithEmailAndPassword(email, password) {
     try {
-      if (!this.manager.firebaseAuth) {
+      if (!this.omega.firebaseAuth) {
         throw new Error('Firebase Auth is not initialized');
       }
 
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const userCredential = await signInWithEmailAndPassword(this.manager.firebaseAuth, email, password);
+      const userCredential = await signInWithEmailAndPassword(this.omega.firebaseAuth, email, password);
       return userCredential.user;
     } catch (error) {
       console.error('Sign in with email and password error:', error);
@@ -386,7 +410,7 @@ class Auth {
   async signOut() {
     try {
       const { signOut } = await import('firebase/auth');
-      await signOut(this.manager.firebaseAuth);
+      await signOut(this.omega.firebaseAuth);
       return true;
     } catch (error) {
       console.error('Sign out error:', error);
@@ -394,40 +418,37 @@ class Auth {
     }
   }
 
-  // Get account data from Firestore
+  // Get the raw account document from Firestore: the stored data, `{}` when no
+  // doc is written yet, null on a failure that degrades (resolution happens in
+  // the User constructor)
   async _getAccountData(uid) {
     try {
-      if (!this.manager.firebaseFirestore) {
+      if (!this.omega.firebaseFirestore) {
         return null;
       }
 
       const { doc, getDoc } = await import('firebase/firestore');
 
-      const accountDoc = doc(this.manager.firebaseFirestore, 'users', uid);
+      const accountDoc = doc(this.omega.firebaseFirestore, 'users', uid);
       const snapshot = await getDoc(accountDoc);
 
-      // Get current Firebase user to pass uid and email to resolver
-      const firebaseUser = this.manager.firebaseAuth?.currentUser || { uid };
-
       if (snapshot.exists()) {
-        // Resolve the account data to ensure proper structure and defaults
-        const rawData = snapshot.data();
-        const resolvedAccount = resolveAccount(rawData, { user: firebaseUser });
-        return resolvedAccount;
+        return snapshot.data();
       }
 
-      // If no account exists, return resolved empty object for consistent structure
-      return resolveAccount({}, { user: firebaseUser });
+      // No doc written yet: an empty document, which the User resolves to the
+      // signed-in empty shape
+      return {};
     } catch (error) {
       // Capture here — every failure passes through this catch, so monitoring
       // sees them all: the degrade-to-null path below never surfaces to callers,
       // and the permission-denied rethrow is captured before it throws.
       console.error('Get account data error:', error);
-      this.manager.sentry().captureException(new Error('Failed to get account data', { cause: error }));
+      this.omega.sentry.captureException(new Error('Failed to get account data', { cause: error }));
 
       // Rules refused the read: a REAL failure, and the caller has to be able to
-      // tell it apart from a doc that simply is not written yet — that one
-      // resolves to an empty account above and is normal
+      // tell it apart from a doc that simply is not written yet: that one
+      // returns an empty document above and is normal
       // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). Every
       // other failure keeps degrading to null.
       if (error?.code === 'permission-denied') {
@@ -443,23 +464,25 @@ class Auth {
   // extension all get it from here; surface-specific ones (the extension's
   // `omega-signin`) are registered by that surface.
   setupEventListeners() {
-    registerTrigger('signout', async () => {
+    this.omega.triggers.register('signout', async () => {
       try {
         // Show confirmation
         if (!confirm('Are you sure you want to sign out?')) {
           return;
         }
 
-        // Sign out
-        await this.signOut();
+        // Sign out. An instance with its own `signOut()` signs out more than
+        // this page (desktop: main, which then signs every window out), so it
+        // wins over this page's session alone.
+        await (this.omega.signOut ? this.omega.signOut() : this.signOut());
 
         // Show success notification
-        this.manager.utilities().showNotification('Successfully signed out.', 'success');
+        this.omega.utilities.showNotification('Successfully signed out.', 'success');
 
       } catch (error) {
         console.error('Sign out error:', error);
         // Show error notification if utilities are available
-        this.manager.utilities().showNotification('Failed to sign out. Please try again.', 'danger');
+        this.omega.utilities.showNotification('Failed to sign out. Please try again.', 'danger');
       }
     });
   }

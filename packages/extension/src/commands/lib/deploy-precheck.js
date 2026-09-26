@@ -22,12 +22,12 @@
  * The RUNNER is `@omega.js/devkit/deploy-precheck` (one copy for every
  * framework); this file is the extension's STEPS.
  */
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 const { runDeployPrecheck } = require('@omega.js/devkit/deploy-precheck');
 const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { updateManager } = require('./dependencies.js');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 /**
  * The default steps, in order. Named so a test can hand its own recorder in

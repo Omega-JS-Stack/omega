@@ -19,7 +19,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: 'Test Email',
           to: [{ email: `_test-receiver@${config.domain}` }],
         });
@@ -34,7 +34,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: 'Test Email',
           to: [{ email: `_test-receiver@${config.domain}` }],
         });
@@ -51,7 +51,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,
         });
@@ -68,7 +68,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Status Sent',
           to: [{ email: `_test-receiver@${config.domain}`, name: 'Test Receiver' }],
           copy: false,
@@ -94,7 +94,7 @@ module.exports = defineCases({
       async run({ http, assert, config }) {
         const sendAt = Math.floor(Date.now() / 1000) + (72 * 60 * 60);
 
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: '@omega.js/backend Test Email - Status Queued',
           to: [{ email: `_test-receiver@${config.domain}`, name: 'Test Receiver' }],
           copy: false,

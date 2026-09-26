@@ -1,6 +1,6 @@
 /**
  * Ghostii API client — mirror of @omega.js/backend's Ghostii client
- * (@omega.js/backend src/manager/libraries/content/ghostii.js). The SSOT for
+ * (@omega.js/backend src/omega/libraries/content/ghostii.js). The SSOT for
  * the request shape is @omega.js/backend; keep this in sync when it changes.
  *
  * Raw Cloud Functions URL (not api.ghostii.ai) to get the 5-min function
@@ -47,8 +47,8 @@ async function writeArticle({ brandConfig, description, links = [], sourceConten
   const { brand } = brandConfig;
 
   const body = {
-    // Ghostii's LIVE wire contract: its production backend runs legacy BEM,
-    // whose auth reads exactly this payload field. Renames to the omega
+    // Ghostii's LIVE wire contract: its production backend runs an older
+    // backend whose auth reads exactly this payload field. Renames to the omega
     // spelling only when Ghostii itself migrates to the new stack — never
     // "fix" unilaterally (it would break devlog publishing).
     backendManagerKey: process.env.OMEGA_ADMIN_KEY,

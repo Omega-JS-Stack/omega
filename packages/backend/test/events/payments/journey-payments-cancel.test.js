@@ -32,7 +32,7 @@ module.exports = defineCases({
         state.paidProductName = paidProduct.name;
 
         // Create subscription via test intent
-        const response = await http.as('journey-payments-cancel').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-cancel').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
@@ -63,7 +63,7 @@ module.exports = defineCases({
 
         state.eventId1 = `_test-evt-journey-cancel-pending-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId1,
           type: 'customer.subscription.updated',
           data: {
@@ -112,7 +112,7 @@ module.exports = defineCases({
       async run({ http, assert, state, config, payments }) {
         state.eventId2 = `_test-evt-journey-cancel-final-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId2,
           type: 'customer.subscription.deleted',
           data: {

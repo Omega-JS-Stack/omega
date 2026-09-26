@@ -13,7 +13,7 @@ module.exports = defineCases({
     {
       name: 'rejects-unauthenticated',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/payments/trial-eligibility');
+        const response = await http.as('none').get('omega/payments/trial-eligibility');
 
         assert.isError(response, 401, 'Should reject unauthenticated request');
       },
@@ -23,7 +23,7 @@ module.exports = defineCases({
       name: 'eligible-when-no-orders',
       async run({ http, assert }) {
         // Basic user with no subscription history should be eligible
-        const response = await http.as('basic').get('backend-manager/payments/trial-eligibility');
+        const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
         assert.isSuccess(response, 'Should succeed for authenticated user');
         assert.equal(response.data.eligible, true, 'Should be eligible with no order history');
@@ -40,7 +40,7 @@ module.exports = defineCases({
         await firestore.set(orderDocPath, { owner: uid, type: 'subscription', provider: 'test', status: 'cancelled' });
 
         try {
-          const response = await http.as('basic').get('backend-manager/payments/trial-eligibility');
+          const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
           assert.isSuccess(response, 'Should succeed for authenticated user');
           assert.equal(response.data.eligible, false, 'Should be ineligible with subscription history');
@@ -60,7 +60,7 @@ module.exports = defineCases({
         await firestore.set(orderDocPath, { owner: uid, type: 'one-time', provider: 'test', status: 'completed' });
 
         try {
-          const response = await http.as('basic').get('backend-manager/payments/trial-eligibility');
+          const response = await http.as('basic').get('omega/payments/trial-eligibility');
 
           assert.isSuccess(response, 'Should succeed for authenticated user');
           assert.equal(response.data.eligible, true, 'Should be eligible — only non-subscription orders');

@@ -47,7 +47,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -103,7 +103,7 @@ async function rewriteSrcset(value) {
         },
       },
     },
-    dom: () => ({ ready: () => Promise.resolve() }),
+    dom: { ready: () => Promise.resolve() },
   };
 
   // No IntersectionObserver: the module's own fallback loads every matched
@@ -112,9 +112,9 @@ async function rewriteSrcset(value) {
   globalThis.document = { querySelectorAll: () => [element] };
 
   delete require.cache[require.resolve(BUNDLE)];
-  require(BUNDLE).default();
+  require(BUNDLE).default({ omega: globalThis.__omegaClient });
 
-  // The module starts inside omega.dom().ready() — let that microtask land.
+  // The module starts inside omega.dom.ready(): let that microtask land.
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   return element.srcset;

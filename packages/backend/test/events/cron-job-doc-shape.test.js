@@ -4,7 +4,7 @@
  *
  * `docs/routes.md` § "New Cron Job (Consumer Project)" documented a
  * `Job.prototype.main` constructor shape, but the runner does
- * `await handler({ Manager, ctx, context, libraries })` — a job written to the
+ * `await handler({ ctx, omega, context })` — a job written to the
  * doc was called as a plain function, its body never ran, and nothing errored.
  * That is the defect class that made legacy playlisteer's clear-promotions
  * route 500 for years (a pre-BEM export shape meeting a newer middleware).
@@ -19,7 +19,7 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const { loadAndExecuteJobs } = require('../../dist/manager/events/cron/runner.js');
+const { loadAndExecuteJobs } = require('../../dist/omega/cron.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const ROUTES_DOC = path.join(__dirname, '..', '..', 'docs', 'routes.md');
@@ -69,11 +69,11 @@ module.exports = defineCases({
       name: 'the-documented-job-body-executes',
       auth: 'none',
 
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const jobsDir = jetpack.tmpDir({ prefix: 'omega-cron-doc-' }).path();
         jetpack.write(path.join(jobsDir, 'documented-job.js'), documentedCronJob());
 
-        const output = await capturingLogs(() => loadAndExecuteJobs('daily', jobsDir, Manager, {}));
+        const output = await capturingLogs(() => loadAndExecuteJobs('daily', jobsDir, omega, {}));
 
         assert.ok(output.includes(JOB_MARKER), 'the documented job must RUN when the runner calls it — a job the runner cannot call fails silently, exactly as this one did');
         assert.equal(output.includes('Error executing:'), false, `the documented job must not throw: ${output}`);

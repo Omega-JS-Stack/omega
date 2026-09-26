@@ -25,9 +25,9 @@ function withEnv(overrides, fn) {
   }
 }
 
-// The shape getApiUrl() sees at runtime: a context Manager carrying the parsed
-// baked config plus mode-helpers' getEnvironment().
-function fakeManager(environment, ports) {
+// The shape getApiUrl() sees at runtime: a context `Omega` carrying the parsed
+// baked config plus its getEnvironment().
+function fakeOmega(environment, ports) {
   return {
     getEnvironment: () => environment,
     config: {
@@ -46,9 +46,9 @@ module.exports = defineCases({
   description: 'utils/url-helpers: getApiUrl resolves env, then the baked dev.ports, then throws',
   tests: [
     {
-      name: 'exports { attachTo, getApiUrl, localPort, requiredPort }',
+      name: 'exports the plain functions { getApiUrl, localPort, requiredPort }, no mixin',
       run: (ctx) => {
-        ctx.expect(typeof helpers.attachTo).toBe('function');
+        ctx.expect(helpers.attachTo).toBeUndefined();
         ctx.expect(typeof helpers.getApiUrl).toBe('function');
         ctx.expect(typeof helpers.localPort).toBe('function');
         ctx.expect(typeof helpers.requiredPort).toBe('function');
@@ -58,8 +58,8 @@ module.exports = defineCases({
       name: 'a BUMPED baked dev.ports.hosting is the api base in testing',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('testing', { hosting: 5012, auth: 9109 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5012');
+          const omega = fakeOmega('testing', { hosting: 5012, auth: 9109 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
         });
       },
     },
@@ -67,8 +67,8 @@ module.exports = defineCases({
       name: 'a BUMPED baked dev.ports.hosting is the api base in development too',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('development', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5012');
+          const omega = fakeOmega('development', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
         });
       },
     },
@@ -76,8 +76,8 @@ module.exports = defineCases({
       name: 'OMEGA_HOSTING_PORT wins over the baked value',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
-          const manager = fakeManager('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5022');
+          const omega = fakeOmega('testing', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5022');
         });
       },
     },
@@ -91,8 +91,8 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           for (const environment of ['testing', 'development']) {
-            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment))).toThrow(/dev port for `hosting`/);
-            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment))).toThrow(/bundle task/);
+            ctx.expect(() => helpers.getApiUrl(fakeOmega(environment))).toThrow(/dev port for `hosting`/);
+            ctx.expect(() => helpers.getApiUrl(fakeOmega(environment))).toThrow(/bundle task/);
           }
         });
       },
@@ -114,8 +114,8 @@ module.exports = defineCases({
       name: 'OMEGA_HTTPS_PORT means the mkcert proxy is up — https, not hosting',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HTTPS_PORT: '5003' }, () => {
-          const manager = fakeManager('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://localhost:5003');
+          const omega = fakeOmega('testing', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://localhost:5003');
         });
       },
     },
@@ -123,8 +123,8 @@ module.exports = defineCases({
       name: 'a baked dev.ports.https does the same for a browser context',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('testing', { https: 5003, hosting: 5443 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://localhost:5003');
+          const omega = fakeOmega('testing', { https: 5003, hosting: 5443 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://localhost:5003');
         });
       },
     },
@@ -132,8 +132,8 @@ module.exports = defineCases({
       name: 'production ignores every local channel — api.<brand host>',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
-          const manager = fakeManager('production', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://api.playground.omegajs.dev');
+          const omega = fakeOmega('production', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://api.playground.omegajs.dev');
         });
       },
     },

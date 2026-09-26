@@ -140,4 +140,4 @@ In @omega.js/extension's own self-tests, the boot layer points at a hand-authore
 ## See also
 
 - [test-framework.md](test-framework.md) — overall harness, layers, ctx, expect API
-- [environment-detection.md](environment-detection.md) — `Manager.isTesting()` and friends
+- [environment-detection.md](environment-detection.md): `omega.isTesting()` and friends

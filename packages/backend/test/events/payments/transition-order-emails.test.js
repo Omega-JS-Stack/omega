@@ -15,7 +15,7 @@
  * So the transition is driven the way the framework already drives one in a test:
  * the handler module is called DIRECTLY, exactly as
  * `purchase-failed-handler.test.js` and `transition-promo-lines.test.js` do. What
- * changes here is that the email door is NOT swapped — the REAL `Manager.Email()`
+ * changes here is that the email door is NOT swapped — the REAL `ctx.email`
  * runs, through the real brand, the real template data and the real MJML render,
  * and the capture is what the assertions read.
  *
@@ -25,9 +25,9 @@
  * Run: npx omega test framework:events/payments/transition-order-emails
  */
 const assert = require('node:assert');
-const newSubscription = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
-const purchaseCompleted = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
-const checkoutDeclined = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/subscription/checkout-declined.js');
+const newSubscription = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
+const purchaseCompleted = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
+const checkoutDeclined = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/subscription/checkout-declined.js');
 const capture = require('../../../dist/test/utils/email-capture.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -42,15 +42,15 @@ const USER_DOC = {
  * so a test waits for the record the same way the pipeline's own caller would see
  * it land — by looking.
  *
- * @param {object} Manager - The booted Manager whose project owns the store
+ * @param {object} omega - The booted Omega instance whose project owns the store
  * @param {number} count - How many records to wait for
  * @returns {Promise<object[]>} The records, once there are `count` of them
  */
-async function waitForCaptured(Manager, count) {
+async function waitForCaptured(omega, count) {
   const deadline = Date.now() + 10000;
 
   while (Date.now() < deadline) {
-    const records = capture.readCaptured(Manager);
+    const records = capture.readCaptured(omega);
 
     if (records.length >= count) {
       return records;
@@ -59,7 +59,7 @@ async function waitForCaptured(Manager, count) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  throw new Error(`Timed out waiting for ${count} captured email(s); got ${capture.readCaptured(Manager).length}`);
+  throw new Error(`Timed out waiting for ${count} captured email(s); got ${capture.readCaptured(omega).length}`);
 }
 
 module.exports = defineCases({
@@ -71,8 +71,8 @@ module.exports = defineCases({
     {
       name: 'a-new-subscription-emails-the-receipt-that-names-the-plan',
 
-      async run({ Manager, ctx }) {
-        capture.clearCaptured(Manager);
+      async run({ omega, ctx }) {
+        capture.clearCaptured(omega);
 
         const after = {
           product: { id: 'premium', name: 'Premium' },
@@ -94,8 +94,8 @@ module.exports = defineCases({
           ctx,
         });
 
-        const [record] = await waitForCaptured(Manager, 1);
-        const brandName = Manager.config.brand.name;
+        const [record] = await waitForCaptured(omega, 1);
+        const brandName = omega.config.brand.name;
 
         assert.deepEqual(record.to, [USER_DOC.auth.email], 'the receipt goes to the subscriber');
         assert.equal(record.template, 'order', 'on the order template');
@@ -107,15 +107,15 @@ module.exports = defineCases({
         assert.match(record.summary, /Billed monthly/, `and how it bills, got: ${record.summary}`);
         assert.match(record.summary, /Total paid today \$4\.99/, `and what was charged, got: ${record.summary}`);
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
       },
     },
 
     {
       name: 'a-one-time-purchase-emails-the-receipt-that-names-the-product',
 
-      async run({ Manager, ctx }) {
-        capture.clearCaptured(Manager);
+      async run({ omega, ctx }) {
+        capture.clearCaptured(omega);
 
         const after = {
           product: { id: 'credits-100', name: '100 Credits' },
@@ -137,8 +137,8 @@ module.exports = defineCases({
           ctx,
         });
 
-        const [record] = await waitForCaptured(Manager, 1);
-        const brandName = Manager.config.brand.name;
+        const [record] = await waitForCaptured(omega, 1);
+        const brandName = omega.config.brand.name;
 
         assert.deepEqual(record.to, [USER_DOC.auth.email], 'the receipt goes to the buyer');
         assert.equal(record.template, 'order');
@@ -150,15 +150,15 @@ module.exports = defineCases({
         assert.match(record.summary, /One-time purchase/, `and says it is not a subscription, got: ${record.summary}`);
         assert.match(record.summary, /Total paid today \$9\.99/, `and what was charged, got: ${record.summary}`);
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
       },
     },
 
     {
       name: 'a-transition-that-owes-no-email-sends-none',
 
-      async run({ Manager, ctx }) {
-        capture.clearCaptured(Manager);
+      async run({ omega, ctx }) {
+        capture.clearCaptured(omega);
 
         // checkout-declined is log-only on purpose: the customer is standing at the
         // checkout watching the decline, and the dunning copy its cousin sends is
@@ -178,7 +178,7 @@ module.exports = defineCases({
         // inside, which waitForCaptured() measures at well under this.
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        assert.deepEqual(capture.readCaptured(Manager), [], 'a log-only transition emails nobody');
+        assert.deepEqual(capture.readCaptured(omega), [], 'a log-only transition emails nobody');
       },
     },
   ],

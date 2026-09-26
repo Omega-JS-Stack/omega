@@ -1,5 +1,5 @@
 /**
- * Test: the request + headers lines Middleware.process() logs
+ * Test: the request + headers lines the request pipeline logs
  * ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
  *
  * The user projection closed one half of this leak; the request itself was the
@@ -16,10 +16,10 @@
  * directly. The wiring half is proven by the emulator: every authenticated
  * route suite still round-trips green through these same two lines.
  */
-const Middleware = require('../../dist/manager/helpers/middleware.js');
+const redaction = require('../../dist/omega/helpers/log-redaction.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const { redactHeadersForLog, redactDataForLog } = Middleware;
+const { redactHeadersForLog, redactDataForLog } = redaction;
 
 // The credentials, in the shapes the authenticator accepts them.
 const PRIVATE_KEY = 'sk_live_275_private_key_value';
@@ -33,7 +33,7 @@ function serialize(value) {
 }
 
 module.exports = defineCases({
-  description: 'Middleware request log redaction — no credential reaches a log line',
+  description: 'Pipeline request log redaction — no credential reaches a log line',
   type: 'group',
 
   tests: [

@@ -27,6 +27,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { get: _get, set: _set } = require('lodash');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const AUTH_ENTRY = path.join(CORE_DIR, 'js', 'core', 'auth.js');
@@ -53,7 +54,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -81,7 +82,7 @@ function bundleOnce() {
 }
 
 /** One page load: the real gate, a seeded storage tree, the requests it made. */
-async function pageLoad({ account, stored = {}, requestError = null } = {}) {
+async function pageLoad({ user, stored = {}, requestError = null } = {}) {
   await bundleOnce();
 
   const storage = { attribution: {}, consent: {}, trackingConsent: null };
@@ -100,17 +101,17 @@ async function pageLoad({ account, stored = {}, requestError = null } = {}) {
   globalThis.__omegaClient = {
     config: { environment: 'production', analytics: { providers: {} } },
     isDevelopment: () => false,
-    storage: () => ({
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
       // The module's own remove(): set the path to undefined, which is what
       // JSON.stringify drops on the way into localStorage.
       remove: (keyPath) => _set(storage, keyPath, undefined),
-    }),
-    utilities: () => ({
+    },
+    utilities: {
       getContext: () => ({ client: { platform: 'macos' } }),
       showNotification: () => {},
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
       if (requestError) {
@@ -126,16 +127,16 @@ async function pageLoad({ account, stored = {}, requestError = null } = {}) {
   delete require.cache[require.resolve(BUNDLE)];
   const auth = require(BUNDLE);
 
-  await auth.sendUserSignupMetadata(account);
+  await auth.sendUserSignupMetadata(globalThis.__omegaClient, user);
 
   return { requests: requests, marker: _get(storage, MARKER_PATH) };
 }
 
-const UNPROCESSED = { auth: { uid: UID }, flags: { signupProcessed: false } };
-const PROCESSED = { auth: { uid: UID }, flags: { signupProcessed: true } };
+const UNPROCESSED = new User({ flags: { signupProcessed: false } }, { uid: UID });
+const PROCESSED = new User({ flags: { signupProcessed: true } }, { uid: UID });
 
 test('signup gate: an unprocessed doc with no marker posts, and marks the post in flight', async () => {
-  const { requests, marker } = await pageLoad({ account: UNPROCESSED });
+  const { requests, marker } = await pageLoad({ user: UNPROCESSED });
 
   assert.strictEqual(requests.length, 1, 'the first page load after signup still posts');
   assert.strictEqual(requests[0].url, '/omega/user/signup');
@@ -144,7 +145,7 @@ test('signup gate: an unprocessed doc with no marker posts, and marks the post i
 
 test('signup gate: an unprocessed doc posts nothing while the marker is fresh', async () => {
   const { requests, marker } = await pageLoad({
-    account: UNPROCESSED,
+    user: UNPROCESSED,
     stored: { [MARKER_PATH]: Date.now() },
   });
 
@@ -155,7 +156,7 @@ test('signup gate: an unprocessed doc posts nothing while the marker is fresh', 
 test('signup gate: a marker older than the TTL reads as absent — the post goes out again', async () => {
   const expired = Date.now() - (SIGNUP_MARKER_TTL_MS + 1000);
   const { requests, marker } = await pageLoad({
-    account: UNPROCESSED,
+    user: UNPROCESSED,
     stored: { [MARKER_PATH]: expired },
   });
 
@@ -165,7 +166,7 @@ test('signup gate: a marker older than the TTL reads as absent — the post goes
 
 test('signup gate: another user in the same browser is not blocked by the marker', async () => {
   const { requests } = await pageLoad({
-    account: { auth: { uid: 'someone-else' }, flags: { signupProcessed: false } },
+    user: new User({ flags: { signupProcessed: false } }, { uid: 'someone-else' }),
     stored: { [MARKER_PATH]: Date.now() },
   });
 
@@ -173,13 +174,13 @@ test('signup gate: another user in the same browser is not blocked by the marker
 });
 
 test('signup gate: a post that never landed clears the marker — the retry is not blocked', async () => {
-  const network = await pageLoad({ account: UNPROCESSED, requestError: new Error('Failed to fetch') });
+  const network = await pageLoad({ user: UNPROCESSED, requestError: new Error('Failed to fetch') });
   assert.strictEqual(network.requests.length, 1);
   assert.strictEqual(network.marker, undefined, 'a dead network leaves no gate behind');
 
   const serverFault = new Error('Request failed with status 500');
   serverFault.code = 500;
-  const failed = await pageLoad({ account: UNPROCESSED, requestError: serverFault });
+  const failed = await pageLoad({ user: UNPROCESSED, requestError: serverFault });
   assert.strictEqual(failed.marker, undefined, 'a 500 leaves no gate behind either');
 });
 
@@ -187,7 +188,7 @@ test('signup gate: the server\'s "already processed" 400 KEEPS the marker — th
   const alreadyProcessed = new Error('Signup has already been processed');
   alreadyProcessed.code = 400;
 
-  const { requests, marker } = await pageLoad({ account: UNPROCESSED, requestError: alreadyProcessed });
+  const { requests, marker } = await pageLoad({ user: UNPROCESSED, requestError: alreadyProcessed });
 
   assert.strictEqual(requests.length, 1);
   assert.ok(marker, 'the work is done — re-posting would only collect the same 400');
@@ -195,7 +196,7 @@ test('signup gate: the server\'s "already processed" 400 KEEPS the marker — th
 
 test('signup gate: a processed doc posts nothing and clears the marker', async () => {
   const { requests, marker } = await pageLoad({
-    account: PROCESSED,
+    user: PROCESSED,
     stored: { [MARKER_PATH]: Date.now() },
   });
 

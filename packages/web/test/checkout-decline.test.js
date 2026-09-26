@@ -43,7 +43,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -68,11 +68,11 @@ function makeClient({ development, storage }) {
     removals,
     config: { environment: development ? 'development' : 'production' },
     isDevelopment: () => development,
-    storage: () => ({
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
       remove: (keyPath) => { removals.push(keyPath); _set(storage, keyPath, undefined); },
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
       if (client.failRequest) {

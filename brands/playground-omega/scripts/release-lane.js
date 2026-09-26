@@ -38,15 +38,15 @@ function defaultRun(args) {
  * Prepare the playground for a deploy of ONE target: prune its release family.
  *
  * @param {object} ctx - The deploy hook ctx.
- * @param {object} ctx.manager - The target's framework Manager.
+ * @param {object} ctx.build - The target's framework build module.
  * @param {object} options - The lane options.
  * @param {RegExp} options.tagFamily - Which release tags belong to this target (`/^v\d/`, `/^extension-v/`).
  * @param {Function} [options.run] - The `gh` runner (injected by tests).
  * @returns {Promise<void>}
  * @throws {Error} When the brand is not the playground.
  */
-module.exports = async function prepareRelease({ manager }, { tagFamily, run = defaultRun }) {
-  const brandId = manager.getConfig().brand.id;
+module.exports = async function prepareRelease({ build }, { tagFamily, run = defaultRun }) {
+  const brandId = build.getConfig().brand.id;
 
   if (brandId !== BRAND_ID) {
     throw new Error(`scripts/release-lane.js belongs to the playground (brand.id "${BRAND_ID}") and refuses brand "${brandId}": it deletes releases on ${RELEASES_REPO}.`);

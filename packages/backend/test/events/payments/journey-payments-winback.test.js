@@ -20,9 +20,9 @@
  * Run: npx omega test framework:events/payments/journey-payments-winback
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
-const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
+const analytics = require('../../../dist/omega/events/firestore/payments-webhooks/analytics.js');
 
-const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/omega/routes/payments/intent/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
@@ -93,22 +93,22 @@ module.exports = defineCases({
 
     {
       name: 'resubscribe-through-checkout',
-      async run({ assert, Manager, state }) {
-        const user = buildUser(Manager, {
+      async run({ assert, omega, state }) {
+        const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
           // What schemas/payments/intent/post.js resolves a bare checkout request
           // to — the handler receives settings already defaulted, and writes them
           // onto the intent doc as-is.
-          settings: {
+          data: {
             provider: 'test',
             productId: state.productId,
             frequency: state.frequency,

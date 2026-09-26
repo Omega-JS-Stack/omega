@@ -27,7 +27,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 const { resolveWinbackOffer } = require('@omega.js/config/winback');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
@@ -51,7 +51,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -87,7 +87,7 @@ const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
 /** A paying subscriber the save offer can reach: the offer owns this click. */
 function paidAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -95,12 +95,12 @@ function paidAccount(subscription) {
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /** A live trial: #267's warning owns this click. */
 function trialingAccount() {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -108,7 +108,7 @@ function trialingAccount() {
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /**
@@ -237,9 +237,8 @@ async function wireCancelFlow(account, { winback, without = [] } = {}) {
     },
   };
   globalThis.__omegaClient = {
-    auth: () => ({ resolveSubscription: (a) => resolveSubscription(a) }),
-    bindings: () => ({ update: (state) => updates.push(state) }),
-    utilities: () => ({ showNotification: () => {}, escapeHTML: (v) => v }),
+    bindings: { update: (state) => updates.push(state) },
+    utilities: { showNotification: () => {}, escapeHTML: (v) => v },
     request: async (url, options) => {
       requests.push({ url, options });
 
@@ -398,7 +397,7 @@ test('#341: a page missing the fallback dialog falls back to the questionnaire, 
 });
 
 test('#341: a state that cannot cancel is never warned about anything', async () => {
-  const free = await wireCancelFlow({ subscription: { product: { id: 'basic' }, status: 'active' } });
+  const free = await wireCancelFlow(new User({ subscription: { product: { id: 'basic' }, status: 'active' } }, { uid: 'u1' }));
 
   assert.deepStrictEqual(dialogsOwed(free.state()), [], 'a free account has no cancel to warn about');
 

@@ -3,7 +3,7 @@
 // @omega.js/desktop looks for the consumer's `src/integrations/tray/index.js` and calls it with a builder API:
 //
 //   // src/integrations/tray/index.js
-//   module.exports = ({ manager, tray }) => {
+//   module.exports = ({ omega, tray }) => {
 //     tray.icon('src/assets/icons/tray-Template.png');
 //     tray.tooltip('MyApp');
 //
@@ -11,11 +11,11 @@
 //     tray.useDefaults();
 //
 //     // ...or build from scratch:
-//     tray.item({ id: 'open', label: 'Open', click: () => manager.windows.show('main') });
+//     tray.item({ id: 'open', label: 'Open', click: () => omega.windows.show('main') });
 //     tray.separator();
 //     tray.item({ id: 'quit', label: 'Quit', click: () => require('electron').app.quit() });
 //
-//     // Mutate by id (works during definition AND at runtime via `manager.tray.*`):
+//     // Mutate by id (works during definition AND at runtime via `omega.tray.*`):
 //     tray.insertAfter('open', { id: 'preferences', label: 'Preferences...', click: ... });
 //     tray.update('check-for-updates', { label: 'Updates' });
 //     tray.remove('website');
@@ -28,12 +28,12 @@
 //   tray.useDefaults()        — populate with @omega.js/desktop's default template
 //   tray.clear()              — start over
 //
-// Id-path API (during definition AND at runtime via `manager.tray.*`):
+// Id-path API (during definition AND at runtime via `omega.tray.*`):
 //   .find / .has / .update / .remove / .enable / .show / .hide /
 //   .insertBefore / .insertAfter / .appendTo
 //
 // Items support dynamic labels (function) and dynamic enabled/visible/checked.
-// Call `manager.tray.refresh()` after mutating state to re-render the menu.
+// Call `omega.tray.refresh()` after mutating state to re-render the menu.
 //
 // Default template ids (flat — no `tray/` prefix; the lib namespace is implicit):
 //   title              — disabled label showing the app name
@@ -42,7 +42,7 @@
 //   website            — opens brand.url in external browser (only if configured)
 //   quit               — quits the app
 //
-// Disabling at runtime: call `manager.tray.disable()` from anywhere in main —
+// Disabling at runtime: call `omega.tray.disable()` from anywhere in main,
 // idempotent, tears down any existing Tray + clears items. There is no config
 // flag for this; default is "enabled, looks at the conventional path."
 
@@ -56,7 +56,7 @@ const logger = new LoggerLite('tray');
 
 const tray = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _tray:        null,    // electron Tray instance
   _items:       [],      // raw item descriptors
   _icon:        null,    // resolved abs path
@@ -64,15 +64,15 @@ const tray = {
   _electron:    null,
   _definitionFn: null,   // consumer's exported fn (or null)
 
-  initialize(manager) {
+  initialize(omega) {
     if (tray._initialized) {
       return;
     }
 
-    tray._manager = manager;
+    tray._omega = omega;
 
     if (tray._disabled) {
-      logger.log('initialize — disabled via manager.tray.disable() called pre-init');
+      logger.log('initialize — disabled via omega.tray.disable() called pre-init');
       tray._initialized = true;
       return;
     }
@@ -87,7 +87,7 @@ const tray = {
 
     if (fs.existsSync(absPath)) {
       const loadConsumerFile = require('../utils/load-consumer-file.js');
-      const loaded = loadConsumerFile(absPath, logger);
+      const loaded = loadConsumerFile(absPath);
       if (typeof loaded === 'function') {
         tray._definitionFn = loaded;
       } else if (loaded != null) {
@@ -103,7 +103,7 @@ const tray = {
 
     if (tray._definitionFn) {
       try {
-        tray._definitionFn({ manager, tray: builder });
+        tray._definitionFn({ omega, tray: builder });
       } catch (e) {
         logger.error('tray definition fn threw:', e);
       }
@@ -116,14 +116,14 @@ const tray = {
     // back to sensible framework defaults so a consumer file is truly optional —
     // someone with no `src/integrations/tray/index.js` still gets a working tray.
     if (!tray._icon)    tray._icon    = tray._defaultIconPath();
-    if (!tray._tooltip) tray._tooltip = manager.config.app?.productName || manager.config.brand.name;
+    if (!tray._tooltip) tray._tooltip = omega.config.app?.productName || omega.config.brand.name;
 
     // Create the Tray now that items/icon/tooltip are in place.
     tray._render();
 
     // Reflect current auto-updater state into the tray check-for-updates item if present.
-    if (manager.autoUpdater._updateTrayItem) {
-      manager.autoUpdater._updateTrayItem();
+    if (omega.autoUpdater._updateTrayItem) {
+      omega.autoUpdater._updateTrayItem();
     }
 
     logger.log(`initialize — items=${tray._items.length} icon=${tray._icon || '(none)'}`);
@@ -207,9 +207,9 @@ const tray = {
 
   // Default template — id-tagged so consumers can target each item.
   _defaultTemplate() {
-    const m = tray._manager;
-    const productName = m.config.app?.productName || m.config.brand.name;
-    const brandUrl    = m.config.brand.url || null;
+    const omega = tray._omega;
+    const productName = omega.config.app?.productName || omega.config.brand.name;
+    const brandUrl    = omega.config.brand.url || null;
 
     const items = [
       { id: 'title', label: productName, enabled: false },
@@ -218,17 +218,17 @@ const tray = {
         id: 'open',
         label: `Open ${productName}`,
         click: () => {
-          m.windows.show('main');
+          omega.windows.show('main');
         },
       },
       {
         id: 'check-for-updates',
         label: 'Check for Updates...',
         click: () => {
-          if (!m || !m.autoUpdater) return;
-          const status = m.autoUpdater.getStatus();
-          if (status.code === 'downloaded') m.autoUpdater.installNow();
-          else m.autoUpdater.checkNow({ userInitiated: true });
+          if (!omega || !omega.autoUpdater) return;
+          const status = omega.autoUpdater.getStatus();
+          if (status.code === 'downloaded') omega.autoUpdater.installNow();
+          else omega.autoUpdater.checkNow({ userInitiated: true });
         },
       },
     ];
@@ -241,7 +241,7 @@ const tray = {
           const { shell } = require('electron');
           // Route through getWebsiteUrl() so dev runs open localhost:4000 instead
           // of punching out to the live brand site.
-          const safe = sanitizeURL(m.getWebsiteUrl());
+          const safe = sanitizeURL(omega.getWebsiteUrl());
           if (safe) shell.openExternal(safe);
         },
       });
@@ -349,7 +349,7 @@ const tray = {
       throw new Error('tray.define: fn must be a function');
     }
     tray._items = [];
-    fn({ manager: tray._manager, tray: tray._buildBuilder() });
+    fn({ omega: tray._omega, tray: tray._buildBuilder() });
     tray._render();
   },
 
@@ -391,7 +391,7 @@ const tray = {
   // Disable the tray entirely. Idempotent. Safe to call before OR after initialize:
   //   - Pre-init: marks the lib as disabled, initialize() short-circuits.
   //   - Post-init: tears down the live Tray + clears items.
-  // No way to re-enable after disable() — call manager.tray.define() if you want a fresh
+  // No way to re-enable after disable(): call omega.tray.define() if you want a fresh
   // tray, then it'll re-render on next refresh.
   disable() {
     tray._disabled = true;
@@ -405,7 +405,7 @@ const tray = {
   isDisabled() { return Boolean(tray._disabled); },
 };
 
-// Mix the id-path API onto the singleton so `manager.tray.update(...)` works at runtime.
+// Mix the id-path API onto the singleton so `omega.tray.update(...)` works at runtime.
 Object.assign(tray, buildIdApi({
   getItems: () => tray._items,
   render:   () => tray._render(),

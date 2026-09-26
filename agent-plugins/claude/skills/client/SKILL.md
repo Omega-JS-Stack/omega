@@ -1,12 +1,12 @@
 ---
 name: client
-description: Use when working in @omega.js/client or on any frontend behavior it owns — the runtime singleton, auth state, data-omega-bind bindings, the Firestore, storage, notifications and Sentry modules, omega.request(), verts, icons, motion, or anything in packages/client/.
+description: Use when working in @omega.js/client or on any frontend behavior it owns: the browser base class, auth and the User, data-omega-bind bindings, the Firestore, storage, notifications and Sentry modules, omega.request(), verts, icons, motion, or anything in packages/client/.
 user-invocable: true
 ---
 
 # OMEGA Client (@omega.js/client)
 
-`@omega.js/client` is the runtime singleton every frontend framework embeds — `@omega.js/web` ships it into each page, `@omega.js/desktop` runs it in the renderer, `@omega.js/extension` runs it in every context. One `import omega from '@omega.js/client'` returns the same already-initialized `Manager`, owning storage, auth, bindings, firestore, notifications, service-worker, sentry, dom, utilities, device, request, and verts, alongside the transport-free `icon-core`, `icon-renderer`, and `motion` modules the frameworks boot themselves. It is a library, not an app: real behavior is proved from inside a consuming framework.
+`@omega.js/client` exports the browser base class `Omega` and no instance. Each frontend framework subclasses it and exports the one ready-made `omega`: `@omega.js/web/runtime` for every page, `@omega.js/desktop/renderer` in the renderer, and `@omega.js/extension/{popup,sidepanel,options,page}` in the four page contexts. The instance carries storage, auth, bindings, firestore, notifications, serviceWorker, sentry, dom, utilities, device, request, verts, triggers, icons and motion as plain properties (`omega.auth.user`, `omega.utilities.escapeHTML()`), and `omega.auth.user` is always a `User` from `@omega.js/account`. It is a library, not an app: real behavior is proved from inside a consuming framework.
 
 ## Where the knowledge lives
 
@@ -17,8 +17,8 @@ This skill routes; the docs are the source of truth. Read the guide BEFORE touch
 
 ## Non-negotiables
 
-- **Singleton, always.** Never `new Manager()`, never pass the instance through function params or module-level variables.
+- **One instance per surface, built by its framework.** A consumer never writes `new`; every client module receives the instance in its constructor (`new Auth(omega)`), and nothing imports a live instance from `@omega.js/client`. Accessors are properties, never zero-arg methods.
 - **Keep Firebase imports lazy** — the dynamic imports are what keeps consumer bundles small; do not convert them to static imports.
-- **`resolveSubscription()` stays unified with `@omega.js/backend`'s `User.resolveSubscription()`** — subscription-state logic is identical frontend and backend, so a change here is a cross-stack change.
+- **The `User` class is shared with `@omega.js/backend`.** `@omega.js/account` owns it: the same getters (`plan`, `active`, `trialing`, `cancelling`, `everPaid`) answer on both sides, so a change to subscription-state logic is a cross-stack change.
 - **The runtime is what makes the page paint contract possible** — bindings fill at auth settle, `bindings.update()` defers by ROOT key, and `FormManager`'s gates hold a submit control until its answers land. Read `docs/web/page-contract.md` before changing any of the three.
 - **Prove changes from a consumer.** `npm run prepare` plus the package tests are necessary, not sufficient; verify end to end inside a linked web, desktop, or extension app (`docs/shared/local-dev.md`).

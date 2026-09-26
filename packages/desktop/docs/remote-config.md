@@ -17,7 +17,7 @@ remoteConfig: {
 
 ## Cadence
 
-Polled at the same interval as the auto-updater feed-check (`autoUpdater.feedCheckIntervalMs`, default 1h). Same job category (HTTP, low-frequency, network-dependent), so re-using the cadence keeps both poll-rates aligned. Fetch timeout is 60s; in tests both collapse to 500ms via `manager.isTesting()`.
+Polled at the same interval as the auto-updater feed-check (`autoUpdater.feedCheckIntervalMs`, default 1h). Same job category (HTTP, low-frequency, network-dependent), so re-using the cadence keeps both poll-rates aligned. Fetch timeout is 60s; in tests both collapse to 500ms via `omega.isTesting()`.
 
 ## Defaults — `get()` always returns SOMETHING usable
 
@@ -28,7 +28,7 @@ A key design point: **app boot never blocks on the fetch**. `initialize()` retur
 3. **Async, on the first successful background fetch:** server values overlay the defaults.
 4. **Async, on every subsequent successful fetch:** repeats step 3, fires `'update'` event so consumers can re-run gates.
 
-Defaults (exported as `manager.remoteConfig.DEFAULTS`):
+Defaults (exported as `omega.remoteConfig.DEFAULTS`):
 
 ```js
 {
@@ -59,10 +59,10 @@ function checkForceUpdate(cfg) {
 }
 
 // Run at boot — works against defaults / cached value / first fetch result, whatever's there.
-checkForceUpdate(manager.remoteConfig.get());
+checkForceUpdate(omega.remoteConfig.get());
 
 // Re-run on every fresh fetch so a server-side bump kicks in within an hour.
-manager.remoteConfig.on('update', checkForceUpdate);
+omega.remoteConfig.on('update', checkForceUpdate);
 ```
 
 ## Failure mode
@@ -74,11 +74,11 @@ Failure warnings are formatted through `src/utils/format-fetch-error.js` — one
 ## API
 
 ```js
-manager.remoteConfig.get();                     // → entire current config (cache-first, never blocks)
-manager.remoteConfig.get('versionRequired');    // → dot-path lookup
-manager.remoteConfig.get('settings.deep.path'); // → nested
-manager.remoteConfig.refreshNow();              // → force a fetch right now (returns Promise<data | null>)
-const off = manager.remoteConfig.on('update', (data) => { ... });
+omega.remoteConfig.get();                     // → entire current config (cache-first, never blocks)
+omega.remoteConfig.get('versionRequired');    // → dot-path lookup
+omega.remoteConfig.get('settings.deep.path'); // → nested
+omega.remoteConfig.refreshNow();              // → force a fetch right now (returns Promise<data | null>)
+const off = omega.remoteConfig.on('update', (data) => { ... });
 off();                                          // unsubscribe
 ```
 

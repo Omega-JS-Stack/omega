@@ -35,7 +35,7 @@ module.exports = defineCases({
         state.paidProductName = paidProduct.name;
 
         // Create subscription via test intent
-        const response = await http.as('journey-payments-failure').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-failure').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
@@ -65,7 +65,7 @@ module.exports = defineCases({
 
         // Send invoice.payment_failed with subscription billing reason
         // This tests the new parseWebhook routing: billing_reason=subscription_cycle → subscription category
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'invoice.payment_failed',
           data: {

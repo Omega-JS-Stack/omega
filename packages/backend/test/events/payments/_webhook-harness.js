@@ -11,7 +11,7 @@
  *
  * `_`-prefixed, so the runner never discovers it as a suite.
  */
-const onWrite = require('../../../dist/manager/events/firestore/payments-webhooks/on-write.js');
+const onWrite = require('../../../dist/omega/events/firestore/payments-webhooks/on-write.js');
 
 // A contended transaction re-runs; a stand-in that re-ran forever would hang a suite
 // instead of failing it. Firestore's own client gives up too.
@@ -245,7 +245,7 @@ function subscriptionPayload({ uid, orderId, resourceId }) {
  * @param {string|function|null} options.failPath - The document path whose write rejects, or a
  *   `(path, data) => boolean` predicate
  * @param {string[]} [options.authUids] - The uids that have a Firebase auth user (default: the subscriber, as every real one does)
- * @param {boolean} [options.reporting] - Whether a Sentry handle is configured at all (false = no DSN, `libraries.sentry` is null)
+ * @param {boolean} [options.reporting] - Whether a Sentry handle is configured at all (false = no DSN, `omega.sentry` is null)
  * @param {string} [options.provider] - The provider library the event loads (default: the test provider; a real one lets a suite stub its API at the transport boundary)
  * @param {number|null} [options.receivedUNIX] - The second the event ARRIVED (`metadata.created`), which is the staleness clock the pipeline compares against the order
  * @param {boolean} [options.previouslyCompleted] - Whether this doc already completed once (a redelivery, or the retry sweep re-flipping it)
@@ -273,17 +273,17 @@ async function runTrigger({ uid, orderId, resourceId, eventId, eventType = 'cust
   const logs = [];
 
   // The error reporter is an external SINK, recorded rather than run — the same
-  // treatment the route harness gives `res`. `libraries.sentry` IS the backend's
-  // one capture handle (helpers/context/respond.js reads exactly this), and it is
+  // treatment the route harness gives `res`. `omega.sentry` IS the backend's
+  // one capture handle (context/respond.js reads exactly this), and it is
   // null whenever no DSN is configured, which `reporting: false` reproduces.
   const captures = [];
   const sentry = reporting
     ? { captureMessage: (message, context) => captures.push({ message, ...context }) }
     : null;
 
-  const Manager = { config: CONFIG, libraries: { admin, sentry } };
+  const omega = { config: CONFIG, firebase: { admin }, sentry };
   const ctx = {
-    Manager,
+    omega,
     isTesting: () => true,
     log: (...args) => logs.push(args.join(' ')),
     warn: (...args) => logs.push(args.join(' ')),

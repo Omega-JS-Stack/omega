@@ -13,13 +13,13 @@ const os = require('os');
 const jetpack = require('fs-jetpack');
 
 const SRC = path.join(__dirname, '..', '..', '..');
-const Manager = require(path.join(SRC, 'build.js'));
+const build = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
 const { deployPrecheck } = require(path.join(SRC, 'commands', 'lib', 'deploy-precheck.js'));
 const cli = require(path.join(SRC, 'cli.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 // A consumer whose peer deps are already satisfied — the steady state.
 function stageConsumer(dir) {

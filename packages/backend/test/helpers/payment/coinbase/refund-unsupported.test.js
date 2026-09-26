@@ -17,8 +17,8 @@
  *
  * Run: npx omega test backend:helpers/payment/coinbase/refund-unsupported
  */
-const { oneTimeRefundRefusal } = require('../../../../dist/manager/libraries/payment/refund-policy.js');
-const refundProvider = require('../../../../dist/manager/routes/payments/refund/providers/coinbase.js');
+const { oneTimeRefundRefusal } = require('../../../../dist/omega/libraries/payment/refund-policy.js');
+const refundProvider = require('../../../../dist/omega/routes/payments/refund/providers/coinbase.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 /** A completed one-time order, the shape the webhook pipeline writes */

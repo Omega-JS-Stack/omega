@@ -12,8 +12,8 @@
  */
 const path = require('path');
 const { loadConfig } = require('../../dist/vendor/config/index.js');
-const { resolveSignupLimit, DEFAULT_MAX_SIGNUPS_PER_DAY } = require('../../dist/manager/events/auth/utils.js');
-const beforeCreate = require('../../dist/manager/events/auth/before-create.js');
+const { resolveSignupLimit, DEFAULT_MAX_SIGNUPS_PER_DAY } = require('../../dist/omega/events/auth/utils.js');
+const beforeCreate = require('../../dist/omega/events/auth/before-create.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A signup event driven straight through the REAL before-create, with ONE seam:
@@ -32,14 +32,15 @@ function runBeforeCreate(consume) {
   const record = (...args) => lines.push(args.join(' '));
 
   const counter = {
-    attach: () => counter,
+    configure: () => counter,
     forKey: () => counter,
     consume: consume,
   };
 
-  const Manager = { config: {}, Usage: () => counter };
+  const omega = { config: {}, firebase: { functions: { auth: { HttpsError } } } };
 
   const ctx = {
+    usage: counter,
     log: record,
     debug: record,
     warn: record,
@@ -52,15 +53,14 @@ function runBeforeCreate(consume) {
   };
 
   return beforeCreate({
-    Manager,
     ctx,
+    omega,
     user: { uid: 'user-647', email: 'someone@example.com' },
     context: { ipAddress: '203.0.113.7' },
-    libraries: { functions: { auth: { HttpsError } } },
   });
 }
 
-// The framework-defaults layer the Manager resolves at boot
+// The framework-defaults layer the Omega instance resolves at boot
 const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 
 module.exports = defineCases({

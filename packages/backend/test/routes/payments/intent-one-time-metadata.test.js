@@ -14,8 +14,8 @@
  *
  * Run: npx omega test backend:routes/payments/intent-one-time-metadata
  */
-const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const stripeIntent = require('../../../dist/manager/routes/payments/intent/providers/stripe.js');
+const StripeLib = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const stripeIntent = require('../../../dist/omega/routes/payments/intent/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-intent-metadata-uid';
@@ -65,7 +65,7 @@ function sdkCapturing(captured) {
 function buildCtx() {
   return {
     log: () => {},
-    getUser: () => ({ auth: { email: `${UID}@example.com` } }),
+    user: { auth: { email: `${UID}@example.com` } },
   };
 }
 

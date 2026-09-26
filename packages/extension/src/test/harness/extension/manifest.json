@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "BXM Test Harness",
+  "name": "OMEGA Test Harness",
   "version": "1.0.0",
   "description": "Loaded by the chromium runner to host background + view layer tests.",
   "background": {
@@ -8,7 +8,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BXM Test Harness"
+    "default_title": "OMEGA Test Harness"
   },
   "options_ui": {
     "page": "options.html",

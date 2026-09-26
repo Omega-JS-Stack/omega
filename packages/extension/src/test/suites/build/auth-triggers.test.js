@@ -3,9 +3,10 @@
 // `omega-signin` and `omega-account` are the extension's OWN triggers (only an
 // extension opens a brand page in a tab), registered on @omega.js/client's shared
 // registry instead of the delegated `document` click listener auth-helpers used
-// to roll itself. auth-helpers.js is a browser-context ES module (it imports the
-// client by bare specifier), so the wiring is pinned by SOURCE — the same model
-// as global-handlers / cache-warming / verts-binding.
+// to roll itself. The registry is the page context's own `omega.triggers`, and
+// both triggers open the brand site through `omega.auth.openPage()`. The wiring
+// is pinned by SOURCE, the same model as global-handlers / cache-warming /
+// verts-binding.
 //
 // The whole class of regression is covered, not just the rename: a legacy class
 // name anywhere in the source, or a hand-rolled listener coming back, both fail.
@@ -24,13 +25,14 @@ module.exports = defineCases({
   description: 'click triggers: omega-signin / omega-account ride the shared registry (#16, #122)',
   tests: [
     {
-      name: 'setupAuthEventListeners registers the `signin` trigger, no hand-rolled listener',
+      name: 'setupAuthEventListeners registers the `signin` trigger on omega.triggers, no hand-rolled listener',
       run: (ctx) => {
-        ctx.expect(AUTH_HELPERS.includes("import { registerTrigger } from '@omega.js/client/modules/triggers.js'")).toBe(true);
+        // The instance's registry, never an imported one
+        ctx.expect(AUTH_HELPERS.includes('registerTrigger')).toBe(false);
+        ctx.expect(AUTH_HELPERS.includes('modules/triggers.js')).toBe(false);
 
         const fnSource = AUTH_HELPERS.slice(AUTH_HELPERS.indexOf('export function setupAuthEventListeners'));
-        ctx.expect(fnSource.includes("registerTrigger('signin'")).toBe(true);
-        ctx.expect(fnSource.includes('openAuthPage(context)')).toBe(true);
+        ctx.expect(fnSource.includes("omega.triggers.register('signin', () => omega.auth.openPage());")).toBe(true);
         // The trigger class is the registry's to spell — never written by hand.
         ctx.expect(fnSource.includes('omega-signin')).toBe(false);
         ctx.expect(fnSource.includes('addEventListener')).toBe(false);
@@ -40,11 +42,17 @@ module.exports = defineCases({
       name: 'setupAuthEventListeners registers the `account` trigger, opening /account on the brand site',
       run: (ctx) => {
         const fnSource = AUTH_HELPERS.slice(AUTH_HELPERS.indexOf('export function setupAuthEventListeners'));
-        ctx.expect(fnSource.includes("registerTrigger('account'")).toBe(true);
         // Same resolver as signin: brand.url + tabs.create, only the path differs.
-        ctx.expect(fnSource.includes("openAuthPage(context, { path: '/account' })")).toBe(true);
+        ctx.expect(fnSource.includes("omega.triggers.register('account', () => omega.auth.openPage({ path: '/account' }));")).toBe(true);
         // The trigger class is the registry's to spell — never written by hand.
         ctx.expect(fnSource.includes('omega-account')).toBe(false);
+      },
+    },
+    {
+      // The page contexts register the triggers once they boot
+      name: 'the page class wires the triggers with its own instance',
+      run: (ctx) => {
+        ctx.expect(fs.readFileSync(path.join(SRC, 'page-context.js'), 'utf8').includes('setupAuthEventListeners(this);')).toBe(true);
       },
     },
     {

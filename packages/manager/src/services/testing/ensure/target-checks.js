@@ -19,10 +19,9 @@
  * drill-down works unchanged. Data problems roll up honestly: any failed
  * check → error, any warning → warned.
  *
- * omega-manager deltas: build.json check stays behind (a UJM artifact —
- * @omega.js/web has no build manifest); the stash check stays behind (nothing
- * stashes in the new update service); GitHub Actions is repo-level (one repo
- * per brand, not one per target).
+ * Not checked: a build.json (@omega.js/web has no build manifest); a stash (nothing
+ * stashes in the update service); GitHub Actions per target (Actions are
+ * repo-level: one repo per brand, not one per target).
  */
 const chalk = require('chalk').default;
 

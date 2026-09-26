@@ -71,7 +71,7 @@
   // App/cloud platform role (provider-discriminated). `config` is the Firebase web
   // SDK config — copy directly from Firebase Console → Project Settings → SDK setup
   // (Config option). Same shape every OMEGA target reads.
-  // Empty config {} disables Firebase Auth in the renderer (client-bridge logs a warn).
+  // Empty config {} disables Firebase Auth in the renderer (the auth lib logs a warn).
   cloud: {
     provider: 'firebase',
     config: {
@@ -87,7 +87,7 @@
   },
 
   // Appearance — the app's DEFAULT theme. 'system' follows the OS preference live;
-  // 'light'/'dark' are explicit overrides. A user's runtime choice (manager.theme.set
+  // 'light'/'dark' are explicit overrides. A user's runtime choice (omega.theme.set
   // or the [data-omega-theme-set] controls) persists in storage and wins over this on
   // every boot. See docs/themes.md.
   theme: {
@@ -234,8 +234,8 @@
       //   src/integrations/tray/index.js
       //   src/integrations/menu/index.js
       //   src/integrations/context-menu/index.js
-      // To disable at runtime: call `manager.tray.disable()` / `manager.menu.disable()` /
-      // `manager.contextMenu.disable()` from your main entry. Idempotent.
+      // To disable at runtime: call `omega.tray.disable()` / `omega.menu.disable()` /
+      // `omega.contextMenu.disable()` from your main entry. Idempotent.
 
       // Startup behavior — two independent knobs.
       //
@@ -263,7 +263,7 @@
         },
       },
       // No `windows` block needed — @omega.js/desktop no longer auto-creates windows. Your main.js
-      // calls `manager.windows.create('main', { width: 1280, height: 800, ... })` when
+      // calls `omega.windows.create('main', { width: 1280, height: 800, ... })` when
       // you want UI to surface. Defaults baked in:
       //   main      → { width: 1024, height: 720, hideOnClose: true,  view: 'main' }
       //   any other → { width: 800,  height: 600, hideOnClose: false, view: name   }
@@ -282,9 +282,9 @@
       },
       // Deep links: scheme is automatically `<brand.id>://...`. Built-in routes:
       //   auth/token  → @omega.js/client auth token handoff
-      //   app/show    → manager.windows.show(query.window || 'main')
+      //   app/show    → omega.windows.show(query.window || 'main')
       //   app/quit    → app.quit()
-      // Add custom routes at runtime: manager.deepLink.on('my-route', (ctx) => {...}) in main.
+      // Add custom routes at runtime: omega.deepLink.on('my-route', (ctx) => {...}) in main.
 
       // "Hot config" — JSON document fetched from the brand site so app behavior
       // can be flipped without shipping a new build (e.g. force-update gate, ads

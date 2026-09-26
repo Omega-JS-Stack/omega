@@ -1,10 +1,10 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('publish');
-const chromeLogger = Manager.logger('publish:chrome');
-const firefoxLogger = Manager.logger('publish:firefox');
-const edgeLogger = Manager.logger('publish:edge');
-const argv = Manager.getArguments();
+const build = require('../../build.js');
+const logger = build.logger('publish');
+const chromeLogger = build.logger('publish:chrome');
+const firefoxLogger = build.logger('publish:firefox');
+const edgeLogger = build.logger('publish:edge');
+const argv = build.getArguments();
 const { series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
@@ -15,7 +15,7 @@ const { FORMATS } = require('@omega.js/config');
 const { shipPlan, missingShipKeys, shipKeyRefusal, listingManualStep } = require('@omega.js/devkit/ship-plan');
 
 // Load package
-const project = Manager.getPackage('project');
+const project = build.getPackage('project');
 
 // Helper to parse browser filter from --browser flag or OMEGA_BROWSER env var
 // Returns array of browser names to publish to, or null for all
@@ -76,7 +76,7 @@ function targetName() {
 
 // The resolved config every store lane reads its listing id from (#893).
 function resolveConfig(options) {
-  return (options && options.config) || Manager.getConfig();
+  return (options && options.config) || build.getConfig();
 }
 
 // The store's own id, or a refusal naming the ONE place it is declared. Chrome
@@ -376,7 +376,7 @@ async function publishToGitHubRelease(options) {
   const { gh } = require('@omega.js/devkit/github-repo');
   const { releasesRepo, targetNameFromDir } = require('@omega.js/config');
 
-  const config = options.config || Manager.getConfig();
+  const config = options.config || build.getConfig();
   const releases = releasesRepo(config);
 
   // Half an address publishes nowhere: this is the address a download button on

@@ -1,6 +1,6 @@
 /**
  * Service-worker build step + build-meta emission (the master-service-worker
- * successor's plumbing half; the browser half lives in sw/manager.js).
+ * successor's plumbing half; the browser half lives in sw/omega.js).
  *
  * Every build — dev included — emits to the site root:
  *   /service-worker.js  - esbuild iife bundle of the consumer's
@@ -138,7 +138,7 @@ async function buildServiceWorker(options) {
     // Classic worker script — importScripts() only exists outside module workers
     format: 'iife',
     outfile: path.join(options.outDir, 'service-worker.js'),
-    alias: { '@omega.js/web/service-worker': path.resolve(FRAMEWORK_ROOT, 'sw', 'manager.js') },
+    alias: { '@omega.js/web/service-worker': path.resolve(FRAMEWORK_ROOT, 'sw', 'omega.js') },
     define: {
       'process.env.NODE_ENV': options.dev ? '"development"' : '"production"',
       __OMEGA_FIREBASE_VERSION__: JSON.stringify(resolveFirebaseVersion(options.clientEntry)),

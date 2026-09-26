@@ -21,7 +21,7 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`), a comprehensi
 
 ## 🚨 READ @omega.js/client TOO
 
-**OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context (background service worker, popup, options, sidepanel, content scripts).**
+**OMEGA Extension ships `@omega.js/client` in its page contexts: the popup, options, sidepanel and page instances extend the client's base class, so `omega.auth`, `omega.storage`, `omega.bindings` and the rest are properties of the one `omega` each context imports.** The background service worker carries its own `omega.auth` (the source of truth the page contexts sync with over `omega.messenger`); content and offscreen have no auth.
 - It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
 - Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
 
@@ -53,7 +53,7 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 
 ## Where things live
 
-- `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here; they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
+- `config/omega.json5`: the single OMEGA config (JSON5), with shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `require('@omega.js/extension/build').getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here; they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
   - What the extension SHIPS is one declaration: `platforms.<chrome|firefox|edge>.formats.<zip|store>`. Presence = enabled, every browser and format is on by default, and `false` drops one (`edge: false`). Edge ships the chrome build.
 - `config/messages.json`: i18n source. Auto-translated at build time to the languages in `translation.languages` (omega.json5); only missing keys regenerated, cache committed under `translations/`.
 - `config/description.md`: store-listing description (used by the publish step).
@@ -64,7 +64,7 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 - `src/views/<context>/index.html`: per-context HTML (popup / options / sidepanel / pages).
 - `src/assets/js/components/<context>/index.js`: per-context script entry. One-line bootstrap of `@omega.js/extension/<context>`.
 - `src/assets/css/components/<context>/index.scss`: per-context styles.
-- `src/assets/js/components/background.js`: MV3 service worker entry. Source of truth for auth + messaging.
+- `src/assets/js/components/background/index.js`: MV3 service worker entry. Source of truth for auth + messaging.
 - `hooks/build/{pre,post}.js`: optional lifecycle hooks.
 - `test/**/*.js`: your project test suites (framework auto-runs them alongside its own).
 
@@ -72,32 +72,33 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 
 ```js
 // src/assets/js/components/popup/index.js
-import Manager from '@omega.js/extension/popup';
-await new Manager().initialize();
+import omega from '@omega.js/extension/popup';
+await omega.initialize();
 
-// src/assets/js/components/background.js  (service worker)
-import Manager from '@omega.js/extension/background';
-await new Manager().initialize();
+// src/assets/js/components/background/index.js  (service worker)
+import omega from '@omega.js/extension/background';
+await omega.initialize();
 
 // Same shape for options / sidepanel / content / page / offscreen
 ```
 
 ## Available APIs at runtime
 
-After `initialize()`, every Manager exposes:
-- `manager.extension`: cross-browser `chrome.*` / `browser.*` / `window.*` wrapper
-- `manager.logger`: timestamped per-context logger
-- `manager.omega`: Web Manager singleton (Firebase, auth, analytics, reactive `data-omega-bind` directives)
-- `manager.messenger`: `chrome.runtime.onMessage` listener wired automatically
-- `manager.isDevelopment()` / `isProduction()` / `isTesting()` / `getVersion()`: cross-context helpers. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive; testing wins). Gate side effects on the intentional check (`isProduction()` for prod-only; `isDevelopment() || isTesting()` for local-or-test), never `!isDevelopment()`.
+Each context module's default export is ONE ready-made instance, `omega`; a consumer never writes `new`. After `initialize()` (or `await omega.ready`), every context's `omega` carries:
+- `omega.extension`: cross-browser `chrome.*` / `browser.*` / `window.*` wrapper
+- `omega.logger`: timestamped per-context logger
+- `omega.messenger`: the one lane between contexts (`send({ destination, command, payload })`, `onMessage(handler)`)
+- `omega.config`, `omega.version`, `omega.getApiUrl()`
+- `omega.isDevelopment()` / `isProduction()` / `isTesting()`: cross-context helpers. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive; testing wins). Gate side effects on the intentional check (`isProduction()` for prod-only; `isDevelopment() || isTesting()` for local-or-test), never `!isDevelopment()`.
 
-Auth UI is declarative: add `.omega-signin` / `.omega-signout` / `.omega-account` to buttons; the framework wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user"`.
+The page contexts (popup, options, sidepanel, page) also carry the client's modules (`omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore`, `omega.analytics`, ...). `omega.auth.user` is always a `User` (`authenticated`, `plan`, `active`, `profile.displayName`); `omega.auth.openPage()` opens the brand site's sign-in page in a new tab. Background's `omega.auth.user` is the same `User`, built from the account the page contexts push.
+
+Auth UI is declarative: add `.omega-signin` / `.omega-signout` / `.omega-account` to buttons; the framework wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user.authenticated"`.
 
 ## Dependency resolution
 
 - **Do NOT install framework dependencies directly** (`firebase`, `@omega.js/client`, etc.). The framework's bundler resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in the framework's declared dependencies, not your `package.json`.
-- **@omega.js/client owns Firebase.** Never `import firebase from 'firebase/app'`. Use `import omega from '@omega.js/client'` → `omega.auth()`, `omega.firestore()`.
-- **`Manager.require(name)`** resolves from the framework's module context at runtime for unbundled code (gulp tasks, test fixtures).
+- **@omega.js/client owns Firebase.** Never `import firebase from 'firebase/app'`. Use the context's instance: `omega.auth`, `omega.firestore`.
 
 ## Testing
 

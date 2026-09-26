@@ -23,8 +23,8 @@
  *   4. Chrome loads the built extension unpacked. A tab lands on the brand host
  *      carrying `?authToken=…` — the REAL sign-in path — and the background SW's
  *      tab watcher signs itself in with `signInWithCustomToken`.
- *   5. From the REAL popup context, `chrome.runtime.sendMessage({ command:
- *      'omega:syncAuth' })` makes the SW fetch a FRESH custom token from the
+ *   5. From the REAL popup context, the messenger's `{ destination: 'background',
+ *      command: 'omega:syncAuth', payload }` makes the SW fetch a FRESH custom token from the
  *      backend emulator and hand it back. The uid equality is asserted INSIDE
  *      the extension context: the SW's user uid and the uid claim of the token
  *      the backend just minted must both be the uid node created.
@@ -382,9 +382,10 @@ async function main() {
 
     // The popup is the REAL context the auth-helpers sync from — one page,
     // reused: it both proves the SW finished booting and carries the sync
-    // assertions. `ask()` is the exact message syncWithBackground() sends.
+    // assertions. `ask()` is the messenger shape syncWithBackground() sends,
+    // for a context that holds no user yet.
     const askSyncAuth = (page) => page.evaluate(() => new Promise((resolve) => {
-      chrome.runtime.sendMessage({ command: 'omega:syncAuth', contextUid: null }, (response) => {
+      chrome.runtime.sendMessage({ destination: 'background', command: 'omega:syncAuth', payload: { uid: null } }, (response) => {
         resolve(chrome.runtime.lastError ? { error: chrome.runtime.lastError.message } : (response || {}));
       });
     }));
@@ -423,7 +424,7 @@ async function main() {
       // message the real auth-helpers send, and the uid comparison itself.
       const result = await popup.evaluate(async (expectedUid) => {
         const ask = () => new Promise((resolve) => {
-          chrome.runtime.sendMessage({ command: 'omega:syncAuth', contextUid: null }, (response) => {
+          chrome.runtime.sendMessage({ destination: 'background', command: 'omega:syncAuth', payload: { uid: null } }, (response) => {
             resolve(chrome.runtime.lastError ? { error: chrome.runtime.lastError.message } : (response || {}));
           });
         });

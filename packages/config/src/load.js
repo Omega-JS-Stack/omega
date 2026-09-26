@@ -58,8 +58,7 @@
  *
  * Secrets hard-fail: raw files are scanned BEFORE any merge — a secret in
  * any target section (requested or not) throws. Schema findings come back
- * as `errors` so callers pick their strictness (audit throws, boot warns —
- * EM's proven two-mode usage).
+ * as `errors` so callers pick their strictness (audit throws, boot warns).
  */
 
 const fs = require('node:fs');

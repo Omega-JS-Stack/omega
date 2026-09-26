@@ -1,7 +1,8 @@
 /**
  * icon-core tests — the shared Font Awesome semantics (C4 cp108): name/style
  * validation, candidate lookup order, root-attribute injection, and alias
- * mapping. Pure CJS — required straight from dist like desktop main does.
+ * mapping. ESM like its siblings, required straight from dist (require(esm))
+ * like desktop main does.
  */
 const { describe, it, before } = require('node:test');
 const assert = require('assert');

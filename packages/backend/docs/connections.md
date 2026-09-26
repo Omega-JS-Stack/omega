@@ -2,7 +2,7 @@
 
 The lane a brand's users link third-party accounts through: Google, Discord, Spotify, Twitch and Kick ship with the framework, and **a brand adds any other provider — of any grant shape — with one file and one config entry** ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)). No framework edit, ever.
 
-Route: `GET | POST | DELETE /omega/user/connections` ([src/manager/routes/user/connections/](../src/manager/routes/user/connections)). The browser half is `@omega.js/web`'s `/connections/callback` page and the account page's Connections section.
+Route: `GET | POST | DELETE /omega/user/connections` ([src/omega/routes/user/connections/](../src/omega/routes/user/connections)). The browser half is `@omega.js/web`'s `/connections/callback` page and the account page's Connections section.
 
 ## The record
 
@@ -40,7 +40,7 @@ The callback page lands on `/dashboard/account#connections`. A brand page that s
 url.searchParams.set('returnUrl', location.pathname + location.search + location.hash);
 ```
 
-`returnUrl` is **a path on this site**: it starts with a single `/` and carries no scheme, no `//`, no backslash and no whitespace (a query and a hash are fine). Anything else answers **400** naming the rule, rather than being dropped — a caller that asked to be sent somewhere would otherwise land on the default and never learn why. The rule has one home, `returnUrlError()` in [_context.js](../src/manager/routes/user/connections/_context.js).
+`returnUrl` is **a path on this site**: it starts with a single `/` and carries no scheme, no `//`, no backslash and no whitespace (a query and a hash are fine). Anything else answers **400** naming the rule, rather than being dropped: a caller that asked to be sent somewhere would otherwise land on the default and never learn why. The rule has one home, `returnUrlError()` in [_context.js](../src/omega/routes/user/connections/_context.js).
 
 The path rides the **encrypted state**, beside the provider, the uid and the CSRF token: the browser leaves for the provider in between, and the state is the only thing that survives the trip. `tokenize` answers it, and the callback page navigates there on success and offers it as the way back on an error — re-checking the same rule itself first, because it is the code that touches `location`. Absent, everything is exactly as before: no key in the state, no `returnUrl` in the answer, and the page keeps its default. A provider the visitor DENIED never reaches tokenize, so that page keeps the default too.
 
@@ -79,7 +79,7 @@ module.exports = {
 
 A module that declares neither `urls.authorize` nor `authorize()` — or neither `urls.token` nor `exchange()`, or no `identity()` at all — throws at load naming the file and the missing field (the file NAME, never the deployed path: the request that trips it is a signed-in user's). That is a programmer error, not a caller's typo, so it is never the 400 an unknown provider name gets.
 
-**Never log the token response, the identity, or a code/verifier** ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)): `identity()` opens with the one allowed line (`logIdentityCheck` from [_providers.js](../src/manager/routes/user/connections/_providers.js), or its equivalent — provider, uid, whether the exchange succeeded), and no identity fetch carries wonderful-fetch's `log: true`, which would print the authorization header.
+**Never log the token response, the identity, or a code/verifier** ([#641](https://github.com/Omega-JS-Stack/omega/issues/641)): `identity()` opens with the one allowed line (`logIdentityCheck` from [_providers.js](../src/omega/routes/user/connections/_providers.js), or its equivalent: provider, uid, whether the exchange succeeded), and no identity fetch carries wonderful-fetch's `log: true`, which would print the authorization header.
 
 **2. The two env keys**, in the brand `.env`: `CONNECTIONS_<PROVIDER>_CLIENT_ID` and `CONNECTIONS_<PROVIDER>_CLIENT_SECRET` (the provider name uppercased, dashes as underscores: `sandbox-pkce` → `CONNECTIONS_SANDBOX_PKCE_CLIENT_ID`). The redirect URI to register with the provider is `<websiteUrl>/connections/callback`, for every provider.
 
@@ -93,7 +93,7 @@ A **public client** (Twitch registers one; the brand then holds an id and no sec
 |---|---|
 | `provider` | The provider module itself (so an override never needs `this`) |
 | `providerName` | The key it was loaded by |
-| `Manager`, `ctx` | The BackendManager and the route context (`ctx.log`) |
+| `omega`, `ctx` | The instance and the request's `Context` (`ctx.log`) |
 | `uid` | The user this connect is for — what `identity()` logs |
 | `clientId`, `clientSecret` | The resolved `CONNECTIONS_<PROVIDER>_*` pair (`clientSecret` undefined for a public client) |
 | `redirectUri` | `<websiteUrl>/connections/callback` |

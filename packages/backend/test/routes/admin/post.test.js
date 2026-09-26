@@ -51,7 +51,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           body: 'Test content',
         });
 
@@ -66,7 +66,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
         });
 
@@ -81,7 +81,7 @@ module.exports = defineCases({
       timeout: 60000,
 
       async run({ http, assert, config }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: `https://${config.domain}/blog/nonexistent-test-post-12345`,
           body: 'This is test content from @omega.js/backend test suite.',
         });
@@ -100,7 +100,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: `https://example.com/blog/never-created-${Date.now()}`,
           body: 'Test content',
         });
@@ -221,7 +221,7 @@ module.exports = defineCases({
         const newBody = 'This content was EDITED by the @omega.js/backend test suite.\n\nThe edit was successful!';
         state.editedBody = newBody;
 
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: state.postUrl,
           body: newBody,
         });
@@ -282,7 +282,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
           body: 'Test content',
         });
@@ -297,7 +297,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.put('backend-manager/admin/post', {
+        const response = await http.put('omega/admin/post', {
           url: 'https://example.com/blog/test-post',
           body: 'Test content',
         });

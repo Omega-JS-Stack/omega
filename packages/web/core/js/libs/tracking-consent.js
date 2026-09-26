@@ -2,7 +2,7 @@
  * The TRACKING consent record — one home for "what may this page load, and
  * count?" ([#383](https://github.com/Omega-JS-Stack/omega/issues/383)).
  *
- * Shape, under `trackingConsent` in `omega.storage()`:
+ * Shape, under `trackingConsent` in `omega.storage`:
  *
  *   { analytics: bool, marketing: bool, region: 'opt-in'|'opt-out',
  *     timestamp: ISO string, version: 1 }
@@ -31,7 +31,7 @@
  * The read API is deliberately tiny because it has callers beyond the banner:
  * the loader gates on it, and the checkout/signup payloads read it.
  */
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { detectRegion } from '__main_assets__/js/libs/consent-region.js';
@@ -55,7 +55,7 @@ const listeners = new Set();
  * @returns {object|null}
  */
 function readStored() {
-  const stored = omega.storage().get(TRACKING_CONSENT_KEY);
+  const stored = omega.storage.get(TRACKING_CONSENT_KEY);
 
   if (!stored || typeof stored !== 'object' || stored.version !== TRACKING_CONSENT_VERSION) {
     return null;
@@ -117,7 +117,7 @@ export function setTrackingConsent(choices) {
     version: TRACKING_CONSENT_VERSION,
   };
 
-  omega.storage().set(TRACKING_CONSENT_KEY, record);
+  omega.storage.set(TRACKING_CONSENT_KEY, record);
   notify(record);
 
   return record;
@@ -129,7 +129,7 @@ export function setTrackingConsent(choices) {
  * @returns {object} the consent now in effect
  */
 export function clearTrackingDecision() {
-  omega.storage().remove(TRACKING_CONSENT_KEY);
+  omega.storage.remove(TRACKING_CONSENT_KEY);
 
   const record = getTrackingConsent();
   notify(record);

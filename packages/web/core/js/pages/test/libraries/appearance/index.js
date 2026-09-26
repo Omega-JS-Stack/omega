@@ -3,7 +3,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('test:appearance');
@@ -16,7 +16,7 @@ let refreshDebugPanel = () => {};
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     // Initialize debug panel
     initDebugPanel();
@@ -45,7 +45,7 @@ function initDebugPanel() {
 
   // Update function
   function updateDebug() {
-    const appearance = omega.library().appearance;
+    const appearance = omega.appearance;
 
     // Saved preference via API
     const saved = appearance.get();
@@ -114,7 +114,7 @@ function initDebugPanel() {
  * Initialize programmatic control buttons
  */
 function initControls() {
-  const appearance = omega.library().appearance;
+  const appearance = omega.appearance;
 
   // Toggle button
   document.getElementById('btn-toggle').addEventListener('click', () => {
@@ -216,5 +216,5 @@ function initEventLog() {
   // Initial log entry
   addLogEntry('Appearance test page loaded');
   addLogEntry(`Initial theme: "${document.documentElement.getAttribute('data-bs-theme')}"`);
-  addLogEntry(`Saved preference: ${omega.library().appearance.get() || '(none)'}`);
+  addLogEntry(`Saved preference: ${omega.appearance.get() || '(none)'}`);
 }

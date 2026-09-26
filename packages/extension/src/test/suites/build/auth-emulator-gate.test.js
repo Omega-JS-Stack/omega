@@ -2,13 +2,13 @@
 //
 // The SW connects Firebase Auth to the local emulator ONLY on a testing build.
 // Its whole signal is what the bundle task BAKED into OMEGA_BUILD_JSON: a
-// service worker has no `process.env`, so `Manager.isTesting()` resolves from
+// service worker has no `process.env`, so `omega.isTesting()` resolves from
 // `config.environment`, the ONE input a browser context has
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). This suite
 // drives that for real (the actual composeBuildJson undereach build lane,
 // feeding the actual snapshot into the actual helpers) and then pins that the
-// emulator call sits behind exactly that check. background.js itself is a
-// browser-context ES module, so the call site is pinned by source, same model as
+// emulator call sits behind exactly that check. The call lives in background's
+// auth (lib/background-auth.js), pinned by source, same model as
 // cache-warming.test.js / verts-binding.test.js.
 //
 // Nothing reads `chrome.runtime.getManifest().update_url` any more: what an
@@ -23,6 +23,7 @@ const TASK_PATH = path.join(SRC, 'gulp', 'tasks', 'bundle.js');
 const helpers   = require(path.join(SRC, 'utils', 'mode-helpers.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 const BACKGROUND = fs.readFileSync(path.join(SRC, 'background.js'), 'utf8');
+const BACKGROUND_AUTH = fs.readFileSync(path.join(SRC, 'lib', 'background-auth.js'), 'utf8');
 
 // Compose a real snapshot under the given build mode and hand back its `config`
 // blob — exactly what the SW reads out of OMEGA_BUILD_JSON.
@@ -109,14 +110,17 @@ module.exports = defineCases({
     {
       name: 'the SW calls connectAuthEmulator once, only inside the isTesting() gate',
       run: (ctx) => {
-        const calls = BACKGROUND.match(/connectAuthEmulator\(/g) || [];
+        const calls = BACKGROUND_AUTH.match(/connectAuthEmulator\(/g) || [];
         ctx.expect(calls.length).toBe(1);
-        ctx.expect(/if \(this\.isTesting\(\)\) \{[\s\S]*?const port = requiredPort\(this, 'OMEGA_AUTH_PORT', 'auth'\);\s*this\.authLogger\.log\([^\n]*\);\s*connectAuthEmulator\(this\.libraries\.firebaseAuth, `http:\/\/localhost:\$\{port\}`/.test(BACKGROUND)).toBe(true);
+        ctx.expect(BACKGROUND.includes('connectAuthEmulator')).toBe(false);
+        ctx.expect(/if \(this\.omega\.isTesting\(\)\) \{[\s\S]*?const port = requiredPort\(this\.omega, 'OMEGA_AUTH_PORT', 'auth'\);\s*this\.logger\.log\([^\n]*\);\s*connectAuthEmulator\(this\._firebaseAuth, `http:\/\/localhost:\$\{port\}`/.test(BACKGROUND_AUTH)).toBe(true);
         // The baked map is the ONLY source (#300: a SW can't read a bumped
         // OMEGA_AUTH_PORT, so the bake carries it). The classic 9099 that used
         // to sit under it as a fallback is gone (#834), numbers and all.
-        ctx.expect(BACKGROUND.includes('AUTH_EMULATOR_PORT')).toBe(false);
-        ctx.expect(BACKGROUND.includes('9099')).toBe(false);
+        for (const source of [BACKGROUND, BACKGROUND_AUTH]) {
+          ctx.expect(source.includes('AUTH_EMULATOR_PORT')).toBe(false);
+          ctx.expect(source.includes('9099')).toBe(false);
+        }
       },
     },
   ],

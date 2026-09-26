@@ -34,7 +34,7 @@ module.exports = defineCases({
     {
       name: 'regenerate-both-keys',
       async run({ http, assert, state }) {
-        const response = await http.as('basic').post('backend-manager/user/api-keys', {});
+        const response = await http.as('basic').post('omega/user/api-keys', {});
 
         assert.isSuccess(response, 'Regenerate API keys should succeed');
         assert.hasProperty(response, 'data.clientId', 'Response should contain new clientId');
@@ -83,7 +83,7 @@ module.exports = defineCases({
       name: 'regenerate-only-clientId',
       async run({ http, assert, state }) {
         // Use the new privateKey from test 2 since old one is invalid
-        const response = await http.withPrivateKey(state.newPrivateKey).post('backend-manager/user/api-keys', {
+        const response = await http.withPrivateKey(state.newPrivateKey).post('omega/user/api-keys', {
           keys: ['clientId'],
         });
 
@@ -110,7 +110,7 @@ module.exports = defineCases({
         const currentClientId = beforeDoc.api.clientId;
 
         // Still use newPrivateKey since test 4 didn't change it
-        const response = await http.withPrivateKey(state.newPrivateKey).post('backend-manager/user/api-keys', {
+        const response = await http.withPrivateKey(state.newPrivateKey).post('omega/user/api-keys', {
           keys: ['privateKey'],
         });
 
@@ -135,7 +135,7 @@ module.exports = defineCases({
     {
       name: 'unauthenticated-rejected',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/user/api-keys', {});
+        const response = await http.as('none').post('omega/user/api-keys', {});
 
         assert.isError(response, 401, 'Regenerate API keys should fail without authentication');
       },

@@ -46,7 +46,7 @@ module.exports = defineCases({
     {
       name: 'buy-the-one-time-product',
       async run({ http, firestore, assert, state, waitFor }) {
-        const response = await http.as('journey-payments-one-time-refund').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-one-time-refund').post('omega/payments/intent', {
           provider: 'test',
           productId: state.productId,
         });
@@ -85,7 +85,7 @@ module.exports = defineCases({
     {
       name: 'refund-the-purchase',
       async run({ http, assert, state }) {
-        const response = await http.as('journey-payments-one-time-refund').post('backend-manager/payments/refund', {
+        const response = await http.as('journey-payments-one-time-refund').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Bought the wrong thing',
           feedback: 'Testing the one-time refund flow',

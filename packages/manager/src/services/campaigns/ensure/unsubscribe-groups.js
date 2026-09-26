@@ -15,7 +15,7 @@
  * ([#649](https://github.com/Omega-JS-Stack/omega/issues/649)).
  */
 const chalk = require('chalk').default;
-const { BEM_GROUP_KEYS } = require('../../../lib/backend-marketing.js');
+const { BACKEND_GROUP_KEYS } = require('../../../lib/backend-marketing.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -59,7 +59,7 @@ module.exports = async function ensureUnsubscribeGroups(context) {
 
   // A key @omega.js/backend added without a row here would send through a group
   // this service never provisions — loud, at the top, not at send time.
-  const undefinedKeys = BEM_GROUP_KEYS.filter((key) => !GROUP_DEFINITIONS[key]);
+  const undefinedKeys = BACKEND_GROUP_KEYS.filter((key) => !GROUP_DEFINITIONS[key]);
   if (undefinedKeys.length > 0) {
     throw new Error(`@omega.js/backend group key(s) with no name+description row here: ${undefinedKeys.join(', ')}`);
   }
@@ -67,7 +67,7 @@ module.exports = async function ensureUnsubscribeGroups(context) {
   const existing = await api.getUnsubscribeGroups();
   const existingByName = Object.fromEntries(existing.map((group) => [group.name, group]));
 
-  const missing = BEM_GROUP_KEYS.filter((key) => !existingByName[GROUP_DEFINITIONS[key].name]);
+  const missing = BACKEND_GROUP_KEYS.filter((key) => !existingByName[GROUP_DEFINITIONS[key].name]);
 
   if (missing.length > 0 && options.dryRun) {
     return dryRunPlan(
@@ -78,7 +78,7 @@ module.exports = async function ensureUnsubscribeGroups(context) {
 
   const ids = {};
 
-  for (const key of BEM_GROUP_KEYS) {
+  for (const key of BACKEND_GROUP_KEYS) {
     const { name, description } = GROUP_DEFINITIONS[key];
     const found = existingByName[name];
 
@@ -93,19 +93,19 @@ module.exports = async function ensureUnsubscribeGroups(context) {
   }
 
   if (missing.length === 0) {
-    console.log(`      ${chalk.green('✓')} All ${BEM_GROUP_KEYS.length} unsubscribe groups exist`);
+    console.log(`      ${chalk.green('✓')} All ${BACKEND_GROUP_KEYS.length} unsubscribe groups exist`);
   }
 
   // Already-equal ids are skipped by the editor, so a converged brand leaves
   // omega.json5 byte-identical.
   const written = writeBrandConfig(context, Object.fromEntries(
-    BEM_GROUP_KEYS.map((key) => [`marketing.campaigns.providers.sendgrid.groups.${key}`, ids[key]]),
+    BACKEND_GROUP_KEYS.map((key) => [`marketing.campaigns.providers.sendgrid.groups.${key}`, ids[key]]),
   ));
 
   return {
     output: {
       unsubscribeGroups: {
-        total: BEM_GROUP_KEYS.length,
+        total: BACKEND_GROUP_KEYS.length,
         created: missing.length,
         written: written.length,
       },

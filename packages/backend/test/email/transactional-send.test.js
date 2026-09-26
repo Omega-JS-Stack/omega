@@ -11,7 +11,7 @@ module.exports = defineCases({
   timeout: 30000,
 
   async run({ http, assert, config }) {
-    const response = await http.post('backend-manager/admin/email', {
+    const response = await http.post('omega/admin/email', {
       subject: '[TEST] Transactional pipeline — card template',
       to: `_test-email-send@${config.domain}`,
       template: 'card',

@@ -1,15 +1,15 @@
 # Usage
 
-Tracks app-launch + hours-of-use stats. Sister of legacy @omega.js/desktop's Usage library, but uses `manager.storage` instead of a separate electron-store.
+Tracks app-launch + hours-of-use stats. Sister of legacy @omega.js/desktop's Usage library, but uses `omega.storage` instead of a separate electron-store.
 
 ## What's tracked
 
 ```js
-manager.usage.opens()              // total app launches
-manager.usage.hoursTotal()         // cumulative hours-of-use across clean exits
-manager.usage.hoursThisSession()   // live, computed from session start
-manager.usage.installedAt()        // ISO timestamp of first launch
-manager.usage.toJSON()             // all of the above as a structured-cloneable object
+omega.usage.opens()              // total app launches
+omega.usage.hoursTotal()         // cumulative hours-of-use across clean exits
+omega.usage.hoursThisSession()   // live, computed from session start
+omega.usage.installedAt()        // ISO timestamp of first launch
+omega.usage.toJSON()             // all of the above as a structured-cloneable object
 ```
 
 ## How it accumulates
@@ -51,7 +51,7 @@ const snap = await window.desktop.usage.get();
 
 ## Why not just use app-state?
 
-`app-state.js` already tracks `launchCount` (= opens). We could fold these in. But `app-state` is concerned with first-launch / crash-sentinel / version-change semantics — `usage` is concerned with telemetry. Keeping them separate keeps each module focused. Both write to disjoint keys in `manager.storage`.
+`app-state.js` already tracks `launchCount` (= opens). We could fold these in. But `app-state` is concerned with first-launch / crash-sentinel / version-change semantics: `usage` is concerned with telemetry. Keeping them separate keeps each module focused. Both write to disjoint keys in `omega.storage`.
 
 ## Tests
 

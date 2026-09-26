@@ -12,8 +12,8 @@
 //      partial Pro supply never loses icons the free set has.
 //
 // Main-side API:
-//   manager.fontawesome.get(name, style)  → svg string | null   ('play', 'solid')
-//   manager.fontawesome.has(name, style)  → boolean
+//   omega.fontawesome.get(name, style)  → svg string | null   ('play', 'solid')
+//   omega.fontawesome.has(name, style)  → boolean
 //
 // Renderer-side (preload contextBridge):
 //   window.desktop.fontawesome.get(name, style) → Promise<svg string | null>
@@ -54,17 +54,17 @@ const logger = new LoggerLite('fontawesome');
 
 const fontawesome = {
   _initialized: false,
-  _manager: null,
+  _omega: null,
   _roots: [],
   _aliasMap: null,
   _cache: new Map(),
 
-  initialize(manager) {
+  initialize(omega) {
     if (fontawesome._initialized) {
       return;
     }
 
-    fontawesome._manager = manager;
+    fontawesome._omega = omega;
     fontawesome._roots = fontawesome._resolveRoots();
 
     fontawesome._registerIpc();

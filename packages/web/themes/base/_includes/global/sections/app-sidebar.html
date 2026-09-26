@@ -223,24 +223,24 @@
         <div class="omega-side__ad omega-shell__label">
           <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="omega-chip">Sponsored</span>
-            <a href="/pricing" class="omega-footer__link" data-omega-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
+            <a href="/pricing" class="omega-footer__link" data-omega-bind="@show !auth.user.active" hidden aria-label="Remove ads with Pro">
               <i class="fa-solid fa-xmark fa-xs"></i>
             </a>
           </div>
           {% section "verts/unit", type: "in-article", size: "rectangle" %}
-          <a href="/pricing" class="d-block text-center omega-footer__link small mt-2 text-decoration-none" data-omega-bind="@show !auth.resolved.active" hidden>
+          <a href="/pricing" class="d-block text-center omega-footer__link small mt-2 text-decoration-none" data-omega-bind="@show !auth.user.active" hidden>
             Remove with <span class="text-primary">Pro</span>
           </a>
         </div>
       {% endif %}
 
       <!-- User row -->
-      <div class="omega-side__user" data-omega-bind="@show auth.user" hidden>
+      <div class="omega-side__user" data-omega-bind="@show auth.user.authenticated" hidden>
         <span class="avatar avatar-sm rounded-circle overflow-hidden d-inline-flex flex-shrink-0">
-          <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ resolved.config.brand.name }} profile picture"/>
+          <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.profile.photoURL" alt="{{ resolved.config.brand.name }} profile picture"/>
         </span>
         <span class="omega-shell__label flex-grow-1 overflow-hidden">
-          <span class="omega-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.displayName">User</span>
+          <span class="omega-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.profile.displayName">User</span>
           <span class="omega-side__user-email d-block text-truncate" data-omega-bind="@text auth.user.email">email@example.com</span>
         </span>
         <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">

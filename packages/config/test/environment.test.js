@@ -20,7 +20,6 @@ const {
   isTesting,
   setEnvironment,
   buildLaneEnvironment,
-  attachTo,
 } = require('../src/environment.js');
 
 // Run a thunk with OMEGA_ENVIRONMENT set to exactly `value` (absent when
@@ -147,26 +146,7 @@ test('buildLaneEnvironment(): build mode wins, else the inherited word, else dev
   });
 });
 
-test('attachTo(): the four calls land statically AND on the prototype', () => {
-  function Target() {}
-  attachTo(Target);
-
-  for (const name of ['getEnvironment', 'isDevelopment', 'isProduction', 'isTesting']) {
-    assert.strictEqual(typeof Target[name], 'function', `Target.${name}() is the static call form`);
-    assert.strictEqual(typeof Target.prototype[name], 'function', `Target#${name}() is the instance call form`);
-  }
-
-  withVar('development', () => {
-    assert.strictEqual(Target.getEnvironment(), 'development');
-    assert.strictEqual(new Target().getEnvironment(), 'development');
-    assert.strictEqual(Target.isDevelopment(), true);
-  });
-
-  // An instance carrying a baked config resolves from it, with no variable set.
-  withVar(undefined, () => {
-    const instance = new Target();
-    instance.config = { environment: 'testing' };
-    assert.strictEqual(instance.getEnvironment(), 'testing');
-    assert.strictEqual(instance.isTesting(), true);
-  });
+test('no mixin: every framework calls the functions directly, so nothing attaches them to a class', () => {
+  assert.strictEqual(require('../src/environment.js').attachTo, undefined);
+  assert.strictEqual(require('../src/index.js').attachEnvironment, undefined);
 });

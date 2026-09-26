@@ -76,11 +76,13 @@ loses an offer to a timeout.
 ## 5. Forms gate their submit control
 
 Every form uses FormManager
-(`@omega.js/client/modules/form-manager.js`). When a form must not be submitted
+(`@omega.js/client/modules/form-manager.js`), a class the page builds once per
+form with the instance it received. When a form must not be submitted
 until an async answer is in, the page registers a gate per answer before it
 calls `ready()`:
 
 ```javascript
+const formManager = new FormManager(omega, '#checkout-form');
 formManager.addGate('eligibility');
 formManager.addGate('recaptcha');
 formManager.ready();          // held: the form stays `initializing`

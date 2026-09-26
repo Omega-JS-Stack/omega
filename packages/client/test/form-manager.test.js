@@ -10,7 +10,7 @@ const { describe, it, before } = require('node:test');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { assert } = require('./helpers.js');
+const { assert, getOmega } = require('./helpers.js');
 
 const SRC_PATH = path.join(__dirname, '..', 'src', 'modules', 'form-manager.js');
 const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'form-manager.js');
@@ -30,7 +30,7 @@ describe('FormManager Module', () => {
 
   it('constructor fails loud when the form is missing', () => {
     try {
-      new FormManager('#definitely-not-a-form');
+      new FormManager(getOmega(), '#definitely-not-a-form');
       assert.fail('Should have thrown');
     } catch (e) {
       assert(e.message.includes('Form not found'));
@@ -39,7 +39,7 @@ describe('FormManager Module', () => {
 
   it('lives on client primitives only — relative imports, no self-name or web-alias refs', () => {
     assert(SOURCE.includes("from './dom.js'"), 'dom module imported relatively');
-    assert(SOURCE.includes("from '../index.js'"), 'manager singleton imported relatively');
+    assert(!SOURCE.includes("from '../index.js'"), 'no instance imported: the form receives omega when built');
     assert(!SOURCE.includes('@omega.js/client'), 'no self-name imports (pre-publish safe)');
     assert(!SOURCE.includes('__main_assets__'), 'no web-only alias refs survived the move');
   });
@@ -89,7 +89,7 @@ describe('FormManager gates (#637)', () => {
 
   it('holds ready() until every gate resolves, with the submit control disabled meanwhile', () => {
     const $form = makeForm();
-    const formManager = new FormManager($form, { autoReady: false });
+    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
     formManager.addGate('eligibility');
     formManager.addGate('recaptcha');
@@ -109,7 +109,7 @@ describe('FormManager gates (#637)', () => {
 
   it('resolving a gate before ready() is called still leaves the caller in charge of arming', () => {
     const $form = makeForm();
-    const formManager = new FormManager($form, { autoReady: false });
+    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
     formManager.addGate('eligibility');
     formManager.resolveGate('eligibility');
@@ -122,7 +122,7 @@ describe('FormManager gates (#637)', () => {
 
   it('resolving a gate nobody opened fails loud', () => {
     const $form = makeForm();
-    const formManager = new FormManager($form, { autoReady: false });
+    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
     formManager.addGate('eligibility');
 
@@ -149,7 +149,7 @@ describe('FormManager gates (#637)', () => {
 
   it('a gate added after the form armed fails loud', () => {
     const $form = makeForm();
-    const formManager = new FormManager($form, { autoReady: false });
+    const formManager = new FormManager(getOmega(), $form, { autoReady: false });
 
     formManager.ready();
 

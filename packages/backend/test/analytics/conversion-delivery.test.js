@@ -30,8 +30,8 @@
  */
 const crypto = require('crypto');
 const path = require('path');
-const conversions = require('../../dist/manager/libraries/analytics/conversions.js');
-const matchData = require('../../dist/manager/libraries/analytics/match-data.js');
+const conversions = require('../../dist/omega/libraries/analytics/conversions.js');
+const matchData = require('../../dist/omega/libraries/analytics/match-data.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A uid the way one actually looks — Firebase's alphabet is case-SENSITIVE —
@@ -105,7 +105,7 @@ const PURCHASE_PARAMS = {
 };
 
 /** Deliver one event exactly as the payment webhook would, and hand back the per-provider results. */
-function deliver({ ctx, Manager, event = 'purchase', params = PURCHASE_PARAMS, attribution = fullAttribution(), trackingConsent = null, providers, identity }) {
+function deliver({ ctx, omega, event = 'purchase', params = PURCHASE_PARAMS, attribution = fullAttribution(), trackingConsent = null, providers, identity }) {
   return conversions.deliverConversion({
     event: event,
     params: params,
@@ -120,7 +120,7 @@ function deliver({ ctx, Manager, event = 'purchase', params = PURCHASE_PARAMS, a
     trackingConsent: trackingConsent,
     eventId: `${event}._test-webhook-event`,
     ctx: ctx,
-    Manager: Manager,
+    omega: omega,
   });
 }
 
@@ -146,7 +146,7 @@ const TIKTOK_PIXEL = '_TEST_TIKTOK_PIXEL';
  * The module and the cache entry are both restored, so every other test in this
  * file keeps the real transport.
  *
- * GA4 is out of the fire: its transport is the Manager's own Measurement
+ * GA4 is out of the fire: its transport is the Omega instance's own Measurement
  * Protocol helper rather than this module's `post`, and the server half of a
  * purchase-shaped fire names the two providers that dedupe anyway.
  *
@@ -155,7 +155,7 @@ const TIKTOK_PIXEL = '_TEST_TIKTOK_PIXEL';
  * @returns {{results: object[], calls: object[], lines: string[]}}
  */
 function fireOnRecordedWire({ production }) {
-  const modulePath = require.resolve('../../dist/manager/libraries/analytics/conversions.js');
+  const modulePath = require.resolve('../../dist/omega/libraries/analytics/conversions.js');
   const fetchPath = require.resolve('wonderful-fetch', { paths: [path.dirname(modulePath)] });
   const realFetch = require.cache[fetchPath];
   const savedEnv = { META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN, TIKTOK_ACCESS_TOKEN: process.env.TIKTOK_ACCESS_TOKEN };
@@ -194,7 +194,7 @@ function fireOnRecordedWire({ production }) {
         isProduction: () => production,
         isDevelopment: () => !production,
       },
-      Manager: { config: { analytics: { providers: { meta: { id: META_PIXEL }, tiktok: { id: TIKTOK_PIXEL } } } } },
+      omega: { config: { analytics: { providers: { meta: { id: META_PIXEL }, tiktok: { id: TIKTOK_PIXEL } } } } },
     });
 
     return { results: results, calls: calls, lines: lines };
@@ -226,8 +226,8 @@ module.exports = defineCases({
       name: 'meta-user-data-carries-the-full-match-block',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
-        const results = deliver({ ctx, Manager });
+      async run({ assert, ctx, omega }) {
+        const results = deliver({ ctx, omega });
         const body = conversions.buildMetaBody({
           descriptor: descriptorFor(results, 'meta'),
           identity: matchData.buildIdentity({
@@ -277,10 +277,10 @@ module.exports = defineCases({
       name: 'a-billed-charge-tells-meta-system-generated-and-a-checkout-website',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const identity = matchData.buildIdentity({ uid: UID, email: EMAIL, request: { ip: IP, userAgent: USER_AGENT } });
         const actionSourceFor = (event) => conversions.buildMetaBody({
-          descriptor: descriptorFor(deliver({ ctx, Manager, event: event }), 'meta'),
+          descriptor: descriptorFor(deliver({ ctx, omega, event: event }), 'meta'),
           identity: identity,
           eventId: `${event}._test-webhook-event`,
         }).data[0].action_source;
@@ -306,14 +306,14 @@ module.exports = defineCases({
       name: 'a-full-account-fills-every-meta-parameter',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const identity = matchData.buildIdentity({
           uid: UID,
           user: FULL_USER_DOC,
           request: { ip: IP, userAgent: USER_AGENT },
         });
 
-        const results = deliver({ ctx, Manager, identity });
+        const results = deliver({ ctx, omega, identity });
         const userData = conversions.buildMetaBody({
           descriptor: descriptorFor(results, 'meta'),
           identity: identity,
@@ -342,7 +342,7 @@ module.exports = defineCases({
       name: 'the-fire-log-names-the-match-keys-sent-and-the-ones-that-were-empty',
       auth: 'none',
 
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const lines = [];
         const record = (...args) => lines.push(args.map((arg) => String(arg)).join(' '));
         const identity = matchData.buildIdentity({ uid: UID, email: EMAIL, request: { ip: IP, userAgent: USER_AGENT } });
@@ -355,7 +355,7 @@ module.exports = defineCases({
           providers: ['meta'],
           eventId: 'purchase._test-fire-log',
           ctx: { log: record, error: record, warn: record, isProduction: () => false, isDevelopment: () => true },
-          Manager: Manager,
+          omega: omega,
         });
 
         const summary = lines.find((line) => line.startsWith('deliverConversion: purchase →'));
@@ -372,12 +372,12 @@ module.exports = defineCases({
       name: 'meta-constructs-fbc-from-the-captured-fbclid',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The cookie never made it to checkout (cleared jar, ITP, another device)
         const attribution = fullAttribution();
         delete attribution.cookies.fbc;
 
-        const results = deliver({ ctx, Manager, attribution });
+        const results = deliver({ ctx, omega, attribution });
         const descriptor = descriptorFor(results, 'meta');
         const capturedMs = Date.parse('2026-08-01T00:00:00.000Z');
 
@@ -389,7 +389,7 @@ module.exports = defineCases({
         delete noClick.cookies.fbc;
         delete noClick.last.clickIds.fbclid;
 
-        const bare = descriptorFor(deliver({ ctx, Manager, attribution: noClick }), 'meta');
+        const bare = descriptorFor(deliver({ ctx, omega, attribution: noClick }), 'meta');
         assert.equal(bare.userData.fbc, undefined, 'no cookie and no fbclid means no fbc, never a malformed one');
       },
     },
@@ -404,8 +404,8 @@ module.exports = defineCases({
       name: 'tiktok-user-block-carries-the-full-match-block',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
-        const results = deliver({ ctx, Manager });
+      async run({ assert, ctx, omega }) {
+        const results = deliver({ ctx, omega });
         const body = conversions.buildTikTokBody({
           descriptor: descriptorFor(results, 'tiktok'),
           identity: matchData.buildIdentity({
@@ -449,9 +449,9 @@ module.exports = defineCases({
       name: 'the-tiktok-item-stamps-event-time-in-unix-seconds',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const before = Math.floor(Date.now() / 1000);
-        const results = deliver({ ctx, Manager });
+        const results = deliver({ ctx, omega });
         const event = conversions.buildTikTokBody({
           descriptor: descriptorFor(results, 'tiktok'),
           identity: matchData.buildIdentity({ uid: UID }),
@@ -481,8 +481,8 @@ module.exports = defineCases({
       name: 'the-tiktok-body-names-the-pixel-in-event-source-id',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
-        const results = deliver({ ctx, Manager });
+      async run({ assert, ctx, omega }) {
+        const results = deliver({ ctx, omega });
         const body = conversions.buildTikTokBody({
           descriptor: descriptorFor(results, 'tiktok'),
           identity: matchData.buildIdentity({ uid: UID }),
@@ -529,13 +529,13 @@ module.exports = defineCases({
       name: 'the-page-the-conversion-happened-on-rides-both-ad-bodies',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const context = matchData.buildAttributionContext(fullAttribution());
 
         assert.equal(context.url, 'https://brand.test/pricing?utm_source=meta', 'the CREDITED touch\'s url reaches the adapters');
         assert.equal(context.referrer, 'https://facebook.com/', 'and the referrer it landed from');
 
-        const results = deliver({ ctx, Manager });
+        const results = deliver({ ctx, omega });
         const identity = matchData.buildIdentity({ uid: UID });
 
         const meta = conversions.buildMetaBody({
@@ -571,14 +571,14 @@ module.exports = defineCases({
       name: 'a-direct-landing-sends-a-page-of-the-url-alone',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The landing capture writes `referrer: null` for a visit that came from
         // no page at all (a typed url, an app link). An empty referrer key is a
         // field we tried and failed to send.
         const attribution = fullAttribution();
         attribution.last.referrer = null;
 
-        const results = deliver({ ctx, Manager, attribution });
+        const results = deliver({ ctx, omega, attribution });
         const identity = matchData.buildIdentity({ uid: UID });
 
         const meta = conversions.buildMetaBody({
@@ -604,12 +604,12 @@ module.exports = defineCases({
       name: 'no-touch-url-means-no-page-and-no-event-source-url',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The raw-API recovery lane: no browser was ever involved, so there is
         // no touch and no url. An invented one is worse than an absent one —
         // the brand's home page would credit every recovered order to a page
         // nobody converted on.
-        const results = deliver({ ctx, Manager, attribution: {}, identity: matchData.buildIdentity({ uid: UID }) });
+        const results = deliver({ ctx, omega, attribution: {}, identity: matchData.buildIdentity({ uid: UID }) });
         const identity = matchData.buildIdentity({ uid: UID });
 
         const meta = conversions.buildMetaBody({
@@ -634,8 +634,8 @@ module.exports = defineCases({
       name: 'ga4-gains-the-campaign-params-and-gclid',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
-        const descriptor = descriptorFor(deliver({ ctx, Manager }), 'ga4');
+      async run({ assert, ctx, omega }) {
+        const descriptor = descriptorFor(deliver({ ctx, omega }), 'ga4');
 
         assert.equal(descriptor.name, 'purchase');
         assert.equal(descriptor.payload.source, 'meta', 'last touch is the credited one');
@@ -653,13 +653,13 @@ module.exports = defineCases({
       name: 'campaign-falls-back-to-the-first-touch',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // A user who arrived on a tagged link and never came back through one:
         // last touch is only ever written by a tagged visit (#384).
         const attribution = fullAttribution();
         delete attribution.last;
 
-        const descriptor = descriptorFor(deliver({ ctx, Manager, attribution }), 'ga4');
+        const descriptor = descriptorFor(deliver({ ctx, omega, attribution }), 'ga4');
 
         assert.equal(descriptor.payload.source, 'newsletter', 'first touch credits the conversion when there is no last');
         assert.equal(descriptor.payload.medium, 'email');
@@ -671,10 +671,10 @@ module.exports = defineCases({
       name: 'marketing-declined-blocks-meta-and-tiktok-but-not-ga4',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const results = deliver({
           ctx,
-          Manager,
+          omega,
           trackingConsent: { analytics: true, marketing: false, region: 'opt-in', version: 1 },
         });
 
@@ -689,10 +689,10 @@ module.exports = defineCases({
       name: 'analytics-declined-blocks-ga4-but-not-the-ad-platforms',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const results = deliver({
           ctx,
-          Manager,
+          omega,
           trackingConsent: { analytics: false, marketing: true, region: 'opt-in', version: 1 },
         });
 
@@ -705,7 +705,7 @@ module.exports = defineCases({
       name: 'an-absent-snapshot-is-not-a-denial',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // A legacy order, or one minted by the raw-API recovery lane, carries no
         // snapshot at all. Blocking it would be a silent revenue hole.
         for (const snapshot of [null, undefined, {}]) {
@@ -715,7 +715,7 @@ module.exports = defineCases({
           assert.equal(granted.marketing, true, `${JSON.stringify(snapshot)} allows marketing`);
         }
 
-        const results = deliver({ ctx, Manager, trackingConsent: null });
+        const results = deliver({ ctx, omega, trackingConsent: null });
 
         for (const provider of ['ga4', 'meta', 'tiktok']) {
           assert.equal(outcomeFor(results, provider).startsWith('skipped (consent'), false, `${provider} fires without a snapshot`);
@@ -727,12 +727,12 @@ module.exports = defineCases({
       name: 'an-order-with-no-attribution-still-fires-on-external-id',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The raw-API recovery lane: no browser was ever involved, so there is no
         // attribution, no cookies and no request pair.
         const results = deliver({
           ctx,
-          Manager,
+          omega,
           attribution: {},
           identity: matchData.buildIdentity({ uid: UID }),
         });
@@ -770,10 +770,10 @@ module.exports = defineCases({
       name: 'a-provider-the-other-half-owns-is-never-fired',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const results = deliver({
           ctx,
-          Manager,
+          omega,
           event: 'sign_up',
           params: { method: 'email', user_id: UID },
           providers: ['meta', 'tiktok'],
@@ -789,7 +789,7 @@ module.exports = defineCases({
         }
 
         // Unrestricted stays unrestricted — the seam is opt-in per fire.
-        const everyProvider = deliver({ ctx, Manager, event: 'sign_up', params: { method: 'email', user_id: UID } });
+        const everyProvider = deliver({ ctx, omega, event: 'sign_up', params: { method: 'email', user_id: UID } });
 
         assert.equal(outcomeFor(everyProvider, 'ga4').startsWith('skipped (not selected)'), false, 'a fire that names no providers reaches every mapped one');
       },
@@ -829,7 +829,7 @@ module.exports = defineCases({
       name: 'the-phone-hash-is-normalized-per-provider-spec',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         const telephone = { countryCode: 1, national: 5550102030 };
         const identity = matchData.buildIdentity({ uid: UID, telephone: telephone });
 
@@ -839,7 +839,7 @@ module.exports = defineCases({
 
         // The same normalizers the browser half uses (`@omega.js/analytics/identity`),
         // so a server conversion and a pixel event carry the SAME match key.
-        const results = deliver({ ctx, Manager, identity });
+        const results = deliver({ ctx, omega, identity });
 
         const meta = conversions.buildMetaBody({ descriptor: descriptorFor(results, 'meta'), identity: identity, eventId: 'purchase._test-webhook-event' });
         const tiktok = conversions.buildTikTokBody({ descriptor: descriptorFor(results, 'tiktok'), identity: identity, eventId: 'purchase._test-webhook-event', pixelCode: '_TEST_PIXEL' });
@@ -853,7 +853,7 @@ module.exports = defineCases({
       name: 'an-event-name-the-catalog-does-not-know-is-loud-and-harmless',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // A typo in a canonical name used to be SILENT: every adapter returned
         // null, and the fire read exactly like `subscription_plan_change` on Meta — a
         // deliberate non-mapping. So a webhook could stop reporting revenue and the logs
@@ -868,7 +868,7 @@ module.exports = defineCases({
           params: PURCHASE_PARAMS,
           eventId: 'purchsae._test-typo',
           ctx: guarded,
-          Manager: Manager,
+          omega: omega,
         });
 
         for (const provider of ['ga4', 'meta', 'tiktok']) {
@@ -886,7 +886,7 @@ module.exports = defineCases({
       name: 'the-outcomes-an-ad-platform-has-no-use-for-reach-ga4-only',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The catalog maps none of these on Meta or TikTok — an unmapped provider
         // is a decision, and the adapter skips rather than inventing an event.
         // `trial_lapse` is the deliberate omission of the exclusion lane below
@@ -895,7 +895,7 @@ module.exports = defineCases({
         // The other two are [#407](https://github.com/Omega-JS-Stack/omega/issues/407)'s
         // lifecycle additions, dark to an ad platform because no money moved.
         for (const event of ['subscription_uncancel', 'subscription_plan_change', 'trial_lapse']) {
-          const results = deliver({ ctx, Manager, event });
+          const results = deliver({ ctx, omega, event });
 
           assert.equal(descriptorFor(results, 'ga4').name, event, `${event} resolves on GA4 under its own name`);
           assert.equal(outcomeFor(results, 'meta'), 'skipped (no mapping)', `${event} has no Meta mapping`);
@@ -908,7 +908,7 @@ module.exports = defineCases({
       name: 'a-cancellation-and-a-refund-build-exclusion-audiences-worth-zero',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The churn moments an ad platform CAN use
         // ([#415](https://github.com/Omega-JS-Stack/omega/issues/415)): neither
         // Meta nor TikTok can subtract revenue and neither optimizes against an
@@ -917,7 +917,7 @@ module.exports = defineCases({
         // platforms as well — at value ZERO, because a refund carrying its
         // amount would ADD to the return their ads manager reports.
         for (const [event, native] of [['subscription_cancel', 'SubscriptionCancel'], ['refund', 'Refund']]) {
-          const results = deliver({ ctx, Manager, event });
+          const results = deliver({ ctx, omega, event });
 
           const google = descriptorFor(results, 'ga4');
           const meta = descriptorFor(results, 'meta');
@@ -955,14 +955,14 @@ module.exports = defineCases({
       name: 'a-trial-conversion-reaches-all-three-as-real-revenue',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // The one [#407] addition where money actually moved, so unlike the four
         // above it carries a full mapping: GA4's standard purchase (revenue
         // belongs in the revenue report) and each ad platform's Purchase, which
         // is what every real charge is to them (Ian's money-event table, [#652]).
         const results = deliver({
           ctx,
-          Manager,
+          omega,
           event: 'trial_convert',
           params: { ...PURCHASE_PARAMS, is_trial: true, is_recurring: false },
         });

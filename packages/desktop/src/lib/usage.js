@@ -1,6 +1,6 @@
 // Usage tracking — opens (= launchCount) + hours-of-use accumulation.
 // Sister of legacy @omega.js/desktop's Usage library, but without the
-// electron-store-cwd hack (uses our manager.storage instead).
+// electron-store-cwd hack (uses our omega.storage instead).
 //
 // Persisted shape (storage.usage):
 //   {
@@ -37,17 +37,17 @@ const STORAGE_KEY = 'usage';
 
 const usage = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _sessionStart: null,
   _snapshot:    null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (usage._initialized) return;
     usage._initialized = true;
-    usage._manager = manager;
+    usage._omega = omega;
     usage._sessionStart = Date.now();
 
-    const previous = manager.storage.get(STORAGE_KEY) || {};
+    const previous = omega.storage.get(STORAGE_KEY) || {};
     const now = new Date();
 
     // Step 2: credit prior session if it ended cleanly.
@@ -69,15 +69,15 @@ const usage = {
       lastQuitAt:   null,                                 // cleared; will be set on quit
     };
 
-    manager.storage.set(STORAGE_KEY, next);
+    omega.storage.set(STORAGE_KEY, next);
     usage._snapshot = next;
 
     // Wire the quit handler — single registration, idempotent if re-init runs.
     usage._wireQuitHandler();
 
     // IPC for renderer access to usage stats.
-    manager.ipc.unhandle('desktop:usage:get');
-    manager.ipc.handle('desktop:usage:get', () => usage.toJSON());
+    omega.ipc.unhandle('desktop:usage:get');
+    omega.ipc.handle('desktop:usage:get', () => usage.toJSON());
 
     logger.log(`usage initialized — opens=${next.opens} hoursTotal=${next.hoursTotal.toFixed(2)} installedAt=${next.installedAt}`);
   },
@@ -87,9 +87,9 @@ const usage = {
     usage._quitHandlerWired = true;
     const { app } = require('electron');
     app.on('before-quit', () => {
-      const cur = usage._manager.storage.get(STORAGE_KEY) || usage._snapshot || {};
+      const cur = usage._omega.storage.get(STORAGE_KEY) || usage._snapshot || {};
       cur.lastQuitAt = new Date().toISOString();
-      usage._manager.storage.set(STORAGE_KEY, cur);
+      usage._omega.storage.set(STORAGE_KEY, cur);
     });
   },
 
@@ -129,7 +129,7 @@ const usage = {
   // Test teardown.
   shutdown() {
     usage._initialized = false;
-    usage._manager     = null;
+    usage._omega       = null;
     usage._sessionStart = null;
     usage._snapshot    = null;
     // Note: we don't unwire `app.on('before-quit')` — Electron has no listener

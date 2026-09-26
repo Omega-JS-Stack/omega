@@ -1,4 +1,4 @@
-// Import the theme entry point
+// A theme module: the host calls the default export with { omega, options }.
 // __main_assets__ is a build alias that resolves to the framework's core assets
 import bootstrap from '__main_assets__/themes/bootstrap/js/index.umd.js';
 import { ready as domReady } from '@omega.js/client/modules/dom.js';
@@ -14,18 +14,20 @@ window.bootstrap = bootstrap;
 /* @dev-only:end */
 
 // Nav glassiness, marquees, reveals, count-ups, and rotators all ride the
-// shared motion engine (core/js/core/motion.js) — no theme JS needed.
+// shared motion engine (core/js/core/motion.js), so no theme JS is needed.
 
-// Import tooltip initialization (the shared core-layer helper — #99)
+// Import tooltip initialization (the shared core-layer helper, #99)
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 // Import hero demo form initialization
 import initHeroDemoForm from './js/hero-demo-form.js';
 
 // Initialize theme components when DOM is ready
-domReady().then(() => {
+export default async function ({ omega, options }) {
+  await domReady();
+
   // Generic Bootstrap initializations
   initializeTooltips();
 
   // Initialize hero demo form if present
-  initHeroDemoForm();
-});
+  initHeroDemoForm(omega);
+}

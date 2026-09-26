@@ -14,17 +14,17 @@ const logger = new LoggerLite('protocol');
 
 const protocol = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _electron:    null,
   _hasLock:     true,
   _schemes:     [],
 
-  initialize(manager) {
+  initialize(omega) {
     if (protocol._initialized) {
       return;
     }
 
-    protocol._manager = manager;
+    protocol._omega = omega;
     protocol._electron = require('electron');
 
     // `app` is only defined in the main process. In renderer/preload (and in
@@ -57,9 +57,9 @@ const protocol = {
     // Register custom URL scheme. Always derived from brand.id — `<brand.id>://...` is
     // the one and only scheme. No config knob; if you need multiple schemes for the same app,
     // call `app.setAsDefaultProtocolClient(extra)` yourself in main.js.
-    const schemes = [manager.config.brand.id];
+    const schemes = [omega.config.brand.id];
     protocol._schemes = schemes;
-    if (manager.isProduction()) {
+    if (omega.isProduction()) {
       schemes.forEach((scheme) => {
         if (process.platform === 'win32' || process.platform === 'linux') {
           app.setAsDefaultProtocolClient(scheme, process.execPath, [process.cwd()]);

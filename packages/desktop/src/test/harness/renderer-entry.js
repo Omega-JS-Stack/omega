@@ -1,8 +1,8 @@
 // Renderer test-harness entry. Runs inside the hidden BrowserWindow.
 //
 // Lifecycle:
-//   1. window load → __emTest.ready()
-//   2. main sends suites via __emTest:suites
+//   1. window load → __omegaTest.ready()
+//   2. main sends suites via __omegaTest:suites
 //   3. renderer reconstructs each test fn via new Function('ctx', body), runs it sequentially
 //   4. emits { event, ... } for each result; emits { event: 'end' } when done
 //
@@ -24,7 +24,7 @@
   };
 
   function emit(evt) {
-    try { window.__emTest.emit(evt); } catch (e) { /* harness gone */ }
+    try { window.__omegaTest.emit(evt); } catch (e) { /* harness gone */ }
   }
 
   // Tiny inline expect — mirrors src/test/assert.js minimal surface used by tests.
@@ -162,12 +162,12 @@
     emit({ event: 'end', passed, failed, skipped });
   }
 
-  window.__emTest.onSuites((suites) => {
+  window.__omegaTest.onSuites((suites) => {
     runAll(suites).catch((e) => {
       emit({ event: 'fatal', message: e.message, stack: e.stack });
     });
   });
 
   // Signal ready as soon as the page is parsed.
-  window.__emTest.ready();
+  window.__omegaTest.ready();
 })();

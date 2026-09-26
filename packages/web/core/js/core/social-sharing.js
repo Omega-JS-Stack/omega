@@ -1,8 +1,7 @@
-import omega from '@omega.js/client';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Social Sharing Module
-export default function () {
+export default function ({ omega }) {
 
   // Configuration with defaults merged with supplied config
   const config = omega.config.socialSharing.config;
@@ -59,7 +58,7 @@ export default function () {
   };
 
   // Wait for DOM to be ready
-  omega.dom().ready().then(() => {
+  omega.dom.ready().then(() => {
     initSocialSharing();
   });
 
@@ -227,7 +226,7 @@ export default function () {
     // Use omega utility for clipboard copy — the confirmation is owed to a copy
     // that actually happened, and a refused clipboard rejects since #726, so
     // the failure lane is handled here rather than left unhandled.
-    omega.utilities().clipboardCopy(url)
+    omega.utilities.clipboardCopy(url)
       .then(() => showCopySuccess())
       .catch((error) => console.error('Failed to copy the share link:', error));
 

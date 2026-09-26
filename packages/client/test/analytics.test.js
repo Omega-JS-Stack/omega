@@ -1,7 +1,7 @@
 const { describe, it } = require('node:test');
 const fs = require('fs');
 const path = require('path');
-const { assert, getManager, TEST_CONFIG } = require('./helpers.js');
+const { assert, getOmega, TEST_CONFIG } = require('./helpers.js');
 
 const SOURCE_PATH = path.join(__dirname, '..', 'src', 'modules', 'analytics.js');
 const SOURCE = fs.readFileSync(SOURCE_PATH, 'utf8');
@@ -38,7 +38,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
     try {
       // Dev: initializes with config creds, logs, never posts
       const dev = new Analytics({
-        utilities: () => ({ getRuntime: () => 'electron' }),
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => true,
       });
       dev.init({ id: 'G-TESTONLY', secret: 'test-secret' });
@@ -47,7 +47,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
 
       // Production: same config posts for real
       const prod = new Analytics({
-        utilities: () => ({ getRuntime: () => 'electron' }),
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => false,
       });
       prod.init({ id: 'G-TESTONLY', secret: 'test-secret' });
@@ -56,7 +56,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
 
       // No config at all → inert (no invented fallbacks)
       const bare = new Analytics({
-        utilities: () => ({ getRuntime: () => 'electron' }),
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => true,
       });
       bare.init({});
@@ -87,16 +87,16 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
     };
 
     try {
-      const manager = {
-        utilities: () => ({ getRuntime: () => 'electron' }),
+      const omega = {
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => false,
       };
 
       // Same device + same project → same client_id on every instance,
       // and it is exactly uuidv5(deviceId, uuidv5(projectId, URL-ns))
-      const a = new Analytics(manager);
+      const a = new Analytics(omega);
       a.init({ id: 'G-TESTONLY', secret: 's', projectId: 'proj-x' });
-      const b = new Analytics(manager);
+      const b = new Analytics(omega);
       b.init({ id: 'G-TESTONLY', secret: 's', projectId: 'proj-x' });
 
       const ns = uuidv5('proj-x', uuidv5.URL);
@@ -158,12 +158,12 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
     });
 
     try {
-      const manager = {
-        utilities: () => ({ getRuntime: () => 'web' }),
+      const omega = {
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       };
 
-      const first = new Analytics(manager);
+      const first = new Analytics(omega);
       first.init({ projectId: 'proj-x' });
 
       const deviceId = store.get('_omega_device_id');
@@ -174,7 +174,7 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
       );
 
       // Persisted, so the next boot on this browser is the same GA client
-      const second = new Analytics(manager);
+      const second = new Analytics(omega);
       second.init({ projectId: 'proj-x' });
       assert.strictEqual(store.get('_omega_device_id'), deviceId, 'the stored id is never re-derived');
       assert.strictEqual(second.clientId, first.clientId);
@@ -204,7 +204,7 @@ describe('Analytics on web (#159: gtag delegation)', () => {
 
     try {
       const web = new Analytics({
-        utilities: () => ({ getRuntime: () => 'web' }),
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       });
 
@@ -226,7 +226,7 @@ describe('Analytics on web (#159: gtag delegation)', () => {
 
       // A secret handed in anyway is dropped on the floor, never stored
       const withSecret = new Analytics({
-        utilities: () => ({ getRuntime: () => 'web' }),
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       });
       withSecret.init({ id: 'G-TESTONLY', secret: 'test-secret' });
@@ -243,19 +243,19 @@ describe('Analytics on web (#159: gtag delegation)', () => {
     }
   });
 
-  it('the manager initializes web analytics with no provider config (the vert_click chain)', async () => {
-    const Manager = getManager();
+  it('the Omega instance initializes web analytics with no provider config (the vert_click chain)', async () => {
+    const omega = getOmega();
 
     const calls = [];
     globalThis.gtag = (...args) => calls.push(args);
 
     try {
-      await Manager.initialize(TEST_CONFIG);
-      assert.strictEqual(Manager.analytics().initialized, true, 'web analytics initializes on a brand with no google id');
+      await omega.initialize(TEST_CONFIG);
+      assert.strictEqual(omega.analytics.initialized, true, 'web analytics initializes on a brand with no google id');
 
-      Manager.analytics().event('vert_click', { vert_lane: 'promo' });
+      omega.analytics.event('vert_click', { vert_lane: 'promo' });
       const events = calls.filter((entry) => entry[0] === 'event' && entry[1] === 'vert_click');
-      assert.strictEqual(events.length, 1, 'vert_click reaches gtag through the manager');
+      assert.strictEqual(events.length, 1, 'vert_click reaches gtag through the instance');
       assert.strictEqual(events[0][2].vert_lane, 'promo');
     } finally {
       delete globalThis.gtag;
@@ -293,7 +293,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
       // resolves as the WEB runtime — the bridge, not the runtime name, is
       // what makes this client a forwarder.
       const renderer = new Analytics({
-        utilities: () => ({ getRuntime: () => 'web' }),
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       });
       renderer.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x', bridge });
@@ -324,7 +324,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
       // handed credentials keeps neither, so the guard holds wherever a host
       // wires the bridge.
       const electron = new Analytics({
-        utilities: () => ({ getRuntime: () => 'electron' }),
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => false,
       });
       electron.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x', bridge });
@@ -361,7 +361,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     // programmer: it must surface at this call site in development, not as a
     // warn in the main process's log with nothing to blame.
     const dev = new Analytics({
-      utilities: () => ({ getRuntime: () => 'web' }),
+      utilities: { getRuntime: () => 'web' },
       isDevelopment: () => true,
     });
     dev.init({ projectId: 'proj-x', bridge });
@@ -370,7 +370,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     assert.strictEqual(forwarded.length, 0, 'and nothing crossed to main');
 
     const prod = new Analytics({
-      utilities: () => ({ getRuntime: () => 'web' }),
+      utilities: { getRuntime: () => 'web' },
       isDevelopment: () => false,
     });
     prod.init({ projectId: 'proj-x', bridge });
@@ -380,7 +380,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     assert.strictEqual(forwarded.length, 0, 'production skips it instead of shipping junk to main');
 
     const broken = new Analytics({
-      utilities: () => ({ getRuntime: () => 'web' }),
+      utilities: { getRuntime: () => 'web' },
       isDevelopment: () => false,
     });
     broken.init({ projectId: 'proj-x', bridge: uncloneable });
@@ -402,7 +402,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     };
 
     const renderer = new Analytics({
-      utilities: () => ({ getRuntime: () => 'web' }),
+      utilities: { getRuntime: () => 'web' },
       isDevelopment: () => false,
     });
     renderer.init({ projectId: 'proj-x', bridge });
@@ -422,8 +422,8 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
   });
 
   it('the seam is the host\'s injected config value alone — a global can never bridge a page', async () => {
-    const Manager = getManager();
-    const savedConfig = Manager.config;
+    const omega = getOmega();
+    const savedConfig = omega.config;
 
     const calls = [];
     globalThis.gtag = (...args) => calls.push(args);
@@ -431,29 +431,29 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
     try {
       const injected = { event: () => {} };
 
-      Manager.config = { analyticsBridge: injected };
-      assert.strictEqual(Manager._resolveAnalyticsBridge(), injected, 'the injected surface IS the seam');
+      omega.config = { analyticsBridge: injected };
+      assert.strictEqual(omega._resolveAnalyticsBridge(), injected, 'the injected surface IS the seam');
 
-      Manager.config = {};
-      assert.strictEqual(Manager._resolveAnalyticsBridge(), null, 'a host that injects nothing gets no bridge');
+      omega.config = {};
+      assert.strictEqual(omega._resolveAnalyticsBridge(), null, 'a host that injects nothing gets no bridge');
 
       // The global is inert BY CONSTRUCTION now: a page carrying a
       // `window.desktop.analytics` (a brand's own script, an extension, a
       // stray global) bridges nothing, so a brand's analytics can never be
       // silently routed into a void.
       global.window.desktop = { analytics: { event: () => { throw new Error('a global must never bridge'); } } };
-      assert.strictEqual(Manager._resolveAnalyticsBridge(), null, 'a planted window.desktop is not a seam');
+      assert.strictEqual(omega._resolveAnalyticsBridge(), null, 'a planted window.desktop is not a seam');
 
       // A host that injects a broken surface is a broken host — loud, never a
       // quiet fall back to the sender a desktop renderer must not have.
-      Manager.config = { analyticsBridge: { pageview: () => {} } };
-      assert.throws(() => Manager._resolveAnalyticsBridge(), /carries no event\(\)/, 'a malformed injection raises');
+      omega.config = { analyticsBridge: { pageview: () => {} } };
+      assert.throws(() => omega._resolveAnalyticsBridge(), /carries no event\(\)/, 'a malformed injection raises');
 
       // And web is untouched with that same global still planted: no bridge was
       // injected, so the event goes to the page's gtag exactly as before.
       const Analytics = (await import(SOURCE_PATH)).default;
       const web = new Analytics({
-        utilities: () => ({ getRuntime: () => 'web' }),
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       });
       web.init({ projectId: 'proj-x' });
@@ -463,7 +463,7 @@ describe("Analytics in desktop's renderer (#411: one sender, reached over IPC)",
       assert.strictEqual(calls.length, 1, 'the event still reaches the page gtag');
       assert.strictEqual(calls[0][1], 'vert_click');
     } finally {
-      Manager.config = savedConfig;
+      omega.config = savedConfig;
       delete global.window.desktop;
       delete globalThis.gtag;
     }
@@ -488,7 +488,7 @@ describe('Analytics rides the shared catalog (#328 stage E)', () => {
 
     try {
       const prod = new Analytics({
-        utilities: () => ({ getRuntime: () => 'electron' }),
+        utilities: { getRuntime: () => 'electron' },
         isDevelopment: () => false,
       });
       prod.init({ id: 'G-TESTONLY', secret: 'test-secret' });
@@ -523,7 +523,7 @@ describe('Analytics rides the shared catalog (#328 stage E)', () => {
 
     try {
       const extension = new Analytics({
-        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        utilities: { getRuntime: () => 'browser-extension' },
         isDevelopment: () => false,
       });
       extension.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });
@@ -540,7 +540,7 @@ describe('Analytics rides the shared catalog (#328 stage E)', () => {
       // an ad signal, and GA4 reads the session end on its own — so the proof
       // that it FIRED is the facade's dev line, not a delivery.
       const dev = new Analytics({
-        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        utilities: { getRuntime: () => 'browser-extension' },
         isDevelopment: () => true,
       });
       dev.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });
@@ -565,7 +565,7 @@ describe('Analytics rides the shared catalog (#328 stage E)', () => {
       globalThis.gtag = (...args) => calls.push(args);
 
       const web = new Analytics({
-        utilities: () => ({ getRuntime: () => 'web' }),
+        utilities: { getRuntime: () => 'web' },
         isDevelopment: () => false,
       });
       web.init({ projectId: 'proj-x' });
@@ -618,7 +618,7 @@ describe('Analytics session id in an extension context (#412)', () => {
       global.sessionStorage.clear();
 
       const popup = new Analytics({
-        utilities: () => ({ getRuntime: () => 'browser-extension' }),
+        utilities: { getRuntime: () => 'browser-extension' },
         isDevelopment: () => false,
       });
       popup.init({ id: 'G-TESTONLY', secret: 'test-secret', projectId: 'proj-x' });

@@ -4,7 +4,7 @@
  * All dates/times are UTC. No local time APIs.
  */
 
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { VIEW_MODES, DAY_ABBREVS, MONTH_NAMES, TYPE_COLORS, formatDateUTC, formatTimeUTC, parseDateUTC } from './calendar-core.js';
 
 export default class CalendarRenderer {
@@ -380,7 +380,7 @@ export default class CalendarRenderer {
 
       html += `<tr class="calendar-list-row" data-campaign-id="${campaign.id}" style="opacity: ${statusStyle.opacity}">
         <td style="width: 60px">${timeStr}</td>
-        <td>${recurringIcon}${omega.utilities().escapeHTML(name)}</td>
+        <td>${recurringIcon}${omega.utilities.escapeHTML(name)}</td>
         <td style="width: 80px">${typeBadge}</td>
         <td style="width: 80px">${statusBadge}</td>
       </tr>`;
@@ -427,12 +427,12 @@ export default class CalendarRenderer {
            data-send-at="${campaign.sendAt}"
            ${isDraggable ? 'draggable="true"' : ''}
            style="background-color: ${color}; opacity: ${statusStyle.opacity};"
-           title="${omega.utilities().escapeHTML(name)}${isRecurring ? ' (recurring)' : ''}">
+           title="${omega.utilities.escapeHTML(name)}${isRecurring ? ' (recurring)' : ''}">
         ${statusIcon}
         ${recurringIcon}
         <span class="calendar-event-time">${timeStr}</span>
         <span class="calendar-event-type-icon">${typeIcon}</span>
-        <span class="calendar-event-title">${omega.utilities().escapeHTML(name)}</span>
+        <span class="calendar-event-title">${omega.utilities.escapeHTML(name)}</span>
       </div>
     `;
   }
@@ -470,8 +470,8 @@ export default class CalendarRenderer {
            data-send-at="${campaign.sendAt}"
            ${isDraggable ? 'draggable="true"' : ''}
            style="background-color: ${color}; opacity: ${statusStyle.opacity}; top: ${topPx}px; height: ${heightPx}px; ${sizeStyle}"
-           title="${omega.utilities().escapeHTML(name)}${isRecurring ? ' (recurring)' : ''}">
-        ${statusIcon}${recurringIcon}<strong>${timeStr}</strong> ${omega.utilities().escapeHTML(name)}
+           title="${omega.utilities.escapeHTML(name)}${isRecurring ? ' (recurring)' : ''}">
+        ${statusIcon}${recurringIcon}<strong>${timeStr}</strong> ${omega.utilities.escapeHTML(name)}
       </div>
     `;
   }

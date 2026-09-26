@@ -1,7 +1,7 @@
 /**
  * Canonical schema for config/omega.json5 — pure data, no logic.
  *
- * Entry format is electron-manager's proven src/config/schema.js shape:
+ * Entry format:
  *
  *   {
  *     path:        'brand.id',            // dot-path into the RESOLVED config
@@ -61,9 +61,7 @@
  * target entry overrides the shared value.
  *
  * SHARED_SCHEMA always applies; TARGET_SCHEMAS[target] adds that target's
- * refinements. Sections grow as each framework adopts dual-read — seed
- * entries come from EM's schema (desktop) and the sandbox brand's real @omega.js/backend
- * config (backend), never from guesses.
+ * refinements, seeded from real brand configs, never from guesses.
  */
 
 // The durations a winback coupon can be built for on every provider that
@@ -1486,7 +1484,7 @@ const TARGET_SCHEMAS = {
     },
   ],
 
-  // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).
+  // Seeded from the sandbox brand's real @omega.js/backend config.
   backend: [
     // reviews, marketing, blog, dataRequest moved to SHARED_SCHEMA (#277); a
     // targets.backend block still overrides them through the merge chain.
@@ -1506,8 +1504,7 @@ const TARGET_SCHEMAS = {
     },
   ],
 
-  // Seeded from EM's proven src/config/schema.js. EM's per-OS `targets` key
-  // is renamed `platforms` here (avoids targets.desktop.targets).
+  // The per-OS key is `platforms` (avoids targets.desktop.targets).
   desktop: [
     {
       path:        'app.category',
@@ -1703,7 +1700,7 @@ const TARGET_SCHEMAS = {
       path:        'autoUpdate.autoDownload',
       type:        'boolean',
       required:    false,
-      description: 'Whether a found update downloads on its own. Unset reads as true; false leaves the download to `manager.autoUpdater` being asked for it.',
+      description: 'Whether a found update downloads on its own. Unset reads as true; false leaves the download to `omega.autoUpdater` being asked for it.',
     },
     {
       path:        'autoUpdate.startupDelayMs',

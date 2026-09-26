@@ -26,10 +26,10 @@
 const assert = require('node:assert');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 
-const cancelProcessor = require('../../../dist/manager/routes/payments/cancel/providers/test.js');
-const refundProcessor = require('../../../dist/manager/routes/payments/refund/providers/test.js');
-const planProcessor = require('../../../dist/manager/routes/payments/plan/providers/test.js');
-const uncancelProcessor = require('../../../dist/manager/routes/payments/uncancel/providers/test.js');
+const cancelProcessor = require('../../../dist/omega/routes/payments/cancel/providers/test.js');
+const refundProcessor = require('../../../dist/omega/routes/payments/refund/providers/test.js');
+const planProcessor = require('../../../dist/omega/routes/payments/plan/providers/test.js');
+const uncancelProcessor = require('../../../dist/omega/routes/payments/uncancel/providers/test.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-doc-shape-uid';
@@ -84,7 +84,7 @@ async function synthesize(act) {
   });
 
   const ctx = {
-    Manager: { config: CONFIG, libraries: { admin } },
+    omega: { config: CONFIG, firebase: { admin } },
     isProduction: () => false,
     isTesting: () => true,
     log: () => {},

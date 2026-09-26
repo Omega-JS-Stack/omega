@@ -39,9 +39,9 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 
 ## Part 2: Legacy Code Migration
 
-Search all `.js` files under `functions/` for legacy config reads and convert to `process.env`:
+The old patterns below are the legacy text this migration matches, as a ported project still spells it. Search all `.js` files under `functions/` for legacy config reads and convert them:
 
-- `Manager.config.*` → `process.env.KEY_NAME`
+- `Manager.config.*` secrets → `process.env.KEY_NAME`
 - `RUNTIME_CONFIG` → individual `process.env` vars
 - `functions.config()` → `process.env` vars
 
@@ -51,9 +51,9 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | `Manager.config.sendgrid.key` | `process.env.SENDGRID_API_KEY` |
 | `Manager.config.stripe.secret_key` | `process.env.STRIPE_SECRET_KEY` |
 | `Manager.config.openai.key` | `process.env.OPENAI_API_KEY` |
-| `Manager.config.paypal.client_id` | `Manager.config.payment.providers.paypal.clientId` |
+| `Manager.config.paypal.client_id` | `omega.config.payment.providers.paypal.clientId` |
 | `Manager.config.paypal.client_secret` | `process.env.PAYPAL_CLIENT_SECRET` |
-| `Manager.config.chargebee.site` | `Manager.config.payment.providers.chargebee.site` |
+| `Manager.config.chargebee.site` | `omega.config.payment.providers.chargebee.site` |
 | `Manager.config.chargebee.api_key` | `process.env.CHARGEBEE_API_KEY` |
 | `Manager.config.cloudflare.token` | `process.env.CLOUDFLARE_TOKEN` |
 | `Manager.config.recaptcha.secret_key` | `process.env.RECAPTCHA_SECRET_KEY` |
@@ -62,43 +62,35 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | `Manager.config.backend_manager.key` | `process.env.OMEGA_ADMIN_KEY` |
 | `Manager.config.backend_manager.namespace` | `process.env.OMEGA_NAMESPACE` |
 
+The consumer entry, the handler arguments and every other runtime shape a ported project rewrites (`Manager` to `omega`, `settings` to `data`, `libraries.admin` to `omega.firebase.admin`) are the by-hand steps of the breaking-changes register: [one runtime shape](../../../docs/shared/breaking-changes.md#2026-09-25-one-runtime-shape-on-every-package-945).
+
 ## Part 3: Route/Schema Migration
 
-**IMPORTANT:** Only migrate routes that already use the middleware system in `functions/index.js`:
-
-```javascript
-// MIGRATE these (uses Manager.Middleware)
-.https.onRequest((req, res) => Manager.Middleware(req, res).run('example'));
-
-// DO NOT migrate these (old manual route loading)
-.https.onRequest(async (req, res) => {
-  return new (require(`${__dirname}/routes/example/index.js`))().main(Manager, req, res);
-});
-```
+**IMPORTANT:** Only migrate routes a ported `functions/index.js` already runs through the request pipeline (the legacy text: `Manager.Middleware(req, res).run('example')`, which becomes `omega.routes.run('example', { req, res })`). A route loaded by hand (`new (require(`${__dirname}/routes/example/index.js`))().main(Manager, req, res)`) is rewritten as a route first.
 
 ### Old → New Format
 
-**Route:** constructor pattern → context-object export ([routes.md](routes.md)):
+**Route:** constructor pattern → one-object export ([routes.md](routes.md)):
 
 - `routes/example/index.js` → `routes/example/post.js` (or the appropriate method file)
-- Remove the constructor; use `module.exports = async ({ Manager, ctx, analytics, usage, user, settings, libraries, utilities }) => {}`
+- Remove the constructor; export `module.exports = async ({ ctx, omega, user, data, usage, analytics }) => {}`
 
-**Schema:** wrapped tiers → flat ([schemas.md](schemas.md)):
+**Schema:** wrapped tiers → a function returning a flat declaration ([schemas.md](schemas.md)):
 
 - `schemas/example/index.js` → `schemas/example/post.js`
-- Remove the `['defaults']:` wrapper; flatten the structure (plan adjustments move INSIDE the function, branching on `user`)
-- Change the signature to the context object: `({ ctx, user, data, method, headers, geolocation, client })`
-- Remove `value: undefined` noise
+- Remove the `['defaults']:` wrapper and flatten the structure: plan adjustments move INSIDE the function, splitting on `user.plan`
+- Export a function of the request, `({ user, body, query, path, method, headers, geolocation })`, returning the declaration
+- Rename every field's `types: ['string']` to `type: 'string'`, and remove `value: undefined` noise
 
 | Aspect | Old Format | New Format |
 |--------|-----------|------------|
-| Route export | `module.exports = Route` (constructor) | `module.exports = async ({ ... }) => {}` |
+| Route export | `module.exports = Route` (constructor) | `module.exports = async ({ ctx, omega, user, data }) => {}` |
 | Self reference | `const self = this;` | Not needed |
 | File naming | `index.js` | `get.js`, `post.js`, `put.js`, `delete.js` |
-| Schema wrapper | `['defaults']: { ... }` | Flat structure (no wrapper) |
-| Schema params | `(ctx)` | `({ ctx, user, data, ... })` context object |
-| Context key | `{ assistant }` / `Manager.Assistant()` / `BackendAssistant` | `{ ctx }` / `Manager.RouteContext()` / `RouteContext` (cp263) |
-| Error factory | `assistant.errorify(e, { code, sentry, log })` | `ctx.report(e, { code })` — 5xx captures to Sentry automatically, 4xx never; sending stays `ctx.respond()` |
+| Schema wrapper | `['defaults']: { ... }` | A function returning the flat declaration |
+| Schema params | `(ctx)` | `({ user, body, query, path, method, headers, geolocation })` |
+| Context key | `{ assistant }` / `Manager.Assistant()` / `BackendAssistant` | `{ ctx }`, a `Context` the pipeline builds |
+| Error factory | `assistant.errorify(e, { code, sentry, log })` | `ctx.report(e, { code })`: 5xx captures to Sentry automatically, 4xx never; sending stays `ctx.respond()` |
 
 ## Part 4: The dependency-resolution report
 

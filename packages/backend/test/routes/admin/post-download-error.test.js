@@ -13,7 +13,7 @@
  *     image broke.
  *   - Long reasons are truncated; empty reasons fall back to "unknown error".
  */
-const post = require('../../../dist/manager/routes/admin/post/post');
+const post = require('../../../dist/omega/routes/admin/post/post');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { formatImageDownloadError } = post;

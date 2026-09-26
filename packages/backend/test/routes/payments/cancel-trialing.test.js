@@ -45,17 +45,17 @@
  */
 const { buildUser, callHandler, withEnvironment, PRODUCTION_ENVIRONMENT } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
-const isTrialing = require('../../../dist/manager/routes/payments/cancel/_is-trialing.js');
+const handler = require('../../../dist/omega/routes/payments/cancel/post.js');
+const isTrialing = require('../../../dist/omega/routes/payments/cancel/_is-trialing.js');
 
-const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const ChargebeeLib = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
-const PayPalLib = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+const StripeLib = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
+const PayPalLib = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 
-const stripeCancel = require('../../../dist/manager/routes/payments/cancel/providers/stripe.js');
-const chargebeeCancel = require('../../../dist/manager/routes/payments/cancel/providers/chargebee.js');
-const paypalCancel = require('../../../dist/manager/routes/payments/cancel/providers/paypal.js');
-const testCancel = require('../../../dist/manager/routes/payments/cancel/providers/test.js');
+const stripeCancel = require('../../../dist/omega/routes/payments/cancel/providers/stripe.js');
+const chargebeeCancel = require('../../../dist/omega/routes/payments/cancel/providers/chargebee.js');
+const paypalCancel = require('../../../dist/omega/routes/payments/cancel/providers/paypal.js');
+const testCancel = require('../../../dist/omega/routes/payments/cancel/providers/test.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const DAY = 24 * 60 * 60;
@@ -65,12 +65,12 @@ const DAY = 24 * 60 * 60;
  * exists for. A trialing one expires exactly when its trial does; a paid one
  * carries no trial at all.
  */
-function youngSubscriber(Manager, { uid, trialing }) {
+function youngSubscriber(omega, { uid, trialing }) {
   const nowUNIX = Math.floor(Date.now() / 1000);
   const trialEndUNIX = nowUNIX + (14 * DAY);
   const stamp = (unix) => ({ timestamp: new Date(unix * 1000).toISOString(), timestampUNIX: unix });
 
-  return buildUser(Manager, {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: {},
     subscription: {
@@ -94,21 +94,21 @@ function youngSubscriber(Manager, { uid, trialing }) {
 }
 
 // Cancel the way a real customer does — no privileged `skipGuards` anywhere.
-function cancel(Manager, user) {
+function cancel(omega, user) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-cancel',
     user,
-    settings: { confirmed: true, skipGuards: false, reason: 'Not for me', feedback: null },
+    data: { confirmed: true, skipGuards: false, reason: 'Not for me', feedback: null },
   });
 }
 
 // The guards have to be driven in a PRODUCTION environment: in a testing run
 // every caller may bypass them by design, so a testing-run assertion would
 // prove nothing (the reasoning cancel-skip-guards.test.js sets out in full).
-function cancelInProduction(Manager, user) {
-  return withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(Manager, user));
+function cancelInProduction(omega, user) {
+  return withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(omega, user));
 }
 
 // The subscription shapes the pipeline writes, as the classifier sees them.
@@ -139,7 +139,7 @@ function subscriptionInState(trialing) {
 // A ctx that records the log line, which is how each provider names the cancel
 // it performed. Everything else the providers touch is the REAL ctx — the
 // recorder delegates to it (rather than copying it, which would drop every
-// method the providers call, `isProduction()` and `Manager` among them).
+// method the providers call, `isProduction()` and `omega` among them).
 function recordingCtx(ctx) {
   const logs = [];
   const recorder = Object.create(ctx);
@@ -187,10 +187,10 @@ module.exports = defineCases({
     {
       name: 'a-trial-cancel-is-not-blocked-by-the-24-hour-guard',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = youngSubscriber(Manager, { uid: '_test-cancel-trialing-young', trialing: true });
+      async run({ assert, omega }) {
+        const user = youngSubscriber(omega, { uid: '_test-cancel-trialing-young', trialing: true });
 
-        const sent = await cancelInProduction(Manager, user);
+        const sent = await cancelInProduction(omega, user);
 
         assert.equal(sent.code, 400, `Expected the request to reach the provider lookup, got ${sent.code}: ${sent.body}`);
         assert.ok(
@@ -204,12 +204,12 @@ module.exports = defineCases({
     {
       name: 'a-paid-cancel-that-young-is-still-guarded',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // The other half of the ruling: paid cancels keep today's behavior
         // exactly. Same age, same everything — only the trial differs.
-        const user = youngSubscriber(Manager, { uid: '_test-cancel-paid-young', trialing: false });
+        const user = youngSubscriber(omega, { uid: '_test-cancel-paid-young', trialing: false });
 
-        const sent = await cancelInProduction(Manager, user);
+        const sent = await cancelInProduction(omega, user);
 
         assert.equal(sent.code, 400, `A young PAID subscription must still be guarded, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /still being set up/i, 'The age guard should be the rejection for a paid subscription');

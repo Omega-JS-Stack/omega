@@ -32,14 +32,14 @@ const DEFAULTS = Object.freeze({
 //     const required = cfg?.versionRequired || '0.0.0';
 //     if (semver.lt(app.getVersion(), required)) showForceUpdateDialog();
 //   };
-//   checkVersion(manager.remoteConfig.get());                  // run at boot with defaults/cache
-//   manager.remoteConfig.on('update', checkVersion);           // re-run on every fresh fetch
+//   checkVersion(omega.remoteConfig.get());                  // run at boot with defaults/cache
+//   omega.remoteConfig.on('update', checkVersion);           // re-run on every fresh fetch
 //
 // API:
-//   manager.remoteConfig.get()                   → entire data (defaults | cache | latest fetch)
-//   manager.remoteConfig.get('versionRequired')  → dot-path lookup
-//   manager.remoteConfig.on('update', fn)        → subscribe; returns unsub fn
-//   manager.remoteConfig.refreshNow()            → force a fetch right now (Promise<data | null>)
+//   omega.remoteConfig.get()                   → entire data (defaults | cache | latest fetch)
+//   omega.remoteConfig.get('versionRequired')  → dot-path lookup
+//   omega.remoteConfig.on('update', fn)        → subscribe; returns unsub fn
+//   omega.remoteConfig.refreshNow()            → force a fetch right now (Promise<data | null>)
 
 const LoggerLite       = require('./logger-lite.js');
 const fetch            = require('wonderful-fetch');
@@ -53,17 +53,17 @@ const FETCH_TIMEOUT_MS = 60 * 1000;       // 60s — generous; this is a once-an
 
 const remoteConfig = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _data:        null,
   _intervalId:  null,
   _listeners:   new Set(),
   _url:         null,
   _enabled:     true,
 
-  initialize(manager) {
+  initialize(omega) {
     if (remoteConfig._initialized) return;
     remoteConfig._initialized = true;
-    remoteConfig._manager = manager;
+    remoteConfig._omega = omega;
 
     // Always seed with safe defaults FIRST so any caller reading `get()` between
     // `initialize()` and the first successful fetch sees usable values (status:
@@ -74,16 +74,16 @@ const remoteConfig = {
     // (disabled / no URL / transport gate) — the preload exposes these invokes
     // unconditionally, so an unregistered handler would reject every renderer
     // call instead of serving the defaults the early-return paths promise.
-    manager.ipc.unhandle('desktop:remote-config:get');
-    manager.ipc.handle('desktop:remote-config:get',         (path) => remoteConfig.get(path));
-    manager.ipc.unhandle('desktop:remote-config:refresh-now');
-    manager.ipc.handle('desktop:remote-config:refresh-now', () => remoteConfig.refreshNow());
+    omega.ipc.unhandle('desktop:remote-config:get');
+    omega.ipc.handle('desktop:remote-config:get',         (path) => remoteConfig.get(path));
+    omega.ipc.unhandle('desktop:remote-config:refresh-now');
+    omega.ipc.handle('desktop:remote-config:refresh-now', () => remoteConfig.refreshNow());
     // Broadcast updates to renderers.
     remoteConfig.on('update', (data) => {
-      manager.ipc.broadcast('desktop:remote-config:update', data);
+      omega.ipc.broadcast('desktop:remote-config:update', data);
     });
 
-    const cfg = manager.config.remoteConfig || {};
+    const cfg = omega.config.remoteConfig || {};
     remoteConfig._enabled = cfg.enabled !== false;       // default on
 
     if (!remoteConfig._enabled) {
@@ -95,8 +95,8 @@ const remoteConfig = {
     // brand.url + the legacy convention path.
     if (cfg.url) {
       remoteConfig._url = cfg.url;
-    } else if (manager.config.brand.url) {
-      const base = String(manager.config.brand.url).replace(/\/$/, '');
+    } else if (omega.config.brand.url) {
+      const base = String(omega.config.brand.url).replace(/\/$/, '');
       remoteConfig._url = `${base}/data/resources/main.json`;
     }
 
@@ -115,7 +115,7 @@ const remoteConfig = {
 
     // Restore cached data on top of defaults (last-known-good wins over defaults
     // until the next successful fetch lands).
-    const cached = manager.storage.get(STORAGE_KEY);
+    const cached = omega.storage.get(STORAGE_KEY);
     if (cached && typeof cached === 'object') {
       remoteConfig._data = { ...DEFAULTS, ...cached };
     }
@@ -127,9 +127,9 @@ const remoteConfig = {
     // Cadence: match auto-updater's feed-check (same "occasionally network-hits-the-internet"
     // job category). Auto-updater is wired BEFORE remote-config in boot sequence
     // so `_options` is always populated; testing collapses to 500ms via isTesting().
-    const interval = manager.isTesting()
+    const interval = omega.isTesting()
       ? 500
-      : manager.autoUpdater._options.feedCheckIntervalMs;
+      : omega.autoUpdater._options.feedCheckIntervalMs;
     remoteConfig._intervalId = setInterval(() => {
       remoteConfig.refreshNow().catch((e) => logger.warn(`periodic fetch failed: ${formatFetchError(e)}`));
     }, interval);
@@ -190,7 +190,7 @@ const remoteConfig = {
     // Layer fresh fetch on top of defaults so consumers can omit fields from
     // their hosted JSON and @omega.js/desktop still has sensible values.
     remoteConfig._data = { ...DEFAULTS, ...data };
-    remoteConfig._manager.storage.set(STORAGE_KEY, data);
+    remoteConfig._omega.storage.set(STORAGE_KEY, data);
     remoteConfig._emit('update', remoteConfig._data);
     logger.log(`remote-config refreshed (${remoteConfig._url})`);
     return remoteConfig._data;
@@ -210,7 +210,7 @@ const remoteConfig = {
     if (remoteConfig._intervalId) clearInterval(remoteConfig._intervalId);
     remoteConfig._intervalId = null;
     remoteConfig._initialized = false;
-    remoteConfig._manager     = null;
+    remoteConfig._omega       = null;
     remoteConfig._data        = null;
     remoteConfig._listeners.clear();
     remoteConfig._url         = null;

@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Stripe = require('../../../../dist/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../../dist/omega/libraries/payment/providers/stripe.js');
 
 // Real Stripe CLI fixtures (generated via `stripe trigger`)
 const FIXTURE_SESSION = require('../../../fixtures/stripe/checkout-session-completed.json');

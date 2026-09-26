@@ -1,5 +1,5 @@
 const moment = require('moment');
-const { nextWeekday, nextNthWeekday } = require('../../../../manager/libraries/email/constants.js');
+const { nextWeekday, nextNthWeekday } = require('../../../../omega/libraries/email/constants.js');
 
 /**
  * Seed marketing campaigns — recurring templates created/enforced on setup.

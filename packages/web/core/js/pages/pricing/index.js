@@ -1,6 +1,6 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -10,7 +10,7 @@ import { ONE_TIME_FREQUENCY } from '../payment/checkout/modules/state.js';
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupBillingToggle();
     setupPlanButtons();
@@ -198,7 +198,7 @@ function handlePlanSelection(button) {
   const billingType = document.querySelector(`${config.selectors.billingRadios}:checked`)?.dataset.billing || 'monthly';
 
   if (!planId) {
-    omega.sentry().captureException(new Error('Plan ID missing from button'));
+    omega.sentry.captureException(new Error('Plan ID missing from button'));
     return;
   }
 
@@ -359,15 +359,15 @@ function setupPromoCountdown() {
 
 // Update buttons based on the user's current active plan
 function setupCurrentPlanIndicator() {
-  omega.auth().listen({ once: true }, (state) => {
-    const resolved = omega.auth().resolveSubscription(state.account);
+  omega.auth.listen({ once: true }, (state) => {
+    const user = state.user;
 
-    if (!resolved.active) {
+    if (!user.active) {
       return;
     }
 
     // Mark current plan button
-    const $currentButton = document.querySelector(`button[data-plan-id="${resolved.plan}"]`);
+    const $currentButton = document.querySelector(`button[data-plan-id="${user.plan}"]`);
     if ($currentButton) {
       $currentButton.disabled = true;
       $currentButton.textContent = 'Current Plan';
@@ -381,7 +381,7 @@ function setupCurrentPlanIndicator() {
     // ([#237]). Offering "Switch to this plan" here would promise a move that
     // ends in a modal that will not open: those buttons keep the CTA they were
     // authored with.
-    if (state.account?.subscription?.cancellation?.pending === true) {
+    if (user.subscription.cancellation.pending === true) {
       return;
     }
 
@@ -391,7 +391,7 @@ function setupCurrentPlanIndicator() {
     // is not buying a second one, so the button goes to the billing page's own
     // switcher rather than through checkout ([#236]).
     document.querySelectorAll('button[data-plan-id]').forEach(($button) => {
-      if ($button.dataset.planId === resolved.plan || $button.dataset.planId === 'enterprise' || $button.dataset.planType !== 'subscription') {
+      if ($button.dataset.planId === user.plan || $button.dataset.planId === 'enterprise' || $button.dataset.planType !== 'subscription') {
         return;
       }
       $button.textContent = 'Switch to This Plan';

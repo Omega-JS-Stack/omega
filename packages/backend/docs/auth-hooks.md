@@ -9,14 +9,14 @@ Auth hooks let consumer projects inject custom logic into @omega.js/backend's au
 | `on-create` | `hooks/auth/on-create.js` | Runs after @omega.js/backend creates the user doc. **Non-blocking** — errors are caught and logged. |
 | `on-delete` | `hooks/auth/on-delete.js` | Runs after @omega.js/backend deletes the user doc. **Non-blocking** — errors are caught and logged. |
 
-Hook signature (same as @omega.js/backend's internal handlers):
+Hook signature (the same object @omega.js/backend's own handler received):
 
 ```javascript
-module.exports = async ({ Manager, ctx, user, context, libraries }) => {
+module.exports = async ({ ctx, omega, user, context }) => {
   // user: AuthUserRecord (uid, email, providerData, etc.)
   // context: AuthEventContext for blocking functions (ipAddress, userAgent, additionalUserInfo)
-  //          EventContext for triggers (eventId, eventType, timestamp — no IP/userAgent)
-  // libraries: { admin, functions, ... }
+  //          EventContext for triggers (eventId, eventType, timestamp; no IP/userAgent)
+  // omega: the instance (omega.firebase.admin, omega.firebase.functions, omega.config, ...)
 };
 ```
 
@@ -28,10 +28,10 @@ const ENFORCE = true;
 
 const ALLOWED_PROVIDERS = ['google.com'];
 
-module.exports = async ({ ctx, user, context, libraries }) => {
+module.exports = async ({ ctx, omega, user, context }) => {
   if (!ENFORCE) { return; }
 
-  const { functions } = libraries;
+  const functions = omega.firebase.functions;
   const provider = context.additionalUserInfo?.providerId;
 
   if (!ALLOWED_PROVIDERS.includes(provider)) {
@@ -50,10 +50,10 @@ const powertools = require('node-powertools');
 const ENFORCE = true;
 const BLOCKED_AFFILIATE_CODES = ['iLvQjmvm'];
 
-module.exports = async ({ Manager, ctx, user, context, libraries }) => {
+module.exports = async ({ ctx, omega, user, context }) => {
   if (!ENFORCE) { return; }
 
-  const { admin } = libraries;
+  const admin = omega.firebase.admin;
   const uid = user.uid;
 
   // Poll until signup route attaches attribution.affiliate.code

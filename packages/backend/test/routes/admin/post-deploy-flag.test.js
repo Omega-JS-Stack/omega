@@ -2,31 +2,29 @@
  * Test: admin/post schemas carry the D13 deploy flag
  *
  * Regression: the schemas didn't declare `deploy`, and unknown keys are
- * stripped at validation (middleware's includeNonSchemaSettings defaults
- * false) — so `deploy: false` could NEVER reach dispatch-deploy and the
- * documented opt-out was dead on arrival. These resolve the REAL schema
- * modules through Settings.resolve (same direct-schema seam as
- * test/helpers/schema-zod.js) and pin the contract: absent → true,
- * explicit false → false.
+ * stripped at validation (the pipeline's includeUnknown defaults false), so
+ * `deploy: false` could NEVER reach dispatch-deploy and the documented
+ * opt-out was dead on arrival. These validate against the REAL schema
+ * modules' declarations through helpers/schema.js and pin the contract:
+ * absent → true, explicit false → false.
  *
  * Run: npx omega test backend:routes/admin/post-deploy-flag
  */
-const Settings = require('../../../dist/manager/helpers/settings.js');
-const createSchema = require('../../../dist/manager/schemas/admin/post/post.js');
-const editSchema = require('../../../dist/manager/schemas/admin/post/put.js');
+const { validate } = require('../../../dist/omega/helpers/schema.js');
+const createSchema = require('../../../dist/omega/schemas/admin/post/post.js');
+const editSchema = require('../../../dist/omega/schemas/admin/post/put.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-// Settings.resolve only touches these surfaces when the schema is passed
-// directly (no file loading) — the seam test/helpers/schema-zod.js documents
-const makeAssistant = () => ({
-  log() {},
-  warn() {},
-  report: (msg, opts) => Object.assign(new Error(msg), { code: (opts || {}).code }),
-  request: { method: 'POST', user: { auth: { uid: 'u1', email: 'u1@test.com' } } },
-});
-const Manager = { cwd: '/tmp' };
+// The validated data, or the refusal thrown so a case fails naming it
+const resolve = (declaration, input) => {
+  const { data, error } = validate(declaration, input);
 
-const resolve = (schema, input) => new Settings(Manager).resolve(makeAssistant(), schema, input, {});
+  if (error) {
+    throw new Error(error);
+  }
+
+  return data;
+};
 
 const CREATE_INPUT = {
   title: 'Post',
@@ -85,7 +83,7 @@ module.exports = defineCases({
     {
       name: 'dispatch: the composed workflow is <target>-build.yml, named by devkit',
       async run({ assert }) {
-        const dispatchDeploy = require('../../../dist/manager/routes/admin/post/dispatch-deploy.js');
+        const dispatchDeploy = require('../../../dist/omega/routes/admin/post/dispatch-deploy.js');
 
         const requests = [];
         const savedFetch = globalThis.fetch;

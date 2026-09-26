@@ -8,4 +8,33 @@
 // ============================================
 // Custom Content Script Styles
 // ============================================
-// Add your project-specific content script CSS below...
+// The "Save selection as note" button (assets/js/components/content/index.js).
+// It only ever renders on the brand's own site, which carries the --omega-*
+// token sheet, so it paints in the site's own tokens.
+.notes-save-selection {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2147483647;
+  padding: 0.5rem 0.875rem;
+  border: 0;
+  border-radius: var(--omega-radius-m);
+  background: var(--omega-accent);
+  color: var(--omega-accent-ink);
+  box-shadow: var(--omega-shadow-2);
+  font: 500 0.875rem/1.2 var(--omega-font-ui);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--omega-accent-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}

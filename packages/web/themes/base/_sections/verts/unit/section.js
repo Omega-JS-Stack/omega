@@ -8,15 +8,14 @@
  * renders empty). One implementation
  * across web/desktop/extension (the data-omega-vert vocabulary). Paying users
  * never see the unit: the host carries the standard
- * `@hide auth.resolved.active` binding.
+ * `@hide auth.user.active` binding.
  */
-import omega from '@omega.js/client';
 
-export default (el) => {
+export default (el, { omega }) => {
   const $host = el.querySelector('.omega-vert-unit');
   if (!$host) {
     return;
   }
 
-  omega.verts().mount($host);
+  omega.verts.mount($host);
 };

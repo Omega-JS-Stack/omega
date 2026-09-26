@@ -1,5 +1,5 @@
 // Boot-runner — spawns electron with the consumer's actual built main bundle, runs
-// inspect functions against the live manager, then quits cleanly.
+// inspect functions against the live omega instance, then quits cleanly.
 //
 // Differences from runners/electron.js:
 //   - electron.js spawns electron with `harness/main-entry.js` and tests @omega.js/desktop lib code in isolation.
@@ -27,6 +27,7 @@ const { spawn, spawnSync } = require('child_process');
 const chalk = require('chalk').default;
 const distSnapshot = require('../utils/dist-snapshot.js');
 const { renderEvent } = require('./render-event.js');
+const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
 
 // How long a booted app gets to say anything at all before the run is declared
 // failed. Generous: the app under test is the consumer's real one, cold.
@@ -44,8 +45,8 @@ async function runBootTests({ tests, suites, projectRoot, frameworkDistRoot }) {
 
   // OMEGA_TEST_BOOT_PROJECT — boot a different project root than the CWD. Auto-set to the
   // bundled fixture when @omega.js/desktop self-tests (see commands/test.js); set it explicitly to boot a
-  // real consumer (e.g. deployment-playground-desktop) without cd-ing into it. Mirrors
-  // BXM's OMEGA_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
+  // real consumer (e.g. deployment-playground-desktop) without cd-ing into it. The
+  // same switch every framework's boot runner reads.
   const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
     ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
     : projectRoot;
@@ -147,7 +148,7 @@ async function bootProject({ tests, suites, effectiveRoot, frameworkDistRoot }) 
 
   const bootEntry = path.join(frameworkDistRoot, 'test', 'harness', 'boot-entry.js');
 
-  // Tell the consumer's main.js to publish the manager + run the boot harness.
+  // Tell the consumer's main.js to publish the instance + run the boot harness.
   // Three env vars are picked up by @omega.js/desktop's main.js after init completes:
   //   OMEGA_TEST_BOOT          — gate; "1" turns on harness loading
   //   OMEGA_TEST_BOOT_HARNESS  — absolute path to harness module (resolved here so it works
@@ -232,9 +233,9 @@ function runBootChild({ electronBin, args, childEnv, effectiveRoot, specFile, sk
       while ((nl = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
-        if (line.startsWith('__EM_TEST__')) {
+        if (line.startsWith(TEST_EVENT_PREFIX)) {
           armBudget();
-          renderEvent(JSON.parse(line.slice('__EM_TEST__'.length)), counts);
+          renderEvent(JSON.parse(line.slice(TEST_EVENT_PREFIX.length)), counts);
         } else if (process.env.OMEGA_TEST_DEBUG && line.trim().length > 0) {
           process.stdout.write(chalk.gray(`      ${line}\n`));
         }

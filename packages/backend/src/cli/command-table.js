@@ -225,8 +225,8 @@ const COMMANDS = [
     run: (self) => new MigrateRulesCommand(self).execute(),
   },
   {
-    // The one-time conversion of the PRE-FAMILY marker formats a tree carried
-    // over from BEM still holds. Evergreen verbs speak only the family grammar,
+    // The one-time conversion of the PRE-FAMILY marker formats an older tree
+    // still holds. Evergreen verbs speak only the family grammar,
     // so they detect those shapes and point here instead of converting
     // ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)).
     name: 'migrate:markers',

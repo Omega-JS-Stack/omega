@@ -23,7 +23,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: 'Raw HTML probe',
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,
@@ -40,7 +40,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/email', {
+        const response = await http.post('omega/admin/email', {
           subject: 'Raw HTML probe',
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,

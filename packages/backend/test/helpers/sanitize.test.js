@@ -1,5 +1,5 @@
 /**
- * Test: helpers/utilities.sanitize()
+ * Test: services/utilities.sanitize()
  * Unit tests for HTML sanitization and trimming across all data types
  *
  * Run: npx omega test helpers/sanitize
@@ -9,12 +9,12 @@
  * - All non-schema fields (no schema, sanitize everything)
  * - Combo: schema + non-schema fields together
  */
-const Utilities = require('../../dist/manager/helpers/utilities.js');
+const Utilities = require('../../dist/omega/services/utilities.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// Mock Manager
-const Manager = { libraries: {} };
-const utilities = new Utilities(Manager);
+// Mock omega
+const omega = { firebase: {} };
+const utilities = new Utilities(omega);
 
 module.exports = defineCases({
   description: 'Utilities.sanitize()',

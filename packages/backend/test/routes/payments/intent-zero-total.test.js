@@ -23,11 +23,11 @@
  *
  * Run: npx omega test backend:routes/payments/intent-zero-total
  */
-const paypalIntent = require('../../../dist/manager/routes/payments/intent/providers/paypal.js');
-const coinbaseIntent = require('../../../dist/manager/routes/payments/intent/providers/coinbase.js');
-const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
-const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
-const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const paypalIntent = require('../../../dist/omega/routes/payments/intent/providers/paypal.js');
+const coinbaseIntent = require('../../../dist/omega/routes/payments/intent/providers/coinbase.js');
+const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
+const Coinbase = require('../../../dist/omega/libraries/payment/providers/coinbase.js');
+const discountCodes = require('../../../dist/omega/libraries/payment/discount-codes.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-zero-total-buyer';
@@ -81,7 +81,7 @@ const CHARGE_RESPONSE = {
   },
 };
 
-/** A logger the provider can talk to, with no Manager behind it */
+/** A logger the provider can talk to, with no omega behind it */
 function testCtx() {
   const lines = [];
 

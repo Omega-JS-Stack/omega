@@ -45,7 +45,7 @@ function bundleOnce() {
     plugins: [{
       name: 'harness-aliases',
       setup(build) {
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -64,7 +64,7 @@ async function makeRenderer(core) {
 
   globalThis.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
-  globalThis.__omegaClient = { utilities: () => ({ escapeHTML: (value) => `${value}` }) };
+  globalThis.__omegaClient = { utilities: { escapeHTML: (value) => `${value}` } };
 
   delete require.cache[require.resolve(BUNDLE)];
   const calendar = require(BUNDLE);

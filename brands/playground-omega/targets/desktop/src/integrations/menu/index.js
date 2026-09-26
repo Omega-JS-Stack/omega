@@ -1,6 +1,10 @@
+// Surface: the application menu (a file-based definition): a "Notes" menu, and
+// the Preferences item opening the settings window
+// Doc: node_modules/@omega.js/desktop/docs/menu.md
+//
 // Application menu definition. Called by @omega.js/desktop during boot.
 //
-// `manager`  — the running @omega.js/desktop Manager.
+// `omega`: the running @omega.js/desktop main-process instance.
 // `menu`     — builder API + id-path API (find/update/remove/insertAfter/etc.).
 // `defaults` — the platform-aware default template (an array you can mutate manually if needed).
 //
@@ -18,23 +22,30 @@
 //   development/{open-exe-folder, open-user-data, open-logs, open-app-config,
 //                test-error}                                                       (dev only)
 
-module.exports = ({ manager, menu, defaults }) => {
-  // Start from the platform-appropriate default template. Don't add anything
-  // by default — leave it identical to what the framework would do without
-  // this file. Add your own customizations below.
+const { sendToNotes } = require('../../lib/notes.js');
+
+module.exports = ({ omega, menu, defaults }) => {
+  // Start from the platform-appropriate default template, then customize below.
   menu.useDefaults();
 
+  // "New note" brings the main window forward and focuses its composer
+  menu.menu('Notes', [
+    { id: 'notes/new', label: 'New note', accelerator: 'CommandOrControl+N', click: () => sendToNotes(omega, 'notes:focus') },
+  ]);
+
+  // Preferences ships hidden; this app has a settings window, so show it.
+  // create() is single-instance: a second click focuses the open window.
+  const preferences = process.platform === 'darwin' ? 'main/preferences' : 'file/preferences';
+  menu.show(preferences);
+  menu.update(preferences, { click: () => omega.windows.create('settings') });
+
   // ───────── Examples (uncomment to use) ─────────
-  //
-  // // Show the Preferences item (hidden by default — flip its visibility once you
-  // // wire up your settings window):
-  // menu.show(process.platform === 'darwin' ? 'main/preferences' : 'file/preferences');
   //
   // // Insert your own item right after Check for Updates:
   // menu.insertAfter('main/check-for-updates', {
   //   id: 'main/account',
   //   label: 'Account...',
-  //   click: () => manager.windows.show('account'),
+  //   click: () => omega.windows.show('account'),
   // });
   //
   // // Rename an existing item:

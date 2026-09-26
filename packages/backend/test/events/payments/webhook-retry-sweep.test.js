@@ -64,7 +64,7 @@ module.exports = defineCases({
         state.resourceId = `_test-retry-sub-${Date.now()}`;
         state.eventId = `_test-evt-retry-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'customer.subscription.updated',
           data: {
@@ -134,7 +134,7 @@ module.exports = defineCases({
         state.failedOrderId = '5151-5151-5151';
 
         // No uid anywhere the pipeline can reach — the trigger throws on it
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.failedEventId,
           type: 'customer.subscription.updated',
           data: {

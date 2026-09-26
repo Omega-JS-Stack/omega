@@ -13,8 +13,8 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const fetch = require('wonderful-fetch');
-const resolverPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/source-resolver.js');
-const { parseFeed, extractArticleContent } = require('../../../dist/manager/libraries/content/feed-parser.js');
+const resolverPath = path.resolve(__dirname, '../../../dist/omega/libraries/content/source-resolver.js');
+const { parseFeed, extractArticleContent } = require('../../../dist/omega/libraries/content/feed-parser.js');
 const { contentSourceHash, getProcessedItemIds, trackContentSource } = require(resolverPath);
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -22,8 +22,8 @@ const EXTENDED = !!process.env.TEST_EXTENDED_MODE;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 // Resolve .temp/ relative to @omega.js/backend repo root (3 dirs up from test/helpers/content/)
-const BEM_ROOT = path.resolve(__dirname, '..', '..', '..');
-const TEMP_DIR = path.join(BEM_ROOT, '.temp', 'ghostii-feed', `run-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`);
+const PACKAGE_ROOT = path.resolve(__dirname, '..', '..', '..');
+const TEMP_DIR = path.join(PACKAGE_ROOT, '.temp', 'ghostii-feed', `run-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`);
 
 // --- Real feed URLs for extended tests ---
 // Chosen for stability and confirmed to work with wonderful-fetch.

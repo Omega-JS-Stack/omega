@@ -18,7 +18,7 @@ supplies only what it alone can know.
   scripts, ad and chat widgets, and whatever browser extension a visitor installed. None of it is
   ours to answer for, so a browser event reports only when an `@omega.js` bundle is on its stack.
 - **Capture lives at SEAMS**, never in scattered try/catch: process hooks, the route error handler
-  (`RouteContext.report()`), the event-trigger catch, the SDK's own global handlers.
+  (`ctx.report()`), the event-trigger catch, the SDK's own global handlers.
 - **PII is scrubbed by default.** The uid rides (it is the join key to the account); the email is
   OFF unless a config explicitly opts in.
 - **Everything is OFF when the DSN is unset** — and when it is off, the SDK is never `require()`d
@@ -88,7 +88,7 @@ target answers from ([#817](https://github.com/Omega-JS-Stack/omega/issues/817))
 context such as a renderer bundle). `OMEGA_BUILD_MODE` used to be that default, which made it a
 FIFTH production signal with an opinion of its own: a build-mode run of a development artifact
 reported as production, and a packaged production app whose lane did not carry the flag reported as
-development. @omega.js/backend still passes its own answer in (`Manager.isProduction()`, env-derived
+development. @omega.js/backend still passes its own answer in (`omega.isProduction()`, env-derived
 and stable for the life of the process), alongside its own `reportErrorsInDev` option, and a boolean
 a host supplies always wins. A context that names no environment at all throws by name, the same way
 every other read of the one environment does.
@@ -119,8 +119,8 @@ by hand. Nothing tags a build stamp by design.
 
 | Surface | Seam |
 |---|---|
-| Backend routes | `RouteContext.report()` — 5xx captures automatically, 4xx never ([backend guide](../backend/index.md)) |
-| Backend event triggers | `helpers/event-middleware.js` — a handler that throws, or a handler file that will not load, goes through the SAME `report()` door. A deliberate block (an `HttpsError`, or an explicit numeric 4xx code) is the trigger's 4xx and never captures — a string `.code` (`ENOENT`, `messaging/invalid-token`) is a system error, not a block, and reports. |
+| Backend routes | `ctx.report()`: 5xx captures automatically, 4xx never ([backend guide](../backend/index.md)) |
+| Backend event triggers | `omega/events.js`: a handler that throws, or a handler file that will not load, goes through the SAME `report()` door. A deliberate block (an `HttpsError`, or an explicit numeric 4xx code) is the trigger's 4xx and never captures; a string `.code` (`ENOENT`, `messaging/invalid-token`) is a system error, not a block, and reports. |
 | Backend payment webhooks | the REFUSAL family's shared seam (`acknowledgeRefusal()` in `events/firestore/payments-webhooks/on-write.js`) captures ONE `warning` per refused event, tagged with the reason and the provider. A refusal is a decision, not a fault, so it never reports as an exception; a processed event reports nothing; and only IDS ride — the refusal stamp's own fields plus the event's ([#550](https://github.com/Omega-JS-Stack/omega/issues/550)). |
 | Desktop main | `@sentry/electron/main`'s own `OnUncaughtException` + `onUnhandledRejection` integrations. Desktop's process handlers log to `runtime.log` and are ADDITIVE — never a second capture. |
 | Desktop renderer | the SDK's window `error` / `unhandledrejection` handlers |
@@ -134,7 +134,7 @@ configured URL fragments. Default: `/assets/js/`, which is where both @omega.js/
 
 An event with **no matching frame is dropped**, and that includes an event with no frames at all — a
 cross-origin `Script error.` is exactly the third-party noise this exists to kill. Deliberate
-`omega.sentry().captureException(…)` calls are unaffected: they are thrown from page bundles, which
+`omega.sentry.captureException(…)` calls are unaffected: they are thrown from page bundles, which
 ARE our bundles. The corollary: a deliberate capture must pass an Error CONSTRUCTED in framework
 code — hand it a frameless one (a bare cross-browser `fetch` TypeError, say, which some engines
 raise with no usable stack) and the filter drops it, by design.

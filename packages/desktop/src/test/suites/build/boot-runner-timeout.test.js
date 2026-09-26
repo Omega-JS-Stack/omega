@@ -15,6 +15,7 @@ const jetpack = require('fs-jetpack');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const { runBootChild } = require(path.join(__dirname, '..', '..', 'runners', 'boot.js'));
+const { TEST_EVENT_PREFIX } = require(path.join(__dirname, '..', '..', '..', 'utils', 'test-events.js'));
 
 // A project root the runner reads its report clue from. `logLine` null writes no
 // logs/ at all, the boot that died before the logger ever opened a file.
@@ -152,11 +153,11 @@ module.exports = defineCases({
             killGraceMs:   20,
           });
 
-          child.stdout.emit('data', `__EM_TEST__${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
+          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
           await sleep(150);
-          child.stdout.emit('data', `__EM_TEST__${JSON.stringify({ event: 'result', name: 'a slow suite finishes', passed: true, duration: 12 })}\n`);
+          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'a slow suite finishes', passed: true, duration: 12 })}\n`);
           await sleep(150);
-          child.stdout.emit('data', `__EM_TEST__${JSON.stringify({ event: 'result', name: 'and another', passed: true, duration: 12 })}\n`);
+          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'and another', passed: true, duration: 12 })}\n`);
           await sleep(150);
           child.emit('exit', 0);
 
@@ -196,7 +197,7 @@ module.exports = defineCases({
             killGraceMs:   20,
           });
 
-          child.stdout.emit('data', `__EM_TEST__${JSON.stringify({ event: 'result', name: 'a late line', passed: true, duration: 12 })}\n`);
+          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'a late line', passed: true, duration: 12 })}\n`);
           child.emit('exit', 0);
           await sleep(40);
 
@@ -231,7 +232,7 @@ module.exports = defineCases({
             killGraceMs:   20,
           });
 
-          child.stdout.emit('data', `__EM_TEST__${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
+          child.stdout.emit('data', `${TEST_EVENT_PREFIX}${JSON.stringify({ event: 'result', name: 'the app boots', passed: true, duration: 12 })}\n`);
           child.emit('exit', 0);
 
           const settled = await pending;

@@ -9,7 +9,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('test:verts');
@@ -17,7 +17,7 @@ const logger = createLogger('test:verts');
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     document.querySelectorAll('.omega-vert-unit').forEach(($host) => {
       addReloadButton($host);
@@ -62,7 +62,7 @@ function reloadUnit($host) {
   $host.__omegaVertUnit = null;
   $host.__omegaVertMounted = false;
 
-  omega.verts().mount($host);
+  omega.verts.mount($host);
 
   logger.log('slot re-mounted', $host.getAttribute('data-omega-vert-size') || 'unsized');
 }

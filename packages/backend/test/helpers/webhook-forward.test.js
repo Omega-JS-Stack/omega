@@ -3,14 +3,14 @@
  *
  * Why this exists as a unit test (not an emulator test):
  *
- * The forwarder is gated on Manager.isParent(): the brand names no company, or
+ * The forwarder is gated on omega.isParent(): the brand names no company, or
  * names itself as one (`company: { id: 'self' }`, #677). In real test runs
  * we run AGAINST a child brand's @omega.js/backend (Somiibo, etc.), so the route is invisible
  * (404). To verify the fan-out logic, we exercise the route handler directly
  * against a mocked admin SDK + mocked fetch, no HTTP needed.
  *
  * What's covered:
- *   - Gate: returns 404 if Manager.isParent() returns false (the brand belongs to a company)
+ *   - Gate: returns 404 if omega.isParent() returns false (the brand belongs to a company)
  *   - Auth: returns 401 if key missing/wrong
  *   - Provider validation: returns 400 if missing
  *   - Brand iteration: reads brands collection, derives API URLs
@@ -27,7 +27,7 @@
 // runner, so the require cache is shared. We MUST save the original
 // wonderful-fetch cache entry here and restore it in the suite-level `cleanup`
 // below — otherwise this mock leaks into every test file that runs afterwards
-// (e.g. emulator route tests whose `Manager.require('wonderful-fetch')` would
+// (e.g. emulator route tests whose `omega.require('wonderful-fetch')` would
 // then return our stub instead of doing a real HTTP round-trip).
 const originalFetchPath = require.resolve('wonderful-fetch');
 const originalFetchCacheEntry = require.cache[originalFetchPath];
@@ -45,7 +45,7 @@ require.cache[originalFetchPath] = {
   },
 };
 
-const route = require('../../dist/manager/routes/marketing/webhook/forward/post.js');
+const route = require('../../dist/omega/routes/marketing/webhook/forward/post.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Restore the real wonderful-fetch in the require cache so the mock is confined
@@ -89,7 +89,7 @@ function makeAssistant({ query, body }) {
   const responses = [];
   return {
     request: { query: query || {} },
-    ref: { req: { body: body !== undefined ? body : [] } },
+    req: { body: body !== undefined ? body : [] },
     log: () => {},
     error: () => {},
     respond: (data, opts) => {
@@ -100,14 +100,13 @@ function makeAssistant({ query, body }) {
   };
 }
 
-function makeManager(configOverrides) {
+function makeOmega(configOverrides) {
   const config = {
     company: { id: 'self', url: 'https://itwcreativeworks.com', images: {} },
     ...configOverrides,
   };
   return {
     config,
-    libraries: {}, // Not used in this route — admin comes in via libraries arg
     // The real gate's rule (#677): no company, or this brand IS the company
     isParent: () => !config.company?.id || config.company.id === 'self',
   };
@@ -152,10 +151,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
-          const Manager = makeManager({ company: { id: 'itw-creative-works', url: 'https://itwcreativeworks.com', images: {} } }); // belongs to a company
+          const omega = makeOmega({ company: { id: 'itw-creative-works', url: 'https://itwcreativeworks.com', images: {} } }); // belongs to a company
           const admin = makeAdminMock([]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(ctx._responses.length, 1, 'should respond once');
           assert.equal(ctx._responses[0].code, 404, 'should return 404');
@@ -170,10 +169,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
-          const Manager = makeManager({ company: { id: 'self', url: 'https://itwcreativeworks.com', images: {} } });
+          const omega = makeOmega({ company: { id: 'self', url: 'https://itwcreativeworks.com', images: {} } });
           const admin = makeAdminMock([]); // No brands — but route still reaches the fan-out step
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(ctx._responses[0].code, 200, "should return 200 when company.id is 'self'");
           assert.equal(ctx._responses[0].data.forwarded, 0, 'no brands means 0 forwarded');
@@ -189,10 +188,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { key: 'test-key' } }); // no provider
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(ctx._responses[0].code, 400, 'missing provider → 400');
         });
@@ -205,10 +204,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid' } }); // no key
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(ctx._responses[0].code, 401, 'missing key → 401');
         });
@@ -221,10 +220,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'real-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'wrong-key' } });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(ctx._responses[0].code, 401, 'wrong key → 401');
         });
@@ -243,13 +242,13 @@ module.exports = defineCases({
             query: { provider: 'sendgrid', key: 'test-key' },
             body,
           });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
             { id: 'chatsy', data: { brand: { id: 'chatsy', url: 'https://chatsy.com' } } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 2, 'should fan out to both brands');
           assert.equal(
@@ -283,12 +282,12 @@ module.exports = defineCases({
             query: { provider: 'beehiiv', key: 'test-key' },
             body,
           });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 1);
           assert.ok(fetchCalls[0].url.includes('provider=beehiiv'), 'provider param preserved');
@@ -303,14 +302,14 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
             { id: 'partial-brand', data: { brand: { id: 'partial-brand' /* no url */ } } },
             { id: 'no-brand-key', data: { /* no brand at all */ } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 1, 'only the brand with a URL should be fanned to');
           assert.ok(fetchCalls[0].url.includes('api.somiibo.com'), 'somiibo was the one called');
@@ -331,14 +330,14 @@ module.exports = defineCases({
           };
 
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
             { id: 'chatsy', data: { brand: { id: 'chatsy', url: 'https://chatsy.com' } } },
             { id: 'dashqr', data: { brand: { id: 'dashqr', url: 'https://dashqr.com' } } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 3, 'all 3 children attempted');
           const response = ctx._responses[0];
@@ -357,13 +356,13 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
             { id: 'broken', data: { brand: { id: 'broken', url: 'not-a-valid-url' } } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           const response = ctx._responses[0];
           assert.equal(response.code, 200, 'route still returns 200');
@@ -383,13 +382,13 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
-          const Manager = makeManager({ brand: { id: 'itw-creative-works' } });
+          const omega = makeOmega({ brand: { id: 'itw-creative-works' } });
           const admin = makeAdminMock([
             { id: 'itw-creative-works', data: { brand: { id: 'itw-creative-works', url: 'https://itwcreativeworks.com' } } },
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
           ]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 2, 'parent fans out to ALL brands including itself');
           assert.ok(
@@ -406,10 +405,10 @@ module.exports = defineCases({
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
-          const Manager = makeManager();
+          const omega = makeOmega();
           const admin = makeAdminMock([]);
 
-          await route({ ctx, Manager, libraries: { admin } });
+          await route({ ctx, omega: { ...omega, firebase: { admin } } });
 
           assert.equal(fetchCalls.length, 0);
           assert.equal(ctx._responses[0].code, 200, 'still 200 with no brands');

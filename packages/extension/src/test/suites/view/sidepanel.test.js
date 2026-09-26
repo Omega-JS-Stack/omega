@@ -1,4 +1,4 @@
-// View-layer test for the sidepanel context. Most consumers of BXM use
+// View-layer test for the sidepanel context. Most extension consumers use
 // chrome.sidePanel for the Chrome 114+ UI panel surface — verify that
 // the test harness can target it just like popup/options.
 

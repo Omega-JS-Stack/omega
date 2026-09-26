@@ -29,7 +29,7 @@ const motion = createMotion();
 // picks up anything rendered later.
 motion.start();
 
-// Handed to the main bundle's motion module, which registers it on the omega
-// library for programmatic access (omega.library().motion.scan(el)). One engine
-// per page: the bundle adopts this instance rather than starting a second.
+// Handed to the web runtime, which adopts it as `omega.motion` for
+// programmatic access (omega.motion.scan(el)). One engine per page: the
+// runtime adopts this instance rather than starting a second.
 window.__omegaMotion = motion;

@@ -5,7 +5,7 @@
 // sometimes never (a declined charge, an undelivered webhook in local dev). The
 // redirect's URL params are the provider's claim, not proof, so the page asks
 // the account itself before it congratulates anyone.
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { FREQUENCIES } from '../../checkout/modules/state.js';
 
@@ -60,38 +60,34 @@ export function initialStatus(state) {
  * webhook writes. The plan has to MATCH: a user who already held one plan while
  * buying another must not be confirmed by the plan they walked in with.
  *
- * @param {object|null} account - the user doc, or null when there is none
+ * @param {User|null} user - the User from a fresh read of the account, or null when there is none
  * @param {string} productId - the plan the redirect says was bought
  */
-export function purchaseLanded(account, productId) {
-  // No account doc is no ANSWER, never a yes — and it must not be asked about
-  // either: the client's `resolveSubscription(account)` falls back to the STORED
-  // auth state when it is handed nothing, so a null read would be answered out
-  // of localStorage with the plan the shopper walked in with.
-  if (!account) {
+export function purchaseLanded(user, productId) {
+  // No account doc is no ANSWER, never a yes: a null read is never answered
+  // with the plan the shopper walked in with
+  if (!user) {
     return false;
   }
 
-  const resolved = omega.auth().resolveSubscription(account);
-
-  if (!resolved.active) {
+  if (!user.active) {
     return false;
   }
 
-  return !productId || resolved.plan === productId;
+  return !productId || user.plan === productId;
 }
 
-// Read the buyer's own account doc.
+// Read the buyer's own account, FRESH. The signed-in User was built before the
+// webhook landed, so its plan is the one the shopper walked in with;
+// `omega.auth.reload()` re-reads the doc and lands the rebuilt User everywhere.
 async function readAccount() {
-  const user = omega.auth().getUser();
-
-  if (!user) {
+  if (!omega.auth.user.authenticated) {
     return null;
   }
 
-  const snapshot = await omega.firestore().doc(`users/${user.uid}`).get();
+  const { user } = await omega.auth.reload();
 
-  return snapshot.exists() ? snapshot.data() : null;
+  return user;
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -119,17 +115,17 @@ export async function verifyPurchase(state, {
   const deadline = now() + timeoutMs;
 
   while (true) {
-    let account = null;
+    let user = null;
 
     try {
-      account = await read();
+      user = await read();
     } catch (e) {
       // A read that FAILED is no answer, not a NO — the webhook may still be in
       // flight behind a network blip. Keep asking; the budget decides.
       logger.warn(`Could not read the account while confirming the purchase: ${e.message}`);
     }
 
-    if (purchaseLanded(account, state.productId)) {
+    if (purchaseLanded(user, state.productId)) {
       return 'confirmed';
     }
 

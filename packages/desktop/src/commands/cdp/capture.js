@@ -21,7 +21,7 @@
 const { execFileSync } = require('child_process');
 const client = require('./client');
 
-const Manager = new (require('../../build.js'))();
+const build = require('../../build.js');
 
 const SRGB_PROFILE = '/System/Library/ColorSync/Profiles/sRGB Profile.icc';
 
@@ -65,7 +65,7 @@ module.exports = async function (options) {
     throw new Error('mgr cdp capture is macOS-only (screencapture/sips/osascript)');
   }
 
-  const names = client.appNames(Manager.getConfig());
+  const names = client.appNames(build.getConfig());
 
   if (options['find-window-id'] || options.findWindowId) {
     console.log(findWindowIds(names) || `no windows found (tried: ${names.join(', ')})`);

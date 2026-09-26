@@ -28,17 +28,17 @@
 const { callHandler } = require('./_route-harness.js');
 const { TEST_ACCOUNTS } = require('../../../dist/test/test-accounts.js');
 
-const webhookHandler = require('../../../dist/manager/routes/payments/webhook/post.js');
-const disputeHandler = require('../../../dist/manager/routes/payments/dispute-alert/post.js');
+const webhookHandler = require('../../../dist/omega/routes/payments/webhook/post.js');
+const disputeHandler = require('../../../dist/omega/routes/payments/dispute-alert/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
 
 // The `test` provider fabricates Stripe-shaped events locally and signs nothing,
 // so a webhook delivery here never needs a secret or the network.
-function deliverWebhook(Manager, eventId) {
+function deliverWebhook(omega, eventId) {
   return callHandler({
-    Manager,
+    omega,
     handler: webhookHandler,
     functionName: 'payments-webhook',
     req: {
@@ -58,9 +58,9 @@ function deliverWebhook(Manager, eventId) {
   });
 }
 
-function deliverDisputeAlert(Manager, alertId) {
+function deliverDisputeAlert(omega, alertId) {
   return callHandler({
-    Manager,
+    omega,
     handler: disputeHandler,
     functionName: 'payments-dispute-alert',
     req: {
@@ -97,12 +97,12 @@ module.exports = defineCases({
     {
       name: 'two-same-instant-webhook-deliveries-process-once',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const eventId = '_test-evt-dedup-race';
 
         const sent = await Promise.all([
-          deliverWebhook(Manager, eventId),
-          deliverWebhook(Manager, eventId),
+          deliverWebhook(omega, eventId),
+          deliverWebhook(omega, eventId),
         ]);
 
         assertExactlyOneProcessed(assert, sent, 'webhook');
@@ -112,14 +112,14 @@ module.exports = defineCases({
     {
       name: 'a-failed-webhook-is-still-reclaimable',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const eventId = '_test-evt-dedup-race-retry';
 
         // The retry path the atomic claim must preserve: a previously FAILED
         // delivery is the one existing state a new delivery may take over.
         await firestore.set(`payments-webhooks/${eventId}`, { id: eventId, status: 'failed', error: 'Previous error' });
 
-        const sent = await deliverWebhook(Manager, eventId);
+        const sent = await deliverWebhook(omega, eventId);
 
         assert.equal(sent.code, 200, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.ok(!sent.body?.duplicate, 'A failed webhook must not be reported as a duplicate');
@@ -138,7 +138,7 @@ module.exports = defineCases({
       // ([#212](https://github.com/Omega-JS-Stack/omega/issues/212)).
       name: 'a-reclaimed-webhook-starts-a-fresh-retry-ladder',
       auth: 'none',
-      async run({ assert, Manager, firestore, waitFor }) {
+      async run({ assert, omega, firestore, waitFor }) {
         const eventId = '_test-evt-dedup-race-deadlettered';
 
         // A doc the sweep gave up on: the ceiling burned, stamped once, terminal.
@@ -150,7 +150,7 @@ module.exports = defineCases({
           deadLetter: true,
         });
 
-        const sent = await deliverWebhook(Manager, eventId);
+        const sent = await deliverWebhook(omega, eventId);
 
         assert.equal(sent.code, 200, `A redelivery should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.ok(!sent.body?.duplicate, 'A dead-lettered webhook must still be reclaimable — redelivery is the escape hatch');
@@ -171,12 +171,12 @@ module.exports = defineCases({
     {
       name: 'a-failed-dispute-alert-is-still-reclaimable',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const alertId = '_test-dispute-dedup-race-retry';
 
         await firestore.set(`payments-disputes/${alertId}`, { id: alertId, status: 'failed', error: 'Previous error' });
 
-        const sent = await deliverDisputeAlert(Manager, alertId);
+        const sent = await deliverDisputeAlert(omega, alertId);
 
         assert.equal(sent.code, 200, `A retry should answer 200, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.ok(!sent.body?.duplicate, 'A failed dispute alert must not be reported as a duplicate');

@@ -190,7 +190,7 @@ function scaffoldConfigs(projectDir, result) {
  * (Cloud Functions runtime detection). Derived from the FRAMEWORK's pinned
  * runtime, never the ambient node: a scaffold must produce the same app under
  * any shell (cp195 journey catch — an ambient-24 run stamped 24 against the
- * v22/* .nvmrc and boot died on the Manager.init version mismatch). A
+ * v22/* .nvmrc and boot died on the omega.initialize() version mismatch). A
  * consumer-authored value is never overwritten.
  *
  * scripts: the opposite policy, and the same one the three sibling frameworks

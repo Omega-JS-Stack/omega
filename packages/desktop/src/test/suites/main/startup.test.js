@@ -13,78 +13,78 @@ module.exports = defineCases({
   description: 'startup (main)',
   cleanup: (ctx) => {
     // Restore default mode so no later suite is affected.
-    if (ctx.manager.config?.startup) {
-      ctx.manager.config.startup.mode = 'normal';
+    if (ctx.omega.config?.startup) {
+      ctx.omega.config.startup.mode = 'normal';
     }
   },
   tests: [
     {
       name: 'initialize ran during boot',
       run: (ctx) => {
-        ctx.expect(ctx.manager.startup._initialized).toBe(true);
+        ctx.expect(ctx.omega.startup._initialized).toBe(true);
       },
     },
     {
       name: 'getMode returns "normal" by default',
       run: (ctx) => {
-        ctx.manager.config.startup.mode = 'normal';
-        ctx.expect(ctx.manager.startup.getMode()).toBe('normal');
+        ctx.omega.config.startup.mode = 'normal';
+        ctx.expect(ctx.omega.startup.getMode()).toBe('normal');
       },
     },
     {
       name: 'getMode honors valid values',
       run: (ctx) => {
         for (const mode of ['normal', 'hidden']) {
-          ctx.manager.config.startup.mode = mode;
-          ctx.expect(ctx.manager.startup.getMode()).toBe(mode);
+          ctx.omega.config.startup.mode = mode;
+          ctx.expect(ctx.omega.startup.getMode()).toBe(mode);
         }
       },
     },
     {
       name: 'getMode falls back to "normal" for unknown values',
       run: (ctx) => {
-        ctx.manager.config.startup.mode = 'banana';
-        ctx.expect(ctx.manager.startup.getMode()).toBe('normal');
+        ctx.omega.config.startup.mode = 'banana';
+        ctx.expect(ctx.omega.startup.getMode()).toBe('normal');
       },
     },
     {
       name: 'getMode rejects deprecated tray-only as unknown (falls back to normal)',
       run: (ctx) => {
         // tray-only was folded into hidden; it's no longer a valid mode.
-        ctx.manager.config.startup.mode = 'tray-only';
-        ctx.expect(ctx.manager.startup.getMode()).toBe('normal');
+        ctx.omega.config.startup.mode = 'tray-only';
+        ctx.expect(ctx.omega.startup.getMode()).toBe('normal');
       },
     },
     {
       name: 'isLaunchHidden true for hidden, false for normal',
       run: (ctx) => {
-        ctx.manager.config.startup.mode = 'normal';
-        ctx.expect(ctx.manager.startup.isLaunchHidden()).toBe(false);
-        ctx.manager.config.startup.mode = 'hidden';
-        ctx.expect(ctx.manager.startup.isLaunchHidden()).toBe(true);
+        ctx.omega.config.startup.mode = 'normal';
+        ctx.expect(ctx.omega.startup.isLaunchHidden()).toBe(false);
+        ctx.omega.config.startup.mode = 'hidden';
+        ctx.expect(ctx.omega.startup.isLaunchHidden()).toBe(true);
       },
     },
     {
       name: 'applyEarly is a no-op outside hidden mode',
       run: (ctx) => {
-        ctx.manager.config.startup.mode = 'normal';
+        ctx.omega.config.startup.mode = 'normal';
         // Just confirm it doesn't throw.
-        ctx.manager.startup.applyEarly();
+        ctx.omega.startup.applyEarly();
         ctx.expect(true).toBe(true);
       },
     },
     {
       name: 'applyEarly does not throw for hidden mode',
       run: (ctx) => {
-        ctx.manager.config.startup.mode = 'hidden';
-        ctx.manager.startup.applyEarly();
+        ctx.omega.config.startup.mode = 'hidden';
+        ctx.omega.startup.applyEarly();
         ctx.expect(true).toBe(true);
       },
     },
     {
       name: 'isOpenAtLogin returns a boolean (or null on platforms without support)',
       run: (ctx) => {
-        const v = ctx.manager.startup.isOpenAtLogin();
+        const v = ctx.omega.startup.isOpenAtLogin();
         ctx.expect(v === null || typeof v === 'boolean').toBe(true);
       },
     },
@@ -92,7 +92,7 @@ module.exports = defineCases({
       name: 'setOpenAtLogin runs without throwing',
       run: (ctx) => {
         // Set to false to avoid actually registering the test harness for login on the dev box.
-        ctx.manager.startup.setOpenAtLogin(false);
+        ctx.omega.startup.setOpenAtLogin(false);
         ctx.expect(true).toBe(true);
       },
     },
@@ -100,17 +100,17 @@ module.exports = defineCases({
       name: 'setOpenAtLogin accepts the object form { enabled, mode }',
       run: (ctx) => {
         // Object form should not throw and should round-trip the args/openAsHidden flags.
-        ctx.manager.startup.setOpenAtLogin({ enabled: false, mode: 'normal' });
-        ctx.manager.startup.setOpenAtLogin({ enabled: true,  mode: 'hidden' });
+        ctx.omega.startup.setOpenAtLogin({ enabled: false, mode: 'normal' });
+        ctx.omega.startup.setOpenAtLogin({ enabled: true,  mode: 'hidden' });
         // Restore to disabled at end so we don't leave the test harness as a login item.
-        ctx.manager.startup.setOpenAtLogin(false);
+        ctx.omega.startup.setOpenAtLogin(false);
         ctx.expect(true).toBe(true);
       },
     },
     {
       name: 'wasLaunchedAtLogin returns a boolean',
       run: (ctx) => {
-        ctx.expect(typeof ctx.manager.startup.wasLaunchedAtLogin()).toBe('boolean');
+        ctx.expect(typeof ctx.omega.startup.wasLaunchedAtLogin()).toBe('boolean');
       },
     },
     {
@@ -119,7 +119,7 @@ module.exports = defineCases({
         // The harness runs unpackaged, so initialize() must have force-OFF'd the login item.
         // Confirm the current OS state reflects that — getLoginItemSettings should report
         // openAtLogin: false. (Note: returns null on platforms without LoginItemSettings.)
-        const live = ctx.manager.startup.isOpenAtLogin();
+        const live = ctx.omega.startup.isOpenAtLogin();
         if (live !== null) {
           ctx.expect(live).toBe(false);
         }

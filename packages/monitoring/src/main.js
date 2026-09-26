@@ -25,7 +25,7 @@ const main = {
   _Sentry:      null,
 
   /**
-   * @param {object} host - the desktop Manager: { config, getVersion() }
+   * @param {object} host - the desktop Omega instance: { config, getVersion() }
    */
   initialize(host) {
     main._initialized = true;

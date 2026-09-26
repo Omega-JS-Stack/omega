@@ -29,7 +29,7 @@ module.exports = defineCases({
         state.paidProductId = paidProduct.id;
         state.product = payments.products[paidProduct.id];
         // Create subscription via test intent — auto-fires webhook pipeline
-        const response = await http.as('journey-payments-cancel-route').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-cancel-route').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
@@ -56,7 +56,7 @@ module.exports = defineCases({
         // Test provider writes a payments-webhooks doc directly,
         // triggering the on-write pipeline automatically — no manual webhook needed.
         // skipGuards bypasses the 24-hour subscription-age guard.
-        const response = await http.as('journey-payments-cancel-route').post('backend-manager/payments/cancel', {
+        const response = await http.as('journey-payments-cancel-route').post('omega/payments/cancel', {
           confirmed: true,
           reason: 'Too expensive',
           feedback: 'Would return at a lower price',

@@ -55,7 +55,7 @@ There are five places where consent gets recorded or updated. All five converge 
 
 ### 1. Signup form (Phase B)
 
-[src/manager/routes/user/signup/post.js](../src/manager/routes/user/signup/post.js) — the existing `/user/signup` route now accepts a `consent` settings field:
+[src/omega/routes/user/signup/post.js](../src/omega/routes/user/signup/post.js): the existing `/user/signup` route now accepts a `consent` settings field:
 
 ```js
 // Client sends (lightweight transit shape):
@@ -67,7 +67,7 @@ There are five places where consent gets recorded or updated. All five converge 
 }
 ```
 
-`buildConsentRecord(ctx, settings.consent, creationTime, existingConsent)` translates this into the canonical user-doc shape:
+`buildConsentRecord(ctx, data.consent, creationTime, existingConsent)` translates this into the canonical user-doc shape:
 
 - `legal.granted: true` → `legal.status = 'granted'`, `grantedAt` populated with `source: 'signup'` + **timestamp from Auth `creationTime`** + server-detected IP + exact label text.
 - `marketing.granted: false` → `marketing.status = 'revoked'`, `grantedAt` all-null, `revokedAt` populated with `source: 'signup'`. (Records the explicit decline.)
@@ -84,7 +84,7 @@ There are five places where consent gets recorded or updated. All five converge 
 
 ### 2. Account-page toggle (Phase D)
 
-[src/manager/routes/marketing/email-preferences/post.js](../src/manager/routes/marketing/email-preferences/post.js) — authenticated mode.
+[src/omega/routes/marketing/email-preferences/post.js](../src/omega/routes/marketing/email-preferences/post.js): authenticated mode.
 
 ```
 POST /omega/marketing/email-preferences
@@ -116,7 +116,7 @@ Body: { email, asmId, sig, action: 'subscribe' | 'unsubscribe' }
 
 ### 4. Provider webhooks (Phase E)
 
-[src/manager/routes/marketing/webhook/post.js](../src/manager/routes/marketing/webhook/post.js) — receives unsub / spam / bounce events from SendGrid and Beehiiv.
+[src/omega/routes/marketing/webhook/post.js](../src/omega/routes/marketing/webhook/post.js): receives unsub / spam / bounce events from SendGrid and Beehiiv.
 
 ```
 POST /omega/marketing/webhook?provider=sendgrid&key=<OMEGA_WEBHOOK_KEY>
@@ -126,7 +126,7 @@ POST /omega/marketing/webhook?provider=beehiiv&key=<OMEGA_WEBHOOK_KEY>
 The dispatcher loads `providers/{provider}.js`, parses the event(s), and for each event:
 
 1. Checks `isSupported(eventType)` — filters out non-revoke events like `delivered` / `open`.
-2. Calls `handleEvent({ Manager, ctx, parsed })` on the provider.
+2. Calls `handleEvent({ omega, ctx, parsed })` on the provider.
 
 There is **no idempotency ledger**. Both handler side effects — writing `consent.marketing.status = 'revoked'` and calling `mailer.remove()` — are idempotent, so a provider retry (or a duplicate fan-out from the parent) re-runs to the same end state with no extra side effects. This is the key difference from `payments-webhooks`, where dedup is load-bearing because payment side effects are not idempotent.
 
@@ -145,11 +145,11 @@ Each provider's `handleEvent` does the same shape of work:
 \* `bounce` and `dropped` only revoke consent when `bounce_classification` is `'Invalid Address'` (hard bounce). Technical bounces (DMARC, TLS, DNS, reputation) are sender-side issues — the recipient's email is still valid, so consent is preserved.
 | Beehiiv | `subscription.unsubscribed`, `subscription.deleted`, `subscription.paused` |
 
-**Beehiiv publication filter.** Each Beehiiv event includes a `publication_id`. The provider compares this against `beehiivProvider.getPublicationId()`, which reads `Manager.config.marketing.newsletter.providers.beehiiv.publicationId` (populated at brand-onboarding time by OMEGA's `newsletter/ensure/publication.js`). Mismatch → silent skip. This is how shared-publication events (e.g. devbeans shared by 6 brands) get routed correctly — each brand processes only events matching its own publication. Brands without `publicationId` in config silently skip all Beehiiv webhook events. The same convention applies to SendGrid: `marketing.campaigns.providers.sendgrid.listId` is populated by OMEGA's `campaigns/ensure/list.js`.
+**Beehiiv publication filter.** Each Beehiiv event includes a `publication_id`. The provider compares this against `beehiivProvider.getPublicationId()`, which reads `omega.config.marketing.newsletter.providers.beehiiv.publicationId` (populated at brand-onboarding time by OMEGA's `newsletter/ensure/publication.js`). Mismatch → silent skip. This is how shared-publication events (e.g. devbeans shared by 6 brands) get routed correctly: each brand processes only events matching its own publication. Brands without `publicationId` in config silently skip all Beehiiv webhook events. The same convention applies to SendGrid: `marketing.campaigns.providers.sendgrid.listId` is populated by OMEGA's `campaigns/ensure/list.js`.
 
 ### 5. Admin contact removal
 
-[src/manager/routes/marketing/contact/delete.js](../src/manager/routes/marketing/contact/delete.js) — admin-only endpoint.
+[src/omega/routes/marketing/contact/delete.js](../src/omega/routes/marketing/contact/delete.js): admin-only endpoint.
 
 ```
 DELETE /omega/marketing/contact
@@ -160,7 +160,7 @@ After removing the contact from all providers, the route mirrors `consent.market
 
 ## Parent forwarder (Phase E)
 
-[src/manager/routes/marketing/webhook/forward/post.js](../src/manager/routes/marketing/webhook/forward/post.js)
+[src/omega/routes/marketing/webhook/forward/post.js](../src/omega/routes/marketing/webhook/forward/post.js)
 
 SendGrid and Beehiiv only let you configure a small number of webhook URLs (often one per account). With many brands sharing the same SendGrid account, we can't point the webhook at every brand's @omega.js/backend directly. Instead:
 
@@ -169,7 +169,7 @@ SendGrid → POST https://api.itwcreativeworks.com/omega/marketing/webhook/forwa
 Beehiiv  → POST https://api.itwcreativeworks.com/omega/marketing/webhook/forward?provider=beehiiv&key=X
 ```
 
-The **parent @omega.js/backend** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other @omega.js/backend has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
+The **parent @omega.js/backend** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other @omega.js/backend has the route but it returns 404 (gated on `omega.isParent()`).
 
 The parent forwarder:
 
@@ -202,9 +202,9 @@ The parent @omega.js/backend has its own brand (e.g. `itw-creative-works`) with 
 
 ## Email library consent gate
 
-[src/manager/libraries/email/marketing/index.js](../src/manager/libraries/email/marketing/index.js)
+[src/omega/libraries/email/marketing/index.js](../src/omega/libraries/email/marketing/index.js)
 
-`email.add()` and `email.sync()` check the user's `consent.marketing.status` IN THE LIBRARY, before validation and provider calls. Because the gate lives in the library rather than at call sites, every caller is covered: the signup route, the email-preferences toggle, payment-event syncs ([events/firestore/payments-webhooks/on-write.js](../src/manager/events/firestore/payments-webhooks/on-write.js)), the admin PUT re-sync (`routes/marketing/contact/put.js`), the public newsletter form (`routes/marketing/contact/post.js`).
+`email.add()` and `email.sync()` check the user's `consent.marketing.status` IN THE LIBRARY, before validation and provider calls. Because the gate lives in the library rather than at call sites, every caller is covered: the signup route, the email-preferences toggle, payment-event syncs ([events/firestore/payments-webhooks/on-write.js](../src/omega/events/firestore/payments-webhooks/on-write.js)), the admin PUT re-sync (`routes/marketing/contact/put.js`), the public newsletter form (`routes/marketing/contact/post.js`).
 
 **Semantics:**
 
@@ -273,15 +273,15 @@ Every other brand:
 }
 ```
 
-**Convention:** `parent` stores the parent's brand URL (matching the format of `brand.url`), NOT the API URL. The `api.` subdomain is inserted at call time by `Manager.getParentApiUrl()`. This keeps stored config in one consistent format and lets the deployment convention (`api.` subdomain) live in one place.
+**Convention:** `parent` stores the parent's brand URL (matching the format of `brand.url`), NOT the API URL. The `api.` subdomain is inserted at call time by `omega.getParentApiUrl()`. This keeps stored config in one consistent format and lets the deployment convention (`api.` subdomain) live in one place.
 
-**Three helpers** on the Manager instance for working with this:
+**Three helpers** on the instance for working with this:
 
-- `Manager.getParentUrl()` — returns the parent's brand URL. Resolves `'self'` to `Manager.config.brand.url`.
-- `Manager.getParentApiUrl()` — returns the parent's API URL (`https://api.{host}`). **Always live** — does NOT redirect to localhost in dev mode, because you can't run two Firebase emulators simultaneously. The parent's API is always the production URL regardless of which environment THIS brand is in.
-- `Manager.isParent()` — boolean, true when `config.parent === 'self'`.
+- `omega.getParentUrl()`: returns the parent's website URL, `config.company.url`, else this brand's own `config.brand.url`.
+- `omega.getParentApiUrl()`: returns the parent's API URL (`https://api.{host}`). **Always live**: it does NOT redirect to localhost in dev mode, because you can't run two Firebase emulators simultaneously. The parent's API is always the production URL regardless of which environment THIS brand is in.
+- `omega.isParent()`: boolean, true when the config names no company or `company: { id: 'self' }`.
 
-Only the @omega.js/backend where `Manager.isParent()` returns true exposes `/marketing/webhook/forward`. Everywhere else, the route is invisible (404).
+Only the @omega.js/backend where `omega.isParent()` returns true exposes `/marketing/webhook/forward`. Everywhere else, the route is invisible (404).
 
 ## Legacy user migration
 
@@ -330,7 +330,7 @@ After the migration: optionally run a re-opt-in drip campaign to legally recover
 - [test/routes/user/signup.test.js](../test/routes/user/signup.test.js) — 3 tests for signup-time consent capture (granted both, marketing declined, missing payload)
 - [test/routes/marketing/email-preferences.test.js](../test/routes/marketing/email-preferences.test.js) — 14 tests for the email-preferences route (anonymous HMAC + authenticated)
 - [test/routes/marketing/webhook.test.js](../test/routes/marketing/webhook.test.js) — 15+ tests covering SendGrid + Beehiiv providers against the emulator
-- [test/routes/marketing/webhook-forward.test.js](../test/routes/marketing/webhook-forward.test.js) — verifies the forwarder route returns 404 on non-parent BEMs
+- [test/routes/marketing/webhook-forward.test.js](../test/routes/marketing/webhook-forward.test.js): verifies the forwarder route returns 404 on non-parent backends
 - [test/helpers/webhook-forward.test.js](../test/helpers/webhook-forward.test.js) — 12 unit-style tests with mocked admin + fetch, covering fan-out, URL derivation, failure isolation, self-inclusion, edge cases
 - [test/email/marketing/consent-gate.test.js](../test/email/marketing/consent-gate.test.js) — 21 plain-node tests for the library consent gate (revoked-only skip semantics, `{ blocked: 'consent' }` returns from `sync()`/`add()`, by-email lookup query + normalization, fail-open on lookup errors); the tests themselves touch no emulator and no network (the runner still boots its standard harness)
 
@@ -342,7 +342,7 @@ Run with `npx omega test` (full suite) or `npx omega test routes/marketing/webho
 
 Most @omega.js/backend tests are self-contained against the local emulator. The marketing-consent system has one test that's an exception — [test/email/consent-lifecycle.test.js](../test/email/consent-lifecycle.test.js) — which makes real API calls to SendGrid + Beehiiv to verify the full round-trip works end-to-end.
 
-The validation pipeline (`src/manager/libraries/email/validation.js`) blocks all `_test.*` emails from reaching providers via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`. The two `_test.allow_*` sentinels (`_test.allow_consent-granted` and `_test.allow_consent-declined`) used by the lifecycle test bypass that gate intentionally, and the test cleans up after itself (phase-3 removes the granted contact via `Manager.Email().remove()`).
+The validation pipeline (`src/omega/libraries/email/validation.js`) blocks all `_test.*` emails from reaching providers via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`. The two `_test.allow_*` sentinels (`_test.allow_consent-granted` and `_test.allow_consent-declined`) used by the lifecycle test bypass that gate intentionally, and the test cleans up after itself (phase-3 removes the granted contact via `omega.email.remove()`).
 
 The "all cleanup runs at start, never at the end" rule documented in [docs/test-framework.md](test-framework.md) applies to all test data, including third-party providers.
 

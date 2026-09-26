@@ -35,6 +35,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 const yaml = require('js-yaml');
 const { Liquid } = require('liquidjs');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
@@ -71,7 +72,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -180,7 +181,7 @@ function documentFor(html) {
   globalThis.window = { location: { search: '', href: 'https://x.test/account' }, addEventListener() {} };
   globalThis.__omegaClient = {
     getApiUrl: () => 'https://api.x.test',
-    utilities: () => ({ escapeHTML: (value) => `${value}` }),
+    utilities: { escapeHTML: (value) => `${value}` },
     request: async () => ({}),
   };
 
@@ -188,7 +189,7 @@ function documentFor(html) {
 }
 
 /** Render the markup, run the REAL section over it, hand back what it did. */
-async function runSection({ connectionsConfig = CONNECTIONS_CONFIG, account = {} } = {}) {
+async function runSection({ connectionsConfig = CONNECTIONS_CONFIG, account = new User({}, { uid: 'u1' }) } = {}) {
   await bundleOnce();
 
   const html = await renderConnections(connectionsConfig);

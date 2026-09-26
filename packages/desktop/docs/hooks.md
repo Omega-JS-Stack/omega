@@ -6,7 +6,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 1. @omega.js/desktop scaffolds empty hook files into `<consumer>/hooks/**/*.js` on every verb (`ensureTarget()`).
 2. At each lifecycle point, @omega.js/desktop checks for the file. If it exists, @omega.js/desktop loads + invokes it. If not, no-op.
-3. The hook signature is `async (ctx) => { ... }`. Whatever it returns is awaited but ignored.
+3. The hook signature is `async (ctx) => { ... }`, with `ctx` the ONE hook-argument shape every OMEGA framework passes, `{ build, projectRoot, mode }`: `build` is the build module (`require('@omega.js/desktop/build')`, one plain object of functions: `getConfig()`, `getPackage()`, `getRootPath()`, ...). Whatever it returns is awaited but ignored.
 4. **Failure semantics:**
    - File missing entirely → logged informationally (`hook "<name>" not present at ... — skipping.`), build continues.
    - File exists but fails to load (syntax error, etc.) → **throws**, build fails.
@@ -19,11 +19,11 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 | Hook file | When it runs | `ctx` shape |
 |---|---|---|
-| `hooks/build/pre.js`     | Before the build pipeline runs (`defaults` → `distribute` → `bundle` ...) | `{ manager, projectRoot, mode }` |
-| `hooks/build/post.js`    | After the build pipeline finishes, before `electron-builder` packages anything | `{ manager, projectRoot, mode }` |
-| `hooks/release/pre.js`   | Before `electron-builder build --publish always` | `{ manager, projectRoot, mode }` |
-| `hooks/release/post.js`  | After the release publishes | `{ manager, projectRoot, mode }` |
-| `hooks/deploy/pre.js`    | Inside `omega deploy`, after the local scaffold and before the network precheck, on both lanes (the dispatch and `--direct`); a dry run skips it, because a hook may act on the world ([#900](https://github.com/Omega-JS-Stack/omega/issues/900): the playground's prunes its release family down to the newest, so two releases stay live; the VERSION comes from `omega bump` at the brand root, [#869](https://github.com/Omega-JS-Stack/omega/issues/869), never from a hook) | `{ manager, projectRoot, mode: 'production' }` |
+| `hooks/build/pre.js`     | Before the build pipeline runs (`defaults` → `distribute` → `bundle` ...) | `{ build, projectRoot, mode }` |
+| `hooks/build/post.js`    | After the build pipeline finishes, before `electron-builder` packages anything | `{ build, projectRoot, mode }` |
+| `hooks/release/pre.js`   | Before `electron-builder build --publish always` | `{ build, projectRoot, mode }` |
+| `hooks/release/post.js`  | After the release publishes | `{ build, projectRoot, mode }` |
+| `hooks/deploy/pre.js`    | Inside `omega deploy`, after the local scaffold and before the network precheck, on both lanes (the dispatch and `--direct`); a dry run skips it, because a hook may act on the world ([#900](https://github.com/Omega-JS-Stack/omega/issues/900): the playground's prunes its release family down to the newest, so two releases stay live; the VERSION comes from `omega bump` at the brand root, [#869](https://github.com/Omega-JS-Stack/omega/issues/869), never from a hook) | `{ build, projectRoot, mode: 'production' }` |
 | `hooks/notarize/post.js` | After @omega.js/desktop's built-in macOS notarization completes (extension only — @omega.js/desktop's notarize is the real entrypoint) | electron-builder afterSign context |
 
 `mode` is `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`. A deploy hook always reads `'production'`: the verb runs outside a build, and what it is about to publish is a release.
@@ -32,7 +32,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 - **Notarize specifically:** the consumer's `hooks/notarize/post.js` is **never** the electron-builder afterSign entrypoint. @omega.js/desktop's `gulp/build-config` injects `afterSign:` pointing at @omega.js/desktop's real notarize implementation (resolved via `require.resolve('@omega.js/desktop/hooks/notarize')`). @omega.js/desktop's real notarize calls into the consumer's `hooks/notarize/post.js` as a final post-step. So the consumer can never accidentally break notarization by editing the file — the file can be empty, malformed, or missing entirely and the app still notarizes correctly.
 - **Why no `hooks/notarize/pre.js`?** electron-builder's `afterSign` hook is the only signing-related extension point we control. Anything that would belong in a "pre-notarize" step belongs either in `hooks/release/pre.js` (whole-release-level prep, runs before the gulp release task), or in electron-builder's own `afterPack` / `afterAllArtifactBuild` configuration (per-artifact mutation). If you have a real use case that doesn't fit either, file an issue.
-- **Build/release hooks:** standard before/after lifecycle pattern. Same shape as Ultimate Jekyll Manager's hook system.
+- **Build/release hooks:** standard before/after lifecycle pattern, the same `ctx` @omega.js/extension hands its hooks.
 
 ## Examples
 
@@ -40,7 +40,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 
 ```js
 // hooks/release/post.js
-module.exports = async ({ manager, projectRoot }) => {
+module.exports = async ({ build, projectRoot }) => {
   const pkg = require(`${projectRoot}/package.json`);
   const url = process.env.SLACK_WEBHOOK_URL;
   if (!url) return;

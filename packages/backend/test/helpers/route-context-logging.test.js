@@ -1,5 +1,5 @@
 /**
- * Test: RouteContext logging — the ONE identity tag
+ * Test: Context logging — the ONE identity tag
  * ([#121](https://github.com/Omega-JS-Stack/omega/issues/121)) and the local
  * timestamp ([#130](https://github.com/Omega-JS-Stack/omega/issues/130)).
  *
@@ -12,7 +12,7 @@
  * short `[HH:MM:SS]` bracket comes first — both branches are pinned below.
  *
  * The only stand-in here is `console` itself (the external sink the logger
- * writes to); the ctx is a real one, built by Manager.RouteContext().
+ * writes to); the ctx is a real one, a real Context.
  *
  * Run: npx omega test backend:helpers/route-context-logging
  */
@@ -20,6 +20,7 @@
 // Record every console call the thunk makes, restoring console afterward.
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 function withConsoleRecorder(fn) {
   const calls = { log: [], error: [] };
   const original = { log: console.log, error: console.error };
@@ -78,8 +79,8 @@ module.exports = defineCases({
   tests: [
     {
       name: 'ctx-log-opens-with-the-identity-tag',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         const calls = withConsoleRecorder((recorded) => {
           ctx.log('Created user');
@@ -93,8 +94,8 @@ module.exports = defineCases({
 
     {
       name: 'outside-production-the-line-opens-with-a-local-timestamp',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         // The suite's own environment is non-production — that IS the local branch.
         assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
@@ -114,9 +115,9 @@ module.exports = defineCases({
 
     {
       name: 'in-production-the-tag-stands-alone-no-timestamp-bracket',
-      run: async ({ assert, Manager }) => {
+      run: async ({ assert, omega }) => {
         const line = withProductionEnvironment(() => {
-          const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
+          const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
           assert.equal(ctx.isProduction(), true, 'the production branch was not reached');
 
@@ -137,7 +138,7 @@ module.exports = defineCases({
 
     {
       name: 'under-the-emulator-the-line-is-stamped-like-any-local-run',
-      run: async ({ assert, Manager }) => {
+      run: async ({ assert, omega }) => {
         const saved = process.env.FUNCTIONS_EMULATOR;
         const savedTestMode = process.env.OMEGA_TEST_MODE;
         const savedEnvironment = process.env.ENVIRONMENT;
@@ -151,11 +152,11 @@ module.exports = defineCases({
         delete process.env.ENVIRONMENT;
         process.env.OMEGA_ENVIRONMENT = 'development';
         try {
-          const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
+          const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
           // The emulator's `>` functions prefix carries no time, so emulator lines
           // are stamped exactly like any other non-production run.
-          assert.equal(Manager.getEnvironment(), 'development', 'the emulator branch must resolve as development');
+          assert.equal(omega.getEnvironment(), 'development', 'the emulator branch must resolve as development');
 
           const calls = withConsoleRecorder((recorded) => {
             ctx.log('Created user');
@@ -192,8 +193,8 @@ module.exports = defineCases({
 
     {
       name: 'a-log-prefix-follows-the-tag',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'cron' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'cron' });
 
         ctx.setLogPrefix('cron/daily()');
 
@@ -208,8 +209,8 @@ module.exports = defineCases({
 
     {
       name: 'every-level-carries-the-same-tag',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'user-signup' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'user-signup' });
 
         const calls = withConsoleRecorder((recorded) => {
           ctx.error('Something broke');

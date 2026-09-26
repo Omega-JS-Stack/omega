@@ -161,7 +161,7 @@ function createTee() {
 // The roll is what the tee has no need for: a child that stays up for days (a
 // Firebase emulator) has to be truncatable MID-RUN, so a sibling process asks
 // for a fresh log by touching `resetPath` and the poll below honors it within
-// `pollMs`. Ported from BEM's emulator/serve commands, which carried a copy each.
+// `pollMs`. The backend's emulator and serve commands share it.
 //
 // Writes go to an open fd synchronously, for the same reason the tee's do: the
 // lines describing a crash are the ones a buffered stream drops.

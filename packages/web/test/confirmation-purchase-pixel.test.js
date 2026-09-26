@@ -75,7 +75,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
           return { path: CLIENT_ANALYTICS };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -104,10 +104,10 @@ function wirePage() {
   globalThis.document = { title: 'Confirmation', cookie: '' };
   globalThis.__omegaClient = {
     config: { analytics: { providers: { meta: { id: 'META-1' } } } },
-    storage: () => ({
+    storage: {
       get: (key, fallback) => (stored.has(key) ? stored.get(key) : fallback),
       set: (key, value) => stored.set(key, value),
-    }),
+    },
   };
 
   globalThis.gtag = (...args) => tracked.push(['gtag', ...args]);

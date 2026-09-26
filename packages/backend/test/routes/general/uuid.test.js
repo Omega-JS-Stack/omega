@@ -15,7 +15,7 @@ module.exports = defineCases({
 
       async run({ http, assert }) {
         // POST /omega/general/uuid
-        const response = await http.post('backend-manager/general/uuid', {
+        const response = await http.post('omega/general/uuid', {
           version: '4',
         });
 
@@ -37,7 +37,7 @@ module.exports = defineCases({
       timeout: 10000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/general/uuid', {
+        const response = await http.post('omega/general/uuid', {
           version: '5',
           name: 'test-name-for-uuid',
         });
@@ -60,12 +60,12 @@ module.exports = defineCases({
       timeout: 10000,
 
       async run({ http, assert }) {
-        const response1 = await http.post('backend-manager/general/uuid', {
+        const response1 = await http.post('omega/general/uuid', {
           version: '5',
           name: 'test-name-for-uuid',
         });
 
-        const response2 = await http.post('backend-manager/general/uuid', {
+        const response2 = await http.post('omega/general/uuid', {
           version: '5',
           name: 'test-name-for-uuid',
         });
@@ -88,7 +88,7 @@ module.exports = defineCases({
       timeout: 10000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/general/uuid', {
+        const response = await http.post('omega/general/uuid', {
           version: '5',
         });
 
@@ -104,7 +104,7 @@ module.exports = defineCases({
       timeout: 10000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/general/uuid', {
+        const response = await http.post('omega/general/uuid', {
           version: '99',
         });
 
@@ -122,7 +122,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // uuid is a method-file route (post.js only) — a GET must answer an
         // honest 405, not the old 500 "Unable to load route" (friction #17)
-        const response = await http.get('backend-manager/general/uuid');
+        const response = await http.get('omega/general/uuid');
 
         assert.isError(response, 405, 'GET on a POST-only route should return 405');
 

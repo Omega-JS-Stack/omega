@@ -7,13 +7,13 @@
 // tree, the locality warning. Idempotent and quiet: a converged target writes
 // nothing. The non-gulp verbs (`omega test`, `omega deploy`) call ensureTarget
 // themselves.
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('defaults');
+const build = require('../../build.js');
+const logger = build.logger('defaults');
 const { ensureTarget } = require('../../commands/lib/ensure-target.js');
 
 module.exports = async function defaults() {
   await ensureTarget({
-    projectDir: Manager.getRootPath('project'),
+    projectDir: build.getRootPath('project'),
     log: (line) => logger.log(line),
     warn: (line) => logger.warn(line),
   });

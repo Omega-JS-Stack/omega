@@ -14,12 +14,12 @@ disclosure (below) is written in the brand's voice, while the commission it
 discloses is the framework author's.
 
 Source: [src/lib/affiliatizer.js](../src/lib/affiliatizer.js), initialized by the
-content-script Manager ([src/content.js](../src/content.js)).
+content script's `omega` ([src/content.js](../src/content.js)).
 
 ## Mechanism
 
-1. The content script runs on the visited page and hands the Manager to
-   `Affiliatizer.initialize(Manager)`.
+1. The content script runs on the visited page and hands its instance to
+   `Affiliatizer.initialize(omega)`.
 2. The page's `window.location.hostname` is tested against each entry's `match`
    regex in the module's `map` — a hardcoded constant, identical in every build.
 3. On a match, the entry's `replace` is applied to a copy of the current URL —
@@ -66,7 +66,7 @@ Append `?affiliatizerStatus=<value>` to any URL the content script runs on:
 | `allow` | Writes `affiliatizer: 'allow'` — redirects active again |
 | `reset` | Clears the key, dropping both the status and the 24-hour ledger |
 
-Each control also logs through the content Manager's logger, so the state change
+Each control also logs through the content script's `omega.logger`, so the state change
 is visible in the page console.
 
 ## Store-listing disclosure

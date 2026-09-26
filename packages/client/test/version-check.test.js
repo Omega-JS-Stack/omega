@@ -1,5 +1,5 @@
 const { describe, it, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
 
 // Minimal fetch stand-in: the transport boundary is the only seam, and the
 // poll's manifest is the one thing it asks for. Records every request URL.
@@ -37,9 +37,9 @@ describe('Version check under a URL-path mount', () => {
     restorePrefix = setPathPrefix('/workkit');
     const calls = fetchStub();
 
-    const manager = getManager();
-    await manager.initialize({ ...TEST_CONFIG });
-    await manager._checkVersion();
+    const omega = getOmega();
+    await omega.initialize({ ...TEST_CONFIG });
+    await omega._checkVersion();
 
     assert.strictEqual(calls.length, 1);
     assert.match(calls[0], /^\/workkit\/build\.json\?cb=\d+$/);
@@ -48,9 +48,9 @@ describe('Version check under a URL-path mount', () => {
   it('should leave the unprefixed poll byte-identical', async () => {
     const calls = fetchStub();
 
-    const manager = getManager();
-    await manager.initialize({ ...TEST_CONFIG });
-    await manager._checkVersion();
+    const omega = getOmega();
+    await omega.initialize({ ...TEST_CONFIG });
+    await omega._checkVersion();
 
     assert.strictEqual(calls.length, 1);
     assert.match(calls[0], /^\/build\.json\?cb=\d+$/);

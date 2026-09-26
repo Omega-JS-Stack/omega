@@ -12,9 +12,9 @@ user-invocable: true
 
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
-- **Working in this monorepo** — `docs/extension/index.md` is the guide (per-context singletons, the component table, auth sync, build system and modes, themes, defaults, translations, hooks, environment detection, the CLI table). The per-subsystem meat lives in `packages/extension/docs/*.md`. Cross-framework contracts live in `docs/shared/` (config, theming, icons, translation, testing, deploys, updates, local-dev).
+- **Working in this monorepo**: `docs/extension/index.md` is the guide (the consumer entry and the per-context instance, the component table, auth sync, build system and modes, themes, defaults, translations, hooks, environment detection, the CLI table). The per-subsystem meat lives in `packages/extension/docs/*.md`. Cross-framework contracts live in `docs/shared/` (config, theming, icons, translation, testing, deploys, updates, local-dev).
 - **Working in a consumer project** — read `docs/extension/index.md` in the framework monorepo (the local era links `node_modules/@omega.js/extension` straight into it; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
-- **`@omega.js/client` comes with it.** The client singleton runs in every context, so any task touching auth, Firestore, subscriptions, notifications, or `data-omega-bind` is client work too — `docs/client/index.md` and the `omega:client` skill.
+- **`@omega.js/client` comes with it.** The four page contexts' instances extend the client's base class, so any task touching auth, Firestore, subscriptions, notifications, or `data-omega-bind` is client work too: `docs/client/index.md` and the `omega:client` skill.
 
 ## Non-negotiables
 

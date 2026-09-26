@@ -4,25 +4,24 @@
 //
 // The dist/ paths in package.json#exports point to dist/foo.js — when running the
 // test framework, this file IS the one shipped into dist/test/suites/build/exports.test.js,
-// so the relative path back to dist root via `../../../..` lands at <bxm>/dist, and
+// so the relative path back to dist root via `../../../..` lands at <package>/dist, and
 // each export key resolves correctly.
 
 const path = require('path');
 
 // Each export key (e.g. './main' / './lib/logger-lite') maps to a relative dist path.
-// We strip the './dist/' prefix and resolve against `<bxm>/dist` (this file's grandparent
+// We strip the './dist/' prefix and resolve against `<package>/dist` (this file's grandparent
 // chain: dist/test/suites/build → ../../../ → dist).
-const BXM_ROOT_FROM_SUITE = path.resolve(__dirname, '..', '..', '..', '..');
+const PACKAGE_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 const DIST_ROOT           = path.resolve(__dirname, '..', '..', '..');
-const pkg = require(path.join(BXM_ROOT_FROM_SUITE, 'package.json'));
+const pkg = require(path.join(PACKAGE_ROOT, 'package.json'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 // Browser-context modules can't be plain-required from Node (they touch chrome.* /
 // window.* without try/catch around the top-level usage). Skip those — the build-layer
-// only asserts the "node-safe" surface of BXM. Browser-context modules are exercised
+// only asserts the "node-safe" surface of the package. Browser-context modules are exercised
 // by the background/view test layers.
 const BROWSER_CONTEXT_KEYS = new Set([
-  '.',
   './background',
   './content',
   './popup',
@@ -32,11 +31,21 @@ const BROWSER_CONTEXT_KEYS = new Set([
   './offscreen',
 ]);
 
+// The dead root entry is retired: every consumer imports a context by its
+// subpath, and there is no `.` for a bare `@omega.js/extension` to land on.
+const ROOT_ENTRY_RETIRED = {
+  name: 'no `.` export and no root index.js: a context is imported by its subpath',
+  run: (ctx) => {
+    ctx.expect(pkg.exports['.']).toBeUndefined();
+    ctx.expect(require('fs').existsSync(path.join(DIST_ROOT, 'index.js'))).toBe(false);
+  },
+};
+
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
-  description: 'package.json#exports — node-safe entries resolve',
-  tests: Object.entries(pkg.exports || {})
+  description: 'package.json#exports: node-safe entries resolve',
+  tests: [ROOT_ENTRY_RETIRED, ...Object.entries(pkg.exports || {})
     .filter(([key]) => !BROWSER_CONTEXT_KEYS.has(key))
     .map(([key, relDistPath]) => ({
       name: `${key} → ${relDistPath}`,
@@ -49,5 +58,5 @@ module.exports = defineCases({
         const mod = require(abs);
         ctx.expect(mod).toBeDefined();
       },
-    })),
+    }))],
 });

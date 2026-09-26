@@ -2,7 +2,7 @@
  * Test: Chargebee toUnifiedOneTime()
  * Unit tests for the Chargebee library's invoice → unified one-time transformation
  */
-const Chargebee = require('../../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../../dist/omega/libraries/payment/providers/chargebee.js');
 
 const FIXTURE_INVOICE = require('../../../fixtures/chargebee/invoice-one-time.json');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');

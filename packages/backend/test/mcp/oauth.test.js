@@ -40,7 +40,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await http.as('none').get(
-          'backend-manager/mcp/authorize',
+          'omega/mcp/authorize',
           {
             client_id: key,
             redirect_uri: 'https://example.com/callback',

@@ -4,7 +4,7 @@
 
 ## Adding a New Field
 
-1. Add the field to `FIELDS` in `src/manager/libraries/email/constants.js` — the key IS the field name in both providers. Set `source`, `path`, `type`. A provider that must NOT carry it goes in `skip: ['beehiiv']`.
+1. Add the field to `FIELDS` in `src/omega/libraries/email/constants.js`: the key IS the field name in both providers. Set `source`, `path`, `type`. A provider that must NOT carry it goes in `skip: ['beehiiv']`.
 2. Nothing to add anywhere else: `fieldsForProvider(provider)` beside the dictionary is the ONE derivation of a provider's view, read by OMEGA's `custom-fields` ensure (what gets provisioned) and by the provider's `buildFields()` (what gets written), so the two lists cannot drift ([#695](https://github.com/Omega-JS-Stack/omega/issues/695)).
 3. Run OMEGA: `npx omega manage --service=campaigns,newsletter` from the brand root.
 4. @omega.js/backend resolves field IDs at runtime — no provider code changes needed.
@@ -19,7 +19,7 @@
 
 | Purpose | File |
 |---------|------|
-| Field dictionary + per-provider view (the ONE SSOT) | `src/manager/libraries/email/constants.js` (`FIELDS`, `fieldsForProvider()`) |
+| Field dictionary + per-provider view (the ONE SSOT) | `src/omega/libraries/email/constants.js` (`FIELDS`, `fieldsForProvider()`) |
 | How OMEGA reads the dictionary | `@omega.js/manager` `src/lib/backend-marketing.js` |
 | SendGrid provisioning | `@omega.js/manager` `src/services/campaigns/ensure/custom-fields.js` |
 | Beehiiv provisioning | `@omega.js/manager` `src/services/newsletter/ensure/custom-fields.js` |

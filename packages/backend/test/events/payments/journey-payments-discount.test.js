@@ -36,7 +36,7 @@ module.exports = defineCases({
     {
       name: 'create-intent-with-discount',
       async run({ http, assert, state }) {
-        const response = await http.as('journey-payments-intent-discount').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-intent-discount').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,

@@ -1,22 +1,30 @@
-// ============================================
-// Options Component
-// ============================================
+/**
+ * Surface: the options page (a page context)
+ * Doc: node_modules/@omega.js/extension/docs/extension.md
+ *
+ * One setting, notes.autoSaveSelection, written to omega.extension.storage:
+ * the store the content script reads on load (../../lib/notes.js says why it
+ * is not this page's omega.storage).
+ */
+import omega from '@omega.js/extension/options';
+import { AUTO_SAVE_KEY, readAutoSave } from '../../lib/notes.js';
 
-// Import OMEGA Extension
-import Manager from '@omega.js/extension/options';
+omega.initialize()
+  .then(async () => {
+    const { extension, logger } = omega;
+    const $toggle = document.getElementById('auto-save-selection');
+    const $status = document.getElementById('auto-save-status');
 
-// Create instance
-const manager = new Manager();
+    $toggle.checked = await readAutoSave(omega);
 
-// Initialize
-manager.initialize()
-.then(() => {
-  // Shortcuts
-  const { extension, messenger, logger, omega } = manager;
+    $toggle.addEventListener('change', async () => {
+      await extension.storage.sync.set({ [AUTO_SAVE_KEY]: $toggle.checked });
 
-  // Add your project-specific options logic here
-  // ...
+      $status.textContent = 'Saved. Reload the site to apply it.';
+    });
 
-  // Log the initialization
-  logger.log('Options initialized!');
-});
+    // The view ships the switch disabled until it shows the stored value
+    $toggle.disabled = false;
+
+    logger.log('Options initialized!');
+  });

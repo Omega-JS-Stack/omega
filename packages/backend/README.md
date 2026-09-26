@@ -5,10 +5,10 @@
 </p>
 
 <p align="center">
-  <strong>OMEGA Backend</strong> — all-in-one development framework for Firebase Cloud Functions backends. Sister project to
-  <a href="../desktop/">@omega.js/desktop</a>,
-  <a href="../extension/">@omega.js/extension</a>, and
-  <a href="https://github.com/itw-creative-works/ultimate-jekyll-manager">Ultimate Jekyll Manager</a>.
+  <strong>OMEGA Backend</strong>: all-in-one development framework for Firebase Cloud Functions backends. Sister project to
+  <a href="../web/">@omega.js/web</a>,
+  <a href="../desktop/">@omega.js/desktop</a>, and
+  <a href="../extension/">@omega.js/extension</a>.
 </p>
 
 ## Installation
@@ -25,52 +25,41 @@ npm install @omega.js/backend
 
 ## Quick Start
 
-Create `functions/index.js`:
+Create `src/index.js`. The package's main export is the ONE `omega` instance; you never write `new`:
 
 ```javascript
-const Manager = (new (require('@omega.js/backend'))).init(exports, {
-  setupFunctionsIdentity: true,
+const omega = require('@omega.js/backend');
+
+omega.initialize({
+  identity: true,
 });
-const { functions } = Manager.libraries;
 
 // Create a custom function
-exports.myEndpoint = functions
+omega.functions.myEndpoint = omega.firebase.functions
   .runWith({ memory: '256MB', timeoutSeconds: 120 })
-  .https.onRequest((req, res) => Manager.Middleware(req, res).run('myEndpoint', { /* options */ }));
+  .region(omega.project.resourceZone)
+  .https.onRequest((req, res) => omega.routes.run('myEndpoint', { req, res }, { /* options */ }));
+
+module.exports = omega.functions;
 ```
 
-Create `functions/routes/myEndpoint/index.js`:
+Create `src/routes/myEndpoint/index.js`:
 
 ```javascript
-function Route() {}
-
-Route.prototype.main = async function (ctx) {
-  const Manager = ctx.Manager;
-  const user = ctx.usage.user;
-  const settings = ctx.settings;
-
-  ctx.log('Request data:', ctx.request.data);
+module.exports = async ({ ctx, omega, user, data }) => {
+  ctx.log('Request data:', data);
 
   // Return response
-  ctx.respond({ success: true, timestamp: new Date().toISOString() });
+  return ctx.respond({ success: true, message: data.message, timestamp: new Date().toISOString() });
 };
-
-module.exports = Route;
 ```
 
-Create `functions/schemas/myEndpoint/index.js`:
+Create `src/schemas/myEndpoint/index.js`:
 
 ```javascript
-module.exports = function (ctx) {
-  return {
-    defaults: {
-      message: {
-        types: ['string'],
-        default: 'Hello World',
-      },
-    },
-  };
-};
+module.exports = ({ user, body, query }) => ({
+  message: { type: 'string', default: 'Hello World' },
+});
 ```
 
 Run any verb; the first one scaffolds the project:
@@ -82,26 +71,32 @@ npx omega test
 ## Initialization Options
 
 ```javascript
-const Manager = (new (require('@omega.js/backend'))).init(exports, options);
+const omega = require('@omega.js/backend');
+
+omega.initialize(options);
 ```
+
+`initialize()` is synchronous and returns the instance. Every option is optional:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `initialize` | `true` | Initialize Firebase Admin SDK |
-| `projectType` | `targets.backend.projectType` (default `'firebase'`) | `'firebase'` for Cloud Functions, `'custom'` for an Express server on `PORT`. The brand's `config/omega.json5` is the switch ([#584](https://github.com/Omega-JS-Stack/omega/issues/584)) — pass it here only to override the config |
-| `setupFunctions` | `true` | Setup built-in Cloud Functions (`omega_api`, etc.) |
-| `setupFunctionsIdentity` | `true` | Setup auth event functions (onCreate, onDelete, beforeCreate, beforeSignIn) |
-| `setupFunctionsLegacy` | `false` | Setup legacy admin functions |
-| `setupServer` | `true` | Setup custom Express server for routes |
+| `projectType` | `targets.backend.projectType` (default `'firebase'`) | `'firebase'` for Cloud Functions, `'custom'` for an Express server on `PORT`. The brand's `config/omega.json5` is the switch; pass it here only to override the config |
+| `identity` | `true` | Wire the blocking auth functions (`beforeCreate`, `beforeSignIn`) |
 | `routes` | `'/routes'` | Directory for custom route handlers |
 | `schemas` | `'/schemas'` | Directory for schema definitions |
 | `resourceZone` | `'us-central1'` | Firebase/GCP region |
 | `sentry` | `true` | Enable Sentry error tracking |
-| `serviceAccountPath` | `'service-account.json'` | Path to Firebase service account |
-| `initializeLocalStorage` | `false` | Initialize local lowdb storage on startup |
+| `reportErrorsInDev` | `false` | Report errors to Sentry in development too |
+| `serviceAccountPath` | `'service-account.json'` | Path to Firebase service account (local scripts only) |
 | `checkNodeVersion` | `true` | Validate Node.js version on startup |
+| `uniqueAppName` | none | The Firebase Admin app name |
+| `cwd` | `process.cwd()` | The functions directory |
+| `logSavePath` | `false` | A file the logger also writes to |
+| `useFirebaseLogger` | `true` | Route `console` to Cloud Logging in production |
 | `express.bodyParser.json` | `{ limit: '100kb' }` | Express JSON body parser options |
 | `express.bodyParser.urlencoded` | `{ limit: '100kb', extended: true }` | Express URL-encoded options |
+
+The test runner passes nothing: `OMEGA_TEST_RUNNER` alone turns off the Firebase init, the function wiring, the custom server and Sentry.
 
 ## Configuration File
 
@@ -172,21 +167,12 @@ Routes handle HTTP requests. Create files in your `routes/` directory:
 - `routes/{name}/post.js` - Handles POST requests only
 - (also supports `put.js`, `delete.js`, `patch.js`)
 
-**Route File Pattern:**
+**Route File Pattern:** a route exports an async function receiving ONE object:
 
 ```javascript
-function Route() {}
-
-Route.prototype.main = async function (ctx) {
-  // Access Manager and helpers
-  const Manager = ctx.Manager;
-  const usage = ctx.usage;
-  const user = ctx.usage.user;
-  const analytics = ctx.analytics;
-  const settings = ctx.settings;
-
-  // Access request data
-  const data = ctx.request.data;       // Merged body + query
+module.exports = async ({ ctx, omega, user, data, usage, analytics }) => {
+  // data: the input validated against the route's schema
+  // The raw request stays on ctx.request
   const body = ctx.request.body;       // POST body
   const query = ctx.request.query;     // Query params
   const headers = ctx.request.headers;
@@ -194,7 +180,7 @@ Route.prototype.main = async function (ctx) {
   const geolocation = ctx.request.geolocation; // { ip, country, region, city, latitude, longitude }
   const client = ctx.request.client;   // { userAgent, language, platform, mobile }
 
-  // Check authentication
+  // Check authentication (user is a User, never null)
   if (!user.authenticated) {
     return ctx.respond('Authentication required', { code: 401 });
   }
@@ -207,85 +193,78 @@ Route.prototype.main = async function (ctx) {
   // Track analytics
   analytics.event('my_event', { action: 'test' });
 
-  // Count a use of a metered feature — check, count and write in ONE call,
+  // Count a use of a metered feature: check, count and write in ONE call,
   // throwing a 429 over limit
   await usage.consume('requests');
 
   // Send response
-  ctx.respond({ success: true, data: settings });
+  return ctx.respond({ success: true, data });
 };
-
-module.exports = Route;
 ```
+
+Everything in the argument is also on `ctx` (`ctx.user`, `ctx.data`, `ctx.usage`, `ctx.analytics`, `ctx.omega`). A route never constructs a service: it reads it off `ctx` or `omega`.
 
 ### Schemas
 
-Schemas define and validate request parameters with defaults and plan-based limits:
+A schema file exports a function of the request and returns a plain field declaration. One adapter validates it with zod; a split on the plan, the request or the input is ordinary code:
 
 ```javascript
-module.exports = function (ctx, settings, options) {
-  const user = options.user;
-
-  return {
-    // Default values for all plans
-    defaults: {
-      message: {
-        types: ['string'],
-        default: 'Hello',
-        required: false,
-      },
-      count: {
-        types: ['number'],
-        default: 10,
-        min: 1,
-        max: 100,
-      },
-      format: {
-        types: ['string'],
-        default: 'json',
-        // Dynamic required based on other settings
-        required: (ctx, settings) => settings.output === 'file',
-        // Clean/sanitize input
-        clean: (value) => value.toLowerCase().trim(),
-      },
-    },
-
-    // Override defaults for premium plan
-    premium: {
-      count: {
-        types: ['number'],
-        default: 100,
-        max: 1000,
-      },
-    },
+module.exports = ({ user, body, query, path, method, headers, geolocation }) => {
+  const fields = {
+    message: { type: 'string', default: 'Hello' },
+    count: { type: 'number', default: 10, min: 1, max: 100 },
+    format: { type: 'string', enum: ['json', 'csv'], default: 'json', clean: (value) => value.toLowerCase().trim() },
+    id: { type: 'string', path: true },
   };
+
+  // A higher limit for a paid plan
+  if (user.plan !== 'basic') {
+    fields.count.max = 1000;
+  }
+
+  // Required only when the caller asks for a file
+  if (body.output === 'file') {
+    fields.format = { type: 'string', required: true };
+  }
+
+  return fields;
 };
 ```
 
-**Schema Property Options:**
+**Field keys:**
 
-| Property | Type | Description |
+| Key | Type | Description |
 |----------|------|-------------|
-| `types` | `string[]` | Allowed types: `'string'`, `'number'`, `'boolean'`, `'object'`, `'array'` |
-| `default` | `any` | Default value if not provided |
-| `required` | `boolean \| function` | Whether the field is required |
+| `type` | `string \| string[]` | `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, `'any'`, or a list of them |
+| `default` | `any \| function` | Value when the caller sends none |
+| `required` | `boolean` | Refuse the request when the field is missing (never paired with `default`) |
+| `min` / `max` | `number` | Numbers clamp; strings and arrays truncate at `max` and are refused under `min` |
+| `enum` | `any[]` | The allowed values of a sent field |
+| `pattern` | `RegExp` | A sent string must match it |
 | `clean` | `RegExp \| function` | Sanitize/transform the value |
-| `min` | `number` | Minimum value (for numbers) |
-| `max` | `number` | Maximum value (for numbers) |
-| `available` | `boolean` | Whether the field is available |
+| `of` / `fields` | `object` | An array's item declaration / an object's nested declaration |
+| `path` | `true` | Filled from the request path (`/items/:id`) |
+| `value` | `any` | A forced value the caller cannot set |
+| `sanitize` | `false` | Keep the field's HTML when the route opts in to the HTML strip |
 
-### Middleware Options
+The full example and the split kinds: [docs/schemas.md](docs/schemas.md).
+
+### Pipeline Options
+
+The third argument of `omega.routes.run()`:
 
 ```javascript
-Manager.Middleware(req, res).run('routeName', {
+omega.routes.run('routeName', { req, res }, {
   authenticate: true,           // Authenticate user (default: true)
   setupAnalytics: true,         // Initialize analytics (default: true)
   setupUsage: true,             // Initialize usage tracking (default: true)
-  setupSettings: true,          // Resolve settings from schema (default: true)
+  validate: true,               // Validate the input against the schema into data (default: true)
+  includeUnknown: false,        // Keep undeclared input keys in data (default: false)
+  sanitize: false,              // Strip HTML from data (default: false)
   schema: 'routeName',          // Schema file to use (default: same as route)
-  parseMultipartFormData: true, // Parse multipart uploads (default: true)
-  routesDir: '/routes',         // Custom routes directory
-  schemasDir: '/schemas',       // Custom schemas directory
+  parseMultipart: true,         // Parse multipart uploads (default: true)
+  routesDir: `${omega.cwd}/routes`,   // Custom routes directory
+  schemasDir: `${omega.cwd}/schemas`, // Custom schemas directory
 });
 ```
 
@@ -293,7 +272,7 @@ Manager.Middleware(req, res).run('routeName', {
 
 ### HTTP API (`omega_api`)
 
-The main API endpoint serves the RESTful routes system. Requests to `/omega/<route>` (hosting rewrite; the legacy `/backend-manager/` prefix works as an alias) resolve to `routes/{name}/{method}.js` handlers with their matching schemas — see [Creating Custom Functions](#creating-custom-functions) above.
+The main API endpoint serves the framework's built-in routes and the MCP endpoint. Requests to `/omega/<route>` (hosting rewrite; `/omega_api/<route>` on the direct function URL) resolve to the framework's `routes/{name}/{method}.js` handlers with their matching schemas. A route of yours never rides it: it gets its own function and its own hosting rewrite, at its own path (see [Creating Custom Functions](#creating-custom-functions) above).
 
 ```javascript
 // POST https://api.<yourdomain>/omega/user/token
@@ -319,31 +298,32 @@ The main API endpoint serves the RESTful routes system. Requests to `/omega/<rou
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `omega_cronDaily` | Every 24 hours | Runs daily jobs from `cron/daily/` and `hooks/cron/daily/` |
+| `omega_cronDaily` | Every 24 hours | Runs the framework's daily jobs, then yours from `hooks/cron/daily/` |
+| `omega_cronFrequent` | Every 10 minutes | Runs the framework's frequent jobs, then yours from `hooks/cron/frequent/` |
 
 **Creating Custom Cron Jobs:**
 
-Create `hooks/cron/daily/myJob.js` in your functions directory:
+Create `src/hooks/cron/daily/myJob.js`. A job exports an async function receiving ONE object, and each job gets its own `ctx`:
 
 ```javascript
-function Job() {}
+module.exports = async ({ ctx, omega, context }) => {
+  ctx.log('Running my daily job...');
 
-Job.prototype.main = function () {
-  const self = this;
-  const Manager = self.Manager;
-  const ctx = self.ctx;
-
-  return new Promise(async function(resolve, reject) {
-    ctx.log('Running my daily job...');
-
-    // Your job logic here
-
-    return resolve();
-  });
+  // Your job logic here (Firebase Admin is omega.firebase.admin)
 };
-
-module.exports = Job;
 ```
+
+### Custom Triggers
+
+A trigger of your own runs its handler through the framework with `omega.events.run(name, payload)`; the handler receives `{ ctx, omega, user, context, change, snapshot }`:
+
+```javascript
+omega.functions.usersOnCreate = omega.firebase.functions
+  .auth.user()
+  .onCreate((user, context) => omega.events.run('users/on-create', { user, context }));
+```
+
+`'users/on-create'` loads `src/events/users/on-create.js` (staged to `dist/events/`).
 
 ## Email System
 
@@ -358,7 +338,7 @@ Unified MJML-based email rendering for transactional, marketing, and newsletter 
 ### Email API
 
 ```javascript
-const email = Manager.Email(ctx);
+const email = ctx.email;
 await email.send({
   template: 'card',
   subject: 'Welcome!',
@@ -399,60 +379,71 @@ GDPR/CASL-compliant consent capture and cross-provider unsubscribe sync.
 
 See [docs/consent.md](docs/consent.md) for the full architecture, source enum reference, migration script template, and provider configuration steps.
 
-## Helper Classes
+## Context and Services
 
-### RouteContext
+Every route, event and cron job runs with ONE `Context`, the `ctx` its handler receives. The services hang off `ctx` (per request, built on first read) or off `omega` (per process, built once); a route never constructs one.
 
-Handles request/response lifecycle, authentication, and logging.
+### Context (`ctx`)
+
+Handles the request/response lifecycle, authentication, and logging. `ctx.request` is null outside HTTP.
 
 ```javascript
-const ctx = Manager.RouteContext({ req, res });
+module.exports = async ({ ctx, omega, user }) => {
+  // The caller: a User, signed out until the pipeline's authenticate step resolves one
+  ctx.user.authenticated;
 
-// Authentication
-const user = await ctx.authenticate();
-// Returns: { authenticated, auth: { uid, email }, roles, plan, ... }
+  // Request data
+  ctx.request.data;        // Merged body + query (raw)
+  ctx.data;                // The validated input
+  ctx.request.body;        // POST body
+  ctx.request.query;       // Query params
+  ctx.request.headers;     // Request headers
+  ctx.request.method;      // HTTP method
+  ctx.request.geolocation; // { ip, country, region, city, latitude, longitude }
+  ctx.request.client;      // { userAgent, language, platform, mobile }
 
-// Request data
-ctx.request.data;        // Merged body + query
-ctx.request.body;        // POST body
-ctx.request.query;       // Query params
-ctx.request.headers;     // Request headers
-ctx.request.method;      // HTTP method
-ctx.request.geolocation; // { ip, country, region, city, latitude, longitude }
-ctx.request.client;      // { userAgent, language, platform, mobile }
+  // Response
+  ctx.respond({ success: true });                    // 200 JSON
+  ctx.respond({ success: true }, { code: 201 });     // Custom status
+  ctx.redirect('https://example.com');               // 302
 
-// Response
-ctx.respond({ success: true });              // 200 JSON
-ctx.respond({ success: true }, { code: 201 }); // Custom status
-ctx.respond('https://example.com', { code: 302 }); // Redirect
+  // Errors: a 5xx captures to Sentry, a 4xx never does
+  ctx.respond(new Error('Bad request'), { code: 400 });
+  throw ctx.report('Something went wrong', { code: 500 }); // report() logs and captures without sending
 
-// Errors
-ctx.report('Something went wrong', { code: 500, sentry: true });
-ctx.respond(new Error('Bad request'), { code: 400 });
+  // Logging
+  ctx.log('Info message');
+  ctx.warn('Warning message');
+  ctx.error('Error message');
+  ctx.debug('Debug message');
 
-// Logging
-ctx.log('Info message');
-ctx.warn('Warning message');
-ctx.error('Error message');
-ctx.debug('Debug message');
+  // Environment (forwarded from omega)
+  ctx.isDevelopment(); // true in emulator
+  ctx.isProduction();  // true in production
+  ctx.isTesting();     // true when running tests
 
-// Environment
-ctx.isDevelopment(); // true in emulator
-ctx.isProduction();  // true in production
-ctx.isTesting();     // true when running tests
-
-// File uploads
-const { fields, files } = await ctx.parseMultipartFormData();
+  // File uploads (the pipeline already parsed a multipart body)
+  const { fields, files } = await ctx.parseMultipart();
+};
 ```
 
 ### User
 
-Creates user objects with default properties:
+`ctx.user` (the route's `user`) is a `User` from `@omega.js/account`, the same class the browser's `omega.auth.user` is. Its own fields are the stored account document; the derived facts are getters:
 
 ```javascript
-const userProps = Manager.User(existingData, { defaults: true }).properties;
+user.authenticated;   // false for a signed-out caller (never null)
+user.uid;             // user.auth.uid
+user.email;           // user.auth.email
+user.plan;            // the plan with access right now ('basic' when cancelled)
+user.active;          // an active paid plan (including trialing and cancelling)
+user.trialing;
+user.cancelling;
+user.everPaid;
+user.profile;         // { displayName, photoURL, emailVerified } from the ID token
+user.toJSON();        // the stored document alone
 
-// User structure:
+// The stored document:
 {
   auth: { uid, email, temporary },
   subscription: {
@@ -473,21 +464,13 @@ const userProps = Manager.User(existingData, { defaults: true }).properties;
   personal: { birthday, gender, location, name, company, telephone },
   connections: {}
 }
-
-// Methods
-userProps.merge(otherUser);    // Merge with another user object
 ```
 
 ### Analytics
 
-Send events to Google Analytics 4:
+`ctx.analytics` (the route's `analytics`) sends GA4 events as the caller:
 
 ```javascript
-const analytics = Manager.Analytics({
-  ctx: ctx,
-  uuid: user.auth.uid,
-});
-
 analytics.event('purchase', {
   item_id: 'product-123',
   value: 29.99,
@@ -505,7 +488,7 @@ analytics.event('purchase', {
 Track and limit API usage:
 
 ```javascript
-// The middleware attaches `ctx.usage` to every route. Attaching is I/O-free —
+// The pipeline attaches `ctx.usage` to every route. Attaching is I/O-free:
 // the counter resolves the account on its first consume()/read()
 const usage = ctx.usage;
 
@@ -529,61 +512,30 @@ await usage.forKey(ctx.request.geolocation.ip).consume('signups', 1, { limit: 5 
 
 A feature is defined ONCE in the top-level `features` catalog (name, icon, definition, and the `usage` block that meters it); each product names only its VALUE. Mirrors are declared there too — no call-site mirror API. Full reference: [docs/usage-rate-limiting.md](docs/usage-rate-limiting.md).
 
-### Middleware
+### The Request Pipeline
 
-Process requests through the middleware pipeline:
+Every request (the built-in `omega_api`, your own function through `omega.routes.run()`, the custom server) passes one ordered list of steps (`src/omega/pipeline.js`):
 
-```javascript
-// In your function definition
-exports.myEndpoint = functions
-  .https.onRequest((req, res) => Manager.Middleware(req, res).run('myEndpoint', {
-    authenticate: true,
-    setupAnalytics: true,
-    setupUsage: true,
-    setupSettings: true,
-    schema: 'myEndpoint',
-  }));
-```
-
-The middleware automatically:
-1. Parses multipart form data
-2. Logs request details
-3. Loads route handler (method-specific or index.js)
-4. Authenticates user
-5. Initializes usage tracking
-6. Sets up analytics
-7. Resolves settings from schema
-8. Calls your route handler
+1. Refuses a route path outside the routes directory, and a `test/` route in production
+2. Parses multipart form data
+3. Logs request details (credentials redacted)
+4. Answers a `wakeup` request and stops
+5. Loads the route handler (method-specific or index.js)
+6. Authenticates the caller into `ctx.user`
+7. Initializes usage tracking and analytics
+8. Validates the input against the schema into `data`, then trims it (and strips HTML when `sanitize` is on)
+9. Calls your route handler
 
 ### Settings
 
-Resolve and validate request settings against a schema:
-
-```javascript
-const settings = Manager.Settings().resolve(ctx, schema, inputSettings, {
-  dir: '/schemas',
-  schema: 'mySchema',
-  user: user,
-  checkRequired: true,
-});
-
-// Timestamp constants
-const timestamp = Manager.Settings().constant('timestamp');
-// { types: ['string'], value: undefined, default: '2024-01-01T00:00:00.000Z' }
-
-const timestampUNIX = Manager.Settings().constant('timestampUNIX');
-// { types: ['number'], value: undefined, default: 1704067200 }
-
-const timestampFULL = Manager.Settings().constant('timestampFULL');
-// { timestamp: {...}, timestampUNIX: {...} }
-```
+The pipeline's validation step: it loads `schemas/{name}/{method}.js` (else `index.js`), calls it with `{ user, body, query, path, method, headers, geolocation }`, and validates the input into `ctx.data`. Full contract: [docs/schemas.md](docs/schemas.md).
 
 ### Utilities
 
 Batch operations and helper functions:
 
 ```javascript
-const utilities = Manager.Utilities();
+const utilities = omega.utilities;
 
 // Batch iterate Firestore collection
 const results = await utilities.iterateCollection(
@@ -640,12 +592,11 @@ const doc = await utilities.get('users/abc123', {
 
 ### Metadata
 
-Add timestamps and tags to documents:
+Stamp a document's `metadata` block (`updated` and a `tag`; `created` is never touched):
 
 ```javascript
-const metadata = Manager.Metadata(document);
-
-document.metadata = metadata.set({ tag: 'my-operation' });
+ctx.metadata({ tag: 'my-operation' }, document);
+// document.metadata:
 // {
 //   updated: { timestamp: '...', timestampUNIX: ... },
 //   tag: 'my-operation'
@@ -657,7 +608,7 @@ document.metadata = metadata.set({ tag: 'my-operation' });
 Persistent JSON storage using lowdb:
 
 ```javascript
-const storage = Manager.storage({
+const storage = omega.storage({
   name: 'myStorage',     // Storage name (default: 'main')
   temporary: false,      // Use OS temp directory (default: false)
   clear: true,           // Clear on dev startup (default: true)
@@ -697,20 +648,18 @@ storage.set('nested.path', { data: true }).write();
    Cookie: __session=<firebase-id-token>
    ```
 
-**Authenticated User Object:**
+**The authenticated caller** is `ctx.user` (the route's `user`), a `User`:
 
 ```javascript
-const user = await ctx.authenticate();
-
-{
-  authenticated: true,
-  auth: { uid: 'abc123', email: 'user@example.com' },
-  roles: { admin: false, betaTester: false, developer: false },
-  subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active', ... },
-  api: { clientId: '...', privateKey: '...' },
-  // ... other user properties
-}
+user.authenticated;       // true
+user.auth;                // { uid: 'abc123', email: 'user@example.com' }
+user.roles;               // { admin: false, betaTester: false, developer: false }
+user.subscription;        // { product: { id: 'basic', name: 'Basic' }, status: 'active', ... }
+user.api;                 // { clientId: '...', privateKey: '...' }
+user.plan;                // 'basic'
 ```
+
+The pipeline authenticates once per request before the route runs; `ctx.authenticate()` resolves the same answer for code outside the pipeline.
 
 ## CLI Commands
 
@@ -791,7 +740,7 @@ npx omega test
 
 ### Extended Mode (real APIs)
 
-Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:
+Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across all four frameworks; the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`), so there is no need to set it on the emulator too:
 
 ```bash
 # Terminal 1 — start once, no flag needed
@@ -844,7 +793,7 @@ Bare runs and bare paths are PROJECT-scoped (C5); reach the framework corpus exp
 **Suite** - Sequential tests with shared state (stops on first failure):
 
 ```javascript
-// test/functions/user/sign-up.js
+// test/user/sign-up.test.js
 module.exports = {
   description: 'User signup flow with affiliate tracking',
   type: 'suite',
@@ -860,7 +809,7 @@ module.exports = {
     {
       name: 'call-user-signup-with-affiliate',
       async run({ http, assert, state }) {
-        const response = await http.as('signup-referred').command('user:sign-up', {
+        const response = await http.as('signup-referred').post('omega/user/signup', {
           attribution: { affiliate: { code: 'TESTREF' } },
         });
         assert.isSuccess(response);
@@ -873,7 +822,7 @@ module.exports = {
 **Group** - Independent tests (continues even if one fails):
 
 ```javascript
-// test/functions/admin/firestore-write.js
+// test/admin/firestore-write.test.js
 module.exports = {
   description: 'Admin Firestore write operation',
   type: 'group',
@@ -882,7 +831,7 @@ module.exports = {
       name: 'admin-auth-succeeds',
       auth: 'admin',
       async run({ http, assert }) {
-        const response = await http.command('admin:firestore-write', {
+        const response = await http.post('omega/admin/firestore', {
           path: '_test/doc',
           document: { test: 'value' },
         });
@@ -893,7 +842,7 @@ module.exports = {
       name: 'unauthenticated-rejected',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.command('admin:firestore-write', {
+        const response = await http.post('omega/admin/firestore', {
           path: '_test/doc',
           document: { test: 'value' },
         });
@@ -1015,25 +964,19 @@ user.subscription.cancellation.pending === true
 user.subscription.status === 'suspended'
 ```
 
-### resolveSubscription(account)
+### The `User` getters
 
-Static method on the `User` helper that derives calculated subscription fields. Returns only fields that require derivation logic — raw data lives on the account object directly.
+A route's `user` is a `User`, and the derived subscription facts are getters on it (the same class, and the same answers, as the browser's `omega.auth.user`):
 
 ```javascript
-const User = require('@omega.js/backend/dist/manager/helpers/user');
-
-const resolved = User.resolveSubscription(account);
-// Returns: { plan, active, trialing, cancelling }
+user.plan;        // effective plan ID right now ('basic' if cancelled/suspended)
+user.active;      // an active paid plan (including trialing and cancelling)
+user.trialing;    // in an active trial (status 'active' + claimed + unexpired)
+user.cancelling;  // cancellation pending (status 'active' + cancellation.pending, not trialing)
+user.everPaid;    // the user has ever paid
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `plan` | `string` | Effective plan ID right now (`'basic'` if cancelled/suspended) |
-| `active` | `boolean` | Has paid access (product is not `'basic'` and status is `'active'`) |
-| `trialing` | `boolean` | In active trial (status `'active'` + claimed + unexpired) |
-| `cancelling` | `boolean` | Cancellation pending (status `'active'` + `cancellation.pending`) |
-
-The same function exists as `auth.resolveSubscription(account)` in [@omega.js/client](../client/) with identical logic and return shape.
+Prefer the getters over the manual checks above: they hold the derivation logic in one place.
 
 ## Final Words
 

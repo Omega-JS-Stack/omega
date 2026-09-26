@@ -3,7 +3,7 @@ import { state, buildBindingsState } from './modules/state.js';
 import { trackPurchaseIfNeeded } from './modules/tracking.js';
 import { triggerCelebration } from './modules/celebration.js';
 import { verifyPurchase, initialStatus } from './modules/verify.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('confirmation');
@@ -15,7 +15,7 @@ const logger = createLogger('confirmation');
 // Module export
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
     await initializeConfirmation();
     return resolve();
   });
@@ -23,7 +23,7 @@ export default () => {
 
 // Update UI via bindings (single source of truth)
 function updateUI() {
-  omega.bindings().update(buildBindingsState());
+  omega.bindings.update(buildBindingsState());
 }
 
 // Initialize confirmation page
@@ -43,7 +43,7 @@ async function initializeConfirmation() {
   // Wired before the verification wait so the CTAs are live immediately.
   document.querySelectorAll('.btn').forEach(($btn) => {
     $btn.addEventListener('click', () => {
-      omega.notifications().subscribe().catch((e) => {
+      omega.notifications.subscribe().catch((e) => {
         logger.warn('Notification subscribe failed:', e.message);
       });
     }, { once: true });
@@ -55,7 +55,7 @@ async function initializeConfirmation() {
   // purchase that opened already answered has no poll to wait on and nothing to
   // wait for auth for — it rendered its receipt in the update above.
   if (state.status === 'processing') {
-    await new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
+    await new Promise((resolve) => omega.auth.listen({ once: true }, resolve));
 
     // ONE reveal: the update that answers the page is the update that brings
     // the order details with it, and the celebration rides that same flip —

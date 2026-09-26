@@ -14,7 +14,7 @@
  *      user's api.privateKey. New users land on MrLogo's basic plan
  *      (100 credits), plenty for brandmark generation.
  *   2. MRLOGO_API_KEY — an existing MrLogo account's api.privateKey used
- *      directly. Verified against the live wire contract: BEM's
+ *      directly. Verified against the live wire contract: MrLogo's backend
  *      authenticate() resolves a non-JWT Bearer value by querying
  *      users.api.privateKey, and MrLogo's logos route rides that auth.
  *   3. LOGO_API_ID_TOKEN — a pasted Firebase ID token (manual escape
@@ -33,7 +33,7 @@ const { createAuthAdmin } = require('../../../lib/auth-admin.js');
 const { ensureProductUser } = require('../../../lib/product-create.js');
 const { createPasswordResolver } = require('../../account/lib/resolve-password.js');
 
-// MrLogo's LIVE production route (the old-world /backend-manager path IS its
+// MrLogo's LIVE production route (the /backend-manager path IS its
 // api). Env override is a test/staging seam, not brand config.
 const MRLOGO_API_URL = 'https://api.mrlogo.ai/backend-manager/logos';
 const MRLOGO_URL = 'https://mrlogo.ai';
@@ -45,7 +45,7 @@ function apiUrl() {
 /**
  * Resolve the logo API's Bearer credential down the product ladder, or null
  * when no tier is configured. The SA tier ensures the brand's own MrLogo
- * product user and uses ITS api.privateKey — BEM auth accepts a privateKey
+ * product user and uses ITS api.privateKey — MrLogo's auth accepts a privateKey
  * and an ID token through the same Authorization header.
  *
  * @param {object} spec

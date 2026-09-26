@@ -56,8 +56,7 @@
  *     <url>` materializes supersedes the default while the sections inside
  *     keep flowing from the theme)
  *
- * The legacy UJM add-below flag (`append: true`) is GONE (#607, Ian
- * 2026-08-26): a page that wants the default bands AND its own prose writes
+ * There is no add-below flag (#607): a page that wants the default bands AND its own prose writes
  * the bands itself — `omega customize <url>` materializes exactly that — and
  * body content always renders below the sections THE BODY ITSELF calls, never
  * below the layout composition it replaced.

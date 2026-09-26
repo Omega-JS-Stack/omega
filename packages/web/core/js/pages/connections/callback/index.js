@@ -1,5 +1,5 @@
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
@@ -22,11 +22,11 @@ export default () => {
     // ([#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
     omega.request(WAKEUP_ROUTE, { wakeup: true });
 
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     // Wait for auth state before handling callback
     // Required because omega.request needs auth.currentUser
-    omega.auth().listen({ once: true }, () => {
+    omega.auth.listen({ once: true }, () => {
       handleOAuthCallback();
     });
 

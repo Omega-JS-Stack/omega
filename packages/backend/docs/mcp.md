@@ -1,6 +1,6 @@
 # Model Context Protocol (MCP)
 
-@omega.js/backend includes a built-in MCP server that exposes @omega.js/backend routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing @omega.js/backend API — every tool maps to a route, and authentication goes through the same middleware pipeline.
+@omega.js/backend includes a built-in MCP server that exposes @omega.js/backend routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing @omega.js/backend API: every tool maps to a route, and authentication goes through the same request pipeline.
 
 ## Architecture
 
@@ -20,38 +20,40 @@ Every tool has a `role` that controls who can see and call it:
 
 Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omega.js/backend route still rejects.
 
+Over HTTP the connection's role is its caller's, resolved ONCE per request through `Context.authenticate()`: the admin key, or an account whose doc carries `roles.admin`, is `admin`; any other account's `api.privateKey` is `user`; a token that matches no account is `public`.
+
 ## Available Tools (28)
 
 | Tool | Role | Route | Description |
 |------|------|-------|-------------|
-| `firestore_read` | admin | `GET /admin/firestore` | Read a Firestore document by path |
-| `firestore_write` | admin | `POST /admin/firestore` | Write/merge a Firestore document |
-| `firestore_query` | admin | `POST /admin/firestore/query` | Query a collection with where/orderBy/limit |
-| `send_email` | admin | `POST /admin/email` | Send transactional email via SendGrid |
-| `send_notification` | admin | `POST /admin/notification` | Send push notification via FCM |
-| `get_user` | user | `GET /user` | Get authenticated user info |
-| `get_subscription` | user | `GET /user/subscription` | Get subscription info for a user |
-| `sync_users` | admin | `POST /admin/users/sync` | Sync user data across systems |
-| `list_users` | admin | `GET /admin/users/list` | List users newest-first with the Auth join (providers, verified, disabled, last sign-in), email/uid prefix search, cursor pagination |
-| `set_user_disabled` | admin | `POST /admin/users/disable` | Disable or re-enable a user at the Auth level (disable also revokes refresh tokens) |
-| `list_campaigns` | admin | `GET /marketing/campaign` | List marketing campaigns |
-| `create_campaign` | admin | `POST /marketing/campaign` | Create a marketing campaign |
-| `get_stats` | admin | `GET /admin/stats` | Get system statistics |
-| `cancel_subscription` | admin | `POST /payments/cancel` | Cancel subscription at period end |
-| `refund_payment` | admin | `POST /payments/refund` | Process a refund |
-| `get_payment_portal` | admin | `POST /payments/portal` | Generate Stripe billing portal link |
-| `update_campaign` | admin | `PUT /marketing/campaign` | Update a pending campaign |
-| `delete_campaign` | admin | `DELETE /marketing/campaign` | Delete a pending campaign |
-| `create_contact` | admin | `POST /marketing/contact` | Add a marketing contact |
-| `delete_contact` | admin | `DELETE /marketing/contact` | Remove a marketing contact |
-| `run_cron` | admin | `POST /admin/cron` | Trigger a cron job by ID |
-| `create_post` | admin | `POST /admin/post` | Create a blog post |
-| `update_post` | admin | `PUT /admin/post` | Update an existing blog post |
-| `get_post` | public | `GET /content/post` | Fetch a post's markdown + frontmatter by URL (pairs with `update_post`) |
-| `create_backup` | admin | `POST /admin/backup` | Create a Firestore backup |
-| `run_hook` | admin | `POST /admin/hook` | Execute a custom hook |
-| `generate_uuid` | admin | `POST /general/uuid` | Generate a UUID |
-| `health_check` | public | `GET /health` | Check server health |
+| `firestore_read` | admin | `GET /omega/admin/firestore` | Read a Firestore document by path |
+| `firestore_write` | admin | `POST /omega/admin/firestore` | Write/merge a Firestore document |
+| `firestore_query` | admin | `POST /omega/admin/firestore/query` | Query a collection with where/orderBy/limit |
+| `send_email` | admin | `POST /omega/admin/email` | Send transactional email via SendGrid |
+| `send_notification` | admin | `POST /omega/admin/notification` | Send push notification via FCM |
+| `get_user` | user | `GET /omega/user` | Get authenticated user info |
+| `get_subscription` | user | `GET /omega/user/subscription` | Get subscription info for a user |
+| `sync_users` | admin | `POST /omega/admin/users/sync` | Sync user data across systems |
+| `list_users` | admin | `GET /omega/admin/users/list` | List users newest-first with the Auth join (providers, verified, disabled, last sign-in), email/uid prefix search, cursor pagination |
+| `set_user_disabled` | admin | `POST /omega/admin/users/disable` | Disable or re-enable a user at the Auth level (disable also revokes refresh tokens) |
+| `list_campaigns` | admin | `GET /omega/marketing/campaign` | List marketing campaigns |
+| `create_campaign` | admin | `POST /omega/marketing/campaign` | Create a marketing campaign |
+| `get_stats` | admin | `GET /omega/admin/stats` | Get system statistics |
+| `cancel_subscription` | admin | `POST /omega/payments/cancel` | Cancel subscription at period end |
+| `refund_payment` | admin | `POST /omega/payments/refund` | Process a refund |
+| `get_payment_portal` | admin | `POST /omega/payments/portal` | Generate Stripe billing portal link |
+| `update_campaign` | admin | `PUT /omega/marketing/campaign` | Update a pending campaign |
+| `delete_campaign` | admin | `DELETE /omega/marketing/campaign` | Delete a pending campaign |
+| `create_contact` | admin | `POST /omega/marketing/contact` | Add a marketing contact |
+| `delete_contact` | admin | `DELETE /omega/marketing/contact` | Remove a marketing contact |
+| `run_cron` | admin | `POST /omega/admin/cron` | Trigger a cron job by ID |
+| `create_post` | admin | `POST /omega/admin/post` | Create a blog post |
+| `update_post` | admin | `PUT /omega/admin/post` | Update an existing blog post |
+| `get_post` | public | `GET /omega/content/post` | Fetch a post's markdown + frontmatter by URL (pairs with `update_post`) |
+| `create_backup` | admin | `POST /omega/admin/backup` | Create a Firestore backup |
+| `run_hook` | admin | `POST /omega/admin/hook` | Execute a custom hook |
+| `generate_uuid` | admin | `POST /omega/general/uuid` | Generate a UUID |
+| `health_check` | public | `GET /omega/health` | Check server health |
 
 ## Tool Annotations
 
@@ -83,7 +85,7 @@ Consumer tools can set all the same annotations — they're passed through autom
 8. Client exchanges code: `POST /omega/mcp/token` → @omega.js/backend verifies ID token, returns `api.privateKey` as `access_token`
 9. Client uses the API key for all future MCP requests as `Authorization: Bearer {key}`
 
-The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
+The consumer auth URL is resolved from `omega.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
 
 ### Admin (Stdio)
 
@@ -99,10 +101,10 @@ npx omega mcp --token <api-key>    # User-level — sees 4 tools (2 user + 2 pub
 
 ## Consumer MCP Tools
 
-Consumer projects expose custom MCP tools via a single `functions/mcp.js` file. Tools are automatically discovered and merged with the built-in tools.
+Consumer projects expose custom MCP tools via a single `src/mcp.js` file, which `omega build` stages to `dist/mcp.js` where both transports load it. Tools are automatically discovered and merged with the built-in tools.
 
 ```js
-// functions/mcp.js
+// src/mcp.js
 module.exports = [
   // Route delegation — points at an existing route (works on stdio + HTTP)
   {
@@ -110,7 +112,7 @@ module.exports = [
     description: 'Get sponsorship details by ID',
     role: 'user',
     method: 'GET',
-    path: 'sponsorship',
+    path: '/sponsorship',
     annotations: { title: 'Get sponsorship details', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -123,34 +125,46 @@ module.exports = [
 
   // Handler mode — runs code directly (HTTP transport only)
   {
-    name: 'newsletter_stats',
-    description: 'Get newsletter stats for the past N days',
-    role: 'admin',
-    annotations: { title: 'Get newsletter stats', readOnlyHint: true },
+    name: 'my_sponsorships',
+    description: 'Count the caller\'s sponsorships created in the past N days',
+    role: 'user',
+    annotations: { title: 'Count my sponsorships', readOnlyHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         days: { type: 'number', description: 'Days to look back', default: 30 },
       },
     },
-    handler: async ({ Manager, ctx, user, params, libraries }) => {
+    handler: async ({ ctx, omega, user, params }) => {
+      // No route stands behind a handler tool to refuse a signed-out caller, so it is its own gate
+      if (!user.authenticated) {
+        throw new Error('Sign in to count your sponsorships');
+      }
+
       const cutoff = Date.now() - (params.days || 30) * 86400000;
-      const snapshot = await libraries.admin.firestore()
-        .collection('newsletters')
+      const snapshot = await omega.firebase.admin.firestore()
+        .collection('sponsorships')
+        .where('owner', '==', user.uid)
         .where('metadata.created.timestampUNIX', '>=', Math.floor(cutoff / 1000))
         .get();
-      return { total: snapshot.docs.length };
+
+      ctx.log(`my_sponsorships: ${snapshot.size} for ${user.uid}`);
+
+      return { total: snapshot.size };
     },
   },
 ];
 ```
 
+A route tool's `path` is the HTTP path AS SERVED, and the client prefixes nothing: `/sponsorship` for a consumer route, `/omega/admin/firestore` for a built-in. A consumer route is not on `omega_api`, so it needs its own function (`omega.routes.run('sponsorship', { req, res })`) and its own hosting rewrite ([routes.md](routes.md#functions-entry-point-srcindexjs)) before a tool can reach it.
+
 **Rules:**
 - Consumer tools with the same name as a built-in tool override it
 - Every tool needs `name`, `description`, and either `path` (route delegation) or `handler` (direct execution)
+- A `path` starts with `/`; one without it refuses to load, naming the tool
 - `role` defaults to `admin` if not specified
 - Handler-based tools only work on the HTTP transport (they return an error on stdio)
-- Handler-based tools bypass @omega.js/backend route middleware — they execute directly with the Manager context
+- A handler tool runs with the request's `Context` as `ctx` and the resolved caller as `user` (a `User`, signed out when the token matches no account), outside the route pipeline (no schema, no `ctx.respond`): it executes directly with `{ ctx, omega, user, params }` and its return value is the tool's answer. The admin key is an admin caller with no account behind it (`user.roles.admin` true, `user.uid` null)
 - All MCP-standard fields are passed through: `annotations`, `outputSchema`, `inputSchema`
 
 ## HTTPS Local Development
@@ -203,20 +217,22 @@ Add to `.claude/settings.json`:
 |---------|------|
 | Tool definitions (roles + annotations) | `src/mcp/tools.js` |
 | Shared utilities (auth, filtering, consumer loading) | `src/mcp/utils.js` |
-| HTTP handler (OAuth + roles + consumer tools) | `src/mcp/handler.js` |
+| HTTP handler (discovery, the caller's role, the protocol) | `src/mcp/handler.js` |
+| OAuth authorize, token, and client registration | `src/mcp/oauth.js` |
+| Tool call (handler tools in-process, route tools over HTTP) | `src/mcp/call-tool.js` |
 | Stdio server | `src/mcp/index.js` |
 | HTTP client | `src/mcp/client.js` |
 | CLI command | `src/cli/commands/mcp.js` |
 | HTTPS proxy for local dev | `@omega.js/devkit/local-https` (wired in `src/cli/commands/serve.js` + `emulator.js`) |
-| MCP route interception | `src/manager/index.js` (`_handleMcp`, `resolveMcpRoutePath`) |
+| MCP route interception | `src/omega/router.js` (`dispatch`, `resolveMcpRoutePath`) |
 | Hosting rewrites setup | `src/cli/commands/setup-tests/hosting-rewrites.js` |
 
 ## Adding New Tools
 
 ### Built-in tools (in @omega.js/backend itself)
 
-Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The tool automatically maps to the corresponding @omega.js/backend route via the HTTP client.
+Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The `path` is the route as served, `/omega/<route>` (e.g. `/omega/admin/firestore`), and the HTTP client calls it untouched.
 
 ### Consumer tools (in a consumer project)
 
-Add an entry to `functions/mcp.js`. Use `path` + `method` for route delegation (works on both transports), or `handler` for direct execution (HTTP only). All MCP fields (`annotations`, `outputSchema`, etc.) are passed through automatically.
+Add an entry to `src/mcp.js`. Use `path` + `method` for route delegation (works on both transports), or `handler` for direct execution (HTTP only). The `path` is the route as served (`/notes`), and the route behind it needs its own function and hosting rewrite, since `omega_api` serves only the framework's routes. All MCP fields (`annotations`, `outputSchema`, etc.) are passed through automatically.

@@ -133,7 +133,7 @@ module.exports = defineCases({
           ctx.expect(blob.license.status).toBe('licensed');
           ctx.expect(typeof blob.builtAt).toBe('string');
           // The mode is the same THREE keys everywhere (#894): desktop's own
-          // `server` verdict stays inside the Manager.
+          // `server` verdict stays inside the build module.
           ctx.expect(Object.keys(blob.mode).sort()).toEqual(['build', 'environment', 'publish']);
           ctx.expect(blob.mode.environment).toBe('production');
           ctx.expect(blob.mode.build).toBe(true);

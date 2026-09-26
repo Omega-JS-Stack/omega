@@ -1,31 +1,32 @@
-// Libraries
-import extension from './lib/extension.js';
-import LoggerLite from './lib/logger-lite.js';
-import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
+// The offscreen-document context: the extension base, for the long-running
+// work background hands off (WebSocket connections, DOM parsing).
 
-// Class
-class Manager {
+// Libraries
+import { Omega as BaseOmega } from './omega.js';
+
+/**
+ * The offscreen document's runtime.
+ */
+class Omega extends BaseOmega {
   constructor() {
-    // Properties
-    this.extension = null;
-    this.logger = null;
+    super('offscreen');
   }
 
+  /**
+   * Settle `ready`.
+   * @returns {Promise<Omega>} the instance.
+   */
   async initialize() {
-    // Set properties
-    this.extension = extension;
-    this.logger = new LoggerLite('offscreen');
+    await super.initialize();
 
     // Log
     this.logger.log('Initialized!', this);
 
-    // Return manager instance
     return this;
   }
 }
 
-// Cross-context helpers — Manager.isTesting() / isDevelopment() / etc.
-attachModeHelpers(Manager);
+const omega = new Omega();
 
-// Export
-export default Manager;
+export default omega;
+export { Omega };

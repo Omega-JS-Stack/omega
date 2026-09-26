@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const SECTIONS_DIR = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections');
@@ -55,7 +55,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -170,11 +170,10 @@ async function renderSections(drive, { orders = [] } = {}) {
       requests.push({ url, options });
       return ordersPayload;
     },
-    auth: () => ({ resolveSubscription: (account) => resolveSubscription(account) }),
-    utilities: () => ({
+    utilities: {
       escapeHTML: (value) => String(value ?? '').replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`),
       showNotification: () => {},
-    }),
+    },
   };
 
   delete require.cache[require.resolve(BUNDLE)];
@@ -185,7 +184,7 @@ async function renderSections(drive, { orders = [] } = {}) {
   return elements;
 }
 
-const FREE_ACCOUNT = { subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active' } };
+const FREE_ACCOUNT = new User({ subscription: { product: { id: 'basic', name: 'Basic' }, status: 'active' } }, { uid: 'u1' });
 
 test('#672: the orders list renders the purchases the route hands back', async () => {
   const orders = [
@@ -333,7 +332,7 @@ test('#672: a refund on a picked purchase posts that order id', async () => {
 test('#672: a subscription refund posts no order id at all', async () => {
   // An ABSENT orderId is what the route reads as "the subscription" — an empty
   // string would be a named order it could not find, so the key must not ride
-  const SUBSCRIBER = { subscription: { product: { id: 'pro', name: 'Pro' }, status: 'cancelled' } };
+  const SUBSCRIBER = new User({ subscription: { product: { id: 'pro', name: 'Pro' }, status: 'cancelled' } }, { uid: 'u1' });
 
   await renderSections(async (bundle) => {
     bundle.refund.init();

@@ -1,8 +1,8 @@
 // Libraries
 const path = require('path');
 const fs = require('fs');
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('test');
+const build = require('../build.js');
+const logger = build.logger('test');
 const { run } = require('../test/runner.js');
 const attachLogFile = require('../utils/attach-log-file.js');
 const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.js');
@@ -43,7 +43,7 @@ module.exports = async function (options) {
   // Extended mode — opt into tests that hit REAL external services (Firebase, analytics,
   // update feeds) instead of skipping them. Off by default so `npx omega test` stays fast and
   // offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var — the
-  // SAME name across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop (cross-framework parity); `--extended` is the CLI
+  // SAME name on every framework (cross-framework parity); `--extended` is the CLI
   // shorthand. Once set on process.env it propagates to every spawned child (electron
   // main/renderer/boot, the gulp boot build) automatically via `{ ...process.env }`.
   const extended    = options.extended === true
@@ -58,7 +58,7 @@ module.exports = async function (options) {
   // When @omega.js/desktop itself runs its own boot-layer tests (the cwd's package.json is @omega.js/desktop's), there's
   // no real consumer app to boot. Point the boot runner at the fixture under
   // dist/test/fixtures/consumer-app unless the caller has already set OMEGA_TEST_BOOT_PROJECT
-  // explicitly. Mirrors BXM's OMEGA_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
+  // explicitly.
   if (!process.env.OMEGA_TEST_BOOT_PROJECT) {
     try {
       const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));

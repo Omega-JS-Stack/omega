@@ -1,5 +1,5 @@
 // Build-layer tests for utils/merge-line-files.js — verify the .env / .gitignore merge convention
-// (BXM/UJM-style Default + Custom sections) AND the double-quote normalization for .env values.
+// (Default + Custom sections) AND the double-quote normalization for .env values.
 
 const path = require('path');
 const { mergeLineBasedFiles, normalizeEnvLine, DEFAULT_MARKER, CUSTOM_MARKER } =

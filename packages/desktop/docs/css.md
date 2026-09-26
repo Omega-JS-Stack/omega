@@ -32,7 +32,7 @@ Compiles to `dist/assets/css/main.bundle.css` (Bootstrap + classy theme + your g
 
 ## Theme integration
 
-The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omega.js/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override, see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block, and `$primary` arrives from `brand.color` through the generated `dist/assets/scss/_brand.scss` unless a literal replaces `brand.$primary` ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)). See [themes.md](themes.md) for the full variable reference.
+The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omega.js/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `omega.theme` (OS-following, runtime-switchable, persisted override, see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block, and `$primary` arrives from `brand.color` through the generated `dist/assets/scss/_brand.scss` unless a literal replaces `brand.$primary` ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)). See [themes.md](themes.md) for the full variable reference.
 
 ## Icon presentation
 
@@ -69,15 +69,9 @@ Emit this markup in the window's HTML:
 </div>
 ```
 
-Wire the behavior from a renderer component (`src/assets/js/components/<window>/index.js`) — `__main_assets__` is the build alias for @omega.js/desktop's vendored core assets:
+The renderer instance wires the behavior during `omega.initialize()` (the vendored `__main_assets__/js/core/app-shell.js`, the same module @omega.js/web runs), so a view that renders the markup needs no script of its own. The API is `omega.shell` (`isCollapsed`, `isOpen`, `setCollapsed`, `setOpen`, `toggleCollapsed`, `toggleOpen`).
 
-```js
-import appShell from '__main_assets__/js/core/app-shell.js';
-
-appShell();
-```
-
-The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container — `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"` — which is what the CSS keys off; the API is also registered at `omega._library.appShell`. Add `.omega-shell--locked` when `main` should never scroll (the page manages its own interior scroll).
+The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container: `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"`, which is what the CSS keys off. Add `.omega-shell--locked` when `main` should never scroll (the page manages its own interior scroll).
 
 ## Bootstrap-first convention
 

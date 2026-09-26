@@ -9,7 +9,7 @@
  *      the product project's Identity Toolkit (email = brand contact
  *      email; password through the account service's owner channels:
  *      env pin → owner hook → derived seed). The users/{uid} doc writes
- *      the CANONICAL @omega.js/account shape (the BEM golden master the
+ *      the CANONICAL @omega.js/account shape (the golden master the
  *      products run) with real generated credentials — including
  *      api.privateKey, the user API key the products accept.
  *   2. The ASSET doc — shape-templated from an existing doc (the config's
@@ -83,7 +83,7 @@ async function ensureProductUser(spec) {
 
   const created = await authAdmin.createUser({ email, password });
 
-  // The canonical account shape (the BEM golden master) with REAL generated
+  // The canonical account shape (the golden master) with REAL generated
   // credentials — a direct write, since the product's own auth-onCreate
   // trigger only fires for its backend, not for admin REST creates.
   const userDoc = resolveAccount({ auth: { uid: created.uid, email } }, {
@@ -130,7 +130,7 @@ async function createProductAsset(spec) {
   const { uid } = await ensureProductUser({ db, authAdmin, email, resolvePassword, log });
 
   const id = generateAssetId();
-  // BEM docs mirror their doc id in an `id` field — a copied donor id would
+  // Product docs mirror their doc id in an `id` field — a copied donor id would
   // self-reference the WRONG doc. Donor usage counters copy as-is (their
   // shape is product-specific; the product resets them on its own cycle).
   const doc = { ...template, ...overrides, owner: uid, ...(template.id !== undefined ? { id } : {}) };

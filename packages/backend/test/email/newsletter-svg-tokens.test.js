@@ -8,9 +8,13 @@
  * discarded attempt's cost from the newsletter's aggregateTotals.
  *
  * Driven by the real `test` AI provider (directives scripted into the image
- * prompt), so the retry loop runs for real with no paid API call and no mock.
+ * prompt), so the retry loop runs for real with no paid API call and no mock,
+ * on a Context of a REAL Omega instance booted from the bundled fixture, so the
+ * file runs with or without an emulator.
  */
-const { generateSectionImage } = require('../../dist/manager/libraries/email/generators/lib/svg-illustrator.js');
+const { generateSectionImage } = require('../../dist/omega/libraries/email/generators/lib/svg-illustrator.js');
+const Context = require('../../dist/omega/context.js');
+const { bootOmega } = require('../helpers/_boot-omega.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Scripted reply with no <svg> in it, so BOTH attempts of the retry loop run
@@ -26,8 +30,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'svg-retry-attempts-accumulate-into-the-section-tokens',
-      async run({ assert, ctx, Manager }) {
-        const ai = Manager.AI(ctx);
+      async run({ assert }) {
+        const ctx = new Context(bootOmega());
+        const ai = ctx.ai;
 
         const result = await generateSectionImage({
           imagePrompt: NO_SVG_PROMPT,

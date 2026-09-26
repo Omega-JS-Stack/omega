@@ -78,7 +78,7 @@ module.exports = defineCases({
     {
       name: 'the-resolved-port-map-rides-along-with-the-command',
       run({ assert }) {
-        // Journey tests call route handlers IN-PROCESS, so the runner's Manager
+        // Journey tests call route handlers IN-PROCESS, so the runner's omega
         // builds URLs from OMEGA_*_PORT exactly like a function worker does.
         // Unset, every getter fell back to the classic defaults and answered for
         // a stack that may not be there.

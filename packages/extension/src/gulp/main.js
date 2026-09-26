@@ -1,15 +1,15 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('main');
-const argv = Manager.getArguments();
+const build = require('../build.js');
+const logger = build.logger('main');
+const argv = build.getArguments();
 const { series, parallel } = require('gulp');
 const path = require('path');
 const glob = require('glob').globSync;
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const projectRoot = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const projectRoot = build.getRootPath('project');
 
 // Resolve the .env cascade from the project root (shell > app > brand > company).
 // `target` delivers the schema's `deliverAs` renames into process.env (#678);
@@ -23,7 +23,7 @@ require('@omega.js/config').loadEnv(projectRoot, { target: 'extension' });
 const attachLogFile = require('../utils/attach-log-file.js');
 const logFileEnv = process.env.OMEGA_LOG_FILE;
 if (logFileEnv !== 'false' && logFileEnv !== '0') {
-  const defaultName = Manager.isBuildMode() ? 'build.log' : 'dev.log';
+  const defaultName = build.isBuildMode() ? 'build.log' : 'dev.log';
   const logPath = (logFileEnv && logFileEnv !== 'true') ? logFileEnv : path.join(projectRoot, 'logs', defaultName);
   attachLogFile(logPath);
   logger.log(`Logs tee'd to ${logPath}`);

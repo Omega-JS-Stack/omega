@@ -9,7 +9,7 @@
 const { execFileSync } = require('child_process');
 const client = require('./client');
 
-const Manager = new (require('../../build.js'))();
+const build = require('../../build.js');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -77,7 +77,7 @@ async function quitAndDrain(names) {
 }
 
 module.exports = async function (options) {
-  const wasRunning = await quitAndDrain(client.appNames(Manager.getConfig()));
+  const wasRunning = await quitAndDrain(client.appNames(build.getConfig()));
   console.log(wasRunning ? 'quit running app' : 'app was not running');
 };
 

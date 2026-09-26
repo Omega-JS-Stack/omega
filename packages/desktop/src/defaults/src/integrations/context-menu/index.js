@@ -1,6 +1,6 @@
 // Context-menu definition. Called by @omega.js/desktop EVERY time the user right-clicks.
 //
-// `manager`     — the running @omega.js/desktop Manager.
+// `omega`: the running @omega.js/desktop main-process instance.
 // `menu`        — per-event builder API + id-path API.
 // `params`      — Electron's context-menu params (selectionText, isEditable, linkURL,
 //                 srcURL, mediaType, editFlags, x, y, etc.).
@@ -17,7 +17,7 @@
 //   reload                                        — always
 //   inspect, toggle-devtools                      — dev mode only
 
-module.exports = ({ manager, menu, params, webContents }) => {
+module.exports = ({ omega, menu, params, webContents }) => {
   // Start from @omega.js/desktop's default template. Don't add anything by default — leave it
   // identical to what the framework would do without this file.
   menu.useDefaults();

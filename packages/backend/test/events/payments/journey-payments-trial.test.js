@@ -42,7 +42,7 @@ module.exports = defineCases({
     {
       name: 'create-trial-intent',
       async run({ http, assert, state }) {
-        const response = await http.as('journey-payments-trial').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-trial').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,
@@ -124,7 +124,7 @@ module.exports = defineCases({
 
         state.eventId2 = `_test-evt-journey-trial-active-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId2,
           type: 'customer.subscription.updated',
           data: {

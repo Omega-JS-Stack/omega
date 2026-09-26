@@ -181,7 +181,7 @@ function enabledFormats(config, target) {
 
 /**
  * The product name a desktop target packages under: the same derivation
- * @omega.js/desktop's `Manager.getConfig()` applies (`app.productName` then
+ * @omega.js/desktop's `build.getConfig()` applies (`app.productName` then
  * `brand.name`), so the website reads the name the packager actually used.
  *
  * @param {object} config - Desktop-shaped config (`{ app, brand }`).

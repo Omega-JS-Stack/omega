@@ -3,7 +3,7 @@
  * in a REAL Electron app across the real app boundary (#46).
  *
  * The fast wire lane (scripts/e2e-auth-token.js) requires the desktop
- * client-bridge in-process from node with a synthetic Manager: it proves the
+ * lib/auth.js in-process from node with a synthetic instance: it proves the
  * TOKEN contract, never the app. This lane proves the APP: a real consumer
  * bundle booting in a real Electron process, a real deep link arriving the way
  * the OS delivers one, and both sides of the process boundary landing on the
@@ -22,15 +22,15 @@
  *      `<brand.id>://auth/token?authToken=…` in its argv. The OS-level
  *      single-instance lock forwards that argv to the running app, whose real
  *      `second-instance` handler parses it, dispatches `auth/token` through the
- *      real deep-link pipeline, and hands the token to client-bridge. Nothing
+ *      real deep-link pipeline, and hands the token to lib/auth.js. Nothing
  *      here calls a route handler directly.
- *   5. BOTH sides of the process boundary are asserted: main's client-bridge is
+ *   5. BOTH sides of the process boundary are asserted: main's auth is
  *      signed in as the emulator user, and the RENDERER — which learned about it
  *      only through the real `desktop:auth:sign-in-with-token` broadcast — has
  *      its own @omega.js/client Firebase on the same uid, with main's view of
  *      the user agreeing over IPC.
  *
- * Offline: emulator only. Main runs as a TESTING app, so client-bridge connects
+ * Offline: emulator only. Main runs as a TESTING app, so lib/auth.js connects
  * its Firebase Auth to the local auth emulator; the staged consumer config marks
  * the renderer's @omega.js/client `development` with the resolved dev ports, so
  * its Firebase talks to the same emulator. No leg reaches a real cloud.
@@ -40,7 +40,7 @@
  *   - a cloud config + `environment`/`dev.ports` block (the committed fixture
  *     ships an EMPTY cloud config on purpose, so its boot suite never inits
  *     Firebase), and
- *   - a renderer entry that parks the renderer Manager on `window` so the lane
+ *   - a renderer entry that parks the renderer instance on `window` so the lane
  *     can read the renderer's own auth state.
  *
  * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes). No electron
@@ -212,7 +212,9 @@ function stageApp({ projectId, apiKey, ports }) {
     dev: { ports },
     cloud: {
       provider: 'firebase',
-      config: { apiKey, projectId },
+      // The renderer's @omega.js/client boots Messaging, which refuses a config
+      // without appId and messagingSenderId, so the staged brand carries both
+      config: { apiKey, projectId, appId: '1:000000000000:web:desktopauthe2e', messagingSenderId: '000000000000' },
     },
     monitoring: { providers: { sentry: { dsn: '' } } },
     analytics: { providers: { google: { id: '' } } },
@@ -226,17 +228,16 @@ function stageApp({ projectId, apiKey, ports }) {
   };
   fs.writeFileSync(path.join(APP_DIR, 'config', 'omega.json5'), `${JSON.stringify(config, null, 2)}\n`);
 
-  // Renderer entry override — park the Manager on window so the lane can read
+  // Renderer entry override: park the instance on window so the lane can read
   // the RENDERER's own auth state (the fixture's entry keeps no reference).
   const rendererEntry = path.join(APP_DIR, 'src', 'assets', 'js', 'components', 'main', 'index.js');
   fs.writeFileSync(rendererEntry, [
     '// Staged for scripts/e2e-desktop-auth.js — the fixture entry plus a window',
     '// handle, so the lane can read this renderer\'s own @omega.js/client auth state.',
-    "const Manager = require('@omega.js/desktop/renderer');",
+    "import omega from '@omega.js/desktop/renderer';",
     '',
-    'const manager = new Manager();',
-    'window.__omegaAuthE2E = manager;',
-    'manager.initialize();',
+    'window.__omegaAuthE2E = omega;',
+    'omega.initialize();',
     '',
   ].join('\n'));
 }
@@ -249,15 +250,15 @@ function stageApp({ projectId, apiKey, ports }) {
 
 const bootTests = [
   {
-    description: 'main-process client-bridge is live on the emulator, not yet the e2e user',
+    description: 'main-process auth is live on the emulator, not yet the e2e user',
     timeout: 30000,
-    inspect: async ({ manager, expect }) => {
-      expect(manager._initialized).toBe(true);
-      // Firebase actually loaded (an empty cloud.config leaves the bridge in
-      // no-op mode — that would make every assertion below vacuous).
-      expect(Boolean(manager.omega._firebaseAuth)).toBe(true);
-      expect(manager.isTesting()).toBe(true);
-      const current = manager.omega.getCurrentUser();
+    inspect: async ({ omega, expect }) => {
+      expect(omega._initialized).toBe(true);
+      // Firebase actually loaded (an empty cloud.config leaves auth in no-op
+      // mode, which would make every assertion below vacuous).
+      expect(Boolean(omega.auth._firebaseAuth)).toBe(true);
+      expect(omega.isTesting()).toBe(true);
+      const current = omega.auth._firebaseAuth.currentUser;
       expect(current?.uid === process.env.OMEGA_E2E_UID).toBe(false);
     },
   },
@@ -265,7 +266,7 @@ const bootTests = [
   {
     description: 'a REAL second instance delivers the deep link; main signs in as the emulator user',
     timeout: 150000,
-    inspect: async ({ manager, expect, appRoot }) => {
+    inspect: async ({ omega, expect, appRoot }) => {
       const { spawn } = require('child_process');
 
       const url = `${process.env.OMEGA_E2E_SCHEME}://auth/token?authToken=${process.env.OMEGA_E2E_TOKEN}`;
@@ -274,7 +275,7 @@ const bootTests = [
       // the built-in and, leaving ctx.handled false, lets the built-in do the
       // real work. This is how we know the token arrived through the pipeline.
       global.__omega_e2e_dispatch = null;
-      manager.deepLink.on('auth/token', (ctx) => {
+      omega.deepLink.on('auth/token', (ctx) => {
         global.__omega_e2e_dispatch = { source: ctx.source, url: ctx.url, hasToken: Boolean(ctx.query?.authToken) };
       });
 
@@ -304,7 +305,9 @@ const bootTests = [
 
       let user = null;
       for (let i = 0; i < 120; i++) {
-        user = manager.omega.getCurrentUser();
+        // Main's own Firebase session: `omega.auth.user` builds from the account a
+        // renderer pushes, which needs the Firestore read this lane does not stage
+        user = omega.auth._firebaseAuth.currentUser;
         if (user?.uid === process.env.OMEGA_E2E_UID) break;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -326,17 +329,17 @@ const bootTests = [
   {
     description: 'the renderer reflects the same emulator user (own Firebase + main over IPC)',
     timeout: 90000,
-    inspect: async ({ manager, expect }) => {
+    inspect: async ({ omega, expect }) => {
       const { BrowserWindow } = require('electron');
 
-      const win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+      const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
       expect(Boolean(win && !win.isDestroyed())).toBe(true);
 
       // The renderer learned about the sign-in ONLY through the real
       // desktop:auth:sign-in-with-token broadcast — nothing pushes it here.
       const read = () => win.webContents.executeJavaScript(`(async () => {
-        const manager = window.__omegaAuthE2E;
-        const rendererUid = manager?.omega?.auth?.()?.getUser?.()?.uid || null;
+        const instance = window.__omegaAuthE2E;
+        const rendererUid = instance?.firebaseAuth?.currentUser?.uid || null;
         const mainUser = await window.desktop.ipc.invoke('desktop:auth:get-user').catch(() => null);
         return { rendererUid, mainUid: mainUser?.uid || null };
       })()`).catch(() => null);

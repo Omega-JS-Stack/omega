@@ -9,12 +9,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const SW_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'sw', 'manager.js'), 'utf8');
+const SW_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'sw', 'omega.js'), 'utf8');
 
 // Evaluate the worker the way a browser does — as a script against a worker
 // global — since it ships as an esbuild iife bundle. The ONLY edit is the
-// trailing `export default` (esbuild's job), swapped for the completion value
-// so the harness gets the class back — plus, for the cache-warming pin, the
+// trailing exports (esbuild's job), swapped for the completion value so the
+// harness gets the class back, plus, for the cache-warming pin, the
 // `CACHE_WARMING_ENABLED` constant flipped on: the flag ships OFF (page speed
 // wins) and the machinery behind it still has to be right when it flips.
 function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
@@ -72,21 +72,21 @@ function loadWorker(scriptUrl, { cacheWarming = false } = {}) {
     },
   };
 
-  let source = SW_SOURCE.replace(/export default Manager;\s*$/, 'Manager;');
+  let source = SW_SOURCE.replace(/export default omega;\s*export \{ Omega \};\s*$/, 'Omega;');
   if (cacheWarming) {
     source = source.replace('const CACHE_WARMING_ENABLED = false;', 'const CACHE_WARMING_ENABLED = true;');
   }
-  const Manager = vm.runInNewContext(source, context, { filename: 'sw/manager.js' });
-  const manager = new Manager();
+  const Omega = vm.runInNewContext(source, context, { filename: 'sw/omega.js' });
+  const omega = new Omega();
 
-  manager.initializeFirebase();
+  omega.initializeFirebase();
 
   return {
     importedScripts,
     notifications,
     opened,
     cached,
-    updateCache: (pages) => manager.updateCache(pages),
+    updateCache: (pages) => omega.updateCache(pages),
     pushBackgroundMessage: (payload) => backgroundMessage(payload),
     notificationClick: (clickAction) => listeners.notificationclick({
       notification: { data: { FCM_MSG: { data: clickAction ? { click_action: clickAction } : {}, notification: {} } }, close: () => {} },

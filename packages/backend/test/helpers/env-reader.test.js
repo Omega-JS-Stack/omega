@@ -4,7 +4,7 @@
  *
  * A brand's backend used to serve every route fine with a required key
  * missing and crash at the first customer action that needed it (#569: an
- * order email, at a real customer's first receipt). Now `Manager.init()`
+ * order email, at a real customer's first receipt). Now `omega.initialize()`
  * validates every required key of the env schema and refuses — in EVERY
  * environment, development included — with ONE error that names them all.
  * The single exempt lane is a process with no consumer omega.json5: the
@@ -12,7 +12,7 @@
  * minted keys into. (The self-test fixture IS brand-shaped and gets its keys
  * seeded — see ensureFixtureEnv in cli/commands/test.js.)
  *
- * Real everything: the real reader, the real Manager module booted against
+ * Real everything: the real reader, the real omega module booted against
  * real temp project dirs. Plain-node unit test (no emulator, no network).
  *
  * Run: npx omega test framework:helpers/env-reader
@@ -26,17 +26,17 @@ const path = require('node:path');
 const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
 const { getEnvironment } = require('../../dist/vendor/config/environment.js');
 
-const env = require('../../dist/manager/libraries/env.js');
+const env = require('../../dist/omega/libraries/env.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
+const OMEGA_PATH = require.resolve('../../dist/omega/index.js');
 const REQUIRED = requiredEnvKeys('backend');
 
-/** A FRESH Manager module, so the boot latches start unset. */
-function freshManagerModule() {
-  delete require.cache[MANAGER_PATH];
+/** A FRESH omega module, so the boot latches start unset. */
+function freshOmegaModule() {
+  delete require.cache[OMEGA_PATH];
 
-  return require(MANAGER_PATH);
+  return require(OMEGA_PATH);
 }
 
 /** A temp project dir, with a brand's config/omega.json5 when asked for one. */
@@ -88,7 +88,7 @@ const PRODUCTION = { OMEGA_ENVIRONMENT: 'production' };
 const DEVELOPMENT = { OMEGA_ENVIRONMENT: 'development' };
 
 /**
- * Boot a real Manager in `development` with every required key absent,
+ * Boot a real omega in `development` with every required key absent,
  * restoring the process env afterwards — a leaked delete would break every
  * later test in the run.
  */
@@ -109,13 +109,12 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
   console.warn = (...args) => warnings.push(args.join(' '));
 
   try {
-    const FreshManager = freshManagerModule();
-    const manager = new FreshManager();
-    manager.init(null, { cwd: dir, log: false });
+    const { Omega } = freshOmegaModule();
+    const omega = new Omega().initialize({ cwd: dir });
 
     // Read INSIDE the boot's env: the finally below puts the runner's own
     // input back, and this boot's answer is the one it named
-    return { manager, warnings, environment: manager.getEnvironment() };
+    return { omega, warnings, environment: omega.getEnvironment() };
   } finally {
     console.warn = originalWarn;
     fs.rmSync(dir, { recursive: true, force: true });
@@ -127,7 +126,7 @@ function bootWithoutRequiredKeys({ consumerConfig }) {
 }
 
 /**
- * Boot a real Manager with every REQUIRED key seeded (so the #581 guard is
+ * Boot a real omega with every REQUIRED key seeded (so the #581 guard is
  * satisfied and the CONDITIONAL one is what fires), the given consumer config
  * on disk, and the given environment. Restores the process env afterwards.
  */
@@ -153,8 +152,8 @@ function bootWithConfig({ config, environment }) {
   console.warn = (...args) => warnings.push(args.join(' '));
 
   try {
-    const FreshManager = freshManagerModule();
-    new FreshManager().init(null, { cwd: dir, log: false });
+    const { Omega } = freshOmegaModule();
+    new Omega().initialize({ cwd: dir });
     return { warnings };
   } finally {
     console.warn = originalWarn;

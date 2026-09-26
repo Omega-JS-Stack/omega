@@ -4,12 +4,12 @@
 // Future passes will add: livereload websocket, watch + rebuild, renderer reload via webContents.reload(),
 // main reload via app.relaunch().
 
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('serve');
+const build = require('../../build.js');
+const logger = build.logger('serve');
 const { spawn } = require('child_process');
 const { watchEnvChain } = require('@omega.js/devkit/env-watch');
 
-const projectRoot = Manager.getRootPath('project');
+const projectRoot = build.getRootPath('project');
 
 module.exports = function serve(done) {
   // N7: resolve livereload (and CDP when requested) through the allocator —
@@ -22,7 +22,7 @@ module.exports = function serve(done) {
 
 async function resolveServePorts() {
   const { resolvePorts, envPort, CLASSIC_PORTS } = require('@omega.js/config');
-  const configPins = Manager.getConfig()?.ports || {};
+  const configPins = build.getConfig()?.ports || {};
 
   const wanted = { livereload: envPort('livereload') || CLASSIC_PORTS.livereload };
   const pins = {};

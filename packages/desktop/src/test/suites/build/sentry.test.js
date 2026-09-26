@@ -3,7 +3,7 @@
 // The policy itself — config gating, the dev/kill switches, user normalization,
 // release tagging — is @omega.js/monitoring's, proven by its own suite
 // (packages/monitoring/test/). What belongs here is the desktop half: the
-// package entry resolves in a main-process context, the manager's `sentry`
+// package entry resolves in a main-process context, the omega instance's `sentry`
 // surface is the one every lib calls, and a brand with no DSN gets a silent
 // no-op instead of a crash.
 
@@ -47,7 +47,7 @@ module.exports = defineCases({
         try {
           main.captureException(new Error('test'));
           main.captureMessage('test');
-          // client-bridge calls this on every auth change — a documented no-op when off.
+          // lib/auth.js calls this on every auth change, a documented no-op when off.
           main.setUser({ uid: 'abc', email: 'user@example.com' });
         } catch (e) {
           threw = e;

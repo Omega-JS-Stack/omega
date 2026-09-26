@@ -143,6 +143,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "notes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.created.timestampUNIX",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

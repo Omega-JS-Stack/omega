@@ -23,8 +23,9 @@
  * test/routes/marketing/campaign.test.js.
  */
 const assert = require('node:assert');
-const prepare = require('../../dist/manager/libraries/email/prepare.js');
-const { buildCampaignDoc } = require('../../dist/manager/routes/marketing/campaign/utils.js');
+const prepare = require('../../dist/omega/libraries/email/prepare.js');
+const { buildCampaignDoc } = require('../../dist/omega/routes/marketing/campaign/utils.js');
+const { validate } = require('../../dist/omega/helpers/schema.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The internal lane's build runs for real so the passthrough is proven all the way to
@@ -32,18 +33,17 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function transactionalBuild(settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
-  const Manager = {
+  const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
+  const omega = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
       // The account's unsubscribe group ids (#649) — every send resolves one from config
       marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
     },
     project: { websiteUrl: 'https://test.dev' },
-    libraries: { admin: {} },
-    User: () => ({ properties: {} }),
+    firebase: { admin: {} },
   };
-  const ctx = { Manager, log: () => {}, error: () => {} };
+  const ctx = { omega, log: () => {}, error: () => {} };
 
   return new Transactional(ctx).build({
     to: 'user@test.dev',
@@ -204,14 +204,14 @@ module.exports = defineCases({
       name: 'the admin/email + campaign schemas strip html, contentHtml and trustedContent',
 
       run() {
-        // These three never reach the handler over HTTP today, because a zod object
+        // These three never reach the handler over HTTP today, because validation
         // strips unknown keys and none of them is declared (#125 removed the last one,
         // `html`, from the admin/email schema). That strip is the BELT;
         // internalOnlyFieldFault() in the handler is the BRACES — the moment either
         // field is declared on a schema (or a consumer route forwards raw settings),
         // the guard is what stops it. If this test ever fails, the guard is live.
-        const emailSchema = require('../../dist/manager/schemas/admin/email/post.js')();
-        const email = emailSchema.parse({
+        const emailSchema = require('../../dist/omega/schemas/admin/email/post.js')();
+        const { data: email } = validate(emailSchema, {
           to: 'a@b.co',
           subject: 's',
           html: '<img src=x onerror=alert(1)>',
@@ -228,8 +228,8 @@ module.exports = defineCases({
         // the handler guard rather than a schema strip.
         assert.equal(email.data.content.html, '<img src=x onerror=alert(1)>', 'data.content.html no longer passes the schema — update this test');
 
-        const campaignSchema = require('../../dist/manager/schemas/marketing/campaign/post.js')();
-        const campaign = campaignSchema.parse({ name: 'n', subject: 's', contentHtml: '<img src=x>', trustedContent: true });
+        const campaignSchema = require('../../dist/omega/schemas/marketing/campaign/post.js')();
+        const { data: campaign } = validate(campaignSchema, { name: 'n', subject: 's', contentHtml: '<img src=x>', trustedContent: true });
 
         assert.equal(campaign.contentHtml, undefined, 'campaign schema admitted contentHtml');
         assert.equal(campaign.trustedContent, undefined, 'campaign schema admitted trustedContent');

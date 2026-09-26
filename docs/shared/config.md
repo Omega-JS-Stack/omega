@@ -338,8 +338,8 @@ targets: {
   and runs locally on the emulator suite. Everything OMEGA does today.
 - **`'custom'`** — the SAME backend (same routes, same schemas, same auth middleware, same
   helpers, same `.env`) served by its Express app on `process.env.PORT`, for a container host
-  (Render & co). `Manager.init()` reads the mode off this key, so a brand's `src/index.js` is
-  unchanged; an explicit `init` option still wins.
+  (Render & co). `initialize()` reads the mode off this key, so a brand's `src/index.js` is
+  unchanged; an explicit `projectType` option still wins.
 - **What custom mode removes is the Firebase LANE, not Firebase**: no Functions deploy, no
   emulator, no emulator test run — those four verbs refuse loudly and name their replacement
   ([docs/backend/index.md](../backend/index.md)). `firebase-admin` still loads, so a custom
@@ -752,9 +752,8 @@ Who derives from it:
 `src/environment.js` is the ONE environment module every OMEGA target answers
 from ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). Four calls,
 one implementation, one call form everywhere: `getEnvironment()` plus
-`isDevelopment()` / `isProduction()` / `isTesting()`, mixed into a framework's
-Manager with `attachTo()` (exported from the package index as
-`attachEnvironment`). It requires NOTHING, so it is bundled into browser
+`isDevelopment()` / `isProduction()` / `isTesting()`, called directly by every
+framework's `omega` instance and build module. It requires NOTHING, so it is bundled into browser
 artifacts (the desktop renderer, every extension bundle) and vendored into
 `@omega.js/client`, which reaches the same four through its own methods.
 
@@ -762,24 +761,21 @@ artifacts (the desktop renderer, every extension bundle) and vendored into
 context, which can read neither env nor files, it is `config.environment`, the
 build fact every surface already bakes into `OMEGA_BUILD_JSON.config`
 ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)), reached as
-`this.config.environment` off the Manager the call is made on. Nothing else is
+`this.config.environment` off the instance the call is made on. Nothing else is
 consulted: no `app.isPackaged`, no `manifest.update_url`, no `NODE_ENV`, no
 terminal sniffing.
 
-**NO DEFAULT.** A context with no input throws and names the variable. The four
-framework copies this replaced each had their own default and they DISAGREED:
-desktop answered `production` with no signal while the extension answered
-`development`, so a desktop `npm start` bundled itself as a production artifact.
-@omega.js/client seeded `environment: 'production'` into its own config defaults,
-and web's browser Manager defaulted to `development`.
+**NO DEFAULT.** A context with no input throws and names the variable. A guessed
+environment is how a dev build ships as production and how a production build talks
+to an emulator, and both failures stay silent until a user finds them.
 
 **`setEnvironment(value)` is the only writer**, so a fourth word can never reach
 the variable. Who calls it, and with what:
 
 | Lane | Names |
 |---|---|
-| `@omega.js/backend`'s boot (`Manager.init`, right after the `.env` cascade loads) | `envEnvironment()`, the AMBIENT answer (below) |
-| `@omega.js/desktop` / `@omega.js/extension` `src/build.js`, at load | `buildLaneEnvironment(Manager.isBuildMode())`: `production` under `OMEGA_BUILD_MODE` (which WINS over an inherited value, so a production build spawned from a test run still bakes production), else an already-named value, else `development`. That rule is ONE exported helper beside `setEnvironment`, not a copy of the expression per framework, and those two build lanes are its only callers |
+| `@omega.js/backend`'s boot (`initialize()`, right after the `.env` cascade loads) | `envEnvironment()`, the AMBIENT answer (below) |
+| `@omega.js/desktop` / `@omega.js/extension` `src/build.js`, at load | `buildLaneEnvironment(isBuildMode())`: `production` under `OMEGA_BUILD_MODE` (which WINS over an inherited value, so a production build spawned from a test run still bakes production), else an already-named value, else `development`. That rule is ONE exported helper beside `setEnvironment`, not a copy of the expression per framework, and those two build lanes are its only callers |
 | `@omega.js/desktop`'s main process, at `initialize()` | the `environment` its baked config carries, for a packaged app that has no parent lane |
 | `@omega.js/web`'s verbs | `production` for `omega build`, `development` for `omega dev`, `testing` for `omega test` |
 | the desktop test runners, the extension `test` verb | `testing` |
@@ -828,7 +824,7 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   livereload 35729, cdp 9222). **This map is the ONLY source of those numbers**
   ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)): @omega.js/client
   carried four of them plus a classic dev origin, @omega.js/desktop's url-helpers
-  and client-bridge three more, and @omega.js/extension's url-helpers and
+  and the desktop auth lib three more, and @omega.js/extension's url-helpers and
   background worker two, each as a last-resort fallback "for a build made with no
   stack up". Every one of those is gone. The numbers reach a browser exactly one
   way: each surface bakes the map into its build json with the classics as the
@@ -1352,7 +1348,7 @@ decision, declared once and made once, and it is DELIVERED one way:
   rest are facts about the BUILD and never part of the client contract. `mode` is the same
   THREE keys everywhere, `{ environment, build, publish }`: the build's verdict, whether it
   was a build rather than a dev/watch run, and whether it publishes. A surface's own extra
-  verdicts (desktop's `server`) stay inside that surface's Manager.
+  verdicts (desktop's `server`) stay inside that surface's build module.
 - **The delivery** is ONE FILE, `build.js` at the artifact's web root
   ([#743](https://github.com/Omega-JS-Stack/omega/issues/743), Ian 2026-09-12: "make it
   same shape and consumption everywhere as much as possible"). Two plain statements, written
@@ -1367,7 +1363,7 @@ decision, declared once and made once, and it is DELIVERED one way:
   Every HTML shell loads it with one script tag, FIRST (web's `core/_includes/core/head.html`
   at `/build.js`, desktop's page template at `../../build.js`, the extension's at
   `/build.js`), and every worker with one `importScripts('/build.js')` line (web's
-  `sw/manager.js`, the extension's `background.js`). No bundle carries a copy: the esbuild
+  `sw/omega.js`, the extension's `background.js`). No bundle carries a copy: the esbuild
   banners and defines the browser bundles grew are retired, and so is web's inline foot
   script. The `dev` map is its own statement because `omega dev` REWRITES that one line per
   request (#346), so a site built before the emulator came up still serves the map of the
@@ -1400,7 +1396,7 @@ always applies.
 ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand target cannot require
 this private package at runtime, so a framework that owns a derivation publishes its
 ANSWER on the runtime config object the target already holds, under `resolved.*`: the
-backend's `Manager.config.resolved.sourceRepo` carries `{ owner, name, slug }`, the brand's
+backend's `omega.config.resolved.github` carries `{ owner, name, slug }`, the brand's
 SOURCE repo as one finished value. The derivations themselves stay here (`src/repo.js`):
 one implementation, called by the framework, so no brand re-implements the rules and
 drifts from them. New derived values join a framework's `resolved` group as real brand
@@ -1828,8 +1824,8 @@ resolved config would fire on its own answer. The by-hand step, and the `parent`
 | `parent` | RETIRED outright ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): a URL or `'self'` becomes **`company: { id }`**, and `parent: false` becomes **`company: { webhooks: false }`**. The key itself fails the load now, naming its new home |
 
 Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
-the same loader and passed as `options.defaults`; `Manager.init()`'s
-`backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
+the same loader and passed as `options.defaults`; `initialize()` takes no
+`backendManagerConfigPath` option (the loader discovers the file); boot warns on
 schema findings, `npx omega test`'s target checks are the hard audit. The sandbox brand dogfoods the full
 hierarchy: shared sections live in `brands/sandbox-brand/config/omega.json5` (brand level),
 the backend target's local file carries only `targets.backend`.
@@ -1845,7 +1841,7 @@ the backend target's local file carries only `targets.backend`.
 | `analytics.providers.google.secret` | **`.env` → `GOOGLE_ANALYTICS_SECRET`** (secrets never in omega.json5; loader hard-fails) |
 | *(no extension-specific keys yet)* | `targets.extension: {}` — presence = enabled; extension-specific settings land here |
 
-Notes: `Manager.getConfig()` returns the RESOLVED config (missing file → `{}`; schema
+Notes: `build.getConfig()` (`require('@omega.js/extension/build')`) returns the RESOLVED config (missing file → `{}`; schema
 findings warn once per process — BXM has no separate audit surface). The build snapshot
 (`OMEGA_BUILD_JSON`, the artifact's one `build.js`) bakes `GOOGLE_ANALYTICS_SECRET` from the environment at
 build time, same value flow as before. `bxm setup` scaffolds + merges `config/omega.json5`

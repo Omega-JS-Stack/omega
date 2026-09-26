@@ -16,7 +16,7 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 
-const post = require('../../../dist/manager/routes/admin/post/post');
+const post = require('../../../dist/omega/routes/admin/post/post');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { resizeImage, IMAGE_MAX_DIMENSION, IMAGE_JPEG_QUALITY } = post;
@@ -40,11 +40,11 @@ async function makeJpeg(width, height) {
   return filepath;
 }
 
-// Minimal ctx stub — resizeImage only uses Manager.require + log.
+// Minimal ctx stub — resizeImage only uses omega.require + log.
 function makeAssistant() {
   return {
     log: () => {},
-    Manager: {
+    omega: {
       require: (mod) => require(mod),
     },
   };

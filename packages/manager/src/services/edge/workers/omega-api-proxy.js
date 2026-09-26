@@ -4,9 +4,8 @@
  * Firebase-hosted api domains don't need this (hosting rewrites serve /omega
  * directly). This worker is for brands that front a DEDICATED backend on the
  * api domain (proxifly's shape: api.{domain} is its own API server) and still
- * need the omega routes to reach the brand's Firebase Functions — the worker
- * carves /omega (and the legacy /backend-manager alias) out at the Cloudflare
- * edge and proxies it to
+ * need the omega routes to reach the brand's Firebase Functions: the worker
+ * carves /omega out at the Cloudflare edge and proxies it to
  * us-central1-{FIREBASE_PROJECT_ID}.cloudfunctions.net/omega_api; everything
  * else passes through to the origin untouched.
  *
@@ -22,11 +21,10 @@ export default {
     // Get Firebase project ID from environment variable
     const firebaseProjectId = env.FIREBASE_PROJECT_ID;
 
-    // Check if path starts with /omega or the legacy /backend-manager alias
-    const prefix = ['/omega', '/backend-manager'].find((p) => url.pathname.startsWith(p));
-    if (prefix) {
-      // Build Firebase URL, removing the matched prefix
-      const firebasePath = url.pathname.replace(prefix, '') || '/';
+    // Check if path starts with /omega
+    if (url.pathname.startsWith('/omega')) {
+      // Build Firebase URL, removing the prefix
+      const firebasePath = url.pathname.replace('/omega', '') || '/';
       const firebaseUrl = `https://us-central1-${firebaseProjectId}.cloudfunctions.net/omega_api${firebasePath}${url.search}`;
 
       // Proxy the request

@@ -1,7 +1,8 @@
 /**
  * icon-renderer tests — the ONE Font Awesome DOM auto-render (C4 cp112)
- * shared by desktop renderers, web pages, and extension pages. Pure CJS —
- * required straight from dist like desktop main does.
+ * shared by desktop renderers, web pages, and extension pages, plus the
+ * instance's wrapper around it (`omega.icons`). ESM like its siblings,
+ * required straight from dist (require(esm)) like desktop main does.
  *
  * The module's own seam is the injected transport `(name, style) => svg`, so
  * the transport here is a real recording function, not a stub of the module.
@@ -15,6 +16,7 @@ const path = require('path');
 require('./helpers.js');
 
 const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'icon-renderer.js');
+const ICONS_DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'icons.js');
 
 const RAW_SVG = '<svg viewBox="0 0 512 512"><path d="M0 0h512v512H0z"/></svg>';
 
@@ -440,5 +442,47 @@ describe('icon-renderer', () => {
 
       assert.strictEqual(observers.length, 0);
     });
+  });
+});
+
+describe('Icons (omega.icons)', () => {
+  let Icons;
+
+  before(() => {
+    Icons = require(ICONS_DIST_PATH).default;
+  });
+
+  // A document still parsing: start() defers its observer to
+  // DOMContentLoaded, which this suite never fires, so the transport binding
+  // is all a start() does here.
+  const loadingDoc = () => ({ readyState: 'loading', addEventListener: () => {} });
+
+  it('refuses a scan before start() binds a transport', () => {
+    assert.throws(() => new Icons().scan(makeRoot([])), /before icons\.start\(\)/);
+  });
+
+  it('renders through the transport start() bound, and keeps it on a second start()', async () => {
+    const icons = new Icons();
+    const first = transport();
+    const second = transport();
+    const icon = makeIcon('fa-solid fa-rocket');
+
+    icons.start({ resolve: first.resolve }, loadingDoc());
+    icons.start({ resolve: second.resolve }, loadingDoc());
+    icons.scan(makeRoot([icon]));
+    await settle();
+
+    assert.deepStrictEqual(first.calls, ['solid/rocket'], 'the first transport answers');
+    assert.deepStrictEqual(second.calls, [], 'a second start() binds nothing new');
+    assert(icon.innerHTML.includes('<svg'), 'the icon rendered');
+  });
+
+  it('stop() drops the transport, so a later scan fails loudly until start() again', () => {
+    const icons = new Icons();
+
+    icons.start({ resolve: transport().resolve }, loadingDoc());
+    icons.stop();
+
+    assert.throws(() => icons.scan(makeRoot([])), /before icons\.start\(\)/);
   });
 });

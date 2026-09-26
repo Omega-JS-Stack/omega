@@ -12,11 +12,11 @@
  * Run: npx omega test backend:helpers/payment/license-gate
  */
 const assert = require('node:assert');
-const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
-const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
-const Test = require('../../../dist/manager/libraries/payment/providers/test.js');
+const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
+const Coinbase = require('../../../dist/omega/libraries/payment/providers/coinbase.js');
+const Test = require('../../../dist/omega/libraries/payment/providers/test.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const REAL_PROVIDERS = [['stripe', Stripe], ['paypal', PayPal], ['chargebee', Chargebee], ['coinbase', Coinbase]];

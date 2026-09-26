@@ -13,7 +13,7 @@
  */
 const assert = require('node:assert');
 
-const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
+const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The leak fixture: a user document shaped the way a sender hands it to Email.send().
@@ -29,18 +29,17 @@ const USER_DOC = {
 async function captureSend(to) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Manager = {
+  const omega = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
     },
     project: { websiteUrl: 'https://test.dev' },
-    libraries: { admin: {} },
-    User: () => ({ properties: {} }),
+    firebase: { admin: {} },
   };
 
   const captured = [];
   const record = (...args) => captured.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
-  const ctx = { Manager, log: record, warn: record, error: record };
+  const ctx = { omega, log: record, warn: record, error: record };
 
   // There is no SendGrid in a unit test — the send rejects at that seam, long after
   // the line under test was written. The assertions are on the log, not the result.

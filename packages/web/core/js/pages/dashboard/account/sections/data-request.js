@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 let formManager = null;
@@ -25,7 +25,7 @@ function setupDataRequestForm() {
     return;
   }
 
-  formManager = new FormManager('#data-request-form', {
+  formManager = new FormManager(omega, '#data-request-form', {
     allowResubmit: false,
     warnOnUnsavedChanges: false,
     submittingText: 'Submitting request...',
@@ -63,7 +63,7 @@ function setupDownloadButton() {
     return;
   }
 
-  downloadFormManager = new FormManager('#data-request-download-form', {
+  downloadFormManager = new FormManager(omega, '#data-request-download-form', {
     allowResubmit: false,
     submittingText: 'Downloading...',
     submittedText: 'Downloaded!',
@@ -102,7 +102,7 @@ function setupCancelButton() {
     return;
   }
 
-  cancelFormManager = new FormManager('#data-request-cancel-form', {
+  cancelFormManager = new FormManager(omega, '#data-request-cancel-form', {
     allowResubmit: true,
     submittingText: 'Withdrawing...',
   });

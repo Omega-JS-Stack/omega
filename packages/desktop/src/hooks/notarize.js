@@ -29,7 +29,7 @@
 const path = require('path');
 const fs   = require('fs');
 const { execute } = require('node-powertools');
-const Logger = require('../lib/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { stapleAndProve, toolRunner } = require('./lib/notarize-tools.js');
 
 const logger = new Logger('notarize');

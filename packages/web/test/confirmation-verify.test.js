@@ -49,7 +49,7 @@ function bundleEntry({ contents, resolveDir, outfile }) {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -75,27 +75,26 @@ function bundleOnce() {
   return building;
 }
 
-// The REAL subscription derivation — the same @omega.js/account math the client
-// singleton exposes, so "does the account reflect the purchase" is answered here
-// exactly as it is in a browser.
-const resolveSubscription = require('@omega.js/account/subscription');
+// The REAL User, the class the client builds, so "does the account reflect the
+// purchase" is answered by the same getters here as in a browser.
+const { User } = require('@omega.js/account');
+
+// The shopper the page reads for: every doc read is built into a User for them.
+const IDENTITY = { uid: 'test-uid' };
+const asUser = (document) => new User(document, IDENTITY);
 
 /**
  * @param {object} [options]
- * @param {object|null} [options.cached] - what the client's stored auth state
- *   holds. The REAL `auth().resolveSubscription(account)` answers from
- *   `account || storage().get('auth').account` (client/src/modules/auth.js), so
- *   handing it nothing reads the plan the shopper walked in with — the stub has
- *   to carry that fallback or it proves the opposite of the shipped code.
+ * @param {object} [options.signedIn] - the document the signed-in User was built
+ *   from: the plan the shopper walked in with, which must never answer the poll
  */
-async function loadModules({ cached = null } = {}) {
+async function loadModules({ signedIn = {} } = {}) {
   await bundleOnce();
 
   globalThis.__omegaClient = {
-    auth: () => ({
-      getUser: () => ({ uid: 'test-uid' }),
-      resolveSubscription: (account) => resolveSubscription(account || cached),
-    }),
+    auth: {
+      user: asUser(signedIn),
+    },
   };
 
   // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and
@@ -144,34 +143,31 @@ async function runPage({ search, accounts }) {
   globalThis.document = { querySelectorAll: () => [] };
 
   globalThis.__omegaClient = {
-    dom: () => ({
+    dom: {
       ready: async () => {},
       loadScript: async () => {
         events.push('celebration');
         globalThis.window.confetti = () => {};
       },
-    }),
-    bindings: () => ({
+    },
+    bindings: {
       update: (bound) => events.push({ bind: bound.confirmation }),
-    }),
-    auth: () => ({
+    },
+    auth: {
       listen: (options, callback) => {
         listens++;
         callback();
       },
-      getUser: () => ({ uid: 'test-uid' }),
-      resolveSubscription: (account) => resolveSubscription(account),
-    }),
-    firestore: () => ({
-      doc: () => ({
-        get: async () => {
-          const account = accounts[Math.min(reads, accounts.length - 1)];
-          reads++;
-          return { exists: () => !!account, data: () => account };
-        },
-      }),
-    }),
-    notifications: () => ({ subscribe: async () => {} }),
+      user: asUser({}),
+      // The one re-read a page gets: the next scripted account, built as the
+      // client builds it (a doc not written yet lands the empty signed-in User)
+      reload: async () => {
+        const account = accounts[Math.min(reads, accounts.length - 1)];
+        reads++;
+        return { user: asUser(account || {}), denied: false };
+      },
+    },
+    notifications: { subscribe: async () => {} },
   };
 
   delete require.cache[require.resolve(PAGE_BUNDLE)];
@@ -229,7 +225,8 @@ async function runPoll(modules, answers, state = SUBSCRIPTION) {
       const answer = answers[Math.min(reads.length, answers.length - 1)];
       reads.push(answer);
       if (answer instanceof Error) throw answer;
-      return answer;
+      // What readAccount hands back: the reloaded User, or null when signed out
+      return answer && asUser(answer);
     },
     sleep: async (ms) => { clock += ms; },
     now: () => clock,
@@ -395,26 +392,25 @@ test('#232: the built page gates its success chrome and offers support on timeou
 test('#232: purchaseLanded reads the account, not the URL', async () => {
   const modules = await loadModules();
 
-  assert.strictEqual(modules.purchaseLanded(PREMIUM, 'premium'), true, 'the bought plan, active');
-  assert.strictEqual(modules.purchaseLanded(BASIC, 'premium'), false, 'still basic');
-  assert.strictEqual(modules.purchaseLanded(SUSPENDED, 'premium'), false, 'suspended is not entitled');
+  assert.strictEqual(modules.purchaseLanded(asUser(PREMIUM), 'premium'), true, 'the bought plan, active');
+  assert.strictEqual(modules.purchaseLanded(asUser(BASIC), 'premium'), false, 'still basic');
+  assert.strictEqual(modules.purchaseLanded(asUser(SUSPENDED), 'premium'), false, 'suspended is not entitled');
   assert.strictEqual(modules.purchaseLanded(null, 'premium'), false, 'no account doc at all');
 });
 
-test('#232: no account doc is never answered out of cached storage', async () => {
-  // A signed-out read, or a user doc that does not exist yet, hands the page
-  // `null`. The client's own resolveSubscription answers a null account from
-  // the STORED auth state, so passing it through would confirm the purchase off
-  // whatever plan localStorage still remembers — the receipt would congratulate
-  // a returning premium subscriber on a checkout that never landed.
-  const modules = await loadModules({ cached: PREMIUM });
+test('#232: no account doc is never answered by the plan the shopper walked in with', async () => {
+  // A signed-out read hands the page `null`. Answering it from the signed-in
+  // User would confirm the purchase off the plan the shopper walked in with:
+  // the receipt would congratulate a returning premium subscriber on a
+  // checkout that never landed.
+  const modules = await loadModules({ signedIn: PREMIUM });
 
   assert.strictEqual(modules.purchaseLanded(null, 'premium'), false, 'a missing account doc is not a confirmation');
   assert.strictEqual(modules.purchaseLanded(undefined, 'premium'), false, 'and neither is no answer at all');
 
   const { outcome, reads } = await runPoll(modules, [null]);
 
-  assert.strictEqual(outcome, 'timeout', 'the poll keeps waiting rather than reading the cache');
+  assert.strictEqual(outcome, 'timeout', 'the poll keeps waiting rather than reading the signed-in plan');
   assert.ok(reads.length > 1, 'and it really did keep asking');
 });
 

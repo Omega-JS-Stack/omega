@@ -1,6 +1,6 @@
 // Application menu definition. Called by @omega.js/desktop during boot.
 //
-// `manager`  — the running @omega.js/desktop Manager.
+// `omega`: the running @omega.js/desktop main-process instance.
 // `menu`     — builder API + id-path API (find/update/remove/insertAfter/etc.).
 // `defaults` — the platform-aware default template (an array you can mutate manually if needed).
 //
@@ -18,7 +18,7 @@
 //   development/{open-exe-folder, open-user-data, open-logs, open-app-config,
 //                test-error}                                                       (dev only)
 
-module.exports = ({ manager, menu, defaults }) => {
+module.exports = ({ omega, menu, defaults }) => {
   // Start from the platform-appropriate default template. Don't add anything
   // by default — leave it identical to what the framework would do without
   // this file. Add your own customizations below.
@@ -34,7 +34,7 @@ module.exports = ({ manager, menu, defaults }) => {
   // menu.insertAfter('main/check-for-updates', {
   //   id: 'main/account',
   //   label: 'Account...',
-  //   click: () => manager.windows.show('account'),
+  //   click: () => omega.windows.show('account'),
   // });
   //
   // // Rename an existing item:

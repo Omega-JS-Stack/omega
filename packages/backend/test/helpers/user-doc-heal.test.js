@@ -10,7 +10,7 @@
  *
  * Real everything: real Firebase Auth users in the emulator, real ID tokens
  * (custom token → the emulator's own identitytoolkit endpoint, exactly how a
- * browser gets one), the real RouteContext, the real on-create and before-signin
+ * browser gets one), the real Context, the real on-create and before-signin
  * handlers, and the real HTTP surface for the wiring. Broken states are BUILT
  * here — an established account whose doc is deleted — because that is the state
  * the wild produces, and the accounts are IMPORTED so their creationTime is a
@@ -19,10 +19,11 @@
  * Run: npx omega test framework:helpers/user-doc-heal
  */
 
-const onCreate = require('../../dist/manager/events/auth/on-create.js');
-const beforeSignIn = require('../../dist/manager/events/auth/before-signin.js');
-const { buildUserDoc, healUserDoc, HEAL_TAG } = require('../../dist/manager/libraries/user-doc.js');
+const onCreate = require('../../dist/omega/events/auth/on-create.js');
+const beforeSignIn = require('../../dist/omega/events/auth/before-signin.js');
+const { buildUserDoc, healUserDoc, HEAL_TAG } = require('../../dist/omega/libraries/user-doc.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 // The 1st-gen EventContext shape for a user creation — what the trigger hands the
 // handler, forwarded straight to its debug line and the consumer hook.
@@ -46,14 +47,14 @@ const SIGNIN_CONTEXT = {
  * identitytoolkit endpoint. The token authenticate() verifies is the one Firebase
  * Auth issued, not a hand-built JWT.
  */
-async function mintIdToken(Manager, uid) {
+async function mintIdToken(omega, uid) {
   const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
   if (!authHost) {
     throw new Error('FIREBASE_AUTH_EMULATOR_HOST is unset — this suite needs the auth emulator');
   }
 
-  const customToken = await Manager.libraries.admin.auth().createCustomToken(uid);
+  const customToken = await omega.firebase.admin.auth().createCustomToken(uid);
   const response = await fetch(`http://${authHost}/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -71,8 +72,8 @@ async function mintIdToken(Manager, uid) {
 
 // A context carrying the token the way a request does — the Authorization header
 // authenticate() reads.
-function contextFor(Manager, idToken) {
-  return Manager.RouteContext({
+function contextFor(omega, idToken) {
+  return new Context(omega, {
     req: { headers: { authorization: `Bearer ${idToken}` } },
   }, { functionName: 'omega_api' });
 }
@@ -101,10 +102,10 @@ function shapeOf(value, prefix) {
  * doc anywhere). Auth's import path fires no user-creation trigger either, so
  * nothing races the heal into writing a doc of its own.
  */
-async function agedAuthUser(Manager, uid, options) {
+async function agedAuthUser(omega, uid, options) {
   options = options || {};
 
-  const admin = Manager.libraries.admin;
+  const admin = omega.firebase.admin;
   const email = `${uid}@example.com`;
   const ageMs = typeof options.ageMs === 'number' ? options.ageMs : 30 * 24 * 60 * 60 * 1000;
   const created = new Date(Date.now() - ageMs);
@@ -136,26 +137,25 @@ async function agedAuthUser(Manager, uid, options) {
 // An account created RIGHT NOW, with its doc still to come: the signup window the
 // heal stands down inside. Imported so the trigger stays out of the test's way —
 // this suite drives the on-create handler itself.
-async function freshAuthUser(Manager, uid) {
-  return agedAuthUser(Manager, uid, { ageMs: 0 });
+async function freshAuthUser(omega, uid) {
+  return agedAuthUser(omega, uid, { ageMs: 0 });
 }
 
 // The real auth:on-create handler, run on a real Auth record — how this suite
 // gets the doc a signup writes without waiting on trigger timing.
-async function runOnCreate(Manager, authUser) {
+async function runOnCreate(omega, authUser) {
   return onCreate({
-    Manager: Manager,
-    ctx: Manager.RouteContext({}, { functionName: 'omega_authOnCreate' }),
+    omega: omega,
+    ctx: new Context(omega, {}, { functionName: 'omega_authOnCreate' }),
     user: authUser,
     context: EVENT_CONTEXT,
-    libraries: { admin: Manager.libraries.admin },
   });
 }
 
 // Leave nothing behind: the auth user goes (its on-delete takes the doc), then
 // the doc itself in case the account never had a trigger to fire.
-async function cleanup(Manager, uid) {
-  const admin = Manager.libraries.admin;
+async function cleanup(omega, uid) {
+  const admin = omega.firebase.admin;
 
   await admin.auth().deleteUser(uid).catch(() => {});
   await admin.firestore().doc(`users/${uid}`).delete().catch(() => {});
@@ -169,9 +169,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-signed-in-user-with-a-doc-is-never-rewritten',
-      run: async ({ assert, Manager, accounts, firestore }) => {
+      run: async ({ assert, omega, accounts, firestore }) => {
         const uid = accounts.basic.uid;
-        const idToken = await mintIdToken(Manager, uid);
+        const idToken = await mintIdToken(omega, uid);
 
         // Snapshot AFTER the sign-in that minted the token — the pin is on the
         // authentication, not on what a sign-in itself is entitled to update.
@@ -179,7 +179,7 @@ module.exports = defineCases({
 
         assert.ok(before?.auth?.uid, `precondition: users/${uid} should already exist`);
 
-        const ctx = contextFor(Manager, idToken);
+        const ctx = contextFor(omega, idToken);
         const user = await ctx.authenticate();
 
         assert.equal(user.authenticated, true, 'a persona with a doc authenticates');
@@ -193,16 +193,16 @@ module.exports = defineCases({
 
     {
       name: 'a-missing-doc-is-recreated-at-signin',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         const uid = '_test-heal-missing-doc';
 
         try {
-          const authUser = await agedAuthUser(Manager, uid);
-          const idToken = await mintIdToken(Manager, uid);
+          const authUser = await agedAuthUser(omega, uid);
+          const idToken = await mintIdToken(omega, uid);
 
           assert.equal(await firestore.get(`users/${uid}`), null, 'precondition: the doc is missing');
 
-          const ctx = contextFor(Manager, idToken);
+          const ctx = contextFor(omega, idToken);
           const user = await ctx.authenticate();
 
           assert.equal(user.authenticated, true, 'the healed caller authenticates on the same request');
@@ -220,34 +220,33 @@ module.exports = defineCases({
           assert.equal(healed.flags.signupProcessed, true, 'a healed account is not sent back through signup');
 
           // The shape is auth:on-create's, not a second hand-rolled one
-          const born = buildUserDoc({ Manager: Manager, user: authUser, tag: 'auth:on-create' });
+          const born = buildUserDoc({ ctx, user: authUser, tag: 'auth:on-create' });
 
           assert.deepEqual(shapeOf(healed), shapeOf(born), 'the healed doc has the shape a signup writes');
           assert.deepEqual(healed.metadata.created, born.metadata.created, 'metadata.created comes from the Auth record');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'the-doc-a-signin-leaves-behind-is-healed-not-trusted',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         const uid = '_test-heal-signin-residue';
 
         try {
-          const authUser = await agedAuthUser(Manager, uid);
-          const idToken = await mintIdToken(Manager, uid);
+          const authUser = await agedAuthUser(omega, uid);
+          const idToken = await mintIdToken(omega, uid);
 
           // The REAL blocking handler every sign-in runs through: it merge-writes
           // activity onto users/{uid}, so a doc-less account reaches authenticate()
           // carrying a doc that is not an account.
           await beforeSignIn({
-            Manager: Manager,
-            ctx: Manager.RouteContext({}, { functionName: 'omega_authBeforeSignIn' }),
+            omega: omega,
+            ctx: new Context(omega, {}, { functionName: 'omega_authBeforeSignIn' }),
             user: authUser,
             context: SIGNIN_CONTEXT,
-            libraries: { admin: Manager.libraries.admin },
           });
 
           const residue = await firestore.get(`users/${uid}`);
@@ -255,7 +254,7 @@ module.exports = defineCases({
           assert.ok(residue, 'precondition: the sign-in left a doc');
           assert.equal(residue.auth, undefined, 'precondition: that doc is not an account');
 
-          const user = await contextFor(Manager, idToken).authenticate();
+          const user = await contextFor(omega, idToken).authenticate();
 
           assert.equal(user.authenticated, true, 'a caller whose doc is nothing but sign-in residue is healed and authenticated');
 
@@ -265,24 +264,24 @@ module.exports = defineCases({
           assert.equal(healed.activity.geolocation.ip, SIGNIN_CONTEXT.ipAddress, 'the heal keeps what the sign-in already wrote');
           assert.ok(healed.api?.privateKey, 'the account gets the api keys it never had');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'on-create-then-heal-converges-without-clobbering',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         const uid = '_test-heal-race-create-first';
 
         try {
-          await runOnCreate(Manager, await agedAuthUser(Manager, uid));
+          await runOnCreate(omega, await agedAuthUser(omega, uid));
 
           // Age the doc the way the live database ages one: a leaf the schema
           // gained after this account signed up. Reshaping those is the manual
           // users migration's job alone — a heal that finds a real doc must leave
           // it exactly as it is, drift included.
-          const admin = Manager.libraries.admin;
+          const admin = omega.firebase.admin;
 
           await admin.firestore().doc(`users/${uid}`)
             .update({ 'subscription.trial.claimed': admin.firestore.FieldValue.delete() });
@@ -292,11 +291,10 @@ module.exports = defineCases({
           assert.equal(born.metadata.tag, 'auth:on-create', 'precondition: on-create wrote the doc');
           assert.equal(born.subscription.trial.claimed, undefined, 'precondition: the doc is missing a schema leaf');
 
-          const ctx = Manager.RouteContext({}, { functionName: 'omega_api' });
+          const ctx = new Context(omega, {}, { functionName: 'omega_api' });
           const returned = await healUserDoc({
-            Manager: Manager,
             ctx: ctx,
-            admin: Manager.libraries.admin,
+            admin: omega.firebase.admin,
             uid: uid,
           });
 
@@ -306,25 +304,24 @@ module.exports = defineCases({
           assert.equal(returned.api.privateKey, born.api.privateKey, 'the heal reports the doc that survived');
           assert.equal(after.metadata.tag, 'auth:on-create', 'the tag still names the seam that created it');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'heal-then-on-create-converges-without-duplicating',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         const uid = '_test-heal-race-heal-first';
 
         try {
           // An established account whose doc went missing, healed first
-          const authUser = await agedAuthUser(Manager, uid);
-          const ctx = Manager.RouteContext({}, { functionName: 'omega_api' });
+          const authUser = await agedAuthUser(omega, uid);
+          const ctx = new Context(omega, {}, { functionName: 'omega_api' });
 
           await healUserDoc({
-            Manager: Manager,
             ctx: ctx,
-            admin: Manager.libraries.admin,
+            admin: omega.firebase.admin,
             uid: uid,
           });
 
@@ -333,26 +330,26 @@ module.exports = defineCases({
           assert.equal(healed.metadata.tag, HEAL_TAG, 'precondition: the heal wrote the doc');
 
           // The trigger arrives afterward with the REAL Auth record it fires on
-          await runOnCreate(Manager, authUser);
+          await runOnCreate(omega, authUser);
 
           const after = await firestore.get(`users/${uid}`);
 
           assert.deepEqual(after, healed, 'on-create arriving second must skip the doc the heal wrote');
           assert.equal(after.api.privateKey, healed.api.privateKey, 'no second set of api keys was minted');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'a-healed-account-can-make-an-authenticated-request-immediately',
-      run: async ({ assert, Manager, http, firestore }) => {
+      run: async ({ assert, omega, http, firestore }) => {
         const uid = '_test-heal-authenticated-request';
 
         try {
-          await agedAuthUser(Manager, uid);
-          const idToken = await mintIdToken(Manager, uid);
+          await agedAuthUser(omega, uid);
+          const idToken = await mintIdToken(omega, uid);
 
           assert.equal(await firestore.get(`users/${uid}`), null, 'precondition: the doc is missing');
 
@@ -360,48 +357,48 @@ module.exports = defineCases({
 
           // The route is a normal authenticated read — the heal happens inside the
           // request that would previously have answered 401
-          const first = await http.get('backend-manager/user/subscription', {});
+          const first = await http.get('omega/user/subscription', {});
 
           assert.isSuccess(first, 'the request that healed the account also succeeds');
           assert.hasProperty(first, 'data.subscription', 'the account answers with its subscription');
           assert.ok(await firestore.get(`users/${uid}`), 'the doc exists after the request');
 
-          const second = await http.get('backend-manager/user/subscription', {});
+          const second = await http.get('omega/user/subscription', {});
 
           assert.isSuccess(second, 'the next request succeeds too, healing nothing');
           assert.equal((await firestore.get(`users/${uid}`)).metadata.tag, HEAL_TAG, 'the second request wrote no new doc');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'a-token-whose-account-is-gone-is-never-healed',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         const uid = '_test-heal-deleted-account';
 
         try {
-          await agedAuthUser(Manager, uid);
-          const idToken = await mintIdToken(Manager, uid);
+          await agedAuthUser(omega, uid);
+          const idToken = await mintIdToken(omega, uid);
 
           // The account goes away while its token is still inside its hour
-          await Manager.libraries.admin.auth().deleteUser(uid);
+          await omega.firebase.admin.auth().deleteUser(uid);
 
-          const ctx = contextFor(Manager, idToken);
+          const ctx = contextFor(omega, idToken);
           const user = await ctx.authenticate();
 
           assert.equal(user.authenticated, false, 'a deleted account does not authenticate');
           assert.equal(await firestore.get(`users/${uid}`), null, 'the heal must never mint a doc with no auth user behind it');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'the-heal-refuses-a-uid-with-no-auth-user',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         // The seam above cannot reach the heal for a deleted account — the
         // emulator's verifyIdToken refuses the token first. The guard itself is
         // what keeps the auth-less doc #399 refuses from being minted here, so it
@@ -409,27 +406,26 @@ module.exports = defineCases({
         const uid = '_test-heal-no-auth-user';
 
         try {
-          await Manager.libraries.admin.firestore().doc(`users/${uid}`).delete();
+          await omega.firebase.admin.firestore().doc(`users/${uid}`).delete();
 
-          const ctx = Manager.RouteContext({}, { functionName: 'omega_api' });
+          const ctx = new Context(omega, {}, { functionName: 'omega_api' });
           const healed = await healUserDoc({
-            Manager: Manager,
             ctx: ctx,
-            admin: Manager.libraries.admin,
+            admin: omega.firebase.admin,
             uid: uid,
           });
 
           assert.equal(healed, null, 'the heal reports nothing to heal');
           assert.equal(await firestore.get(`users/${uid}`), null, 'no doc is written for a uid this project never authenticated');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'a-signup-still-in-flight-is-left-to-on-create',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         // The interleaving that made this window necessary: a brand-new account
         // makes an authenticated request BEFORE auth:on-create has run. A heal
         // there would write the doc, and on-create's own "already exists" check
@@ -438,17 +434,16 @@ module.exports = defineCases({
         const uid = '_test-heal-signup-in-flight';
 
         try {
-          const authUser = await freshAuthUser(Manager, uid);
+          const authUser = await freshAuthUser(omega, uid);
           const age = Date.now() - new Date(authUser.metadata?.creationTime || 0).getTime();
 
           assert.ok(age < 120000, `precondition: the record should be brand new, Auth says ${authUser.metadata?.creationTime} (${Math.round(age / 1000)}s old)`);
 
-          const ctx = Manager.RouteContext({}, { functionName: 'omega_api' });
+          const ctx = new Context(omega, {}, { functionName: 'omega_api' });
 
           const healed = await healUserDoc({
-            Manager: Manager,
             ctx: ctx,
-            admin: Manager.libraries.admin,
+            admin: omega.firebase.admin,
             uid: uid,
           });
 
@@ -456,21 +451,21 @@ module.exports = defineCases({
           assert.equal(await firestore.get(`users/${uid}`), null, 'the doc is still on-create\'s to write');
 
           // on-create arrives and does its FULL job, early return untaken
-          await runOnCreate(Manager, authUser);
+          await runOnCreate(omega, authUser);
 
           const born = await firestore.get(`users/${uid}`);
 
           assert.equal(born.metadata.tag, 'auth:on-create', 'the signup doc is on-create\'s, tag and all');
           assert.equal(born.flags.signupProcessed, false, 'a real new signup still has its signup flow ahead of it');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'a-signup-window-caller-with-residue-still-authenticates',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         // The stand-down must not cost a caller the answer they used to get. A
         // signup still in flight has a doc holding nothing but before-signin's
         // activity, and that doc authenticated its caller before the heal existed
@@ -479,15 +474,14 @@ module.exports = defineCases({
         const uid = '_test-heal-window-residue';
 
         try {
-          const authUser = await freshAuthUser(Manager, uid);
-          const idToken = await mintIdToken(Manager, uid);
+          const authUser = await freshAuthUser(omega, uid);
+          const idToken = await mintIdToken(omega, uid);
 
           await beforeSignIn({
-            Manager: Manager,
-            ctx: Manager.RouteContext({}, { functionName: 'omega_authBeforeSignIn' }),
+            omega: omega,
+            ctx: new Context(omega, {}, { functionName: 'omega_authBeforeSignIn' }),
             user: authUser,
             context: SIGNIN_CONTEXT,
-            libraries: { admin: Manager.libraries.admin },
           });
 
           const residue = await firestore.get(`users/${uid}`);
@@ -495,7 +489,7 @@ module.exports = defineCases({
           assert.ok(residue, 'precondition: the sign-in left a doc');
           assert.equal(residue.auth, undefined, 'precondition: that doc is not an account yet');
 
-          const user = await contextFor(Manager, idToken).authenticate();
+          const user = await contextFor(omega, idToken).authenticate();
 
           assert.equal(user.authenticated, true, 'a signup in flight authenticates on its residue, exactly as it did before the heal existed');
 
@@ -504,35 +498,34 @@ module.exports = defineCases({
           assert.equal(after.auth, undefined, 'the heal still wrote nothing inside the window');
           assert.equal(after.metadata.tag, undefined, 'nothing tagged this doc a heal');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },
 
     {
       name: 'an-anonymous-account-is-never-given-a-doc',
-      run: async ({ assert, Manager, firestore }) => {
+      run: async ({ assert, omega, firestore }) => {
         // Anonymous accounts get no user doc anywhere in the framework — the heal
         // reads the record the same way auth:on-create does.
         const uid = '_test-heal-anonymous';
 
         try {
-          const authUser = await agedAuthUser(Manager, uid, { anonymous: true });
+          const authUser = await agedAuthUser(omega, uid, { anonymous: true });
 
           assert.deepEqual(authUser.providerData, [], 'precondition: the record has no provider behind it');
 
-          const ctx = Manager.RouteContext({}, { functionName: 'omega_api' });
+          const ctx = new Context(omega, {}, { functionName: 'omega_api' });
           const healed = await healUserDoc({
-            Manager: Manager,
             ctx: ctx,
-            admin: Manager.libraries.admin,
+            admin: omega.firebase.admin,
             uid: uid,
           });
 
           assert.equal(healed, null, 'the heal refuses an anonymous account');
           assert.equal(await firestore.get(`users/${uid}`), null, 'no doc is written for one');
         } finally {
-          await cleanup(Manager, uid);
+          await cleanup(omega, uid);
         }
       },
     },

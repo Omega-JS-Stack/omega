@@ -15,9 +15,9 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 
-const logger = Manager.logger('package-quick');
+const logger = build.logger('package-quick');
 
 module.exports = function packageQuick(done) {
   const projectRoot = process.cwd();
@@ -29,7 +29,7 @@ module.exports = function packageQuick(done) {
 
   let builder;
   try {
-    builder = Manager.require('electron-builder');
+    builder = require('electron-builder');
   } catch (e) {
     return done(new Error(`Could not resolve electron-builder: ${e.message}`));
   }

@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('package');
+const build = require('../build.js');
+const logger = build.logger('package');
 const { runPipeline } = require('../utils/build-pipeline.js');
 
 // `npx omega package` (the consumer's `package` script) builds the full installer

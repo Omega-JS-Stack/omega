@@ -11,7 +11,7 @@
  * ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
  */
 
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { isCountedFeature } from '@omega.js/client/modules/features.js';
 
 // Get the full payment config object

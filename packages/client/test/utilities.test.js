@@ -1,16 +1,16 @@
 const { describe, it, before, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Utilities Module', () => {
 
   before(async () => {
-    await getManager().initialize(TEST_CONFIG);
+    await getOmega().initialize(TEST_CONFIG);
   });
 
   describe('escapeHTML', () => {
 
     it('should escape HTML strings', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(
         u.escapeHTML('<script>alert("xss")</script>'),
         '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;',
@@ -18,7 +18,7 @@ describe('Utilities Module', () => {
     });
 
     it('should escape objects recursively', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       const input = {
         name: '<b>John</b>',
         email: 'john@example.com',
@@ -37,14 +37,14 @@ describe('Utilities Module', () => {
     });
 
     it('should escape arrays', () => {
-      const escaped = getManager().utilities().escapeHTML(['<b>bold</b>', 'safe', 123]);
+      const escaped = getOmega().utilities.escapeHTML(['<b>bold</b>', 'safe', 123]);
       assert.strictEqual(escaped[0], '&lt;b&gt;bold&lt;/b&gt;');
       assert.strictEqual(escaped[1], 'safe');
       assert.strictEqual(escaped[2], 123);
     });
 
     it('should pass through null, undefined, numbers, and booleans', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(u.escapeHTML(null), null);
       assert.strictEqual(u.escapeHTML(undefined), undefined);
       assert.strictEqual(u.escapeHTML(42), 42);
@@ -54,7 +54,7 @@ describe('Utilities Module', () => {
     it('should work when detached from the utilities instance', () => {
       // Methods are arrow class fields — `this` is permanently bound to the instance,
       // so destructuring, aliasing, or passing as a callback must all work.
-      const utilities = getManager().utilities();
+      const utilities = getOmega().utilities;
 
       // Destructured
       const { escapeHTML } = utilities;
@@ -74,31 +74,31 @@ describe('Utilities Module', () => {
   describe('Detection methods', () => {
 
     it('getPlatform should return a string', () => {
-      assert(typeof getManager().utilities().getPlatform() === 'string');
+      assert(typeof getOmega().utilities.getPlatform() === 'string');
     });
 
     it('getBrowser should return string or null', () => {
-      const browser = getManager().utilities().getBrowser();
+      const browser = getOmega().utilities.getBrowser();
       assert(browser === null || typeof browser === 'string');
     });
 
     it('getRuntime should return web by default', () => {
-      assert.strictEqual(getManager().utilities().getRuntime(), 'web');
+      assert.strictEqual(getOmega().utilities.getRuntime(), 'web');
     });
 
     it('getRuntime should use config override', async () => {
-      const Manager = getManager();
-      await Manager.initialize({ ...TEST_CONFIG, runtime: 'electron' });
-      assert.strictEqual(Manager.utilities().getRuntime(), 'electron');
-      await Manager.initialize(TEST_CONFIG);
+      const omega = getOmega();
+      await omega.initialize({ ...TEST_CONFIG, runtime: 'electron' });
+      assert.strictEqual(omega.utilities.getRuntime(), 'electron');
+      await omega.initialize(TEST_CONFIG);
     });
 
     it('isMobile should return a boolean', () => {
-      assert.strictEqual(typeof getManager().utilities().isMobile(), 'boolean');
+      assert.strictEqual(typeof getOmega().utilities.isMobile(), 'boolean');
     });
 
     it('getDevice should return mobile, tablet, or desktop', () => {
-      const device = getManager().utilities().getDevice();
+      const device = getOmega().utilities.getDevice();
       assert(['mobile', 'tablet', 'desktop'].includes(device));
     });
   });
@@ -106,7 +106,7 @@ describe('Utilities Module', () => {
   describe('sanitizeURL', () => {
 
     it('should keep an http(s) URL and reject every other scheme', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(u.sanitizeURL('https://example.com/a'), 'https://example.com/a');
       assert.strictEqual(u.sanitizeURL('javascript:alert(1)'), '');
       assert.strictEqual(u.sanitizeURL('data:text/html;base64,AAAA'), '');
@@ -116,7 +116,7 @@ describe('Utilities Module', () => {
   describe('renderMarkdown', () => {
 
     it('should render nothing for an empty body, so the caller can say what that means', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(u.renderMarkdown(''), '');
       assert.strictEqual(u.renderMarkdown('   \n\n'), '');
       assert.strictEqual(u.renderMarkdown(null), '');
@@ -125,25 +125,25 @@ describe('Utilities Module', () => {
 
     it('should render markup in the source as text, whatever the grammar around it', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('<script>alert(1)</script>\n\n- <img src=x onerror=alert(1)>'),
+        getOmega().utilities.renderMarkdown('<script>alert(1)</script>\n\n- <img src=x onerror=alert(1)>'),
         '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p><ul><li>&lt;img src=x onerror=alert(1)&gt;</li></ul>',
       );
     });
 
     it('should escape the quotes an attribute injection would need', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('see [say "hi"](https://ok.com/a"b)'),
+        getOmega().utilities.renderMarkdown('see [say "hi"](https://ok.com/a"b)'),
         '<p>see <a href="https://ok.com/a&quot;b" target="_blank" rel="noopener">say &quot;hi&quot;</a></p>',
       );
       assert.strictEqual(
-        getManager().utilities().renderMarkdown(`it's <b>fine</b>`),
+        getOmega().utilities.renderMarkdown(`it's <b>fine</b>`),
         '<p>it&#039;s &lt;b&gt;fine&lt;/b&gt;</p>',
       );
     });
 
     it('should render the small grammar the renderer claims', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('## Spec\n\nOne **bold** and `code`.\n\n- first\n- second\n\n1. step'),
+        getOmega().utilities.renderMarkdown('## Spec\n\nOne **bold** and `code`.\n\n- first\n- second\n\n1. step'),
         '<h5 class="h6 mt-3 mb-2">Spec</h5>'
           + '<p>One <strong>bold</strong> and <code>code</code>.</p>'
           + '<ul><li>first</li><li>second</li></ul>'
@@ -152,34 +152,34 @@ describe('Utilities Module', () => {
     });
 
     it('should start headings below the host page title and floor them at h6', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(u.renderMarkdown('# Title'), '<h4 class="h6 mt-3 mb-2">Title</h4>');
       assert.strictEqual(u.renderMarkdown('#### Deep'), '<h6 class="h6 mt-3 mb-2">Deep</h6>');
       assert.strictEqual(u.renderMarkdown('###### Deepest'), '<h6 class="h6 mt-3 mb-2">Deepest</h6>');
     });
 
     it('should render italics and join the lines of one paragraph', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(u.renderMarkdown('an *italic* word'), '<p>an <em>italic</em> word</p>');
       assert.strictEqual(u.renderMarkdown('line one\nline two'), '<p>line one<br>line two</p>');
     });
 
     it('should treat a fenced block as literal, emphasis and all', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('```\nrm -rf *not*bold*\n<b>x</b>\n```'),
+        getOmega().utilities.renderMarkdown('```\nrm -rf *not*bold*\n<b>x</b>\n```'),
         '<pre class="p-2 rounded"><code>rm -rf *not*bold*\n&lt;b&gt;x&lt;/b&gt;</code></pre>',
       );
     });
 
     it('should keep the content of an unterminated fence instead of dropping it', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('```\nhalf a block'),
+        getOmega().utilities.renderMarkdown('```\nhalf a block'),
         '<pre class="p-2 rounded"><code>half a block</code></pre>',
       );
     });
 
     it('should link only the schemes a browser may follow', () => {
-      const u = getManager().utilities();
+      const u = getOmega().utilities;
       assert.strictEqual(
         u.renderMarkdown('see [the spec](https://example.com/a)'),
         '<p>see <a href="https://example.com/a" target="_blank" rel="noopener">the spec</a></p>',
@@ -200,13 +200,13 @@ describe('Utilities Module', () => {
 
     it('should carry an href holding asterisks through the emphasis pass untouched', () => {
       assert.strictEqual(
-        getManager().utilities().renderMarkdown('see [x](https://ok.com/*a*b*)'),
+        getOmega().utilities.renderMarkdown('see [x](https://ok.com/*a*b*)'),
         '<p>see <a href="https://ok.com/*a*b*" target="_blank" rel="noopener">x</a></p>',
       );
     });
 
     it('should work when detached from the utilities instance', () => {
-      const { renderMarkdown } = getManager().utilities();
+      const { renderMarkdown } = getOmega().utilities;
       assert.strictEqual(renderMarkdown('**bold**'), '<p><strong>bold</strong></p>');
     });
   });
@@ -214,7 +214,7 @@ describe('Utilities Module', () => {
   describe('getContext', () => {
 
     it('should return client and geolocation objects', () => {
-      const context = getManager().utilities().getContext();
+      const context = getOmega().utilities.getContext();
       assert(context.client);
       assert(context.geolocation);
       assert(typeof context.client.mobile === 'boolean');
@@ -224,7 +224,7 @@ describe('Utilities Module', () => {
   });
 
   it('should have clipboardCopy method', () => {
-    assert(typeof getManager().utilities().clipboardCopy === 'function');
+    assert(typeof getOmega().utilities.clipboardCopy === 'function');
   });
 
   describe('clipboardCopy', () => {
@@ -259,7 +259,7 @@ describe('Utilities Module', () => {
       const written = [];
       navigator.clipboard = { writeText: async (text) => { written.push(text); } };
 
-      await getManager().utilities().clipboardCopy('modern lane');
+      await getOmega().utilities.clipboardCopy('modern lane');
 
       assert.deepStrictEqual(written, ['modern lane']);
     });
@@ -271,7 +271,7 @@ describe('Utilities Module', () => {
 
       const created = captureElements();
 
-      await getManager().utilities().clipboardCopy('fallback lane');
+      await getOmega().utilities.clipboardCopy('fallback lane');
 
       assert.strictEqual(created.length, 1, 'the fallback minted its textarea');
       assert.strictEqual(created[0].value, 'fallback lane', 'the text reached the fallback');
@@ -284,7 +284,7 @@ describe('Utilities Module', () => {
       document.execCommand = () => false;
 
       await assert.rejects(
-        () => getManager().utilities().clipboardCopy('refused'),
+        () => getOmega().utilities.clipboardCopy('refused'),
         /Failed to copy to clipboard/,
       );
     });
@@ -293,11 +293,11 @@ describe('Utilities Module', () => {
       navigator.clipboard = { writeText: async () => { throw new Error('denied'); } };
       document.execCommand = () => { throw new Error('not allowed'); };
 
-      await assert.rejects(() => getManager().utilities().clipboardCopy('refused'));
+      await assert.rejects(() => getOmega().utilities.clipboardCopy('refused'));
     });
   });
 
   it('should have showNotification method', () => {
-    assert(typeof getManager().utilities().showNotification === 'function');
+    assert(typeof getOmega().utilities.showNotification === 'function');
   });
 });

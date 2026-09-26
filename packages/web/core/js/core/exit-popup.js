@@ -1,10 +1,14 @@
 // Libraries
 import merge from 'lodash/merge.js';
-import omega from '@omega.js/client';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
-// Exit Popup Module
-export default function () {
+/**
+ * Exit Popup Module: arm the exit-intent detection and build `omega.exitPopup`.
+ * @param {object} omega - the web runtime instance (config, storage, dom, sentry).
+ * @returns {{ show: function(object=): void }} the exit popup API; `show(overrides)`
+ *   opens the popup with `overrides` deep-merged over the configured content.
+ */
+export function createExitPopup(omega) {
 
   // Get config
   const config = omega.config.exitPopup.config;
@@ -13,7 +17,7 @@ export default function () {
   const STORAGE_KEY = 'exitPopup.timestamp';
 
   // Check if we should show the popup based on timeout
-  const lastShown = omega.storage().get(STORAGE_KEY, 0);
+  const lastShown = omega.storage.get(STORAGE_KEY, 0);
   const now = Date.now();
   const timeSinceLastShown = now - lastShown;
 
@@ -21,15 +25,10 @@ export default function () {
   let shouldShow = timeSinceLastShown >= config.timeout;
 
   // Wait for DOM to be ready
-  omega.dom().ready().then(() => {
+  omega.dom.ready().then(() => {
     // Setup exit intent detection without needing the element yet
     setupExitIntentDetection();
   });
-
-  // Register showExitPopup on the omega library for programmatic access
-  // Usage: omega.library().showExitPopup()
-
-  omega._library.showExitPopup = showExitPopup;
 
   function updateModalContent($modal, effectiveConfig) {
     // Update title
@@ -185,12 +184,12 @@ export default function () {
     shouldShow = false;
 
     // Store timestamp in storage
-    omega.storage().set(STORAGE_KEY, Date.now());
+    omega.storage.set(STORAGE_KEY, Date.now());
 
     // Find the modal element only when needed
     const $modalElement = document.getElementById('modal-exit-popup');
     if (!$modalElement) {
-      omega.sentry().captureException(new Error('Exit popup modal element not found'));
+      omega.sentry.captureException(new Error('Exit popup modal element not found'));
       return;
     }
 
@@ -199,7 +198,7 @@ export default function () {
 
     // Check if Bootstrap is available
     if (!window.bootstrap || !window.bootstrap.Modal) {
-      omega.sentry().captureException(new Error('Bootstrap Modal not available for exit popup'));
+      omega.sentry.captureException(new Error('Bootstrap Modal not available for exit popup'));
       return;
     }
 
@@ -208,7 +207,7 @@ export default function () {
     try {
       modal = new window.bootstrap.Modal($modalElement);
     } catch (error) {
-      omega.sentry().captureException(new Error('Error initializing Bootstrap modal for exit popup', { cause: error }));
+      omega.sentry.captureException(new Error('Error initializing Bootstrap modal for exit popup', { cause: error }));
       return;
     }
 
@@ -245,7 +244,7 @@ export default function () {
         trackExitPopupDismissed();
       }, { once: true });
     } catch (error) {
-      omega.sentry().captureException(new Error('Error showing exit popup', { cause: error }));
+      omega.sentry.captureException(new Error('Error showing exit popup', { cause: error }));
     }
   }
 
@@ -273,4 +272,6 @@ export default function () {
       event_label: config.title
     });
   }
-};
+
+  return { show: showExitPopup };
+}

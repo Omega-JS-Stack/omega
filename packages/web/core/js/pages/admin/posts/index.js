@@ -9,7 +9,7 @@
 
 // Libraries
 import { formatTimeAgo } from '__main_assets__/js/libs/admin-helpers.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
@@ -19,10 +19,10 @@ let filterText = '';
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, async (state) => {
-      if (!state.user) {
+    omega.auth.listen({ once: true }, async (state) => {
+      if (!state.user.authenticated) {
         return;
       }
 
@@ -142,7 +142,7 @@ function matchesFilter(post) {
 
 // Build one post row
 function renderRow(post) {
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
   const title = post.title || 'Untitled';
   const url = post.url || '';
   const pathname = url ? new URL(url, window.location.origin).pathname : '';

@@ -321,7 +321,7 @@ const RETIRED_PATHS = {
   },
 
   // ─── one home for the download/extension links (#610) ──────────────────
-  // The legacy UJM page maps survived beside the derivation #85/#124 added,
+  // The hand-written page maps survived beside the derivation #85/#124 added,
   // so explicit config could silently override the release the desktop target
   // actually ships. Matched at their AUTHORED path: `targets.web` is where the
   // converter wrote them and where every carrying brand still has them, and
@@ -339,7 +339,7 @@ const RETIRED_PATHS = {
 
   // ─── the four schema-less web sections (#850) ─────────────────────────
   // Everything the build processes has a schema home (Ian 2026-09-09). These
-  // four were the exception: legacy UJM presentation blocks the converter
+  // four were the exception: presentation blocks the converter
   // wrote under `targets.web`, which @omega.js/web carried in a PRIVATE list
   // (`WEB_ONLY_SECTIONS`) purely to let its own `config:` guard pass them.
   // The list is gone, so each one is a registered path instead of a key that

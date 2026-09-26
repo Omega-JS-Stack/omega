@@ -28,7 +28,7 @@
 // 60s heartbeats reconnect through the fresh runtime.json afterwards.
 //
 // Bail conditions (any one → the lib schedules nothing):
-//   - manager.isTesting() — tests drive the public methods explicitly against
+//   - omega.isTesting() — tests drive the public methods explicitly against
 //     an isolated root; nothing may fire on its own, and install/spawn paths
 //     stay dead so tests never touch network or real OS state.
 //   - brand.id === 'restart-manager' (RM doesn't manage itself)
@@ -70,7 +70,7 @@ const INSTALL_COOLDOWN_MS     = 60 * 60 * 1000;        // failed install → bac
 
 const restartManager = {
   _initialized:  false,
-  _manager:      null,
+  _omega:        null,
   _enabled:      true,
   _bailed:       false,
   _bailReason:   null,
@@ -88,12 +88,12 @@ const restartManager = {
   _lastHeartbeatAt: null,
   _lastError:    null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (restartManager._initialized) return;
     restartManager._initialized = true;
-    restartManager._manager = manager;
+    restartManager._omega = omega;
 
-    const cfg = manager.config.restartManager || {};
+    const cfg = omega.config.restartManager || {};
     restartManager._enabled = cfg.enabled !== false;
     restartManager._feed = { ...DEFAULT_FEED, ...(cfg.feed || {}) };
 
@@ -103,20 +103,20 @@ const restartManager = {
     // userData (wiped every run) so explicit test calls never touch the real
     // neutral root; everything else shares `<appData>/restart-manager` (or the
     // OMEGA_RM_ROOT override — the cross-repo dev/test isolation seam).
-    restartManager._root = manager.isTesting()
+    restartManager._root = omega.isTesting()
       ? path.join(app.getPath('userData'), protocol.SHARED_DIR_NAME)
       : protocol.resolveSharedRoot(app.getPath('appData'), process.env);
 
     // Bail #1: test mode. Nothing fires on its own — no timers, no quit hook
     // (a preventDefault in before-quit would wedge the harness's quit). Tests
     // drive register()/unregister()/ensureInstalled() explicitly.
-    if (manager.isTesting()) {
+    if (omega.isTesting()) {
       restartManager._bail('testing', 'skipping (test mode).');
       return;
     }
 
     // Bail #2: this app IS restart-manager. RM doesn't manage itself.
-    if (manager.config.brand.id === 'restart-manager') {
+    if (omega.config.brand.id === 'restart-manager') {
       restartManager._bail('self', 'skipping (this app is restart-manager itself).');
       return;
     }
@@ -129,14 +129,14 @@ const restartManager = {
 
     // Bail #4: dev mode unless explicitly opted in — avoids feed fetches and
     // spawn thrash during local dev where RM likely isn't installed.
-    if (!manager.isProduction() && process.env.OMEGA_RESTART_MANAGER_DEV !== '1') {
+    if (!omega.isProduction() && process.env.OMEGA_RESTART_MANAGER_DEV !== '1') {
       restartManager._bail('dev', 'skipping outside production (set OMEGA_RESTART_MANAGER_DEV=1 to test).');
       return;
     }
 
     // Schedule the first register after whenReady; single timer so re-init
     // guards don't pile up (tests shutdown() to clear).
-    const delay = manager.isDevelopment() ? REGISTER_DELAY_DEV_MS : REGISTER_DELAY_PROD_MS;
+    const delay = omega.isDevelopment() ? REGISTER_DELAY_DEV_MS : REGISTER_DELAY_PROD_MS;
     app.whenReady().then(() => {
       restartManager._registerTimer = setTimeout(() => {
         restartManager.register().catch((e) => logger.warn(`register failed: ${e.message}`));
@@ -155,14 +155,14 @@ const restartManager = {
   // or spawns — a probe failure just returns false.
   async register() {
     if (restartManager._hardBailed()) return false;
-    const manager = restartManager._manager;
+    const omega = restartManager._omega;
 
     for (let attempt = 1; attempt <= MAX_REGISTER_ATTEMPTS; attempt++) {
       try {
         let probe = await restartManager._probeRunning();
 
         if (!probe.ok) {
-          if (manager.isTesting()) {
+          if (omega.isTesting()) {
             restartManager._lastError = 'restart-manager not running';
             return false;
           }
@@ -198,9 +198,9 @@ const restartManager = {
     if (restartManager._hardBailed()) return false;
 
     try {
-      const manager = restartManager._manager;
+      const omega = restartManager._omega;
       const res = await restartManager._post(protocol.ENDPOINTS.deregister, {
-        id:  manager.config.brand.id,
+        id:  omega.config.brand.id,
         pid: process.pid,
       });
       restartManager._registered = false;
@@ -215,21 +215,21 @@ const restartManager = {
   // Install RM into <root>/app/ when missing. Smart existence: the installed
   // app on disk short-circuits BEFORE any network so repeat boots cost one stat.
   async ensureInstalled() {
-    const manager = restartManager._manager;
+    const omega = restartManager._omega;
     const platform = process.platform;
 
     const appPath = protocol.getInstalledAppPath(restartManager._root, platform);
     if (fs.existsSync(appPath)) return true;
 
     // Tests never hit the network unless explicitly in extended mode.
-    if (manager.isTesting() && !process.env.TEST_EXTENDED_MODE) return false;
+    if (omega.isTesting() && !process.env.TEST_EXTENDED_MODE) return false;
 
     if (Date.now() < restartManager._installCooldownUntil) {
       logger.log('install on cooldown after a recent failure — skipping.');
       return false;
     }
 
-    if (!install.acquireInstallLock(restartManager._root, { pid: process.pid, hostAppId: manager.config.brand.id })) {
+    if (!install.acquireInstallLock(restartManager._root, { pid: process.pid, hostAppId: omega.config.brand.id })) {
       logger.log('another app holds the install lock — skipping (heartbeat retries).');
       return false;
     }
@@ -258,13 +258,13 @@ const restartManager = {
 
   // Make sure RM is actually serving: probe → spawn the installed app → poll.
   async ensureRunning() {
-    const manager = restartManager._manager;
+    const omega = restartManager._omega;
 
     const probe = await restartManager._probeRunning();
     if (probe.ok) return true;
 
     // Tests never spawn real binaries — the fixture server plays the running RM.
-    if (manager.isTesting()) return false;
+    if (omega.isTesting()) return false;
 
     const appPath = protocol.getInstalledAppPath(restartManager._root, process.platform);
     if (!fs.existsSync(appPath)) return false;
@@ -319,7 +319,7 @@ const restartManager = {
       restartManager._quitWired = false;
     }
     restartManager._initialized  = false;
-    restartManager._manager      = null;
+    restartManager._omega        = null;
     restartManager._enabled      = true;
     restartManager._bailed       = false;
     restartManager._bailReason   = null;
@@ -441,15 +441,15 @@ const restartManager = {
   },
 
   _buildPayload() {
-    const manager = restartManager._manager;
+    const omega = restartManager._omega;
     const { app } = require('electron');
     return protocol.buildRegisterPayload({
-      id:          manager.config.brand.id,
+      id:          omega.config.brand.id,
       name:        app.getName(),
       pid:         process.pid,
       path:        app.getPath('exe'),
-      version:     manager.getVersion(),
-      environment: manager.getEnvironment(),
+      version:     omega.getVersion(),
+      environment: omega.getEnvironment(),
     });
   },
 
@@ -516,15 +516,15 @@ const restartManager = {
   },
 
   _handleBeforeQuit(event) {
-    const manager = restartManager._manager;
+    const omega = restartManager._omega;
     if (restartManager._quitFlushed || !restartManager._registered) return;
 
     // Never intercept the auto-updater's quitAndInstall — its quit sequence
     // (especially Squirrel.Mac) must own the exit. The app relaunches via the
     // updater anyway; RM's deregister-wins grace window + @omega.js/desktop's single-instance
     // lock neutralize the tiny race.
-    const updaterStatus = manager.autoUpdater.getStatus();
-    if (manager._allowQuit && updaterStatus.code === 'downloaded') {
+    const updaterStatus = omega.autoUpdater.getStatus();
+    if (omega._allowQuit && updaterStatus.code === 'downloaded') {
       restartManager._quitFlushed = true;
       restartManager.unregister().catch(() => { /* best-effort */ });
       return;
@@ -532,7 +532,7 @@ const restartManager = {
 
     event.preventDefault();
     restartManager._quitFlushed = true;
-    restartManager._quitFlush().finally(() => manager.quit({ force: true }));
+    restartManager._quitFlush().finally(() => omega.quit({ force: true }));
   },
 
   async _quitFlush() {

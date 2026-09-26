@@ -19,8 +19,9 @@ function safeRedirect(raw) {
 
 /**
  * Initialize the hero demo form if present
+ * @param {object} omega - the host's instance, handed down by the theme module
  */
-export default async function initHeroDemoForm() {
+export default async function initHeroDemoForm(omega) {
   const $form = document.querySelector('#hero-demo-form');
 
   if (!$form) {
@@ -30,7 +31,7 @@ export default async function initHeroDemoForm() {
   // Dynamic import FormManager only when needed
   const { FormManager } = await import('@omega.js/client/modules/form-manager.js');
 
-  const formManager = new FormManager($form, {
+  const formManager = new FormManager(omega, $form, {
     submittingText: 'Processing...',
   });
 

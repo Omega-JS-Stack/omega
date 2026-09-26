@@ -11,12 +11,12 @@ The build and the boot happen in a **staged app root of their own**, `<project>/
 | `build` | Plain Node — config parsing, util fns, schema validation. | Fast (ms) |
 | `main` | @omega.js/desktop lib code in isolation (storage, ipc, tray, etc.) inside Electron. | Fast (~50ms each) |
 | `renderer` | Inside a hidden BrowserWindow. | Fast |
-| `boot` | The **whole boot integration** — consumer's main.js → manager.initialize → live state | ~1s startup, then fast |
+| `boot` | The **whole boot integration**: consumer's main.js → omega.initialize → live state | ~1s startup, then fast |
 
 Use `boot` for tests that need to verify **integration** rather than unit behavior:
 - "Does the consumer's `src/main.js` actually wire up correctly?"
 - "Did all 13 boot steps complete without throwing?"
-- "Did config flow from JSON5 → manager.config → tray titles?"
+- "Did config flow from JSON5 → omega.config → tray titles?"
 - "Did `src/integrations/{tray,menu,context-menu}/index.js` load?"
 - "Is the menu rendered with the expected default ids?"
 
@@ -31,17 +31,17 @@ module.exports = {
   timeout:     20000,
   tests: [
     {
-      description: 'manager initialized end-to-end',
-      inspect: async ({ manager, expect, projectRoot }) => {
-        expect(manager._initialized).toBe(true);
-        expect(manager.config).toBeTruthy();
+      description: 'omega initialized end-to-end',
+      inspect: async ({ omega, expect, projectRoot }) => {
+        expect(omega._initialized).toBe(true);
+        expect(omega.config).toBeTruthy();
       },
     },
     {
       description: 'tray + menu rendered',
-      inspect: async ({ manager, expect }) => {
-        expect(manager.tray.has('open')).toBe(true);
-        expect(manager.menu.isRendered()).toBe(true);
+      inspect: async ({ omega, expect }) => {
+        expect(omega.tray.has('open')).toBe(true);
+        expect(omega.menu.isRendered()).toBe(true);
       },
     },
   ],
@@ -51,7 +51,7 @@ module.exports = {
 The `inspect` function receives:
 | Arg | Description |
 |---|---|
-| `manager` | The fully-initialized live Manager instance — same one your consumer code uses. |
+| `omega` | The fully-initialized live main-process instance, the same one your consumer code uses. |
 | `expect` | @omega.js/desktop's [Jest-compatible assertion library](../src/test/assert.js). |
 | `projectRoot` | Absolute path to the consumer project root (its `src/`, `config/` — and the `dist/` a boot run must never write). |
 | `appRoot` | Absolute path to the staged app root Electron booted — `<projectRoot>/.omega/test-app`. Assert on built artifacts here (`<appRoot>/dist/main.bundle.js`), not under `projectRoot`. |
@@ -67,7 +67,7 @@ The `inspect` function receives:
    - `OMEGA_TEST_BOOT=1` — gate
    - `OMEGA_TEST_BOOT_HARNESS=<absolute path to dist/test/harness/boot-entry.js>`
    - `OMEGA_TEST_BOOT_SPEC=<temp file with test definitions>`
-5. @omega.js/desktop's `main.js` boots normally; after `manager.initialize()` resolves, detects `OMEGA_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__EM_TEST__` JSON lines on stdout.
+5. @omega.js/desktop's `main.js` boots normally; after `omega.initialize()` resolves, detects `OMEGA_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__OMEGA_TEST__` JSON lines on stdout (the ONE prefix, `TEST_EVENT_PREFIX` in [src/utils/test-events.js](../src/utils/test-events.js)).
 6. Test runner parses results, calls `app.exit()`. **No sleep, no kill.**
 
 ## View suites in this lane
@@ -152,6 +152,6 @@ The `build`/`main`/`renderer` layers cover @omega.js/desktop's lib code fast and
 
 ## Limitations
 
-- Tests run sequentially in a single Electron process to amortize startup cost (~1s). State doesn't carry across tests — they all share one `manager` instance.
+- Tests run sequentially in a single Electron process to amortize startup cost (~1s). State doesn't carry across tests: they all share one `omega` instance.
 - `inspect` function bodies are serialized via `Function.prototype.toString` and reconstituted with `new Function(...)`. Closures over the test file's outer scope **don't survive** — only the `inspect` argument bag is available inside.
 - We can't simulate user input (clicking the tray, right-clicking, typing). For that, you'd need `nut-js` or similar — out of scope.

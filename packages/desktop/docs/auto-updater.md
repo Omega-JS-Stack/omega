@@ -10,7 +10,7 @@ Wraps `electron-updater` with three triggers: startup check, periodic check, and
 | **Feed check** | Every `feedCheckIntervalMs` (default 1h) | HTTP poll of the release feed; also re-evaluates the 30-day gate each tick. |
 | **Idle evaluation** | Every `idleEvalIntervalMs` (default 60s) | Cheap in-process check: install a downloaded update once the user has been idle long enough. |
 | **30-day gate** | When a download lands + every feed tick | If a pending update was downloaded ≥ `maxAgeMs` ago (default 30 days), force `quitAndInstall()`. A pending update carried from a prior session keeps its original `downloadedAt`, so the gate trips as soon as the startup check re-downloads it. |
-| **Manual check** | `manager.autoUpdater.checkNow()` (main) or `window.desktop.autoUpdater.checkNow()` (renderer) | Same as a periodic check but `userInitiated: true`. |
+| **Manual check** | `omega.autoUpdater.checkNow()` (main) or `window.desktop.autoUpdater.checkNow()` (renderer) | Same as a periodic check but `userInitiated: true`. |
 
 ## State machine
 
@@ -93,7 +93,7 @@ Subtle: `_userInitiated` is only flipped AFTER the `_readyToCheck` guard. So a u
 Consumers can force-bump the activity timestamp from anywhere:
 
 ```js
-manager.autoUpdater.markActive();
+omega.autoUpdater.markActive();
 ```
 
 Call this from app-specific signals the framework can't see — e.g. just received an auth event, finished a long renderer task, finished a backend sync. Use sparingly; the built-in renderer mouse/keyboard/focus signals cover almost everything.
@@ -110,7 +110,7 @@ Long enough that an actively-used app won't surprise-quit mid-task. Short enough
 
 ### Test mode behavior
 
-When `manager.isTesting() === true` (the one input: `OMEGA_ENVIRONMENT=testing`), the auto-updater swaps in test-friendly defaults so a real download → idle wait → install can complete in seconds instead of minutes:
+When `omega.isTesting() === true` (the one input: `OMEGA_ENVIRONMENT=testing`), the auto-updater swaps in test-friendly defaults so a real download → idle wait → install can complete in seconds instead of minutes:
 
 - **Idle threshold**: `IDLE_INSTALL_THRESHOLD_MS_TESTING = 3000ms` (3 sec) instead of 15 min.
 - **Both timers**: `IDLE_TICK_MS_TESTING = 500ms` replaces `feedCheckIntervalMs` and `idleEvalIntervalMs`.
@@ -133,7 +133,7 @@ This lets the framework's own integration tests drive the full sequence (`OMEGA_
 
 Click handler defaults to `checkNow()` when not yet downloaded; `installNow()` when downloaded.
 
-Consumers can find / move / remove the item via `manager.menu.findItem('desktop:check-for-updates')` etc. — see [docs/menu.md](menu.md).
+Consumers can find / move / remove the item via `omega.menu.findItem('desktop:check-for-updates')` etc.: see [docs/menu.md](menu.md).
 
 ## Renderer surface
 
@@ -187,10 +187,10 @@ Relaunching once per scenario is a slow way to walk three outcomes, so the defau
 | No update available | `view/developer/simulate-update/unavailable` | lands in `not-available` |
 | Update error | `view/developer/simulate-update/error` | lands in `error` |
 
-Each item calls `manager.autoUpdater.simulate(scenario)`, which is callable from anywhere in main:
+Each item calls `omega.autoUpdater.simulate(scenario)`, which is callable from anywhere in main:
 
 ```js
-await manager.autoUpdater.simulate('available');
+await omega.autoUpdater.simulate('available');
 ```
 
 Rules of the road:
@@ -212,11 +212,11 @@ Because the synthetic library stays wired, every LATER trigger drives it too: th
 That latch is what keeps a synthetic update out of the real install path. Every existing guard is written against `_isSimulating()`, so with it set:
 
 - `_evaluateIdleInstall()` bails, so no native "restart to update" prompt fires for an update that does not exist.
-- `installNow()` bails before `manager._allowQuit = true` and `quitAndInstall()`.
+- `installNow()` bails before `omega._allowQuit = true` and `quitAndInstall()`.
 
 Without the latch, a plain dev session (env var unset) that clicked the menu once would hit all of the above on the next tick. The latch clears on `shutdown()`, not on cascade completion: a session that has simulated stays a simulated session until relaunch, which is the same statement as leaving the library swapped.
 
-The submenu is dev-only (same gate as `view/developer/toggle-devtools`) and is an ordinary menu item, so `manager.menu.remove('view/developer/simulate-update')` drops it like any other.
+The submenu is dev-only (same gate as `view/developer/toggle-devtools`) and is an ordinary menu item, so `omega.menu.remove('view/developer/simulate-update')` drops it like any other.
 
 ## Production: how electron-updater finds the feed
 

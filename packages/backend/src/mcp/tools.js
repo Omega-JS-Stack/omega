@@ -11,7 +11,7 @@ module.exports = [
     description: 'Read a Firestore document by path (e.g. "users/abc123")',
     role: 'admin',
     method: 'GET',
-    path: 'admin/firestore',
+    path: '/omega/admin/firestore',
     annotations: { title: 'Read a Firestore document', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -26,7 +26,7 @@ module.exports = [
     description: 'Write/merge a Firestore document. Set merge=false to overwrite entirely.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/firestore',
+    path: '/omega/admin/firestore',
     annotations: { title: 'Write a Firestore document', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -43,7 +43,7 @@ module.exports = [
     description: 'Query a Firestore collection with where clauses, ordering, and limits. Each query in the array has: collection (string), where (array of {field, operator, value}), orderBy (array of {field, order}), limit (number).',
     role: 'admin',
     method: 'POST',
-    path: 'admin/firestore/query',
+    path: '/omega/admin/firestore/query',
     annotations: { title: 'Query a Firestore collection', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -96,7 +96,7 @@ module.exports = [
     description: 'Send a transactional email via SendGrid. Recipients can be email strings, UIDs (auto-resolves from Firestore), or {email, name} objects.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/email',
+    path: '/omega/admin/email',
     annotations: { title: 'Send a transactional email', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -121,7 +121,7 @@ module.exports = [
     description: 'Send a push notification via FCM to users or topics',
     role: 'admin',
     method: 'POST',
-    path: 'admin/notification',
+    path: '/omega/admin/notification',
     annotations: { title: 'Send a push notification', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -156,7 +156,7 @@ module.exports = [
     description: 'Get the currently authenticated user info. To look up a specific user, use firestore_read with path "users/{uid}" instead.',
     role: 'user',
     method: 'GET',
-    path: 'user',
+    path: '/omega/user',
     annotations: { title: 'Get authenticated user info', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -168,7 +168,7 @@ module.exports = [
     description: 'Get subscription info for a user. Defaults to the authenticated user, or pass a uid to look up another user (admin only).',
     role: 'user',
     method: 'GET',
-    path: 'user/subscription',
+    path: '/omega/user/subscription',
     annotations: { title: 'Get subscription info', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -182,7 +182,7 @@ module.exports = [
     description: 'Sync user data across systems (marketing contacts, etc). Processes users in batches.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/users/sync',
+    path: '/omega/admin/users/sync',
     annotations: { title: 'Sync users across systems', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -194,7 +194,7 @@ module.exports = [
     description: 'List users (newest first) with the Firebase Auth join the client cannot read: providers, disabled flag, email verification, last sign-in. Supports email/uid prefix search and cursor pagination.',
     role: 'admin',
     method: 'GET',
-    path: 'admin/users/list',
+    path: '/omega/admin/users/list',
     annotations: { title: 'List users with auth records', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -211,7 +211,7 @@ module.exports = [
     description: 'Disable or re-enable a user account at the Firebase Auth level. Disabling blocks sign-in and revokes refresh tokens (live sessions end at their next token refresh); disabled: false re-enables. Read the flag back via list_users.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/users/disable',
+    path: '/omega/admin/users/disable',
     annotations: { title: 'Disable or re-enable a user', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       type: 'object',
@@ -229,7 +229,7 @@ module.exports = [
     description: 'List marketing campaigns with optional filters by date range, status, and type',
     role: 'admin',
     method: 'GET',
-    path: 'marketing/campaign',
+    path: '/omega/marketing/campaign',
     annotations: { title: 'List marketing campaigns', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -248,7 +248,7 @@ module.exports = [
     description: 'Create a marketing campaign (email or push notification). Can be immediate or scheduled.',
     role: 'admin',
     method: 'POST',
-    path: 'marketing/campaign',
+    path: '/omega/marketing/campaign',
     annotations: { title: 'Create a marketing campaign', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -275,7 +275,7 @@ module.exports = [
     description: 'Update a pending marketing campaign. Only pending campaigns can be edited.',
     role: 'admin',
     method: 'PUT',
-    path: 'marketing/campaign',
+    path: '/omega/marketing/campaign',
     annotations: { title: 'Update a campaign', readOnlyHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -300,7 +300,7 @@ module.exports = [
     description: 'Delete a pending marketing campaign. Only pending campaigns can be deleted.',
     role: 'admin',
     method: 'DELETE',
-    path: 'marketing/campaign',
+    path: '/omega/marketing/campaign',
     annotations: { title: 'Delete a campaign', readOnlyHint: false, destructiveHint: true },
     inputSchema: {
       type: 'object',
@@ -317,7 +317,7 @@ module.exports = [
     description: 'Add a marketing contact to email providers (SendGrid/Beehiiv). Admin mode skips reCAPTCHA and allows tags.',
     role: 'admin',
     method: 'POST',
-    path: 'marketing/contact',
+    path: '/omega/marketing/contact',
     annotations: { title: 'Add a marketing contact', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -337,7 +337,7 @@ module.exports = [
     description: 'Remove a marketing contact from email providers and revoke marketing consent.',
     role: 'admin',
     method: 'DELETE',
-    path: 'marketing/contact',
+    path: '/omega/marketing/contact',
     annotations: { title: 'Remove a marketing contact', readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -354,7 +354,7 @@ module.exports = [
     description: 'Get system statistics (user counts, subscription metrics, etc.)',
     role: 'admin',
     method: 'GET',
-    path: 'admin/stats',
+    path: '/omega/admin/stats',
     annotations: { title: 'Get system statistics', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -370,7 +370,7 @@ module.exports = [
     description: 'Cancel a subscription at the end of the current billing period. Requires the authenticated user to have an active subscription.',
     role: 'admin',
     method: 'POST',
-    path: 'payments/cancel',
+    path: '/omega/payments/cancel',
     annotations: { title: 'Cancel a subscription', readOnlyHint: false, destructiveHint: true },
     inputSchema: {
       type: 'object',
@@ -387,7 +387,7 @@ module.exports = [
     description: 'Process a refund for a subscription. Immediately cancels and refunds the latest payment.',
     role: 'admin',
     method: 'POST',
-    path: 'payments/refund',
+    path: '/omega/payments/refund',
     annotations: { title: 'Refund a payment', readOnlyHint: false, destructiveHint: true },
     inputSchema: {
       type: 'object',
@@ -405,7 +405,7 @@ module.exports = [
     description: 'Generate a Stripe Billing Portal link for the authenticated user to manage their subscription.',
     role: 'admin',
     method: 'POST',
-    path: 'payments/portal',
+    path: '/omega/payments/portal',
     annotations: { title: 'Get payment portal link', readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -421,7 +421,7 @@ module.exports = [
     description: 'Manually trigger a cron job by ID (e.g. "daily", "reset-usage", "marketing-campaigns")',
     role: 'admin',
     method: 'POST',
-    path: 'admin/cron',
+    path: '/omega/admin/cron',
     annotations: { title: 'Trigger a cron job', readOnlyHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -438,7 +438,7 @@ module.exports = [
     description: 'Create a blog post. Handles image downloading, GitHub upload, and body rewriting.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/post',
+    path: '/omega/admin/post',
     annotations: { title: 'Create a blog post', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -459,7 +459,7 @@ module.exports = [
     description: 'Update an existing blog post. Fetches the post by URL and uploads changes via GitHub.',
     role: 'admin',
     method: 'PUT',
-    path: 'admin/post',
+    path: '/omega/admin/post',
     annotations: { title: 'Update a blog post', readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -478,7 +478,7 @@ module.exports = [
     description: 'Fetch a blog post by its public URL — returns the markdown body, raw frontmatter, parsed metadata (title, description, author, tags, categories), and the GitHub path/sha. Use before update_post to edit an existing post.',
     role: 'public',
     method: 'GET',
-    path: 'content/post',
+    path: '/omega/content/post',
     annotations: { title: 'Get a blog post', readOnlyHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -496,7 +496,7 @@ module.exports = [
     description: 'Create a Firestore data backup. Optionally filter with a deletion regex.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/backup',
+    path: '/omega/admin/backup',
     annotations: { title: 'Create a Firestore backup', readOnlyHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -512,7 +512,7 @@ module.exports = [
     description: 'Execute a hook or @omega.js/backend cron job by path. Searches: @omega.js/backend internal crons (e.g. "cron/daily/blog-auto-publisher", "cron/daily/reset-usage"), consumer hooks/ directory, and consumer project root. Supports both function exports and class-based hooks.',
     role: 'admin',
     method: 'POST',
-    path: 'admin/hook',
+    path: '/omega/admin/hook',
     annotations: { title: 'Run hook or cron', readOnlyHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -529,7 +529,7 @@ module.exports = [
     description: 'Generate a UUID (v4 random or v5 namespace-based)',
     role: 'admin',
     method: 'POST',
-    path: 'general/uuid',
+    path: '/omega/general/uuid',
     annotations: { title: 'Generate a UUID', readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -548,7 +548,7 @@ module.exports = [
     description: 'Check if the @omega.js/backend server is running and responding',
     role: 'public',
     method: 'GET',
-    path: 'health',
+    path: '/omega/health',
     annotations: { title: 'Check server health', readOnlyHint: true },
     inputSchema: {
       type: 'object',

@@ -8,7 +8,7 @@
 // auth settle, so the cold start burns down while Firebase comes up.
 //
 // auth-helpers.js is a browser-context ES module, but a transport-free one: it
-// takes its context as an argument, so this imports the REAL function rather
+// takes the page context's omega as an argument, so this imports the REAL function rather
 // than pinning its source (the model auth-triggers.test.js had to use for the
 // DOM-bound halves of the same file).
 
@@ -16,12 +16,14 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
+const { User } = require('@omega.js/account');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const AUTH_HELPERS = pathToFileURL(path.join(__dirname, '..', '..', '..', 'lib', 'auth-helpers.js')).href;
 
-// A surface's context: the omega singleton and the runtime messaging channel,
-// with everything the sync touches recorded in the order it happened.
+// A page context's omega: its request layer, its auth and its messenger, with
+// everything the sync touches recorded in the order it happened. The auth
+// settles as the real signed-out `User` the client lands.
 function makeContext({ needsSync = false } = {}) {
   const requests = [];
   const timeline = [];
@@ -30,26 +32,21 @@ function makeContext({ needsSync = false } = {}) {
     requests,
     timeline,
     context: {
-      extension: {
-        runtime: {
-          lastError: null,
-          sendMessage: (message, callback) => {
-            timeline.push(message.command);
-            callback({ needsSync });
-          },
+      request: async (url, options = {}) => {
+        requests.push({ url, options });
+        timeline.push(options.wakeup ? 'wakeup' : url);
+      },
+      auth: {
+        listen: (options, callback) => {
+          timeline.push('auth-settle');
+          callback({ user: new User(), denied: false });
         },
       },
-      omega: {
-        request: async (url, options = {}) => {
-          requests.push({ url, options });
-          timeline.push(options.wakeup ? 'wakeup' : url);
+      messenger: {
+        send: async (message) => {
+          timeline.push(message.command);
+          return { needsSync };
         },
-        auth: () => ({
-          listen: (options, callback) => {
-            timeline.push('auth-settle');
-            callback({ user: null });
-          },
-        }),
       },
     },
   };

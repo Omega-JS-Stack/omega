@@ -29,9 +29,9 @@ const {
   FIELDS,
   fieldsForProvider,
   resolveFieldValues,
-} = require('../../../dist/manager/libraries/email/constants.js');
-const Manager = require('../../../dist/manager/index.js');
-const beehiivProvider = require('../../../dist/manager/libraries/email/providers/beehiiv.js');
+} = require('../../../dist/omega/libraries/email/constants.js');
+const omega = require('../../../dist/omega/index.js');
+const beehiivProvider = require('../../../dist/omega/libraries/email/providers/beehiiv.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const CONFIG = { brand: { id: 'acme' } };
@@ -69,7 +69,7 @@ const USER_DOC = {
 
 const FIELD_DEFINITIONS_URL = 'https://api.sendgrid.com/v3/marketing/field_definitions';
 const FETCH_PATH = require.resolve('wonderful-fetch');
-const SENDGRID_PATH = require.resolve('../../../dist/manager/libraries/email/providers/sendgrid.js');
+const SENDGRID_PATH = require.resolve('../../../dist/omega/libraries/email/providers/sendgrid.js');
 
 /**
  * A SendGrid field_definitions response for the catalog's SendGrid view — every
@@ -92,7 +92,7 @@ function fieldDefinitions() {
 async function withSendgrid(run) {
   const originalFetchEntry = require.cache[FETCH_PATH];
   const originalSendgridEntry = require.cache[SENDGRID_PATH];
-  const originalConfig = Manager.config;
+  const originalConfig = omega.config;
   const originalWarn = console.warn;
   const warns = [];
 
@@ -108,14 +108,14 @@ async function withSendgrid(run) {
   };
 
   delete require.cache[SENDGRID_PATH];
-  Manager.config = CONFIG;
+  omega.config = CONFIG;
   console.warn = (...args) => warns.push(args.join(' '));
 
   try {
     return await run(require(SENDGRID_PATH), warns);
   } finally {
     console.warn = originalWarn;
-    Manager.config = originalConfig;
+    omega.config = originalConfig;
 
     if (originalSendgridEntry) {
       require.cache[SENDGRID_PATH] = originalSendgridEntry;
@@ -131,16 +131,16 @@ async function withSendgrid(run) {
   }
 }
 
-/** Run with Manager.config pinned — buildFields resolves 'config' fields off it. */
+/** Run with omega.config pinned — buildFields resolves 'config' fields off it. */
 function withConfig(run) {
-  const originalConfig = Manager.config;
+  const originalConfig = omega.config;
 
-  Manager.config = CONFIG;
+  omega.config = CONFIG;
 
   try {
     return run();
   } finally {
-    Manager.config = originalConfig;
+    omega.config = originalConfig;
   }
 }
 

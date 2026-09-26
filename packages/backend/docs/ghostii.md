@@ -27,11 +27,11 @@ trackContentSource() -- Firestore, AFTER successful publish
 
 | File | Purpose |
 |---|---|
-| `src/manager/libraries/content/source-resolver.js` | **Shared SSOT**: prompt templates, anti-traceability rules, feed/parent resolution, Firestore tracking, fallback chain. Used by both blog + newsletter. |
-| `src/manager/libraries/content/ghostii.js` | `writeArticle()`, `publishArticle()`, `blocksToPost()` -- Ghostii API client + post transform |
-| `src/manager/libraries/content/feed-parser.js` | `parseFeed()`, `extractArticleContent()` -- RSS/Atom/JSON parser + article extractor |
-| `src/manager/events/cron/daily/blog-auto-publisher.js` | Daily cron: imports from source-resolver, manages harvest loop + provider dispatch |
-| `src/manager/routes/admin/post/post.js` | Publishing endpoint: image download + resize, GitHub commit |
+| `src/omega/libraries/content/source-resolver.js` | **Shared SSOT**: prompt templates, anti-traceability rules, feed/parent resolution, Firestore tracking, fallback chain. Used by both blog + newsletter. |
+| `src/omega/libraries/content/ghostii.js` | `writeArticle()`, `publishArticle()`, `blocksToPost()` -- Ghostii API client + post transform |
+| `src/omega/libraries/content/feed-parser.js` | `parseFeed()`, `extractArticleContent()` -- RSS/Atom/JSON parser + article extractor |
+| `src/omega/events/cron/daily/blog-auto-publisher.js` | Daily cron: imports from source-resolver, manages harvest loop + provider dispatch |
+| `src/omega/routes/admin/post/post.js` | Publishing endpoint: image download + resize, GitHub commit |
 
 ## Source Types
 
@@ -167,7 +167,7 @@ When a `$feed:` or `$parent` source provides extracted article text, it's passed
 
 ## Feed Parser
 
-`src/manager/libraries/content/feed-parser.js` exports:
+`src/omega/libraries/content/feed-parser.js` exports:
 
 - **`parseFeed(text)`** -- Parse RSS 2.0, Atom 1.0, or JSON Feed into `{ items: [{ id, title, url, summary, content, publishedAt }] }`. Handles CDATA, namespaced elements (`content:encoded`), BOM, attribute-based links. Returns `{ items: [] }` on invalid input.
 

@@ -4,9 +4,9 @@
 // inserted after boot), title changes update the live instance, and removal
 // disposes it. Real DOM, real Bootstrap — the tip element actually renders.
 //
-// The harness wires the renderer Manager in the PRELOAD world (contextIsolation
+// The harness wires the renderer instance in the PRELOAD world (contextIsolation
 // — see harness/renderer-preload.js), so instance-level assertions and the
-// show trigger go through the `window.__emTestTooltip` probe (page-world
+// show trigger go through the `window.__omegaTestTooltip` probe (page-world
 // synthetic mouse events can't reach preload-world listeners). Real
 // hover-in-one-world behavior + `window.bootstrap` page exposure are covered
 // by consumer boot suites.
@@ -25,10 +25,10 @@ module.exports = defineCases({
     {
       name: 'the Bootstrap bundle loads — Tooltip is available',
       run: (ctx) => {
-        if (!window.__emTestTooltip.available()) {
-          throw new Error(`Bootstrap bundle failed to load: ${window.__emTestTooltip.error() || '(no require error — wiring bailed earlier)'}`);
+        if (!window.__omegaTestTooltip.available()) {
+          throw new Error(`Bootstrap bundle failed to load: ${window.__omegaTestTooltip.error() || '(no require error, wiring bailed earlier)'}`);
         }
-        ctx.expect(window.__emTestTooltip.available()).toBe(true);
+        ctx.expect(window.__omegaTestTooltip.available()).toBe(true);
       },
     },
     {
@@ -51,9 +51,9 @@ module.exports = defineCases({
         document.body.appendChild(el);
 
         // The auto-init observer creates the instance without any consumer code.
-        await until(() => window.__emTestTooltip.hasInstance('tt-show'));
+        await until(() => window.__omegaTestTooltip.hasInstance('tt-show'));
 
-        const shown = window.__emTestTooltip.showDirect('tt-show');
+        const shown = window.__omegaTestTooltip.showDirect('tt-show');
         ctx.expect(shown).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
         ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('Hello from @omega.js/desktop');
@@ -80,13 +80,13 @@ module.exports = defineCases({
         el.setAttribute('data-bs-toggle', 'tooltip');
         el.setAttribute('data-bs-title', 'before');
         document.body.appendChild(el);
-        await until(() => window.__emTestTooltip.hasInstance('tt-retitle'));
+        await until(() => window.__omegaTestTooltip.hasInstance('tt-retitle'));
 
         el.setAttribute('data-bs-title', 'after');
         // The observer applies setContent asynchronously (mutation microtask) —
         // give it a beat, then show and assert the rendered text.
         await new Promise((r) => setTimeout(r, 100));
-        ctx.expect(window.__emTestTooltip.showDirect('tt-retitle')).toBe(true);
+        ctx.expect(window.__omegaTestTooltip.showDirect('tt-retitle')).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
         ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('after');
 
@@ -118,7 +118,7 @@ module.exports = defineCases({
         el.setAttribute('title', 'plain title');
         document.body.appendChild(el);
 
-        await until(() => window.__emTestTooltip.hasInstance('tt-title-only'));
+        await until(() => window.__omegaTestTooltip.hasInstance('tt-title-only'));
 
         // The loop starved macrotasks — a timer firing IS the proof the
         // main thread survived the mutation settling.
@@ -129,8 +129,8 @@ module.exports = defineCases({
         // instance alive, and the tip renders the original text.
         ctx.expect(el.hasAttribute('title')).toBe(false);
         ctx.expect(el.getAttribute('data-bs-original-title')).toBe('plain title');
-        ctx.expect(window.__emTestTooltip.hasInstance('tt-title-only')).toBe(true);
-        ctx.expect(window.__emTestTooltip.showDirect('tt-title-only')).toBe(true);
+        ctx.expect(window.__omegaTestTooltip.hasInstance('tt-title-only')).toBe(true);
+        ctx.expect(window.__omegaTestTooltip.showDirect('tt-title-only')).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
         ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('plain title');
 
@@ -155,11 +155,11 @@ module.exports = defineCases({
         el.setAttribute('data-bs-toggle', 'tooltip');
         el.setAttribute('data-bs-title', 'bye');
         document.body.appendChild(el);
-        await until(() => window.__emTestTooltip.hasInstance('tt-dispose'));
+        await until(() => window.__omegaTestTooltip.hasInstance('tt-dispose'));
 
         el.remove();
-        await until(() => !window.__emTestTooltip.hasInstance('tt-dispose'));
-        ctx.expect(window.__emTestTooltip.hasInstance('tt-dispose')).toBe(false);
+        await until(() => !window.__omegaTestTooltip.hasInstance('tt-dispose'));
+        ctx.expect(window.__omegaTestTooltip.hasInstance('tt-dispose')).toBe(false);
       },
     },
   ],

@@ -12,9 +12,9 @@
  * supplies it, free floor), and alias mapping from the icon set's own
  * metadata ('search' → 'magnifying-glass').
  *
- * CJS on purpose: template-kit and Electron main require() it directly (via
- * the package's dist exports); browser modules import it with standard
- * interop.
+ * ESM like its siblings. The Node consumers (web's build-time inlining pass,
+ * desktop main, the devkit build side) require() it through the package's
+ * dist exports, which Node's require(esm) answers with these named exports.
  */
 
 // Icon asset packages, best-first (cp111): a brand that supplies Font
@@ -210,7 +210,7 @@ function buildAliasMap(iconFamilies) {
   return map;
 }
 
-module.exports = {
+export {
   PACKAGES,
   ICONS_DIR,
   STYLES,

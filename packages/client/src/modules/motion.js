@@ -850,4 +850,4 @@ function createMotion() {
   return { start, stop, scan };
 }
 
-module.exports = { createMotion, parseCountTarget, formatCount, marqueeCopies, parseColor, rainbowColor };
+export { createMotion, parseCountTarget, formatCount, marqueeCopies, parseColor, rainbowColor };

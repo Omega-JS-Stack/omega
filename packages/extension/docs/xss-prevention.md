@@ -4,14 +4,14 @@ Zero tolerance for unescaped attacker-controllable strings in HTML. Extensions a
 
 ## The Rule
 
-**Canonical form (same as UJM/EM):** `omega.utilities().escapeHTML(value)` inline at every usage site.
+**Canonical form (the same on every OMEGA browser surface):** `omega.utilities.escapeHTML(value)` inline at every usage site, on the context's own `omega`.
 
 ```javascript
-// ✅ CORRECT — canonical inline form
-import omega from '@omega.js/client';
+// ✅ CORRECT: canonical inline form, on the context's instance
+import omega from '@omega.js/extension/popup';
 
-$el.innerHTML = `<div>${omega.utilities().escapeHTML(tab.title)}</div>`;
-$el.innerHTML = `<img src="${omega.utilities().escapeHTML(tab.favIconUrl)}" alt="">`;
+$el.innerHTML = `<div>${omega.utilities.escapeHTML(tab.title)}</div>`;
+$el.innerHTML = `<img src="${omega.utilities.escapeHTML(tab.favIconUrl)}" alt="">`;
 
 // ❌ DANGEROUS — attacker-controlled favicon URL can break out of src=""
 $el.innerHTML = `<img src="${tab.favIconUrl}">`;
@@ -33,15 +33,15 @@ $el.innerHTML = `<h1>${tab.title}</h1>`;
 
 Do NOT:
 
-- Alias: `const escape = omega.utilities().escapeHTML;`
-- Wrap: `const escape = (s) => omega.utilities().escapeHTML(s);`
-- Destructure: `const { escapeHTML } = omega.utilities();`
+- Alias: `const escape = omega.utilities.escapeHTML;`
+- Wrap: `const escape = (s) => omega.utilities.escapeHTML(s);`
+- Destructure: `const { escapeHTML } = omega.utilities;`
 - `.bind()` it
-- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files — this is the most common violation in @omega.js/extension extensions. Delete the helper, add `import omega from '@omega.js/client'`, inline the canonical form at every call site.
+- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files: this is the most common violation in @omega.js/extension extensions. Delete the helper, import the context's instance (`import omega from '@omega.js/extension/<context>'`), and inline the canonical form at every call site.
 
 ## URLs Must Also Be Sanitized
 
-`escapeHTML` alone lets `javascript:alert(1)` through — dynamic URLs in executable sinks MUST also be wrapped in `omega.utilities().sanitizeURL(url)`, which returns `''` for any non-`http:`/`https:` protocol (blocks `javascript:`, `data:`, `vbscript:`). Extensions often build UI from `tab.url` — a malicious page can set a `javascript:` URL that executes when clicked in the popup.
+`escapeHTML` alone lets `javascript:alert(1)` through: dynamic URLs in executable sinks MUST also be wrapped in `omega.utilities.sanitizeURL(url)`, which returns `''` for any non-`http:`/`https:` protocol (blocks `javascript:`, `data:`, `vbscript:`). Extensions often build UI from `tab.url`, and a malicious page can set a `javascript:` URL that executes when clicked in the popup.
 
 **Must sanitize (can execute JS):**
 
@@ -63,14 +63,14 @@ Do NOT:
 
 ```javascript
 // ✅ CORRECT — href in innerHTML (dynamic URL)
-$el.innerHTML = `<a href="${omega.utilities().escapeHTML(omega.utilities().sanitizeURL(tab.url))}">${omega.utilities().escapeHTML(tab.title)}</a>`;
+$el.innerHTML = `<a href="${omega.utilities.escapeHTML(omega.utilities.sanitizeURL(tab.url))}">${omega.utilities.escapeHTML(tab.title)}</a>`;
 
 // ✅ CORRECT — property assignment
-$link.href = omega.utilities().sanitizeURL(tab.url);
-extension.tabs.create({ url: omega.utilities().sanitizeURL(tab.url) });
+$link.href = omega.utilities.sanitizeURL(tab.url);
+extension.tabs.create({ url: omega.utilities.sanitizeURL(tab.url) });
 
 // ❌ WRONG — escape alone lets `javascript:alert(1)` through
-`<a href="${omega.utilities().escapeHTML(tab.url)}">...</a>`
+`<a href="${omega.utilities.escapeHTML(tab.url)}">...</a>`
 ```
 
 ## Do NOT Escape Values Passed to textContent-Based APIs
@@ -86,7 +86,7 @@ Safe by context (regardless of value):
 
 - `textContent`, `.value`, `.placeholder` property assignments
 - `setAttribute()` calls
-- `omega.utilities().showNotification(...)` — uses textContent internally; pre-escaping causes `'` → `&#039;` double-encoding visible to users.
+- `omega.utilities.showNotification(...)`: uses textContent internally; pre-escaping causes `'` → `&#039;` double-encoding visible to users.
 
 ## See also
 

@@ -13,15 +13,16 @@
 // exits 0 on success / 1 on any failure.
 
 const path = require('path');
+const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
 const { app, BrowserWindow, ipcMain } = require('electron');
 
 // macOS: suppress app activation BEFORE ready — launching a regular-policy app
 // steals keyboard focus app-wide even when no window is ever focused. This file
-// only initializes its Manager after whenReady (too late: activation fires when
+// only initializes its instance after whenReady (too late: activation fires when
 // the app finishes launching), so flip the accessory policy here at require time.
 // This process is always a test run (runners/electron.js spawns it naming
 // OMEGA_ENVIRONMENT=testing, the one environment input), so
-// the shared predicate needs no Manager. OMEGA_TEST_SHOW=1 opts back into normal
+// the shared predicate needs no instance. OMEGA_TEST_SHOW=1 opts back into normal
 // activation along with visible windows.
 if (process.platform === 'darwin' && require('../../utils/test-stealth.js')()) {
   app.dock.hide();
@@ -31,7 +32,7 @@ if (process.platform === 'darwin' && require('../../utils/test-stealth.js')()) {
 // the harness Electron (e.g. playwright-core connectOverCDP). Port 0 = an
 // OS-assigned loopback-only port; Chromium writes the resolved port to
 // DevToolsActivePort inside the userData dir that's CURRENT when the DevTools
-// server starts — captured here at require time, because Manager.initialize()
+// server starts, captured here at require time, because omega.initialize()
 // re-paths userData later (post-ready in this harness). runSuites() resolves
 // the port from that file and publishes it as process.env.OMEGA_CDP_PORT.
 if (!app.commandLine.hasSwitch('remote-debugging-port')) {
@@ -73,7 +74,7 @@ const filter = (() => {
 })();
 
 function emit(obj) {
-  process.stdout.write(`__EM_TEST__${JSON.stringify(obj)}\n`);
+  process.stdout.write(`${TEST_EVENT_PREFIX}${JSON.stringify(obj)}\n`);
 }
 
 class SkipError extends Error {
@@ -98,8 +99,8 @@ async function runSuites() {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  const Manager = require('../../main.js');
-  const manager = new Manager();
+  // The ONE main-process instance, the same object a consumer's main.js requires
+  const omega = require('../../main.js');
 
   // Test mode: load default config from @omega.js/desktop defaults (since the harness CWD won't have
   // one), resolved for the desktop target via @omega.js/config, and skip window creation
@@ -109,7 +110,7 @@ async function runSuites() {
   const { loadConfig } = require('@omega.js/config');
   const defaultConfig = loadConfig(path.join(__dirname, '..', '..', 'defaults'), 'desktop').config;
 
-  await manager.initialize(defaultConfig, { skipWindowCreation: true });
+  await omega.initialize(defaultConfig, { skipWindowCreation: true });
 
   // Consumer-scheme containment. Main-layer suites exercise consumer code that
   // loads `<brand.id>://` URLs (tab managers, internal pages), but the consumer's
@@ -151,7 +152,7 @@ async function runSuites() {
     expect: require('../assert.js'),
     state,
     layer: 'main',
-    manager,
+    omega,
     skip(reason) { throw new SkipError(reason); },
   });
 
@@ -200,7 +201,7 @@ async function runSuites() {
   // After main suites finish, optionally run renderer suites in a hidden BrowserWindow.
   if (rendererSuiteFiles.length > 0) {
     try {
-      const r = await runRendererSuites(rendererSuiteFiles, manager);
+      const r = await runRendererSuites(rendererSuiteFiles, omega);
       passed  += r.passed;
       failed  += r.failed;
       skipped += r.skipped;
@@ -217,7 +218,7 @@ async function runSuites() {
 // Spawn a hidden BrowserWindow and run each renderer suite inside it. Each suite file is
 // loaded via require() in main, then its tests are serialized to { name, runSource } and
 // shipped over IPC for the renderer to reconstruct + execute.
-async function runRendererSuites(files, manager) {
+async function runRendererSuites(files, omega) {
   // Serialize suites for transport. We can't ship functions directly via IPC, so we extract
   // the function body of each test's `run` and ship that as a string. The renderer rebuilds
   // it with `new Function('ctx', body)`.
@@ -262,9 +263,9 @@ async function runRendererSuites(files, manager) {
 
   const harnessDir = __dirname;
   // Tell the renderer-preload (running in the BrowserWindow's preload) where to
-  // require() the renderer Manager from. We resolve by absolute path because the
+  // require() the renderer instance from. We resolve by absolute path because the
   // preload runs with the renderer's module resolution scope, not main's.
-  process.env.OMEGA_TEST_RENDERER_MANAGER_PATH = path.resolve(__dirname, '..', '..', 'renderer.js');
+  process.env.OMEGA_TEST_RENDERER_PATH = path.resolve(__dirname, '..', '..', 'renderer.js');
 
   // Register test-only IPC channels so renderer-layer tests can verify round-trip
   // behavior end-to-end (renderer.invoke → main handler → response). Idempotent:
@@ -273,15 +274,15 @@ async function runRendererSuites(files, manager) {
   ipcMain.handle('desktop:__test:echo', (_evt, payload) => ({ echoed: payload, ts: Date.now() }));
   // Forwarded log capture — renderer logger.log(...) sends 'desktop:log:forward'; we
   // accumulate the most recent payload so the renderer test can verify it landed.
-  global.__emTestLastForwardedLog = null;
+  global.__omegaTestLastForwardedLog = null;
   ipcMain.removeAllListeners('desktop:__test:forwarded-log-tap');
   ipcMain.on('desktop:log:forward', (_evt, payload) => {
-    global.__emTestLastForwardedLog = payload;
+    global.__omegaTestLastForwardedLog = payload;
   });
   // Test-only handler the renderer can call to read back the most recently
   // forwarded log payload. Returns null if none yet.
   try { ipcMain.removeHandler('desktop:__test:read-last-log'); } catch (_) { /* ignore */ }
-  ipcMain.handle('desktop:__test:read-last-log', () => global.__emTestLastForwardedLog);
+  ipcMain.handle('desktop:__test:read-last-log', () => global.__omegaTestLastForwardedLog);
   // Analytics sender tap ([#411](https://github.com/Omega-JS-Stack/omega/issues/411)):
   // renderer-originated omega.analytics() calls forward over IPC and must fire
   // through main's ONE sender, so a renderer suite needs to read back what that
@@ -296,17 +297,17 @@ async function runRendererSuites(files, manager) {
   // identity fields), so a suite asserts on `client_id` as GA would receive it
   // rather than on a field the tap made up.
   const analyticsCore = require('@omega.js/analytics/core');
-  global.__emTestAnalyticsSends = [];
-  manager.analytics.shutdown();
-  manager.analytics._send = (descriptor) => {
-    global.__emTestAnalyticsSends.push({
+  global.__omegaTestAnalyticsSends = [];
+  omega.analytics.shutdown();
+  omega.analytics._send = (descriptor) => {
+    global.__omegaTestAnalyticsSends.push({
       provider: descriptor.provider,
       name:     descriptor.name,
       payload:  descriptor.payload,
       body:     analyticsCore.buildPayload({
-        clientId:       manager.analytics._clientId,
-        userId:         manager.analytics._userId,
-        userProperties: manager.analytics._userProperties,
+        clientId:       omega.analytics._clientId,
+        userId:         omega.analytics._userId,
+        userProperties: omega.analytics._userProperties,
         eventName:      descriptor.name,
         params:         descriptor.payload,
       }),
@@ -314,10 +315,10 @@ async function runRendererSuites(files, manager) {
     return true;
   };
   process.env.GOOGLE_ANALYTICS_SECRET = 'harness-secret';
-  manager.config.analytics = { providers: { google: { id: 'G-HARNESS1' } } };
-  manager.analytics.initialize(manager);
+  omega.config.analytics = { providers: { google: { id: 'G-HARNESS1' } } };
+  omega.analytics.initialize(omega);
   try { ipcMain.removeHandler('desktop:__test:read-analytics-sends'); } catch (_) { /* ignore */ }
-  ipcMain.handle('desktop:__test:read-analytics-sends', () => global.__emTestAnalyticsSends);
+  ipcMain.handle('desktop:__test:read-analytics-sends', () => global.__omegaTestAnalyticsSends);
   const win = new BrowserWindow({
     show:           false,
     width:          800,
@@ -337,16 +338,16 @@ async function runRendererSuites(files, manager) {
       if (resolved) return;
       resolved = true;
       try { win.destroy(); } catch (_e) { /* noop */ }
-      ipcMain.removeAllListeners('__emTest:ready');
-      ipcMain.removeAllListeners('__emTest:result');
+      ipcMain.removeAllListeners('__omegaTest:ready');
+      ipcMain.removeAllListeners('__omegaTest:result');
       if (err) reject(err); else resolve(val);
     };
 
-    ipcMain.on('__emTest:ready', () => {
-      win.webContents.send('__emTest:suites', suites);
+    ipcMain.on('__omegaTest:ready', () => {
+      win.webContents.send('__omegaTest:suites', suites);
     });
 
-    ipcMain.on('__emTest:result', (_e, evt) => {
+    ipcMain.on('__omegaTest:result', (_e, evt) => {
       // Forward verbatim to stdout — same envelope as main-process events.
       emit(evt);
       if (evt.event === 'result') {

@@ -1,5 +1,5 @@
 // Build-layer tests for the defaults scaffold — the gulp task's guts now run through
-// the shared devkit defaults engine; these tests run the REAL scaffold (BXM's actual
+// the shared devkit defaults engine; these tests run the REAL scaffold (the extension's actual
 // FILE_MAP + site-token transform) into a temp consumer dir and verify the wiring:
 // `_.` renames, omega.json5 defaults merge (consumer keys survive — the setup
 // data-loss regression), preserve-if-exists rules, .nvmrc templating, convergence.
@@ -76,6 +76,24 @@ module.exports = defineCases({
         const nvmrc = jetpack.read(path.join(tmp, '.nvmrc'));
         ctx.expect(nvmrc).toContain('v22');
         ctx.expect(nvmrc.includes('{{')).toBe(false);
+      },
+    },
+    {
+      // Every context module exports ONE ready-made instance (#945): the
+      // scaffolded entry imports it and initializes it, and never writes `new`.
+      name: 'every scaffolded component entry imports its context instance and initializes it',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
+        scaffoldDefaults({ outputDir: tmp });
+
+        const entries = { background: 'background', content: 'content', offscreen: 'offscreen', options: 'options', pages: 'page', popup: 'popup', sidepanel: 'sidepanel' };
+        for (const [component, context] of Object.entries(entries)) {
+          const entry = jetpack.read(path.join(tmp, 'src', 'assets', 'js', 'components', component, 'index.js'));
+          ctx.expect(entry).toContain(`import omega from '@omega.js/extension/${context}';`);
+          ctx.expect(entry).toContain('omega.initialize()');
+          ctx.expect(/\} = omega;/.test(entry)).toBe(true);
+          ctx.expect(/\bnew\b|Manager|manager/.test(entry)).toBe(false);
+        }
       },
     },
     {

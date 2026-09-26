@@ -11,8 +11,8 @@
  *
  * Run: npx omega test backend:helpers/payment/coinbase/create-intent
  */
-const intentProvider = require('../../../../dist/manager/routes/payments/intent/providers/coinbase.js');
-const Coinbase = require('../../../../dist/manager/libraries/payment/providers/coinbase.js');
+const intentProvider = require('../../../../dist/omega/routes/payments/intent/providers/coinbase.js');
+const Coinbase = require('../../../../dist/omega/libraries/payment/providers/coinbase.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-coinbase-buyer';
@@ -35,7 +35,7 @@ const CHARGE_RESPONSE = {
   },
 };
 
-/** A logger the provider can talk to, with no Manager behind it */
+/** A logger the provider can talk to, with no omega behind it */
 function testCtx() {
   const lines = [];
 

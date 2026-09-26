@@ -6,7 +6,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "dist/manager/index.js",
+  "main": "dist/omega/index.js",
   "files": [
     "bin/",
     "dist/",

@@ -77,13 +77,13 @@ Drop your own `config/page-template.html` in your project root. @omega.js/deskto
 
 ## Runtime API
 
-`manager.templating` is also available at runtime if you need to template a string yourself (e.g. dynamic deep-link routes):
+`omega.templating` is also available at runtime if you need to template a string yourself (e.g. dynamic deep-link routes):
 
 ```js
-manager.templating.render('Hello {{ user.name }}', { user: { name: 'Ian' } });
+omega.templating.render('Hello {{ user.name }}', { user: { name: 'Ian' } });
 // → 'Hello Ian'
 
-manager.templating.render('Custom [name]', { name: 'X' }, { brackets: ['[', ']'] });
+omega.templating.render('Custom [name]', { name: 'X' }, { brackets: ['[', ']'] });
 // → 'Custom X'
 ```
 

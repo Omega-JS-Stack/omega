@@ -35,7 +35,7 @@ module.exports = defineCases({
         }
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook/forward?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook/forward?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [{ sg_event_id: 'should-not-process', event: 'group_unsubscribe', email: 'test@example.com' }]
         );
 
@@ -56,7 +56,7 @@ module.exports = defineCases({
         // A valid key shouldn't unlock the forwarder: the gate is the company,
         // not the key.
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook/forward?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook/forward?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           { id: 'should-not-process', event: 'subscription.unsubscribed', email: 'test@example.com' }
         );
 

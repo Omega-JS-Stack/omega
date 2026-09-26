@@ -19,13 +19,13 @@
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
-const createPost = require('../../../dist/manager/routes/admin/post/post.js');
-const writeContent = require('../../../dist/manager/routes/admin/repo/content/post.js');
+const createPost = require('../../../dist/omega/routes/admin/post/post.js');
+const writeContent = require('../../../dist/omega/routes/admin/repo/content/post.js');
 const { loadConfig } = require('../../helpers/_shared-config.js');
 const {
   ADMIN_USER,
   brandConfig,
-  fakeManager,
+  fakeOmega,
   recordingCtx,
   githubDouble,
   withGithub,
@@ -52,13 +52,13 @@ const POST_SETTINGS = {
 /** Run the create route against a config, returning what it sent and what GitHub saw. */
 async function createAgainst(config, overrides) {
   const github = githubDouble();
-  const Manager = fakeManager(config, {
+  const omega = fakeOmega(config, {
     require: (name) => (name === 'wonderful-fetch' ? imageDownloader() : require(name)),
   });
-  const ctx = recordingCtx(Manager, { now: NOW });
+  const ctx = recordingCtx(omega, { now: NOW });
   const settings = { ...POST_SETTINGS, ...overrides };
 
-  await withGithub(github, () => createPost({ ctx, Manager, user: ADMIN_USER, settings, analytics: { event() {} } }));
+  await withGithub(github, () => createPost({ ctx, omega, user: ADMIN_USER, data: settings, analytics: { event() {} } }));
 
   return { sent: ctx.sent, calls: github.calls, settings: settings };
 }
@@ -73,10 +73,10 @@ function committedTree(calls) {
 /** Run the repo-content route against a config, returning what it sent and what GitHub saw. */
 async function writeAgainst(config, settings) {
   const github = githubDouble();
-  const Manager = fakeManager(config);
-  const ctx = recordingCtx(Manager);
+  const omega = fakeOmega(config);
+  const ctx = recordingCtx(omega);
 
-  await withGithub(github, () => writeContent({ ctx, Manager, user: ADMIN_USER, settings, analytics: { event() {} } }));
+  await withGithub(github, () => writeContent({ ctx, omega, user: ADMIN_USER, data: settings, analytics: { event() {} } }));
 
   return { sent: ctx.sent, calls: github.calls, settings: settings };
 }

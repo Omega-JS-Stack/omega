@@ -1,37 +1,35 @@
-// Libraries
-import extension from './lib/extension.js';
-import LoggerLite from './lib/logger-lite.js';
-import Messaging from './lib/messaging.js';
-import Affiliatizer from './lib/affiliatizer.js';
-import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
+// The content-script context: the extension base plus the affiliatizer, which
+// runs against the HOST page this script is injected into.
 
-// Class
-class Manager {
+// Libraries
+import { Omega as BaseOmega } from './omega.js';
+import Affiliatizer from './lib/affiliatizer.js';
+
+/**
+ * The content script's runtime.
+ */
+class Omega extends BaseOmega {
   constructor() {
-    // Properties
-    this.extension = null;
-    this.messenger = null;
-    this.logger = null;
-    this.affiliatizer = null;
+    super('content');
   }
 
+  /**
+   * Settle `ready`, then run the affiliatizer over the host page.
+   * @returns {Promise<Omega>} the instance.
+   */
   async initialize() {
-    // Set properties
-    this.extension = extension;
-    this.messenger = new Messaging({ sender: 'content' });
-    this.logger = new LoggerLite('content');
-    this.affiliatizer = Affiliatizer.initialize(this);
+    await super.initialize();
+
+    await Affiliatizer.initialize(this);
 
     // Log
     this.logger.log('Initialized!', this);
 
-    // Return manager instance
     return this;
   }
 }
 
-// Cross-context helpers — Manager.isTesting() / isDevelopment() / etc.
-attachModeHelpers(Manager);
+const omega = new Omega();
 
-// Export
-export default Manager;
+export default omega;
+export { Omega };

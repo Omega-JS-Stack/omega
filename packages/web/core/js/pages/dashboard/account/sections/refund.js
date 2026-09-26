@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { fetchOrders, refundableOrders, takeRefundRequest } from '../modules/orders.js';
 
@@ -69,11 +69,10 @@ export function onShow() {
 // Is the SUBSCRIPTION refundable? Its own rule, unchanged: the backend requires
 // a cancelled or cancelling subscription before it will reverse its last charge.
 function subscriptionEligible(account) {
-  const subscription = account?.subscription || {};
-  const resolved = omega.auth().resolveSubscription(account);
+  const subscription = account.subscription;
   const isPaid = subscription.product?.id !== 'basic' && !!subscription.product?.id;
 
-  return isPaid && (subscription.status === 'cancelled' || resolved.cancelling);
+  return isPaid && (subscription.status === 'cancelled' || account.cancelling);
 }
 
 function updateRefundEligibility(account) {
@@ -112,7 +111,7 @@ function populateSubjects(account) {
   ];
 
   $subject.innerHTML = options
-    .map((option) => `<option value="${omega.utilities().escapeHTML(option.value)}">${omega.utilities().escapeHTML(option.label)}</option>`)
+    .map((option) => `<option value="${omega.utilities.escapeHTML(option.value)}">${omega.utilities.escapeHTML(option.label)}</option>`)
     .join('');
 
   if ($picker) {
@@ -155,7 +154,7 @@ function setupRefundForm() {
     return;
   }
 
-  formManager = new FormManager('#refund-form', {
+  formManager = new FormManager(omega, '#refund-form', {
     allowResubmit: false,
     warnOnUnsavedChanges: false,
     submittingText: 'Processing refund...',
@@ -230,8 +229,8 @@ function populateRefundReasons() {
 
   $container.innerHTML = shuffled.map((reason, i) => `
     <div class="form-check mb-2">
-      <input class="form-check-input" type="radio" name="refund_reason" id="refund-reason-${i}" value="${omega.utilities().escapeHTML(reason)}" required>
-      <label class="form-check-label" for="refund-reason-${i}">${omega.utilities().escapeHTML(reason)}</label>
+      <input class="form-check-input" type="radio" name="refund_reason" id="refund-reason-${i}" value="${omega.utilities.escapeHTML(reason)}" required>
+      <label class="form-check-label" for="refund-reason-${i}">${omega.utilities.escapeHTML(reason)}</label>
     </div>
   `).join('');
 }

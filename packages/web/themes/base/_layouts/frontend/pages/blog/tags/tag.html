@@ -9,7 +9,7 @@ hero:
 <!-- ═══ Masthead ═══ -->
 {% comment %} The term as it DISPLAYS: the aggregation humanizes the winning
    spelling ("Growth Hacks", #457); the tag cloud on /blog/tags title-cases the
-   RAW spelling ("Growth-hacks") — a split legacy UJM shipped too (#294). {% endcomment %}
+   RAW spelling ("Growth-hacks") (#294). {% endcomment %}
 {% assign tag_name = resolved.tag.name | omega_title_case %}
 {% comment %} #467 (after #749): this masthead IS the page's first viewport, so
 the band paints with the document — data-omega-first-paint on the section, no

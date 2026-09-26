@@ -24,7 +24,7 @@ The default behavior — `mode: 'normal'` + `openAtLogin: { enabled: true, mode:
 
 ### `normal` (default)
 
-Standard app behavior. Your `main.js` calls `windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(...)`. In `normal` mode, `show` is `true` so the window appears immediately. Dock visible (macOS), taskbar entry (win/linux).
+Standard app behavior. Your `main.js` calls `windows.create('main', { show: !startup.isLaunchHidden() })` from inside `omega.initialize().then(...)`. In `normal` mode, `show` is `true` so the window appears immediately. Dock visible (macOS), taskbar entry (win/linux).
 
 ### `hidden`
 
@@ -38,31 +38,31 @@ Use this for: menubar apps, agent apps (clipboard managers, time trackers, syste
 
 > **Note:** the deprecated `'tray-only'` mode is no longer valid — its behavior was always identical to `'hidden'`, so they've been folded into one. Old `tray-only` configs fall back to `'normal'` per `getMode()` validation.
 
-## Public API on `manager.startup`
+## Public API on `omega.startup`
 
 ```js
-manager.startup.getMode()                  // user-launch mode: 'normal' | 'hidden'
-manager.startup.isLaunchHidden()           // true if THIS launch is hidden — combines
+omega.startup.getMode()                  // user-launch mode: 'normal' | 'hidden'
+omega.startup.isLaunchHidden()           // true if THIS launch is hidden: combines
                                            //   user-launch mode + login-launch detection.
                                            //   Use this in main.js to gate windows.create().
-manager.startup.wasLaunchedAtLogin()       // true if the OS auto-launched us at login
-manager.startup.applyEarly()               // calls app.dock.hide() if needed (called by main.js boot)
+omega.startup.wasLaunchedAtLogin()       // true if the OS auto-launched us at login
+omega.startup.applyEarly()               // calls app.dock.hide() if needed (called by main.js boot)
 
-manager.startup.setOpenAtLogin(true)                            // back-compat boolean form
-manager.startup.setOpenAtLogin({ enabled: true, mode: 'hidden' }) // object form
-manager.startup.isOpenAtLogin()            // read live OS state
+omega.startup.setOpenAtLogin(true)                            // back-compat boolean form
+omega.startup.setOpenAtLogin({ enabled: true, mode: 'hidden' }) // object form
+omega.startup.isOpenAtLogin()            // read live OS state
 ```
 
 ## Typical main.js pattern
 
 ```js
-manager.initialize().then(() => {
+omega.initialize().then(() => {
   // Always create the main window. In hidden launches, `show: false` keeps it
   // invisible until something explicitly calls windows.show('main') — but it's
   // in the registry, so @omega.js/desktop's activate/second-instance handlers can find and
   // surface it when the user double-clicks the running app.
-  manager.windows.create('main', {
-    show: !manager.startup.isLaunchHidden(),
+  omega.windows.create('main', {
+    show: !omega.startup.isLaunchHidden(),
   });
 });
 ```
@@ -71,9 +71,9 @@ Don't conditionally skip `create()` for hidden launches — without `main` in th
 
 ## Boot order
 
-`startup.applyEarly()` is the **first** call in `Manager.initialize()` — before `whenReady`, before any other lib. The goal: spend as little time as possible in the dock-bounce window.
+`startup.applyEarly()` is the **first** call in `omega.initialize()`: before `whenReady`, before any other lib. The goal: spend as little time as possible in the dock-bounce window.
 
-Sequence: applyEarly → before-quit hook → ipc → storage → sentry → protocol → deep-link → app-state → whenReady → updater → tray/menu/contextMenu → startup.initialize → @omega.js/client → windows.initialize. **@omega.js/desktop no longer auto-creates the main window** — your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
+Sequence: applyEarly → before-quit hook → ipc → storage → theme → fontawesome → sentry → protocol → deep-link → auth-flow → app-state → context → usage → whenReady → updater → tray/menu/contextMenu → startup.initialize → auth → remote-config → remote-scripts → analytics → restart-manager → windows.initialize (full list: [boot-sequence.md](boot-sequence.md)). **@omega.js/desktop does not auto-create the main window**: your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
 
 ## How zero-bounce works on macOS
 
@@ -86,7 +86,7 @@ Sequence: applyEarly → before-quit hook → ipc → storage → sentry → pro
 
 With the key baked, a MANUAL launch also starts dockless — the dock icon appears the moment the main window surfaces (every surface path runs `_ensureDockVisible()` → `app.dock.show()`), so the visible difference is only that the bounce animation is replaced by the icon appearing when the window is ready.
 
-At runtime, when the consumer first calls `manager.windows.show()` (or the `windows.create()` call resolves with `show: true`), @omega.js/desktop calls `app.dock.show()` so the dock icon appears alongside the window. Reverses cleanly via `app.dock.hide()` if you want to go back to invisible.
+At runtime, when the consumer first calls `omega.windows.show()` (or the `windows.create()` call resolves with `show: true`), @omega.js/desktop calls `app.dock.show()` so the dock icon appears alongside the window. Reverses cleanly via `app.dock.hide()` if you want to go back to invisible.
 
 The injection is YAML-text-level (preserves comments, idempotent, merges with existing `extendInfo`). See `src/gulp/tasks/build-config.js`.
 
@@ -136,7 +136,7 @@ Hidden / agent apps usually want:
 And in `src/integrations/tray/index.js`:
 
 ```js
-tray.update('open', { click: () => manager.windows.show('main') });
+tray.update('open', { click: () => omega.windows.show('main') });
 ```
 
 The window is created at boot but invisible. When the user clicks the tray's "Open" item (or double-clicks the app icon), `windows.show('main')` runs, @omega.js/desktop calls `app.dock.show()`, and the user sees both the dock icon and the window appear together.

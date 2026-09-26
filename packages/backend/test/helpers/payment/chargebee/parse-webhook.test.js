@@ -5,7 +5,7 @@
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type.
  */
-const chargebeeProvider = require('../../../../dist/manager/routes/payments/webhook/providers/chargebee.js');
+const chargebeeProvider = require('../../../../dist/omega/routes/payments/webhook/providers/chargebee.js');
 
 // Chargebee webhook fixtures
 const FIXTURE_SUB_CREATED = require('../../../fixtures/chargebee/webhook-subscription-created.json');

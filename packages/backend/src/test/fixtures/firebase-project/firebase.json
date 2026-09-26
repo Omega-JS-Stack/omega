@@ -8,7 +8,7 @@
     ],
     "rewrites": [
       {
-        "source": "{/omega,/omega/**,/backend-manager,/backend-manager/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}",
+        "source": "{/omega,/omega/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}",
         "function": "omega_api"
       }
     ]

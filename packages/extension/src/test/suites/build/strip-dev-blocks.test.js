@@ -16,7 +16,7 @@ const path = require('path');
 
 const FRAMEWORK_ROOT = path.join(__dirname, '..', '..', '..', '..');
 const { bundle } = require('@omega.js/devkit/bundle');
-const Manager = new (require(path.join(FRAMEWORK_ROOT, 'src', 'build.js')));
+const build = require(path.join(FRAMEWORK_ROOT, 'src', 'build.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 const FIXTURE = [
@@ -94,10 +94,10 @@ module.exports = defineCases({
         process.env.OMEGA_AUDIT_FORCE = 'true';
 
         try {
-          ctx.expect(Manager.isBuildMode()).toBe(false);
-          ctx.expect(Manager.actLikeProduction()).toBe(true);
+          ctx.expect(build.isBuildMode()).toBe(false);
+          ctx.expect(build.actLikeProduction()).toBe(true);
 
-          const built = await compile(Manager.actLikeProduction());
+          const built = await compile(build.actLikeProduction());
           ctx.expect(built).toContain('PROD_SENTINEL');
           ctx.expect(built.includes('DEV_ONLY_SENTINEL')).toBe(false);
         } finally {
@@ -115,7 +115,7 @@ module.exports = defineCases({
       name: 'the one bundle call takes the production rule',
       run: (ctx) => {
         const task = fs.readFileSync(path.join(FRAMEWORK_ROOT, 'src', 'gulp', 'tasks', 'bundle.js'), 'utf8');
-        ctx.expect(task).toContain('dev: !Manager.actLikeProduction()');
+        ctx.expect(task).toContain('dev: !build.actLikeProduction()');
       },
     },
   ],

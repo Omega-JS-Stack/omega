@@ -5,5 +5,5 @@
 // the bundle / build-config tasks see it.
 
 module.exports = async (ctx) => {
-  // ctx = { manager, mode, projectRoot }
+  // ctx = { build, mode, projectRoot }
 };

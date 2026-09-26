@@ -24,10 +24,10 @@
  * config hole at all; it stays the integration surface for the happy paths.
  */
 const assert = require('node:assert');
-const cron = require('../../dist/manager/events/cron/frequent/marketing-campaigns.js');
-const newsletter = require('../../dist/manager/libraries/email/generators/newsletter.js');
-const Marketing = require('../../dist/manager/libraries/email/marketing/index.js');
-const { getNextFutureOccurrence } = require('../../dist/manager/libraries/email/constants.js');
+const cron = require('../../dist/omega/events/cron/frequent/marketing-campaigns.js');
+const newsletter = require('../../dist/omega/libraries/email/generators/newsletter.js');
+const Marketing = require('../../dist/omega/libraries/email/marketing/index.js');
+const { getNextFutureOccurrence } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The config-hole message the email library actually throws (prepare.js).
@@ -108,19 +108,20 @@ async function runCron(seed, { sendCampaign, generate } = {}) {
   const logs = [];
   const errors = [];
 
-  const Manager = {
+  const omega = {
     config: { brand: BRAND_WITHOUT_URL },
+    firebase: { admin },
     isProduction: () => false,
-    Email: () => ({
-      sendCampaign: sendCampaign
-        || (async () => { throw new Error('sendCampaign() should not be reached'); }),
-    }),
   };
 
-  // notification.send() reads the brand off ctx.Manager, as it does in the
+  // notification.send() reads the brand off ctx.omega, as it does in the
   // real framework ctx.
   const ctx = {
-    Manager,
+    omega,
+    email: {
+      sendCampaign: sendCampaign
+        || (async () => { throw new Error('sendCampaign() should not be reached'); }),
+    },
     log: (...args) => logs.push(args.join(' ')),
     error: (...args) => errors.push(args.join(' ')),
   };
@@ -132,7 +133,7 @@ async function runCron(seed, { sendCampaign, generate } = {}) {
   }
 
   try {
-    await cron({ Manager, ctx, libraries: { admin } });
+    await cron({ ctx, omega });
   } finally {
     newsletter.generate = original;
   }

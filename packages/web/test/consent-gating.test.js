@@ -74,7 +74,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
           return { path: CLIENT_ANALYTICS };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -119,23 +119,23 @@ async function boot({ timeZone, ids = IDS, storage = {} } = {}) {
         },
       },
     },
-    dom: () => ({
+    dom: {
       loadScript: (options) => {
         injected.push(options.src);
         return Promise.resolve({});
       },
-    }),
-    storage: () => ({
+    },
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
       remove: (keyPath) => _set(storage, keyPath, undefined),
-    }),
+    },
   };
 
   delete require.cache[require.resolve(BUNDLE)];
   const bundle = require(BUNDLE);
 
-  bundle.default();
+  bundle.default({ omega: globalThis.__omegaClient });
 
   return {
     injected,

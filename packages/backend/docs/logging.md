@@ -24,11 +24,11 @@ The child-only files, all in `<projectDir>/dist/` — the same lines the verb lo
 | `test.log` | `npx omega test` runner output when running against an already-running emulator | Overwritten each run |
 | `production.log` | `npx omega logs:read` / `npx omega logs:tail` — production Cloud Function logs from Google Cloud Logging (raw JSON for `read`, streaming text for `tail`) | Overwritten each run |
 
-The `dev`/`test` names match EM/BXM/UJM for cross-framework parity.
+The `dev`/`test` names match desktop, extension and web for cross-framework parity.
 
 ## attach-log-file utility
 
-`src/cli/utils/attach-log-file.js` — shared DRY utility (same pattern as BXM/UJM/EM). Intercepts `process.stdout.write` / `process.stderr.write` to tee all output to a log file while preserving console display. ANSI codes stripped from file output for grep-friendliness.
+`src/cli/utils/attach-log-file.js`: shared DRY utility (same pattern as extension, web and desktop). Intercepts `process.stdout.write` / `process.stderr.write` to tee all output to a log file while preserving console display. ANSI codes stripped from file output for grep-friendliness.
 
 ```js
 const attachLogFile = require('../utils/attach-log-file');

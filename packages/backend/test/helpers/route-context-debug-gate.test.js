@@ -8,7 +8,7 @@
  * env var away.
  *
  * The only stand-in here is `console` (the sink the logger writes to); the ctx is
- * a real one, built by Manager.RouteContext().
+ * a real one, a real Context.
  *
  * Run: npx omega test framework:helpers/route-context-debug-gate
  */
@@ -16,6 +16,7 @@
 // Record every console call the thunk makes, restoring console afterward.
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 function withConsoleRecorder(fn) {
   const calls = { log: [], debug: [], warn: [], error: [] };
   const original = { log: console.log, debug: console.debug, warn: console.warn, error: console.error };
@@ -65,8 +66,8 @@ module.exports = defineCases({
   tests: [
     {
       name: 'debug-is-silent-by-default',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'debug-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
           withDebug(undefined, () => {
@@ -81,8 +82,8 @@ module.exports = defineCases({
 
     {
       name: 'debug-writes-when-omega-debug-is-set',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'debug-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
           withDebug('1', () => {
@@ -98,8 +99,8 @@ module.exports = defineCases({
 
     {
       name: 'every-other-level-is-untouched-by-the-gate',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'debug-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'debug-gate' });
 
         const calls = withConsoleRecorder(() => {
           withDebug(undefined, () => {

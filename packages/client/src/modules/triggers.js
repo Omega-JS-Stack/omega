@@ -9,7 +9,7 @@
  * `.uj-password-toggle` in web, twice). Now there is exactly ONE listener and
  * exactly one naming rule:
  *
- *   registerTrigger('signout', handler)  →  the class is `omega-signout`
+ *   omega.triggers.register('signout', handler)  →  the class is `omega-signout`
  *
  * The class is ALWAYS `omega-<name>` — callers never spell it, so it can never
  * drift. A click anywhere inside a trigger element counts (closest()), which is
@@ -31,87 +31,97 @@ const logger = createLogger('triggers');
 // The one prefix. A trigger named `signout` is the class `omega-signout`.
 const PREFIX = 'omega-';
 
-// name → handler. Module-level because the registry IS the singleton: one
-// document, one listener, one table.
-const handlers = new Map();
-
-// True once the ONE delegated listener is attached.
-let listening = false;
-
 /**
- * Attach the single delegated listener, once.
+ * The click-trigger registry: one delegated `document` listener and one
+ * name-to-handler table, owned by the instance (`omega.triggers`).
  */
-function ensureListener() {
-  if (listening || typeof document === 'undefined') {
-    return;
+class Triggers {
+  constructor() {
+    // name → handler: one document, one listener, one table.
+    this._handlers = new Map();
+
+    // True once the ONE delegated listener is attached.
+    this._listening = false;
+
+    // Bound once so the listener that is attached is the one that is kept
+    this._handleClick = this._handleClick.bind(this);
   }
 
-  listening = true;
-  document.addEventListener('click', handleClick);
-}
-
-/**
- * The one delegated handler: find the innermost trigger element the click
- * happened inside, then run every trigger that element carries.
- * @param {Event} event
- */
-function handleClick(event) {
-  if (!handlers.size) {
-    return;
-  }
-
-  // ONE closest() call over the union selector — the INNERMOST trigger wins,
-  // so nesting a trigger inside a trigger is deterministic.
-  const selector = [...handlers.keys()].map((name) => `.${PREFIX}${name}`).join(',');
-  const element = event.target?.closest?.(selector);
-
-  if (!element) {
-    return;
-  }
-
-  // A trigger class means the framework owns this click: no default navigation,
-  // no page-level handler behind it. Both legacy auth listeners did exactly
-  // this, and the markup contract is now the same everywhere.
-  event.preventDefault();
-  event.stopPropagation();
-
-  for (const [name, handler] of handlers) {
-    if (!element.classList.contains(`${PREFIX}${name}`)) {
-      continue;
+  /**
+   * Attach the single delegated listener, once.
+   */
+  _ensureListener() {
+    if (this._listening || typeof document === 'undefined') {
+      return;
     }
 
-    // A throwing trigger is logged and never allowed to swallow the others.
-    // Async handlers (sign-out awaits Firebase) hand their failure back the
-    // same way.
-    try {
-      const result = handler(event, element);
-      if (typeof result?.catch === 'function') {
-        result.catch((error) => logger.error(`Trigger "${name}" failed:`, error));
+    this._listening = true;
+    document.addEventListener('click', this._handleClick);
+  }
+
+  /**
+   * The one delegated handler: find the innermost trigger element the click
+   * happened inside, then run every trigger that element carries.
+   * @param {Event} event
+   */
+  _handleClick(event) {
+    if (!this._handlers.size) {
+      return;
+    }
+
+    // ONE closest() call over the union selector — the INNERMOST trigger wins,
+    // so nesting a trigger inside a trigger is deterministic.
+    const selector = [...this._handlers.keys()].map((name) => `.${PREFIX}${name}`).join(',');
+    const element = event.target?.closest?.(selector);
+
+    if (!element) {
+      return;
+    }
+
+    // A trigger class means the framework owns this click: no default navigation,
+    // no page-level handler behind it. Both legacy auth listeners did exactly
+    // this, and the markup contract is now the same everywhere.
+    event.preventDefault();
+    event.stopPropagation();
+
+    for (const [name, handler] of this._handlers) {
+      if (!element.classList.contains(`${PREFIX}${name}`)) {
+        continue;
       }
-    } catch (error) {
-      logger.error(`Trigger "${name}" failed:`, error);
+
+      // A throwing trigger is logged and never allowed to swallow the others.
+      // Async handlers (sign-out awaits Firebase) hand their failure back the
+      // same way.
+      try {
+        const result = handler(event, element);
+        if (typeof result?.catch === 'function') {
+          result.catch((error) => logger.error(`Trigger "${name}" failed:`, error));
+        }
+      } catch (error) {
+        logger.error(`Trigger "${name}" failed:`, error);
+      }
     }
   }
+
+  /**
+   * Register a click trigger. The class it answers to is always `omega-<name>`.
+   * Re-registering the same name REPLACES the handler (with a warning) — there is
+   * no stacking, so a hot reload or a double boot can never double-fire.
+   * @param {string} name - trigger name, e.g. 'signout'
+   * @param {Function} handler - called with (event, element)
+   */
+  register(name, handler) {
+    if (typeof handler !== 'function') {
+      throw new Error(`triggers.register("${name}") needs a handler function`);
+    }
+
+    if (this._handlers.has(name)) {
+      logger.warn(`Trigger "${name}" re-registered — the new handler replaces the old one`);
+    }
+
+    this._handlers.set(name, handler);
+    this._ensureListener();
+  }
 }
 
-/**
- * Register a click trigger. The class it answers to is always `omega-<name>`.
- * Re-registering the same name REPLACES the handler (with a warning) — there is
- * no stacking, so a hot reload or a double boot can never double-fire.
- * @param {string} name - trigger name, e.g. 'signout'
- * @param {Function} handler - called with (event, element)
- */
-export function registerTrigger(name, handler) {
-  if (typeof handler !== 'function') {
-    throw new Error(`registerTrigger("${name}") needs a handler function`);
-  }
-
-  if (handlers.has(name)) {
-    logger.warn(`Trigger "${name}" re-registered — the new handler replaces the old one`);
-  }
-
-  handlers.set(name, handler);
-  ensureListener();
-}
-
-export default registerTrigger;
+export default Triggers;

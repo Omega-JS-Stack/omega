@@ -4,18 +4,32 @@
 
 ```
 src/
-  manager/
-    index.js                          # Main Manager class
-    helpers/                          # Helper classes
-      ctx.js                    # Request/response handling
-      user.js                         # User property structure + schema
-      analytics.js                    # GA4 integration
-      usage.js                        # Rate limiting
-      middleware.js                   # Request pipeline
-      settings.js                     # Schema validation
-      utilities.js                    # Batch operations
-      metadata.js                     # Timestamps/tags
+  omega/
+    index.js                          # The Omega class and its one instance (initialize, function wiring)
+    context.js                        # Context: the ctx every route, event and cron job receives
+    context/                          # Its concerns: logging, respond/redirect/report, authenticate, parse, client-info
+    pipeline.js                       # The request pipeline: one ordered list of named steps
+    router.js                         # omega_api dispatch: MCP, else the framework's route
+    events.js                         # The event dispatcher (every trigger, omega.events.run())
+    cron.js                           # The cron runner (framework jobs, then the consumer's hooks/cron/)
+    server.js                         # Custom-server mode (projectType 'custom')
+    services/                         # One class per service
+      utilities.js                    # omega.utilities: batch operations, randomId, slugify, sanitize, trim
+      storage.js                      # omega.storage({ name }): local JSON storage (lowdb)
+      user.js                         # The User id generators
+      usage.js                        # ctx.usage: the counted-feature gate
+      analytics.js                    # ctx.analytics: GA4 integration
+      metadata.js                     # ctx.metadata(): timestamps and tags
+      settings.js                     # Schema loading and validation into ctx.data
+    helpers/
+      schema.js                       # The one schema adapter (declaration to zod)
+      account.js                      # @omega.js/account (User) for the backend
+      log-redaction.js                # Credential redaction for every log line
+      resolved-config.js              # config.resolved.*
     libraries/
+      env.js                          # The one env reader
+      email/                          # Transactional and marketing email
+      ai/                             # OpenAI and Anthropic
       analytics/                      # Server-side conversion delivery
         conversions.js                # The one send path (GA4 MP, Meta CAPI, TikTok Events API)
         match-data.js                 # Attribution + identity: one match table per platform
@@ -33,8 +47,7 @@ src/
         on-create.js                    # User doc creation
         on-delete.js                    # User doc deletion + marketing cleanup
         utils.js                        # Shared utilities (retryWrite, runAuthHook)
-      cron/                             # Cron job runners
-        runner.js                       # Shared cron job runner (@omega.js/backend + consumer hooks)
+      cron/                             # Cron schedules and their jobs
         daily.js                        # Daily cron entry point
         daily/{job}.js                  # Individual daily cron jobs (incl. trial-lapse-sweep.js, expire-paypal-cancellations.js)
         frequent.js                     # Frequent cron entry point
@@ -48,10 +61,6 @@ src/
             send-email.js               # Shared email helper for handlers
             subscription/               # Subscription transition handlers
             one-time/                   # One-time payment transition handlers
-    functions/core/                     # Built-in functions
-      actions/
-        api.js                          # Main omega_api handler
-        api/{category}/{action}.js      # API command handlers
     routes/                           # Built-in routes
       admin/
         post/                         # POST /admin/post - Create blog posts via GitHub
@@ -114,7 +123,7 @@ config/omega.json5                    # Local config (standalone only — brand 
 service-account.json                  # Firebase SA (standalone only — brand targets
                                       # keep it in the brand's .omega/secrets/)
 src/
-  index.js                            # Manager.init() + custom functions
+  index.js                            # initialize() + custom functions; exports omega.functions
   routes/
     {endpoint}/
       index.js                        # All methods handler
@@ -123,6 +132,9 @@ src/
   schemas/
     {endpoint}/
       index.js                        # Schema definition
+  events/
+    {name}.js                         # OPTIONAL: handlers a custom trigger runs
+                                      # through omega.events.run('{name}', payload)
   hooks/
     auth/
       before-create.js                # Custom pre-signup checks (can block)
@@ -132,14 +144,13 @@ src/
     cron/
       daily/
         {job}.js                      # Custom daily jobs (async fn taking
-                                      # { Manager, ctx, context, libraries } —
-                                      # see routes.md)
+                                      # { ctx, omega, context }; see routes.md)
   payment-providers/
     {productId}.js                    # OPTIONAL: per-product handler that
                                       # POST /omega/admin/payment loads off
-                                      # Manager.cwd (the STAGED copy). A CLASS:
-                                      # the route news it up, sets .Manager,
-                                      # and awaits .process(settings)
+                                      # omega.cwd (the STAGED copy). A CLASS:
+                                      # the route constructs it, sets .omega,
+                                      # and awaits .process(data)
   public/                             # OPTIONAL: hosting boilerplate overrides
 test/                                 # Project tests
 firebase.json  .firebaserc           # Firebase project config

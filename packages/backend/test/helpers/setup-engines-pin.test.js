@@ -5,7 +5,7 @@
  * not a version) — never the ambient process. The scaffold must produce the
  * same app under any shell Node (cp195 journey catch: an ambient-24 run
  * stamped 24 against the v22/* .nvmrc default and `omega dev` died on the
- * Manager.init version mismatch).
+ * omega.initialize() version mismatch).
  */
 const path = require('path');
 const os = require('os');

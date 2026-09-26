@@ -15,12 +15,12 @@ const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
 const { deepMerge, enabledFormats, desktopArtifactName, sanitizeProductName, releasesRepo } = require('@omega.js/config');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 
 const { writeMacEntitlements } = require('../../lib/sign-helpers/entitlements.js');
 const { resolveAndCopy }       = require('../../lib/sign-helpers/resolve-icons.js');
 
-const logger = Manager.logger('build-config');
+const logger = build.logger('build-config');
 
 module.exports = function buildConfig(done) {
   Promise.resolve().then(async () => {
@@ -28,7 +28,7 @@ module.exports = function buildConfig(done) {
     const distRoot    = require('../../utils/dist-root.js')(projectRoot);
     const distPath    = path.join(distRoot, 'electron-builder.yml');
 
-    const config      = Manager.getConfig();
+    const config      = build.getConfig();
     const startupMode = config.startup?.mode || 'normal';
 
     // 1. Generate entitlements.mac.plist into dist/config/. Consumer overrides live at
@@ -51,7 +51,7 @@ module.exports = function buildConfig(done) {
     // (the cp142 rehearsal catch). The framework resolves the INSTALLED
     // electron from its own module context instead.
     try {
-      builderConfig.electronVersion = Manager.require('electron/package.json').version;
+      builderConfig.electronVersion = require('electron/package.json').version;
       logger.log(`electronVersion → ${builderConfig.electronVersion} (resolved from the installed electron)`);
     } catch (error) {
       logger.log('electronVersion not injected (electron unresolved) — electron-builder falls back to its own detection');
@@ -160,11 +160,11 @@ function expandYear(str) {
 // test assertions).
 function baseConfig(config, extras = {}) {
   // Seed `app` + `brand` so callers (including tests passing bare {}) can deref without
-  // optional-chaining at every site. Matches Manager.getConfig()'s own seeding.
+  // optional-chaining at every site. Matches build.getConfig()'s own seeding.
   config.app   = config.app   || {};
   config.brand = config.brand || {};
 
-  // Manager.getConfig() derives appId from the brand url/id; the literal here
+  // build.getConfig() derives appId from the brand url/id; the literal here
   // only backstops bare test configs. Copyright derives from the BRAND, never
   // a hardcoded company (friction #18).
   const appId       = config.app.appId       || 'app.omega.consumer';
@@ -444,13 +444,13 @@ function baseConfig(config, extras = {}) {
  *
  * @param {object} arch - The resolved per-platform arch lists (`{ mac, linux }`).
  * @param {object} [options]
- * @param {object} [options.mode] - The Manager's mode (`{ build, publish, … }`).
+ * @param {object} [options.mode] - The build module's mode (`{ build, publish, … }`).
  * @param {object} [options.logger] - Logger with `warn` (default: this task's).
  * @throws {Error} in build/publish mode, naming the offending config key.
  */
 function assertArchRules(arch, options) {
   options = options || {};
-  const mode = options.mode || Manager.getMode();
+  const mode = options.mode || build.getMode();
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
   const violations = [];

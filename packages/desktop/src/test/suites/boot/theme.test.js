@@ -16,39 +16,39 @@ module.exports = defineCases({
   tests: [
     {
       description: 'page boots with data-bs-theme equal to the resolved appearance',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const { BrowserWindow } = require('electron');
 
-        expect(manager.theme._initialized).toBe(true);
-        expect(['light', 'dark'].includes(manager.theme.resolved())).toBe(true);
+        expect(omega.theme._initialized).toBe(true);
+        expect(['light', 'dark'].includes(omega.theme.resolved())).toBe(true);
 
         // Wait for the fixture's main window + view, then for the applier to land
         // (it applies at DOMContentLoaded).
         let attr = null;
         for (let i = 0; i < 50; i++) {
-          const win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
           if (win && !win.isDestroyed() && win.webContents.getURL().includes('/views/main/')) {
             attr = await win.webContents.executeJavaScript('document.documentElement.getAttribute("data-bs-theme")').catch(() => null);
-            if (attr === manager.theme.resolved()) break;
+            if (attr === omega.theme.resolved()) break;
           }
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        expect(attr).toBe(manager.theme.resolved());
+        expect(attr).toBe(omega.theme.resolved());
       },
     },
 
     {
       description: 'main-side theme.set() updates the live page attribute (no reload)',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const { BrowserWindow } = require('electron');
-        const win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+        const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
         expect(Boolean(win && !win.isDestroyed())).toBe(true);
 
-        const original = manager.theme.get();
-        const target = manager.theme.resolved() === 'dark' ? 'light' : 'dark';
+        const original = omega.theme.get();
+        const target = omega.theme.resolved() === 'dark' ? 'light' : 'dark';
 
-        manager.theme.set(target);
+        omega.theme.set(target);
 
         let attr = null;
         for (let i = 0; i < 50; i++) {
@@ -58,8 +58,8 @@ module.exports = defineCases({
         }
 
         // Restore before asserting so a failure can't strand the flipped state.
-        manager.theme.set(original);
-        manager.storage.delete('theme.appearance');
+        omega.theme.set(original);
+        omega.storage.delete('theme.appearance');
 
         expect(attr).toBe(target);
       },

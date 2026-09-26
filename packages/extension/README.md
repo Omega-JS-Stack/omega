@@ -21,7 +21,7 @@
 
 - **Build for any browser**: Chrome, Firefox, Edge, Opera, Brave
 - **Component architecture**: seven contexts (background / popup / options / sidepanel / content / pages / offscreen) each with view + styles + script
-- **One-line bootstrap per context** with cross-browser API wrapper
+- **One ready-made `omega` per context**: `import omega from '@omega.js/extension/popup'; await omega.initialize();`, with the cross-browser API wrapper, the logger and the messenger on every context, and `@omega.js/client` on the four page contexts
 - **Cross-context auth sync**: sign-in in one tab is reflected in all open contexts (no `chrome.storage` needed)
 - **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/verts.md](docs/verts.md)
 - **Affiliate redirects**: a visit to a partner site (Amazon, Rakuten, NordVPN, …) redirects once per 24h to an affiliate URL — default-on, `?affiliatizerStatus=block` to stop it. The partner map is a fixed framework constant carrying the framework author's referral codes, not per-brand config. See [docs/affiliatizer.md](docs/affiliatizer.md)
@@ -61,7 +61,7 @@ npx omega test --layer boot      # real-Chromium end-to-end test
 npx omega test --extended        # also run extended suites against REAL external services (Firebase, etc.)
 ```
 
-Tests run against the **real** harness — a real MV3 service worker, a real Chromium tab, the real packaged extension. **Never mock** (`chrome`, the Manager, contexts are all real); only pure, I/O-free functions are called directly. Real external APIs are gated behind **extended mode** — `--extended` or the shared, unprefixed `TEST_EXTENDED_MODE=true` env var (skipped in-source otherwise, never mocked).
+Tests run against the **real** harness: a real MV3 service worker, a real Chromium tab, the real packaged extension. **Never mock** (`chrome`, `omega`, contexts are all real); only pure, I/O-free functions are called directly. Real external APIs are gated behind **extended mode**: `--extended` or the shared, unprefixed `TEST_EXTENDED_MODE=true` env var (skipped in-source otherwise, never mocked).
 
 All CLI output also lands in `logs/` (ANSI-stripped, truncated each run) — `test.log` from `npx omega test`, `dev.log` from `npm start`, `build.log` from `npm run build`. Details: [docs/logging.md](docs/logging.md).
 
@@ -69,13 +69,13 @@ Test files use Jest-compatible matchers:
 
 ```js
 // test/build/manifest.test.js
-const Manager = require('@omega.js/extension/build');
+const build = require('@omega.js/extension/build');
 
 module.exports = {
   layer: 'build',
   description: 'manifest is valid MV3',
   run: (ctx) => {
-    const m = Manager.getManifest();
+    const m = build.getManifest();
     ctx.expect(m.manifest_version).toBe(3);
     ctx.expect(m.permissions).toContain('storage');
   },
@@ -158,7 +158,7 @@ Only stores with configured credentials get published to. Full guide: [docs/publ
 
 @omega.js/extension provides built-in cross-context authentication that syncs across all extension contexts (popup, options, sidepanel, pages, background) without using `chrome.storage`.
 
-**Background.js is the source of truth.** Auth syncs via messaging — sign-in / sign-out events propagate across all open contexts, and new contexts handshake with background on load.
+**Background's `omega.auth` is the source of truth.** Auth syncs over `omega.messenger`: sign-in / sign-out events propagate across all open contexts, and new contexts handshake with background on load, pushing their account document so background's `omega.auth.user` is the same `User`.
 
 ### Setup
 
@@ -172,15 +172,15 @@ Add these CSS classes to HTML elements for declarative auth UI:
 | Class | Action |
 |---|---|
 | `.omega-signin` | Opens `/token` page on your website |
-| `.omega-signout` | Signs out via Web Manager (broadcasts to all contexts) |
+| `.omega-signout` | Signs out via @omega.js/client (broadcasts to all contexts) |
 | `.omega-account` | Opens `/account` page on your website |
 
 ```html
-<button class="btn omega-signin" data-omega-bind="@show !auth.user">Sign In</button>
+<button class="btn omega-signin" data-omega-bind="@show !auth.user.authenticated">Sign In</button>
 
-<div data-omega-bind="@show auth.user" hidden>
-  <img data-omega-bind="@attr src auth.user.photoURL">
-  <span data-omega-bind="@text auth.user.displayName">User</span>
+<div data-omega-bind="@show auth.user.authenticated" hidden>
+  <img data-omega-bind="@attr src auth.user.profile.photoURL">
+  <span data-omega-bind="@text auth.user.profile.displayName">User</span>
   <button class="omega-account">Account</button>
   <button class="omega-signout">Sign Out</button>
 </div>
@@ -198,9 +198,9 @@ In-depth docs for every subsystem live in [docs/](docs/); the architecture overv
 
 ## 🧰 Sister projects
 
-- [@omega.js/desktop](../desktop/) — same patterns, but for Electron desktop apps
-- [Ultimate Jekyll Manager (UJM)](https://github.com/itw-creative-works/ultimate-jekyll-manager) — Jekyll static-site framework
-- [Backend Manager (@omega.js/backend)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework
+- [@omega.js/desktop](../desktop/): same patterns, but for Electron desktop apps
+- [@omega.js/web](../web/): the Eleventy web framework
+- [@omega.js/backend](../backend/): the Firebase Functions backend framework
 
 ## 📜 License
 

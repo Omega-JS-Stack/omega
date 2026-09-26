@@ -34,18 +34,21 @@ const PERSONA_PASSWORD = 'omega-test-password';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Poll authState() until check(state) returns truthy (or time runs out).
-// state = { user, account, resolved } — account re-fetches the user doc each
-// call, which is how the driver observes webhook-trigger writes landing.
+// state = { user, denied }, with user re-read from the user doc each call,
+// which is how the driver observes webhook-trigger writes landing. A User
+// serializes to its document only, so the getters are read in the browser.
 async function waitForAuthState(page, check, label, timeout = WEBHOOK_TIMEOUT) {
   const deadline = Date.now() + timeout;
   let last = null;
   while (Date.now() < deadline) {
     last = await page.evaluate(() => window.__omega.authState().then((s) => ({
-      status: s.account.subscription.status,
-      productId: s.account.subscription.product.id,
-      provider: s.account.subscription.payment.provider,
-      cancellationPending: s.account.subscription.cancellation.pending,
-      resolved: s.resolved,
+      status: s.user.subscription.status,
+      productId: s.user.subscription.product.id,
+      provider: s.user.subscription.payment.provider,
+      cancellationPending: s.user.subscription.cancellation.pending,
+      plan: s.user.plan,
+      active: s.user.active,
+      cancelling: s.user.cancelling,
     })));
     if (check(last)) {
       return last;
@@ -134,8 +137,8 @@ async function main() {
       let last = null;
       while (Date.now() < deadline) {
         last = await page.evaluate(() => window.__omega.authState().then((state) => ({
-          uid: state.account.auth.uid,
-          clientId: state.account.api.clientId,
+          uid: state.user.auth.uid,
+          clientId: state.user.api.clientId,
         })));
         if (last.clientId) {
           if (last.uid !== uid) {
@@ -150,8 +153,8 @@ async function main() {
 
     await harness.step('sign out', async () => {
       await page.evaluate(() => window.__omega.signOut());
-      const user = await page.evaluate(() => window.__omega.currentUser());
-      if (user) {
+      const authenticated = await page.evaluate(() => window.__omega.currentUser().authenticated);
+      if (authenticated) {
         throw new Error('currentUser still set after signOut');
       }
     });
@@ -170,8 +173,8 @@ async function main() {
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction('window.__omega && window.__omega.isReady', { timeout: 30000 });
       const state = await page.evaluate(() => window.__omega.authState().then((s) => ({
-        uid: s.user && s.user.uid,
-        clientId: s.account.api.clientId,
+        uid: s.user.uid,
+        clientId: s.user.api.clientId,
       })));
       if (state.uid !== uid) {
         throw new Error(`restored session uid mismatch: ${JSON.stringify(state)}`);
@@ -183,10 +186,10 @@ async function main() {
 
     await harness.step('subscription resolves for a fresh user', async () => {
       const resolved = await page.evaluate(() => window.__omega.authState().then((s) => ({
-        email: s.account.auth.email,
-        plan: s.resolved.plan,
-        active: s.resolved.active,
-        everPaid: s.resolved.everPaid,
+        email: s.user.auth.email,
+        plan: s.user.plan,
+        active: s.user.active,
+        everPaid: s.user.everPaid,
       })));
       if (resolved.email !== EMAIL || resolved.plan !== 'basic' || resolved.active !== false || resolved.everPaid !== false) {
         throw new Error(`unexpected resolved state: ${JSON.stringify(resolved)}`);
@@ -213,7 +216,7 @@ async function main() {
         (s) => s.status === 'active' && s.provider === 'test' && s.productId === 'premium',
         'active test-provider subscription',
       );
-      return `plan: ${state.resolved.plan}, active: ${state.resolved.active}`;
+      return `plan: ${state.plan}, active: ${state.active}`;
     });
 
     await harness.step('cancel (confirmed) → webhook flips cancellation.pending', async () => {
@@ -230,8 +233,8 @@ async function main() {
         (s) => s.cancellationPending === true && s.status === 'active',
         'cancellation pending (status stays active until period end)',
       );
-      if (state.resolved.cancelling !== true) {
-        throw new Error(`resolved.cancelling should be true: ${JSON.stringify(state.resolved)}`);
+      if (state.cancelling !== true) {
+        throw new Error(`user.cancelling should be true: ${JSON.stringify(state)}`);
       }
     });
 
@@ -252,8 +255,8 @@ async function main() {
         (s) => s.status === 'cancelled',
         'subscription cancelled after refund webhook',
       );
-      if (state.resolved.active !== false) {
-        throw new Error(`resolved.active should be false: ${JSON.stringify(state.resolved)}`);
+      if (state.active !== false) {
+        throw new Error(`user.active should be false: ${JSON.stringify(state)}`);
       }
       return `refund: ${refund.json.refund.amount} (full)`;
     });

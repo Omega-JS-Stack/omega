@@ -21,6 +21,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { firebaseAuthStub } = require('./lib/firebase-auth-stub.js');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const AUTH_ENTRY = path.join(CORE_DIR, 'js', 'core', 'auth.js');
@@ -74,7 +75,7 @@ function bundleModule(entryPoint, outfile, stubs = []) {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -128,29 +129,28 @@ function makeClient({ policy, roles = null, redirects = {} }) {
       auth: { config: { policy, roles, redirects } },
       analytics: { meta: 'META-PIXEL' },
     },
-    // `signedInUser` is the harness's stand-in for firebase's currentUser: the
-    // signout handler asks whether anybody is signed in before flagging.
-    signedInUser: null,
-    auth: () => ({
+    auth: {
+      // The client's live User: the signout handler asks whether anybody is
+      // signed in before flagging.
+      user: new User(),
       listen: (options, handler) => listeners.push(handler),
       signOut: async () => signOuts.push(true),
-      isAuthenticated: () => !!client.signedInUser,
-    }),
+    },
     isValidRedirectUrl: () => true,
-    notifications: () => ({ subscribe: async () => {} }),
+    notifications: { subscribe: async () => {} },
     // The url rides with the capture: Sentry's httpContext integration reads
     // window.location.href AT CAPTURE TIME, so a key still in the address bar
     // when captureException runs is a key inside the event (#661).
-    sentry: () => ({ captureException: (error) => sentryCaptures.push({ error, url: window.location.href }) }),
-    utilities: () => ({
+    sentry: { captureException: (error) => sentryCaptures.push({ error, url: window.location.href }) },
+    utilities: {
       showNotification: (message, options) => notificationsShown.push({ message, options }),
       getContext: () => ({}),
-    }),
-    storage: () => ({
+    },
+    storage: {
       get: (key, fallback) => fallback,
       set: () => {},
       remove: () => {},
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
 
@@ -211,7 +211,7 @@ async function boot({ href, policy, roles, redirects, pagePath, firebaseAuth }) 
   // macOS's tmpdir is a symlink (/var → /private/var).
   delete require.cache[require.resolve(BUNDLE)];
   delete require.cache[require.resolve(SESSION_PARAMS_BUNDLE)];
-  require(BUNDLE).default();
+  require(BUNDLE).default({ omega: globalThis.__omegaClient });
 
   return {
     navigations,
@@ -244,7 +244,7 @@ test('auth policy: signed out on an authenticated page kicks the user to signin 
     redirects: REDIRECTS,
   });
 
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.deepStrictEqual(navigations, [
     'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount',
@@ -259,7 +259,7 @@ test('auth policy: signed in on an unauthenticated page bounces to the authentic
     pagePath: '/signin',
   });
 
-  await fire({ user: { uid: 'u1', email: 'a@b.co' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1', email: 'a@b.co' }), denied: false });
 
   assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account']);
 });
@@ -272,7 +272,7 @@ test('auth policy: signed in on an unauthenticated page prefers authReturnUrl ov
     pagePath: '/signin',
   });
 
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.deepStrictEqual(navigations, ['https://brand.test/pricing']);
 });
@@ -285,9 +285,9 @@ test('auth policy: a signout in flight with an authReturnUrl keeps the user on t
   });
 
   // The signout pass: still signed in, param present — sets justSignedOut.
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
   // The state change the signout produces: no kick-out, the page re-authenticates.
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.deepStrictEqual(navigations, []);
 });
@@ -299,9 +299,9 @@ test('auth policy: the suppression is one-shot — the next signed-out state sti
     redirects: REDIRECTS,
   });
 
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
-  await fire({ user: null, account: null });
-  await fire({ user: null, account: null });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
+  await fire({ user: new User(), denied: false });
+  await fire({ user: new User(), denied: false });
 
   assert.deepStrictEqual(navigations, [
     'https://brand.test/signin?authReturnUrl=https%3A%2F%2Fbrand.test%2Fdashboard%2Faccount%3FauthSignout%3Dtrue%26authReturnUrl%3Dhttps%253A%252F%252Fbrand.test%252Fdashboard%252Faccount',
@@ -320,13 +320,13 @@ test('auth policy: a stale signed-in state after the authSignout param is stripp
   // already stripped of ?authSignout — so only the flag can catch the stale event.
   window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
 
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.deepStrictEqual(navigations, [], 'the stale signed-in event must not bounce off /signin');
   assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'the flag holds until the signed-out event lands');
 
   // The signed-out event the flag was waiting for: clears it, page stays put.
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
   assert.deepStrictEqual(navigations, []);
@@ -341,7 +341,7 @@ test('auth policy: the signed-out state clears the signout flag and falls throug
 
   window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
 
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
   assert.deepStrictEqual(navigations, [
@@ -360,7 +360,7 @@ test('auth policy: a signed-OUT visit to ?authSignout=true never wedges the next
   // Nobody is signed in — checkout's switch-account link and the legacy reset
   // redirects both land here. signOut() changes no uid, so firebase fires NO
   // state change, so nothing would ever clear a flag set now.
-  client.signedInUser = null;
+  client.auth.user = new User();
 
   await sessionParams.handleAuthSignout();
 
@@ -369,7 +369,7 @@ test('auth policy: a signed-OUT visit to ?authSignout=true never wedges the next
   assert.strictEqual(window.location.href, 'https://brand.test/signin', 'and the param is still stripped');
 
   // The user signs in on this same page load: the policy must still bounce them.
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account'], 'a swallowed sign-in strands the user on /signin');
 });
@@ -381,14 +381,14 @@ test('auth policy: a signed-IN visit to ?authSignout=true still flags the signou
     redirects: REDIRECTS,
   });
 
-  client.signedInUser = { uid: 'u1' };
+  client.auth.user = new User({}, { uid: 'u1' });
 
   await sessionParams.handleAuthSignout();
 
   assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, true, 'a real signout is in flight — the flag guards the stale event');
 
   // The signed-out state change the flag was waiting for clears it.
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.strictEqual(window.__OMEGA_SIGNOUT_IN_PROGRESS, false);
 });
@@ -524,7 +524,7 @@ test('auth policy: a signed-out visitor to a public page stays put', async () =>
     pagePath: '/pricing',
   });
 
-  await fire({ user: null, account: null });
+  await fire({ user: new User(), denied: false });
 
   assert.deepStrictEqual(navigations, []);
 });
@@ -537,7 +537,7 @@ test('auth policy: a signed-in user missing a required role is sent to the authe
     redirects: REDIRECTS,
   });
 
-  await fire({ user: { uid: 'u1' }, account: SETTLED_ACCOUNT });
+  await fire({ user: new User(SETTLED_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.deepStrictEqual(navigations, ['https://brand.test/dashboard/account']);
 });
@@ -560,7 +560,7 @@ test('auth policy: the signup post never blocks the rest of the listener (#700)'
   // A post that never answers: awaiting it would strand the listener here.
   client.blockRequests();
 
-  await fire({ user: { uid: 'u1' }, account: PENDING_ACCOUNT });
+  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.strictEqual(client.requests.length, 1, 'the post still goes out');
   assert.strictEqual(client.requests[0].url, '/omega/user/signup');
@@ -574,7 +574,7 @@ test('auth policy: a doc that is not written yet keeps the user signed in (#700)
     redirects: REDIRECTS,
   });
 
-  await fire({ user: { uid: 'u1' }, account: PENDING_ACCOUNT });
+  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: false });
 
   assert.deepStrictEqual(client.signOuts, [], 'pending is the normal state right after signup');
   assert.deepStrictEqual(client.notificationsShown, [], 'and nothing to tell the user about');
@@ -591,8 +591,8 @@ test('auth policy: a processed doc with no legal consent is no longer signed out
 
   // Exactly what the deleted consent guard kicked out on.
   await fire({
-    user: { uid: 'u1' },
-    account: { flags: { signupProcessed: true }, consent: { legal: { status: 'revoked' } } },
+    user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'revoked' } } }, { uid: 'u1' }),
+    denied: false,
   });
 
   assert.deepStrictEqual(client.signOuts, [], 'the guard is gone — consent is the signup route\'s business');
@@ -607,7 +607,7 @@ test('auth policy: a denied account read signs the user out and posts nothing (#
   });
 
   // The one signal that means a real failure: rules refused the read.
-  await fire({ user: { uid: 'u1' }, account: PENDING_ACCOUNT, accountDenied: true });
+  await fire({ user: new User(PENDING_ACCOUNT, { uid: 'u1' }), denied: true });
 
   assert.deepStrictEqual(client.signOuts, [true]);
   assert.strictEqual(client.notificationsShown.length, 1, 'the user is told, not silently bounced');
@@ -650,9 +650,9 @@ async function bootAuthPage({ href, pagePath, firebaseAuth }) {
 
   // What the boot needs beyond the policy listener's client: the DOM-ready gate
   // it hangs off, the production answer (no dev simulation), and Sentry.
-  client.dom = () => ({ ready: async () => {} });
+  client.dom = { ready: async () => {} };
   client.isDevelopment = () => false;
-  client.sentry = () => ({ captureException: () => {} });
+  client.sentry = { captureException: () => {} };
 
   globalThis.__omegaClient = client;
   globalThis.__firebaseAuth = firebaseAuth;
@@ -660,7 +660,7 @@ async function bootAuthPage({ href, pagePath, firebaseAuth }) {
   delete require.cache[require.resolve(AUTH_PAGES_BUNDLE)];
   require(AUTH_PAGES_BUNDLE).default();
 
-  // The boot is a promise chain off dom().ready() with nothing to await from
+  // The boot is a promise chain off dom.ready() with nothing to await from
   // out here: let it run to its end before reading what the user was left with.
   await new Promise((resolve) => setTimeout(resolve, 50));
 

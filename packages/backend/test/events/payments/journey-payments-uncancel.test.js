@@ -19,7 +19,7 @@
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/uncancel/post.js');
+const handler = require('../../../dist/omega/routes/payments/uncancel/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
@@ -90,19 +90,19 @@ module.exports = defineCases({
 
     {
       name: 'call-uncancel-endpoint',
-      async run({ assert, Manager, state }) {
-        const user = buildUser(Manager, {
+      async run({ assert, omega, state }) {
+        const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-uncancel',
           user,
-          settings: { confirmed: true },
+          data: { confirmed: true },
         });
 
         assert.equal(sent.code, 200, `Uncancel should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);

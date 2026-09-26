@@ -13,13 +13,13 @@ Linux:   ~/.config/<productName>/omega-storage.json
 ## Main-process API (sync, direct disk-backed)
 
 ```js
-manager.storage.get(key, defaultValue)   // any
-manager.storage.set(key, value)
-manager.storage.delete(key)
-manager.storage.has(key)                 // boolean
-manager.storage.clear()
-manager.storage.onChange(key, fn)        // returns unsubscribe fn
-manager.storage.getPath()                // absolute path to omega-storage.json
+omega.storage.get(key, defaultValue)   // any
+omega.storage.set(key, value)
+omega.storage.delete(key)
+omega.storage.has(key)                 // boolean
+omega.storage.clear()
+omega.storage.onChange(key, fn)        // returns unsubscribe fn
+omega.storage.getPath()                // absolute path to omega-storage.json
 ```
 
 ## Renderer-process API (async, proxied through preload + IPC)
@@ -41,19 +41,19 @@ off();
 Keys support dot-notation for nested objects natively:
 
 ```js
-manager.storage.set('window.main.bounds', { x: 10, y: 20, w: 800, h: 600 });
-manager.storage.get('window.main.bounds.w');   // → 800
+omega.storage.set('window.main.bounds', { x: 10, y: 20, w: 800, h: 600 });
+omega.storage.get('window.main.bounds.w');   // → 800
 ```
 
 ## Change broadcasts
 
 Every `set` / `delete` / `clear` in main broadcasts an `desktop:storage:change` IPC event to all renderer windows. The renderer's `window.desktop.storage.onChange` filters by key locally.
 
-In main, `manager.storage.onChange(key, fn)` registers a callback fired with `(value, previous)`.
+In main, `omega.storage.onChange(key, fn)` registers a callback fired with `(value, previous)`.
 
 ## Implementation notes
 
-- Storage initialization is async — `Manager.initialize()` `await`s it before any other lib boots, since features like `app-state` and `windows` rely on it.
+- Storage initialization is async: `omega.initialize()` `await`s it before any other lib boots, since features like `app-state` and `windows` rely on it.
 - IPC handlers (`desktop:storage:get` etc.) are registered on the @omega.js/desktop `ipc` bus, not directly on `ipcMain`. See [ipc.md](ipc.md).
 - The store uses `name: 'omega-storage'` (filename `omega-storage.json`). Don't reuse this name in a separate `electron-store` instance.
 - `electron-store@11` is ESM-only. The bundler inlines it INTO `main.bundle.js` (the static-specifier `import()` in `lib/storage.js`) — consumers install NOTHING; packaged apps carry it inside the bundle with no runtime resolution. (It used to be a runtime import the bundler was told to ignore, which silently no-op'd storage in packaged consumers — @omega.js/desktop is a devDependency and never ships in the asar.)

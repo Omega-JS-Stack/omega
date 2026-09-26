@@ -1,7 +1,7 @@
 // Shared reCAPTCHA v3 management — lazy script load + token mint for any
 // public form that posts to a recaptcha-gated backend route (checkout
 // payment intent, newsletter capture). Site key: omega.config.captcha.providers.recaptcha.siteKey.
-import omega from '@omega.js/client';
+import { loadScript } from '@omega.js/client/modules/dom.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('recaptcha');
@@ -25,10 +25,11 @@ export async function initializeRecaptcha(siteKey) {
   }
 
   try {
-    // Use omega.dom().loadScript()
+    // The client's dom loadScript (the same function as omega.dom.loadScript;
+    // a lib with no entry stays host-neutral, since the extension vendors it)
     const scriptUrl = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
 
-    await omega.dom().loadScript({
+    await loadScript({
       src: scriptUrl,
       async: true,
       defer: true,

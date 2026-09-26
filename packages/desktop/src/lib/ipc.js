@@ -15,7 +15,7 @@
 //   window.desktop.ipc.send(channel, payload)                  // fire-and-forget renderer → main
 //
 // All framework-internal channels are prefixed `desktop:` (e.g. `desktop:storage:get`);
-// the test harness keeps its own `desktop:__test:*` channels (parked internals, like EM_* env vars).
+// the test harness keeps its own `desktop:__test:*` channels (parked internals, like the OMEGA_TEST_* env vars).
 // Consumers can register their own channels under any namespace they want.
 
 const LoggerLite = require('./logger-lite.js');
@@ -24,18 +24,18 @@ const logger = new LoggerLite('ipc');
 
 const ipc = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _handlers:    {}, // channel -> handler fn
   _listeners:   {}, // channel -> Set<fn>
   _ipcMain:     null,
   _electron:    null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (ipc._initialized) {
       return;
     }
 
-    ipc._manager = manager;
+    ipc._omega = omega;
     ipc._electron = require('electron');
     ipc._ipcMain = ipc._electron.ipcMain;
     // No ipcMain in renderer/preload — those contexts use ipcRenderer instead.

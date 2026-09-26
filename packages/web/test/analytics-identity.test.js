@@ -79,7 +79,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
           return { path: CLIENT_ANALYTICS };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -100,7 +100,7 @@ async function boot() {
 
   globalThis.__omegaClient = {
     config: { analytics: { providers: { meta: { id: PIXEL_ID } } } },
-    storage: () => ({ get: (key, fallback) => fallback }),
+    storage: { get: (key, fallback) => fallback },
   };
   globalThis.gtag = (...args) => calls.gtag.push(args);
   globalThis.fbq = (...args) => calls.fbq.push(args);

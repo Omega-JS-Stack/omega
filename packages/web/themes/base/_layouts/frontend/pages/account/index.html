@@ -163,9 +163,9 @@ config:
           <div class="mb-4">
             <div class="d-flex align-items-center">
               <div id="avatar-container" class="me-3 position-relative d-flex align-items-center">
-                <!-- Avatar always available from getUser() -->
+                <!-- Avatar always available from the User's profile -->
                 <div class="avatar avatar-lg rounded-circle overflow-hidden border">
-                  <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ resolved.config.brand.name }} profile picture"/>
+                  <img src="{{ site.omega.placeholder.src }}" data-omega-bind="@attr src auth.user.profile.photoURL" class="object-fit-cover w-100 h-100" alt="{{ resolved.config.brand.name }} profile picture"/>
                 </div>
                 <!-- Active status indicator -->
                 <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -173,7 +173,7 @@ config:
                 </span>
               </div>
               <div>
-                <h5 class="mb-1" data-omega-bind="@text auth.user.displayName">Loading...</h5>
+                <h5 class="mb-1" data-omega-bind="@text auth.user.profile.displayName">Loading...</h5>
                 <small class="text-muted" id="profile-join-date">Member since Loading...</small>
               </div>
             </div>

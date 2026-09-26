@@ -5,6 +5,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const chalk = require('chalk').default;
 const { renderEvent } = require('./render-event.js');
+const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
 
 function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter, projectRoot }) {
   rendererSuiteFiles = rendererSuiteFiles || [];
@@ -59,8 +60,8 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
       while ((nl = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, nl);
         buffer = buffer.slice(nl + 1);
-        if (line.startsWith('__EM_TEST__')) {
-          renderEvent(JSON.parse(line.slice('__EM_TEST__'.length)), counts);
+        if (line.startsWith(TEST_EVENT_PREFIX)) {
+          renderEvent(JSON.parse(line.slice(TEST_EVENT_PREFIX.length)), counts);
         } else if (line.trim().length > 0) {
           // Pass-through other electron stdout (logger lines from @omega.js/desktop init, etc.)
           // Indent so they don't disrupt the layout.

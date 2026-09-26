@@ -1,4 +1,4 @@
-// Import the theme entry point
+// A theme module: the host calls the default export with { omega, options }.
 import bootstrap from './js/index.umd.js';
 
 // Make Bootstrap available globally
@@ -12,5 +12,5 @@ window.bootstrap = bootstrap;
 /* @dev-only:end */
 
 // Add any custom code here
-// ...
+export default async function ({ omega, options }) {}
 

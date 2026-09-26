@@ -11,14 +11,14 @@
 // collapsing).
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import autosizeShowcaseFrames from '__main_assets__/js/libs/showcase-frames.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     autosizeShowcaseFrames();
 

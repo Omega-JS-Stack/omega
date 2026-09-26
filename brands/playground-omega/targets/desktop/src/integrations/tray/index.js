@@ -1,6 +1,9 @@
+// Surface: the tray (a file-based definition), with one live item, "Notes: N"
+// Doc: node_modules/@omega.js/desktop/docs/tray.md
+//
 // Tray definition. Called by @omega.js/desktop during boot.
 //
-// `manager` — the running @omega.js/desktop Manager.
+// `omega`: the running @omega.js/desktop main-process instance.
 // `tray`    — builder API + id-path API (find/update/remove/insertAfter/etc.).
 //
 // @omega.js/desktop auto-resolves the tray icon by convention (most specific wins):
@@ -19,13 +22,23 @@
 //
 // This file is OPTIONAL — delete it and @omega.js/desktop still ships a working tray.
 
-module.exports = ({ manager, tray }) => {
+const { trayLabel } = require('../../lib/notes.js');
+
+module.exports = ({ omega, tray }) => {
   // Use @omega.js/desktop's default template + auto-resolved icon + auto-resolved tooltip.
   tray.useDefaults();
 
+  // The notes count. A function label is re-read on every refresh, and
+  // src/lib/notes.js refreshes the tray each time the renderer reports a count.
+  tray.insertAfter('open', {
+    id: 'notes',
+    label: () => trayLabel(omega),
+    click: () => omega.windows.show('main'),
+  });
+
   // ───────── Examples (uncomment to use) ─────────
   //
-  // // Override the icon path (otherwise auto-resolved from config/icons/macos/tray.png).
+  // // Override the icon path (otherwise auto-resolved from config/icons/mac/tray.png).
   // // On macOS, the filename MUST end in `Template.png` for OS dark-mode auto-inversion.
   // tray.icon('src/assets/icons/my-trayTemplate.png');
   //
@@ -36,7 +49,7 @@ module.exports = ({ manager, tray }) => {
   // tray.insertAfter('open', {
   //   id: 'dashboard',
   //   label: 'Open Dashboard',
-  //   click: () => manager.windows.show('dashboard'),
+  //   click: () => omega.windows.show('dashboard'),
   // });
   //
   // // Rename an existing item:

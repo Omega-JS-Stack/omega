@@ -30,7 +30,7 @@
 import Utilities from './utilities.js';
 
 // Escaping is utilities' job, never this module's. The helpers are pure — they
-// touch no manager state — so a manager-free instance is the whole dependency.
+// touch no Omega instance state, so a standalone Utilities is the whole dependency.
 const { escapeHTML } = new Utilities();
 
 /** What swap last wrote into each host, keyed by the element itself. */

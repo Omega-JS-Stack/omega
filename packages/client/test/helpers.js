@@ -14,18 +14,19 @@ const TEST_CONFIG = {
   sentry: { enabled: false },
 };
 
-// Manager singleton
-let Manager;
+// The one Omega instance the suites share. The package exports the class and
+// no instance, so the harness builds it the way a framework does.
+let omega;
 
-function getManager() {
-  return Manager;
+function getOmega() {
+  return omega;
 }
 
 // Root hooks — registered on require, so every test file that pulls the
-// helpers in gets the same pre-suite Manager load and per-test storage reset.
+// helpers in gets the same pre-suite instance and per-test storage reset.
 before(async () => {
-  const mod = await import('../src/index.js');
-  Manager = mod.default;
+  const { Omega } = await import('../src/index.js');
+  omega = new Omega();
 });
 
 beforeEach(() => {
@@ -38,8 +39,8 @@ beforeEach(() => {
 // `initialize()` arms the refresh-new-version interval, which lives for the
 // page's lifetime in a browser and would hold the test process open forever.
 after(() => {
-  if (Manager?._versionCheckInterval) {
-    clearInterval(Manager._versionCheckInterval);
+  if (omega?._versionCheckInterval) {
+    clearInterval(omega._versionCheckInterval);
   }
 });
 
@@ -64,6 +65,6 @@ function setPathPrefix(prefix) {
 module.exports = {
   TEST_CONFIG,
   assert,
-  getManager,
+  getOmega,
   setPathPrefix,
 };

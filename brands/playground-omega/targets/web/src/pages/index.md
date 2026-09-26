@@ -108,6 +108,15 @@ items:
     label: "Real customers"
     sublabel: "Everything here is test data"
 {% endsection %}
+<!-- ═══ Notes demo: one feature wired through every surface ═══ -->
+{% section "marketing/prose" %}
+superheadline: "See it wired"
+headline: "One feature,"
+headline_accent: "every surface"
+subheadline: "Notes runs a route, a schema, a trigger and a rule behind one page."
+body:
+  - "Sign in and open <a href=\"/notes\">the notes demo</a>: every note you write goes through the {{ resolved.config.brand.name }} backend and comes back live."
+{% endsection %}
 <!-- ═══ CTA band ═══ -->
 {% section "marketing/cta" %}
 superheadline:

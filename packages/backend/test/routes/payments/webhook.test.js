@@ -18,7 +18,7 @@ module.exports = defineCases({
       name: 'rejects-missing-provider',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/webhook', {});
+        const response = await http.as('none').post('omega/payments/webhook', {});
 
         assert.isError(response, 400, 'Should reject missing provider');
       },
@@ -28,7 +28,7 @@ module.exports = defineCases({
       name: 'rejects-invalid-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/webhook?provider=stripe&key=wrong-key', {});
+        const response = await http.as('none').post('omega/payments/webhook?provider=stripe&key=wrong-key', {});
 
         assert.isError(response, 401, 'Should reject invalid key');
       },
@@ -38,7 +38,7 @@ module.exports = defineCases({
       name: 'rejects-unknown-provider',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: 'evt_test_unknown',
           type: 'test.event',
           data: { object: {} },
@@ -66,7 +66,7 @@ module.exports = defineCases({
         };
 
         const response = await http.as('none').post(
-          `backend-manager/payments/webhook?provider=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/payments/webhook?provider=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           payload,
         );
 
@@ -92,7 +92,7 @@ module.exports = defineCases({
 
         // Use the test provider so the on-write trigger doesn't require STRIPE_SECRET_KEY
         // (a failed first webhook would let the dedup-retry branch fire instead of returning duplicate=true)
-        const send = () => http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const send = () => http.as('none').post(`omega/payments/webhook?provider=test&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: eventId,
           type: 'customer.subscription.updated',
           data: {

@@ -2,7 +2,7 @@
 
 The `POST /admin/post` route creates blog posts via GitHub's API. It handles image extraction, resize, upload, and body rewriting.
 
-**Consumers.** Besides direct admin/blogger HTTP calls, this route is the publish target for the **Ghostii article engine** (`src/manager/libraries/content/ghostii.js` → `publishArticle()`), which is used by two paths: the standalone daily `blog-auto-publisher.js` cron (off by default), and the newsletter generator's linked-article flow (`marketing.newsletter.content.article.enabled`). Both POST `title`/`url`/`description`/`headerImageURL`/`body`/`author`/`categories`/`tags`/`postPath`, admin-authenticated via the `omega-admin-key` header. **The target repo is never part of the request** — the route always derives owner/repo from its own brand config, so a blogger-role caller can't redirect a write at another repo the shared `GH_TOKEN` can reach (caller-supplied `githubUser`/`githubRepo` were removed from the schemas). Note: `headerImageURL` MUST resolve to a `.jpg` (the downloader rejects non-`.jpg` headers); Ghostii's `unsplash` hero satisfies this. See [docs/marketing-campaigns.md](marketing-campaigns.md).
+**Consumers.** Besides direct admin/blogger HTTP calls, this route is the publish target for the **Ghostii article engine** (`src/omega/libraries/content/ghostii.js` → `publishArticle()`), which is used by two paths: the standalone daily `blog-auto-publisher.js` cron (off by default), and the newsletter generator's linked-article flow (`marketing.newsletter.content.article.enabled`). Both POST `title`/`url`/`description`/`headerImageURL`/`body`/`author`/`categories`/`tags`/`postPath`, admin-authenticated via the `omega-admin-key` header. **The target repo is never part of the request**: the route always derives owner/repo from its own brand config, so a blogger-role caller can't redirect a write at another repo the shared `GH_TOKEN` can reach (caller-supplied `githubUser`/`githubRepo` were removed from the schemas). Note: `headerImageURL` MUST resolve to a `.jpg` (the downloader rejects non-`.jpg` headers); Ghostii's `unsplash` hero satisfies this. See [docs/marketing-campaigns.md](marketing-campaigns.md).
 
 **Ghostii is unopinionated about @omega.js/backend.** Its `/write/article` response is a generic article — a `json` block array (`[{ name, content }]` where name ∈ `heading-1..6`/`image`/`paragraph`/`blockquote`/`list`) plus top-level `title`/`description`/`headerImageUrl`/`images`/`categories`/`keywords`. @omega.js/backend owns the transform into this route's shape: `blocksToPost(article.json)` extracts the `heading-1` as the title, the first `image` block as `headerImageURL`, and joins every remaining block as the `body` (content only — NO title, NO header image embedded, since this route adds those itself; section images stay in the body and are extracted normally). Older Ghostii responses without `json` fall back to the flat `article.{title,body,headerImageUrl}` fields.
 
@@ -10,7 +10,7 @@ The `POST /admin/post` route creates blog posts via GitHub's API. It handles ima
 
 A brand's website lives at `targets/<name>/` inside the source monorepo, and ONE backend serves every website the brand runs ([#887](https://github.com/Omega-JS-Stack/omega/issues/887)). So every CMS route that touches repo content takes a `target` naming the web target (the `targets` key, [#886](https://github.com/Omega-JS-Stack/omega/issues/886)): `POST`/`PUT /admin/post`, `POST /admin/repo/content`, and `GET /content/post`.
 
-The one-or-many rule, in `src/manager/helpers/web-target.js` (`resolveWebTarget`), is the same on all four:
+The one-or-many rule, in `src/omega/helpers/web-target.js` (`resolveWebTarget`), is the same on all four:
 
 - A brand with exactly ONE web target may omit it, and that target is the answer.
 - A brand with SEVERAL requires it: a missing name answers 400 listing the declared web targets, and so does a name nobody declared. Nothing is guessed.
@@ -51,9 +51,9 @@ Two defenses:
 The resize happens in `downloadImage()` (after the `.jpg` extension check, before returning to the caller), so:
 - The base64 content that gets committed to GitHub is the resized version
 - The consumer repo never sees the giant source
-- Future downstream optimization (UJM imagemin, etc.) starts from a sane source size
+- Future downstream optimization (web's imagemin, etc.) starts from a sane source size
 
-Constants live in `src/manager/routes/admin/post/post.js` (UJM's `imagemin.js` uses the same names and values):
+Constants live in `src/omega/routes/admin/post/post.js` (web's `imagemin.js` uses the same names and values):
 ```js
 const IMAGE_MAX_DIMENSION = 2048;
 const IMAGE_JPEG_QUALITY = 80;
@@ -71,8 +71,8 @@ If these need to become configurable later, promote to `config/omega.json5` rath
 
 ## Files
 
-- `src/manager/routes/admin/post/post.js` — POST handler (create), includes `downloadImage()` + `resizeImage()` helpers
-- `src/manager/routes/admin/post/put.js` — PUT handler (edit) — does NOT download images, just edits frontmatter/body in place
-- `src/manager/routes/admin/post/templates/post.html` — Post template
-- `src/manager/helpers/web-target.js`: `resolveWebTarget()`, the one-or-many rule every CMS route resolves its target through, and `cmsContext()`, the one call each route makes for both facts it needs before touching content (the source repo it commits to, and that target): a response-shaped 500 when the brand names no repo, the same 400s otherwise
+- `src/omega/routes/admin/post/post.js`: POST handler (create), includes `downloadImage()` + `resizeImage()` helpers
+- `src/omega/routes/admin/post/put.js`: PUT handler (edit); does NOT download images, just edits frontmatter/body in place
+- `src/omega/routes/admin/post/templates/post.html`: Post template
+- `src/omega/helpers/web-target.js`: `resolveWebTarget()`, the one-or-many rule every CMS route resolves its target through, and `cmsContext()`, the one call each route makes for both facts it needs before touching content (the source repo it commits to, and that target): a response-shaped 500 when the brand names no repo, the same 400s otherwise
 - `test/helpers/web-target.test.js`, `test/routes/admin/cms-target-paths.test.js`, `test/routes/content/post-target-scope.test.js`: the target rule, the committed paths, and the scoped read

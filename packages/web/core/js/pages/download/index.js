@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
@@ -19,7 +19,7 @@ import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupPlatformDetection();
     setupDownloadTracking();
@@ -88,7 +88,7 @@ const config = {
 // label, href, and platform mark come from the detected platform's card. No
 // card or no configured URL → the "See every download" fallback stays.
 function setupPlatformDetection() {
-  const detectedPlatform = omega.utilities().getPlatform();
+  const detectedPlatform = omega.utilities.getPlatform();
   console.log('Detected platform:', detectedPlatform);
 
   const $hero = document.getElementById('download-hero');
@@ -313,7 +313,7 @@ function setupCopyButtons() {
       }
 
       try {
-        await omega.utilities().clipboardCopy($input);
+        await omega.utilities.clipboardCopy($input);
 
         const $text = this.querySelector('.button-text');
         const originalText = $text.textContent;
@@ -343,7 +343,7 @@ function setupAutoDownload() {
   }
 
   // Find the first download link in the detected platform's card
-  const detectedPlatform = omega.utilities().getPlatform();
+  const detectedPlatform = omega.utilities.getPlatform();
   const $pane = document.querySelector(`[data-download-card][data-platform="${detectedPlatform}"]`);
 
   if (!$pane) {
@@ -389,7 +389,7 @@ function setupMobileEmailForms() {
   }
 
   $forms.forEach($form => {
-    const formManager = new FormManager(`#${$form.id}`, {
+    const formManager = new FormManager(omega, `#${$form.id}`, {
       allowResubmit: false,
       submittingText: 'Sending...',
       submittedText: 'Email Sent!',

@@ -33,7 +33,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 const { resolveWinbackOffer } = require('@omega.js/config/winback');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
@@ -57,7 +57,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -116,7 +116,7 @@ const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
  * at all and the pitch is gated on them ([#311]).
  */
 function paidAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -124,12 +124,12 @@ function paidAccount(subscription) {
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /** A live trial: #267's warning owns this path, and no discount is pitched. */
 function trialingAccount() {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -137,7 +137,7 @@ function trialingAccount() {
       expires: { timestampUNIX: WEEK_FROM_NOW },
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /**
@@ -262,12 +262,11 @@ async function wireCancelFlow(account, { winback, requestFails, without = [] } =
     },
   };
   globalThis.__omegaClient = {
-    auth: () => ({ resolveSubscription: (a) => resolveSubscription(a) }),
-    bindings: () => ({ update: (state) => updates.push(state) }),
-    utilities: () => ({
+    bindings: { update: (state) => updates.push(state) },
+    utilities: {
       showNotification: (message, type) => notifications.push({ message, type }),
       escapeHTML: (v) => v,
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
 
@@ -732,7 +731,7 @@ test('#311: a refusal a retry CAN fix keeps the offer armed', async () => {
 
 test('#268: a state that cannot cancel is never offered anything', async () => {
   const cases = [
-    { what: 'a free account', account: { subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } } },
+    { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
     { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
     { what: 'a subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
   ];

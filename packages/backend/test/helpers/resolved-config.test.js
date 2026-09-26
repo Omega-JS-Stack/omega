@@ -11,7 +11,7 @@
  * block derives ([#883](https://github.com/Omega-JS-Stack/omega/issues/883):
  * `<brand.id>-omega` under `repo.org`, loaded by the real loader), and it IS
  * @omega.js/config's own derivation rather than a second implementation living
- * here. The booted Manager carries the group, which is the surface consumer
+ * here. The booted Omega instance carries the group, which is the surface consumer
  * code actually reads.
  *
  * Run: npx omega test backend:helpers/resolved-config
@@ -19,7 +19,7 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const { resolvedConfigValues } = require('../../dist/manager/helpers/resolved-config.js');
+const { resolvedConfigValues } = require('../../dist/omega/helpers/resolved-config.js');
 const { loadConfig, sourceRepo } = require('./_shared-config.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -92,10 +92,10 @@ module.exports = defineCases({
       name: 'booted-manager-publishes-the-group',
       auth: 'none',
 
-      async run({ assert, Manager }) {
-        // The surface consumer code reads: `Manager.config.resolved.github.slug`
+      async run({ assert, omega }) {
+        // The surface consumer code reads: `omega.config.resolved.github.slug`
         // on the config object every route/hook/cron already receives.
-        assert.deepEqual(Manager.config.resolved.github, sourceRepo(Manager.config), 'the booted value must be the config package derivation');
+        assert.deepEqual(omega.config.resolved.github, sourceRepo(omega.config), 'the booted value must be the config package derivation');
       },
     },
   ],

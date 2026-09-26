@@ -4,16 +4,21 @@ Inside-the-handler patterns for the most frequent operations. See [docs/routes.m
 
 ## Authenticate User
 
+The pipeline authenticates before the route runs, so the route reads the caller off its argument (`ctx.user` is the same `User`):
+
 ```javascript
-const user = await ctx.authenticate();
-if (!user.authenticated) {
-  return ctx.report('Authentication required', { code: 401 });
-}
+module.exports = async ({ ctx, user }) => {
+  if (!user.authenticated) {
+    return ctx.respond('Authentication required', { code: 401 });
+  }
+};
 ```
+
+`ctx.authenticate()` resolves the caller into `ctx.user` for code that runs outside the pipeline, and settles once per request.
 
 ### A missing user doc heals here
 
-A verified ID token whose `users/{uid}` doc is gone is a database out of sync with Auth, not a caller to turn away ([#405](https://github.com/Omega-JS-Stack/omega/issues/405)). `authenticate()` recreates the doc `auth:on-create` writes at signup, built from the Auth record by the one shared builder in [src/manager/libraries/user-doc.js](../src/manager/libraries/user-doc.js), warns naming the uid, and then authenticates the caller normally, so every signed-in surface heals at the same seam. A doc that exists but carries no `auth.uid` counts as missing **to the heal**: that is the residue `auth:before-signin` leaves on a doc-less account, and it is what the heal completes into a real account doc. Whether the caller authenticates is a separate question with an unchanged answer: a doc that exists at all authenticates its caller, healed or not. The healed doc is stamped `metadata.tag: 'auth:heal'` and `flags.signupProcessed: true`, since an established account must not be sent back through the signup flow (welcome emails, affiliate credit, marketing sync) on its next page load.
+A verified ID token whose `users/{uid}` doc is gone is a database out of sync with Auth, not a caller to turn away ([#405](https://github.com/Omega-JS-Stack/omega/issues/405)). `authenticate()` recreates the doc `auth:on-create` writes at signup, built from the Auth record by the one shared builder in [src/omega/libraries/user-doc.js](../src/omega/libraries/user-doc.js), warns naming the uid, and then authenticates the caller normally, so every signed-in surface heals at the same seam. A doc that exists but carries no `auth.uid` counts as missing **to the heal**: that is the residue `auth:before-signin` leaves on a doc-less account, and it is what the heal completes into a real account doc. Whether the caller authenticates is a separate question with an unchanged answer: a doc that exists at all authenticates its caller, healed or not. The healed doc is stamped `metadata.tag: 'auth:heal'` and `flags.signupProcessed: true`, since an established account must not be sent back through the signup flow (welcome emails, affiliate credit, marketing sync) on its next page load.
 
 Three accounts are never healed, so the heal only ever completes an account that should already have a doc:
 
@@ -26,7 +31,7 @@ A declined heal changes nothing about the request: the caller is answered on the
 ## Read/Write Firestore
 
 ```javascript
-const { admin } = Manager.libraries;
+const admin = omega.firebase.admin;
 
 // Read
 const doc = await admin.firestore().doc('users/abc123').get();
@@ -39,11 +44,12 @@ await admin.firestore().doc('users/abc123').set({ field: 'value' }, { merge: tru
 ## Handle Errors
 
 ```javascript
-// Send error response
-ctx.report('Something went wrong', { code: 500, sentry: true });
+// Send an error response (a 5xx is captured to Sentry, a 4xx never is)
+return ctx.respond(new Error('Something went wrong'), { code: 500 });
 
-// Or throw to reject
-return reject(ctx.report('Bad request', { code: 400 }));
+// Or throw: report() decorates, logs and captures without sending, and the
+// pipeline answers a thrown error with its own code
+throw ctx.report('Bad request', { code: 400 });
 ```
 
 ## Send Response

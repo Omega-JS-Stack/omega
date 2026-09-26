@@ -1,11 +1,11 @@
 /**
  * Shared harness for the payments-route suites that call a handler DIRECTLY.
  *
- * The technique, for the routes that need a `user`: a real ctx from
- * Manager.RouteContext(), a real user built the
- * way `ctx.authenticate()` builds one (Manager.User(doc).properties, then the
- * `authenticated` flag it sets outside the schema), and only `res` as a
- * stand-in — the external sink respond() writes to, per the no-mock doctrine.
+ * The technique, for the routes that need a `user`: a real Context, a real
+ * user built the way `ctx.authenticate()` builds one (a `User` from
+ * @omega.js/account, carrying the authenticated verdict the lanes reached), and
+ * only `res` as a stand-in: the external sink respond() writes to, per the
+ * no-mock doctrine.
  *
  * Direct calls are the honest layer for these cases: they let one test choose a
  * provider and a subscription shape without minting a persona per permutation,
@@ -16,6 +16,9 @@
  */
 
 // A minimal express-shaped response recorder — the one external sink respond() writes to.
+const { User } = require('../../../dist/omega/helpers/account.js');
+const Context = require('../../../dist/omega/context.js');
+
 function recordingResponse() {
   const sent = { code: null, body: null, headers: {} };
 
@@ -44,15 +47,17 @@ function recordingResponse() {
 /**
  * Build a resolved user exactly the way authenticate() does.
  *
- * @param {object} Manager - The @omega.js/backend Manager
  * @param {object} doc - The user document shape (auth, roles, subscription, …)
- * @returns {object} The resolved user a route handler receives
+ * @returns {User} The resolved user a route handler receives
  */
-function buildUser(Manager, doc) {
-  const user = Manager.User(doc).properties;
+function buildUser(doc) {
+  const user = new User(doc);
+  const authenticated = doc.authenticated !== false;
 
-  // authenticate() sets this OUTSIDE the account schema — mirror it exactly
-  user.authenticated = doc.authenticated !== false;
+  // authenticate()'s verdict wins over the getter's uid rule, as it does there
+  if (user.authenticated !== authenticated) {
+    Object.defineProperty(user, 'authenticated', { value: authenticated, writable: true });
+  }
 
   return user;
 }
@@ -109,15 +114,15 @@ const PRODUCTION_ENVIRONMENT = {
  * Call a route handler directly against a real ctx.
  *
  * @param {object} options
- * @param {object} options.Manager - The @omega.js/backend Manager
+ * @param {object} options.omega - The Omega instance
  * @param {Function} options.handler - The route handler module
  * @param {string} options.functionName - The ctx's function-name tag
  * @param {object} [options.user] - A user built by buildUser()
- * @param {object} [options.settings] - The resolved request settings
+ * @param {object} [options.data] - The resolved request input
  * @param {object} [options.req] - Request overrides (query, headers, body, rawBody)
  * @returns {Promise<object>} What the handler sent: { code, body, headers }
  */
-async function callHandler({ Manager, handler, functionName, user, settings, req }) {
+async function callHandler({ omega, handler, functionName, user, data, req }) {
   const res = recordingResponse();
   const request = {
     method: 'POST',
@@ -126,14 +131,13 @@ async function callHandler({ Manager, handler, functionName, user, settings, req
     body: {},
     ...(req || {}),
   };
-  const ctx = Manager.RouteContext({ req: request, res }, { functionName });
+  const ctx = new Context(omega, { req: request, res }, { functionName });
 
   await handler({
     ctx,
-    Manager,
+    omega,
     user,
-    settings,
-    libraries: Manager.libraries,
+    data,
   });
 
   return res.sent;

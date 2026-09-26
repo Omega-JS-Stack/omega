@@ -16,7 +16,7 @@ module.exports = defineCases({
     {
       name: 'lists-users-with-auth-join',
       async run({ http, assert }) {
-        const response = await http.as('admin').get('backend-manager/admin/users/list', { limit: 5 });
+        const response = await http.as('admin').get('omega/admin/users/list', { limit: 5 });
 
         assert.isSuccess(response, 'Route responds');
         assert.ok(Array.isArray(response.data.users), 'users is an array');
@@ -34,7 +34,7 @@ module.exports = defineCases({
     {
       name: 'search-filters-by-email-prefix',
       async run({ http, assert }) {
-        const response = await http.as('admin').get('backend-manager/admin/users/list', { search: '_test.admin' });
+        const response = await http.as('admin').get('omega/admin/users/list', { search: '_test.admin' });
 
         assert.isSuccess(response, 'Route responds');
         assert.ok(Array.isArray(response.data.users), 'users is an array');
@@ -49,13 +49,13 @@ module.exports = defineCases({
     {
       name: 'cursor-pagination-advances',
       async run({ http, assert }) {
-        const page1 = await http.as('admin').get('backend-manager/admin/users/list', { limit: 2 });
+        const page1 = await http.as('admin').get('omega/admin/users/list', { limit: 2 });
 
         assert.isSuccess(page1, 'page 1 responds');
         assert.ok(page1.data.users.length === 2, 'page 1 is full');
         assert.ok(typeof page1.data.nextCursor === 'string' && page1.data.nextCursor.length, 'full page carries nextCursor');
 
-        const page2 = await http.as('admin').get('backend-manager/admin/users/list', { limit: 2, startAfter: page1.data.nextCursor });
+        const page2 = await http.as('admin').get('omega/admin/users/list', { limit: 2, startAfter: page1.data.nextCursor });
 
         assert.isSuccess(page2, 'page 2 responds');
         assert.ok(page2.data.users.length > 0, 'page 2 has rows');

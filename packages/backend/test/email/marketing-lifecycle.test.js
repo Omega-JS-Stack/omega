@@ -24,7 +24,7 @@ module.exports = defineCases({
         state.testEmail = testEmail;
 
         // Delete from all providers — handles "not found" gracefully
-        await http.delete('backend-manager/marketing/contact', { email: testEmail }).catch(() => {});
+        await http.delete('omega/marketing/contact', { email: testEmail }).catch(() => {});
       },
     },
 
@@ -34,7 +34,7 @@ module.exports = defineCases({
       auth: 'admin',
 
       async run({ http, assert, state, config }) {
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: state.testEmail,
           firstName: 'Lifecycle',
           lastName: 'Test',
@@ -67,17 +67,17 @@ module.exports = defineCases({
       name: 'sync-contact-by-uid',
       auth: 'admin',
 
-      async run({ http, assert, accounts, config, Manager }) {
+      async run({ http, assert, accounts, config, omega }) {
         // Dedicated journey account — its _test.allow_* prefix bypasses validation, and the
         // cleanup step's DELETE revokes its doc consent, so it must not be a shared sentinel
         // (consent-granted is used by the signup + consent-lifecycle suites).
         const grantedUid = accounts['journey-marketing-sync'].uid;
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
         await admin.firestore().doc(`users/${grantedUid}`).set({
           consent: { marketing: { status: 'granted' } },
         }, { merge: true });
 
-        const response = await http.put('backend-manager/marketing/contact', {
+        const response = await http.put('omega/marketing/contact', {
           uid: grantedUid,
         });
 
@@ -102,7 +102,7 @@ module.exports = defineCases({
       auth: 'admin',
 
       async run({ http, assert, state, config }) {
-        const response = await http.delete('backend-manager/marketing/contact', {
+        const response = await http.delete('omega/marketing/contact', {
           email: state.testEmail,
         });
 
@@ -130,7 +130,7 @@ module.exports = defineCases({
       auth: 'admin',
 
       async run({ http, accounts }) {
-        await http.delete('backend-manager/marketing/contact', {
+        await http.delete('omega/marketing/contact', {
           email: accounts['journey-marketing-sync'].email,
         }).catch(() => {});
       },

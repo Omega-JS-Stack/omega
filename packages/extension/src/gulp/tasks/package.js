@@ -1,7 +1,7 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('package');
-const watcherLogger = Manager.logger('package:watcher');
+const build = require('../../build.js');
+const logger = build.logger('package');
+const watcherLogger = build.logger('package:watcher');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series, parallel, watch } = require('gulp');
@@ -11,9 +11,9 @@ const { CLASSIC_DEV_ORIGIN } = require('@omega.js/config');
 const { listingId, deriveFirefoxId } = require('../../lib/listings.js');
 
 // Load package
-const project = Manager.getPackage('project');
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
+const project = build.getPackage('project');
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
 
 // Glob
 const input = [
@@ -154,15 +154,15 @@ function externallyConnectableOrigins() {
 
   if (brandOrigin) {
     origins.push(`${brandOrigin}/*`);
-  } else if (Manager.isBuildMode()) {
+  } else if (build.isBuildMode()) {
     logger.warn('externally_connectable: no brand.url in config/omega.json5, so the packaged extension declares no messaging origin — your site will not be able to message it');
   }
 
   // The dev-website origin is BUILD-TIME-BAKED by design (N7 non-goal: a shipped
   // extension can't probe ports): the origin the LIVE sibling website published,
   // or the classic default when nothing is up (#262).
-  if (!Manager.isBuildMode()) {
-    origins.push(`${Manager.getDevWebsiteOrigin() || CLASSIC_DEV_ORIGIN}/*`);
+  if (!build.isBuildMode()) {
+    origins.push(`${build.getDevWebsiteOrigin() || CLASSIC_DEV_ORIGIN}/*`);
   }
 
   return origins;
@@ -406,7 +406,7 @@ async function packageZip() {
   logger.log(`Zipping raw packages...`);
 
   // Skip if not in build mode
-  if (!Manager.isBuildMode()) {
+  if (!build.isBuildMode()) {
     logger.log(`Skipping zip (not in build mode)`);
     return;
   }
@@ -445,7 +445,7 @@ async function packageSource() {
     const sourceZipPath = 'packaged/source.zip';
 
     // Only in build mode
-    if (!Manager.isBuildMode()) {
+    if (!build.isBuildMode()) {
       logger.log(`Skipping source zip (not in build mode)`);
       return;
     }
@@ -500,7 +500,7 @@ function liveReload() {
   logger.log('Reloading live server clients...');
 
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     return logger.log('Skipping live reload in build mode');
   }
 
@@ -624,14 +624,14 @@ async function packageFn(complete) {
     return complete();
   } catch (error) {
     // Handle any errors that occur during package build
-    return Manager.reportBuildError(Object.assign(error, { plugin: 'Package' }), complete);
+    return build.reportBuildError(Object.assign(error, { plugin: 'Package' }), complete);
   }
 }
 
 // Watcher Task
 function packageFnWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
@@ -695,19 +695,19 @@ async function hook(file, ctx) {
   }
 
   // Execute hook — the ONE hook-argument shape across OMEGA frameworks: the same
-  // `{ manager, projectRoot, mode }` ctx @omega.js/desktop hands its lifecycle
+  // `{ build, projectRoot, mode }` ctx @omega.js/desktop hands its lifecycle
   // hooks. This used to pass the package task's internal watch counter while both
   // docs described a build-info object nothing ever built, so a hook written from
   // the docs read `undefined` at its first property (#591). Everything those docs
-  // promised is reachable through `manager` (getManifest/getConfig/getPackage).
+  // promised is reachable through `build` (getManifest/getConfig/getPackage).
   try {
     return await hook({
-      manager: Manager,
+      build,
       projectRoot: process.cwd(),
       // Build mode answers the BUILD lane's hooks. A caller that knows better
       // says so: the deploy verb's hook runs outside a build and what it is
       // about to publish is a release, so it names `production` itself.
-      mode: Manager.isBuildMode() ? 'production' : 'development',
+      mode: build.isBuildMode() ? 'production' : 'development',
       ...(ctx || {}),
     });
   } catch (e) {

@@ -1,11 +1,12 @@
-// Backend URL helpers, shared across BXM's context Managers. Mirrors
+// Backend URL helpers: plain functions the context `Omega` base class
+// (src/omega.js) calls. Mirrors
 // @omega.js/desktop's src/utils/url-helpers.js (the SSOT for this contract) so
-// BXM apps hit the same dev/prod backends as EM and UJM consumers — currently
+// extensions hit the same dev/prod backends as desktop and web consumers — currently
 // the getApiUrl subset; add the sibling helpers here when a caller needs them.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in
-// src/utils/mode-helpers.js. getApiUrl() routes through `this.getEnvironment()`
-// and resolves to LOCAL urls in BOTH development AND testing — callers normally
+// src/utils/mode-helpers.js. getApiUrl() routes through the context's
+// `getEnvironment()` and resolves to LOCAL urls in BOTH development AND testing — callers normally
 // pass NO argument; an explicit `environment` arg is an override (used mainly by
 // tests to pin a specific environment's mapping).
 //
@@ -52,8 +53,15 @@ function requiredPort(context, envName, name) {
   return port;
 }
 
-function getApiUrl(environment) {
-  const env = environment || this.getEnvironment();
+/**
+ * The API base for a context: the local stack in development and testing, the
+ * brand's api subdomain in production.
+ * @param {object} context - the `Omega` instance (its `config` and `getEnvironment()`).
+ * @param {string} [environment] - an override of the running environment.
+ * @returns {string} the API base URL.
+ */
+function getApiUrl(context, environment) {
+  const env = environment || context.getEnvironment();
 
   // Local for development OR testing; production otherwise. Mirrors
   // @omega.js/backend's getApiUrl (N7): a published OMEGA_HTTPS_PORT means
@@ -61,16 +69,16 @@ function getApiUrl(environment) {
   // hosting emulator (env port, then baked port). Neither resolved is a broken
   // build, not a case to assume the classic 5002 through (#834).
   if (env === 'development' || env === 'testing') {
-    const httpsPort = localPort(this, 'OMEGA_HTTPS_PORT', 'https');
+    const httpsPort = localPort(context, 'OMEGA_HTTPS_PORT', 'https');
     return httpsPort
       ? `https://localhost:${httpsPort}`
-      : `http://localhost:${requiredPort(this, 'OMEGA_HOSTING_PORT', 'hosting')}`;
+      : `http://localhost:${requiredPort(context, 'OMEGA_HOSTING_PORT', 'hosting')}`;
   }
 
   // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
   // from authDomain — it is an auth concern (the brand host, with /__/auth/*
   // self-hosted at build time) and must stay free to change independently.
-  const brandUrl = this?.config?.brand?.url;
+  const brandUrl = context.config.brand?.url;
   if (!brandUrl) {
     throw new Error('brand.url not set in config/omega.json5');
   }
@@ -78,16 +86,7 @@ function getApiUrl(environment) {
   return `https://api.${new URL(brandUrl).hostname}`;
 }
 
-// Mix the URL helpers into a Manager constructor's prototype + the constructor
-// itself. These call `this.getEnvironment()`, so mode-helpers' attachTo() must
-// run before (or alongside) this one.
-function attachTo(Manager) {
-  Manager.prototype.getApiUrl = getApiUrl;
-  Manager.getApiUrl = getApiUrl;
-}
-
 module.exports = {
-  attachTo,
   localPort,
   requiredPort,
   getApiUrl,

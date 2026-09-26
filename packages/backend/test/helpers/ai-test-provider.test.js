@@ -6,12 +6,12 @@
  * user message. These tests exercise the full request() surface directly —
  * no network involved by design.
  */
-const TestProvider = require('../../dist/manager/libraries/ai/providers/test.js');
+const TestProvider = require('../../dist/omega/libraries/ai/providers/test.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { parseScript } = TestProvider._internals;
 
 function makeProvider() {
-  // No Manager — the provider falls back to the OMEGA_TEST_MODE signal, which the
+  // No Omega instance — the provider falls back to the OMEGA_TEST_MODE signal, which the
   // test runner sets
   return new TestProvider({});
 }

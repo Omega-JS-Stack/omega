@@ -22,7 +22,7 @@
  * Company hop — the consumer side is REAL code, not URL math: The Daily
  * Build's web config is composed by @omega.js/config from its committed
  * omega.json5 (advertising.providers.inhouse.source 'company' +
- * company.url), fed to the REAL @omega.js/client singleton (node globals per
+ * company.url), fed to a REAL @omega.js/client instance (node globals per
  * the client test setup), and the verts module's resolveSource() +
  * VertUnit.buildServeUrl() produce the URL that is then ACTUALLY fetched
  * against the playground emulator — the consumer-resolved request lands on
@@ -326,7 +326,7 @@ async function main() {
 
     // -- 2. The Daily Build consumes as COMPANY ---------------------------
 
-    let Manager = null;
+    let omega = null;
     let composed = null;
 
     await step('The Daily Build composes company-mode verts config (real @omega.js/config)', async () => {
@@ -350,10 +350,10 @@ async function main() {
       };
       global.window.__OMEGA_DEV_PORTS__ = { hosting: ports.hosting };
 
-      const mod = await import(pathToFileURL(path.join(CLIENT_SRC, 'index.js')).href);
-      Manager = mod.default;
+      const { Omega } = await import(pathToFileURL(path.join(CLIENT_SRC, 'index.js')).href);
+      omega = new Omega();
 
-      await Manager.initialize({
+      await omega.initialize({
         runtime: 'web',
         environment: 'development',
         brand: composed.brand,
@@ -363,12 +363,12 @@ async function main() {
         sentry: { enabled: false },
       });
 
-      const source = Manager.verts().resolveSource();
+      const source = omega.verts.resolveSource();
       assert.equal(source, `http://127.0.0.1:${ports.hosting}`, `company source should resolve to the parent emulator (got ${source})`);
 
       // The production derivation of the SAME company.url — the api URL a
       // deployed sub-brand would hit
-      const production = Manager.getApiUrl('production', composed.company.url);
+      const production = omega.getApiUrl('production', composed.company.url);
       assert.equal(production, 'https://api.playground.omegajs.dev', `production derivation should prepend api. (got ${production})`);
 
       return source;
@@ -377,10 +377,10 @@ async function main() {
     await step('consumer-built serve request lands on the parent inventory (the REAL hop)', async () => {
       const { VertUnit } = await import(pathToFileURL(path.join(CLIENT_SRC, 'modules', 'verts.js')).href);
 
-      const source = Manager.verts().resolveSource();
-      const unit = new VertUnit(Manager, {}, {
+      const source = omega.verts.resolveSource();
+      const unit = new VertUnit(omega, {}, {
         source,
-        tags: Manager.config.advertising.tags,
+        tags: omega.config.advertising.tags,
       });
       const serveUrl = unit.buildServeUrl();
 

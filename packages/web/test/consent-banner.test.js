@@ -59,7 +59,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -164,12 +164,12 @@ async function boot({ timeZone = 'Europe/Berlin', storage = {} } = {}) {
   };
   globalThis.__omegaClient = {
     config: { consent: { config: CONFIG } },
-    dom: () => ({ ready: () => Promise.resolve() }),
-    storage: () => ({
+    dom: { ready: () => Promise.resolve() },
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
       remove: (keyPath) => _set(storage, keyPath, undefined),
-    }),
+    },
   };
 
   // The providers ARE loaded here, so the banner's own events are visible. In an
@@ -180,9 +180,9 @@ async function boot({ timeZone = 'Europe/Berlin', storage = {} } = {}) {
   globalThis.ttq = { track: (...args) => tracked.push(['ttq', ...args]) };
 
   delete require.cache[require.resolve(BUNDLE)];
-  require(BUNDLE).default();
+  require(BUNDLE).default({ omega: globalThis.__omegaClient });
 
-  // omega.dom().ready() resolves in a microtask; the mount happens behind it.
+  // omega.dom.ready() resolves in a microtask; the mount happens behind it.
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   const all = () => flatten(doc.body);

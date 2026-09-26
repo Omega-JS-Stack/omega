@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
@@ -50,7 +50,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -164,21 +164,20 @@ async function loadPricingPage(account) {
 
   globalThis.__omegaClient = {
     config: { analytics: { providers: {} } },
-    dom: () => ({ ready: async () => {} }),
+    dom: { ready: async () => {} },
     request: async (url, options = {}) => { requests.push({ url, options }); },
-    auth: () => ({
-      listen: (options, handler) => handler({ account: account }),
-      resolveSubscription: (candidate) => resolveSubscription(candidate),
-    }),
-    sentry: () => ({ captureException: () => {} }),
+    auth: {
+      listen: (options, handler) => handler({ user: new User(account, { uid: 'u1' }), denied: false }),
+    },
+    sentry: { captureException: () => {} },
     // A visitor who consented: what this suite is about is WHICH clicks count,
     // not whether the visitor allowed counting (#383's gate is its own suite).
-    storage: () => ({
+    storage: {
       get: (key, fallback) => (key === 'trackingConsent'
         ? { analytics: true, marketing: true, region: 'opt-out', version: 1 }
         : fallback),
       set: () => {},
-    }),
+    },
   };
 
   // Every analytics call the page makes, as `<network>:<event>` — a switch is

@@ -57,7 +57,7 @@ const RULES_MIGRATION_COMMAND = 'npx omega migrate:rules';
 
 // The one-time conversion of a PRE-FAMILY marker file onto the family grammar
 // ([#40](https://github.com/Omega-JS-Stack/omega/issues/40)). Every evergreen
-// verb speaks ONLY the family, so a tree carried over from BEM converges at no
+// verb speaks ONLY the family, so an older tree converges at no
 // verb until this one has run — the verbs DETECT the old shapes and point here,
 // never convert.
 const MARKER_MIGRATION_COMMAND = 'npx omega migrate:markers';
@@ -773,8 +773,8 @@ function isLegacyMarkerFile(contents) {
 }
 
 /**
- * BEM's hand-written insertion placeholder, whitespace-tolerant exactly as BEM
- * matched it. Fresh regex per call — these are /g for the replace paths.
+ * The pre-family hand-written insertion placeholder, whitespace-tolerant.
+ * Fresh regex per call — these are /g for the replace paths.
  * @returns {RegExp}
  */
 function preFamilyPlaceholderRegex() {
@@ -782,9 +782,9 @@ function preFamilyPlaceholderRegex() {
 }
 
 /**
- * The pre-family managed BLOCK, open marker through end marker: BEM's own
- * `///---backend-manager---///` and the cp72-74 `///---omega---///` interim
- * flavor, which differ only in that word.
+ * The pre-family managed BLOCK, open marker through end marker:
+ * `///---backend-manager---///` and its `///---omega---///` flavor, which
+ * differ only in that word.
  * @returns {RegExp}
  */
 function preFamilyBlockRegex() {

@@ -6,7 +6,7 @@
 //      normal — default. Dock icon visible on macOS, taskbar entry on Windows.
 //      hidden — packaged builds get LSUIElement=true on macOS (zero dock bounce, no
 //               dock icon, not in Cmd+Tab). Tray/notifications/networking still work.
-//               Consumer surfaces UI later via `manager.windows.create('main')`, which
+//               Consumer surfaces UI later via `omega.windows.create('main')`, which
 //               calls app.dock.show() automatically so the icon appears alongside the
 //               window. Use this for menubar apps, agent apps, anything that should
 //               be invisible until the user explicitly asks for UI.
@@ -18,7 +18,7 @@
 //
 // @omega.js/desktop does NOT auto-create any windows anymore — the consumer's main.js drives that.
 // So "isLaunchHidden" no longer needs to gate window creation; we just expose the
-// raw mode and let the consumer decide whether to call `manager.windows.create()`.
+// raw mode and let the consumer decide whether to call `omega.windows.create()`.
 //
 // Detection: macOS sets `getLoginItemSettings().wasOpenedAtLogin = true`. On Windows we
 // register the login item with `--omega-launched-at-login` arg and check process.argv.
@@ -33,17 +33,21 @@ const logger = new LoggerLite('startup');
 const VALID_MODES = ['normal', 'hidden'];
 const LOGIN_ARG   = '--omega-launched-at-login';   // marker for Windows + Linux login-launch detection
 
+// The env keys the boot summary logs: the environment input, the login-item override,
+// and the two a parent process leaks in (ELECTRON_RUN_AS_NODE turns Electron into Node)
+const BOOT_ENV_KEYS = ['OMEGA_ENVIRONMENT', 'OMEGA_FORCE_LOGIN_ITEM', 'ELECTRON_RUN_AS_NODE', 'NODE_ENV'];
+
 const startup = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _electron:    null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (startup._initialized) {
       return;
     }
 
-    startup._manager = manager;
+    startup._omega = omega;
     startup._electron = require('electron');
 
     const mode         = startup.getMode();
@@ -76,8 +80,9 @@ const startup = {
     //   "Why is @omega.js/desktop behaving like X?" → check resolved values
     //   "Why did @omega.js/desktop decide X?" → check raw inputs
     const macLogin = process.platform === 'darwin' ? startup._electron.app.getLoginItemSettings() : null;
-    const emEnv = Object.fromEntries(
-      Object.entries(process.env).filter(([k]) => k.startsWith('EM_') || k === 'ELECTRON_RUN_AS_NODE' || k === 'NODE_ENV')
+    // The named knobs that steer this boot, never a prefix: OMEGA_* also names secrets
+    const bootEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => BOOT_ENV_KEYS.includes(k))
     );
     const launchedAtLogin = startup.wasLaunchedAtLogin();
     const launchedAtLoginVia = startup._launchedAtLoginVia();
@@ -89,7 +94,7 @@ const startup = {
     logger.log(`  process.arch:            ${process.arch}`);
     logger.log(`  app.isPackaged:          ${startup._electron.app.isPackaged}`);
     logger.log(`  app.getLoginItemSettings(): ${macLogin ? JSON.stringify(macLogin) : '(not macOS)'}`);
-    logger.log(`  EM_/electron/node env:   ${JSON.stringify(emEnv)}`);
+    logger.log(`  boot env:                ${JSON.stringify(bootEnv)}`);
 
     logger.log('startup boot summary — RESOLVED values:');
     logger.log(`  config.startup.mode:     ${mode}`);
@@ -116,32 +121,32 @@ const startup = {
   // OMEGA_FORCE_LOGIN_ITEM=1 bypasses the guard so you can intentionally exercise the flow.
   _isDev() {
     if (process.env.OMEGA_FORCE_LOGIN_ITEM === '1') return false;
-    return !startup._manager.isProduction();
+    return !startup._omega.isProduction();
   },
 
   // Returns the resolved user-launch mode, defaulting to 'normal' for unknown values.
   getMode() {
-    const raw = startup._manager.config.startup?.mode || 'normal';
+    const raw = startup._omega.config.startup?.mode || 'normal';
     return VALID_MODES.includes(raw) ? raw : 'normal';
   },
 
   // openAtLogin block reads. `_loginEnabled` defaults to true; `_loginMode` defaults to 'hidden'.
   _loginEnabled() {
-    const v = startup._manager.config.startup?.openAtLogin;
+    const v = startup._omega.config.startup?.openAtLogin;
     if (typeof v === 'boolean') return v;                          // back-compat for boolean form
     if (v && typeof v === 'object') return v.enabled !== false;    // object form: default true
     return true;                                                   // unset → true (apps open at login by default)
   },
 
   _loginMode() {
-    const v = startup._manager.config.startup?.openAtLogin;
+    const v = startup._omega.config.startup?.openAtLogin;
     if (v && typeof v === 'object' && VALID_MODES.includes(v.mode)) return v.mode;
     return 'hidden';                                               // default: launch hidden at login
   },
 
   // True if this launch is hidden — combines user-launch mode (always honored) with
   // login-launch mode (only honored when the app was launched at login). Consumers can
-  // read this to decide whether to call manager.windows.create() during boot.
+  // read this to decide whether to call omega.windows.create() during boot.
   isLaunchHidden() {
     if (startup.getMode() === 'hidden') return true;
     if (startup.wasLaunchedAtLogin() && startup._loginMode() === 'hidden') return true;

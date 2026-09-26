@@ -23,7 +23,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-refund-amount-uid';

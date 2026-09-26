@@ -2,7 +2,7 @@
  * Test: the notification subscribe/unsubscribe events are CANONICAL conversions
  * ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)).
  *
- * The handler used to reach `Manager.Analytics(...).event()` directly with
+ * The handler used to reach `Analytics(...).event()` directly with
  * hyphenated names of its own invention — `notification-subscribe` and
  * `notification-unsubscribe`, which appear in no catalog and therefore in no
  * other surface's vocabulary. Both now go through `deliverConversion`, which is
@@ -14,14 +14,15 @@
  * the only stable key this doc has: `owner` is null on an anonymous subscribe,
  * so a uid-derived id would collapse every anonymous device onto one id.
  *
- * Real handler, real Manager, real ctx, real Firestore counter write. The
+ * Real handler, real omega, real ctx, real Firestore counter write. The
  * `change` pair is built by hand — the trigger's own shape — so no notification
  * doc has to exist for the branch under test.
  *
  * Run: npx omega test framework:events/notification-conversion
  */
-const onWrite = require('../../dist/manager/events/firestore/notifications/on-write.js');
+const onWrite = require('../../dist/omega/events/firestore/notifications/on-write.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 const TOKEN = '_test-notification-conversion-token';
 
@@ -69,17 +70,16 @@ async function withConsoleRecorder(fn) {
 }
 
 /** Run the real handler for one change pair; hand back its delivery lines. */
-async function runHandler({ Manager, before, after }) {
-  const ctx = Manager.RouteContext({}, { functionName: 'omega_notificationsOnWrite' });
-  const admin = Manager.libraries.admin;
+async function runHandler({ omega, before, after }) {
+  const ctx = new Context(omega, {}, { functionName: 'omega_notificationsOnWrite' });
+  const admin = omega.firebase.admin;
 
   const calls = await withConsoleRecorder(async () => {
     await onWrite({
-      Manager: Manager,
+      omega: omega,
       ctx: ctx,
       change: change({ before: before, after: after }),
       context: EVENT_CONTEXT,
-      libraries: { admin: admin },
     });
   });
 
@@ -98,9 +98,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-new-subscription-fires-the-canonical-notification-subscribe',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { delivery } = await runHandler({
-          Manager: Manager,
+          omega: omega,
           before: undefined,
           after: subscriptionDoc({ owner: '_test-notification-owner' }),
         });
@@ -119,9 +119,9 @@ module.exports = defineCases({
 
     {
       name: 'a-deleted-subscription-fires-the-canonical-notification-unsubscribe',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { delivery } = await runHandler({
-          Manager: Manager,
+          omega: omega,
           before: subscriptionDoc({ owner: '_test-notification-owner' }),
           after: undefined,
         });
@@ -134,11 +134,11 @@ module.exports = defineCases({
 
     {
       name: 'an-update-fires-nothing',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // Re-tagging a device is not a subscription event. The handler returns
         // at its update branch, before any tracking.
         const { delivery } = await runHandler({
-          Manager: Manager,
+          omega: omega,
           before: subscriptionDoc(),
           after: subscriptionDoc({ owner: '_test-notification-owner' }),
         });
@@ -149,12 +149,12 @@ module.exports = defineCases({
 
     {
       name: 'an-anonymous-subscribe-still-fires-and-still-keys-on-the-token',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // `owner: null` is the anonymous-subscribe shape the rules explicitly
         // allow. There is no uid to key on and no identity to match — which is
         // exactly why the doc id is the id.
         const { delivery } = await runHandler({
-          Manager: Manager,
+          omega: omega,
           before: undefined,
           after: subscriptionDoc({ owner: null }),
         });
@@ -166,13 +166,13 @@ module.exports = defineCases({
 
     {
       name: 'a-declined-analytics-snapshot-blocks-the-fire',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // The gate is the whole point of routing through deliverConversion: a
-        // raw Manager.Analytics call asked nobody anything.
+        // raw analytics call asked nobody anything.
         const doc = subscriptionDoc({ owner: '_test-notification-owner' });
         doc.trackingConsent = { analytics: false, marketing: false, region: 'opt-in', version: 1 };
 
-        const { delivery } = await runHandler({ Manager: Manager, before: undefined, after: doc });
+        const { delivery } = await runHandler({ omega: omega, before: undefined, after: doc });
 
         assert.equal(delivery.length, 1, delivery.join(' | '));
         assert.equal(delivery[0].includes('ga4 skipped (consent: analytics)'), true, `an opted-out device reaches no platform: ${delivery[0]}`);

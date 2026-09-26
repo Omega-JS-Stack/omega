@@ -10,7 +10,7 @@
  *
  * NOTE: `inspect` bodies are serialized to the spawned Electron process, so they
  * close over nothing from this module. `require` and `process` are injected;
- * { manager, expect, projectRoot, appRoot, distSnapshotBefore, frameworkDistRoot }
+ * { omega, expect, projectRoot, appRoot, distSnapshotBefore, frameworkDistRoot }
  * is the one argument.
  */
 
@@ -21,27 +21,27 @@ module.exports = {
   timeout: 30000,
   tests: [
     {
-      description: 'manager initialized with the libs this app destructures in src/main.js',
-      inspect: async ({ manager, expect }) => {
-        expect(manager._initialized).toBe(true);
+      description: 'omega initialized with the libs this app destructures in src/main.js',
+      inspect: async ({ omega, expect }) => {
+        expect(omega._initialized).toBe(true);
 
-        // The exact set src/main.js pulls off the manager: a lib that stopped
+        // The exact set src/main.js pulls off omega: a lib that stopped
         // being wired would throw there, not here, and only at runtime.
-        for (const lib of ['logger', 'ipc', 'storage', 'windows', 'tray', 'menu', 'contextMenu', 'deepLink', 'autoUpdater', 'omega', 'appState', 'sentry', 'startup']) {
-          expect(Boolean(manager[lib])).toBe(true);
+        for (const lib of ['logger', 'ipc', 'storage', 'windows', 'tray', 'menu', 'contextMenu', 'deepLink', 'autoUpdater', 'auth', 'appState', 'sentry', 'startup']) {
+          expect(Boolean(omega[lib])).toBe(true);
         }
       },
     },
 
     {
       description: 'src/main.js created the main window on the built main view',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const { BrowserWindow } = require('electron');
 
         // windows.create() runs inside this project's initialize().then(), so poll.
         let url = '';
         for (let i = 0; i < 40; i++) {
-          const win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
           if (win && !win.isDestroyed()) {
             url = win.webContents.getURL();
             if (url.includes('/views/main/')) break;
@@ -49,26 +49,26 @@ module.exports = {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        expect(Boolean(manager.windows.get('main'))).toBe(true);
+        expect(Boolean(omega.windows.get('main'))).toBe(true);
         expect(url.includes('/views/main/')).toBe(true);
       },
     },
 
     {
       description: 'the three integrations under src/integrations/ loaded',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         // tray/index.js and menu/index.js both call useDefaults(), so the default
         // items being addressable is the proof the definitions ran and rendered.
-        expect(manager.tray.has('open')).toBe(true);
-        expect(manager.tray.has('quit')).toBe(true);
+        expect(omega.tray.has('open')).toBe(true);
+        expect(omega.tray.has('quit')).toBe(true);
 
-        expect(manager.menu.isRendered()).toBe(true);
-        expect(manager.menu.has('edit/copy')).toBe(true);
+        expect(omega.menu.isRendered()).toBe(true);
+        expect(omega.menu.has('edit/copy')).toBe(true);
 
         // context-menu/index.js is per-event, so nothing is rendered at boot:
         // a loaded consumer definition plus a live menu is the whole surface.
-        expect(manager.contextMenu.hasCustomDefinition()).toBe(true);
-        expect(manager.contextMenu.isDisabled()).toBe(false);
+        expect(omega.contextMenu.hasCustomDefinition()).toBe(true);
+        expect(omega.contextMenu.isDisabled()).toBe(false);
       },
     },
 

@@ -1,9 +1,9 @@
 // Methods are defined as arrow class fields so `this` is permanently bound to the instance.
 // This means consumers can safely alias or destructure methods without losing context:
-//   const { escapeHTML } = omega.utilities(); // ✓ works
-//   const escape = omega.utilities().escapeHTML; // ✓ works
-//   items.map(omega.utilities().escapeHTML); // ✓ works
-// Safe because omega.utilities() is a singleton — only one instance ever exists.
+//   const { escapeHTML } = omega.utilities; // ✓ works
+//   const escape = omega.utilities.escapeHTML; // ✓ works
+//   items.map(omega.utilities.escapeHTML); // ✓ works
+// Safe because `omega.utilities` is built once per instance, so an alias always points at the live one.
 
 // renderMarkdown links are restricted to the two schemes a browser may navigate
 // safely. sanitizeURL already rejects javascript:/data:, but it resolves a bare
@@ -46,8 +46,8 @@ const renderInline = (text, sanitizeURL) => text
   .join('');
 
 class Utilities {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
   }
 
   // Copy text to clipboard
@@ -399,8 +399,8 @@ class Utilities {
   // own) says what it is instead of reading as plain 'web'.
   getRuntime = () => {
     // Use config runtime if provided
-    if (this.manager?.config?.runtime) {
-      return this.manager.config.runtime;
+    if (this.omega?.config?.runtime) {
+      return this.omega.config.runtime;
     }
 
     // Browser extension (Chrome, Edge, Opera, Brave, Firefox, Safari, etc.)

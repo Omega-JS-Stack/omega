@@ -1,6 +1,6 @@
 // Tray definition. Called by @omega.js/desktop during boot.
 //
-// `manager` — the running @omega.js/desktop Manager.
+// `omega`: the running @omega.js/desktop main-process instance.
 // `tray`    — builder API + id-path API (find/update/remove/insertAfter/etc.).
 //
 // @omega.js/desktop auto-resolves the tray icon by convention (most specific wins):
@@ -19,7 +19,7 @@
 //
 // This file is OPTIONAL — delete it and @omega.js/desktop still ships a working tray.
 
-module.exports = ({ manager, tray }) => {
+module.exports = ({ omega, tray }) => {
   // Use @omega.js/desktop's default template + auto-resolved icon + auto-resolved tooltip.
   tray.useDefaults();
 
@@ -36,7 +36,7 @@ module.exports = ({ manager, tray }) => {
   // tray.insertAfter('open', {
   //   id: 'dashboard',
   //   label: 'Open Dashboard',
-  //   click: () => manager.windows.show('dashboard'),
+  //   click: () => omega.windows.show('dashboard'),
   // });
   //
   // // Rename an existing item:

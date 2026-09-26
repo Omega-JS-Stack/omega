@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('account:security');
@@ -26,7 +26,7 @@ export function init() {
 
 // Load security data
 export function loadData(account) {
-  if (!account) {
+  if (!account.authenticated) {
     return;
   }
 
@@ -67,13 +67,13 @@ async function checkRedirectResult() {
     const result = await getRedirectResult(firebaseAuth);
 
     if (result && result.user) {
-      omega.utilities().showNotification('Google account connected successfully', 'success');
+      omega.utilities.showNotification('Google account connected successfully', 'success');
       updateSigninMethods();
     }
   } catch (error) {
     if (error.code && error.code !== 'auth/no-auth-event') {
       console.error('Redirect result error:', error);
-      omega.utilities().showNotification('Failed to connect Google account', 'danger');
+      omega.utilities.showNotification('Failed to connect Google account', 'danger');
     }
   }
 }
@@ -89,9 +89,10 @@ async function updateSigninMethods() {
     return;
   }
 
-  // Get the formatted user from omega for consistency, but we'll use firebaseUser for provider data
-  const user = omega.auth().getUser();
-  if (!user) {
+  // The User for the email, but firebaseUser for provider data: providers
+  // live on the Firebase session, never on the User
+  const user = omega.auth.user;
+  if (!user.authenticated) {
     logger.log('security.js - No user, returning');
     return;
   }
@@ -286,14 +287,14 @@ async function updateActiveSessions(account) {
             ${getDeviceIcon(session.platform || deviceName)}
           </div>
           <div>
-            <strong>${omega.utilities().escapeHTML(deviceName)}</strong>
-            <div class="text-muted small">${omega.utilities().escapeHTML(browserName)}${session.mobile !== undefined ? ` • ${session.mobile ? 'Mobile' : 'Desktop'}` : ''}</div>
-            ${location ? `<div class="text-muted small">${omega.utilities().escapeHTML(location)}</div>` : ''}
-            ${session.ip ? `<div class="text-muted small">IP: ${omega.utilities().escapeHTML(session.ip)}</div>` : ''}
+            <strong>${omega.utilities.escapeHTML(deviceName)}</strong>
+            <div class="text-muted small">${omega.utilities.escapeHTML(browserName)}${session.mobile !== undefined ? ` • ${session.mobile ? 'Mobile' : 'Desktop'}` : ''}</div>
+            ${location ? `<div class="text-muted small">${omega.utilities.escapeHTML(location)}</div>` : ''}
+            ${session.ip ? `<div class="text-muted small">IP: ${omega.utilities.escapeHTML(session.ip)}</div>` : ''}
           </div>
         </div>
         <div class="text-end">
-          <small class="text-muted">${omega.utilities().escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
+          <small class="text-muted">${omega.utilities.escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
           ${session.isCurrent ? '<span class="omega-chip omega-chip--accent ms-2">Current</span>' : ''}
         </div>
       </div>
@@ -314,7 +315,7 @@ function initializeSigninMethodForms() {
   if ($passwordForm && !signinMethodForms.has('password')) {
     logger.log('security.js - Initializing password FormManager');
 
-    const formManager = new FormManager($passwordForm, {
+    const formManager = new FormManager(omega, $passwordForm, {
       allowResubmit: false,
       submittingText: 'Sending...',
       submittedText: 'Email Sent!',
@@ -335,7 +336,7 @@ function initializeSigninMethodForms() {
     logger.log('security.js - About to initialize Google FormManager');
     logger.log('security.js - Google form exists:', !!$googleForm);
 
-    const formManager = new FormManager($googleForm, {
+    const formManager = new FormManager(omega, $googleForm, {
       submittingText: 'Connecting...',
     });
 
@@ -369,7 +370,7 @@ function initializeSignoutAllForm() {
   const $form = document.getElementById('signout-all-sessions-form');
 
   if ($form && !signoutAllFormManager) {
-    signoutAllFormManager = new FormManager($form, {
+    signoutAllFormManager = new FormManager(omega, $form, {
       submittingText: 'Signing out...',
     });
 
@@ -383,7 +384,7 @@ function initializeSignoutAllForm() {
       }
 
       // Sign out of all sessions
-      await omega.auth().signOut();
+      await omega.auth.signOut();
 
       // Show success message
       signoutAllFormManager.showSuccess('Successfully signed out of all sessions.');
@@ -459,7 +460,7 @@ function initializeSigninLinkGenerator() {
       $resultView.classList.remove('d-none');
     } catch (error) {
       logger.error('Failed to generate signin link:', error);
-      omega.utilities().showNotification(
+      omega.utilities.showNotification(
         `Failed to generate signin link: ${error.message || 'Unknown error'}`,
         { type: 'danger', timeout: 8000 }
       );
@@ -481,7 +482,7 @@ async function connectGoogleProvider() {
   if (useAuthPopup) {
     try {
       const result = await linkWithPopup(firebaseAuth.currentUser, provider);
-      omega.utilities().showNotification('Google account connected successfully', 'success');
+      omega.utilities.showNotification('Google account connected successfully', 'success');
 
       // Force refresh of the current user to get updated provider data
       await firebaseAuth.currentUser.reload();
@@ -534,7 +535,7 @@ async function disconnectGoogleProvider() {
 
   try {
     await unlink(user, 'google.com');
-    omega.utilities().showNotification('Google account disconnected successfully', 'success');
+    omega.utilities.showNotification('Google account disconnected successfully', 'success');
   } catch (error) {
     if (error.code === 'auth/no-such-provider') {
       throw new Error('Google account is not connected');
@@ -546,8 +547,8 @@ async function disconnectGoogleProvider() {
 
 // Handle change password
 async function handleChangePassword() {
-  const user = omega.auth().getUser();
-  if (!user || !user.email) {
+  const user = omega.auth.user;
+  if (!user.email) {
     throw new Error('Please log in to reset your password.');
   }
 
@@ -619,7 +620,7 @@ function getBrowserFromUserAgent(userAgent) {
 }
 
 // A stored login record's platform, as a label. The record carries the CLIENT's
-// platform vocabulary (`omega.utilities().getPlatform()` wrote it: mac,
+// platform vocabulary (`omega.utilities.getPlatform()` wrote it: mac,
 // windows, linux, ios, android, chromeos), so this is a lookup of those words
 // and not a second ua-sniffing copy of the detector
 // ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)). A word this map

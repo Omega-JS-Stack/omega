@@ -4,8 +4,8 @@ import { pathPrefix } from './path-prefix.js';
 const logger = createLogger('service-worker');
 
 class ServiceWorker {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this._registration = null;
     this._messageHandlers = new Map();
   }
@@ -45,7 +45,7 @@ class ServiceWorker {
       // the worker has no document to read the stamp from — it reads it back
       // off self.location.search. No prefix leaves both untouched.
       const prefix = pathPrefix();
-      const configuredPath = options.path || this.manager.config.serviceWorker?.config?.path || '/service-worker.js';
+      const configuredPath = options.path || this.omega.config.serviceWorker?.config?.path || '/service-worker.js';
       const swPath = prefix && configuredPath.startsWith('/') && !configuredPath.startsWith('//')
         ? `${prefix}${configuredPath}`
         : configuredPath;
@@ -54,11 +54,11 @@ class ServiceWorker {
 
       // Build config object to pass to service worker
       const config = {
-        brand: this.manager.config.brand?.id,
+        brand: this.omega.config.brand?.id,
         // The ONE environment surface (#817), never the raw baked fact.
-        environment: this.manager.getEnvironment(),
-        buildTime: this.manager.config.buildTime,
-        firebase: this.manager._resolveFirebaseConfig()
+        environment: this.omega.getEnvironment(),
+        buildTime: this.omega.config.buildTime,
+        firebase: this.omega._resolveFirebaseConfig()
       };
 
       // Register service worker
@@ -69,7 +69,7 @@ class ServiceWorker {
 
       // Store registration
       this._registration = registration;
-      this.manager.state.serviceWorker = registration;
+      this.omega.state.serviceWorker = registration;
 
       // Wait for service worker to be ready and send config
       await navigator.serviceWorker.ready;

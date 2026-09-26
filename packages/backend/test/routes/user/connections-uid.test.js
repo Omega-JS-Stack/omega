@@ -26,10 +26,11 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const getRoute = require('../../../dist/manager/routes/user/connections/get.js');
-const postRoute = require('../../../dist/manager/routes/user/connections/post.js');
-const deleteRoute = require('../../../dist/manager/routes/user/connections/delete.js');
-const { encryptState } = require('../../../dist/manager/routes/user/connections/_state.js');
+const getRoute = require('../../../dist/omega/routes/user/connections/get.js');
+const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
+const deleteRoute = require('../../../dist/omega/routes/user/connections/delete.js');
+const { encryptState } = require('../../../dist/omega/routes/user/connections/_state.js');
+const { validate } = require('../../../dist/omega/helpers/schema.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDER_ID = 'uid-fixture-782';
@@ -128,19 +129,19 @@ function lane(docs) {
 
   const { admin, writes } = recordingFirestore(docs || {});
 
-  const Manager = {
+  const omega = {
     cwd,
-    libraries: { admin },
+    firebase: { admin },
     project: { websiteUrl: 'https://brand.test' },
     config: {},
-    Metadata: () => ({ set: () => ({}) }),
   };
 
   const responses = [];
   const redirects = [];
 
   const ctx = {
-    Manager,
+    omega,
+    metadata: () => ({}),
     log() {},
     respond: (message, options) => {
       responses.push({ message, options: options || {} });
@@ -153,7 +154,7 @@ function lane(docs) {
     meta: { startTime: { timestamp: 'now', timestampUNIX: 1 } },
   };
 
-  return { ctx, Manager, writes, responses, redirects };
+  return { ctx, omega, writes, responses, redirects };
 }
 
 /**
@@ -193,7 +194,7 @@ module.exports = defineCases({
         await getRoute({
           ctx,
           user: userFor(CALLER_UID, true),
-          settings: { provider: PROVIDER_ID, action: 'authorize', redirect: false, uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, action: 'authorize', redirect: false, uid: OTHER_UID },
         });
 
         const response = answered(responses);
@@ -218,7 +219,7 @@ module.exports = defineCases({
         await getRoute({
           ctx,
           user: userFor(CALLER_UID, true),
-          settings: { provider: PROVIDER_ID, action: 'status', uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, action: 'status', uid: OTHER_UID },
         });
 
         const response = answered(responses);
@@ -237,7 +238,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userFor(CALLER_UID, true),
-          settings: {
+          data: {
             action: 'tokenize',
             code: 'auth-code-782',
             encryptedState: encryptState({ provider: PROVIDER_ID, uid: CALLER_UID, csrf: 'csrf-782', ts: Date.now() }),
@@ -262,7 +263,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userFor(CALLER_UID, true),
-          settings: { provider: PROVIDER_ID, action: 'refresh', uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, action: 'refresh', uid: OTHER_UID },
         });
 
         const response = answered(responses);
@@ -288,7 +289,7 @@ module.exports = defineCases({
         await deleteRoute({
           ctx,
           user: userFor(CALLER_UID, true),
-          settings: { provider: PROVIDER_ID, uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, uid: OTHER_UID },
         });
 
         const response = answered(responses);
@@ -314,7 +315,7 @@ module.exports = defineCases({
         await getRoute({
           ctx: statusLane.ctx,
           user: userFor(CALLER_UID, false),
-          settings: { provider: PROVIDER_ID, action: 'status', uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, action: 'status', uid: OTHER_UID },
         });
 
         assert.equal(answered(statusLane.responses).options.code, 403, "only an admin reads somebody else's connection status");
@@ -325,7 +326,7 @@ module.exports = defineCases({
         await postRoute({
           ctx: refreshLane.ctx,
           user: userFor(CALLER_UID, false),
-          settings: { provider: PROVIDER_ID, action: 'refresh', uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, action: 'refresh', uid: OTHER_UID },
         });
 
         assert.equal(answered(refreshLane.responses).options.code, 403, 'only an admin refreshes for somebody else');
@@ -336,7 +337,7 @@ module.exports = defineCases({
         await deleteRoute({
           ctx: deleteLane.ctx,
           user: userFor(CALLER_UID, false),
-          settings: { provider: PROVIDER_ID, uid: OTHER_UID },
+          data: { provider: PROVIDER_ID, uid: OTHER_UID },
         });
 
         assert.equal(answered(deleteLane.responses).options.code, 403, 'only an admin revokes for somebody else');
@@ -353,7 +354,7 @@ module.exports = defineCases({
         await getRoute({
           ctx: authorizeLane.ctx,
           user: userFor(CALLER_UID, false),
-          settings: { provider: PROVIDER_ID, action: 'authorize', redirect: false },
+          data: { provider: PROVIDER_ID, action: 'authorize', redirect: false },
         });
 
         const authorized = answered(authorizeLane.responses);
@@ -371,7 +372,7 @@ module.exports = defineCases({
         await getRoute({
           ctx: statusLane.ctx,
           user: userFor(CALLER_UID, false, true),
-          settings: { provider: PROVIDER_ID, action: 'status' },
+          data: { provider: PROVIDER_ID, action: 'status' },
         });
 
         const status = answered(statusLane.responses);
@@ -392,7 +393,7 @@ module.exports = defineCases({
         await postRoute({
           ctx: tokenizeLane.ctx,
           user: userFor(CALLER_UID, false),
-          settings: {
+          data: {
             action: 'tokenize',
             code: 'auth-code-782',
             encryptedState: encryptState({ provider: PROVIDER_ID, uid: CALLER_UID, csrf: 'csrf-782', ts: Date.now() }),
@@ -417,7 +418,7 @@ module.exports = defineCases({
         await postRoute({
           ctx: refreshLane.ctx,
           user: userFor(CALLER_UID, false, true),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         assert.equal(answered(refreshLane.responses).options.code, undefined, 'a user still refreshes their own token');
@@ -429,7 +430,7 @@ module.exports = defineCases({
         await deleteRoute({
           ctx: deleteLane.ctx,
           user: userFor(CALLER_UID, false, true),
-          settings: { provider: PROVIDER_ID },
+          data: { provider: PROVIDER_ID },
         });
 
         assert.equal(answered(deleteLane.responses).options.code, undefined, 'and still disconnects their own');
@@ -446,21 +447,23 @@ module.exports = defineCases({
       name: 'the-schemas-declare-uid-with-no-default',
 
       async run({ assert }) {
-        // Resolved the way settings.js loadSchema() does: the module is a
-        // function taking the request context and answering the schema.
-        const context = { ctx: null, user: null, data: {}, method: 'POST', headers: {}, geolocation: null, client: null };
-
-        const getSchema = require('../../../dist/manager/schemas/user/connections/get.js')(context);
-        const postSchema = require('../../../dist/manager/schemas/user/connections/post.js')(context);
+        // Resolved the way services/settings.js does: the module is a function
+        // of the request's raw parts answering a declaration, validated by
+        // helpers/schema.js. GET requires a provider, so every GET names one.
+        const context = { user: null, body: {}, query: {}, path: '', method: 'POST', headers: {}, geolocation: {} };
+        const getDeclaration = require('../../../dist/omega/schemas/user/connections/get.js')(context);
+        const postDeclaration = require('../../../dist/omega/schemas/user/connections/post.js')(context);
+        const get = (input) => validate(getDeclaration, { provider: 'google', ...input }).data;
+        const post = (input) => validate(postDeclaration, input).data;
 
         // An absent optional string resolves to the empty value (the powertools
         // parity the field pipeline keeps), which is what droppedUidError() reads
         // as "no uid was passed". A DEFAULT here would be a real uid instead.
         for (const [label, resolved] of [
-          ['GET', getSchema.parse({})],
-          ['GET authorize', getSchema.parse({ action: 'authorize' })],
-          ['POST', postSchema.parse({})],
-          ['POST tokenize', postSchema.parse({ action: 'tokenize' })],
+          ['GET', get({})],
+          ['GET authorize', get({ action: 'authorize' })],
+          ['POST', post({})],
+          ['POST tokenize', post({ action: 'tokenize' })],
         ]) {
           assert.equal(resolved.uid, '', `${label} resolves uid to the empty value, never a uid of its own`);
           assert.equal(!!resolved.uid, false, `${label} reads as "no uid was passed", so the self path is not the 400`);
@@ -468,12 +471,12 @@ module.exports = defineCases({
 
         // The field stays DECLARED, or a stale caller's value would be stripped
         // as an unknown key and never reach the 400 that names it
-        assert.equal(postSchema.parse({ uid: OTHER_UID }).uid, OTHER_UID, 'a passed uid still reaches the handler');
-        assert.equal(getSchema.parse({ uid: OTHER_UID }).uid, OTHER_UID, 'on both methods');
+        assert.equal(post({ uid: OTHER_UID }).uid, OTHER_UID, 'a passed uid still reaches the handler');
+        assert.equal(get({ uid: OTHER_UID }).uid, OTHER_UID, 'on both methods');
 
         // The defaults that DO exist are untouched
-        assert.equal(getSchema.parse({}).action, 'authorize', "GET's default action");
-        assert.equal(postSchema.parse({}).action, 'tokenize', "and POST's");
+        assert.equal(get({}).action, 'authorize', "GET's default action");
+        assert.equal(post({}).action, 'tokenize', "and POST's");
       },
     },
 

@@ -52,7 +52,7 @@ control and put the tooltip on the wrapper:
 ## The rest of Bootstrap's JS
 
 The full namespace is exposed at **`window.bootstrap`** (and
-`manager.bootstrap`) — `Tooltip`, `Popover`, `Collapse`, `Dropdown`, `Modal`,
+`omega.bootstrap`): `Tooltip`, `Popover`, `Collapse`, `Dropdown`, `Modal`,
 `Offcanvas`, `Tab`, `Toast`, `Alert`, `Button`, `Carousel`, `ScrollSpy`. Only
 tooltips are auto-initialized; the other components' standard **data-api**
 works out of the box on plain Bootstrap markup (e.g.
@@ -94,6 +94,6 @@ runs from a preload, e.g. the test harness).
 
 - `src/test/suites/renderer/tooltips.test.js` — bundle loads, auto-init on
   insertion, live retitle, dispose-on-removal, tip cleanup. (The harness wires
-  the renderer Manager in the preload world — see the suite header for the
+  the renderer instance in the preload world: see the suite header for the
   world-split notes; single-world hover behavior is covered by consumer boot
   suites.)

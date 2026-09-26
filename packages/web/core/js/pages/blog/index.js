@@ -8,7 +8,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { search, formatDate, createIndexLoader } from './_search.mjs';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -25,7 +25,7 @@ const INDEX_URL = '/blog/index.json';
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupSearch();
 
@@ -132,7 +132,7 @@ function showListing($results, $listing) {
  * @param {string} query - the raw query string
  */
 function render($results, $listing, matches, query) {
-  const { escapeHTML } = omega.utilities();
+  const { escapeHTML } = omega.utilities;
   const safeQuery = escapeHTML(query);
 
   const body = matches.length

@@ -21,7 +21,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger } = require('./_webhook-harness.js');
-const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-cb-transaction-uid';

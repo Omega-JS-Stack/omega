@@ -1,22 +1,17 @@
-// ============================================
-// Index Page (Main Extension Page)
-// ============================================
+/**
+ * Surface: a custom extension page (a page context), the notes dashboard
+ * Doc: node_modules/@omega.js/extension/docs/components.md
+ *
+ * The sidepanel's list (../../lib/notes-list.js), plus omega.auth.reload()
+ * after each create: the one re-read of the account, beside the listen() the
+ * list already runs on.
+ */
+import omega from '@omega.js/extension/page';
+import { mountNotes } from '../../lib/notes-list.js';
 
-// Import OMEGA Extension
-import Manager from '@omega.js/extension/page';
+omega.initialize()
+  .then(() => {
+    mountNotes({ omega, onCreated: () => omega.auth.reload() });
 
-// Create instance
-const manager = new Manager();
-
-// Initialize
-manager.initialize()
-.then(() => {
-  // Shortcuts
-  const { extension, messenger, logger, omega } = manager;
-
-  // Add your project-specific page logic here
-  // ...
-
-  // Log the initialization
-  logger.log('Index page initialized!');
-});
+    omega.logger.log('Notes page initialized!');
+  });

@@ -5,16 +5,13 @@
 // (WebSocket connections, long-running tasks, etc.)
 
 // Import OMEGA Extension
-import Manager from '@omega.js/extension/offscreen';
-
-// Create instance
-const manager = new Manager();
+import omega from '@omega.js/extension/offscreen';
 
 // Initialize
-manager.initialize()
+omega.initialize()
 .then(() => {
   // Shortcuts
-  const { extension, logger } = manager;
+  const { extension, logger } = omega;
 
   // Add your project-specific offscreen logic here
   // This document is invisible and persists in the background

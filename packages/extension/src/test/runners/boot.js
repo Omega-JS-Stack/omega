@@ -3,7 +3,7 @@
 // then closes cleanly.
 //
 // Differences from runners/chromium.js:
-//   - chromium.js spawns the harness extension and tests BXM's framework surface.
+//   - chromium.js spawns the harness extension and tests the framework surface.
 //   - boot.js spawns the CONSUMER'S `dist/` (their real production extension) and
 //     verifies it boots end-to-end: manifest is valid, SW starts, popup loads, etc.
 //

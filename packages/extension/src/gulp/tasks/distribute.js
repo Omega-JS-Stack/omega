@@ -1,8 +1,8 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('distribute');
-const fontAwesomeLogger = Manager.logger('distribute:fontawesome');
-const watcherLogger = Manager.logger('distribute:watcher');
+const build = require('../../build.js');
+const logger = build.logger('distribute');
+const fontAwesomeLogger = build.logger('distribute:fontawesome');
+const watcherLogger = build.logger('distribute:watcher');
 const { src, dest, watch, series } = require('gulp');
 const { Transform } = require('node:stream');
 const path = require('path');
@@ -10,12 +10,12 @@ const jetpack = require('fs-jetpack');
 const createTemplateTransform = require('./utils/template-transform');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const manifest = Manager.getManifest();
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const manifest = build.getManifest();
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Constants
 const LOUD = process.env.OMEGA_LOUD_LOGS === 'true';
@@ -145,7 +145,7 @@ function customTransform() {
 // Watcher task
 function distributeWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
@@ -165,7 +165,7 @@ function distributeWatcher(complete) {
 
 // Default Task
 module.exports = series(
-  // Manager.wrapTask('distribute', distribute),
+  // build.wrapTask('distribute', distribute),
   distribute,
   distributeWatcher
 );

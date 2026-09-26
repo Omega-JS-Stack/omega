@@ -43,7 +43,7 @@ describe('Auth Module: the session probe (#798)', () => {
     },
   });
 
-  // Minimal Manager stand-in (the #196 harness's shape), plus the record of
+  // Minimal Omega stand-in (the #196 harness's shape), plus the record of
   // every stubbed firebase/auth call the probe makes.
   function createHarness({ user = USER, refresh } = {}) {
     const calls = { getIdToken: [], signOut: 0 };
@@ -55,23 +55,21 @@ describe('Auth Module: the session probe (#798)', () => {
       },
       signOut: async () => {
         calls.signOut++;
-        manager.firebaseAuth.currentUser = null;
+        omega.firebaseAuth.currentUser = null;
         return true;
       },
     };
 
-    const manager = {
+    const omega = {
       config: {},
       firebaseAuth: { currentUser: user },
       firebaseFirestore: {},
-      _firebaseAuthInitialized: true,
-      _authReady: Promise.resolve(),
       _resolveFirebaseConfig: () => ({ apiKey: 'test-api-key' }),
-      bindings: () => ({ update: () => {} }),
-      storage: () => ({ set: () => {}, get: () => ({}) }),
+      bindings: { update: () => {} },
+      storage: { set: () => {}, get: () => ({}) },
     };
 
-    return { auth: new Auth(manager), manager, calls };
+    return { auth: new Auth(omega), omega, calls };
   }
 
   const authError = (code) => Object.assign(new Error(`Firebase: Error (${code}).`), { code });
@@ -83,7 +81,7 @@ describe('Auth Module: the session probe (#798)', () => {
   before(async () => {
     Auth = (await import('../src/modules/auth.js')).default;
     // Registered here, not at load: hooks route every later require through the
-    // ESM loader, and the shared helpers' Manager import pulls in CJS that will
+    // ESM loader, and the shared helpers' Omega import pulls in CJS that will
     // not survive the trip.
     stubAuthModule();
   });
@@ -110,27 +108,27 @@ describe('Auth Module: the session probe (#798)', () => {
   });
 
   it('should KEEP the user on a network failure, because a bad connection is not a dead session', async () => {
-    const { auth, calls, manager } = createHarness({ refresh: () => { throw authError('auth/network-request-failed'); } });
+    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/network-request-failed'); } });
 
     assert.strictEqual(await auth.probeSession(), 'unknown');
     assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(manager.firebaseAuth.currentUser, USER, 'the user survives the "Backend starting" window');
+    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'the user survives the "Backend starting" window');
   });
 
   it('should KEEP the user on auth/too-many-requests, a throttle and not a verdict on the session', async () => {
-    const { auth, calls, manager } = createHarness({ refresh: () => { throw authError('auth/too-many-requests'); } });
+    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/too-many-requests'); } });
 
     assert.strictEqual(await auth.probeSession(), 'unknown');
     assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(manager.firebaseAuth.currentUser, USER, 'a rate limit clears on its own; the session did not die');
+    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'a rate limit clears on its own; the session did not die');
   });
 
   it('should KEEP the user on auth/internal-error, which is the Auth server failing and not answering', async () => {
-    const { auth, calls, manager } = createHarness({ refresh: () => { throw authError('auth/internal-error'); } });
+    const { auth, calls, omega } = createHarness({ refresh: () => { throw authError('auth/internal-error'); } });
 
     assert.strictEqual(await auth.probeSession(), 'unknown');
     assert.strictEqual(calls.signOut, 0);
-    assert.strictEqual(manager.firebaseAuth.currentUser, USER, 'a server-side failure is no verdict on this session');
+    assert.strictEqual(omega.firebaseAuth.currentUser, USER, 'a server-side failure is no verdict on this session');
   });
 
   it('should keep the user on an error carrying no auth code', async () => {

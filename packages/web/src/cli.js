@@ -13,7 +13,7 @@ require('@omega.js/config').loadEnv(process.cwd(), { target: 'web' });
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
-// Command name → positional/flag aliases (UJM alias table, adapted)
+// Command name → positional/flag aliases
 const ALIASES = {
   install: ['-i', 'i', '--install'],
   dev: ['serve', 'start', '--dev'],
@@ -37,13 +37,5 @@ const Main = createCliRouter({
   aliases: ALIASES,
   defaultCommand: 'help',
 });
-
-// The environment surface (#717), web's Manager equivalent is this CLI class,
-// the object every bin instantiates, so `Main.getEnvironment()` /
-// `isDevelopment()` / `isProduction()` / `isTesting()` are reachable the same
-// way @omega.js/desktop's and @omega.js/extension's Managers reach theirs.
-// ONE implementation behind all four since
-// [#817](https://github.com/Omega-JS-Stack/omega/issues/817).
-require('@omega.js/config/environment').attachTo(Main);
 
 module.exports = Main;

@@ -13,7 +13,7 @@
  *   integration surface for the real Firestore paths.
  */
 const assert = require('node:assert');
-const Marketing = require('../../../dist/manager/libraries/email/marketing/index.js');
+const Marketing = require('../../../dist/omega/libraries/email/marketing/index.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { isMarketingRevoked } = Marketing;
@@ -46,8 +46,8 @@ function buildAssistant(admin) {
   const calls = { logs: [], warns: [], errors: [] };
 
   const ctx = {
-    Manager: {
-      libraries: { admin },
+    omega: {
+      firebase: { admin },
       config: {},
     },
     isTesting: () => true,

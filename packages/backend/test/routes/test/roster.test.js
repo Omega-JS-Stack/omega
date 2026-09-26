@@ -21,7 +21,7 @@ module.exports = defineCases({
       name: 'returns-the-labelled-personas-in-declaration-order',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/test/roster');
+        const response = await http.as('none').get('omega/test/roster');
 
         assert.isSuccess(response, 'The roster is readable without signing in');
 
@@ -50,7 +50,7 @@ module.exports = defineCases({
       name: 'machinery-personas-stay-invisible',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/test/roster');
+        const response = await http.as('none').get('omega/test/roster');
         const localparts = response.data.personas.map((persona) => persona.localpart);
 
         assert.ok(localparts.includes('_test.referrer'), 'A human-facing persona is offered');

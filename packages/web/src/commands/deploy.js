@@ -279,8 +279,8 @@ function deployDirect({ dryRun }) {
   }
 
   // Cached-only translation: a deploy must never hang on a live LLM pass
-  // (provider limits/outages) — cold language pairs skip with the standard
-  // warning, and `omega translate` owns filling the cache.
+  // (provider limits/outages): cold language pairs ship untranslated with the
+  // standard warning, and `omega translate` owns filling the cache.
   // The base path travels with the build (#358): this lane builds LOCALLY, so
   // it is the lane that must hand `omega build` the mount point.
   logger.log('Building (production, cached-only translation)...');

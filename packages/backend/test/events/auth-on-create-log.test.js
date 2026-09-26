@@ -10,15 +10,16 @@
  * one level down, at debug — silent on a normal run, one `OMEGA_DEBUG=1` away.
  *
  * Real everything: a seeded persona's REAL UserRecord from the emulator's Auth,
- * the real Manager and ctx, the real handler. The persona already has a user doc,
+ * the real omega and ctx, the real handler. The persona already has a user doc,
  * so the handler logs its headline and returns at the "already exists" branch —
  * no writes, nothing to clean up. The only stand-in is `console`, the sink.
  *
  * Run: npx omega test framework:events/auth-on-create-log
  */
 
-const onCreate = require('../../dist/manager/events/auth/on-create.js');
+const onCreate = require('../../dist/omega/events/auth/on-create.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 // Record every console call the thunk makes, restoring console afterward.
 async function withConsoleRecorder(fn) {
@@ -84,18 +85,17 @@ async function withDebug(value, fn) {
   }
 }
 
-async function runHandler({ Manager, user, debug }) {
-  const ctx = Manager.RouteContext({}, { functionName: 'omega_authOnCreate' });
-  const admin = Manager.libraries.admin;
+async function runHandler({ omega, user, debug }) {
+  const ctx = new Context(omega, {}, { functionName: 'omega_authOnCreate' });
+  const admin = omega.firebase.admin;
 
   const calls = await withConsoleRecorder(async () => {
     await withDebug(debug, async () => {
       await onCreate({
-        Manager: Manager,
+        omega: omega,
         ctx: ctx,
         user: user,
         context: EVENT_CONTEXT,
-        libraries: { admin: admin },
       });
     });
   });
@@ -111,12 +111,12 @@ module.exports = defineCases({
   tests: [
     {
       name: 'headline-is-the-uid-alone',
-      run: async ({ assert, Manager, accounts, firestore }) => {
-        const user = await Manager.libraries.admin.auth().getUser(accounts.basic.uid);
+      run: async ({ assert, omega, accounts, firestore }) => {
+        const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
         await assertDocExists({ assert: assert, firestore: firestore, user: user });
 
-        const { calls, headlines } = await runHandler({ Manager: Manager, user: user, debug: undefined });
+        const { calls, headlines } = await runHandler({ omega: omega, user: user, debug: undefined });
 
         assert.equal(headlines.length, 1, `expected one headline line, got ${headlines.length}`);
         assert.equal(headlines[0][1], `onCreate: ${user.uid}`, headlines[0][1]);
@@ -133,12 +133,12 @@ module.exports = defineCases({
 
     {
       name: 'the-record-does-not-print-on-a-normal-run',
-      run: async ({ assert, Manager, accounts, firestore }) => {
-        const user = await Manager.libraries.admin.auth().getUser(accounts.basic.uid);
+      run: async ({ assert, omega, accounts, firestore }) => {
+        const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
         await assertDocExists({ assert: assert, firestore: firestore, user: user });
 
-        const { calls } = await runHandler({ Manager: Manager, user: user, debug: undefined });
+        const { calls } = await runHandler({ omega: omega, user: user, debug: undefined });
 
         assert.equal(calls.debug.length, 0, 'the record must stay behind the debug gate by default');
         assert.equal(calls.log.filter((args) => args.includes(user)).length, 0, 'the record must not ride any log line');
@@ -147,12 +147,12 @@ module.exports = defineCases({
 
     {
       name: 'the-full-record-is-reachable-with-omega-debug',
-      run: async ({ assert, Manager, accounts, firestore }) => {
-        const user = await Manager.libraries.admin.auth().getUser(accounts.basic.uid);
+      run: async ({ assert, omega, accounts, firestore }) => {
+        const user = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
         await assertDocExists({ assert: assert, firestore: firestore, user: user });
 
-        const { calls } = await runHandler({ Manager: Manager, user: user, debug: '1' });
+        const { calls } = await runHandler({ omega: omega, user: user, debug: '1' });
 
         const records = calls.debug.filter((args) => args.includes(user));
 

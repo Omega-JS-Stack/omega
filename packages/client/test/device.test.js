@@ -1,14 +1,14 @@
 const { describe, it, before, beforeEach, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Device Module', () => {
 
   before(async () => {
-    await getManager().initialize(TEST_CONFIG);
+    await getOmega().initialize(TEST_CONFIG);
   });
 
   it('should expose expected methods', () => {
-    const device = getManager().device();
+    const device = getOmega().device;
     assert(typeof device.getUsageDuration === 'function');
     assert(typeof device.getSessionDuration === 'function');
     assert(typeof device.getInstalledDate === 'function');
@@ -18,27 +18,27 @@ describe('Device Module', () => {
   });
 
   it('should return positive usage duration', () => {
-    const ms = getManager().device().getUsageDuration('milliseconds');
+    const ms = getOmega().device.getUsageDuration('milliseconds');
     assert(ms >= 0);
   });
 
   it('should return duration in different units', () => {
-    const ms = getManager().device().getUsageDuration('milliseconds');
-    const sec = getManager().device().getUsageDuration('seconds');
+    const ms = getOmega().device.getUsageDuration('milliseconds');
+    const sec = getOmega().device.getUsageDuration('seconds');
     assert(ms >= sec);
   });
 
   it('should return session count >= 1', () => {
-    assert(getManager().device().getSessionCount() >= 1);
+    assert(getOmega().device.getSessionCount() >= 1);
   });
 
   it('should return installed date as Date object', () => {
-    const date = getManager().device().getInstalledDate();
+    const date = getOmega().device.getInstalledDate();
     assert(date instanceof Date);
   });
 
   it('should return binding data with expected structure', () => {
-    const data = getManager().device().getBindingData();
+    const data = getOmega().device.getBindingData();
     assert(typeof data.installed === 'number');
     assert(typeof data.session.count === 'number');
     assert(typeof data.duration.total.seconds === 'number');
@@ -47,7 +47,7 @@ describe('Device Module', () => {
   });
 
   it('should reset usage data', async () => {
-    const device = getManager().device();
+    const device = getOmega().device;
     await device.reset();
     assert.strictEqual(device.getSessionCount(), 1);
     assert.strictEqual(device.isNewVersion, false);
@@ -58,7 +58,7 @@ describe('Device Module — malformed stored data (wave-4 F6)', () => {
   let priorLocalStorage;
 
   before(async () => {
-    await getManager().initialize(TEST_CONFIG);
+    await getOmega().initialize(TEST_CONFIG);
   });
 
   // Earlier suite files remove/replace global.localStorage — install a
@@ -88,7 +88,7 @@ describe('Device Module — malformed stored data (wave-4 F6)', () => {
     }));
 
     const DeviceModule = (await import('../src/modules/device.js')).default;
-    const device = new DeviceModule(getManager());
+    const device = new DeviceModule(getOmega());
     const data = await device.initialize();
 
     // installed: 1 proves the stored entry was actually read (a fresh
@@ -104,7 +104,7 @@ describe('Device Module — primitive stored data (wave-4 B3)', () => {
   let priorLocalStorage;
 
   before(async () => {
-    await getManager().initialize(TEST_CONFIG);
+    await getOmega().initialize(TEST_CONFIG);
   });
 
   beforeEach(() => {
@@ -126,7 +126,7 @@ describe('Device Module — primitive stored data (wave-4 B3)', () => {
     global.localStorage.setItem('omega_device', JSON.stringify(5));
 
     const DeviceModule = (await import('../src/modules/device.js')).default;
-    const device = new DeviceModule(getManager());
+    const device = new DeviceModule(getOmega());
     const data = await device.initialize();
 
     assert.strictEqual(data.session.count, 1);

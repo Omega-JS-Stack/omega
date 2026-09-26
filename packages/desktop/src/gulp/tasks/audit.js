@@ -19,14 +19,14 @@
 
 const path    = require('path');
 const jetpack = require('fs-jetpack');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 const { validateConfig, releasesRepo, hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
-const logger = Manager.logger('audit');
+const logger = build.logger('audit');
 
 module.exports = function audit(done) {
   const cwd      = process.cwd();
-  const config   = Manager.getConfig();
+  const config   = build.getConfig();
   const errors   = [];
   const warnings = [];
 
@@ -45,11 +45,11 @@ module.exports = function audit(done) {
   // while reporting `0 warnings` ([#911](https://github.com/Omega-JS-Stack/omega/issues/911)).
   // A key the schema does not declare is what a typo looks like, and the
   // consumer has to see it at build time. They come off the LOAD, the same
-  // resolution `Manager.getConfig()` runs: loadConfig judges what the brand
+  // resolution `build.getConfig()` runs: loadConfig judges what the brand
   // AUTHORED, before the loader fills its own resolved facts (`company.name`
   // and friends) and before the build attaches `environment`.
   const { warnings: configWarnings } = hasOmegaConfig(cwd)
-    ? loadConfig(cwd, 'desktop', { environment: Manager.getEnvironment() })
+    ? loadConfig(cwd, 'desktop', { environment: build.getEnvironment() })
     : { warnings: [] };
   warnings.push(...configWarnings);
 
@@ -57,14 +57,14 @@ module.exports = function audit(done) {
   // tied to the build pipeline, not the config shape).
   fileMustExist('src/main.js',    'src/main.js');
   fileMustExist('src/preload.js', 'src/preload.js');
-  if (Manager.isPublishMode() || Manager.isBuildMode()) {
+  if (build.isPublishMode() || build.isBuildMode()) {
     // Icon must exist when packaging — dev runs fine with the default Electron icon.
     fileMustExist(config.brand.images?.icon, 'config.brand.images.icon');
   }
   // Publishing needs an ADDRESS for the releases repo, and no repo name is ever
   // typed: @omega.js/config's releasesRepo derives `<brand.id>-releases` under
   // the brand's org, so only a missing org (or brand.id) leaves it unaddressable.
-  if (Manager.isPublishMode() && config.releases?.enabled !== false && !releasesRepo(config)) {
+  if (build.isPublishMode() && config.releases?.enabled !== false && !releasesRepo(config)) {
     errors.push('the releases repo is unaddressable: set repo.org and brand.id. The repo is always "<brand.id>-releases" under that org');
   }
 

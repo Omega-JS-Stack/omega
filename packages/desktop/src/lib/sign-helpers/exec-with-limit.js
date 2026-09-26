@@ -13,7 +13,7 @@
 const { spawnSync } = require('child_process');
 const { execute } = require('node-powertools');
 
-const logger = new (require('../../build.js'))().logger('exec-with-limit');
+const logger = require('../../build.js').logger('exec-with-limit');
 
 // A kill that failed is exactly the state the operator needs to see, so every
 // failure is said, never swallowed.

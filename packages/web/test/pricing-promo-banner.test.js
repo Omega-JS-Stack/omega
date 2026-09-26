@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const PRICING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'pricing', 'index.js');
@@ -43,7 +44,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -123,14 +124,13 @@ async function loadPricingPage() {
 
   globalThis.__omegaClient = {
     config: { analytics: { providers: {} } },
-    dom: () => ({ ready: async () => {} }),
+    dom: { ready: async () => {} },
     request: async () => {},
-    auth: () => ({
-      listen: (options, handler) => handler({ account: null }),
-      resolveSubscription: () => ({ active: false }),
-    }),
-    sentry: () => ({ captureException: () => {} }),
-    storage: () => ({ get: (key, fallback) => fallback, set: () => {} }),
+    auth: {
+      listen: (options, handler) => handler({ user: new User(), denied: false }),
+    },
+    sentry: { captureException: () => {} },
+    storage: { get: (key, fallback) => fallback, set: () => {} },
   };
 
   // The page waits a second before it shows the banner, then polls a countdown

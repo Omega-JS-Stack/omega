@@ -20,7 +20,7 @@ const reads = require('@omega.js/devkit/reads');
  * bogus claim silently suppresses the framework default at that URL.
  * @param {string} raw - full page source
  * @returns {string|null} normalized URL (`/about/` → `/about`, the canonical
- *   slash-free legacy UJM shape) or null
+ *   slash-free shape) or null
  */
 function permalinkOf(raw) {
   const fm = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/);

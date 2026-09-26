@@ -200,8 +200,8 @@ function templateReads(source) {
 // The other dead read the census owns: `random_id`
 // ([#595](https://github.com/Omega-JS-Stack/omega/issues/595))
 //
-// UJM injected a fresh `random_id` into every render, and consumer includes
-// used it to scope repeated markup (Bootstrap accordion ids). OMEGA has no such
+// A migrated include may read a bare `random_id` to scope repeated markup
+// (Bootstrap accordion ids). OMEGA has no such
 // global: the read renders EMPTY, which is the #611 failure mode exactly — no
 // error, and every accordion on the page collapses into one container. The
 // replacement is an explicit assign of the `omega_random` filter, so what

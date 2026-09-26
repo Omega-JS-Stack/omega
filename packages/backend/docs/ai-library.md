@@ -1,6 +1,6 @@
 # AI Library
 
-`Manager.AI(ctx).request({ provider, model, messages, ... })` is the unified entry for all AI calls. Provider-agnostic surface — same options shape, same return shape.
+`ctx.ai.request({ provider, model, messages, ... })` is the unified entry for all AI calls (`omega.ai` outside a request; `ctx.ai` logs through the request). Provider-agnostic surface: same options shape, same return shape.
 
 | Provider | Default model | Notes |
 |---|---|---|
@@ -47,14 +47,14 @@ A prompt file that is missing, unreadable, or a directory throws from the same o
 
 `r.tokens` is the usage of THAT call — `{ total, input, output }`, each `{ count, price }`, priced from the model table. Summing `r.tokens` across calls is therefore correct. When a call retries internally (OpenAI's `retries` / `retryTriggers`), `r.tokens` is the usage of the attempt that resolved it; the discarded attempts count only on the PROVIDER instance's totals (`provider.tokens`), not in the returned report and not in `ai.tokens`.
 
-The running totals live on the instances: `ai.tokens` counts every call made through that `Manager.AI(ctx)` instance (all providers combined), and each provider instance keeps its own. Callers never share a tokens object, so parallel requests report their own usage.
+The running totals live on the instances: `ai.tokens` counts every call made through that `AI` instance (all providers combined; `ctx.ai` is one per request), and each provider instance keeps its own. Callers never share a tokens object, so parallel requests report their own usage.
 
 ## Image generation (OpenAI)
 
-`Manager.AI(ctx).image({ prompt, ... })` generates an image via OpenAI's image model (`gpt-image-2` by default). Separate from `request()` because the return type is bytes, not text — it bypasses moderation, token accounting, schema, and prompt-normalization (none apply to image gen).
+`ctx.ai.image({ prompt, ... })` generates an image via OpenAI's image model (`gpt-image-2` by default). Separate from `request()` because the return type is bytes, not text: it bypasses moderation, token accounting, schema, and prompt-normalization (none apply to image gen).
 
 ```js
-const ai = Manager.AI(ctx);
+const ai = ctx.ai;
 const { buffer, b64, mime, revisedPrompt } = await ai.image({
   prompt: 'Minimal flat vector illustration of a rocket, undraw.co style, blue + white, no text.',
   size: '1024x1024',   // 1024x1024 | 1536x1024 | 1024x1536 | auto (default 1024x1024)
@@ -89,11 +89,11 @@ A tool-call turn legitimately has `content: ''` — `response: 'json'` parsing i
 
 Structured conversations pass the full turn history through `options.messages` with two cross-provider conventions:
 
-- Assistant tool-call turn: `{ role: 'ctx', content?, toolCalls: [{ id, name, arguments }] }` — or replay the provider's raw blocks (`{ role: 'ctx', content: r.raw.content }`) on Anthropic.
+- Assistant tool-call turn: `{ role: 'assistant', content?, toolCalls: [{ id, name, arguments }] }`, or replay the provider's raw blocks (`{ role: 'assistant', content: r.raw.content }`) on Anthropic.
 - Tool result turn: `{ role: 'tool', toolCallId, content }` — consecutive tool results merge into one Anthropic user turn of `tool_result` blocks; OpenAI gets `function_call_output` items.
 
 ```js
-const ai = Manager.AI(ctx);
+const ai = ctx.ai;
 const messages = [
   { role: 'system', content: 'Use tools to answer.' },
   { role: 'user', content: 'What is the weather in Paris?' },
@@ -103,7 +103,7 @@ const tools = { list: [{ name: 'get_weather', description: '...', parameters: { 
 const first = await ai.request({ provider: 'anthropic', messages, tools });
 // first.stopReason === 'tool_use'; first.toolCalls = [{ id, name: 'get_weather', arguments: { city: 'Paris' } }]
 
-messages.push({ role: 'ctx', content: first.raw.content });          // or { role: 'ctx', toolCalls: first.toolCalls }
+messages.push({ role: 'assistant', content: first.raw.content });    // or { role: 'assistant', toolCalls: first.toolCalls }
 messages.push({ role: 'tool', toolCallId: first.toolCalls[0].id, content: '{"temp":"21C"}' });
 
 const second = await ai.request({ provider: 'anthropic', messages, tools });
@@ -156,16 +156,16 @@ Mint the token with `claude setup-token` (valid ~1 year). When it expires, reque
 
 > **Caveats:** the Bearer/beta subscription path is undocumented and may change. Usage is subject to the subscription's rate limits (not API-tier limits). For high-volume production traffic, prefer `anthropic` + `ANTHROPIC_API_KEY`.
 
-The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that re-exports the OpenAI provider class — existing callers using `new OpenAI(ctx, key)` still work unchanged.
+The legacy `src/omega/libraries/openai.js` is a thin compatibility shim that re-exports the OpenAI provider class: existing callers using `new OpenAI(ctx, key)` still work unchanged.
 
 | File | Purpose |
 |---|---|
-| `src/manager/libraries/ai/index.js` | Unified `AI` class (dispatches by provider; the one normalize point: prompt/message forms, prompt-file loading, universal injections, ambiguity guards; structured-messages detection) |
-| `src/manager/libraries/ai/prompt.js` | Shared prompt-segment normalization + content/prompt-file loading, called by the normalize point (and again, idempotently, by a directly constructed provider) |
-| `src/manager/libraries/ai/tokens.js` | Token accounting helpers (per-call report, running counters) |
-| `src/manager/libraries/ai/providers/openai.js` | OpenAI provider (Responses API; direct-messages mode + tool envelopes) |
-| `src/manager/libraries/ai/providers/anthropic.js` | Anthropic provider (Claude Messages API, x-api-key, API credits, native tool_use) |
-| `src/manager/libraries/ai/providers/claude-code.js` | claude-code provider (Claude Messages API, OAuth Bearer, subscription billing, native tool_use) |
-| `src/manager/libraries/ai/providers/anthropic-format.js` | Shared pure formatters for both Claude providers (tool defs, message building, extraction) |
-| `src/manager/libraries/ai/providers/test.js` | Deterministic `test` provider (scripted directives; dev/testing only) |
-| `src/manager/libraries/openai.js` | Back-compat shim → providers/openai.js |
+| `src/omega/libraries/ai/index.js` | Unified `AI` class (dispatches by provider; the one normalize point: prompt/message forms, prompt-file loading, universal injections, ambiguity guards; structured-messages detection) |
+| `src/omega/libraries/ai/prompt.js` | Shared prompt-segment normalization + content/prompt-file loading, called by the normalize point (and again, idempotently, by a directly constructed provider) |
+| `src/omega/libraries/ai/tokens.js` | Token accounting helpers (per-call report, running counters) |
+| `src/omega/libraries/ai/providers/openai.js` | OpenAI provider (Responses API; direct-messages mode + tool envelopes) |
+| `src/omega/libraries/ai/providers/anthropic.js` | Anthropic provider (Claude Messages API, x-api-key, API credits, native tool_use) |
+| `src/omega/libraries/ai/providers/claude-code.js` | claude-code provider (Claude Messages API, OAuth Bearer, subscription billing, native tool_use) |
+| `src/omega/libraries/ai/providers/anthropic-format.js` | Shared pure formatters for both Claude providers (tool defs, message building, extraction) |
+| `src/omega/libraries/ai/providers/test.js` | Deterministic `test` provider (scripted directives; dev/testing only) |
+| `src/omega/libraries/openai.js` | Back-compat shim → providers/openai.js |

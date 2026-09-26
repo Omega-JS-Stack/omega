@@ -5,7 +5,7 @@
  * `custom` — the same Express app listening on `PORT`, deployed to a
  * container host (Render & co). The switch is the brand's own config,
  * `targets.backend.projectType`, so ONE file decides it for the runtime
- * (`Manager.init`) and for the CLI alike.
+ * (`omega.initialize()`) and for the CLI alike.
  *
  * Custom mode takes three VERBS away, and FIREBASE_ONLY_VERBS is the one home
  * of that list: the Functions deploy, the local emulator, and the emulator test

@@ -1,7 +1,7 @@
 // Libraries
 const { execute } = require('node-powertools');
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('build');
+const build = require('../build.js');
+const logger = build.logger('build');
 const { ensureTarget } = require('./lib/ensure-target.js');
 
 // The consumer's `build` script is `omega build` — this verb owns the pipeline

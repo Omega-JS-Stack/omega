@@ -1,5 +1,5 @@
-// Runtime mode helpers, shared across all three context Managers (main /
-// renderer / preload) and the build-time Manager.
+// Runtime mode helpers: plain functions the process `Omega` classes (src/main.js,
+// src/preload.js, src/renderer.js) and the build-time module (src/build.js) call.
 //
 // The environment half is NOT implemented here any more
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It is
@@ -57,20 +57,7 @@ function getVersion() {
   }
 }
 
-// Mix the helpers into a Manager constructor's prototype + the constructor itself
-// (so `Manager.isTesting()` works statically too). The environment four come from
-// the shared module's own attachTo(), so every desktop entry point and every
-// sibling framework hangs the identical functions; getVersion() is desktop's and
-// is attached beside them. The URL helpers in url-helpers.js depend on
-// this.getEnvironment() existing, so this attachTo() runs first.
-function attachTo(Manager) {
-  environment.attachTo(Manager);
-  Manager.prototype.getVersion = getVersion;
-  Manager.getVersion = getVersion;
-}
-
 module.exports = {
-  attachTo,
   isDevelopment: environment.isDevelopment,
   isProduction: environment.isProduction,
   isTesting: environment.isTesting,

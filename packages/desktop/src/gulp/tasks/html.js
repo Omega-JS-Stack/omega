@@ -4,7 +4,7 @@
 // Page template is FRAMEWORK-INTERNAL (`<framework>/dist/config/page-template.html`). Consumers don't ship
 // their own — every view goes through the same shell so the inset titlebar / draggable region /
 // css/js wiring stay consistent. If a consumer needs a different template they can fork via
-// `manager.windows` config, but we no longer look at `<consumer>/config/page-template.html`.
+// `omega.windows` config, but we no longer look at `<consumer>/config/page-template.html`.
 //
 // Body content is itself templated FIRST (so you can use {{ brand.name }} etc. inside the view),
 // then the result is injected into the page template's `{{ content }}` slot.
@@ -15,17 +15,17 @@
 // This lines up with the `bundle` task's entry naming so /assets/js/components/<page.name>.bundle.js
 // and /assets/css/components/<page.name>.bundle.css resolve correctly.
 
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('html');
+const build = require('../../build.js');
+const logger = build.logger('html');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const projectRoot = Manager.getRootPath('project');
-const packageRoot = Manager.getRootPath('main');
+const projectRoot = build.getRootPath('project');
+const packageRoot = build.getRootPath('main');
 const outputRoot  = require('../../utils/dist-root.js')(projectRoot);
 
-// We require the templating lib directly (rather than going through a Manager singleton)
-// because gulp tasks run pre-Electron, with only the build-time Manager available.
+// We require the templating lib directly (rather than going through the omega instance)
+// because gulp tasks run pre-Electron, with only the build module available.
 const templating = require('../../lib/templating.js');
 
 module.exports = function htmlTask(done) {
@@ -81,9 +81,9 @@ module.exports = function htmlTask(done) {
     const bodyContent = jetpack.read(src);
 
     // Two-pass render: first the body (so it can use {{ brand.name }} etc.), then the outer page.
-    const innerVars = templating.buildPageVars(pageName, { cacheBust }, Manager);
+    const innerVars = templating.buildPageVars(pageName, { cacheBust }, build);
     const renderedBody = templating.render(bodyContent, innerVars);
-    const outerVars = templating.buildPageVars(pageName, { cacheBust, content: renderedBody }, Manager);
+    const outerVars = templating.buildPageVars(pageName, { cacheBust, content: renderedBody }, build);
     const final = templating.render(pageTemplateContent, outerVars);
 
     const dest = path.join(outputRoot, 'views', rel);

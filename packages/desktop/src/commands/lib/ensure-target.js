@@ -31,14 +31,14 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const version = require('wonderful-version');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
-const logger = Manager.logger('ensure-target');
-const package = Manager.getPackage('main');
+const logger = build.logger('ensure-target');
+const package = build.getPackage('main');
 
 /**
  * Sync the consumer manifest: the omega verb scripts, the npm-private latch,
@@ -47,7 +47,7 @@ const package = Manager.getPackage('main');
  * Identical content is not a write (#590).
  */
 function setupScripts(projectDir, result) {
-  projectDir = projectDir || Manager.getRootPath('project');
+  projectDir = projectDir || build.getRootPath('project');
   result = result || { changed: [] };
 
   const project = readProject(projectDir);
@@ -128,7 +128,7 @@ function checkNodeVersion(projectDir, requiredMajor, warn) {
  * @param {object} log - `{ log, warn, error }` handed to the engine.
  */
 async function copyDefaults(projectDir, engineLogger) {
-  projectDir = projectDir || Manager.getRootPath('project');
+  projectDir = projectDir || build.getRootPath('project');
   engineLogger = engineLogger || logger;
 
   const defaultsDir = path.resolve(__dirname, '..', '..', 'defaults');
@@ -311,7 +311,7 @@ function checkLocality(projectDir) {
  */
 async function ensureTarget(options) {
   options = options || {};
-  const projectDir = options.projectDir || Manager.getRootPath('project');
+  const projectDir = options.projectDir || build.getRootPath('project');
   const log = options.log || (() => {});
   const warn = options.warn || (() => {});
   const result = { written: [], merged: [], changed: [] };

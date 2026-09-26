@@ -14,7 +14,7 @@
  *
  * Run: npx omega test backend:helpers/payment/stripe/fetch-charge
  */
-const Stripe = require('../../../../dist/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const CHARGE_ID = 'ch_test_fetch_charge';

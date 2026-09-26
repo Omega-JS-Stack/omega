@@ -11,10 +11,10 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { renderVertUnit } = require('../../../dist/manager/routes/verts/utils.js');
+const { renderVertUnit } = require('../../../dist/omega/routes/verts/utils.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
-const UTILS_PATH = path.join(__dirname, '../../../dist/manager/routes/verts/utils.js');
+const UTILS_PATH = path.join(__dirname, '../../../dist/omega/routes/verts/utils.js');
 
 function makeVert(overrides) {
   return {

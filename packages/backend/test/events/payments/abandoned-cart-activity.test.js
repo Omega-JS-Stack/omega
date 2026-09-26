@@ -18,8 +18,8 @@
  *
  * Run: npx omega test backend:events/payments/abandoned-cart-activity
  */
-const sweep = require('../../../dist/manager/events/cron/frequent/abandoned-carts.js');
-const { REMINDER_DELAYS, COLLECTION } = require('../../../dist/manager/libraries/abandoned-cart-config.js');
+const sweep = require('../../../dist/omega/events/cron/frequent/abandoned-carts.js');
+const { REMINDER_DELAYS, COLLECTION } = require('../../../dist/omega/libraries/abandoned-cart-config.js');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -59,21 +59,21 @@ async function runSweep(cart) {
 
   const logs = [];
   const sent = [];
-  const Manager = {
+  const omega = {
     config: { ...CONFIG, brand: { name: 'Test Brand' } },
     project: { websiteUrl: 'https://test.dev' },
-    libraries: { admin },
-    Email: () => ({ send: async (payload) => { sent.push(payload); return { status: 'sent' }; } }),
+    firebase: { admin },
   };
   const ctx = {
-    Manager,
+    omega,
+    email: { send: async (payload) => { sent.push(payload); return { status: 'sent' }; } },
     isTesting: () => true,
     log: (...args) => logs.push(args.join(' ')),
     warn: (...args) => logs.push(args.join(' ')),
     error: (...args) => logs.push(args.join(' ')),
   };
 
-  await sweep({ Manager, ctx, context: {}, libraries: { admin } });
+  await sweep({ omega, ctx, context: {} });
 
   return { store, logs, sent };
 }

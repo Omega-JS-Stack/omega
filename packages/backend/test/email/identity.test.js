@@ -11,9 +11,9 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { resolvePerson, resolveSignoff } = require('../../dist/manager/libraries/email/prepare.js');
-const { footer } = require('../../dist/manager/libraries/email/generators/lib/templates/base.js');
-const feedbackTemplate = require('../../dist/manager/libraries/email/generators/lib/templates/feedback.js');
+const { resolvePerson, resolveSignoff } = require('../../dist/omega/libraries/email/prepare.js');
+const { footer } = require('../../dist/omega/libraries/email/generators/lib/templates/base.js');
+const feedbackTemplate = require('../../dist/omega/libraries/email/generators/lib/templates/feedback.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The identity the framework used to hardcode. Nothing may ever emit these again.
@@ -47,8 +47,8 @@ const brandWithoutPerson = { name: 'Acme', contact: { email: 'support@acme.examp
 function buildWith(brand, settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
-  const Manager = {
+  const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
+  const omega = {
     config: {
       brand: { id: 'acme', url: 'https://acme.example', images: {}, ...brand },
       company: structuredClone(COMPANY),
@@ -56,10 +56,9 @@ function buildWith(brand, settings) {
       marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
     },
     project: { websiteUrl: 'https://acme.example' },
-    libraries: { admin: {} },
-    User: () => ({ properties: {} }),
+    firebase: { admin: {} },
   };
-  const ctx = { Manager, log: () => {}, error: () => {} };
+  const ctx = { omega, log: () => {}, error: () => {} };
 
   return new Transactional(ctx).build({
     to: 'user@acme.example',

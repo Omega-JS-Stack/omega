@@ -2,7 +2,7 @@
 
 @omega.js/extension page surfaces auto-bind the OMEGA verts (ads) system (monorepo
 `docs/web/ads-system.md`, phase 4): drop a `[data-omega-vert]` element into a
-popup/options/sidepanel/page view and the surface Manager hands it to
+popup/options/sidepanel/page view and the page context's `omega` hands it to
 `@omega.js/client`'s verts module — zero consumer JS, same element vocabulary
 as the web `verts/unit` section and @omega.js/desktop.
 
@@ -12,8 +12,8 @@ as the web `verts/unit` section and @omega.js/desktop.
 
 ## What the wiring does
 
-`lib/verts.js wireAds()` (called by each page-surface Manager's `initialize()`
-after `omega.initialize()`) binds every `[data-omega-vert]` element present at
+`lib/verts.js wireAds()` (called by each page context's `initialize()`
+after the client boots) binds every `[data-omega-vert]` element present at
 boot AND inserted later (MutationObserver), marking bound hosts
 `data-omega-vert-bound="house"`. Everything after the bind lives in the client
 module (`@omega.js/client/modules/verts.js`): lazy arming near the viewport, a

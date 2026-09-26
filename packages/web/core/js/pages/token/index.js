@@ -1,6 +1,6 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -36,7 +36,7 @@ export default function () {
   const isMcp = url.searchParams.get('mcp') === 'true';
 
   // Handle DOM ready
-  omega.dom().ready()
+  omega.dom.ready()
   .then(async () => {
     // Log
     logger.log('Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'authReturnUrl:', authReturnUrl);
@@ -53,11 +53,11 @@ export default function () {
     }
 
     // Wait for auth to be ready and get user
-    omega.auth().listen({ once: true }, async (state) => {
+    omega.auth.listen({ once: true }, async (state) => {
       const user = state.user;
 
       // Should not happen since page requires auth, but just in case
-      if (!user) {
+      if (!user.authenticated) {
         showError('Not authenticated. Please sign in first.');
         return;
       }
@@ -67,7 +67,7 @@ export default function () {
         if (isMcp && mcpRedirectUri) {
           updateStatus('Completing MCP authorization...');
 
-          const idToken = await omega.auth().getIdToken(true);
+          const idToken = await omega.auth.getIdToken(true);
           const returnUrl = new URL(mcpRedirectUri);
           returnUrl.searchParams.set('code', idToken);
 
@@ -81,7 +81,7 @@ export default function () {
           updateStatus('Redirecting to Claude...');
 
           setTimeout(() => {
-            updateStatus(`If you were not redirected, <a href="${omega.utilities().escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
+            updateStatus(`If you were not redirected, <a href="${omega.utilities.escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
           }, 3000);
 
           window.location.href = redirectUrl;
@@ -111,7 +111,7 @@ export default function () {
 
           // Show retry button after a delay in case the redirect was cancelled (e.g. custom protocol dialog)
           setTimeout(() => {
-            updateStatus(`If you were not redirected, <a href="${omega.utilities().escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
+            updateStatus(`If you were not redirected, <a href="${omega.utilities.escapeHTML(redirectUrl)}">click here to try again</a>.`, true);
           }, 3000);
 
           window.location.href = redirectUrl;
@@ -193,7 +193,7 @@ export default function () {
   // LEGACY: Add the legacy token shape for desktop app deep links
   // Legacy desktop apps read ?payload={"token":"X"} on custom protocol URLs — ADDED
   // alongside ?authToken=X (never replacing it): old apps read payload and ignore
-  // authToken, modern apps (Electron Manager) read authToken and ignore payload.
+  // authToken, modern apps (@omega.js/desktop) read authToken and ignore payload.
   // TODO: Remove this function AND its call above when legacy desktop app support is no longer needed
   function _legacyTranslateTokenRedirect(returnUrl, token) {
     if (returnUrl.protocol !== 'http:' && returnUrl.protocol !== 'https:') {

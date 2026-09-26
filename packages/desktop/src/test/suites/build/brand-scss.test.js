@@ -29,7 +29,7 @@ function stageConsumer(color) {
 
 /**
  * Run the sass task with the fixture as the project root. Both the task and the
- * build Manager resolve that root at REQUIRE time, so each run gets a fresh
+ * build module resolve that root at REQUIRE time, so each run gets a fresh
  * copy of both.
  */
 function runSassIn(dir) {

@@ -41,7 +41,7 @@ module.exports = defineCases({
 
         // Send invoice.payment_failed with a non-subscription billing reason
         // This routes to category: 'one-time' in the webhook parser
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'invoice.payment_failed',
           data: {

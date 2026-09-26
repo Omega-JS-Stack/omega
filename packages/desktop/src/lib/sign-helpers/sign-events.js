@@ -21,7 +21,7 @@ const os      = require('os');
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 
-const logger = new (require('../../build.js'))().logger('sign-events');
+const logger = require('../../build.js').logger('sign-events');
 
 function resolveLogPath(env, platform) {
   env      = env || process.env;

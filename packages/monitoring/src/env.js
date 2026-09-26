@@ -21,7 +21,7 @@
  * signal with its own opinion: a build-mode run of a development artifact
  * reported as production, and a packaged production app whose lane did not
  * carry the flag reported as development. @omega.js/backend still passes its
- * own answer in (`Manager.isProduction()`), and a boolean a host supplies
+ * own answer in (`omega.isProduction()`), and a boolean a host supplies
  * always wins.
  */
 
@@ -30,7 +30,7 @@ const { isProduction } = require('@omega.js/config/environment');
 /**
  * Read the environment gates for core.resolveConfig().
  * @param {object} [host] - the host's own signals, and the context the one
- *   environment is read off (a Manager carrying the baked `config`)
+ *   environment is read off (an Omega instance carrying the baked `config`)
  * @param {boolean} [host.isProduction] - overrides the one environment's answer
  * @param {boolean} [host.allowInDev] - the host's own dev opt-in (e.g. @omega.js/backend's `reportErrorsInDev`)
  * @returns {{ killed: boolean, killedReason: string|null, isProduction: boolean, allowInDev: boolean }}

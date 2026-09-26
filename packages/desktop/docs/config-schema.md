@@ -4,7 +4,7 @@
 
 Validation runs in two places:
 
-1. **`Manager.initialize()` (boot)** — hard-fails the app at boot if any required field is missing or any present field is invalid. So a misconfigured app never reaches the "white window of confusion" phase — it tells you exactly which field is broken.
+1. **`omega.initialize()` (boot, main)**: hard-fails the app at boot if any required field is missing or any present field is invalid. So a misconfigured app never reaches the "white window of confusion" phase: it tells you exactly which field is broken.
 2. **`gulp audit` (build)**: same schema, plus build-pipeline-specific extras (file-existence for icons, an addressable releases repo in publish mode, etc.).
 
 ## Schema entry shape

@@ -16,11 +16,11 @@
  * The wiring half is proven by the emulator: every route suite still
  * round-trips green through this same line.
  */
-const Middleware = require('../../dist/manager/helpers/middleware.js');
-const { methods } = require('../../dist/manager/helpers/context/respond.js');
+const redaction = require('../../dist/omega/helpers/log-redaction.js');
+const { methods } = require('../../dist/omega/context/respond.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const { redactResponseForLog } = Middleware;
+const { redactResponseForLog } = redaction;
 
 // The credentials the reported line printed, in the shapes the user record
 // carries them.
@@ -82,10 +82,10 @@ function mockContext() {
     send(body) { sent.send.push(body); return res; },
   };
   const ctx = Object.assign({
-    ref: { res },
+    res,
     tag: null,
-    schema: {},
-    Manager: { libraries: {} },
+    usage: { counters: () => ({}), limits: () => ({}) },
+    omega: { sentry: null },
     log: (...args) => logs.push(args.join(' ')),
     warn: (...args) => logs.push(args.join(' ')),
     error: (...args) => logs.push(args.join(' ')),

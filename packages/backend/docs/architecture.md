@@ -1,17 +1,33 @@
 # Architecture
 
-## Manager Class
+## The `Omega` instance
 
-The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and orchestrates all functionality:
-- Initializes Firebase Admin SDK
-- Sets up built-in Cloud Functions (`omega_api`, auth events, cron)
-- Provides factory methods for helper classes
-- Manages configuration from multiple sources
+The package's main export is ONE instance of the `Omega` class (`src/omega/index.js`, an EventEmitter); a consumer never writes `new`:
+
+```javascript
+const omega = require('@omega.js/backend');
+
+omega.initialize({ /* options */ });
+
+module.exports = omega.functions;
+```
+
+`initialize(options)` is synchronous (Firebase reads a functions entry's exports at module load) and returns the instance. It:
+- loads the `.env` cascade and the composed config (`omega.config`, with `config.resolved`), and resolves the environment once
+- initializes Firebase Admin (`omega.firebase.admin`, `omega.firebase.app`)
+- builds the process services (`omega.utilities`, `omega.storage()`, `omega.email`, `omega.ai`) and the instance's own logger (`omega.logger`)
+- wires the built-in Cloud Functions into `omega.functions` (`omega_api`, the auth and Firestore triggers, the cron schedules), or starts the custom server
+
+The option list and every member of the instance: [the guide](../../../docs/backend/index.md#the-consumer-entry).
+
+## `Context`
+
+Every route, event and cron job runs with ONE `Context` (`src/omega/context.js`), the `ctx` its handler receives. It carries the tagged logger, the response door (`respond`, `redirect`, `report`), authentication, the parsed request (`ctx.request`, null outside HTTP), the validated input (`ctx.data`), and the request services, each built on first read: `ctx.user`, `ctx.usage`, `ctx.analytics`, `ctx.email`, `ctx.ai`, `ctx.metadata()`.
 
 ## Derived config values (`config.resolved.*`)
 
-The composed config a consumer reads (`Manager.config`, and the same object every
-route/hook/cron receives) carries a `resolved` group of values the FRAMEWORK derives at
+The composed config a consumer reads (`omega.config`, the same object every
+route, hook and cron job reaches through `omega`) carries a `resolved` group of values the FRAMEWORK derives at
 boot ([#290](https://github.com/Omega-JS-Stack/omega/issues/290)). A brand target cannot
 require `@omega.js/config` — it is a private package, vendored into the framework's dist
 — so a brand that needed a derived value used to re-implement the derivation and drift
@@ -32,34 +48,34 @@ carrying one fails validation. `null` is the honest answer for a brand that decl
 org, and the CMS routes answer "GitHub repo not configured" off exactly that.
 
 Every derivation lives in `@omega.js/config` (`sourceRepo()` here), never a second copy.
-`src/manager/helpers/resolved-config.js` only names the group and the values in it; new
+`src/omega/helpers/resolved-config.js` only names the group and the values in it; new
 derived values join there as real brand needs surface, each with a test pinning it to the
 config package's own function.
 
 ## Dual-Mode Support
 
 @omega.js/backend supports two deployment modes, picked by the brand's config —
-`targets.backend.projectType` in `config/omega.json5`, read by `Manager.init()` (#584), so a
-consumer's `src/index.js` is the same in both. An explicit `init` option overrides it.
+`targets.backend.projectType` in `config/omega.json5`, read by `initialize()`, so a
+consumer's `src/index.js` is the same in both. An explicit `projectType` option overrides it.
 - **Firebase Functions** (`projectType: 'firebase'`, the default): Cloud Functions with Firebase triggers
-- **Custom Server** (`projectType: 'custom'`): the same routes, schemas, auth middleware and
-  helpers, served by the Express app on `process.env.PORT` for a container host.
-  `firebase-functions` is never loaded (`libraries.functions` is `null`); `firebase-admin`
-  still is. The Firebase-only CLI verbs (`deploy`, `serve`, `emulator`, `test`) refuse and
+- **Custom Server** (`projectType: 'custom'`): the same routes, schemas, request pipeline and
+  services (the framework's routes under `/omega/`, a consumer's at their own path), served by the Express app on `process.env.PORT` (`src/omega/server.js`,
+  `omega.server`) for a container host. `firebase-functions` is never loaded
+  (`omega.firebase.functions` is `null`); `firebase-admin` still is. The Firebase-only CLI verbs (`deploy`, `serve`, `emulator`, `test`) refuse and
   name their replacement lane — `src/cli/utils/project-type.js` is the one home of that list.
 
-## Helper Factory Pattern
+## Services
 
-All helpers are accessed via factory methods on the Manager instance:
+A route never constructs a service: it reads it off `ctx` or `omega`. Each service is one class, `class X { constructor(owner) }` (`src/omega/services/`): a process service takes `omega` and is built once, a request service takes `ctx` and is built on its first read.
 
 ```javascript
-Manager.RouteContext({ req, res })  // Request handler
-Manager.User(data)               // User properties
-Manager.Analytics({ ctx }) // GA4 events
-Manager.Usage()                  // Rate limiting
-Manager.Middleware(req, res)     // Request pipeline
-Manager.Settings()               // Schema validation
-Manager.Utilities()              // Batch operations
-Manager.Metadata(doc)            // Timestamps/tags
-Manager.storage({ name })        // Local JSON storage (lowdb)
+omega.utilities                  // Firestore/Auth iteration, randomId(), slugify(), sanitize(), trim()
+omega.storage({ name })          // A named local JSON store (lowdb)
+omega.email / ctx.email          // Transactional and marketing email
+omega.ai / ctx.ai                // OpenAI and Anthropic
+ctx.user                         // The caller, a User from @omega.js/account
+ctx.usage                        // The counted-feature gate
+ctx.analytics                    // GA4 events as the caller
+ctx.metadata(metadata, document) // A document's metadata block
+ctx.data                         // The input, validated by services/settings.js
 ```

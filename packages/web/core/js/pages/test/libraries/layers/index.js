@@ -7,7 +7,7 @@ import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('test:layers');
 
-export default ({ manager, options }) => {
+export default ({ omega, options }) => {
   const dot = document.querySelector('.layer-dot[data-layer="js-global"]');
   if (dot) {
     dot.style.background = '#30a46c'; // green

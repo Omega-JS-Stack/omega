@@ -43,7 +43,7 @@ module.exports = defineCases({
         state.eventId = `_test-evt-cb-unreachable-${Date.now()}`;
         state.termEnd = Math.floor(Date.now() / 1000) + 86400 * 30;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=chargebee&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=chargebee&key=${config.webhookKey}`, {
           id: state.eventId,
           occurred_at: Math.floor(Date.now() / 1000),
           event_type: 'subscription_created',

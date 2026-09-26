@@ -17,7 +17,7 @@ const { spawn } = require('child_process');
 const client = require('./client');
 const { quitAndDrain } = require('./quit');
 
-const Manager = new (require('../../build.js'))();
+const build = require('../../build.js');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -42,7 +42,7 @@ async function waitForBoot(matcher) {
 }
 
 module.exports = async function (options) {
-  const config = Manager.getConfig();
+  const config = build.getConfig();
 
   const wasRunning = await quitAndDrain(client.appNames(config));
   console.log(wasRunning ? 'quit running app' : 'app was not running');

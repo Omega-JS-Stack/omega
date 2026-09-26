@@ -5,14 +5,14 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     // Initialize components
     initializeUptimeBars();
@@ -139,12 +139,12 @@ function showUptimeTooltip(e, $bar, index, totalDays) {
   });
 
   $tooltip.innerHTML = `
-    <div class="fw-semibold mb-1">${omega.utilities().escapeHTML(dateStr)}</div>
+    <div class="fw-semibold mb-1">${omega.utilities.escapeHTML(dateStr)}</div>
     <div class="d-flex align-items-center gap-2">
       <span class="status-dot rounded-circle ${config.statusClasses[status]}"></span>
-      <span>${omega.utilities().escapeHTML(config.statusLabels[status])}</span>
+      <span>${omega.utilities.escapeHTML(config.statusLabels[status])}</span>
     </div>
-    <div class="text-muted small">Uptime: ${omega.utilities().escapeHTML(uptime)}</div>
+    <div class="text-muted small">Uptime: ${omega.utilities.escapeHTML(uptime)}</div>
   `;
 
   $tooltip.style.display = 'block';
@@ -196,7 +196,7 @@ function initializeSubscribeForm() {
     return;
   }
 
-  const formManager = new FormManager($form, {
+  const formManager = new FormManager(omega, $form, {
     submittedText: 'Subscribed!',
     allowResubmit: false,
   });
@@ -323,7 +323,7 @@ function displayBuildInfo(data) {
   if ($environment && data.environment) {
     const envText = data.environment.charAt(0).toUpperCase() + data.environment.slice(1);
     const envClass = data.environment === 'production' ? 'text-success' : 'text-warning';
-    $environment.innerHTML = `<span class="${envClass}">${omega.utilities().escapeHTML(envText)}</span>`;
+    $environment.innerHTML = `<span class="${envClass}">${omega.utilities.escapeHTML(envText)}</span>`;
   }
 
   // Version
@@ -340,7 +340,7 @@ function displayBuildInfo(data) {
   if ($packages && data.packages) {
     const packageBadges = Object.entries(data.packages)
       .map(([name, version]) => {
-        return `<span class="badge bg-body-secondary text-body fw-normal">${omega.utilities().escapeHTML(name)}: <span class="fw-semibold">${omega.utilities().escapeHTML(version)}</span></span>`;
+        return `<span class="badge bg-body-secondary text-body fw-normal">${omega.utilities.escapeHTML(name)}: <span class="fw-semibold">${omega.utilities.escapeHTML(version)}</span></span>`;
       })
       .join('');
     $packages.innerHTML = packageBadges;
@@ -349,14 +349,14 @@ function displayBuildInfo(data) {
   // Repository
   if ($repo && data.repo) {
     const repoUrl = `https://github.com/${encodeURIComponent(data.repo.user)}/${encodeURIComponent(data.repo.name)}`;
-    $repo.innerHTML = `<a href="${omega.utilities().escapeHTML(repoUrl)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${omega.utilities().escapeHTML(data.repo.user)}/${omega.utilities().escapeHTML(data.repo.name)}</a>`;
+    $repo.innerHTML = `<a href="${omega.utilities.escapeHTML(repoUrl)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${omega.utilities.escapeHTML(data.repo.user)}/${omega.utilities.escapeHTML(data.repo.name)}</a>`;
   }
 
   // Commit — the sha links into the repo when there is one to link into
   if ($commit && data.commit) {
-    const sha = omega.utilities().escapeHTML(data.commit);
+    const sha = omega.utilities.escapeHTML(data.commit);
     $commit.innerHTML = data.repo
-      ? `<a href="${omega.utilities().escapeHTML(`https://github.com/${encodeURIComponent(data.repo.user)}/${encodeURIComponent(data.repo.name)}/commit/${encodeURIComponent(data.commit)}`)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${sha}</a>`
+      ? `<a href="${omega.utilities.escapeHTML(`https://github.com/${encodeURIComponent(data.repo.user)}/${encodeURIComponent(data.repo.name)}/commit/${encodeURIComponent(data.commit)}`)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${sha}</a>`
       : sha;
   }
 }
@@ -558,14 +558,14 @@ function updateMaintenance(maintenanceItems) {
     <div class="card maintenance-card border-0 bg-body-tertiary mb-3 border-info">
       <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <h4 class="h5 fw-semibold mb-0">${omega.utilities().escapeHTML(item.title)}</h4>
-          <span class="text-muted small">${omega.utilities().escapeHTML(formatDate(item.scheduled_for))}</span>
+          <h4 class="h5 fw-semibold mb-0">${omega.utilities.escapeHTML(item.title)}</h4>
+          <span class="text-muted small">${omega.utilities.escapeHTML(formatDate(item.scheduled_for))}</span>
         </div>
-        <p class="text-muted mb-0">${omega.utilities().escapeHTML(item.description)}</p>
+        <p class="text-muted mb-0">${omega.utilities.escapeHTML(item.description)}</p>
         ${item.affected_services ? `
           <div class="mt-2">
             <small class="text-muted">
-              <strong>Affected:</strong> ${item.affected_services.map(s => omega.utilities().escapeHTML(s)).join(', ')}
+              <strong>Affected:</strong> ${item.affected_services.map(s => omega.utilities.escapeHTML(s)).join(', ')}
             </small>
           </div>
         ` : ''}
@@ -607,18 +607,18 @@ function updateIncidents(incidents) {
     <div class="card incident-card border-0 bg-body-tertiary mb-3 ${config.borderClasses[incident.status] || ''}">
       <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
-          <h4 class="h5 fw-semibold mb-0">${omega.utilities().escapeHTML(incident.title)}</h4>
+          <h4 class="h5 fw-semibold mb-0">${omega.utilities.escapeHTML(incident.title)}</h4>
           <div class="d-flex align-items-center gap-2">
-            <span class="badge ${getIncidentBadgeClasses(incident.status)}">${omega.utilities().escapeHTML(formatIncidentStatus(incident.status))}</span>
-            <span class="text-muted small">${omega.utilities().escapeHTML(formatDate(incident.created_at))}</span>
+            <span class="badge ${getIncidentBadgeClasses(incident.status)}">${omega.utilities.escapeHTML(formatIncidentStatus(incident.status))}</span>
+            <span class="text-muted small">${omega.utilities.escapeHTML(formatDate(incident.created_at))}</span>
           </div>
         </div>
         ${incident.updates && incident.updates.length > 0 ? `
           <div class="incident-timeline mt-3">
             ${incident.updates.map(update => `
-              <div class="timeline-item pb-3" data-status="${omega.utilities().escapeHTML(config.dataStatusMap[update.status] || '')}">
-                <div class="small text-muted mb-1">${omega.utilities().escapeHTML(formatDateTime(update.created_at))}</div>
-                <div class="small">${omega.utilities().escapeHTML(update.message)}</div>
+              <div class="timeline-item pb-3" data-status="${omega.utilities.escapeHTML(config.dataStatusMap[update.status] || '')}">
+                <div class="small text-muted mb-1">${omega.utilities.escapeHTML(formatDateTime(update.created_at))}</div>
+                <div class="small">${omega.utilities.escapeHTML(update.message)}</div>
               </div>
             `).join('')}
           </div>

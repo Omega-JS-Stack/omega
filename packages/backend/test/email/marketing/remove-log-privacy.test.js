@@ -20,9 +20,9 @@
  *
  * Run: npx omega test framework:email/marketing/remove-log-privacy
  */
-const Marketing = require('../../../dist/manager/libraries/email/marketing/index.js');
-const sendgridProvider = require('../../../dist/manager/libraries/email/providers/sendgrid.js');
-const beehiivProvider = require('../../../dist/manager/libraries/email/providers/beehiiv.js');
+const Marketing = require('../../../dist/omega/libraries/email/marketing/index.js');
+const sendgridProvider = require('../../../dist/omega/libraries/email/providers/sendgrid.js');
+const beehiivProvider = require('../../../dist/omega/libraries/email/providers/beehiiv.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const EMAIL = 'contact.person@omegajs-test.dev';
@@ -47,7 +47,7 @@ function createRecorder(admin) {
   return {
     calls: calls,
     ctx: {
-      Manager: { libraries: { admin: admin || null }, config: {} },
+      omega: { firebase: { admin: admin || null }, config: {} },
       isTesting: () => false,
       log: record('log'),
       debug: record('debug'),
@@ -130,7 +130,7 @@ async function runSync() {
   const { calls, ctx } = createRecorder();
 
   // buildFields() is stubbed alongside the writes: the real ones read a
-  // module-level Manager config, and SendGrid's fetches the account's
+  // module-level omega config, and SendGrid's fetches the account's
   // custom-field ids over the network.
   await withProviders([
     [sendgridProvider, 'buildFields', async () => ({})],

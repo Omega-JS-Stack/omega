@@ -17,7 +17,7 @@ module.exports = defineCases({
     {
       name: 'default-values-applied',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided', // Must provide required field
         });
 
@@ -38,7 +38,7 @@ module.exports = defineCases({
     {
       name: 'user-values-override-defaults',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           stringField: 'custom-string',
           numberField: 100,
@@ -65,7 +65,7 @@ module.exports = defineCases({
     {
       name: 'required-field-missing-fails',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           // NOT providing requiredField
         });
 
@@ -76,7 +76,7 @@ module.exports = defineCases({
     {
       name: 'required-field-provided-succeeds',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'i-am-required',
         });
 
@@ -90,7 +90,7 @@ module.exports = defineCases({
       auth: 'basic',
       async run({ http, assert }) {
         // Basic user - conditionalRequired should NOT be required
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           // NOT providing conditionalRequired
         });
@@ -104,7 +104,7 @@ module.exports = defineCases({
       auth: 'premium-active',
       async run({ http, assert }) {
         // Premium user - conditionalRequired SHOULD be required
-        const response = await http.as('premium-active').post('backend-manager/test/schema', {
+        const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           // NOT providing conditionalRequired
         });
@@ -117,7 +117,7 @@ module.exports = defineCases({
       name: 'conditional-required-premium-provided',
       auth: 'premium-active',
       async run({ http, assert }) {
-        const response = await http.as('premium-active').post('backend-manager/test/schema', {
+        const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'also-provided',
         });
@@ -132,7 +132,7 @@ module.exports = defineCases({
     {
       name: 'function-default-executed',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
@@ -148,7 +148,7 @@ module.exports = defineCases({
     {
       name: 'user-based-default-authenticated',
       async run({ http, assert, accounts }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
@@ -165,7 +165,7 @@ module.exports = defineCases({
       name: 'user-based-default-unauthenticated',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/test/schema', {
+        const response = await http.as('none').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
@@ -184,7 +184,7 @@ module.exports = defineCases({
     {
       name: 'forced-value-overrides-user-input',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           forcedValue: 'user-tried-to-set-this',
         });
@@ -204,7 +204,7 @@ module.exports = defineCases({
     {
       name: 'min-number-enforced',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           minNumber: -5, // Below min of 1
         });
@@ -221,7 +221,7 @@ module.exports = defineCases({
     {
       name: 'max-number-enforced',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxNumber: 500, // Above max of 100
         });
@@ -238,7 +238,7 @@ module.exports = defineCases({
     {
       name: 'clamped-number-within-range',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 75, // Within range 10-100
         });
@@ -254,7 +254,7 @@ module.exports = defineCases({
     {
       name: 'clamped-number-below-range',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 5, // Below min of 10
         });
@@ -270,7 +270,7 @@ module.exports = defineCases({
     {
       name: 'clamped-number-above-range',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           clampedNumber: 200, // Above max of 100
         });
@@ -289,7 +289,7 @@ module.exports = defineCases({
     {
       name: 'max-length-string-truncated',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxLengthString: 'this-is-way-too-long-for-the-limit', // max is 10
         });
@@ -309,7 +309,7 @@ module.exports = defineCases({
     {
       name: 'max-length-array-truncated',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           maxLengthArray: ['a', 'b', 'c', 'd', 'e'], // max is 3
         });
@@ -330,7 +330,7 @@ module.exports = defineCases({
       name: 'plan-based-limit-basic-user',
       auth: 'basic',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           planBasedLimit: 500, // Basic max is 100
         });
@@ -347,7 +347,7 @@ module.exports = defineCases({
       name: 'plan-based-limit-premium-user',
       auth: 'premium-active',
       async run({ http, assert }) {
-        const response = await http.as('premium-active').post('backend-manager/test/schema', {
+        const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'provided', // Required for premium
           planBasedLimit: 500, // Premium max is 1000
@@ -367,7 +367,7 @@ module.exports = defineCases({
     {
       name: 'multi-type-accepts-string',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           multiType: 'hello',
         });
@@ -384,7 +384,7 @@ module.exports = defineCases({
     {
       name: 'multi-type-accepts-number',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           multiType: 123,
         });
@@ -404,7 +404,7 @@ module.exports = defineCases({
     {
       name: 'any-type-accepts-anything',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           anyType: { complex: { nested: ['data', 123, true] } },
         });
@@ -423,7 +423,7 @@ module.exports = defineCases({
     {
       name: 'clean-regex-removes-characters',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           cleanedString: 'hello@world!123#test',
         });
@@ -442,7 +442,7 @@ module.exports = defineCases({
     {
       name: 'clean-function-transforms-value',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           cleanedFunction: '  HELLO WORLD  ',
         });
@@ -461,7 +461,7 @@ module.exports = defineCases({
     {
       name: 'nested-defaults-applied',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
@@ -477,7 +477,7 @@ module.exports = defineCases({
     {
       name: 'nested-values-overridden',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           nested: {
             level1: 'custom-nested',
@@ -499,7 +499,7 @@ module.exports = defineCases({
       name: 'unauthenticated-request',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/test/schema', {
+        const response = await http.as('none').post('omega/test/schema', {
           requiredField: 'provided',
         });
 
@@ -519,7 +519,7 @@ module.exports = defineCases({
       name: 'premium-only-field-basic-user',
       auth: 'basic',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/schema', {
+        const response = await http.as('basic').post('omega/test/schema', {
           requiredField: 'provided',
           premiumOnlyField: 'trying-to-use-premium-feature',
         });
@@ -537,7 +537,7 @@ module.exports = defineCases({
       name: 'premium-only-field-premium-user',
       auth: 'premium-active',
       async run({ http, assert }) {
-        const response = await http.as('premium-active').post('backend-manager/test/schema', {
+        const response = await http.as('premium-active').post('omega/test/schema', {
           requiredField: 'provided',
           conditionalRequired: 'provided',
           premiumOnlyField: 'using-premium-feature',

@@ -1,0 +1,30 @@
+/**
+ * Surface: a page stylesheet, bound to /notes by its asset key (css/pages/notes.scss)
+ * Doc: node_modules/@omega.js/web/docs/index.md (Key contracts)
+ */
+.notes-list__meta,
+.notes-list__empty,
+.notes-list__date {
+  color: var(--omega-ink-muted);
+}
+
+.notes-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  background: var(--omega-surface);
+  color: var(--omega-ink);
+
+  & + & {
+    margin-top: 0.5rem;
+  }
+}
+
+.notes-list__date {
+  display: block;
+  font-size: 0.8125rem;
+}

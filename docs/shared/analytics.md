@@ -534,7 +534,7 @@ name, birthday, gender, location and phone.
 **One normalization table per provider, and no shared "close enough" normalizer.** The rules
 genuinely differ key by key, and a value normalized by the wrong platform's rule is ACCEPTED
 by the API and matched to nobody — the same silent nothing an unhashed value is. The server's
-tables live in `packages/backend/src/manager/libraries/analytics/match-data.js`; the browser
+tables live in `packages/backend/src/omega/libraries/analytics/match-data.js`; the browser
 half's shared rules (email, phone, external id) live in `@omega.js/analytics/identity` so both
 halves of one person present identical keys.
 

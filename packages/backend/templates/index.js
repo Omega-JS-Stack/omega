@@ -1,12 +1,15 @@
 /*
   Initialize
 */
-const Manager = (new (require('@omega.js/backend'))).init(exports, {
+const omega = require('@omega.js/backend');
+
+omega.initialize({
 });
-const { functions } = Manager.libraries;
 
 /*
   Routes
   Add custom routes below. Built-in routes (auth, payments, newsletters,
   usage, etc.) are registered automatically by OMEGA Backend.
 */
+
+module.exports = omega.functions;

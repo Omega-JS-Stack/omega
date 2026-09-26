@@ -27,7 +27,7 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The BEM-era .gitignore block, byte-exact: BEM's own fix() deleted the whole
 // matched block, CONTENT INCLUDED (`/# BEM>>>([\s\S]*?)# <<<BEM\n?/g`).
-const BEM_GITIGNORE = [
+const PRE_FAMILY_GITIGNORE = [
   '# My own ignores',
   'secrets.local',
   '',
@@ -238,7 +238,7 @@ module.exports = defineCases({
       auth: 'none',
 
       async run({ assert }) {
-        const targetPath = seedTarget('omega-markers-gitignore-', { '.gitignore': BEM_GITIGNORE });
+        const targetPath = seedTarget('omega-markers-gitignore-', { '.gitignore': PRE_FAMILY_GITIGNORE });
 
         await migrate(targetPath);
         const after = read(targetPath, '.gitignore');
@@ -356,7 +356,7 @@ module.exports = defineCases({
 
       async run({ assert }) {
         const targetPath = seedTarget('omega-markers-twice-', {
-          '.gitignore': BEM_GITIGNORE,
+          '.gitignore': PRE_FAMILY_GITIGNORE,
           'firestore.rules': preFamilyFirestore('backend-manager'),
           'database.rules.json': PRE_FAMILY_REALTIME,
         });

@@ -62,8 +62,8 @@ All Firestore documents must nest `created` and `updated` timestamps under a `me
 ```javascript
 // ✅ CORRECT — timestamps under metadata
 const itemData = {
-  id: settings.id,
-  owner: user.auth.uid,
+  id: data.id,
+  owner: user.uid,
   metadata: {
     created: {
       timestamp: ctx.meta.startTime.timestamp,
@@ -77,7 +77,7 @@ const itemData = {
 };
 
 // On update — preserve created, refresh updated
-const updated = _.merge({}, existing, settings, {
+const updated = _.merge({}, existing, data, {
   metadata: {
     created: existing.metadata.created,
     updated: {
@@ -94,14 +94,7 @@ const itemData = {
 };
 ```
 
-In schemas, use `ctx.Manager.Settings().constant('timestampFULL')`:
-
-```javascript
-metadata: {
-  created: ctx.Manager.Settings().constant('timestampFULL', { date: undefined }),
-  updated: ctx.Manager.Settings().constant('timestampFULL', { date: undefined }),
-},
-```
+The stamp is the route's, never the schema's: a schema declares input, and the caller cannot set `metadata`. `ctx.meta.startTime` is the request's one instant, so `created` and `updated` agree; `ctx.metadata({ tag }, document)` re-stamps `updated` and a `tag` on a later write and never touches `created`.
 
 ## Response Format
 

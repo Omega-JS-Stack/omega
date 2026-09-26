@@ -12,7 +12,7 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const auditPath = path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'audit.js');
 
 function freshAudit() {
-  // Clear require cache so each test gets a clean module (it instantiates Manager at require time).
+  // Clear require cache so each test gets a clean module (it loads the build module at require time).
   delete require.cache[require.resolve(auditPath)];
   return require(auditPath);
 }

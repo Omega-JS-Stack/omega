@@ -4,7 +4,7 @@
  * design language (tokens + classy vocabulary, not Bootstrap-era alert boxes).
  *
  * Detection itself is NOT tested here: both the download and the extension page
- * call the shared client logic (omega.utilities().getPlatform/getBrowser) — the
+ * call the shared client logic (omega.utilities.getPlatform/getBrowser): the
  * pin for that is in this file's last test, on the page bundles.
  */
 const assert = require('node:assert');
@@ -181,8 +181,8 @@ test('#14: OS/browser detection on BOTH pages comes from the shared client logic
   const download = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'download', 'index.js'), 'utf8');
   const extension = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'extension', 'index.js'), 'utf8');
 
-  assert.ok(download.includes('omega.utilities().getPlatform()'), 'download reads the shared platform detector');
-  assert.ok(extension.includes('omega.utilities().getBrowser()'), 'extension reads the shared browser detector');
+  assert.ok(download.includes('omega.utilities.getPlatform()'), 'download reads the shared platform detector');
+  assert.ok(extension.includes('omega.utilities.getBrowser()'), 'extension reads the shared browser detector');
   for (const source of [download, extension]) {
     assert.ok(!/navigator\.(userAgent|platform)/.test(source), 'no page-local ua sniffing');
   }

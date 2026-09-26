@@ -1,5 +1,5 @@
 const { describe, it, before } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 // Config with an in-house source + the RESOLVED company section (#677: the
 // brand types `company: { id }` and the loader fills the rest)
@@ -37,12 +37,12 @@ describe('Verts Module', () => {
 
   before(async () => {
     vertsModule = await import('../src/modules/verts.js');
-    await getManager().initialize(ADS_CONFIG);
+    await getOmega().initialize(ADS_CONFIG);
   });
 
   describe('module surface', () => {
-    it('should hang off the singleton as verts()', () => {
-      const verts = getManager().verts();
+    it('should hang off the instance as verts', () => {
+      const verts = getOmega().verts;
       assert(typeof verts.render === 'function');
       assert(typeof verts.renderHouse === 'function');
       assert(typeof verts.resolveSource === 'function');
@@ -76,57 +76,57 @@ describe('Verts Module', () => {
 
   describe('source resolution', () => {
     it('full URL passes through with trailing slashes stripped', () => {
-      assert.strictEqual(getManager().verts().resolveSource(), 'https://verts.example.com');
-      assert.strictEqual(getManager().verts().resolveSource('https://other.example.com///'), 'https://other.example.com');
+      assert.strictEqual(getOmega().verts.resolveSource(), 'https://verts.example.com');
+      assert.strictEqual(getOmega().verts.resolveSource('https://other.example.com///'), 'https://other.example.com');
     });
 
     it("'self' resolves through the brand api-URL derivation", () => {
-      const url = getManager().verts().resolveSource('self');
-      assert.strictEqual(url, getManager().getApiUrl());
+      const url = getOmega().verts.resolveSource('self');
+      assert.strictEqual(url, getOmega().getApiUrl());
       assert(url.includes('api.'));
     });
 
     it("'company' resolves the RESOLVED company url through the api derivation", () => {
-      assert.strictEqual(getManager().verts().resolveSource('company'), 'https://api.parentco.example.com');
+      assert.strictEqual(getOmega().verts.resolveSource('company'), 'https://api.parentco.example.com');
     });
 
     it("'company' with no resolved company url resolves null", async () => {
-      const saved = getManager().config.company;
-      getManager().config.company = undefined;
-      assert.strictEqual(getManager().verts().resolveSource('company'), null);
-      getManager().config.company = saved;
+      const saved = getOmega().config.company;
+      getOmega().config.company = undefined;
+      assert.strictEqual(getOmega().verts.resolveSource('company'), null);
+      getOmega().config.company = saved;
     });
 
     it('unconfigured/unknown sources resolve null', () => {
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = undefined;
-      assert.strictEqual(getManager().verts().resolveSource(), null);
-      getManager().config.advertising = saved;
-      assert.strictEqual(getManager().verts().resolveSource('sideways'), null);
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = undefined;
+      assert.strictEqual(getOmega().verts.resolveSource(), null);
+      getOmega().config.advertising = saved;
+      assert.strictEqual(getOmega().verts.resolveSource('sideways'), null);
     });
   });
 
   describe('the ladder (render)', () => {
     it("type 'house' mounts the fallback lane directly", async () => {
       const $host = makeHost();
-      const result = await getManager().verts().render($host, { type: 'house', fillTimeout: 60000 });
+      const result = await getOmega().verts.render($host, { type: 'house', fillTimeout: 60000 });
       assert.strictEqual(result.lane, 'house');
       result.unit.destroy();
     });
 
     it('no provider configured + fallback: inhouse → the house lane fills in', async () => {
       const $host = makeHost();
-      const result = await getManager().verts().render($host, { type: 'display', fillTimeout: 60000 });
+      const result = await getOmega().verts.render($host, { type: 'display', fillTimeout: 60000 });
       assert.strictEqual(result.lane, 'house');
       result.unit.destroy();
     });
 
     it('no provider + no fallback → the terminal promo lane', async () => {
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = { providers: {} };
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = { providers: {} };
       const $host = makeHost();
       const order = [];
-      const result = await getManager().verts().render($host, {
+      const result = await getOmega().verts.render($host, {
         type: 'display',
         onNoFill: () => { order.push('no-fill'); },
         onPromo: () => { order.push('promo'); },
@@ -134,7 +134,7 @@ describe('Verts Module', () => {
       assert.strictEqual(result.lane, 'promo');
       assert.deepStrictEqual(order, ['no-fill', 'promo'], 'no-fill still reports first, nothing was sold');
       result.unit.destroy();
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
     });
 
     // #527 — the adsense block has ONE switch, the client id: a configured
@@ -142,10 +142,10 @@ describe('Verts Module', () => {
     // gates (`units`, a provider-level `enabled`) are gone, so a config still
     // carrying them is an undeclared key that changes nothing — the lane runs.
     it('a configured client id runs the provider lane — no second gate switches it off', async () => {
-      const verts = getManager().verts();
-      const saved = getManager().config.advertising;
+      const verts = getOmega().verts;
+      const saved = getOmega().config.advertising;
       const savedScript = verts._adsenseScript;
-      getManager().config.advertising = {
+      getOmega().config.advertising = {
         providers: {
           adsense: { client: 'ca-pub-1234567890', displaySlot: '1111111111', units: false, enabled: false },
           inhouse: { source: 'https://verts.example.com/' },
@@ -168,12 +168,12 @@ describe('Verts Module', () => {
 
       result.unit.destroy();
       verts._adsenseScript = savedScript;
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
     });
 
     it('unknown types skip the provider lane and ride the ladder', async () => {
       const $host = makeHost();
-      const result = await getManager().verts().render($host, { type: 'sideways', fillTimeout: 60000 });
+      const result = await getOmega().verts.render($host, { type: 'sideways', fillTimeout: 60000 });
       assert.strictEqual(result.lane, 'house');
       result.unit.destroy();
     });
@@ -182,7 +182,7 @@ describe('Verts Module', () => {
   describe('house unit — message validation', () => {
     function mountUnit(options = {}) {
       const $host = makeHost();
-      const result = getManager().verts().renderHouse($host, {
+      const result = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         size: 'rectangle',
         fillTimeout: 60000,
@@ -205,7 +205,7 @@ describe('Verts Module', () => {
     it('the serve URL carries the host width so the document can stack or tighten', () => {
       const $host = makeHost();
       $host.clientWidth = 344;
-      const result = getManager().verts().renderHouse($host, {
+      const result = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         size: 'rectangle',
         fillTimeout: 60000,
@@ -263,7 +263,7 @@ describe('Verts Module', () => {
     it('emits onNoFill and hands the host to the promo when no dimensions arrive within the fill timeout', async () => {
       const $host = makeHost();
       let noFill = false;
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         size: 'rectangle',
         fillTimeout: 30,
@@ -283,7 +283,7 @@ describe('Verts Module', () => {
     it('a filled unit never no-fill collapses', async () => {
       const $host = makeHost();
       let noFill = false;
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 30,
         onNoFill: () => { noFill = true; },
@@ -297,15 +297,15 @@ describe('Verts Module', () => {
     });
 
     it('renderHouse with no resolvable source goes straight to the promo', () => {
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = {};
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = {};
       const $host = makeHost();
       let noFill = false;
-      const result = getManager().verts().renderHouse($host, { onNoFill: () => { noFill = true; } });
+      const result = getOmega().verts.renderHouse($host, { onNoFill: () => { noFill = true; } });
       assert.strictEqual(result.lane, 'promo');
       assert.strictEqual(noFill, true);
       assert.strictEqual($host.children[0].className, 'omega-vert-promo');
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
     });
   });
 
@@ -323,7 +323,7 @@ describe('Verts Module', () => {
         'data-omega-vert-id': 'promo1',
         'data-omega-vert-tags': ' dev, news ,',
       });
-      assert.deepStrictEqual(getManager().verts().parseElementOptions($el), {
+      assert.deepStrictEqual(getOmega().verts.parseElementOptions($el), {
         type: 'house',
         size: 'banner',
         vertId: 'promo1',
@@ -333,7 +333,7 @@ describe('Verts Module', () => {
     });
 
     it('parseElementOptions defaults a bare element to a display unit', () => {
-      assert.deepStrictEqual(getManager().verts().parseElementOptions(makeAdElement()), {
+      assert.deepStrictEqual(getOmega().verts.parseElementOptions(makeAdElement()), {
         type: 'display',
         size: '',
         vertId: '',
@@ -343,7 +343,7 @@ describe('Verts Module', () => {
     });
 
     it('a unit follows the PAGE theme, and a host pin beats it', () => {
-      const verts = getManager().verts();
+      const verts = getOmega().verts;
       document.documentElement.setAttribute('data-bs-theme', 'dark');
 
       assert.strictEqual(verts.pageTheme(), 'dark');
@@ -362,19 +362,19 @@ describe('Verts Module', () => {
       document.documentElement.setAttribute('data-bs-theme', 'dark');
 
       const $house = makeAdElement({ 'data-omega-vert': 'house' });
-      const house = await getManager().verts().mount($house, { fillTimeout: 60000 });
+      const house = await getOmega().verts.mount($house, { fillTimeout: 60000 });
       assert.strictEqual(house.lane, 'house');
       assert(house.unit.$iframe.src.includes('theme=dark'), 'the serve URL carries the page theme');
       house.unit.destroy();
 
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = {}; // no source → the terminal promo lane
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = {}; // no source → the terminal promo lane
       const $promo = makeAdElement({ 'data-omega-vert': 'display' });
-      const promo = await getManager().verts().mount($promo, {});
+      const promo = await getOmega().verts.mount($promo, {});
       assert.strictEqual(promo.lane, 'promo');
       assert(promo.unit.$iframe.srcdoc.includes('<html lang="en" data-theme="dark">'), 'the promo document is stamped dark');
 
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
       promo.unit.destroy();
       document.documentElement.removeAttribute('data-bs-theme');
     });
@@ -388,14 +388,14 @@ describe('Verts Module', () => {
         observe(target, options) { this.target = target; this.options = options; }
         disconnect() {}
       };
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = {}; // no source → the terminal promo lane
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = {}; // no source → the terminal promo lane
 
       document.documentElement.setAttribute('data-bs-theme', 'light');
       const $free = makeAdElement({ 'data-omega-vert': 'display' });
       const $pinned = makeAdElement({ 'data-omega-vert': 'display', 'data-omega-vert-theme': 'light' });
-      const free = await getManager().verts().mount($free, {});
-      const pinned = await getManager().verts().mount($pinned, {});
+      const free = await getOmega().verts.mount($free, {});
+      const pinned = await getOmega().verts.mount($pinned, {});
       assert(free.unit.$iframe.srcdoc.includes('data-theme="light"'));
 
       // the user flips the page to dark
@@ -408,7 +408,7 @@ describe('Verts Module', () => {
 
       free.unit.destroy();
       pinned.unit.destroy();
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
       document.documentElement.removeAttribute('data-bs-theme');
       global.MutationObserver = savedObserver;
     });
@@ -419,45 +419,45 @@ describe('Verts Module', () => {
         'data-omega-vert-size': 'banner',
         'data-omega-vert-tags': 'dev',
       });
-      const result = await getManager().verts().mount($el, { fillTimeout: 60000 });
+      const result = await getOmega().verts.mount($el, { fillTimeout: 60000 });
       assert.strictEqual(result.lane, 'house');
       assert(result.unit.$iframe.src.includes('tags=dev'), 'attribute tags ride the serve URL');
       assert(result.unit.$iframe.src.includes('height=150'), 'attribute size resolves the preset');
 
       // Second mount is a no-op — the element never double-mounts
-      assert.strictEqual(await getManager().verts().mount($el, { fillTimeout: 60000 }), null);
+      assert.strictEqual(await getOmega().verts.mount($el, { fillTimeout: 60000 }), null);
       assert.strictEqual($el.children.length, 1);
       result.unit.destroy();
     });
 
     it('mount options win over element attributes', async () => {
       const $el = makeAdElement({ 'data-omega-vert': 'house', 'data-omega-vert-id': 'attr-ad' });
-      const result = await getManager().verts().mount($el, { vertId: 'opt-ad', fillTimeout: 60000 });
+      const result = await getOmega().verts.mount($el, { vertId: 'opt-ad', fillTimeout: 60000 });
       assert(result.unit.$iframe.src.includes('vertId=opt-ad'), 'passed option beats the attribute');
       result.unit.destroy();
     });
 
     it('bind scans [data-omega-vert] under a root and mounts each once', async () => {
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = {}; // no source/fallback → straight to the promo, no timers
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = {}; // no source/fallback → straight to the promo, no timers
       const $a = makeAdElement({ 'data-omega-vert': 'house' });
       const $b = makeAdElement({ 'data-omega-vert': 'display' });
       const root = { querySelectorAll: () => [$a, $b] };
 
-      const mounted = getManager().verts().bind(root);
+      const mounted = getOmega().verts.bind(root);
       assert.deepStrictEqual(mounted, [$a, $b]);
 
       // Re-bind mounts nothing new
-      assert.deepStrictEqual(getManager().verts().bind(root), []);
+      assert.deepStrictEqual(getOmega().verts.bind(root), []);
 
       await new Promise((resolve) => setTimeout(resolve, 5));
       assert.strictEqual($a.children[0].className, 'omega-vert-promo', 'the exhausted ladder rendered the promo');
-      getManager().config.advertising = saved;
+      getOmega().config.advertising = saved;
     });
 
     it('an armed-but-not-intersecting unit runs NOTHING until it nears the viewport', async () => {
-      const saved = getManager().config.advertising;
-      getManager().config.advertising = {}; // exhausted ladder → promo the moment it runs
+      const saved = getOmega().config.advertising;
+      getOmega().config.advertising = {}; // exhausted ladder → promo the moment it runs
 
       let observed = null;
       let callback = null;
@@ -469,7 +469,7 @@ describe('Verts Module', () => {
 
       try {
         const $el = makeAdElement({ 'data-omega-vert': 'house' });
-        assert.strictEqual(getManager().verts().mount($el), null, 'lazy mounts return nothing yet');
+        assert.strictEqual(getOmega().verts.mount($el), null, 'lazy mounts return nothing yet');
         assert.strictEqual(observed, $el, 'the host is observed, not rendered');
         assert.strictEqual($el.children.length, 0, 'no lane ran, not even the promo');
 
@@ -483,7 +483,7 @@ describe('Verts Module', () => {
         assert.strictEqual($el.children[0].className, 'omega-vert-promo');
       } finally {
         delete global.IntersectionObserver;
-        getManager().config.advertising = saved;
+        getOmega().config.advertising = saved;
       }
     });
   });
@@ -497,7 +497,7 @@ describe('Verts Module', () => {
 
     function mountPromo(options = {}) {
       const $host = makeHost();
-      const result = getManager().verts().renderPromo($host, options);
+      const result = getOmega().verts.renderPromo($host, options);
       result.unit.$iframe.contentWindow = { name: 'promo-frame' };
       return { $host, unit: result.unit, result };
     }
@@ -505,7 +505,7 @@ describe('Verts Module', () => {
     it('a narrow tall host reaches the document as width, so the promo stacks', () => {
       const $host = makeHost();
       $host.clientWidth = 200;
-      const result = getManager().verts().renderPromo($host, { size: 'skyscraper' });
+      const result = getOmega().verts.renderPromo($host, { size: 'skyscraper' });
 
       assert(result.unit.$iframe.srcdoc.includes('flex-direction: column;'), 'the skyscraper promo stacks');
       result.unit.destroy();
@@ -582,7 +582,7 @@ describe('Verts Module', () => {
     it('forwards the frame click to the host like a served unit does', () => {
       const $host = makeHost();
       let clicked = null;
-      const result = getManager().verts().renderPromo($host, {
+      const result = getOmega().verts.renderPromo($host, {
         size: 'rectangle',
         onClick: (detail) => { clicked = detail; },
       });
@@ -663,7 +663,7 @@ describe('Verts Module', () => {
       $host.style.setProperty('display', 'none');
       $host.style.setProperty('max-height', '600px');
 
-      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const result = getOmega().verts.renderPromo($host, { size: 'rectangle' });
       assert.strictEqual($host.styles.display, undefined);
       assert.strictEqual($host.styles['max-height'], '250px');
       result.unit.destroy();
@@ -673,7 +673,7 @@ describe('Verts Module', () => {
   describe('house unit — host-owned lifecycle', () => {
     it('isStale reflects staleAfter against the last (re)load', () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
         staleAfter: 1000 * 60 * 10,
@@ -689,7 +689,7 @@ describe('Verts Module', () => {
 
     it('recover reloads only a stale, filled unit', () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
       });
@@ -715,7 +715,7 @@ describe('Verts Module', () => {
 
     it('rotation reloads on the configured interval and stops on destroy', async () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
         rotateInterval: 25,
@@ -734,7 +734,7 @@ describe('Verts Module', () => {
 
     it('reload re-arms the fill timer with a fresh cache-busted URL', async () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
       });
@@ -758,7 +758,7 @@ describe('Verts Module', () => {
     // The real analytics instance, wrapped: every call is recorded AND passed
     // through to the module's own event() (no stand-in implementation).
     function recordAnalytics(run) {
-      const analytics = getManager().analytics();
+      const analytics = getOmega().analytics;
       const original = analytics.event;
       const calls = [];
 
@@ -801,7 +801,7 @@ describe('Verts Module', () => {
 
     it('a mounted promo tags utm_source with the HOST brand id, not the host page', () => {
       const $host = makeHost();
-      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const result = getOmega().verts.renderPromo($host, { size: 'rectangle' });
       const href = promoHrefOf(result.unit.$iframe.srcdoc);
 
       assert.strictEqual(href.searchParams.get('utm_source'), 'test', 'the config brand.id');
@@ -809,21 +809,21 @@ describe('Verts Module', () => {
     });
 
     it('a brand with no id falls back to the host page hostname', () => {
-      const saved = getManager().config.brand;
-      getManager().config.brand = { name: 'No Id' };
+      const saved = getOmega().config.brand;
+      getOmega().config.brand = { name: 'No Id' };
 
       const $host = makeHost();
-      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const result = getOmega().verts.renderPromo($host, { size: 'rectangle' });
       const href = promoHrefOf(result.unit.$iframe.srcdoc);
 
       assert.strictEqual(href.searchParams.get('utm_source'), 'localhost', 'the parent host fallback');
       result.unit.destroy();
-      getManager().config.brand = saved;
+      getOmega().config.brand = saved;
     });
 
     it('the house serve URL carries the brand id, so the redirect route tags the same source', () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
       });
@@ -834,23 +834,23 @@ describe('Verts Module', () => {
     });
 
     it('a brand with no id sends no brand param, so the backend falls back to the parent host', () => {
-      const saved = getManager().config.brand;
-      getManager().config.brand = { name: 'No Id' };
+      const saved = getOmega().config.brand;
+      getOmega().config.brand = { name: 'No Id' };
 
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         fillTimeout: 60000,
       });
 
       assert.strictEqual(new URL(unit.$iframe.src).searchParams.get('brand'), null);
       unit.destroy();
-      getManager().config.brand = saved;
+      getOmega().config.brand = saved;
     });
 
     it('the promo click message fires the host-side analytics event', () => {
       const $host = makeHost();
-      const result = getManager().verts().renderPromo($host, { size: 'rectangle' });
+      const result = getOmega().verts.renderPromo($host, { size: 'rectangle' });
       result.unit.$iframe.contentWindow = { name: 'promo-frame' };
 
       const calls = recordAnalytics(() => {
@@ -876,7 +876,7 @@ describe('Verts Module', () => {
 
     it('the house click message fires the host-side analytics event', () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         size: 'banner',
         fillTimeout: 60000,
@@ -901,7 +901,7 @@ describe('Verts Module', () => {
 
     it('a message that is not a click fires nothing', () => {
       const $host = makeHost();
-      const { unit } = getManager().verts().renderHouse($host, {
+      const { unit } = getOmega().verts.renderHouse($host, {
         source: 'https://verts.example.com',
         size: 'banner',
         fillTimeout: 60000,
@@ -921,7 +921,7 @@ describe('Verts Module', () => {
   // (advertising.providers.adsense.displaySlot etc.), not a slots.* subobject
   describe('adsense slot wiring', () => {
     it('_buildIns wires data-ad-slot from each schema *Slot key', () => {
-      const verts = getManager().verts();
+      const verts = getOmega().verts;
       const adsense = {
         client: 'ca-pub-test',
         displaySlot: '1111111111',
@@ -944,7 +944,7 @@ describe('Verts Module', () => {
 
     it('_buildIns omits data-ad-slot when the slot is not configured', () => {
       const format = vertsModule.ADSENSE_FORMATS.display;
-      const $ins = getManager().verts()._buildIns({ client: 'ca-pub-test' }, 'display', format, {});
+      const $ins = getOmega().verts._buildIns({ client: 'ca-pub-test' }, 'display', format, {});
       assert.strictEqual($ins.getAttribute('data-ad-slot'), null);
     });
   });

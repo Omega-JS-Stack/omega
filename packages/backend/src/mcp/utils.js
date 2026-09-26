@@ -37,6 +37,8 @@ function filterToolsByRole(tools, role) {
 /**
  * Load consumer MCP tools from `functions/mcp.js` if it exists.
  * Returns an empty array if the file doesn't exist or fails to load.
+ * A route tool's `path` is the HTTP path as served (`/notes`); one without the
+ * leading slash throws by name, since the client prefixes nothing.
  */
 function loadConsumerTools(cwd) {
   if (!cwd) {
@@ -44,6 +46,7 @@ function loadConsumerTools(cwd) {
   }
 
   const mcpPath = path.join(cwd, 'mcp.js');
+  let consumerTools;
 
   try {
     const jetpack = require('fs-jetpack');
@@ -52,33 +55,38 @@ function loadConsumerTools(cwd) {
       return [];
     }
 
-    const consumerTools = require(mcpPath);
-
-    if (!Array.isArray(consumerTools)) {
-      console.error(`[@omega.js/backend MCP] Consumer mcp.js must export an array, got ${typeof consumerTools}`);
-      return [];
-    }
-
-    for (const tool of consumerTools) {
-      if (!tool.name || !tool.description) {
-        console.error(`[@omega.js/backend MCP] Consumer tool missing name or description:`, tool);
-        return [];
-      }
-
-      if (!tool.path && !tool.handler) {
-        console.error(`[@omega.js/backend MCP] Consumer tool "${tool.name}" must have a path or handler`);
-        return [];
-      }
-
-      tool.role = tool.role || 'admin';
-      tool._consumer = true;
-    }
-
-    return consumerTools;
+    consumerTools = require(mcpPath);
   } catch (error) {
     console.error(`[@omega.js/backend MCP] Failed to load consumer tools from ${mcpPath}:`, error.message);
     return [];
   }
+
+  if (!Array.isArray(consumerTools)) {
+    console.error(`[@omega.js/backend MCP] Consumer mcp.js must export an array, got ${typeof consumerTools}`);
+    return [];
+  }
+
+  for (const tool of consumerTools) {
+    if (!tool.name || !tool.description) {
+      console.error(`[@omega.js/backend MCP] Consumer tool missing name or description:`, tool);
+      return [];
+    }
+
+    if (!tool.path && !tool.handler) {
+      console.error(`[@omega.js/backend MCP] Consumer tool "${tool.name}" must have a path or handler`);
+      return [];
+    }
+
+    // A relative path would reach the host root unprefixed and 404 on every call
+    if (tool.path && !String(tool.path).startsWith('/')) {
+      throw new Error(`[@omega.js/backend:mcp] Consumer tool "${tool.name}" path "${tool.path}" must be the HTTP path as served, starting with "/" (e.g. "/notes")`);
+    }
+
+    tool.role = tool.role || 'admin';
+    tool._consumer = true;
+  }
+
+  return consumerTools;
 }
 
 /**
@@ -99,10 +107,20 @@ function buildToolMap(builtinTools, consumerTools) {
   return map;
 }
 
+/**
+ * Answer a request with a JSON body (the MCP HTTP surface's one JSON door:
+ * handler.js and oauth.js both answer through it).
+ */
+function sendJson(res, code, data) {
+  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
 module.exports = {
   resolveAuthInfo,
   filterToolsByRole,
   loadConsumerTools,
   buildToolMap,
+  sendJson,
   ROLE_HIERARCHY,
 };

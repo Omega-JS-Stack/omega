@@ -37,7 +37,7 @@ module.exports = defineCases({
     {
       name: 'window.desktop.logger.log forwards to main where it can be read back',
       run: async (ctx) => {
-        const marker = `__em_test_log_${Date.now()}_${Math.random()}`;
+        const marker = `__omega_test_log_${Date.now()}_${Math.random()}`;
         window.desktop.logger.log(marker, { extra: 'payload' });
         // Give main a moment to receive (IPC send is async, no callback).
         await new Promise((r) => setTimeout(r, 50));
@@ -53,7 +53,7 @@ module.exports = defineCases({
     {
       name: 'window.desktop.logger.warn also forwards',
       run: async (ctx) => {
-        const marker = `__em_test_warn_${Date.now()}_${Math.random()}`;
+        const marker = `__omega_test_warn_${Date.now()}_${Math.random()}`;
         window.desktop.logger.warn(marker);
         await new Promise((r) => setTimeout(r, 50));
         const last = await window.desktop.ipc.invoke('desktop:__test:read-last-log');
@@ -65,7 +65,7 @@ module.exports = defineCases({
       name: 'window.desktop.storage.set → window.desktop.storage.onChange fires across IPC',
       run: async (ctx) => {
         // Subscribe FIRST so we don't miss the broadcast.
-        const key = `__em_renderer_change_${Date.now()}`;
+        const key = `__omega_renderer_change_${Date.now()}`;
         let received = null;
         const off = window.desktop.storage.onChange(key, (payload) => { received = payload; });
         try {

@@ -12,13 +12,12 @@
  * the Google script). No site key configured → the request still sends;
  * the backend decides.
  */
-import omega from '@omega.js/client';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { initializeRecaptcha, getRecaptchaToken } from '__main_assets__/js/libs/recaptcha.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
-export default (el) => {
+export default (el, { omega }) => {
   const $form = el.querySelector('form.newsletter-form');
   if (!$form) {
     return;
@@ -41,7 +40,7 @@ export default (el) => {
     warmup();
   }, { once: true });
 
-  const formManager = new FormManager($form, {
+  const formManager = new FormManager(omega, $form, {
     allowResubmit: false,
     resetOnSuccess: true,
     submittingText: 'Subscribing...',

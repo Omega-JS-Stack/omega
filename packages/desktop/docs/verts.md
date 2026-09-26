@@ -12,7 +12,7 @@ zero consumer JS, same element vocabulary as the web `verts/unit` section and
 
 ## What the wiring does
 
-`renderer.js _wireAds` (runs inside `manager.initialize()`, same liveness
+`renderer.js _wireAds` (runs inside `omega.initialize()`, same liveness
 model as the FontAwesome/tooltip wiring) binds every `[data-omega-vert]`
 element present at init AND inserted later (MutationObserver), marking bound
 hosts `data-omega-vert-bound="house"`. Everything after the bind lives in the

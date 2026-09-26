@@ -38,7 +38,8 @@
     "./consumer": "./dist/consumer.js",
     "./scaffold": "./dist/scaffold.js",
     "./deploy": "./dist/commands/deploy.js",
-    "./service-worker": "./sw/manager.js",
+    "./runtime": "./runtime/omega.js",
+    "./service-worker": "./sw/omega.js",
     "./migrate": "./dist/migrate/index.js",
     "./cli": "./dist/cli-run.js",
     "./ensure-target": "./dist/commands/lib/ensure-target.js"

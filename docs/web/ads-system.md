@@ -19,7 +19,7 @@ created: 2026-07-20
 
 ## What it kills by design
 
-1. **The vert.js parked-build problem**: the legacy client was a standalone IIFE that can't `import @omega.js/client` without duplicating the singleton. The new client is an **`ads/unit` SECTION** — its `section.js` rides the §7 main-bundle lane (DOM-presence init), sharing the one client instance like every other section. `core/js/modules/vert.js` and the `adunits/*` includes die.
+1. **The vert.js parked-build problem**: the legacy client was a standalone IIFE that could not share the page's runtime instance without a second copy of it. The new client is an **`ads/unit` SECTION**: its `section.js` rides the §7 main-bundle lane (DOM-presence init) and receives the page's one `omega` instance like every other section. `core/js/modules/vert.js` and the `adunits/*` includes die.
 2. **The self-refresh "chrome-error" bug**: rotation lived INSIDE the cross-origin iframe (a sleep/offline refresh strands `chrome-error://` with no JS left to recover). New rule: **the HOST owns all lifecycle** — rotation timer, staleness recovery (`visibilitychange`/`online` → reload iframe if stale), fill monitoring. The iframe only renders and reports.
 3. **Raw hardcoded consumer iframes** (the Tabblar antipattern): every surface gets the same first-class unit — web via the section, desktop/extension via the shared client's ads module bound to a `data-omega-ad` element (mirrored-implementation rule).
 4. Cargo-cult remnants: the dead `popupads.js` "detector" stub, duplicated AdSense in-feed layout keys (one JS-side table), allow-all Firebase rules.
@@ -63,12 +63,12 @@ advertising: {
 ## Client unit — the `ads/unit` section (+ mirrored surfaces)
 
 - `{% section "ads/unit" %}` with args: `type` (`display`/`in-article`/`in-feed`/`multiplex`/`house`), `size` preset (banner/leaderboard/rectangle/…), optional `ad_id` pin. Neutral json5 defaults; markup is context-free per §sections doctrine.
-- `section.js` (§7 presence-init, shared client singleton):
+- `section.js` (§7 presence-init, `(el, { omega })`):
   1. Lazy: IntersectionObserver arms the unit near viewport.
   2. Provider lane (FULL REWRITE — Ian: don't trust the legacy mechanics): adblock detection first (script-load failure of `adsbygoogle.js` IS the detector — no bait divs, no separate library); blocked → straight to fallback. Otherwise build the `<ins>` and await fill via a `data-ad-status` attribute observer (MutationObserver + timeout, not a 100ms poll) — `filled` → done; `unfilled`/timeout → fallback lane (if configured).
   3. Fallback lane: sandboxed iframe → resolved inhouse source's `/omega/ads/serve`; origin-validated postMessage (set-dimensions/click); HOST-side rotation + staleness recovery.
-  4. Paying users: unit hides on `auth.resolved.active` via the standard bindings (legacy behavior kept).
-- Desktop/extension: no AdSense (policy/no-web-context) — the shared client ships the same fallback-lane logic as an `omega.ads()` module binding `data-omega-ad` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
+  4. Paying users: unit hides on `auth.user.active` via the standard bindings.
+- Desktop/extension: no AdSense (policy/no-web-context). The client base class ships the same fallback-lane logic as its `omega.verts` module, binding `data-omega-vert` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
 - `ads.txt`: web build emits it from `providers.adsense.client` when present (closes the parity-gap item) — the same presence that renders the units, because the file is the declaration that this domain sells inventory through that account.
 
 ### Automatic placements (#44 items 24/25, 2026-07-31)
@@ -106,4 +106,4 @@ advertising: {
 
 ## Naming: vert (cp258, Ian's ruling 2026-07-21)
 
-Adblock-safe naming — the ad system speaks **vert** EVERYWHERE at runtime (paths `/omega/verts/*`, DOM `data-omega-vert*`/`.omega-vert-unit`, Firestore collection `verts`, postMessage `omega-vert:*`, client `omega.verts()`/`Verts`/`VertUnit`, section `verts/unit`, admin `/admin/verts`). Only ads.txt, Google's own ad* tokens (adsbygoogle, `data-ad-*`), and the `advertising` config key say "ad". This plan file keeps its historical name.
+Adblock-safe naming: the ad system speaks **vert** EVERYWHERE at runtime (paths `/omega/verts/*`, DOM `data-omega-vert*`/`.omega-vert-unit`, Firestore collection `verts`, postMessage `omega-vert:*`, client `omega.verts`/`Verts`/`VertUnit`, section `verts/unit`, admin `/admin/verts`). Only ads.txt, Google's own ad* tokens (adsbygoogle, `data-ad-*`), and the `advertising` config key say "ad". This plan file keeps its historical name.

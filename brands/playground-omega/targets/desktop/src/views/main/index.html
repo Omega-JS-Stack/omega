@@ -1,8 +1,41 @@
-<div class="container py-5 text-center">
-  <h1 class="display-4 fw-bold mb-3">{{ app.productName }}</h1>
-  <p class="lead text-muted mb-4">Powered by @omega.js/desktop.</p>
-  <div class="d-flex gap-2 justify-content-center">
-    <button type="button" class="btn btn-primary" id="get-started">Get started</button>
-    <button type="button" class="btn btn-outline-secondary" id="open-docs">Documentation</button>
+<!--
+  Surface: the main window's view (data-omega-bind, the auth-button classes, the notes markup)
+  Doc: node_modules/@omega.js/desktop/docs/windows.md
+-->
+<div class="container py-5">
+  <div class="text-center mb-5">
+    <h1 class="display-4 fw-bold mb-3">{{ app.productName }}</h1>
+    <p class="lead text-muted mb-4">Powered by @omega.js/desktop.</p>
+    <div class="d-flex gap-2 justify-content-center">
+      <button type="button" class="btn btn-primary" id="get-started">Get started</button>
+      <button type="button" class="btn btn-outline-secondary" id="open-docs">Documentation</button>
+    </div>
   </div>
+
+  <section class="notes-panel" aria-labelledby="notes-heading">
+    <div class="notes-panel__head">
+      <h2 class="h4 mb-0" id="notes-heading">Notes</h2>
+      <span class="notes-panel__count"><span id="notes-count" data-omega-bind="@text notes.count"></span> saved</span>
+    </div>
+
+    <p id="notes-signed-out" class="text-muted" data-omega-bind="@show !auth.user.authenticated" hidden>
+      Sign in to keep notes.
+      <button type="button" class="btn btn-sm btn-primary ms-2 omega-signin">Sign in</button>
+    </p>
+    <p id="notes-signed-in" class="text-muted" data-omega-bind="@show auth.user.authenticated" hidden>
+      Signed in as <strong data-omega-bind="@text auth.user.profile.displayName"></strong>.
+      <a href="#" class="ms-2 omega-account">Account</a>
+      <a href="#" class="ms-2 omega-signout">Sign out</a>
+    </p>
+
+    <form id="notes-form" class="d-flex gap-2 mb-4" novalidate>
+      <input type="text" name="text" id="note-text" class="form-control" maxlength="280" required placeholder="Write a note" aria-label="Write a note">
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+
+    <div data-omega-bind="@show auth.user.authenticated" hidden>
+      <ul id="notes-list" class="notes-list list-unstyled mb-0" aria-live="polite"></ul>
+      <p id="notes-empty" class="text-muted mb-0" hidden>No notes yet.</p>
+    </div>
+  </section>
 </div>

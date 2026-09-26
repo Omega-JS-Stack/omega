@@ -21,9 +21,9 @@
  *
  * Run: npx omega test framework:events/auth-trigger-log-privacy
  */
-const beforeCreate = require('../../dist/manager/events/auth/before-create.js');
-const beforeSignIn = require('../../dist/manager/events/auth/before-signin.js');
-const onDelete = require('../../dist/manager/events/auth/on-delete.js');
+const beforeCreate = require('../../dist/omega/events/auth/before-create.js');
+const beforeSignIn = require('../../dist/omega/events/auth/before-signin.js');
+const onDelete = require('../../dist/omega/events/auth/on-delete.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-657-uid';
@@ -77,21 +77,23 @@ function render(args) {
 }
 
 // No hooks/auth/*.js under this dir, so the consumer hook lookup is a no-op.
-const MANAGER = { cwd: __dirname, config: {} };
+const OMEGA = { cwd: __dirname, config: {} };
 
 async function runBeforeCreate() {
   const { calls, ctx } = createRecorder();
 
-  // The rate limiter is the handler's real path — only the Usage counter is a
-  // double: attach/forKey/consume, the #647 shape the gate calls.
+  // The rate limiter is the handler's real path: only the usage counter is a
+  // double (configure/forKey/consume, the #647 shape the gate calls).
   const counter = {
-    attach: () => counter,
+    configure: () => counter,
     forKey: () => counter,
     consume: async () => ({ used: 1, left: 1, day: { used: 1, left: 1 } }),
   };
-  const Manager = { ...MANAGER, Usage: () => counter };
+  const omega = { ...OMEGA, firebase: { functions: {} } };
 
-  await beforeCreate({ Manager: Manager, ctx: ctx, user: USER, context: AUTH_CONTEXT, libraries: { functions: {} } });
+  ctx.usage = counter;
+
+  await beforeCreate({ ctx: ctx, omega: omega, user: USER, context: AUTH_CONTEXT });
 
   return calls;
 }
@@ -100,7 +102,7 @@ async function runBeforeSignIn() {
   const { calls, ctx } = createRecorder();
   const admin = { firestore: () => ({ doc: () => ({ set: async () => undefined }) }) };
 
-  await beforeSignIn({ Manager: MANAGER, ctx: ctx, user: USER, context: AUTH_CONTEXT, libraries: { admin: admin } });
+  await beforeSignIn({ ctx: ctx, omega: { ...OMEGA, firebase: { admin } }, user: USER, context: AUTH_CONTEXT });
 
   return calls;
 }
@@ -112,7 +114,7 @@ async function runOnDelete() {
   // delete, the marketing removal and the conversion.
   const admin = { firestore: () => ({ doc: () => ({ get: async () => ({ exists: false }) }) }) };
 
-  await onDelete({ Manager: MANAGER, ctx: ctx, user: USER, context: EVENT_CONTEXT, libraries: { admin: admin } });
+  await onDelete({ ctx: ctx, omega: { ...OMEGA, firebase: { admin } }, user: USER, context: EVENT_CONTEXT });
 
   return calls;
 }
@@ -139,9 +141,11 @@ async function runOnDeleteWithDoc() {
     }),
   };
 
-  const Manager = { ...MANAGER, Email: () => ({ remove: async () => MARKETING_RESULT }) };
+  const omega = { ...OMEGA, firebase: { admin } };
 
-  await onDelete({ Manager: Manager, ctx: ctx, user: USER, context: EVENT_CONTEXT, libraries: { admin: admin } });
+  ctx.email = { remove: async () => MARKETING_RESULT };
+
+  await onDelete({ ctx: ctx, omega: omega, user: USER, context: EVENT_CONTEXT });
   await new Promise((resolve) => setImmediate(resolve));
 
   return calls;

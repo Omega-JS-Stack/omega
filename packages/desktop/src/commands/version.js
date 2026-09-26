@@ -1,8 +1,8 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('version');
+const build = require('../build.js');
+const logger = build.logger('version');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 module.exports = async function (options) {
   logger.log(package.version);

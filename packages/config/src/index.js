@@ -9,12 +9,11 @@
  * `type`, and any shared key inside a target entry overrides the shared value
  * for that surface (one agnostic deep merge).
  *
- * Replaces the per-framework config zoo (UJM's _config.yml + JSON split,
- * EM's config/electron-manager.json, @omega.js/backend's backend-manager-config.json,
- * BXM's config) with NO dual-read: each framework flips to omega.json5
- * outright and legacy brands migrate their file once (docs/shared/config.md has
- * the mapping tables). omega-manager's disperse enumerates SHARED_SECTIONS
- * instead of hardcoding per-target mapping blocks.
+ * Replaces the per-framework legacy config files with NO dual-read: each
+ * framework reads omega.json5 outright and legacy brands migrate their file
+ * once (docs/shared/config.md has the mapping tables). @omega.js/manager's
+ * disperse enumerates SHARED_SECTIONS instead of hardcoding per-target mapping
+ * blocks.
  *
  * Private workspace package — vendored/bundled into the published frameworks
  * at prepare time, never published on its own.
@@ -28,7 +27,7 @@ const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys
 const { chosenProvider } = require('./providers.js');
 const { validateConfig, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
-const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment, attachTo: attachEnvironment } = require('./environment.js');
+const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, bakeSourceKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
@@ -79,8 +78,7 @@ module.exports = {
   ENV_ENVIRONMENTS,
   // The ONE environment module every target answers from (#817): one input
   // (OMEGA_ENVIRONMENT on Node, the baked config.environment in a browser),
-  // no per-surface default, a missing input is a loud error. `attachEnvironment`
-  // is its attachTo(), named for what it mixes in.
+  // no per-surface default, a missing input is a loud error.
   ENVIRONMENT_VAR,
   getEnvironment,
   isDevelopment,
@@ -88,9 +86,8 @@ module.exports = {
   isTesting,
   setEnvironment,
   // The word a node BUILD LANE is for, from its build-mode flag and whatever a
-  // parent lane named: the desktop and extension build Managers set this
+  // parent lane named: the desktop and extension build modules set this
   buildLaneEnvironment,
-  attachEnvironment,
   // The AMBIENT answer a lane resolves when nothing named one for it, and the
   // producer of the input above
   envEnvironment,

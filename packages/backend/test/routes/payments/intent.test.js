@@ -26,7 +26,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('none').post('backend-manager/payments/intent', {
+        const response = await http.as('none').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -44,7 +44,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           productId: paidProduct.id,
           frequency: 'monthly',
         });
@@ -56,7 +56,7 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-product-id',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           frequency: 'monthly',
         });
@@ -73,7 +73,7 @@ module.exports = defineCases({
           skip('No paid subscription product configured in this brand');
         }
 
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
         });
@@ -91,7 +91,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('premium-active').post('backend-manager/payments/intent', {
+        const response = await http.as('premium-active').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -110,7 +110,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('premium-suspended').post('backend-manager/payments/intent', {
+        const response = await http.as('premium-suspended').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -129,7 +129,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('premium-cancelling').post('backend-manager/payments/intent', {
+        const response = await http.as('premium-cancelling').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -148,7 +148,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('premium-expired').post('backend-manager/payments/intent', {
+        const response = await http.as('premium-expired').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -161,7 +161,7 @@ module.exports = defineCases({
     {
       name: 'rejects-invalid-product',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           productId: 'nonexistent-product',
           frequency: 'monthly',
@@ -179,7 +179,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -198,7 +198,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'unknown-provider',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -216,7 +216,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('basic').post('backend-manager/payments/intent', {
+        const response = await http.as('basic').post('omega/payments/intent', {
           provider: 'stripe',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -236,7 +236,7 @@ module.exports = defineCases({
         }
         const frequency = Object.keys(paidProduct.prices)[0];
 
-        const response = await http.as('intent-discount-validation').post('backend-manager/payments/intent', {
+        const response = await http.as('intent-discount-validation').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency,
@@ -303,7 +303,7 @@ module.exports = defineCases({
           version: 1,
         };
 
-        const response = await http.as('journey-payments-intent-attribution').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-intent-attribution').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency,
@@ -344,7 +344,7 @@ module.exports = defineCases({
           skip('No paid product configured in this brand');
         }
 
-        const response = await http.as('journey-payments-intent').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-intent').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -385,7 +385,7 @@ module.exports = defineCases({
         await firestore.set(orderDocPath, { owner: uid, type: 'subscription', provider: 'test', status: 'cancelled' });
 
         try {
-          const response = await http.as('journey-payments-intent-trial').post('backend-manager/payments/intent', {
+          const response = await http.as('journey-payments-intent-trial').post('omega/payments/intent', {
             provider: 'test',
             productId: paidProduct.id,
             frequency: 'monthly',

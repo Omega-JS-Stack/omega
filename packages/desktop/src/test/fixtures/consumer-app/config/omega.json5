@@ -29,7 +29,7 @@
       google: { id: '' },
     },
   },
-  // Empty config → client-bridge skips Firebase init (no hang on a fake projectId).
+  // Empty config → lib/auth.js skips Firebase init (no hang on a fake projectId).
   cloud: { provider: 'firebase', config: {} },
   targets: {
     desktop: {

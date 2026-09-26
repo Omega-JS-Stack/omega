@@ -1,8 +1,7 @@
 /**
  * Schema-driven validation for resolved omega.json5 configs.
  *
- * The rule walker (runSchema) is electron-manager's proven validate-config
- * engine ported verbatim: required/type/match/enum semantics, where match +
+ * The rule walker (runSchema) carries required/type/match/enum semantics, where match +
  * enum (and itemEnum, the same check per member of an array value) only run on
  * PRESENT values and a conditional `required` function
  * receives the full config. See schema.js for the rule format.

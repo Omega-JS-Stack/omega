@@ -14,7 +14,7 @@
 // recorded here, per uid, and read back at auth-ready on a later visit.
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('auth:orphan');
@@ -36,7 +36,7 @@ export function markOrphanedAccount(uid) {
     return;
   }
 
-  omega.storage().set(`${ORPHAN_MARKER}.${uid}`, Date.now());
+  omega.storage.set(`${ORPHAN_MARKER}.${uid}`, Date.now());
 }
 
 /**
@@ -49,30 +49,30 @@ export function markOrphanedAccount(uid) {
  * wrong account only costs a cleanup that Sentry already recorded.
  */
 export function clearOrphanMarkers() {
-  omega.storage().remove(ORPHAN_MARKER);
+  omega.storage.remove(ORPHAN_MARKER);
 }
 
 /**
  * Retry the reversal for a marked account, at auth-ready on a later visit.
  *
- * @param {object} state - the auth state (`user`, `account`) from omega.auth().listen
+ * @param {object} state - the auth state (`user`, `denied`) from omega.auth.listen
  * @returns {Promise<boolean>} true when the user was handled — deleted, or signed
  *   out because the delete failed again — and the caller is done with them
  */
 export async function retryOrphanCleanup(state) {
-  const uid = state.user?.uid;
+  const uid = state.user.uid;
   const key = uid ? `${ORPHAN_MARKER}.${uid}` : null;
 
-  if (!key || !omega.storage().get(key, null)) {
+  if (!key || !omega.storage.get(key, null)) {
     return false;
   }
 
   // The one hard invariant: an account with legal consent on record is somebody's
   // real account, whatever this browser remembers — they signed up for real since
   // (on another device, say). Drop the stale marker and never touch them again.
-  if (state.account?.consent?.legal?.status === 'granted') {
+  if (state.user.consent.legal.status === 'granted') {
     logger.log('Dropping the orphan marker — the account has legal consent on record');
-    omega.storage().remove(key);
+    omega.storage.remove(key);
 
     return false;
   }
@@ -89,19 +89,19 @@ export async function retryOrphanCleanup(state) {
 
   try {
     await auth.currentUser.delete();
-    omega.storage().remove(key);
+    omega.storage.remove(key);
     logger.warn('Deleted an orphaned account on return — the reversal at signin never landed');
   } catch (e) {
     // Failed twice. Fall back to what the deleted consent guard did: the orphan
     // does not stay signed in. The marker HOLDS, so the next visit tries again.
     logger.error('Failed to delete the orphaned account again — signing out:', e);
-    omega.sentry().captureException(new Error('Failed to delete an orphaned account on return', { cause: e }));
+    omega.sentry.captureException(new Error('Failed to delete an orphaned account on return', { cause: e }));
     await signOut(auth);
   }
 
   // Both paths leave the person signed out mid-page with no explanation
   // otherwise — the same message the old guard showed, for the same reason.
-  omega.utilities().showNotification(
+  omega.utilities.showNotification(
     `This account hasn't completed setup. Please sign up first.`,
     { type: 'danger', timeout: 8000 }
   );

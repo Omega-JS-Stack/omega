@@ -1,11 +1,11 @@
 /**
- * Test: helpers/event-middleware.js — event trigger handler dispatch
+ * Test: events.js, event trigger handler dispatch
  *
  * Run: npx omega test backend:helpers/event-middleware
  *
- * EventMiddleware is the door every auth/firestore/cron trigger enters:
- * resolve a handler path, build the event context, run pre/post hooks around
- * it, and translate failures. All of that is decidable without an emulator —
+ * events.run() is the door every auth/firestore/cron trigger enters: resolve a
+ * handler path, build the event's Context, run pre/post hooks around it, and
+ * translate failures. All of that is decidable without an emulator —
  * the trigger PAYLOAD (snapshot/change/context) is just data the middleware
  * forwards, and the handler is a real file on disk here.
  *
@@ -16,7 +16,8 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const EventMiddleware = require('../../dist/manager/helpers/event-middleware.js');
+const events = require('../../dist/omega/events.js');
+const { bootOmega } = require('./_boot-omega.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // Write a handler file and return its absolute path.
@@ -27,44 +28,56 @@ function handlerFile(source) {
   return file;
 }
 
-// The Manager surface EventMiddleware reads: cwd, libraries, handlers, and
-// a RouteContext with the log/error/report/meta.name shape it uses.
-function makeManager({ cwd, handlers, name } = {}) {
-  const errors = [];
-  const reported = [];
-  return {
-    cwd: cwd || '/nonexistent-cwd',
-    libraries: { marker: 'libs' },
-    handlers,
-    errors,
-    reported,
-    RouteContext: () => ({
-      log: () => {},
-      error: (...args) => errors.push(args),
-      // The real report() logs AND captures, returning the decorated Error.
-      report: (e) => { reported.push(e); return e; },
-      meta: { name: name || 'unnamed' },
-    }),
-  };
+// A REAL Omega instance (booted fresh from the bundled fixture) aimed at this
+// case's events dir and hooks, with its capture handle recording every report()
+// of a server fault: the real report() logs AND captures, returning the
+// decorated Error, so `reported` is what went through the one door.
+function makeOmega({ cwd, handlers } = {}) {
+  const instance = bootOmega();
+
+  instance.cwd = cwd || '/nonexistent-cwd';
+  instance.handlers = handlers || {};
+  instance.reported = [];
+  instance.sentry = { captureException: (e) => instance.reported.push(e) };
+
+  return instance;
 }
 
-// Run a thunk with a recording Sentry transport injected on the REAL Manager —
+// Run a trigger under a Cloud Functions target name: the event's Context takes
+// its name from FUNCTION_TARGET, and the hook is keyed by that name.
+async function asFunction(name, fn) {
+  const original = process.env.FUNCTION_TARGET;
+
+  process.env.FUNCTION_TARGET = name;
+
+  try {
+    return await fn();
+  } finally {
+    if (original === undefined) {
+      delete process.env.FUNCTION_TARGET;
+    } else {
+      process.env.FUNCTION_TARGET = original;
+    }
+  }
+}
+
+// Run a thunk with a recording Sentry transport injected on the REAL omega —
 // the same seam route-context.test.js uses, so a trigger's capture is proven
 // against the framework's actual chokepoint, not a stub of it.
-async function withSentryRecorder(Manager, fn) {
+async function withSentryRecorder(omega, fn) {
   const captured = [];
-  const original = Manager.libraries.sentry;
+  const original = omega.sentry;
 
-  Manager.libraries.sentry = { captureException: (e) => captured.push(e) };
+  omega.sentry = { captureException: (e) => captured.push(e) };
 
   try {
     // AWAITED inside the swap: a handler's throw lands after the first await in
-    // EventMiddleware, so restoring on the synchronous return would put the real
+    // events.run(), so restoring on the synchronous return would put the real
     // (null) transport back before the capture ever happened.
     await fn();
     return captured;
   } finally {
-    Manager.libraries.sentry = original;
+    omega.sentry = original;
   }
 }
 
@@ -78,7 +91,7 @@ async function settle(promise) {
 }
 
 module.exports = defineCases({
-  description: 'EventMiddleware handler dispatch + hooks',
+  description: 'events.run() handler dispatch + hooks',
   type: 'group',
 
   tests: [
@@ -89,7 +102,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const file = handlerFile('module.exports = async () => "ran";');
 
-        const outcome = await settle(new EventMiddleware(makeManager(), {}).run(file));
+        const outcome = await settle(events.run(makeOmega(), file, {}));
 
         assert.equal(outcome.resolved, 'ran');
       },
@@ -104,7 +117,7 @@ module.exports = defineCases({
         fs.copyFileSync(file, path.join(cwd, 'events', 'users__on-create.js'));
 
         const outcome = await settle(
-          new EventMiddleware(makeManager({ cwd }), {}).run('users__on-create'),
+          events.run(makeOmega({ cwd }), 'users__on-create', {}),
         );
 
         assert.equal(outcome.resolved, 'from-events-dir');
@@ -114,27 +127,27 @@ module.exports = defineCases({
     {
       name: 'a-missing-handler-rejects-and-is-reported-not-swallowed',
       async run({ assert }) {
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run('does/not/exist'));
+        const outcome = await settle(events.run(omega, 'does/not/exist', {}));
 
         assert.equal(outcome.rejected instanceof Error, true);
         assert.equal(outcome.rejected.message.includes('Failed to load handler'), true);
         assert.equal(outcome.rejected.cause.code, 'MODULE_NOT_FOUND', 'the require failure survives as the cause');
-        assert.equal(Manager.reported.length, 1, 'the load failure goes through report() — logged AND captured');
-        assert.equal(Manager.reported[0], outcome.rejected);
+        assert.equal(omega.reported.length, 1, 'the load failure goes through report() — logged AND captured');
+        assert.equal(omega.reported[0], outcome.rejected);
       },
     },
 
     // ─── The context handed to a handler ───
 
     {
-      name: 'the-handler-receives-manager-ctx-libraries-and-the-event-payload',
+      name: 'the-handler-receives-omega-ctx-and-the-event-payload',
       async run({ assert }) {
         const file = handlerFile(`module.exports = async (context) => ({
-          hasManager: !!context.Manager,
+          hasOmega: !!context.omega,
           hasCtx: typeof context.ctx.log === 'function',
-          libraries: context.libraries.marker,
+          noRequest: context.ctx.request === null,
           user: context.user,
           eventId: context.context && context.context.eventId,
           change: context.change,
@@ -147,12 +160,12 @@ module.exports = defineCases({
           snapshot: { id: 'doc_1' },
         };
 
-        const outcome = await settle(new EventMiddleware(makeManager(), payload).run(file));
+        const outcome = await settle(events.run(makeOmega(), file, payload));
 
         assert.deepEqual(outcome.resolved, {
-          hasManager: true,
+          hasOmega: true,
           hasCtx: true,
-          libraries: 'libs',
+          noRequest: true,
           user: { uid: 'uid_1' },
           eventId: 'evt_1',
           change: { before: 'a', after: 'b' },
@@ -166,9 +179,9 @@ module.exports = defineCases({
       async run({ assert }) {
         const file = handlerFile(`module.exports = async (context) => Object.keys(context).sort().join(',');`);
 
-        const outcome = await settle(new EventMiddleware(makeManager(), {}).run(file));
+        const outcome = await settle(events.run(makeOmega(), file, {}));
 
-        assert.equal(outcome.resolved, 'Manager,change,context,ctx,libraries,snapshot,user');
+        assert.equal(outcome.resolved, 'change,context,ctx,omega,snapshot,user');
       },
     },
 
@@ -179,12 +192,11 @@ module.exports = defineCases({
       async run({ assert }) {
         const order = [];
         const file = handlerFile('module.exports = async () => "handled";');
-        const Manager = makeManager({
-          name: 'users/on-create',
+        const omega = makeOmega({
           handlers: { 'users/on-create': async (context, phase) => order.push(phase) },
         });
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
         assert.deepEqual(order, ['pre', 'post']);
         assert.equal(outcome.resolved, 'handled');
@@ -196,15 +208,14 @@ module.exports = defineCases({
       async run({ assert }) {
         const called = [];
         const file = handlerFile('module.exports = async () => "handled";');
-        const Manager = makeManager({
-          name: 'users/on-create',
+        const omega = makeOmega({
           handlers: {
             'users/on-create': async () => called.push('mine'),
             'users/on-delete': async () => called.push('theirs'),
           },
         });
 
-        await settle(new EventMiddleware(Manager, {}).run(file));
+        await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
         assert.deepEqual(called, ['mine', 'mine']);
       },
@@ -214,8 +225,7 @@ module.exports = defineCases({
       name: 'a-throwing-pre-hook-blocks-the-handler',
       async run({ assert }) {
         const file = handlerFile('module.exports = async () => { throw new Error("handler ran"); };');
-        const Manager = makeManager({
-          name: 'users/on-create',
+        const omega = makeOmega({
           handlers: {
             'users/on-create': async (context, phase) => {
               if (phase === 'pre') throw new Error('blocked by pre hook');
@@ -223,7 +233,7 @@ module.exports = defineCases({
           },
         });
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await asFunction('users/on-create', () => settle(events.run(omega, file, {})));
 
         assert.equal(outcome.rejected.message, 'blocked by pre hook');
       },
@@ -235,13 +245,13 @@ module.exports = defineCases({
       name: 'a-plain-handler-error-rejects-and-is-reported',
       async run({ assert }) {
         const file = handlerFile('module.exports = async () => { throw new Error("handler blew up"); };');
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
         assert.equal(outcome.rejected.message, 'handler blew up', 'the rejection value is the handler\'s own error');
-        assert.equal(Manager.reported.length, 1, 'a thrown trigger error is a server fault — reported');
-        assert.equal(Manager.reported[0], outcome.rejected);
+        assert.equal(omega.reported.length, 1, 'a thrown trigger error is a server fault — reported');
+        assert.equal(omega.reported[0], outcome.rejected);
       },
     },
 
@@ -256,12 +266,12 @@ module.exports = defineCases({
           e.httpErrorCode = { canonicalName: 'PERMISSION_DENIED', status: 403 };
           throw e;
         };`);
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
         assert.equal(outcome.rejected.code, 'permission-denied');
-        assert.equal(Manager.reported.length, 0, 'a blocking auth error is not a framework fault');
+        assert.equal(omega.reported.length, 0, 'a blocking auth error is not a framework fault');
       },
     },
 
@@ -276,13 +286,13 @@ module.exports = defineCases({
           e.code = 'ENOENT';
           throw e;
         };`);
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
         assert.equal(outcome.rejected.message.includes('ENOENT'), true);
-        assert.equal(Manager.reported.length, 1, 'a string-code system error is a framework fault — reported');
-        assert.equal(Manager.reported[0], outcome.rejected);
+        assert.equal(omega.reported.length, 1, 'a string-code system error is a framework fault — reported');
+        assert.equal(omega.reported[0], outcome.rejected);
       },
     },
 
@@ -294,12 +304,12 @@ module.exports = defineCases({
           e.code = 400;
           throw e;
         };`);
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
         assert.equal(outcome.rejected.code, 400, 'the client-fault code survives untouched');
-        assert.equal(Manager.reported.length, 0, 'an explicit 4xx is the client lane — never captured');
+        assert.equal(omega.reported.length, 0, 'an explicit 4xx is the client lane — never captured');
       },
     },
 
@@ -311,12 +321,12 @@ module.exports = defineCases({
           e.code = 503;
           throw e;
         };`);
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
-        assert.equal(Manager.reported.length, 1, 'a 5xx code is a server fault, exactly as respond.js rules it');
-        assert.equal(Manager.reported[0], outcome.rejected);
+        assert.equal(omega.reported.length, 1, 'a 5xx code is a server fault, exactly as respond.js rules it');
+        assert.equal(omega.reported[0], outcome.rejected);
       },
     },
 
@@ -328,23 +338,25 @@ module.exports = defineCases({
           e.httpErrorCode = { status: 401 };
           throw e;
         };`);
-        const Manager = makeManager();
+        const omega = makeOmega();
 
-        const outcome = await settle(new EventMiddleware(Manager, {}).run(file));
+        const outcome = await settle(events.run(omega, file, {}));
 
         assert.equal(outcome.rejected.message, 'unauthenticated');
-        assert.equal(Manager.reported.length, 0);
+        assert.equal(omega.reported.length, 0);
       },
     },
 
-    // ─── The capture seam, against the real Manager (#380) ───
+    // ─── The capture seam, against the real omega (#380) ───
 
     {
       name: 'a-thrown-trigger-error-captures-to-sentry',
-      async run({ assert, Manager }) {
+      async run({ assert }) {
+        const omega = bootOmega();
+
         const file = handlerFile('module.exports = async () => { throw new Error("trigger blew up"); };');
 
-        const captured = await withSentryRecorder(Manager, () => settle(new EventMiddleware(Manager, {}).run(file)));
+        const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
         assert.equal(captured.length, 1, 'an event trigger that throws reaches Sentry, same as a 5xx route');
         assert.equal(captured[0].message, 'trigger blew up');
@@ -353,8 +365,10 @@ module.exports = defineCases({
 
     {
       name: 'a-handler-that-will-not-load-captures-to-sentry',
-      async run({ assert, Manager }) {
-        const captured = await withSentryRecorder(Manager, () => settle(new EventMiddleware(Manager, {}).run('/nonexistent/handler/path')));
+      async run({ assert }) {
+        const omega = bootOmega();
+
+        const captured = await withSentryRecorder(omega, () => settle(events.run(omega, '/nonexistent/handler/path', {})));
 
         assert.equal(captured.length, 1);
         assert.equal(captured[0].message.includes('Failed to load handler'), true);
@@ -363,7 +377,9 @@ module.exports = defineCases({
 
     {
       name: 'a-blocking-auth-error-never-reaches-sentry',
-      async run({ assert, Manager }) {
+      async run({ assert }) {
+        const omega = bootOmega();
+
         const file = handlerFile(`module.exports = async () => {
           const e = new Error('permission-denied');
           e.code = 'permission-denied';
@@ -371,7 +387,7 @@ module.exports = defineCases({
           throw e;
         };`);
 
-        const captured = await withSentryRecorder(Manager, () => settle(new EventMiddleware(Manager, {}).run(file)));
+        const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
         assert.equal(captured.length, 0, 'the trigger\'s 4xx lane never captures — the same rule respond.js runs');
       },
@@ -379,14 +395,16 @@ module.exports = defineCases({
 
     {
       name: 'a-string-code-system-error-still-reaches-sentry',
-      async run({ assert, Manager }) {
+      async run({ assert }) {
+        const omega = bootOmega();
+
         const file = handlerFile(`module.exports = async () => {
           const e = new Error('connect ECONNREFUSED');
           e.code = 'ECONNREFUSED';
           throw e;
         };`);
 
-        const captured = await withSentryRecorder(Manager, () => settle(new EventMiddleware(Manager, {}).run(file)));
+        const captured = await withSentryRecorder(omega, () => settle(events.run(omega, file, {})));
 
         assert.equal(captured.length, 1, 'a string .code is not a block — the server fault reaches Sentry');
         assert.equal(captured[0].message.includes('ECONNREFUSED'), true);
@@ -398,7 +416,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const file = handlerFile('module.exports = () => ({ ok: true });');
 
-        const outcome = await settle(new EventMiddleware(makeManager(), {}).run(file));
+        const outcome = await settle(events.run(makeOmega(), file, {}));
 
         assert.deepEqual(outcome.resolved, { ok: true });
       },

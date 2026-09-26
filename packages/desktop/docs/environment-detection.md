@@ -3,25 +3,25 @@
 `getEnvironment()` returns exactly ONE of three mutually-exclusive, exhaustive values:
 
 ```javascript
-Manager.getEnvironment()    // 'development' | 'testing' | 'production'
+omega.getEnvironment()    // 'development' | 'testing' | 'production'
 
-Manager.isDevelopment()     // true ONLY in development
-Manager.isTesting()         // true ONLY in testing
-Manager.isProduction()      // true ONLY in production
+omega.isDevelopment()     // true ONLY in development
+omega.isTesting()         // true ONLY in testing
+omega.isProduction()      // true ONLY in production
 ```
 
 **ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` reads the `OMEGA_ENVIRONMENT` variable in Node, and the baked `OMEGA_BUILD_JSON.config.environment` in a renderer (which has no `process.env`). Nothing else is consulted: the `app.isPackaged`, `config.em.environment`, `OMEGA_BUILD_MODE` and `NODE_ENV` sniffs are gone, and a context with neither input **throws**, naming the variable. The old default here was `production`, so a plain `npm start` bundled itself as a production artifact while @omega.js/extension's copy of the same function answered `development` from the same inputs.
 
-**One implementation, shared with every sibling framework.** The four calls are `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/extension, @omega.js/web, @omega.js/backend and @omega.js/client all answer from. @omega.js/desktop has four Manager entry points (main / renderer / preload / build); [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) re-exports the shared four beside desktop's own `getVersion()` and mixes them into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
+**One implementation, shared with every sibling framework.** The four calls are `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/extension, @omega.js/web, @omega.js/backend and @omega.js/client all answer from. @omega.js/desktop has four entry points (main / renderer / preload / build); [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) re-exports the shared four beside desktop's own `getVersion()`. The build module exports them as plain functions, and every process's `omega` carries them as methods.
 
 ```javascript
-manager.getEnvironment()    // same answer in main / renderer / preload / build
-Manager.isTesting()         // static form, for build-time scripts
+omega.getEnvironment()                                // same answer in main / renderer / preload
+require('@omega.js/desktop/build').isTesting()        // the build module, for build-time scripts
 ```
 
 **Who sets the input.** [src/build.js](../src/build.js) names it at LOAD, from the lane: `OMEGA_BUILD_MODE` (which `omega build` / `package` / `publish` / `release` and the boot runner's staged build all set) is `production` and WINS over an inherited value, so a production build spawned from a test run still bakes production; otherwise a lane that already named one keeps it (the test runners spawn their children naming `testing`), and a bare dev boot is `development`. The electron app that lane spawns inherits the variable. A PACKAGED app has no parent lane, so [src/main.js](../src/main.js) names it from the word the build baked into the artifact: that is a FALLBACK for the context with no input, never an override ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). A process that already carries `OMEGA_ENVIRONMENT` keeps it, which is why a test lane that boots a production artifact still answers `testing` inside it.
 
-**The renderer gets the running word too.** A page has no `process`, so its Manager reads input 2, the baked `config.environment`, which is the word the BUILD was for. Those agree everywhere except a lane that boots a production artifact, so the preload (a Node context, it has the variable) exposes it on `window.desktop.environment` and [src/renderer.js](../src/renderer.js) applies it over the baked word at `initialize()`. Same precedence, one context removed: the running environment first, the bake second. No second signal exists.
+**The renderer gets the running word too.** A page has no `process`, so its `omega` reads input 2, the baked `config.environment`, which is the word the BUILD was for. Those agree everywhere except a lane that boots a production artifact, so the preload (a Node context, it has the variable) exposes it on `window.desktop.environment` and [src/renderer.js](../src/renderer.js) applies it over the baked word at `initialize()`. Same precedence, one context removed: the running environment first, the bake second. No second signal exists.
 
 **The three checks are mutually exclusive**: exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
 
@@ -52,14 +52,14 @@ if (isDevelopment() || isTesting()) { /* localhost URL, isolate userData, suppre
 ## URL helpers
 
 ```javascript
-Manager.getApiUrl()  // the app's API URL — the SSOT for calling the backend
+omega.getApiUrl()  // the app's API URL: the SSOT for calling the backend
 ```
 
 `getApiUrl()` / `getFunctionsUrl()` / `getWebsiteUrl()` resolve to **local** URLs (from the baked dev map, whose floor is the classic hosting / functions / website numbers) in development OR testing, and to production (`https://api.<brand.url host>` etc.) otherwise. They route through `this.getEnvironment()`, so they're correct everywhere without an argument: call them directly. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one, rarely needed, and mainly used by tests to pin a specific environment's mapping.
 
-`getAuthUrl()` builds the **sign-in URL that round-trips an auth token back to the app**: `<site>/signin?authReturnUrl=<site>/token?authReturnUrl=<brand.id>://auth/token`, where `<site>` is `getWebsiteUrl()` (same env split). The UJM website's `/signin` page logs the user in (or bounces straight through if already signed in), its `/token` page mints a Firebase custom token via the backend, and the final redirect (`?authToken=<token>` — the ONE shape; legacy-app formats live in UJM, not @omega.js/desktop) deep-links the token into the app's built-in `auth/token` route → `omega.handleAuthToken()` → `signInWithCustomToken`. Use it for EVERY "Sign in" affordance an app exposes — never link the bare `/signin` page, which strands the login in the browser. Requires `brand.id` (the deep-link scheme) in config; throws when missing. The optional second arg `getAuthUrl(env, returnUrl)` overrides the chain's final hop — that's how `lib/auth-flow.js` swaps in its dev loopback return.
+`getAuthUrl()` builds the **sign-in URL that round-trips an auth token back to the app**: `<site>/signin?authReturnUrl=<site>/token?authReturnUrl=<brand.id>://auth/token`, where `<site>` is `getWebsiteUrl()` (same env split). The website's `/signin` page logs the user in (or bounces straight through if already signed in), its `/token` page mints a Firebase custom token via the backend, and the final redirect (`?authToken=<token>`, the ONE shape) deep-links the token into the app's built-in `auth/token` route → `omega.auth.handleToken()` → `signInWithCustomToken`. Use it for EVERY "Sign in" affordance an app exposes; never link the bare `/signin` page, which strands the login in the browser. Requires `brand.id` (the deep-link scheme) in config; throws when missing. The optional second arg `getAuthUrl(env, returnUrl)` overrides the chain's final hop: that's how `lib/auth-flow.js` swaps in its dev loopback return.
 
-**Apps should launch the flow through `manager.openAuthFlow()` (main process), not by opening `getAuthUrl()` themselves**: production opens `getAuthUrl()` externally as-is (the OS routes the custom scheme back), while dev/test — where the scheme is NOT OS-registered (protocol.js registers only in production, and macOS can't runtime-register schemes missing from the bundle's Info.plist) — swap the final hop for a one-shot, nonce-checked loopback HTTP listener (RFC 8252 §7.3) that feeds the token into the SAME deep-link pipeline. Sign-in always happens in the user's REAL default browser (their existing session/SSO), never an embedded window. Requires @omega.js/client ≥ 4.3.4 on the website (`isValidRedirectUrl` accepts loopback hosts while the SITE runs in dev). See [src/lib/auth-flow.js](../src/lib/auth-flow.js).
+**Apps should launch the flow through `omega.openAuthFlow()` (main process), not by opening `getAuthUrl()` themselves**: production opens `getAuthUrl()` externally as-is (the OS routes the custom scheme back), while dev/test, where the scheme is NOT OS-registered (protocol.js registers only in production, and macOS can't runtime-register schemes missing from the bundle's Info.plist), swap the final hop for a one-shot, nonce-checked loopback HTTP listener (RFC 8252 §7.3) that feeds the token into the SAME deep-link pipeline. Sign-in always happens in the user's REAL default browser (their existing session/SSO), never an embedded window. Requires @omega.js/client ≥ 4.3.4 on the website (`isValidRedirectUrl` accepts loopback hosts while the SITE runs in dev). See [src/lib/auth-flow.js](../src/lib/auth-flow.js).
 
 All three local helpers resolve from whichever channel the process has: the `OMEGA_*_PORT` env vars (the CLI that booted the stack publishes them), then the `dev` map the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, so a bumped emulator port reaches it only this way, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)). There is no third step: the classic numbers used to be hand-typed under them, and they are gone ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)).
 
@@ -73,15 +73,15 @@ The classics still reach these helpers, from the ONE place they are defined: the
 
 The first two rows are port chains: each cell names a port, and the helper builds the URL around it. The website row is an ORIGIN chain ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)): the baked `dev.origin` the live website published carries scheme, host AND port, so it is the complete fact and outranks the port cell; only when it is absent does a port compose an origin, over **https**, because `omega dev` fronts its public port with the mkcert proxy by default and a port number alone can never say the scheme. Whenever the website published an origin, that is the same answer `@omega.js/client`'s `getDevWebsiteOrigin()` gives every other surface ([#262](https://github.com/Omega-JS-Stack/omega/issues/262)), and `getAuthUrl()` inherits it by construction.
 
-A resolved `OMEGA_HTTPS_PORT` (or a baked `dev.ports.https`) means `omega serve`'s mkcert proxy is up, so the api URL is https. That is the same chain @omega.js/extension's `getApiUrl()` walks, and the same one client-bridge uses for the auth emulator port (`OMEGA_AUTH_PORT` → `dev.ports.auth` → throw, [client-bridge.md](client-bridge.md)).
+A resolved `OMEGA_HTTPS_PORT` (or a baked `dev.ports.https`) means `omega serve`'s mkcert proxy is up, so the api URL is https. That is the same chain @omega.js/extension's `getApiUrl()` walks, and the same one `omega.auth` uses for the auth emulator port (`OMEGA_AUTH_PORT` → `dev.ports.auth` → throw, [auth.md](auth.md)).
 
 Resolving local in test mode is required because tests hit the local emulator — without it, the app (and tests calling `getApiUrl()`) would leak to the live production server.
 
-> The URL helpers live in [src/utils/url-helpers.js](../src/utils/url-helpers.js) and depend on `this.getEnvironment()` (from mode-helpers.js) being mixed in — both `attachTo` calls run at the bottom of every Manager entry point.
+> The URL helpers live in [src/utils/url-helpers.js](../src/utils/url-helpers.js) as plain functions of the instance (`getApiUrl(omega, environment)`), reading its `getEnvironment()`; each process class calls them from its own methods.
 
 ## Where they live
 
-Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnvironment()` + `is*()` + `getVersion()`; [src/utils/url-helpers.js](../src/utils/url-helpers.js) for the URL builders. Each module exposes the functions plus an `attachTo(Manager)` mixin. Attached at the bottom of all four Manager files: [main.js](../src/main.js), [renderer.js](../src/renderer.js), [preload.js](../src/preload.js), [build.js](../src/build.js) — mode-helpers first (so `getEnvironment` exists), then url-helpers.
+Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnvironment()` + `is*()` + `getVersion()`; [src/utils/url-helpers.js](../src/utils/url-helpers.js) for the URL builders. Both modules export plain functions. [build.js](../src/build.js) exports the mode helpers as they are; the three process classes, [main.js](../src/main.js) (the methods mixed in from [lib/_environment-mixin.js](../src/lib/_environment-mixin.js)), [preload.js](../src/preload.js) and [renderer.js](../src/renderer.js), call them from their own methods (the renderer takes the environment four and `getApiUrl()` / `getFunctionsUrl()` from @omega.js/client's base class it extends).
 
 ## How detection works
 
@@ -89,7 +89,7 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)):
 
 1. **`process.env.OMEGA_ENVIRONMENT`**, wherever this context has a `process` (main, preload, build-time Node).
-2. **The baked `config.environment`** off the Manager the call is made on, for a renderer, which has none. It is the build fact every OMEGA surface spells the same way ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)). The preload hands the running word across to the renderer when the two differ, so this step answers the artifact's own build only when no lane named one ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)).
+2. **The baked `config.environment`** off the `omega` the call is made on, for a renderer, which has none. It is the build fact every OMEGA surface spells the same way ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)). The preload hands the running word across to the renderer when the two differ, so this step answers the artifact's own build only when no lane named one ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)).
 3. **Neither** is a loud error naming `OMEGA_ENVIRONMENT`. There is no default, because the four framework copies this replaced each had one and they disagreed.
 
 The lanes above supply that input, and the whole table of who names what lives in
@@ -97,7 +97,7 @@ The lanes above supply that input, and the whole table of who names what lives i
 
 ## Adding a new helper
 
-Write the function in a `src/utils/<topic>-helpers.js` module, expose `attachTo(Manager)`, then call `attachTo` at the bottom of all four Manager files. Don't define helpers on individual Manager prototypes — that path leads to duplicated semantics (the old `getEnvironment` collision between main.js and build.js). For anything environment-derived, derive from `getEnvironment()` rather than reading `process.env` / `app.*` directly, so there is one source of truth and no chance of drift.
+Write the function in a `src/utils/<topic>-helpers.js` module, export it from [build.js](../src/build.js), and call it from a method on each process class that needs it. Don't define a helper's logic inside one process class: that path leads to duplicated semantics. For anything environment-derived, derive from `getEnvironment()` rather than reading `process.env` / `app.*` directly, so there is one source of truth and no chance of drift.
 
 ## Why this matters
 

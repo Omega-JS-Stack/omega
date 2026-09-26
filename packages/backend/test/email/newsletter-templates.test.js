@@ -13,8 +13,8 @@
  * fixture covers clean + editorial; the "field-report" fixture covers
  * field-report.
  */
-const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
-const { listNewsletterTemplates: listTemplates, resolveNewsletterTemplate: resolveTemplate } = require('../../dist/manager/libraries/email/generators/lib/templates/index.js');
+const { renderNewsletter } = require('../../dist/omega/libraries/email/generators/lib/mjml-template.js');
+const { listNewsletterTemplates: listTemplates, resolveNewsletterTemplate: resolveTemplate } = require('../../dist/omega/libraries/email/generators/lib/templates/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const TEST_BRAND = {

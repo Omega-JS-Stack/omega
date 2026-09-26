@@ -1,10 +1,10 @@
 /**
  * @omega.js/web's defaults scaffolding — applies the framework's scaffold tree
  * (scaffold/ in the package) to the consumer project root via the shared
- * devkit engine. Exported standalone (@omega.js/backend/BXM pattern) so the framework
+ * devkit engine. Exported standalone (the @omega.js/backend and @omega.js/extension pattern) so the framework
  * test suite can exercise the REAL file map against a temp dir.
  *
- * UJM-setup semantics preserved, minus what the new architecture deletes:
+ * Scaffold semantics:
  *   - NO page copying — default pages are virtual templates served from the
  *     package (the whole ~60-page default set works with zero files in src/)
  *   - NO Gemfile / _config.yml / Ruby anywhere

@@ -24,8 +24,8 @@
  */
 const path = require('node:path');
 const { execSync } = require('node:child_process');
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('deploy');
+const build = require('../build.js');
+const logger = build.logger('deploy');
 const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { assertBrandVersion } = require('@omega.js/devkit/brand-version');
@@ -71,7 +71,7 @@ module.exports = async function (options) {
   if (dryRun) {
     logger.log('DRY RUN, skipping hook "deploy/pre"');
   } else {
-    // The one ctx shape every OMEGA hook takes, `{ manager, projectRoot, mode }`,
+    // The one ctx shape every OMEGA hook takes, `{ build, projectRoot, mode }`,
     // and a deploy's mode is PRODUCTION: what it is about to publish is a release.
     await require('../gulp/tasks/package.js').hook('deploy:pre', { mode: 'production' });
   }
@@ -97,7 +97,7 @@ module.exports = async function (options) {
   // target's scaffold actually composed at the brand root (#265).
   const { owner, repo, workflow: WORKFLOW } = dispatchTarget({
     projectRoot: process.cwd(),
-    config: Manager.getConfig(),
+    config: build.getConfig(),
     workflow: 'publish.yml',
   });
 

@@ -7,7 +7,7 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { sanitizeImagesForEmail } = require('../../dist/manager/libraries/email/constants.js');
+const { sanitizeImagesForEmail } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({

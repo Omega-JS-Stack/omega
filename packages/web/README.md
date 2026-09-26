@@ -117,12 +117,12 @@ see the harness README for the honest before/after numbers.
 | [minify-html.js](src/minify-html.js) | Production HTML minification (UJM minifyHtml successor) — Rust minifier with the legacy extraction dance (JSON-LD minified as JSON, inline scripts esbuild-minified, IE conditionals preserved); engine mounts it as a transform for `environment: 'production'`, .html outputs only |
 | [purge.js](src/purge.js) | Cloudflare cache purge (UJM cloudflare-purge successor, de-ITW'd — direct API, brand's own `CLOUDFLARE_TOKEN`): zone from config `cloudflare.zone` or brand-url apex lookup; `omega purge` command, auto after `omega deploy --direct`, CI workflow step when the secret exists |
 | [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime/translations) + `resolveClientEntry()` |
-| [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root, and the environment surface mixed into the CLI class |
-| [mode-helpers.js](src/mode-helpers.js) | The build-side environment surface: `getEnvironment()` → `'development' \| 'testing' \| 'production'` (mutually exclusive, testing wins) plus `isDevelopment()` / `isProduction()` / `isTesting()` deriving from it — the same four calls `@omega.js/backend`, `@omega.js/desktop` and `@omega.js/extension` answer, and the browser-side `runtime/manager.js` already carried. `attachTo()` mixes them into the CLI class (statically and on the prototype); the build lanes read them off their own options object (`getEnvironment.call(options)`), precedence is `OMEGA_TEST_MODE` → the context's own `environment` (`omega build` → production, `omega dev` → development) → `OMEGA_BUILD_MODE` / `NODE_ENV` → development |
+| [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI: devkit's shared router (bin/omega → cli.js → commands/<name>.js), with dotenv from the consumer root |
+| [index.js](src/index.js) | The package export: the engine entry points plus the build-side environment surface, `getEnvironment()` → `'development' \| 'testing' \| 'production'` (mutually exclusive) and `isDevelopment()` / `isProduction()` / `isTesting()` deriving from it, re-exported from `@omega.js/config/environment`: the same four calls `@omega.js/backend`, `@omega.js/desktop`, `@omega.js/extension` and the browser runtime instance answer. The verbs name the environment (`omega build` → production, `omega dev` → development, `omega test` → testing) and the build lanes read it back |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
 | [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registration path: registerLiquid plus the framework's own `{% section %}`/`{% component %}`/`{% composition %}` tags, so a fully converted tree lints clean), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
-| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage/bootLayout handshake, `manager.js` frontend Manager (omega + mode helpers), `icons.js` the icon watcher's transport (`/assets/icons/<style>/<name>.svg`, flags one namespace over) — loud on a miss in development, silent in production |
+| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage/bootLayout/bootSections handshake, `omega.js` the web runtime instance (`import omega from '@omega.js/web/runtime'`: the `@omega.js/client` base class plus `appearance`, `shell`, `motion` and `exitPopup`), `icons.js` the icon watcher's transport (`/assets/icons/<style>/<name>.svg`, flags one namespace over): loud on a miss in development, silent in production |
 
 ## Packaged content (the real UJM port, B2)
 
@@ -208,10 +208,10 @@ see the harness README for the honest before/after numbers.
   (serif category monogram) and the brand-byline author fallback; both
   contracts apply to real posts too (`post.image: false` → no-media panel,
   a path → that image, absent → the legacy id-path convention).
-- `sw/` — the service worker: `manager.js` (the master-service-worker
-  successor — FCM background messaging, notification clicks, the
-  `update-cache` command, brand+build-named caches with foreign-cache
-  eviction) + `entry.js` (the consumer-less default entry; the scaffold seeds
+- `sw/`: the service worker. `omega.js` is the worker's one instance
+  (`import omega from '@omega.js/web/service-worker'; await omega.initialize();`):
+  FCM background messaging, notification clicks, the `update-cache` command,
+  brand+build-named caches with foreign-cache eviction. `entry.js` (the consumer-less default entry; the scaffold seeds
   `src/service-worker.js` with the same import for custom worker code).
 
 ## URL shape — flat `.html`, no trailing slashes (legacy parity)
@@ -392,17 +392,18 @@ example, and the four questions to read a page against them:
   extends the layers below with `import coreMain from 'omega:main'` /
   `@use 'omega:main'`. Dev mode (`omega dev`): stable un-hashed names + no
   minify, so in-place asset rebuilds keep their URLs without an HTML re-render.
-- **Boot runtime (ESM + code splitting)** — all bundles come out of ONE
-  esbuild call with `splitting: true`, so @omega.js/client and `runtime/boot.js`
-  land in a shared chunk the browser evaluates ONCE per page: every
-  `import omega from '@omega.js/client'` — in the main bundle, a page module,
-  anywhere — is the SAME initialized singleton (webpack's single module
-  graph, reproduced with `<script type="module">` semantics; both scripts are
-  deferred and execute in document order). The handshake: main stub →
-  `bootMain(mod)` (omega.initialize(window.OMEGA_BUILD_JSON.config) → dev lib in
-  development → global module), page stub → `bootPage(mod)` (awaits the main
-  boot, then `mod({ manager, options })` — the UJM page-module contract,
-  with `manager` the frontend Manager wrapper carrying mode helpers), layout
+- **Boot runtime (ESM + code splitting)**: all bundles come out of ONE
+  esbuild call with `splitting: true`, so `runtime/boot.js` and the web
+  runtime instance it imports (`runtime/omega.js`, the `@omega.js/client` base
+  class plus web's page chrome) land in a shared chunk the browser evaluates
+  ONCE per page. Every `import omega from '@omega.js/web/runtime'`, in the
+  main bundle, a page module or anywhere else, is the SAME initialized
+  instance (one module graph, with `<script type="module">` semantics; both
+  scripts are deferred and execute in document order). The handshake: main
+  stub → `bootMain(mod)` (omega.initialize(window.OMEGA_BUILD_JSON.config) →
+  dev lib in development → global module), page stub → `bootPage(mod)`
+  (awaits the main boot, then `mod({ omega, options })`, the page-module
+  contract every layout, page, section and theme module shares), layout
   stub → `bootLayout(mod)` (the layout module's NAMESPACE, whose default export
   is optional: the redirect layout hops at import time and exports nothing, so
   no stub may name a `default` esbuild can prove undefined, #742).
@@ -488,6 +489,10 @@ consumer-local themes beat packaged ones ([resolveThemeLayers](src/layers.js)),
 `omega dev` watches them, and anything the theme doesn't cover falls through
 to `themes/base` (base's `_theme.scss` forwards classy's theme as the
 default skin css).
+A theme's script is its `_theme.js`, whose default export is
+`async ({ omega, options }) => { }`: the site-wide wiring imports the active
+theme's file (`__theme__/_theme.js`) and calls it with the page's instance,
+the same shape as every page module.
 Legacy `themes/<id>/…` layout spellings alias for consumer ids too.
 
 ## App shell (C3)
@@ -514,7 +519,7 @@ full frame when it is the whole card.
 [core/js/core/app-shell.js](core/js/core/app-shell.js) drives it
 declaratively (`[data-shell-toggle="collapse|drawer"]`,
 `[data-shell-dismiss]`, Escape closes the drawer, `aria-expanded` synced)
-and exposes `omega.library().appShell`. The full contract markup is documented
+and is the instance's `omega.shell`. The full contract markup is documented
 at the top of the sheet; theme layouts emit it (one tree — no duplicated
 mobile nav like classy's offcanvas). Because the state attributes are
 stamped at runtime, `purgeCss` safelists `/omega-shell/`. Classy keeps its

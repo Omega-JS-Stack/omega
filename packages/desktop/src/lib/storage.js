@@ -1,12 +1,12 @@
 // Storage — unified KV store for main + renderer.
 //
 // Main-side (sync, direct disk-backed via electron-store):
-//   manager.storage.get(key, default)
-//   manager.storage.set(key, value)
-//   manager.storage.delete(key)
-//   manager.storage.has(key)
-//   manager.storage.clear()
-//   manager.storage.onChange(key, fn)  // returns unsubscribe fn
+//   omega.storage.get(key, default)
+//   omega.storage.set(key, value)
+//   omega.storage.delete(key)
+//   omega.storage.has(key)
+//   omega.storage.clear()
+//   omega.storage.onChange(key, fn)  // returns unsubscribe fn
 //
 // Renderer-side (async, proxied through preload contextBridge → IPC → main):
 //   window.desktop.storage.get(key, default)   → Promise
@@ -27,17 +27,17 @@ const logger = new LoggerLite('storage');
 
 const storage = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _store:       null,
   _changeSubs:  {}, // key -> Set<fn>
   _ipcRegistered: false,
 
-  async initialize(manager) {
+  async initialize(omega) {
     if (storage._initialized) {
       return;
     }
 
-    storage._manager = manager;
+    storage._omega = omega;
 
     let ElectronStore;
     try {
@@ -58,7 +58,7 @@ const storage = {
 
     // Build the store. Filename is `omega-storage.json` (electron-store appends .json).
     // Production name is read from electron's app.name (set automatically from package.productName).
-    const projectName = manager.config.app?.productName || electron.app.getName();
+    const projectName = omega.config.app?.productName || electron.app.getName();
 
     storage._store = new ElectronStore({
       name: 'omega-storage',

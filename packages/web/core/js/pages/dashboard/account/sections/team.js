@@ -1,5 +1,5 @@
 // Team section module
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Initialize team section
 export function init() {
@@ -8,7 +8,7 @@ export function init() {
 
 // Load team data
 export function loadData(account) {
-  if (!account) return;
+  if (!account.authenticated) return;
 
   // Update members list
   updateMembersList(account.team?.members || []);
@@ -23,11 +23,11 @@ function updateMembersList(members) {
   if (!$membersList) return;
 
   // Always include current user as owner
-  const currentUser = omega.auth().getUser();
+  const currentUser = omega.auth.user;
   const allMembers = [
     {
-      id: currentUser?.uid,
-      email: currentUser?.email,
+      id: currentUser.uid,
+      email: currentUser.email,
       name: 'You',
       role: 'owner',
       status: 'active',
@@ -41,8 +41,8 @@ function updateMembersList(members) {
     <div class="list-group-item">
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <strong>${omega.utilities().escapeHTML(member.name || member.email)}</strong>
-          ${member.role === 'owner' ? '' : `<small class="text-muted d-block">${omega.utilities().escapeHTML(member.email)}</small>`}
+          <strong>${omega.utilities.escapeHTML(member.name || member.email)}</strong>
+          ${member.role === 'owner' ? '' : `<small class="text-muted d-block">${omega.utilities.escapeHTML(member.email)}</small>`}
           <small class="text-muted">${getRoleLabel(member.role)}</small>
         </div>
         <div class="d-flex align-items-center">
@@ -65,11 +65,11 @@ function updateInviteStatus(invites) {
     <div class="list-group-item">
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <strong>${omega.utilities().escapeHTML(invite.email)}</strong>
-          <small class="text-muted d-block">Invited ${omega.utilities().escapeHTML(formatDate(invite.invitedAt))}</small>
+          <strong>${omega.utilities.escapeHTML(invite.email)}</strong>
+          <small class="text-muted d-block">Invited ${omega.utilities.escapeHTML(formatDate(invite.invitedAt))}</small>
         </div>
         <div>
-          <button class="btn btn-sm btn-outline-danger" data-action="cancel-invite" data-invite-id="${omega.utilities().escapeHTML(invite.id)}">
+          <button class="btn btn-sm btn-outline-danger" data-action="cancel-invite" data-invite-id="${omega.utilities.escapeHTML(invite.id)}">
             Cancel Invite
           </button>
         </div>
@@ -118,9 +118,9 @@ function getActionButtons(member) {
         Actions
       </button>
       <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#" data-action="change-role" data-member="${omega.utilities().escapeHTML(member.id)}">Change Role</a></li>
+        <li><a class="dropdown-item" href="#" data-action="change-role" data-member="${omega.utilities.escapeHTML(member.id)}">Change Role</a></li>
         <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="#" data-action="remove" data-member="${omega.utilities().escapeHTML(member.id)}">Remove Team Member</a></li>
+        <li><a class="dropdown-item text-danger" href="#" data-action="remove" data-member="${omega.utilities.escapeHTML(member.id)}">Remove Team Member</a></li>
       </ul>
     </div>
   `;
@@ -163,10 +163,10 @@ async function handleInviteMember() {
     // await omega.team().inviteMember(email);
     console.log('Inviting member:', email);
 
-    omega.utilities().showNotification(`Invitation sent to ${email}`, 'success');
+    omega.utilities.showNotification(`Invitation sent to ${email}`, 'success');
   } catch (error) {
     console.error('Failed to invite member:', error);
-    omega.utilities().showNotification('Failed to send invitation. Please try again.', 'danger');
+    omega.utilities.showNotification('Failed to send invitation. Please try again.', 'danger');
   }
 }
 
@@ -195,10 +195,10 @@ async function handleChangeRole(memberId) {
     // await omega.team().updateMemberRole(memberId, newRole);
     console.log('Changing role for member:', memberId, 'to', newRole);
 
-    omega.utilities().showNotification('Member role updated successfully', 'success');
+    omega.utilities.showNotification('Member role updated successfully', 'success');
   } catch (error) {
     console.error('Failed to update member role:', error);
-    omega.utilities().showNotification('Failed to update member role. Please try again.', 'danger');
+    omega.utilities.showNotification('Failed to update member role. Please try again.', 'danger');
   }
 }
 
@@ -213,10 +213,10 @@ async function handleRemoveMember(memberId) {
     // await omega.team().removeMember(memberId);
     console.log('Removing member:', memberId);
 
-    omega.utilities().showNotification('Member removed successfully', 'success');
+    omega.utilities.showNotification('Member removed successfully', 'success');
   } catch (error) {
     console.error('Failed to remove member:', error);
-    omega.utilities().showNotification('Failed to remove member. Please try again.', 'danger');
+    omega.utilities.showNotification('Failed to remove member. Please try again.', 'danger');
   }
 }
 
@@ -231,10 +231,10 @@ async function cancelInvite(inviteId) {
     // await omega.team().cancelInvite(inviteId);
     console.log('Cancelling invite:', inviteId);
 
-    omega.utilities().showNotification('Invitation cancelled', 'success');
+    omega.utilities.showNotification('Invitation cancelled', 'success');
   } catch (error) {
     console.error('Failed to cancel invite:', error);
-    omega.utilities().showNotification('Failed to cancel invitation. Please try again.', 'danger');
+    omega.utilities.showNotification('Failed to cancel invitation. Please try again.', 'danger');
   }
 }
 

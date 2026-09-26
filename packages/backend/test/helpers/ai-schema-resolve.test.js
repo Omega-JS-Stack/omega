@@ -5,7 +5,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
+const OpenAI = require('../../dist/omega/libraries/ai/providers/openai.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { resolveSchema } = OpenAI._internals;
 

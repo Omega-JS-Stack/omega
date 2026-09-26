@@ -13,6 +13,15 @@ Match the framework's four layers — OMEGA Extension's test runner discovers fi
 | `test/view/` | Popup / options / sidepanel page | DOM, view-side controllers, `data-omega-bind` directives |
 | `test/boot/` | Consumer's actual built extension | End-to-end smoke tests (does the extension load, does the background register, do views render) |
 
+## This project's suites
+
+- `build/notes-background.test.js`: background's notes commands, driven through the real messenger.
+- `build/notes-manifest.test.js`: the notes permissions, and the content script held to `brand.url`.
+- `boot/notes-count.test.js`: the packaged background answers `notes:count`.
+- `boot/options-content.test.js`: the options switch saves the setting, and the content script on the brand site (served by request interception) sends a selection to background.
+- `boot/popup-view.test.js`: the packaged popup's signed-out state and its "Open notes" button (the view layer runs the framework's harness pages, so this project's views are tested here).
+- `boot/sidepanel-view.test.js`: a real submit in the packaged side panel reaches background and shows its answer.
+
 ## Coverage
 
 Every feature ships with tests at every layer it has a surface in — logic (`build`/`background`), UI (`view`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.

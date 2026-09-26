@@ -103,12 +103,14 @@ Emit this markup in the view's HTML:
 Wire the behavior from the view's script (`src/assets/js/components/<component>/index.js`) — `__main_assets__` is the build alias for @omega.js/extension's vendored core assets:
 
 ```js
-import appShell from '__main_assets__/js/core/app-shell.js';
+import omega from '@omega.js/extension/popup';
+import { createShell } from '__main_assets__/js/core/app-shell.js';
 
-appShell();
+await omega.initialize();
+const shell = createShell(omega);
 ```
 
-The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container — `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"` — which is what the CSS keys off; the API is also registered at `omega._library.appShell`. Add `.omega-shell--locked` when `main` should never scroll (the view manages its own interior scroll).
+The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container: `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"`, which is what the CSS keys off; `createShell(omega)` returns the API (`isCollapsed`, `isOpen`, `setCollapsed`, `setOpen`, `toggleCollapsed`, `toggleOpen`). Add `.omega-shell--locked` when `main` should never scroll (the view manages its own interior scroll).
 
 ## Adding a utility class
 

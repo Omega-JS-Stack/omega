@@ -10,21 +10,21 @@
 //   - <output-root>/assets/scss              → resolves bare 'brand' to the generated _brand.scss (#912)
 //   - <consumer>/src/assets/scss             → consumer's own modules
 
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('sass');
+const build = require('../../build.js');
+const logger = build.logger('sass');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const sass = require('sass');
 const { formatBytes } = require('@omega.js/devkit/bundle');
 const { composeBrandTokens, renderBrandScss } = require('@omega.js/devkit/brand-tokens');
 
-const projectRoot = Manager.getRootPath('project');
-const packageRoot = Manager.getRootPath('main');
+const projectRoot = build.getRootPath('project');
+const packageRoot = build.getRootPath('main');
 const outputRoot  = require('../../utils/dist-root.js')(projectRoot);
 
 module.exports = function sassTask(done) {
-  const isProd = Manager.getMode().environment === 'production';
-  const config = Manager.getConfig() || {};
+  const isProd = build.getMode().environment === 'production';
+  const config = build.getConfig() || {};
   const themeId = config.theme?.id || 'classy';
 
   // The brand partial ([#912](https://github.com/Omega-JS-Stack/omega/issues/912)):

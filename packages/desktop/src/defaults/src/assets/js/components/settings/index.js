@@ -1,10 +1,8 @@
 // Settings window renderer entry.
-const Manager = require('@omega.js/desktop/renderer');
+import omega from '@omega.js/desktop/renderer';
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { logger } = manager;
+    const { logger } = omega;
     logger.log('Settings window initialized!');
   });

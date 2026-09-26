@@ -163,7 +163,7 @@ rel_target="${file_path#"$target_root"/}"
 #            UNION ([#624](https://github.com/Omega-JS-Stack/omega/issues/624),
 #            every layer's file runs) rather than a shadow.
 #   backend  the two lanes that really replace a framework file BY NAME
-#            (src/manager/index.js: a consumer route or schema of the same name
+#            (src/omega/index.js: a consumer route or schema of the same name
 #            and method replaces the framework's), plus the framework half of
 #            the rules that ships in templates/.
 # desktop and extension ship NO override layer: their src/defaults/ tree is
@@ -178,8 +178,8 @@ web|src/_sections/|themes/*/_sections/
 web|src/_components/|themes/*/_components/
 web|src/assets/css/|core/css/
 web|src/assets/css/|themes/*/css/
-backend|src/routes/|src/manager/routes/
-backend|src/schemas/|src/manager/schemas/
+backend|src/routes/|src/omega/routes/
+backend|src/schemas/|src/omega/schemas/
 backend||templates/
 "
 

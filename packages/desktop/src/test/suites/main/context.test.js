@@ -13,16 +13,16 @@ module.exports = defineCases({
   description: 'context (main)',
   tests: [
     {
-      name: 'context module wired on manager + initialized during boot',
+      name: 'context module wired on omega + initialized during boot',
       run: (ctx) => {
-        ctx.expect(ctx.manager.context).toBeDefined();
-        ctx.expect(ctx.manager.context._initialized).toBe(true);
+        ctx.expect(ctx.omega.context).toBeDefined();
+        ctx.expect(ctx.omega.context._initialized).toBe(true);
       },
     },
     {
       name: 'session has id (UUID), startTime (ISO), deviceId (string)',
       run: (ctx) => {
-        const s = ctx.manager.context.session;
+        const s = ctx.omega.context.session;
         ctx.expect(typeof s.id).toBe('string');
         ctx.expect(s.id.length).toBe(36);
         ctx.expect(typeof s.startTime).toBe('string');
@@ -34,10 +34,10 @@ module.exports = defineCases({
     {
       name: 'deviceId is stable — re-init preserves the same id',
       run: async (ctx) => {
-        const before = ctx.manager.context.session.deviceId;
-        ctx.manager.context.shutdown();
-        await ctx.manager.context.initialize(ctx.manager);
-        const after = ctx.manager.context.session.deviceId;
+        const before = ctx.omega.context.session.deviceId;
+        ctx.omega.context.shutdown();
+        await ctx.omega.context.initialize(ctx.omega);
+        const after = ctx.omega.context.session.deviceId;
         ctx.expect(after).toBe(before);
       },
     },
@@ -63,14 +63,14 @@ module.exports = defineCases({
       // that hands a wiped install back the id it had before.
       name: 'deviceId derives from the injected MAC seed and persists to storage',
       run: async (ctx) => {
-        const storage = ctx.manager.storage;
+        const storage = ctx.omega.storage;
         const saved = storage.get('context.deviceId');
 
         try {
           // A wiped install: nothing stored, so the seed decides
           storage.delete('context.deviceId');
-          const derived = await ctx.manager.context._resolveDeviceId();
-          const mac = ctx.manager.context._readFirstMac();
+          const derived = await ctx.omega.context._resolveDeviceId();
+          const mac = ctx.omega.context._readFirstMac();
 
           if (mac) {
             ctx.expect(derived).toBe(mac);
@@ -82,7 +82,7 @@ module.exports = defineCases({
           ctx.expect(storage.get('context.deviceId')).toBe(derived);
 
           storage.set('context.deviceId', 'stored-wins-over-the-seed');
-          ctx.expect(await ctx.manager.context._resolveDeviceId()).toBe('stored-wins-over-the-seed');
+          ctx.expect(await ctx.omega.context._resolveDeviceId()).toBe('stored-wins-over-the-seed');
         } finally {
           if (saved) storage.set('context.deviceId', saved);
           else storage.delete('context.deviceId');
@@ -93,38 +93,38 @@ module.exports = defineCases({
       name: 'client.platform is set (matches os.platform())',
       run: (ctx) => {
         const expected = require('os').platform();
-        ctx.expect(ctx.manager.context.client.platform).toBe(expected);
+        ctx.expect(ctx.omega.context.client.platform).toBe(expected);
       },
     },
     {
       name: 'client.arch is set',
       run: (ctx) => {
-        ctx.expect(typeof ctx.manager.context.client.arch).toBe('string');
-        ctx.expect(ctx.manager.context.client.arch.length > 0).toBe(true);
+        ctx.expect(typeof ctx.omega.context.client.arch).toBe('string');
+        ctx.expect(ctx.omega.context.client.arch.length > 0).toBe(true);
       },
     },
     {
       name: 'client.mobile is false on desktop',
       run: (ctx) => {
-        ctx.expect(ctx.manager.context.client.mobile).toBe(false);
+        ctx.expect(ctx.omega.context.client.mobile).toBe(false);
       },
     },
     {
-      name: 'app.environment matches manager.getEnvironment()',
+      name: 'app.environment matches omega.getEnvironment()',
       run: (ctx) => {
-        ctx.expect(ctx.manager.context.app.environment).toBe(ctx.manager.getEnvironment());
+        ctx.expect(ctx.omega.context.app.environment).toBe(ctx.omega.getEnvironment());
       },
     },
     {
-      name: 'app.version matches manager.getVersion()',
+      name: 'app.version matches omega.getVersion()',
       run: (ctx) => {
-        ctx.expect(ctx.manager.context.app.version).toBe(ctx.manager.getVersion());
+        ctx.expect(ctx.omega.context.app.version).toBe(ctx.omega.getVersion());
       },
     },
     {
       name: 'toJSON returns plain JSON snapshot (structured-cloneable)',
       run: (ctx) => {
-        const snap = ctx.manager.context.toJSON();
+        const snap = ctx.omega.context.toJSON();
         ctx.expect(snap.geolocation).toBeDefined();
         ctx.expect(snap.client).toBeDefined();
         ctx.expect(snap.session).toBeDefined();
@@ -137,7 +137,7 @@ module.exports = defineCases({
     {
       name: '_readFirstMac returns null or a MAC-shaped string',
       run: (ctx) => {
-        const mac = ctx.manager.context._readFirstMac();
+        const mac = ctx.omega.context._readFirstMac();
         if (mac !== null) {
           ctx.expect(mac).toMatch(/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i);
         }
@@ -146,9 +146,9 @@ module.exports = defineCases({
     {
       name: 'IPC handler desktop:context:get returns the snapshot',
       run: async (ctx) => {
-        const snap = await ctx.manager.ipc.invoke('desktop:context:get');
-        ctx.expect(snap.session.id).toBe(ctx.manager.context.session.id);
-        ctx.expect(snap.client.platform).toBe(ctx.manager.context.client.platform);
+        const snap = await ctx.omega.ipc.invoke('desktop:context:get');
+        ctx.expect(snap.session.id).toBe(ctx.omega.context.session.id);
+        ctx.expect(snap.client.platform).toBe(ctx.omega.context.client.platform);
       },
     },
   ],

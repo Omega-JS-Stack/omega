@@ -17,7 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const Logger = require('../lib/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { submit, stapleAndProve, toolRunner } = require('./lib/notarize-tools.js');
 
 const logger = new Logger('notarize-artifacts');

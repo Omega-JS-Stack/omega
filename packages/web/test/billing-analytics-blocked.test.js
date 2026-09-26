@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const PKG = path.join(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
@@ -62,7 +62,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
           return { path: CLIENT_ANALYTICS };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -96,7 +96,7 @@ const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
 /** A live subscription that is scheduled to end — the state that offers undo. */
 function cancellingAccount() {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -104,7 +104,7 @@ function cancellingAccount() {
       expires: { timestampUNIX: MONTH_FROM_NOW },
       cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } },
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /**
@@ -150,17 +150,16 @@ async function wireBilling({ analyticsBlocked }) {
   };
   globalThis.__omegaClient = {
     config: { analytics: { providers: {} } },
-    auth: () => ({ resolveSubscription: (account) => resolveSubscription(account) }),
-    bindings: () => ({ update: () => {} }),
-    utilities: () => ({ showNotification: () => {}, escapeHTML: (value) => value }),
+    bindings: { update: () => {} },
+    utilities: { showNotification: () => {}, escapeHTML: (value) => value },
     // The visitor consented to everything — a denied category is its own suite
     // (consent-gating.test.js); this one is about blocked GLOBALS.
-    storage: () => ({
+    storage: {
       get: (key, fallback) => (key === 'trackingConsent'
         ? { analytics: true, marketing: true, region: 'opt-out', version: 1 }
         : fallback),
       set: () => {},
-    }),
+    },
     request: async (route, options) => {
       requests.push({ route, options });
       return route.endsWith('/portal') ? { url: 'https://portal.example/session' } : {};

@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('account:connections');
@@ -29,7 +29,7 @@ export async function init() {
 
 // Load connections data
 export async function loadData(account, sharedConnectionsConfig) {
-  if (!account) {
+  if (!account.authenticated) {
     return;
   }
 
@@ -133,8 +133,8 @@ function renderUnconfiguredCard(providerId, reason) {
           &#9888;
         </div>
         <div>
-          <h6 class="mb-0">${omega.utilities().escapeHTML(providerName)}</h6>
-          <small class="text-warning d-block">Unsupported connection: "${omega.utilities().escapeHTML(providerId)}". ${omega.utilities().escapeHTML(reason)}</small>
+          <h6 class="mb-0">${omega.utilities.escapeHTML(providerName)}</h6>
+          <small class="text-warning d-block">Unsupported connection: "${omega.utilities.escapeHTML(providerId)}". ${omega.utilities.escapeHTML(reason)}</small>
         </div>
       </div>
       <div class="text-start text-sm-end flex-shrink-0">
@@ -231,7 +231,7 @@ function initializeProviderForm(providerId) {
     return;
   }
 
-  const formManager = new FormManager(`#${formId}`, {
+  const formManager = new FormManager(omega, `#${formId}`, {
     submittingText: 'Connecting...',
   });
 

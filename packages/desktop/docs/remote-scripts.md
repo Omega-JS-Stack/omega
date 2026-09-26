@@ -31,14 +31,14 @@ Host a plain `.js` file at the source URL. The content is fetched as text and ex
 ### Example: force all users to update
 
 ```js
-await manager.autoUpdater.checkNow();
+await omega.autoUpdater.checkNow();
 ```
 
 ### Example: clear corrupted storage
 
 ```js
-manager.storage.delete('auth.staleToken');
-manager.storage.set('app.patched', true);
+omega.storage.delete('auth.staleToken');
+omega.storage.set('app.patched', true);
 ```
 
 ### Example: emergency restart with cache wipe
@@ -52,18 +52,18 @@ if (fs.existsSync(cacheDir)) {
   fs.rmSync(cacheDir, { recursive: true });
 }
 
-manager.relaunch({ force: true });
+omega.relaunch({ force: true });
 ```
 
 ### Example: redirect updater to a hotfix feed
 
 ```js
-manager.autoUpdater._autoUpdater.setFeedURL({
+omega.autoUpdater._autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'myorg',
   repo: 'myapp-hotfix',
 });
-await manager.autoUpdater.checkNow();
+await omega.autoUpdater.checkNow();
 ```
 
 ### Example: version-gated fix (script handles its own gating)
@@ -73,7 +73,7 @@ const wv = require('wonderful-version');
 const appVersion = require('electron').app.getVersion();
 
 if (wv.greaterThanOrEqual(appVersion, '1.4.0') && wv.lessThan(appVersion, '1.6.0')) {
-  manager.storage.delete('corrupted.key');
+  omega.storage.delete('corrupted.key');
 }
 ```
 
@@ -89,9 +89,9 @@ Or return a 404 — fetch failures are caught and logged, never crash. Failure l
 
 ## Execution context
 
-The script runs via `new AsyncFunction('manager', 'require', code)`:
+The script runs via `new AsyncFunction('omega', 'require', code)`:
 
-- **`manager`** — the live main-process Manager singleton. Full access to all libs: `manager.storage`, `manager.autoUpdater`, `manager.windows`, `manager.ipc`, etc.
+- **`omega`**: the live main-process instance. Full access to all libs: `omega.storage`, `omega.autoUpdater`, `omega.windows`, `omega.ipc`, etc.
 - **`require`** — the real Node.js `require`. Can load `fs`, `path`, `child_process`, `electron`, or any installed package.
 - **`await`** — supported natively.
 
@@ -107,13 +107,13 @@ If the script throws, the error is logged but the hash is still stored (prevents
 
 ```js
 // Force-fetch and execute if the script changed
-await manager.remoteScripts.refreshNow();
+await omega.remoteScripts.refreshNow();
 
 // See the last execution ({ hash, timestamp } or null)
-manager.remoteScripts.getLastRun();
+omega.remoteScripts.getLastRun();
 
 // Wipe stored hash — next poll will re-run the current script
-manager.remoteScripts.clearExecuted();
+omega.remoteScripts.clearExecuted();
 ```
 
 ## Config

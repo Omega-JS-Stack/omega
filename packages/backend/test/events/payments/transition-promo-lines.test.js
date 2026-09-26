@@ -15,14 +15,13 @@
  * Run: npx omega test framework:events/payments/transition-promo-lines
  *
  * The REAL transition modules run. The one thing swapped is the email door
- * (`ctx.Manager.Email`) — sending would hit the real provider — and it is swapped
- * on a VIEW of the Manager (`Object.create`), so the runner's own Manager is never
- * mutated. Everything else (the discount validation, the arithmetic, the template
- * data) is the real path.
+ * (`ctx.email`), sending would hit the real provider, and it is swapped on the
+ * test ctx alone, so the runner's own omega is never touched. Everything else
+ * (the discount validation, the arithmetic, the template data) is the real path.
  */
-const newSubscription = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
-const purchaseCompleted = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
-const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const newSubscription = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/subscription/new-subscription.js');
+const purchaseCompleted = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/one-time/purchase-completed.js');
+const discountCodes = require('../../../dist/omega/libraries/payment/discount-codes.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PRICE = 49.99;
@@ -35,27 +34,24 @@ const LEGACY_SHAPELESS_DISCOUNT = { valid: true, code: 'LEGACYCODE', duration: '
 const USER_DOC = { auth: { uid: UID, email: `${UID}@example.com` } };
 
 /**
- * A ctx whose Manager is the real one with ONLY the email door swapped, so the
+ * A ctx on the real omega with ONLY the email door swapped, so the
  * transition's own `sendOrderEmail()` path runs for real up to the send.
  */
-function buildCtx(Manager, captured) {
-  const managerView = Object.create(Manager);
-
-  managerView.Email = () => ({
-    send: async (payload) => {
-      captured.sent = payload;
-      return { status: 'captured' };
-    },
-  });
-
+function buildCtx(omega, captured) {
   return {
-    Manager: managerView,
+    omega: omega,
+    email: {
+      send: async (payload) => {
+        captured.sent = payload;
+        return { status: 'captured' };
+      },
+    },
     log: () => {},
     error: (message) => captured.errors.push(message),
   };
 }
 
-async function runSubscription(Manager, discount, { isTrial = false } = {}) {
+async function runSubscription(omega, discount, { isTrial = false } = {}) {
   const captured = { errors: [] };
   const order = {
     id: 'ORD-PROMO-SUB',
@@ -74,13 +70,13 @@ async function runSubscription(Manager, discount, { isTrial = false } = {}) {
     order,
     uid: UID,
     userDoc: USER_DOC,
-    ctx: buildCtx(Manager, captured),
+    ctx: buildCtx(omega, captured),
   });
 
   return { computed: captured.sent?.data?.content?._computed, captured };
 }
 
-async function runOneTime(Manager, discount) {
+async function runOneTime(omega, discount) {
   const captured = { errors: [] };
   const order = {
     id: 'ORD-PROMO-ONE',
@@ -95,7 +91,7 @@ async function runOneTime(Manager, discount) {
     order,
     uid: UID,
     userDoc: USER_DOC,
-    ctx: buildCtx(Manager, captured),
+    ctx: buildCtx(omega, captured),
   });
 
   return { computed: captured.sent?.data?.content?._computed, captured };
@@ -109,8 +105,8 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-percent-code-renders-a-percent-line',
-      async run({ assert, Manager }) {
-        const { computed } = await runSubscription(Manager, discountCodes.validate('WELCOME15'));
+      async run({ assert, omega }) {
+        const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME15'));
 
         assert.ok(computed, 'The transition should have composed the email');
         assert.equal(computed.promoCode, 'WELCOME15', 'The line names the code');
@@ -124,8 +120,8 @@ module.exports = defineCases({
 
     {
       name: 'an-amount-code-renders-a-money-line-and-the-discounted-total',
-      async run({ assert, Manager }) {
-        const { computed } = await runSubscription(Manager, discountCodes.validate('WELCOME10OFF'));
+      async run({ assert, omega }) {
+        const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME10OFF'));
 
         assert.equal(computed.promoCode, 'WELCOME10OFF', 'The line names the code');
         assert.equal(computed.promoAmount, '10.00', 'A flat-dollar code quotes its dollars');
@@ -137,10 +133,10 @@ module.exports = defineCases({
 
     {
       name: 'a-discount-with-neither-shape-renders-no-promo-line-and-does-not-throw',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // An order written before the amount field existed. The handler is
         // dispatched fire-and-forget, so a throw here costs the email silently.
-        const { computed, captured } = await runSubscription(Manager, LEGACY_SHAPELESS_DISCOUNT);
+        const { computed, captured } = await runSubscription(omega, LEGACY_SHAPELESS_DISCOUNT);
 
         assert.ok(computed, 'The email should still be composed');
         assert.equal('promoCode' in computed, false, 'A shapeless discount renders no promo line');
@@ -153,8 +149,8 @@ module.exports = defineCases({
 
     {
       name: 'a-trial-still-charges-nothing-today',
-      async run({ assert, Manager }) {
-        const { computed } = await runSubscription(Manager, discountCodes.validate('WELCOME10OFF'), { isTrial: true });
+      async run({ assert, omega }) {
+        const { computed } = await runSubscription(omega, discountCodes.validate('WELCOME10OFF'), { isTrial: true });
 
         assert.equal(computed.totalToday, '0.00', 'A trial charges nothing today');
         assert.equal(computed.firstChargeAmount, '39.99', 'The first real charge is still the discounted one');
@@ -163,16 +159,16 @@ module.exports = defineCases({
 
     {
       name: 'the-one-time-transition-behaves-the-same-for-every-shape',
-      async run({ assert, Manager }) {
-        const percent = await runOneTime(Manager, discountCodes.validate('FLASH20'));
+      async run({ assert, omega }) {
+        const percent = await runOneTime(omega, discountCodes.validate('FLASH20'));
         assert.equal(percent.computed.promoPercent, 20, 'A percent code quotes its percent');
         assert.equal(percent.computed.totalToday, '39.99', '20% off 49.99 is 39.99');
 
-        const amount = await runOneTime(Manager, discountCodes.validate('WELCOME10OFF'));
+        const amount = await runOneTime(omega, discountCodes.validate('WELCOME10OFF'));
         assert.equal(amount.computed.promoAmount, '10.00', 'A flat-dollar code quotes its dollars');
         assert.equal(amount.computed.totalToday, '39.99', '$10 off 49.99 is 39.99');
 
-        const shapeless = await runOneTime(Manager, LEGACY_SHAPELESS_DISCOUNT);
+        const shapeless = await runOneTime(omega, LEGACY_SHAPELESS_DISCOUNT);
         assert.equal('promoCode' in shapeless.computed, false, 'A shapeless discount renders no promo line');
         assert.equal(shapeless.computed.totalToday, '49.99', 'The full price stands');
         assert.deepEqual(shapeless.captured.errors, [], 'The transition should log no error');
@@ -181,8 +177,8 @@ module.exports = defineCases({
 
     {
       name: 'no-discount-at-all-is-unchanged',
-      async run({ assert, Manager }) {
-        const { computed } = await runSubscription(Manager, null);
+      async run({ assert, omega }) {
+        const { computed } = await runSubscription(omega, null);
 
         assert.equal('promoCode' in computed, false, 'No code, no promo line');
         assert.equal(computed.totalToday, '49.99', 'The customer pays the list price');

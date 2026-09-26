@@ -31,7 +31,6 @@
  * a silent no-op, which is exactly what makes a `cookie_banner_show` in an
  * opt-in region safe — nothing has loaded to receive it.
  */
-import omega from '@omega.js/client';
 
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
@@ -53,10 +52,10 @@ const CATEGORIES = [
 // How long the show/hide transition in _consent.scss runs.
 const ANIMATION_MS = 300;
 
-export default function () {
+export default function ({ omega }) {
   const config = omega.config.consent.config;
 
-  omega.dom().ready().then(() => {
+  omega.dom.ready().then(() => {
     // Two visitors get the tab instead of the banner: one who has answered, and
     // (#391) one in an opt-out region who has not. The second grants both
     // categories by DEFAULT, so there is no gate to hold and nothing worth

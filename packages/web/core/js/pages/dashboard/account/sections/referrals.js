@@ -1,9 +1,9 @@
 // Referrals section module
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Load referrals data
 export function loadData(account) {
-  if (!account) return;
+  if (!account.authenticated) return;
 
   // Update referral code (real code only)
   updateReferralCode(account.affiliate?.code);
@@ -143,13 +143,13 @@ function updateReferralsList(referrals) {
                 <div class="d-flex align-items-center">
                   <span class="omega-chip me-2">#${sortedReferrals.length - index}</span>
                   <div>
-                    <strong class="font-monospace small">${omega.utilities().escapeHTML(referral.uid || 'Unknown User')}</strong>
-                    <div class="text-muted small">${omega.utilities().escapeHTML(dateStr)}${timeStr ? ` at ${omega.utilities().escapeHTML(timeStr)}` : ''}</div>
+                    <strong class="font-monospace small">${omega.utilities.escapeHTML(referral.uid || 'Unknown User')}</strong>
+                    <div class="text-muted small">${omega.utilities.escapeHTML(dateStr)}${timeStr ? ` at ${omega.utilities.escapeHTML(timeStr)}` : ''}</div>
                   </div>
                 </div>
               </div>
               <div class="text-end">
-                <small class="text-muted">${omega.utilities().escapeHTML(getTimeSince(timestamp))}</small>
+                <small class="text-muted">${omega.utilities.escapeHTML(getTimeSince(timestamp))}</small>
               </div>
             </div>
           </div>

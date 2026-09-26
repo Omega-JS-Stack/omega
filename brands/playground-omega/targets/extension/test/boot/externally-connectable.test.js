@@ -16,8 +16,8 @@ module.exports = {
   layer: 'boot',
   description: 'the packaged manifest lets the brand site message the extension',
   inspect: async ({ extension, expect }) => {
-    const Manager = new (require('@omega.js/extension/build'));
-    const brandUrl = Manager.getConfig().brand?.url;
+    const build = require('@omega.js/extension/build');
+    const brandUrl = build.getConfig().brand?.url;
 
     // Nothing to assert until the brand declares its own site
     if (!brandUrl) return;

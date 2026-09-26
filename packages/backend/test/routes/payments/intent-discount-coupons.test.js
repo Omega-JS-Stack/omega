@@ -16,11 +16,11 @@
  *
  * Run: npx omega test framework:routes/payments/intent-discount-coupons
  */
-const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const ChargebeeLib = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
-const stripeIntent = require('../../../dist/manager/routes/payments/intent/providers/stripe.js');
-const chargebeeIntent = require('../../../dist/manager/routes/payments/intent/providers/chargebee.js');
-const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
+const StripeLib = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const ChargebeeLib = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
+const stripeIntent = require('../../../dist/omega/routes/payments/intent/providers/stripe.js');
+const chargebeeIntent = require('../../../dist/omega/routes/payments/intent/providers/chargebee.js');
+const discountCodes = require('../../../dist/omega/libraries/payment/discount-codes.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-intent-coupon-uid';
@@ -41,14 +41,14 @@ const PRODUCT = {
 };
 
 /**
- * The ctx a provider receives. `Manager` is the runner's REAL one — the coupon
+ * The ctx a provider receives. `omega` is the runner's REAL one — the coupon
  * builders read the brand's currency off its resolved config.
  */
-function buildCtx(Manager) {
+function buildCtx(omega) {
   return {
-    Manager,
+    omega,
     log: () => {},
-    getUser: () => ({ auth: { email: `${UID}@example.com` } }),
+    user: { auth: { email: `${UID}@example.com` } },
   };
 }
 
@@ -113,7 +113,7 @@ function sdkCapturing(captured, { couponExists = false } = {}) {
   };
 }
 
-async function stripeCheckout(Manager, code, options) {
+async function stripeCheckout(omega, code, options) {
   const captured = {};
 
   await withStripeSdk(sdkCapturing(captured, options), () => stripeIntent.createIntent({
@@ -126,7 +126,7 @@ async function stripeCheckout(Manager, code, options) {
     discount: discountCodes.validate(code),
     confirmationUrl: 'https://example.com/success',
     cancelUrl: 'https://example.com/cancel',
-    ctx: buildCtx(Manager),
+    ctx: buildCtx(omega),
   }));
 
   return captured;
@@ -150,7 +150,7 @@ async function withChargebeeApi(handler, fn) {
   }
 }
 
-async function chargebeeCheckout(Manager, code, { couponExists = false } = {}) {
+async function chargebeeCheckout(omega, code, { couponExists = false } = {}) {
   const captured = {};
 
   const handler = async (endpoint, options) => {
@@ -185,7 +185,7 @@ async function chargebeeCheckout(Manager, code, { couponExists = false } = {}) {
     discount: discountCodes.validate(code),
     confirmationUrl: 'https://example.com/success',
     cancelUrl: 'https://example.com/cancel',
-    ctx: buildCtx(Manager),
+    ctx: buildCtx(omega),
   }));
 
   return captured;
@@ -200,8 +200,8 @@ module.exports = defineCases({
     {
       name: 'stripe-an-amount-code-creates-an-amount_off-coupon-in-cents',
       auth: 'none',
-      async run({ assert, Manager, config }) {
-        const captured = await stripeCheckout(Manager, AMOUNT_CODE);
+      async run({ assert, omega, config }) {
+        const captured = await stripeCheckout(omega, AMOUNT_CODE);
         const created = captured.created;
 
         assert.ok(created, 'The provider should have created a coupon');
@@ -218,8 +218,8 @@ module.exports = defineCases({
     {
       name: 'stripe-a-percent-code-is-unchanged',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const captured = await stripeCheckout(Manager, PERCENT_CODE);
+      async run({ assert, omega }) {
+        const captured = await stripeCheckout(omega, PERCENT_CODE);
         const created = captured.created;
 
         // The id is byte-identical to what it has always been — coupons already
@@ -236,9 +236,9 @@ module.exports = defineCases({
     {
       name: 'stripe-the-two-shapes-never-share-a-coupon-id',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const amount = await stripeCheckout(Manager, AMOUNT_CODE);
-        const percent = await stripeCheckout(Manager, PERCENT_CODE);
+      async run({ assert, omega }) {
+        const amount = await stripeCheckout(omega, AMOUNT_CODE);
+        const percent = await stripeCheckout(omega, PERCENT_CODE);
 
         assert.notEqual(amount.retrieved, percent.retrieved, 'A $10-off coupon and a 15%-off coupon are different coupons');
       },
@@ -247,8 +247,8 @@ module.exports = defineCases({
     {
       name: 'stripe-an-existing-amount-coupon-is-reused-not-recreated',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const captured = await stripeCheckout(Manager, AMOUNT_CODE, { couponExists: true });
+      async run({ assert, omega }) {
+        const captured = await stripeCheckout(omega, AMOUNT_CODE, { couponExists: true });
 
         assert.ok(captured.retrieved, 'It should have looked the coupon up');
         assert.equal(captured.created, undefined, 'An existing coupon is reused, never re-created');
@@ -259,8 +259,8 @@ module.exports = defineCases({
     {
       name: 'chargebee-an-amount-code-creates-a-fixed_amount-coupon',
       auth: 'none',
-      async run({ assert, Manager, config }) {
-        const captured = await chargebeeCheckout(Manager, AMOUNT_CODE);
+      async run({ assert, omega, config }) {
+        const captured = await chargebeeCheckout(omega, AMOUNT_CODE);
         const created = captured.created;
 
         assert.ok(created, 'The provider should have created a coupon');
@@ -277,8 +277,8 @@ module.exports = defineCases({
     {
       name: 'chargebee-a-percent-code-is-unchanged',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const captured = await chargebeeCheckout(Manager, PERCENT_CODE);
+      async run({ assert, omega }) {
+        const captured = await chargebeeCheckout(omega, PERCENT_CODE);
         const created = captured.created;
 
         assert.equal(captured.retrieved, `BEM_${PERCENT_CODE}_15OFF_ONCE`, 'The percent coupon id is unchanged');

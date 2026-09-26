@@ -4,8 +4,9 @@
  *
  * AI tests only run when TEST_EXTENDED_MODE is set.
  */
-const { inferContact, capitalize } = require('../../dist/manager/libraries/infer-contact.js');
+const { inferContact, capitalize } = require('../../dist/omega/libraries/infer-contact.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 module.exports = defineCases({
   description: 'Infer contact from email',
@@ -103,13 +104,11 @@ module.exports = defineCases({
         const ctx = {
           log: () => {},
           error: () => {},
-          Manager: {
-            AI: (_ctx, key) => {
-              handedKey = key;
+          ai: {
+            request: async (options) => {
+              handedKey = options.apiKey;
               return {
-                request: async () => ({
-                  content: { firstName: 'john', lastName: 'smith', company: 'acme', confidence: 0.9 },
-                }),
+                content: { firstName: 'john', lastName: 'smith', company: 'acme', confidence: 0.9 },
               };
             },
           },
@@ -118,7 +117,7 @@ module.exports = defineCases({
         try {
           const result = await inferContact('john.smith@acme.com', ctx);
 
-          assert.equal(handedKey, 'openai-key-fixture', 'OPENAI_API_KEY reaches the AI factory');
+          assert.equal(handedKey, 'openai-key-fixture', 'OPENAI_API_KEY reaches the AI request');
           assert.equal(result.method, 'ai', 'the AI path ran');
           assert.equal(result.firstName, 'John', 'the inferred name comes back capitalized');
         } finally {
@@ -138,12 +137,12 @@ module.exports = defineCases({
       skip: !process.env.TEST_EXTENDED_MODE ? 'TEST_EXTENDED_MODE not set (skipping AI inference test)' : false,
       timeout: 30000,
 
-      async run({ assert, Manager, skip }) {
+      async run({ assert, omega, skip }) {
         if (!process.env.OPENAI_API_KEY) {
           return skip('OPENAI_API_KEY not set');
         }
 
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
         const result = await inferContact('john.smith@microsoft.com', ctx);
 
         assert.ok(result, 'Should return a result');

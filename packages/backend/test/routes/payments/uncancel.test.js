@@ -21,20 +21,21 @@
  */
 const { buildUser, callHandler, recordingResponse, withEnvironment } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/uncancel/post.js');
+const handler = require('../../../dist/omega/routes/payments/uncancel/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../../dist/omega/context.js');
 
 const PROVIDERS = ['stripe', 'chargebee', 'paypal', 'test'];
 
 function providerModule(name) {
-  return require(`../../../dist/manager/routes/payments/uncancel/providers/${name}.js`);
+  return require(`../../../dist/omega/routes/payments/uncancel/providers/${name}.js`);
 }
 
 // A subscriber whose cancellation is scheduled — the one state uncancel accepts.
-function pendingSubscriber(Manager, { uid, provider, status, pending, productId, resourceId }) {
+function pendingSubscriber(omega, { uid, provider, status, pending, productId, resourceId }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
 
-  return buildUser(Manager, {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: {},
     subscription: {
@@ -51,13 +52,13 @@ function pendingSubscriber(Manager, { uid, provider, status, pending, productId,
   });
 }
 
-function uncancel(Manager, user, settings) {
+function uncancel(omega, user, settings) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-uncancel',
     user,
-    settings: { confirmed: true, ...(settings || {}) },
+    data: { confirmed: true, ...(settings || {}) },
   });
 }
 
@@ -71,7 +72,7 @@ function uncancel(Manager, user, settings) {
  *
  * @returns {Promise<{ sent: object, properties: object|null }>}
  */
-async function uncancelReadingProperties(Manager, user) {
+async function uncancelReadingProperties(omega, user) {
   const res = recordingResponse();
   const headers = {};
 
@@ -82,9 +83,9 @@ async function uncancelReadingProperties(Manager, user) {
   res.get = (key) => headers[key];
 
   const req = { method: 'POST', headers: { 'content-type': 'application/json' }, query: {}, body: {} };
-  const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-uncancel' });
+  const ctx = new Context(omega, { req, res }, { functionName: 'payments-uncancel' });
 
-  await handler({ ctx, Manager, user, settings: { confirmed: true }, libraries: Manager.libraries });
+  await handler({ ctx, omega, user, data: { confirmed: true } });
 
   return {
     sent: res.sent,
@@ -103,7 +104,7 @@ module.exports = defineCases({
     {
       name: 'rejects-unauthenticated',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/uncancel', {
+        const response = await http.as('none').post('omega/payments/uncancel', {
           confirmed: true,
         });
 
@@ -114,7 +115,7 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-confirmed',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/uncancel', {});
+        const response = await http.as('basic').post('omega/payments/uncancel', {});
 
         assert.isError(response, 400, 'Should reject a request that never confirmed');
       },
@@ -125,10 +126,10 @@ module.exports = defineCases({
     {
       name: 'rejects-unconfirmed',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-unconfirmed' });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-unconfirmed' });
 
-        const sent = await uncancel(Manager, user, { confirmed: false });
+        const sent = await uncancel(omega, user, { confirmed: false });
 
         assert.equal(sent.code, 400, `An unconfirmed uncancel must be refused, got ${sent.code}`);
       },
@@ -137,10 +138,10 @@ module.exports = defineCases({
     {
       name: 'rejects-basic-user',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-basic', productId: 'basic' });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-basic', productId: 'basic' });
 
-        const sent = await uncancel(Manager, user);
+        const sent = await uncancel(omega, user);
 
         assert.equal(sent.code, 400, `A free user has no cancellation to undo, got ${sent.code}`);
       },
@@ -149,10 +150,10 @@ module.exports = defineCases({
     {
       name: 'rejects-no-pending-cancellation',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-not-pending', pending: false });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-not-pending', pending: false });
 
-        const sent = await uncancel(Manager, user);
+        const sent = await uncancel(omega, user);
 
         assert.equal(sent.code, 400, `Nothing is scheduled, so there is nothing to resume, got ${sent.code}`);
         assert.match(`${sent.body}`, /not scheduled to cancel/i, `Expected the no-pending-cancellation message, got: ${sent.body}`);
@@ -162,12 +163,12 @@ module.exports = defineCases({
     {
       name: 'rejects-a-subscription-that-is-no-longer-active',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // A suspended (or fully cancelled) subscription cannot be resumed by
         // clearing a scheduled cancellation — the term is already broken.
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-suspended', status: 'suspended' });
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-suspended', status: 'suspended' });
 
-        const sent = await uncancel(Manager, user);
+        const sent = await uncancel(omega, user);
 
         assert.equal(sent.code, 400, `Only an ACTIVE subscription can be resumed, got ${sent.code}`);
       },
@@ -176,10 +177,10 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-payment-details',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-no-provider', provider: null, resourceId: null });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-no-provider', provider: null, resourceId: null });
 
-        const sent = await uncancel(Manager, user);
+        const sent = await uncancel(omega, user);
 
         assert.equal(sent.code, 400, `Without a provider there is nothing to call, got ${sent.code}`);
       },
@@ -188,10 +189,10 @@ module.exports = defineCases({
     {
       name: 'rejects-unknown-provider',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-unknown', provider: 'unknown-provider' });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-unknown', provider: 'unknown-provider' });
 
-        const sent = await uncancel(Manager, user);
+        const sent = await uncancel(omega, user);
 
         assert.equal(sent.code, 400, `An unknown provider must be refused, got ${sent.code}`);
       },
@@ -202,15 +203,15 @@ module.exports = defineCases({
     {
       name: 'paypal-is-gated-before-any-api-call',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
+      async run({ assert, omega }) {
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-paypal', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         // PayPal's credential is stripped: ANY attempt to reach PayPal would
         // throw inside the client and surface as a 500. A 400 is therefore proof
         // the route refused BEFORE dispatch — no network dependency at all.
         // Only the SECRET is an env key now (#893): the public client id is
         // config, which a route test never rewrites.
-        const sent = await withEnvironment({ PAYPAL_CLIENT_SECRET: null }, () => uncancel(Manager, user));
+        const sent = await withEnvironment({ PAYPAL_CLIENT_SECRET: null }, () => uncancel(omega, user));
 
         assert.equal(sent.code, 400, `An unsupported operation is a client fault, not an outage, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.match(`${sent.body}`, /billing portal/i, `The refusal should point at the billing portal, got: ${sent.body}`);
@@ -221,15 +222,15 @@ module.exports = defineCases({
     {
       name: 'the-gate-carries-a-structured-code',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // The client branches on the code, not on the sentence — so the code
         // rides the response's own properties, where every 4xx carries its
         // machine-readable half.
-        const user = pendingSubscriber(Manager, { uid: '_test-uncancel-paypal-code', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
+        const user = pendingSubscriber(omega, { uid: '_test-uncancel-paypal-code', provider: 'paypal', resourceId: 'I-TESTUNCANCEL' });
 
         const { sent, properties } = await withEnvironment(
           { PAYPAL_CLIENT_SECRET: null },
-          () => uncancelReadingProperties(Manager, user),
+          () => uncancelReadingProperties(omega, user),
         );
 
         assert.equal(sent.code, 400, `Expected the capability gate, got ${sent.code}`);

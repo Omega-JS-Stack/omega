@@ -1,20 +1,16 @@
-// ============================================
-// Sidepanel Component
-// ============================================
-// Default functionality for the sidepanel view
+/**
+ * Surface: the side panel (a page context)
+ * Doc: node_modules/@omega.js/extension/docs/components.md
+ *
+ * The full notes list: list, create and delete, each a messenger round trip to
+ * background, rendered with omega.utilities.escapeHTML (../../lib/notes-list.js).
+ */
+import omega from '@omega.js/extension/sidepanel';
+import { mountNotes } from '../../lib/notes-list.js';
 
-// Import OMEGA Extension
-import Manager from '@omega.js/extension/sidepanel';
+omega.initialize()
+  .then(() => {
+    mountNotes({ omega });
 
-// Create instance
-const manager = new Manager();
-
-// Initialize
-manager.initialize()
-.then(() => {
-  // Shortcuts
-  const { extension, messenger, logger, omega } = manager;
-
-  // Add your sidepanel-specific JavaScript here
-  logger.log('Sidepanel initialized!');
-});
+    omega.logger.log('Sidepanel initialized!');
+  });

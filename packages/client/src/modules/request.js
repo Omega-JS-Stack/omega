@@ -1,10 +1,10 @@
 /**
- * request — the harmonized API-fetch layer (successor to legacy UJM's authorizedFetch).
+ * request — the harmonized API-fetch layer.
  *
  * One implementation for every surface: the browser singleton exposes it as
- * `omega.request(url, options)`; desktop main and the extension service worker
- * construct their own instance via `createRequest(deps)` with their framework's
- * url/auth plumbing. Every response's `omega-properties` header (code, tag,
+ * `omega.request(url, options)`, and so do the extension background and
+ * desktop main, each constructing its own instance once via `createRequest(deps)`
+ * with its url/auth plumbing. Every response's `omega-properties` header (code, tag,
  * usage current+limits, schema, additional — emitted by @omega.js/backend's
  * assistant on every respond/errorify) is parsed automatically; contexts with
  * bindings get server usage merged into the top-level `usage` bindings key.

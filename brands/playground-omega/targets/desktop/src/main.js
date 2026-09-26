@@ -1,11 +1,23 @@
-// Main-process entry. Config is auto-loaded from config/omega.json5 (resolved for the desktop target).
-const Manager = require('@omega.js/desktop/main');
+/**
+ * Surface: the main-process entry (one require, one initialize)
+ * Doc: node_modules/@omega.js/desktop/docs/boot-sequence.md
+ *
+ * Config is auto-loaded from config/omega.json5 (resolved for the desktop
+ * target). The notes feature's main-process half lives in ./lib/notes.js.
+ */
+const omega = require('@omega.js/desktop/main');
+const notes = require('./lib/notes.js');
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, omega, appState, sentry, startup } = manager;
+    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, auth, appState, sentry, startup } = omega;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // 0. The notes feature: ipc.handle('notes:count'), ipc.on('notes:report'),
+    //    auth.listen (a sign-out clears the count), the <brand.id>://notes deep
+    //    link. Wired before the window exists, so its renderer finds every channel.
+    // ─────────────────────────────────────────────────────────────────────────────
+    notes.initialize(omega);
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 1. Create the main window

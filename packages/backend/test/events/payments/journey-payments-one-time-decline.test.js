@@ -12,7 +12,7 @@
  * Uses the journey-payments-one-time account (one-time events don't modify
  * subscription state, so the one-time journeys share it).
  */
-const User = require('../../../dist/manager/helpers/user.js');
+const { User } = require('../../../dist/omega/helpers/account.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({
@@ -41,7 +41,7 @@ module.exports = defineCases({
         const before = await firestore.get(`users/${uid}`);
         state.subscriptionBefore = before?.subscription || null;
 
-        const response = await http.as('journey-payments-one-time').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-one-time').post('omega/payments/intent', {
           provider: 'test',
           productId: oneTimeProduct.id,
           simulate: 'decline',
@@ -119,7 +119,7 @@ module.exports = defineCases({
           'A one-time decline must leave subscription state exactly as it was',
         );
 
-        const resolved = User.resolveSubscription(userDoc);
+        const resolved = new User(userDoc);
         assert.equal(resolved.active, false, 'The account keeps its (free) access level');
       },
     },

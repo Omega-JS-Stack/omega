@@ -82,8 +82,8 @@ const omegaSocial = {
     const platform = resolveInput(ctx.lookup, markup.trim()) || markup.trim();
     if (!ctx.page) return '';
 
-    // Two shapes of the same scope: legacy UJM injected `resolved` INTO the
-    // page; @omega.js/web's data cascade puts it beside `page` (its migrate
+    // Two shapes of the same scope: a migrated page may carry `resolved` INSIDE
+    // it; @omega.js/web's data cascade puts it beside `page` (its migrate
     // rule 1: `page.resolved.` → `resolved.`). Config keys live under
     // `resolved.config` since #607 — `socials` is one of them.
     const resolved = ctx.page.resolved || ctx.lookup('resolved');

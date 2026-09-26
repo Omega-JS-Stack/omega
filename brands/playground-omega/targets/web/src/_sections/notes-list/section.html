@@ -1,0 +1,25 @@
+{% comment %}
+  Surface: a consumer section, a new id of the brand's own (src/_sections/<id>/)
+  Doc: node_modules/@omega.js/web/docs/sections.md
+  Bindings: node_modules/@omega.js/client/docs/bindings.md
+{% endcomment %}
+<section class="notes-list">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <p class="notes-list__meta">
+          <span data-omega-bind="@show auth.user.profile.displayName">Signed in as <strong data-omega-bind="@text auth.user.profile.displayName"></strong>.</span>
+          <span class="omega-binding-skeleton" data-omega-bind="@text notes.created">&nbsp;</span> notes written so far.
+        </p>
+
+        <form id="notes-form" class="notes-list__form d-flex gap-2 mb-4" novalidate>
+          <input type="text" name="text" class="form-control" maxlength="280" required placeholder="{{ args.placeholder }}" aria-label="{{ args.placeholder }}">
+          <button type="submit" class="btn btn-adaptive">{{ args.submit_label }}</button>
+        </form>
+
+        <ul id="notes-list" class="notes-list__items list-unstyled mb-0" aria-live="polite"></ul>
+        <p id="notes-empty" class="notes-list__empty mb-0" hidden>{{ args.empty_text }}</p>
+      </div>
+    </div>
+  </div>
+</section>

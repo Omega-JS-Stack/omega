@@ -17,7 +17,7 @@
 /**
  * A browser's store listing id from the resolved config.
  *
- * @param {object} config - The resolved config (Manager.getConfig()).
+ * @param {object} config - The resolved config (build.getConfig()).
  * @param {string} browser - `chrome`, `firefox` or `edge`.
  * @returns {string} The id, or '' when the brand has not declared one.
  */
@@ -38,7 +38,7 @@ function listingId(config, browser) {
  * local scaffold (which pins it into config/omega.json5 so it stays stable
  * after that upload, `brand.url` being free to change afterwards).
  *
- * @param {object} config - The resolved config (Manager.getConfig()).
+ * @param {object} config - The resolved config (build.getConfig()).
  * @returns {string} e.g. `extension@example.com`, or '' with no brand facts at all.
  */
 function deriveFirefoxId(config) {

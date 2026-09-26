@@ -3,17 +3,17 @@
 delete process.env.ELECTRON_RUN_AS_NODE;
 
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('main');
-const argv = Manager.getArguments();
+const build = require('../build.js');
+const logger = build.logger('main');
+const argv = build.getArguments();
 const { series, parallel } = require('gulp');
 const path = require('path');
 const glob = require('glob').globSync;
 
 // Load packages
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const projectRoot = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const projectRoot = build.getRootPath('project');
 
 // Resolve the .env cascade from the project root (shell > app > brand > company)
 // and derive the signing paths the brand's signing tree implies. gulp is its own
@@ -40,7 +40,7 @@ if (sanitizedSigningKeys.length) {
 const attachLogFile = require('../utils/attach-log-file.js');
 const logFileEnv = process.env.OMEGA_LOG_FILE;
 if (logFileEnv !== 'false' && logFileEnv !== '0') {
-  const defaultName = Manager.isBuildMode() ? 'build.log' : 'dev.log';
+  const defaultName = build.isBuildMode() ? 'build.log' : 'dev.log';
   const logPath = (logFileEnv && logFileEnv !== 'true') ? logFileEnv : path.join(projectRoot, 'logs', defaultName);
   attachLogFile(logPath);
   logger.log(`Logs tee'd to ${logPath}`);
@@ -54,7 +54,7 @@ logger.log('Starting...', argv);
 // Auto-load tasks from src/gulp/tasks/*.js
 const tasks = glob('*.js', { cwd: `${__dirname}/tasks` });
 
-// Globals (parity with BXM)
+// Globals (the same pair @omega.js/extension's gulp sets)
 global.tasks = {};
 global.websocket = null;
 
@@ -72,8 +72,7 @@ global.tasks = exports;
 const runConsumerHook = require('../utils/run-consumer-hook.js');
 function makeHookTask(name) {
   const fn = async () => {
-    const Manager = new (require('../build.js'));
-    await runConsumerHook(name, { manager: Manager, projectRoot: process.cwd(), mode: process.env.OMEGA_BUILD_MODE === 'true' ? 'production' : 'development' });
+    await runConsumerHook(name, { build, projectRoot: process.cwd(), mode: process.env.OMEGA_BUILD_MODE === 'true' ? 'production' : 'development' });
   };
   // Set displayName for nicer gulp logs.
   Object.defineProperty(fn, 'name', { value: `hook:${name.replace('/', ':')}` });

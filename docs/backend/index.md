@@ -2,11 +2,11 @@
 
 > **Note for contributors and Claude:** This file is the guide for `@omega.js/backend` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (per-subsystem APIs, behavior tables, recipes) lives in the package's own [`docs/<topic>.md`](../../packages/backend/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
-> **Mirrored structure:** the four framework guides — `docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md` — mirror each other (the legacy UJM/BEM/BXM/EM lineage): shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** the four framework guides (`docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md`) mirror each other: shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them. Each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`, beside its one-line `@AGENTS.md` `CLAUDE.md` pointer) mirrors its guide the same way.
 
 ## Identity
 
-OMEGA Backend (@omega.js/backend) is a comprehensive framework for building modern Firebase Cloud Functions backends. Sister project to Electron Manager (EM), Browser Extension Manager (BXM), and Ultimate Jekyll Manager (UJM). Provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment provider integrations (Stripe / PayPal / Chargebee / Coinbase Commerce), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
+OMEGA Backend (@omega.js/backend) is a comprehensive framework for building modern Firebase Cloud Functions backends, the backend of the OMEGA family beside @omega.js/web, @omega.js/desktop and @omega.js/extension. Its main export is ONE ready-made instance, `omega`: `omega.initialize(options)` boots it and wires the built-in functions (`omega_api`, the auth and Firestore triggers, the cron schedules), the request pipeline, the `Context` every handler receives, the services (User, Usage, Analytics, Settings, Utilities, Metadata, Storage, Email, AI), payment provider integrations (Stripe / PayPal / Chargebee / Coinbase Commerce), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
 
 **This repository** is the @omega.js/backend library itself. **Consumer projects** are src-first Firebase apps: `require('@omega.js/backend')` in `src/index.js`, with optional `src/routes/`, `src/schemas/`, and `src/hooks/` for custom endpoints; `omega build` stages everything into `dist/` (the tree `firebase.json` points at). Config is loaded via `@omega.js/config` (shared sections top-level, backend settings under `targets.backend`; brand-monorepo hierarchy supported — brand targets carry NO config file of their own).
 
@@ -32,7 +32,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
    - `npx omega test project:` — ONLY project tests (all of them)
    - `npx omega test project:routes/custom` — only consumer project tests matching a path
    - `npx omega test backend:rules project:routes` — multiple targets compose (runs both selections)
-   - Pass `--extended` (or prefix `TEST_EXTENDED_MODE=true`) for tests that hit real external APIs (SendGrid, OpenAI, etc.). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM; @omega.js/backend propagates it to BOTH the runner subprocess and the live emulator. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md#extended-mode-test_extended_mode).
+   - Pass `--extended` (or prefix `TEST_EXTENDED_MODE=true`) for tests that hit real external APIs (SendGrid, OpenAI, etc.). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across all four frameworks; @omega.js/backend propagates it to BOTH the runner subprocess and the live emulator. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md#extended-mode-test_extended_mode).
    - Pass `--lane=<name>` for an OPT-IN lane: suites that exist only for a real external service, unreachable by any other run, each behind a gate that prints one skip line rather than failing. Today: `--lane=stripe-live`, which creates test-mode fixtures, forwards REAL Stripe webhooks into the emulator with `stripe listen`, and opens only for an `sk_test_` secret resolved through the ONE env reader (put it in the brand's `.env.testing` overlay). See [docs/test-framework.md](../../packages/backend/docs/test-framework.md#opt-in-lanes---lane).
 6. `npx omega deploy` — deploy Cloud Functions to Firebase
 7. `npx omega logs:read` / `npx omega logs:tail` — Cloud Function logs from Google Cloud Logging
@@ -51,21 +51,132 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 ## Architecture
 
-@omega.js/backend exposes a single `Manager` class that orchestrates everything: it initializes Firebase Admin, wires built-in functions (`omega_api`, auth events, cron), and hands out helper instances via factory methods. Supports **two deployment modes**: Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](../../packages/backend/docs/architecture.md) for the full overview of the Manager class, dual-mode support, the derived `config.resolved.*` values consumer code reads (`config.resolved.github`, the brand's SOURCE repo `<brand.id>-omega`, which is the repo the CMS routes commit content to, [#883](https://github.com/Omega-JS-Stack/omega/issues/883)), and helper factory pattern.
+@omega.js/backend's runtime is ONE instance of the `Omega` class (`src/omega/index.js`): `initialize()` initializes Firebase Admin, builds the process services, and wires the built-in functions into `omega.functions`. Every request, event and cron job runs with a `Context` (`ctx`). Supports **two deployment modes**: Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](../../packages/backend/docs/architecture.md) for the full overview of the instance, dual-mode support, the derived `config.resolved.*` values consumer code reads (`config.resolved.github`, the brand's SOURCE repo `<brand.id>-omega`, which is the repo the CMS routes commit content to), and the services.
 
 For the directory layout of both the @omega.js/backend library and consumer projects, see [docs/directory-structure.md](../../packages/backend/docs/directory-structure.md).
 
+### The consumer entry
+
+```js
+// src/index.js (CommonJS, synchronous: Firebase reads the exports at module load)
+const omega = require('@omega.js/backend');
+
+omega.initialize({ /* options */ });
+
+module.exports = omega.functions;
+```
+
+The package's main export IS the instance; a consumer never writes `new` (the class is exported by name, `Omega`, for tests). `initialize(options)` is synchronous and returns the instance. `omega.functions` is the Cloud Functions map the framework filled; a function of the brand's own joins it before the export line ([routes.md](../../packages/backend/docs/routes.md#functions-entry-point-srcindexjs)). Every option is optional:
+
+| Option | Default | What it does |
+|---|---|---|
+| `projectType` | `targets.backend.projectType` | `'firebase'` or `'custom'`; the config decides, an explicit option wins |
+| `resourceZone` | `'us-central1'` | The functions region |
+| `sentry` | `true` | Error reporting through `@omega.js/monitoring`; `reportErrorsInDev` (default `false`) extends it to development |
+| `firebaseConfig` | `FIREBASE_CONFIG` | The Firebase project the instance reads as `omega.project` |
+| `serviceAccountPath` | `'service-account.json'` | The key a LOCAL script initializes Firebase Admin with (a managed runtime uses its own identity) |
+| `checkNodeVersion` | `true` | In development, exit on a Node.js older than the manifest's `engines.node` (`false` only logs it) |
+| `uniqueAppName` | none | The Firebase Admin app name, and the namespace of `omega.storage()` |
+| `cwd` / `projectPackageDirectory` | `process.cwd()` / `cwd` | The functions directory, and where the consumer's `package.json` is read |
+| `logSavePath` | `false` | A file the logger also writes to |
+| `express.bodyParser` | `{ json: { limit: '100kb' }, urlencoded: { limit: '100kb', extended: true } }` | The custom server's body limits |
+| `identity` | `true` | Wire the blocking `omega_authBeforeCreate` and `omega_authBeforeSignIn` triggers |
+| `useFirebaseLogger` | `true` | In production, route `console` to Cloud Logging's structured logger |
+
+The test runner passes nothing: `OMEGA_TEST_RUNNER` alone turns off the Firebase init, the function wiring, the custom server and Sentry.
+
+### The instance (`omega`)
+
+| Member | What it is |
+|---|---|
+| `config` | The composed `config/omega.json5`, with `config.resolved` (the derived values) |
+| `env` | The env reader (below) |
+| `logger` | A `Context` with no request: `omega.logger.log()`, `.warn()`, `.error()` |
+| `version`, `cwd`, `project`, `package`, `options` | The framework version, the functions directory, the Firebase project (`projectId`, `resourceZone`, the URLs), the consumer's `package.json`, the resolved options |
+| `firebase.admin`, `firebase.app`, `firebase.functions` | The Admin SDK, the initialized app, and the `firebase-functions/v1` SDK (`null` in custom mode) |
+| `functions` | The Cloud Functions map the consumer exports |
+| `server` | `{ app, server }` once a custom-server backend listens, else `null` |
+| `handlers` | The pre/post hook bag, keyed by function name ([routes.md](../../packages/backend/docs/routes.md#new-event-handler)) |
+| `utilities`, `email`, `ai`, `storage(options)` | The process services, built once |
+| `sentry` | The capture handle, `null` when reporting is off |
+| `routes.run(name, { req, res }, options)` | Run a request through the pipeline as the named consumer route, from the consumer's own function |
+| `events.run(name, payload)` | Run an event handler through the dispatcher (a relative name loads `<cwd>/events/<name>.js`) |
+| `require(name)` | Resolve a dependency from the framework's own module context |
+| `getEnvironment()`, `isDevelopment()`, `isProduction()`, `isTesting()` | The environment ([environment-detection.md](../../packages/backend/docs/environment-detection.md)) |
+| `getFunctionsUrl()`, `getApiUrl()`, `getWebsiteUrl()`, `getParentUrl()`, `getParentApiUrl()`, `isParent()` | The URL helpers, local in development and testing |
+
+### `Context` (`ctx`)
+
+One class for routes, events and cron (`src/omega/context.js`, its methods mixed in from `src/omega/context/`). One instance wraps one request, or one trigger invocation; `ctx.request` is `null` outside HTTP.
+
+- **Fields**: `omega`, `req`, `res`, `id`, `tag`, `meta` (`{ startTime, name, environment, type }`), `tmpdir`, `data` (the validated input), and `request.{method,url,path,headers,body,query,data,geolocation,client,type,referrer,multipart}`.
+- **Request services**, each built on first read: `ctx.user` (a `User` from `@omega.js/account`, signed out until `authenticate()` resolves the caller), `ctx.usage`, `ctx.analytics`, `ctx.email`, `ctx.ai`, and `ctx.metadata(metadata, document)`.
+- **Methods**: `log warn error info debug notice critical emergency` and `setLogPrefix()`; `respond(payload, options)`, `redirect(url, options)`, `report(error, options)`; `authenticate(options)`; `parseMultipart(options)`; and `getEnvironment()` with the three checks, forwarded from the instance.
+
+### The handler contracts
+
+Every handler receives ONE object and destructures what it needs; everything in it is also on `ctx`:
+
+```js
+module.exports = async ({ ctx, omega, user, data, usage, analytics }) => { };       // routes
+module.exports = async ({ ctx, omega, user, context, change, snapshot }) => { };    // auth and Firestore events
+module.exports = async ({ ctx, omega, context }) => { };                            // cron jobs
+```
+
+A route answers through `ctx.respond()`. An event's `user` is the trigger's Auth `UserRecord`; a route's `user` is the caller's `User`. Recipes: [routes.md](../../packages/backend/docs/routes.md).
+
+### Services
+
+`src/omega/services/` holds one class per service, one shape: `class X { constructor(owner) }`. A process service takes `omega` and is built once in `initialize()`; a request service takes `ctx` and is built on first read. A route never constructs one: it reads it off `ctx` or `omega`.
+
+| Service | Owner | Reached as |
+|---|---|---|
+| `utilities.js` | `omega` | `omega.utilities`: collection and user iteration, the cached document read, `randomId()`, `slugify()`, `sanitize()`, `trim()` |
+| `storage.js` | `omega` | `omega.storage({ name })`: a named local JSON store |
+| `user.js` | `omega` | Installs the id generators on `@omega.js/account`'s `User`, so every `new User(doc)` mints real ids |
+| `usage.js` | `ctx` | `ctx.usage`: the counted-feature gate ([usage-rate-limiting.md](../../packages/backend/docs/usage-rate-limiting.md)) |
+| `analytics.js` | `ctx` | `ctx.analytics`: GA4 events as the caller |
+| `metadata.js` | `ctx` | `ctx.metadata()`: a document's metadata block |
+| `settings.js` | `ctx` | The pipeline's validation step into `ctx.data` |
+
+Email and AI live in `src/omega/libraries/email/` and `libraries/ai/`: `omega.email` and `omega.ai` log through the instance's logger, `ctx.email` and `ctx.ai` through the request.
+
+### The request pipeline
+
+Every request (the deployed `omega_api`, a consumer's own function through `omega.routes.run()`, the custom server) passes ONE ordered list of named steps in `src/omega/pipeline.js`: the route guard, the dev-only guard, the options, multipart, the request log, wakeup, the handler load, authenticate, usage, the user log, analytics, validation, trim, sanitize, the handler. Each step returns true when it ended the request. The options a consumer's `omega.routes.run()` passes (`authenticate`, `setupUsage`, `setupAnalytics`, `validate`, `includeUnknown`, `sanitize`, `schema`, `parseMultipart`, `routesDir`, `schemasDir`) are in [routes.md](../../packages/backend/docs/routes.md#the-pipeline-options).
+
+### The one schema system
+
+A route's schema file exports a function of the request, `({ user, body, query, path, method, headers, geolocation })`, and returns a plain field declaration (`{ limit: { type: 'number', default: 10, max: 100 } }`). ONE adapter, `src/omega/helpers/schema.js`, turns it into a zod schema and validates with it; a split on the plan, the request or the input is ordinary code in the function. Defaults coerce and never reject. The vocabulary, the full example and the split kinds: [schemas.md](../../packages/backend/docs/schemas.md).
+
+### File map (`src/omega/`)
+
+| Path | What it holds |
+|---|---|
+| `index.js` | The `Omega` class and the one instance: `initialize()`, the function wiring, the environment and URL helpers |
+| `context.js`, `context/` | The `Context` class; its logging, response, authentication, parsing and client-info concerns |
+| `pipeline.js` | The request pipeline's steps |
+| `router.js` | `omega_api`'s dispatch: the MCP endpoint, else the framework's route (a consumer route rides its own function) |
+| `events.js` | The event dispatcher behind every trigger and `omega.events.run()` |
+| `cron.js` | The cron runner: the framework's jobs, then the consumer's `hooks/cron/<schedule>/` |
+| `server.js` | Custom-server mode: the same routes on an express app |
+| `services/` | The services above |
+| `helpers/` | Pure helpers: the schema adapter, log redaction, the resolved config, safe compare |
+| `libraries/` | Email, AI, payment, analytics, content, the env reader, and the provider libraries |
+| `routes/`, `schemas/` | The framework's built-in routes and their schemas |
+| `events/` | The framework's auth, Firestore and cron handlers |
+
 ### The wakeup short-circuit
 
-Any request carrying `wakeup` in its data (query or body) is answered `{ wakeup: true }` by the middleware and goes no further ([helpers/middleware.js](../../packages/backend/src/manager/helpers/middleware.js)). The check runs BEFORE the route module is loaded and before the caller is authenticated, so the request costs one cold start and nothing else. There is no dedicated ping route and none is needed: every route is the same warm-up at the same price.
+Any request carrying `wakeup` in its data (query or body) is answered `{ wakeup: true }` by the request pipeline's `wakeup` step and goes no further ([pipeline.js](../../packages/backend/src/omega/pipeline.js)). The check runs BEFORE the route module is loaded and before the caller is authenticated, so the request costs one cold start and nothing else. There is no dedicated ping route and none is needed: every route is the same warm-up at the same price.
 
 The frontend half is `omega.request(WAKEUP_ROUTE, { wakeup: true })` ([docs/client/index.md](../client/index.md), which lists every page and surface that fires it) — web, desktop and extension all warm the function ahead of the first user action that needs it ([#637](https://github.com/Omega-JS-Stack/omega/issues/637), [#644](https://github.com/Omega-JS-Stack/omega/issues/644)).
 
 ### Custom-server mode — `projectType: 'custom'` ([#584](https://github.com/Omega-JS-Stack/omega/issues/584))
 
-**The brand's config is the switch**, not an init flag: `targets.backend.projectType` in `config/omega.json5` (`'firebase'` — the default — or `'custom'`), resolved by `Manager.init()` off the loaded config, so a consumer's `src/index.js` stays the same two lines in both modes. An explicit `init(exports, { projectType })` still wins for a caller that means to override it.
+**The brand's config is the switch**, not an init flag: `targets.backend.projectType` in `config/omega.json5` (`'firebase'`, the default, or `'custom'`), resolved by `initialize()` off the loaded config, so a consumer's `src/index.js` stays the same two lines in both modes. An explicit `initialize({ projectType })` wins for a caller that means to override it.
 
-Custom mode is the SAME backend: the same routes, the same schemas, the same auth middleware, the same helper factories, the same `.env` — served by the Express app on `process.env.PORT` (`setupCustomServer`) for a container host (Render & co) instead of exported as Cloud Functions. `firebase-functions` is not even loaded (`Manager.libraries.functions` is `null`); `firebase-admin` still is, so Firestore, Auth and the rest of the Admin SDK work exactly as before.
+Custom mode is the SAME backend: the same routes, the same schemas, the same request pipeline, the same services, the same `.env`, served by the Express app on `process.env.PORT` (the framework's routes mount under `/omega/`, a consumer's at their own path, the URL shape Firebase mode serves) (`src/omega/server.js`, exposed as `omega.server`) for a container host (Render and the like) instead of exported as Cloud Functions. `firebase-functions` is not even loaded (`omega.firebase.functions` is `null`); `firebase-admin` still is, so Firestore, Auth and the rest of the Admin SDK work exactly as before.
 
 What it takes away is the **Firebase lane**, and `src/cli/utils/project-type.js` is the ONE home of that list. Each verb refuses loudly, names the mode, names the lane that replaces it, and exits 1 — a refusal that read green would look like a deploy that happened:
 
@@ -86,14 +197,14 @@ The brand-root side of it — how the manager deploys, tests and boots a custom 
 
 ### The env reader (`libraries/env.js`) — #581
 
-Every framework read of a brand-supplied env key goes through ONE reader; nothing under `src/manager/` touches `process.env.<KEY>` directly except the runtime's own vars (`FIREBASE_CONFIG`, `FUNCTIONS_EMULATOR`, `GCLOUD_PROJECT`, the `OMEGA_*_PORT` map, the test-mode switches).
+Every framework read of a brand-supplied env key goes through ONE reader; nothing under `src/omega/` touches `process.env.<KEY>` directly except the runtime's own vars (`FIREBASE_CONFIG`, `FUNCTIONS_EMULATOR`, `GCLOUD_PROJECT`, the `OMEGA_*_PORT` map, the test-mode switches).
 
 - `env.get('KEY')` — the resolved value, empty reading as absent. A key the env schema does not declare **throws** (`UnknownEnvKeyError`): a typo used to resolve to `undefined` forever.
 - `env.has('KEY')` — the switch every optional provider gates on.
 - `env.require('KEY')` — value or `MissingEnvKeyError` (code 500) naming the key and the fix.
-- `env.assertRequired('backend')` — the **boot guard**, run by `Manager.init()`: every required key of the schema, validated in ONE pass, with ONE error listing everything missing. A brand's backend refuses to boot in **every environment**, development included — the keys are one `npx omega manage` away, and booting without them only moves the crash to a customer's first order email ([#569](https://github.com/Omega-JS-Stack/omega/issues/569)). The single advisory lane is a process with no consumer `config/omega.json5` — the framework booting itself, where there is no brand for a manage run to have minted keys into; it warns and continues. The self-test fixture is brand-shaped, so `omega test` seeds its required keys from the fixture's own config values (`ensureFixtureEnv`), the same way manage mints a real brand's.
+- `env.assertRequired('backend')`: the **boot guard**, run by `initialize()`: every required key of the schema, validated in ONE pass, with ONE error listing everything missing. A brand's backend refuses to boot in **every environment**, development included: the keys are one `npx omega manage` away, and booting without them only moves the crash to a customer's first order email ([#569](https://github.com/Omega-JS-Stack/omega/issues/569)). The single advisory lane is a process with no consumer `config/omega.json5`, the framework booting itself, where there is no brand for a manage run to have minted keys into; it warns and continues. The self-test fixture is brand-shaped, so `omega test` seeds its required keys from the fixture's own config values (`ensureFixtureEnv`), the same way manage mints a real brand's.
 
-- `env.getEnvironment()`: the runtime environment, and exactly what `Manager.getEnvironment()` returns. It is `@omega.js/config`'s ONE environment module re-exported ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in full: [docs/shared/config.md](../shared/config.md)), the same four functions @omega.js/desktop, @omega.js/extension and @omega.js/web answer with, so the three names the `.env.<environment>` overlay files are spelled with (#586) and the three the runtime answers are ONE vocabulary. It is reachable here because the provider libraries below hold no Manager handle. It reads ONE input, `OMEGA_ENVIRONMENT`, which `Manager.init()` sets ONCE right after the `.env` cascade loads, from `envEnvironment()`, the ambient answer, whose rules are unchanged: an emulator run or an explicit `ENVIRONMENT=development` is development, `OMEGA_TEST_MODE` is testing, and "no signal" resolves to **production**, because a deployed Cloud Function has no `FUNCTIONS_EMULATOR` and often no `ENVIRONMENT`. Nothing re-sniffs a raw signal at read time, and a process whose lane never named one throws by name. The bare `env.environment()` alias is gone: the name is the one every surface uses.
+- `env.getEnvironment()`: the runtime environment, and exactly what `omega.getEnvironment()` returns. It is `@omega.js/config`'s ONE environment module re-exported ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in full: [docs/shared/config.md](../shared/config.md)), the same four functions @omega.js/desktop, @omega.js/extension and @omega.js/web answer with, so the three names the `.env.<environment>` overlay files are spelled with (#586) and the three the runtime answers are ONE vocabulary. It is reachable here because the provider libraries below hold no instance handle. It reads ONE input, `OMEGA_ENVIRONMENT`, which `initialize()` sets ONCE right after the `.env` cascade loads, from `envEnvironment()`, the ambient answer, whose rules are unchanged: an emulator run or an explicit `ENVIRONMENT=development` is development, `OMEGA_TEST_MODE` is testing, and "no signal" resolves to **production**, because a deployed Cloud Function has no `FUNCTIONS_EMULATOR` and often no `ENVIRONMENT`. Nothing re-sniffs a raw signal at read time, and a process whose lane never named one throws by name. The bare `env.environment()` alias is gone: the name is the one every surface uses.
 
 **One key, every environment** ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)) — the reader never decides WHICH name to read. A key whose value must differ between a local run and a deployed one is supplied by the brand's `.env.<environment>` overlay under the SAME name, and the cascade has already resolved it before anything reaches `env.get()`. So a brand puts its `sk_test_…` in `.env.development` and its live key in `.env`, and `Stripe.init()` still calls `env.get('STRIPE_SECRET_KEY')`. There is no `<KEY>_DEV` twin and no live-shape guard: every key is equal and its value is trusted.
 
@@ -126,7 +237,7 @@ The static lane ships as skeletons the brand OWNS and edits — `registration.te
 
 ### Test coverage
 
-Every feature ships with tests at EVERY surface it exposes — logic (`test/routes/`/`test/events/` handler suites against the real emulator), wiring (route round-trips over `http.as(...)` — registration, auth gates, schema validation; this IS @omega.js/backend's end-to-end), and rules (Firestore security-rules suites when rules change). @omega.js/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM). Skip a surface ONLY when the feature genuinely doesn't have one; "the handler test already covers it" is NOT a reason to skip the route round-trip. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
+Every feature ships with tests at EVERY surface it exposes: logic (`test/routes/`/`test/events/` handler suites against the real emulator), wiring (route round-trips over `http.as(...)`: registration, auth gates, schema validation; this IS @omega.js/backend's end-to-end), and rules (Firestore security-rules suites when rules change). @omega.js/backend has no UI layer: a feature's UI coverage lives in the consuming frontend (web, extension, desktop). Skip a surface ONLY when the feature genuinely doesn't have one; "the handler test already covers it" is NOT a reason to skip the route round-trip. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
 
 ## CLI
 
@@ -197,13 +308,13 @@ See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.
 
 ## Dependency Resolution
 
-- **Consumer code can use `Manager.require(name)`** to load any @omega.js/backend dependency from @omega.js/backend's own module context (static + prototype). Consumer projects do NOT need to install @omega.js/backend's transitive deps directly.
-- **No bundler hook is needed here (#87).** @omega.js/web gives consumers bare imports of framework-declared libraries through an esbuild resolve hook ([docs/devkit/index.md](../devkit/index.md) owns the declared-set reader behind it), and desktop and extension through the same hook. Backend functions are NOT bundled: they run under plain node resolution, and `Manager.require(name)` resolves from @omega.js/backend's own module context, which already delivers the same guarantee — the framework's copy, one copy, from the framework's installation. Bare `require('<framework dep>')` in consumer code is NOT part of the contract here; use `Manager.require`.
-- **@omega.js/client owns Firebase on the client side.** Consumer frontend code (UJM pages, BXM popup/options, EM renderers) NEVER imports Firebase directly — `firebase.firestore()` → `omega.firestore()`, `firebase.auth()` → `omega.auth()`. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different).
+- **Consumer code can use `omega.require(name)`** to load any @omega.js/backend dependency from @omega.js/backend's own module context. Consumer projects do NOT need to install @omega.js/backend's transitive deps directly.
+- **No bundler hook is needed here (#87).** @omega.js/web gives consumers bare imports of framework-declared libraries through an esbuild resolve hook ([docs/devkit/index.md](../devkit/index.md) owns the declared-set reader behind it), and desktop and extension through the same hook. Backend functions are NOT bundled: they run under plain node resolution, and `omega.require(name)` resolves from @omega.js/backend's own module context, which already delivers the same guarantee: the framework's copy, one copy, from the framework's installation. Bare `require('<framework dep>')` in consumer code is NOT part of the contract here; use `omega.require`.
+- **@omega.js/client owns Firebase on the client side.** Consumer frontend code (web pages, extension popups and options, desktop renderers) NEVER imports Firebase directly: `firebase.firestore()` → `omega.firestore`, `firebase.auth()` → `omega.auth`. Backend code reads the Admin SDK as `omega.firebase.admin` (server-side is different).
 
 ## Development Workflow
 
-- **🚫 NEVER use `npx omega ...` from the framework repo**: `npx omega` is for CONSUMER projects only (where the bin lives in the target's `node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. The `scripts` in `package.json` call `node bin/omega` directly. This applies to ALL four OMEGA frameworks (@omega.js/backend/UJM/BXM/EM).
+- **🚫 NEVER use `npx omega ...` from the framework repo**: `npx omega` is for CONSUMER projects only (where the bin lives in the target's `node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. The `scripts` in `package.json` call `node bin/omega` directly. This applies to ALL four OMEGA frameworks (backend, web, extension, desktop).
 - **🚫 NEVER run `npx omega serve` / `npx omega emulator`** (consumer projects) — they're the user's long-running dev processes. Assume they're already running; if they aren't, **instruct the user to run them** rather than running them yourself (running them again kills theirs). To see output, **read the log files** — `logs/dev.log` for the CLI's own run, `dist/emulator.log` for the emulator's traffic — never tail/attach to the process. Running `npx omega test` is fine (it auto-starts its own emulator if needed).
 - **Where the output logs live — two files per verb, one contains the other.** The CLI VERB tees its whole run to `<projectDir>/logs/`, the cross-framework lane every OMEGA target shares: `dev.log` (`npx omega serve` / `npx omega emulator`), `build.log` (`npx omega build`), `test.log` (`npx omega test`) — and since the verb mirrors every child chunk, this file is a superset holding the firebase children's output too. The child-only view lives in `<projectDir>/dist/` (@omega.js/backend's deliberate exception, co-located with firebase-tools' own `*-debug.log`): `emulator.log`, `dev.log`, `test.log`, plus `deploy.log` (`npx omega deploy`) and `production.log` (`npx omega logs`). Both truncate per launch; the sweep at every verb start clears ours and never touches firebase-tools'. Full table and mechanism: [docs/shared/logging.md](../shared/logging.md); backend specifics: [docs/logging.md](../../packages/backend/docs/logging.md).
 - **A credential never rides a log line.** The request, headers and user lines redact the channels the authenticator reads ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)), and the route logger's `Sending response` line gets the same treatment at any depth of the payload: keys are matched lower-cased with `-` and `_` stripped (so `accessToken` and `access_token` are one key), and every name ending in `token`, `secret`, `password`, `privatekey` or `apikey`, plus `sessionCookie`, logs as `***<last 4> (<n> chars)` when it holds a string and `***(redacted object)` when it holds anything else, while a null, a boolean or a number passes through ([#796](https://github.com/Omega-JS-Stack/omega/issues/796)).
@@ -224,10 +335,10 @@ All `npm install` calls in CLI commands (`npx omega i`, the target checks) route
 - **Firestore shorthand**: `admin.firestore().doc('users/abc123')` (path string) rather than `.collection('users').doc('abc123')`.
 - **Template strings for requires**: `` require(`${functionsDir}/node_modules/@omega.js/backend`) `` rather than string concat.
 - **No backwards compatibility** unless explicitly requested.
-- **Routes receive whitespace-trimmed data; HTML is preserved.** Sanitize at the HTML-insertion site via `utilities.sanitize()`. Opt into middleware-level HTML strip per-route with `{ sanitize: true }`. See [docs/sanitization.md](../../packages/backend/docs/sanitization.md).
+- **Routes receive whitespace-trimmed data; HTML is preserved.** Sanitize at the HTML-insertion site via `utilities.sanitize()`. Opt into the pipeline's HTML strip per route with `{ sanitize: true }`. See [docs/sanitization.md](../../packages/backend/docs/sanitization.md).
 - **Match schema names to route names** — if route is `myEndpoint`, schema is `myEndpoint`.
 - **Always use `ctx.respond()` for responses** — do NOT use `res.send()` directly.
-- **Always use `Manager.getApiUrl()` for the API URL** — never read the cached `Manager.project.apiUrl` property. The getter is the SSOT and auto-resolves to the local emulator in dev AND test (and production otherwise), so it's safe everywhere without passing an env arg. See [docs/environment-detection.md](../../packages/backend/docs/environment-detection.md).
+- **Always use `omega.getApiUrl()` for the API URL**, never the cached `omega.project.apiUrl` property. The getter is the SSOT and auto-resolves to the local emulator in dev AND test (and production otherwise), so it's safe everywhere without passing an env arg. See [docs/environment-detection.md](../../packages/backend/docs/environment-detection.md).
 - **Add Firestore composite indexes** for any compound query (`where` + `orderBy`, or multiple `where`s) to `src/cli/commands/setup-tests/helpers/required-indexes.js` (the SSOT). Without the index, queries crash with `FAILED_PRECONDITION` in production.
 
 See [docs/code-patterns.md](../../packages/backend/docs/code-patterns.md) for code-pattern detail, [docs/common-mistakes.md](../../packages/backend/docs/common-mistakes.md) for the full anti-pattern checklist, and [docs/file-naming.md](../../packages/backend/docs/file-naming.md) for the naming table (routes / schemas / API commands / events / cron jobs / hooks).
@@ -251,26 +362,26 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 
 ### Architecture & Conventions
 
-- [docs/architecture.md](../../packages/backend/docs/architecture.md) — Manager class, dual-mode (firebase/custom), helper factory pattern
+- [docs/architecture.md](../../packages/backend/docs/architecture.md): the `Omega` instance, `Context`, dual-mode (firebase/custom), the services
 - [docs/directory-structure.md](../../packages/backend/docs/directory-structure.md) — @omega.js/backend library + consumer project layouts
 - [docs/build-system.md](../../packages/backend/docs/build-system.md) — no consumer build (deliberate outlier), framework prepare-package, deploy pipeline
 - [docs/code-patterns.md](../../packages/backend/docs/code-patterns.md) — short-circuit returns, logical operators on new lines, Firestore shorthand, template-string requires, fs-jetpack preference
 - [docs/file-naming.md](../../packages/backend/docs/file-naming.md) — naming table for routes, schemas, API commands, events, cron jobs, hooks
-- [docs/common-mistakes.md](../../packages/backend/docs/common-mistakes.md) — anti-pattern checklist (don't modify Manager internals, always await, one `ctx.usage.consume()` call counts, etc.)
+- [docs/common-mistakes.md](../../packages/backend/docs/common-mistakes.md): anti-pattern checklist (don't modify framework internals, always await, one `ctx.usage.consume()` call counts, etc.)
 - [docs/audit.md](../../packages/backend/docs/audit.md) — full-audit check catalog (U-xx universal / @omega.js/backend-xx / F-xx IDs with severity + scope), protocol + fix loop
 - [docs/cdp-debugging.md](../../packages/backend/docs/cdp-debugging.md) — launching a controllable Chrome (CDP) to verify the frontend against your routes (network payloads, auth'd flows via the persistent agent profile)
-- [docs/key-files.md](../../packages/backend/docs/key-files.md) — quick lookup for the most-touched files (Manager, helpers, auth events, cron, payment providers, CLI commands)
+- [docs/key-files.md](../../packages/backend/docs/key-files.md): quick lookup for the most-touched files (the instance, `Context`, the pipeline, services, auth events, cron, payment providers, CLI commands)
 - [docs/cli-output.md](../../packages/backend/docs/cli-output.md) — shared CLI styling module (`src/cli/utils/ui.js`): OMEGA-style banner/dividers/sections/status symbols + the `Summary` block (pass/warn/fail); setup check return types (`true`/`false`/`Error`/`'warn'`); used by the target checks, adoptable by other commands
-- [docs/environment-detection.md](../../packages/backend/docs/environment-detection.md) — `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive); gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test) — never `!isDevelopment()`. Plus the URL helper convention (always `Manager.getApiUrl()` — auto-resolves local in dev+test, never read `project.apiUrl`)
+- [docs/environment-detection.md](../../packages/backend/docs/environment-detection.md): `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive); gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test), never `!isDevelopment()`. Plus the URL helper convention (always `omega.getApiUrl()`: it resolves local in dev and test; never read `project.apiUrl`)
 - [docs/response-headers.md](../../packages/backend/docs/response-headers.md) — automatic `omega-properties` header
 
 ### Building Routes & Components
 
-- [docs/routes.md](../../packages/backend/docs/routes.md) — recipes for new API commands, routes (context-object handlers, CRUD method files, ownership checks, firebase.json rewrites + ordering, src/index.js entry), event handlers, cron jobs
-- [docs/schemas.md](../../packages/backend/docs/schemas.md) — schema contract (context object → flat schema, in-function plan branching), field properties, ID generation + path extraction, required-vs-default footgun
+- [docs/routes.md](../../packages/backend/docs/routes.md): recipes for routes (the `{ ctx, omega, user, data, usage, analytics }` handler, CRUD method files, ownership checks, firebase.json rewrites and ordering, the `src/index.js` entry, `omega.routes.run()` and the pipeline options), event handlers and `omega.events.run()`, cron jobs
+- [docs/schemas.md](../../packages/backend/docs/schemas.md): the one schema system: a function of the request returning a plain declaration, the full example, the three split kinds, the field vocabulary, ID generation and `path` ids, the required-vs-default footgun
 - [docs/firestore.md](../../packages/backend/docs/firestore.md) — path style, NO subcollections, batch reads (~500 cursor pagination), `metadata.{created,updated}` timestamps, response format + redaction
-- [docs/migration.md](../../packages/backend/docs/migration.md) — legacy-project migration: runtime config → top-level env vars, `Manager.config.*` → `process.env.*`, constructor routes / tiered schemas → current format
-- [docs/sanitization.md](../../packages/backend/docs/sanitization.md) — middleware trim-only default; opt-in HTML strip (`{ sanitize: true }`) with per-field opt-out (`sanitize: false`); manual `utilities.sanitize()` for HTML-insertion sites
+- [docs/migration.md](../../packages/backend/docs/migration.md): legacy-project migration: runtime config → top-level env vars, config reads → `process.env.*`, constructor routes and tiered schemas → the current format
+- [docs/sanitization.md](../../packages/backend/docs/sanitization.md): the pipeline's trim-only default; opt-in HTML strip (`{ sanitize: true }`) with per-field opt-out (`sanitize: false`); manual `utilities.sanitize()` for HTML-insertion sites
 - [docs/auth-hooks.md](../../packages/backend/docs/auth-hooks.md) — consumer hooks for `before-create`/`before-signin`/`on-create`/`on-delete` (blocking + non-blocking examples)
 - [docs/common-operations.md](../../packages/backend/docs/common-operations.md) — inside-the-handler patterns: authenticate, read/write Firestore, error handling, send response, `omega_api` hook
 
@@ -279,7 +390,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/verts.md](../../packages/backend/docs/verts.md) — house verts module (adblock-safe ad system): `verts` collection, public `GET /omega/verts/serve` (self-contained HTML unit, 204 no-fill) + fail-closed `GET /omega/verts/redirect`, admin CRUD, in-memory inventory cache (~5 min TTL), contextual targeting × weight selection
 - [docs/connections.md](../../packages/backend/docs/connections.md) — user connections (`/user/connections`): the stored record and its `type` ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)), the two things a provider adds (a `src/connections/<name>.js` module the lane loads before its own, the two `CONNECTIONS_<PROVIDER>_*` env keys), `pkce: 'S256'` as a declaration, the ONE context every step takes and the `authorize`/`exchange`/`identity`/`refresh`/`revoke`/`status` table, the route-owned identity uniqueness and the config-defaults card rule ([#793](https://github.com/Omega-JS-Stack/omega/issues/793)), and how another target reads or refreshes the token ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)) — plus the cross-instance refresh lease and the `{ success, token }` answer ([#783](https://github.com/Omega-JS-Stack/omega/issues/783)) and the public client that sends no `client_secret` ([#785](https://github.com/Omega-JS-Stack/omega/issues/785))
 - [docs/admin-post-route.md](../../packages/backend/docs/admin-post-route.md): `POST/PUT /admin/post` blog creation via GitHub (image extraction + resize at ingest + `@post/` rewriting). Also the publish target for the Ghostii article engine (`libraries/content/ghostii.js`). Every CMS route that touches repo content (`/admin/post`, `/admin/repo/content`, `/content/post`) takes a `target` naming the web target ([#887](https://github.com/Omega-JS-Stack/omega/issues/887)): optional for a brand with one web target, REQUIRED when it runs several (a missing or unknown name answers 400 with the declared list), and the commit path is `targetPath(config, target)` plus the site-relative path (`targets/<name>/src/_posts/...`), never composed by hand.
-- [docs/payment-system.md](../../packages/backend/docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, provider interface (Stripe, PayPal, Chargebee, Coinbase Commerce for crypto one-time purchases, test), webhook verification (the shared `?key=` param, the one check), product config, test provider
+- [docs/payment-system.md](../../packages/backend/docs/payment-system.md): full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, the `User` getters (`plan`, `active`, `trialing`), transition handlers, provider interface (Stripe, PayPal, Chargebee, Coinbase Commerce for crypto one-time purchases, test), webhook verification (the shared `?key=` param, the one check), product config, test provider
 - [docs/paypal-sandbox-qa.md](../../packages/backend/docs/paypal-sandbox-qa.md) — the live PayPal sandbox QA drive: standing fixtures (creds, webhook, the trial-free `proof-press` product — listed on /pricing on purpose, the hand-made sandbox buyer — PayPal has no account-creation API), the subscription sale → refund sequence, and the gotchas
 - [docs/marketing-campaigns.md](../../packages/backend/docs/marketing-campaigns.md) — campaign CRUD routes, recurring campaigns, generator pipeline (newsletter), newsletter-driven blog article (`content.article.enabled`), template-owned schemas, asset hosting, seed campaigns
 - [docs/consent.md](../../packages/backend/docs/consent.md) — marketing consent capture: canonical `consent.{legal,marketing}` user-doc shape, signup-form capture, account-page toggle, HMAC unsub link (cross-provider unsub + re-add on resubscribe), admin contact-DELETE revoke mirror, SendGrid+Beehiiv webhook receivers, parent forwarder (`/marketing/webhook/forward`), library-level consent gate in `email.add()`/`email.sync()` (revoked-only skip), migration script template
@@ -290,14 +401,14 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/ghostii.md](../../packages/backend/docs/ghostii.md) — Blog auto-publisher (Ghostii provider): source types (`$brand` / `$feed:` / `$parent` / URL / text), provider-based architecture, per-entry API overrides, RSS/Atom feed parser, unified `content-sources` Firestore tracking, `sourceContent` pass-through to Ghostii API
 - [docs/email-system.md](../../packages/backend/docs/email-system.md) — unified MJML email rendering pipeline: shared preparation (`prepare.js`), composable template system (`base.js` blocks), 4 email templates (card, plain, order, feedback), no SendGrid dynamic templates — everything rendered server-side
 - [docs/usage-rate-limiting.md](../../packages/backend/docs/usage-rate-limiting.md) — the counted-feature gate ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)): ONE call, `await ctx.usage.consume('<feature>')`, checks both counters (month and the day's share of it), refuses with a 429 naming which one hit, else counts and writes. What a feature IS lives once in the top-level `features` catalog and each product names only its VALUE; per-user overrides on the user doc win over the plan's number; mirrors are declared in the catalog, not at the call site; anonymous counting is explicit (`usage.forKey(ip)`); init is lazy, so a route that never counts pays nothing
-- [docs/ai-library.md](../../packages/backend/docs/ai-library.md) — `Manager.AI()` unified entry for OpenAI + Anthropic (text via `.request()`, images via `.image()` → `gpt-image-2`)
+- [docs/ai-library.md](../../packages/backend/docs/ai-library.md): `omega.ai` / `ctx.ai`, the unified entry for OpenAI and Anthropic (text via `.request()`, images via `.image()` → `gpt-image-2`)
 - [docs/marketing-fields.md](../../packages/backend/docs/marketing-fields.md) — adding custom fields to SendGrid + Beehiiv via the @omega.js/backend/OMEGA SSOT pair
 - [docs/stripe-webhook-forwarding.md](../../packages/backend/docs/stripe-webhook-forwarding.md) — auto-started Stripe CLI forwarding for local dev, and the shared key the forwarded deliveries carry
 
 ### Testing & CLI
 
-- [docs/test-framework.md](../../packages/backend/docs/test-framework.md) — running, filtering, log files, test types (standalone/suite/group), context object, assertions, auth levels. **NEVER mock — test against the real emulator.** No `mockManager`/`mockAdmin`/fake `firestore`/stubbed `ctx`; every `run()` gets the real `Manager`/`ctx`/`firestore`/`http`/`accounts` — use them. Pure functions (zero I/O) are the only thing you call directly; anything touching Firestore or an external API runs for real. Real external APIs (OpenAI/PayPal/GitHub/SendGrid/Stripe) are gated behind `TEST_EXTENDED_MODE` in-source (not mocked) — opt in with `--extended` or `TEST_EXTENDED_MODE=true` (shared, unprefixed across @omega.js/backend/BXM/UJM/EM; propagates to BOTH runner + emulator) — and anything an extended test creates externally must be cleaned up by the test. **Each test file `module.exports` a `{ description, type, tests }` object — NOT raw Mocha (`describe`/`it`/`beforeEach`); those globals are not injected and the file fails to load. The only lifecycle hook is `cleanup` — exported `before`/`after` properties are silently IGNORED (do setup inside the tests via an idempotent helper, or in `test/_init.js`). Split tests one-file-per-concern under `test/<area>/`, never one giant `test/test.js`.** **All cleanup runs at the START of every run, never at the end** — the runner flushes the ENTIRE emulator Firestore before every run, so there's nothing to register; seed any needed fixtures in `test/_init.js`'s `setup()`, and never add a trailing cleanup step. Marketing providers (SendGrid/Beehiiv) don't need a special exception — `_test.*` emails are blocked at the validation layer so test signups never reach providers. The `_test.allow_*` carve-out exists only for the live-provider lifecycle test (`test/marketing/consent-lifecycle.js`), which manages its own teardown.
-- [docs/test-boot-layer.md](../../packages/backend/docs/test-boot-layer.md) — the `boot/` smoke layer: framework self-test from the repo via the bundled fixture project + `OMEGA_TEST_BOOT_PROJECT` (@omega.js/backend's analog of BXM/UJM `*_TEST_BOOT_PROJECT`)
+- [docs/test-framework.md](../../packages/backend/docs/test-framework.md): running, filtering, log files, test types (standalone/suite/group), context object, assertions, auth levels. **NEVER mock: test against the real emulator.** No mock instance, mock admin, fake `firestore` or stubbed `ctx`: every `run()` gets the real `omega`, `ctx`, `firestore`, `http` and `accounts`; use them. Pure functions (zero I/O) are the only thing you call directly; anything touching Firestore or an external API runs for real. Real external APIs (OpenAI/PayPal/GitHub/SendGrid/Stripe) are gated behind `TEST_EXTENDED_MODE` in-source (not mocked): opt in with `--extended` or `TEST_EXTENDED_MODE=true` (shared, unprefixed across all four frameworks; propagates to BOTH runner and emulator), and anything an extended test creates externally must be cleaned up by the test. **Each test file `module.exports` a `{ description, type, tests }` object, NOT raw Mocha (`describe`/`it`/`beforeEach`); those globals are not injected and the file fails to load. The only lifecycle hook is `cleanup`: exported `before`/`after` properties are silently IGNORED (do setup inside the tests via an idempotent helper, or in `test/_init.js`). Split tests one-file-per-concern under `test/<area>/`, never one giant `test/test.js`.** **All cleanup runs at the START of every run, never at the end**: the runner flushes the ENTIRE emulator Firestore before every run, so there's nothing to register; seed any needed fixtures in `test/_init.js`'s `setup()`, and never add a trailing cleanup step. Marketing providers (SendGrid/Beehiiv) don't need a special exception: `_test.*` emails are blocked at the validation layer so test signups never reach providers. The `_test.allow_*` carve-out exists only for the live-provider lifecycle test (`test/marketing/consent-lifecycle.js`), which manages its own teardown.
+- [docs/test-boot-layer.md](../../packages/backend/docs/test-boot-layer.md): the `boot/` smoke layer: framework self-test from the repo via the bundled fixture project + `OMEGA_TEST_BOOT_PROJECT` (the backend's analog of the extension's and web's `*_TEST_BOOT_PROJECT`)
 - [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.md) — `npx omega firestore:*` and `auth:*` commands, shared flags, examples
 - [docs/cli-logs.md](../../packages/backend/docs/cli-logs.md) — `npx omega logs:read` / `logs:tail` with full flag reference and built-in Cloud Function names
 - [docs/logging.md](../../packages/backend/docs/logging.md) — `dist/*.log` file table (the `dist/` location exception — co-located with firebase-tools' debug logs), `production.log`

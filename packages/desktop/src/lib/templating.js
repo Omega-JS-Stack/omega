@@ -1,15 +1,15 @@
 // Templating — light token-replacement engine for HTML/CSS/JS at build time.
 //
 // Wraps node-powertools' template() with framework-friendly defaults:
-//   - Brackets are `{{ }}` (matches BXM/UJM convention).
-//   - Standard variable scope built from manager.config + page metadata.
+//   - Brackets are `{{ }}`.
+//   - Standard variable scope built from omega.config + page metadata.
 //
 // Public API:
-//   manager.templating.render(input, vars)               // arbitrary string + arbitrary vars
-//   manager.templating.buildPageVars(pageName, extras)   // produces { brand, app, page, theme, cacheBust }
-//   manager.templating.renderPage(pageTemplate, vars)    // shortcut that uses {{ }} brackets
+//   omega.templating.render(input, vars)               // arbitrary string + arbitrary vars
+//   omega.templating.buildPageVars(pageName, extras)   // produces { brand, app, page, theme, cacheBust }
+//   omega.templating.renderPage(pageTemplate, vars)    // shortcut that uses {{ }} brackets
 //
-// Manager.initialize calls .initialize(manager) but the lib is mostly used at build time
+// omega.initialize() calls .initialize(omega) but the lib is mostly used at build time
 // (gulp/html), not at runtime. The runtime surface is exposed for consumer hooks that want
 // to template their own strings.
 
@@ -22,10 +22,10 @@ const DEFAULT_BRACKETS = ['{{', '}}'];
 
 const templating = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
 
-  initialize(manager) {
-    templating._manager = manager;
+  initialize(omega) {
+    templating._omega = omega;
     templating._initialized = true;
     logger.log('initialize');
   },
@@ -37,19 +37,19 @@ const templating = {
     return template(String(input || ''), vars || {}, { brackets });
   },
 
-  // Build the standard variable scope for a page render. Combines manager.config with
+  // Build the standard variable scope for a page render. Combines omega.config with
   // page-specific metadata + cache-buster for asset URLs.
-  // `manager` is optional — buildPageVars works at build time (where Manager singleton is built
-  // from build.js) without needing the runtime manager singleton.
-  buildPageVars(pageName, extras, manager) {
-    const m = manager || templating._manager;
-    const cfg = (m && m.config) || (m && typeof m.getConfig === 'function' ? m.getConfig() : {}) || {};
+  // `omega` is optional: buildPageVars works at build time (where the build module from
+  // build.js stands in) without needing the runtime omega instance.
+  buildPageVars(pageName, extras, omega) {
+    omega = omega || templating._omega;
+    const cfg = (omega && omega.config) || (omega && typeof omega.getConfig === 'function' ? omega.getConfig() : {}) || {};
     // Pull version from the consumer's package.json at build time. This baked-in
     // string is used by templates that want to display the running version in the
     // UI (e.g. "v1.0.5" in a footer). At runtime it always matches the version
     // that was packaged + signed + uploaded, since both come from the same
     // package.json read.
-    const pkg = (m && typeof m.getPackage === 'function' ? m.getPackage('project') : null) || {};
+    const pkg = (omega && typeof omega.getPackage === 'function' ? omega.getPackage('project') : null) || {};
     const appBlock = { ...(cfg.app || {}) };
     if (pkg.version && !appBlock.version) appBlock.version = pkg.version;
     const vars = {

@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('build');
+const build = require('../build.js');
+const logger = build.logger('build');
 const { runPipeline } = require('../utils/build-pipeline.js');
 const { ensureTarget } = require('./lib/ensure-target.js');
 

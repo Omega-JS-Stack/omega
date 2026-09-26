@@ -1,6 +1,6 @@
 # Bindings (`data-omega-bind`)
 
-The `data-omega-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `omega.bindings()`. **Always prefer omega-bindings over manual JS class toggling** for anything based on user/auth state — if an element's visibility or content depends on the user object, use `data-omega-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
+The `data-omega-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `omega.bindings`. **Always prefer omega-bindings over manual JS class toggling** for anything based on user/auth state: if an element's visibility or content depends on the user object, use `data-omega-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
 
 ## HTML Syntax
 
@@ -14,10 +14,10 @@ Multiple bindings are **comma-separated**. The parser splits by comma first, the
 
 ```html
 <!-- CORRECT: comma-separated -->
-<element data-omega-bind="@show auth.user, @attr src auth.user.photoURL"></element>
+<element data-omega-bind="@show auth.user.authenticated, @attr src auth.user.profile.photoURL"></element>
 
-<!-- WRONG: space-separated — gets parsed as ONE binding with action=@show, expression="auth.user @attr src auth.user.photoURL" -->
-<element data-omega-bind="@show auth.user @attr src auth.user.photoURL"></element>
+<!-- WRONG: space-separated, parsed as ONE binding with action=@show, expression="auth.user.authenticated @attr src auth.user.profile.photoURL" -->
+<element data-omega-bind="@show auth.user.authenticated @attr src auth.user.profile.photoURL"></element>
 ```
 
 **Why this matters:** The parser splits on `,` then finds the first space within each part to separate `@action` from `expression`. Without commas, everything after the first `@action` is treated as a single expression string, producing broken behavior with no error.
@@ -37,13 +37,13 @@ Multiple bindings are **comma-separated**. The parser splits by comma first, the
 
 ```html
 <!-- Truthy check -->
-<div data-omega-bind="@show auth.user">Visible when logged in</div>
+<div data-omega-bind="@show auth.user.authenticated">Visible when logged in</div>
 
 <!-- Negation (!) -->
-<div data-omega-bind="@show !auth.user">Visible when NOT logged in</div>
+<div data-omega-bind="@show !auth.user.authenticated">Visible when NOT logged in</div>
 
 <!-- Comparisons (===, !==, ==, !=, >, <, >=, <=) -->
-<div data-omega-bind="@show auth.account.plan.id === 'premium'">Premium only</div>
+<div data-omega-bind="@show auth.user.plan === 'premium'">Premium only</div>
 <div data-omega-bind="@show checkout.errorCount > 0">Has errors</div>
 ```
 
@@ -53,21 +53,24 @@ No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-
 
 ```html
 <!-- Show for anonymous users -->
-<div data-omega-bind="@show !auth.user">
+<div data-omega-bind="@show !auth.user.authenticated">
   <a href="/signup">Create free account</a>
 </div>
 
-<!-- Show for signed-in users -->
-<div data-omega-bind="@show auth.user">
+<!-- Show on the free plan (a signed-out User's plan is basic too) -->
+<div data-omega-bind="@show auth.user.plan === 'basic'">
   <a href="/pricing">Upgrade your plan</a>
 </div>
 
+<!-- Paid users -->
+<div data-omega-bind="@show auth.user.active">Thanks for supporting us</div>
+
 <!-- Admin-only elements -->
-<div data-omega-bind="@show auth.account.roles.admin">Admin panel</div>
+<div data-omega-bind="@show auth.user.roles.admin">Admin panel</div>
 
 <!-- User data binding -->
-<img data-omega-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName">
-<span data-omega-bind="@text auth.user.displayName">Loading...</span>
+<img data-omega-bind="@show auth.user.authenticated, @attr src auth.user.profile.photoURL, @attr alt auth.user.profile.displayName">
+<span data-omega-bind="@text auth.user.profile.displayName">Loading...</span>
 <input data-omega-bind="@value auth.user.email">
 ```
 
@@ -75,16 +78,23 @@ No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-
 
 ### Auth paths (automatically populated by @omega.js/client)
 
+ONE root, `auth.user`: the live `User` (`omega.auth.user`), never null, so every path below resolves on a signed-out page too. `auth.user` itself is always truthy: test `auth.user.authenticated`.
+
 ```
-auth.user                        # Firebase user object (truthy = signed in)
-auth.user.uid                    # User ID
+auth.user.authenticated          # Boolean: true when signed in
+auth.user.uid                    # User ID (null when signed out)
 auth.user.email                  # Email
-auth.user.displayName            # Display name
-auth.user.photoURL               # Avatar URL
-auth.user.emailVerified          # Boolean
-auth.account.plan.id             # Plan ID (e.g. 'basic', 'premium')
-auth.account.roles.admin         # Boolean
-auth.account.roles.betaTester    # Boolean
+auth.user.plan                   # Effective plan ID (e.g. 'basic', 'premium')
+auth.user.active                 # Boolean: a paid plan is active (trialing and cancelling included)
+auth.user.trialing               # Boolean
+auth.user.cancelling             # Boolean
+auth.user.everPaid               # Boolean
+auth.user.roles.admin            # Boolean (any stored field reads by its path)
+auth.user.roles.betaTester       # Boolean
+auth.user.subscription.status    # The stored subscription fields
+auth.user.profile.displayName    # Display name (from the sign-in)
+auth.user.profile.photoURL       # Avatar URL
+auth.user.profile.emailVerified  # Boolean
 ```
 
 ### Usage paths (server usage — auto-populated by @omega.js/client)
@@ -97,7 +107,7 @@ usage.{feature}.limit                # Plan limit for this feature
 
 Example: `usage.credits.monthly`, `usage.credits.limit`
 
-Seeded on auth settle from `account.usage` + the site's payment plan config. Refreshed after every `omega.request()` call from the `omega-properties` response header — the backend attaches fresh usage counters to every response, so bound elements stay current automatically.
+Seeded on auth settle from `auth.user.usage` + the site's payment plan config. Refreshed after every `omega.request()` call from the `omega-properties` response header: the backend attaches fresh usage counters to every response, so bound elements stay current automatically.
 
 ### Device paths (local stats — auto-populated on initialize)
 
@@ -113,13 +123,13 @@ From the `device` module (localStorage / extension storage) — LOCAL device sta
 
 ### Custom state (set via JS)
 
-Any custom paths set via `omega.bindings().update(stateObject)`.
+Any custom paths set via `omega.bindings.update(stateObject)`.
 
 ## JavaScript API
 
 ```javascript
 // Update bindings with state data
-omega.bindings().update({
+omega.bindings.update({
   checkout: {
     product: { name: 'Pro Plan' },
     error: { show: false, message: '' },
@@ -127,10 +137,10 @@ omega.bindings().update({
 });
 
 // Get current binding context
-const context = omega.bindings().getContext();
+const context = omega.bindings.getContext();
 
 // Clear all bindings
-omega.bindings().clear();
+omega.bindings.clear();
 ```
 
 ## Skeleton Loaders
@@ -150,7 +160,7 @@ When `_updateBindings` processes an element:
 
 ```html
 <!-- Skeleton resolves when 'auth' key is updated -->
-<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.displayName">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.profile.displayName">&nbsp;</span>
 
 <!-- Skeleton resolves when 'checkout' key is updated (NOT when 'auth' updates) -->
 <span class="omega-binding-skeleton" data-omega-bind="@text checkout.pricing.total">&nbsp;</span>
@@ -162,12 +172,12 @@ When bindings fire in phases, skeletons resolve independently per root key:
 
 ```javascript
 // Phase 1: Global auth bindings fire
-omega.bindings().update({ auth: { user: {...} } });
+omega.bindings.update({ auth: { user } });
 // → Only elements bound to 'auth.*' resolve their skeletons
 // → Elements bound to 'checkout.*' keep their skeletons
 
 // Phase 2: After API fetches complete
-omega.bindings().update({ checkout: { pricing: {...} } });
+omega.bindings.update({ checkout: { pricing: {...} } });
 // → Now elements bound to 'checkout.*' resolve their skeletons
 ```
 
@@ -178,7 +188,7 @@ This prevents checkout skeletons from disappearing prematurely when global auth 
 Use `&nbsp;` as placeholder content (prevents zero-width collapse so the shimmer is visible):
 
 ```html
-<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.displayName">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.profile.displayName">&nbsp;</span>
 ```
 
 **Do NOT use text like "Loading..." as placeholder** — it flashes visible text before the shimmer kicks in. Use `&nbsp;` for a clean shimmer-only experience.
@@ -189,7 +199,7 @@ For composite text (e.g., "$0.00 due today"), do NOT mix static text with a bind
 
 ```javascript
 // CORRECT: compose the text in JS, bind as single value
-omega.bindings().update({
+omega.bindings.update({
   checkout: {
     totalDueText: `${formatCurrency(prices.total)} due today`,
   },
@@ -210,7 +220,7 @@ omega.bindings().update({
 
 - Uses the `hidden` attribute for show/hide (`[hidden] { display: none !important; }`)
 - Queries `[data-omega-bind]` on each `update()` call — handles dynamic elements
-- Auth bindings are auto-populated when `omega.auth().listen()` fires
+- Auth bindings are auto-populated on every landed auth state (`{ auth: { user } }`, beside `usage`)
 - When `updatedKeys` is `null` (e.g., from `clear()`), ALL bindings fire
 
 ### Root Key Update Filtering
@@ -219,14 +229,14 @@ omega.bindings().update({
 
 ```javascript
 // This update ONLY triggers bindings whose expression starts with 'checkout'
-omega.bindings().update({
+omega.bindings.update({
   checkout: { pricing: { total: 9.99 } },
 });
 // Fires: @text checkout.pricing.total, @show checkout.active
-// Skips: @text auth.user.displayName (root key is 'auth', not updated)
+// Skips: @text auth.user.profile.displayName (root key is 'auth', not updated)
 ```
 
-Negation (`!`) is stripped before root-key checking, so `@show !auth.user` fires when `auth` is updated.
+Negation (`!`) is stripped before root-key checking, so `@show !auth.user.authenticated` fires when `auth` is updated.
 
 ## See also
 

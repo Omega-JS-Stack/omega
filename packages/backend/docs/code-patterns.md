@@ -8,7 +8,7 @@ Use early returns instead of nested conditionals:
 // CORRECT
 function handler(data) {
   if (!data) {
-    return ctx.report('Missing data', { code: 400 });
+    return ctx.respond(new Error('Missing data'), { code: 400 });
   }
 
   // Main logic here

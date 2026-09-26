@@ -2,11 +2,11 @@
 
 > **Note for contributors and Claude:** This file is the guide for `@omega.js/desktop` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the package's own [`docs/<topic>.md`](../../packages/desktop/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
-> **Mirrored structure:** the four framework guides — `docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md` — mirror each other (the legacy UJM/BEM/BXM/EM lineage): shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** the four framework guides (`docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md`) mirror each other: shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them. Each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`, beside its one-line `@AGENTS.md` `CLAUDE.md` pointer) mirrors its guide the same way.
 
 ## Identity
 
-OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building modern Electron desktop apps. Sister project to @omega.js/extension and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per Electron process, modular feature library with file-based extensibility, a multi-platform build/release pipeline, and a built-in test framework.
+OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building modern Electron desktop apps, the desktop of the OMEGA family beside @omega.js/web, @omega.js/extension and @omega.js/backend. Each process module's default export is ONE ready-made instance, `omega`. It provides a one-line-import bootstrap per Electron process, a modular feature library with file-based extensibility, a multi-platform build/release pipeline, and a built-in test framework.
 
 ## Recommended skills
 
@@ -15,7 +15,7 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
+**@omega.js/desktop's renderer instance extends `@omega.js/client`'s base class**: `omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore` and the rest of the client are properties of the renderer's `omega`, beside `omega.desktop`, the preload's bridge to main. The client powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
 - **`docs/client/index.md`** (in the framework monorepo) — the client guide: identity, module list, conventions
@@ -52,59 +52,70 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 
 ## Architecture
 
-### Per-process Manager singletons
+### The consumer entry
 
-Each Electron process has its own one-line bootstrap:
+Each Electron process's module exports ONE ready-made instance, `omega`; the class is exported by name (`Omega`) for tests only, and a consumer never writes `new`:
 
 ```js
 // src/main.js
-new (require('@omega.js/desktop/main'))().initialize();      // auto-loads JSON5 config
+const omega = require('@omega.js/desktop/main');        // auto-loads JSON5 config
+omega.initialize().then(() => { const { logger, windows } = omega; });
 
 // src/preload.js
-new (require('@omega.js/desktop/preload'))().initialize();   // exposes window.desktop
+const omega = require('@omega.js/desktop/preload');     // exposes window.desktop
+omega.initialize();
 
 // src/assets/js/components/<view>/index.js
-new (require('@omega.js/desktop/renderer'))().initialize();
+import omega from '@omega.js/desktop/renderer';
+omega.initialize().then(() => { const { logger, desktop } = omega; });
 ```
 
-`manager.initialize()` runs a fixed boot order (startup → ipc → storage → theme → sentry → protocol → deepLink → appState → whenReady → autoUpdater → tray/menu/contextMenu → startup → omega → remoteConfig → remoteScripts → windows). See [docs/boot-sequence.md](../../packages/desktop/docs/boot-sequence.md) for the full ordered list + rationale.
+`initialize()` returns the instance, and `omega.ready` is the same promise, so a module that did not call it can still await it. In main, `omega.initialize()` runs a fixed boot order (startup → ipc → storage → theme → fontawesome → sentry → protocol → deepLink → authFlow → appState → context → usage → whenReady → autoUpdater → tray/menu/contextMenu → startup → auth → remoteConfig → remoteScripts → analytics → restartManager → windows). See [docs/boot-sequence.md](../../packages/desktop/docs/boot-sequence.md) for the full ordered list + rationale.
+
+### The instance (`omega`)
+
+- **main**: every lib is a plain property: `omega.windows`, `tray`, `menu`, `contextMenu`, `ipc`, `storage`, `deepLink`, `autoUpdater`, `appState`, `startup`, `protocol`, `authFlow`, `theme`, `fontawesome`, `context`, `usage`, `remoteConfig`, `remoteScripts`, `restartManager`, `analytics`, `sentry`, `logger`, plus `config`, the environment helpers, the URL helpers (`getApiUrl()`, `getWebsiteUrl()`, `getFunctionsUrl()`, `getAuthUrl()`), `quit()`, `relaunch()`, `openAuthFlow()`, `request(url, options)` (the client base's harmonized API fetch, carrying a fresh Bearer token from main's session when signed in) and `require(name)`. `omega.auth` is the signed-in account: `.user` (always a `User`), `.listen()`, `.signOut()`, `.getIdToken()`, `.handleToken()` ([docs/auth.md](../../packages/desktop/docs/auth.md)).
+- **preload**: exposes `window.desktop` through `contextBridge`; `omega.logger` and the environment helpers.
+- **renderer**: `@omega.js/client`'s base class (`omega.auth`, `omega.storage` the page store, `omega.bindings`, `omega.firestore`, ...) plus `omega.desktop`, the preload's bridge under main's names: `omega.desktop.{ipc,storage,theme,fontawesome,autoUpdater,analytics,context,usage,remoteConfig}`. `omega.desktop.storage` is the app store, async over IPC. The renderer carries the same auth click triggers as the extension's pages: `.omega-signin` runs main's `openAuthFlow()`, `.omega-account` opens the website's `/account` page in the user's browser, and `.omega-signout` (the client's trigger) signs the whole app out through main, whose broadcast then signs every window out ([docs/auth.md](../../packages/desktop/docs/auth.md)).
 
 ### Lib modules
 
-`src/lib/*.js` — every Electron concern its own module. Each exports a singleton with `initialize(manager)`. Deep dive per module: see `docs/<lib-name>.md`. Authoring guide (initialization contract, adding a new lib, flat-vs-split): [docs/lib-modules.md](../../packages/desktop/docs/lib-modules.md).
+`src/lib/*.js`: every Electron concern its own module. Each exports one object with `initialize(omega)`, and main hangs it on the instance by name. Deep dive per module: see `docs/<lib-name>.md`. Authoring guide (initialization contract, adding a new lib, flat-vs-split): [docs/lib-modules.md](../../packages/desktop/docs/lib-modules.md).
 
 | Module | Description |
 |---|---|
 | `ipc` | typed channel bus, single registration point |
 | `storage` | electron-store wrapper, sync main / async renderer via IPC |
-| `theme` | system-aware appearance — `nativeTheme.themeSource` ('system'/'light'/'dark'), persisted override, live `<html data-bs-theme>` in every renderer via matchMedia |
+| `theme` | system-aware appearance: `nativeTheme.themeSource` ('system'/'light'/'dark'), persisted override, live `<html data-bs-theme>` in every renderer via matchMedia |
 | `window-manager` | lazy-creation registry, bounds persistence, Discord-style hide-on-close, inset titlebar, dock-show on first window, re-surface on user re-launch |
 | `tray` / `menu` / `context-menu` | file-based definitions; unified id-path API; default templates with id-tagged items |
 | `startup` | `mode: 'normal' \| 'hidden'`; `'hidden'` bakes `LSUIElement: true` for zero dock bounce |
 | `app-state` | storage-backed launch flags + crash sentinel |
 | `protocol` | single-instance lock + scheme registration |
+| `fontawesome` | serves the bundled icon SVGs to renderers over IPC (`desktop:fontawesome:get`); the renderer auto-renders `fa-*` markup ([docs/fontawesome.md](../../packages/desktop/docs/fontawesome.md)) |
 | `deep-link` | unified deep-link dispatch (cold + warm start, mac + win + linux), built-in routes, pattern matching |
-| `client-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the @omega.js/client-resolved plan → `getResolvedPlan()` |
+| `auth` | `omega.auth`: main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the account document their client resolved, so main's `omega.auth.user` is the same `User` |
+| `auth-flow` | `omega.authFlow` / `omega.openAuthFlow()`: the sign-in round trip in the user's default browser, returning over the deep link (production) or a one-shot loopback listener (dev/test) |
 | `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `omega.authPersistence` config) |
 | `auto-updater` | electron-updater wrapper, idle-aware install, 30-day pending gate, dev simulation |
 | `sentry` | `@omega.js/monitoring` — the shared error-reporting contract, auto auth attribution, dev-mode gating |
-| `templating` | `{{ }}` token replacement (BXM/UJM convention), used at build time by `gulp/html` |
-| `context` | runtime info — `manager.context.{geolocation,client,session,app}` |
+| `templating` | `{{ }}` token replacement, used at build time by `gulp/html` |
+| `context` | runtime info: `omega.context.{geolocation,client,session,app}` |
 | `usage` | `opens` / `hoursTotal` / `hoursThisSession`; crash-safe |
 | `remote-config` | "Hot config" fetched from `${brand.url}/data/resources/main.json`, polled hourly |
-| `remote-scripts` | Emergency remote code execution — OPT-IN (`remoteScripts.enabled: true`) + https-only; fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `manager` + `require` in scope |
+| `remote-scripts` | Emergency remote code execution: OPT-IN (`remoteScripts.enabled: true`) + https-only; fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `omega` + `require` in scope |
 | `analytics` | GA4 Measurement Protocol; cross-platform `uuidv5` identity; the app's ONE sender — renderer events forward here over IPC ([docs/analytics.md](../../packages/desktop/docs/analytics.md)) |
 | `restart-manager` | external guardian app for crash relaunches — localhost HTTP protocol v1 (register/heartbeat/deregister), silent install when missing (mac zip / win NSIS `/S` / linux AppImage; RM self-updates via its own @omega.js/desktop autoUpdater); split dir ships the protocol SSOT the RM app imports |
 
 ### File-based feature definitions
 
-Trays, menus, and context-menus are NOT defined in config — they're defined in JS files the consumer authors at fixed conventional paths (`src/integrations/{tray,menu,context-menu}/index.js`). To opt out, call `manager.{tray,menu,contextMenu}.disable()` at runtime.
+Trays, menus, and context-menus are NOT defined in config: they're defined in JS files the consumer authors at fixed conventional paths (`src/integrations/{tray,menu,context-menu}/index.js`). To opt out, call `omega.{tray,menu,contextMenu}.disable()` at runtime. Each file exports one function of an object: `({ omega, tray })`, `({ omega, menu, defaults })`, and `({ omega, menu, params, webContents })` for the context menu, called per right-click.
 
 All three ship sensible default templates and share a unified id-path API (`.find/.has/.update/.remove/.enable/.show/.hide/.insertBefore/.insertAfter/.appendTo`), implemented once in `src/lib/_menu-mixin.js`. See [docs/tray.md](../../packages/desktop/docs/tray.md), [docs/menu.md](../../packages/desktop/docs/menu.md), [docs/context-menu.md](../../packages/desktop/docs/context-menu.md).
 
 ### Windows
 
-@omega.js/desktop does NOT auto-create any windows. Consumers call `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(...)`. Inset titlebar by default; Discord-style hide-on-close on `main`; auto re-surface on user re-launch. See [docs/windows.md](../../packages/desktop/docs/windows.md).
+@omega.js/desktop does NOT auto-create any windows. Consumers call `omega.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `omega.initialize().then(...)`. Inset titlebar by default; Discord-style hide-on-close on `main`; auto re-surface on user re-launch. See [docs/windows.md](../../packages/desktop/docs/windows.md).
 
 ### Icons
 
@@ -148,7 +159,7 @@ All three bundles strip `@dev-only` blocks in production builds — code between
 
 ### Config flow
 
-`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omega.js/config`: `targets.desktop` overlays the top level, brand-monorepo walk-up included), then applies derived defaults: `app.appId` ← `<certificates.providers.apple.bundleIdPrefix>.<brand.id>` with the brand id's dashes as dots, the very id the certificates service registers ([#909](https://github.com/Omega-JS-Stack/omega/issues/909); no prefix declared, and it falls back to the reverse-domain of `brand.url`, then `app.<brand.id>`), `app.productName` ← `brand.name`) → injected into the NODE bundles (main, preload) at build time as an esbuild `define` of `OMEGA_BUILD_JSON` plus a banner that assigns the same literal to `globalThis`, and written for the RENDERER as the ONE `dist/build.js` every view's shell loads with its first script tag ([#743](https://github.com/Omega-JS-Stack/omega/issues/743), the same file and the same load order web and the extension use). Runtime reads `OMEGA_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
+`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `build.getConfig()` (resolves via `@omega.js/config`: `targets.desktop` overlays the top level, brand-monorepo walk-up included), then applies derived defaults: `app.appId` ← `<certificates.providers.apple.bundleIdPrefix>.<brand.id>` with the brand id's dashes as dots, the very id the certificates service registers ([#909](https://github.com/Omega-JS-Stack/omega/issues/909); no prefix declared, and it falls back to the reverse-domain of `brand.url`, then `app.<brand.id>`), `app.productName` ← `brand.name`) → injected into the NODE bundles (main, preload) at build time as an esbuild `define` of `OMEGA_BUILD_JSON` plus a banner that assigns the same literal to `globalThis`, and written for the RENDERER as the ONE `dist/build.js` every view's shell loads with its first script tag ([#743](https://github.com/Omega-JS-Stack/omega/issues/743), the same file and the same load order web and the extension use). Runtime reads `OMEGA_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
 
 The wrapper is the ONE shape every OMEGA browser surface bakes ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)): `{ config, package, mode, license, builtAt }`, with the build's own facts outside `config` and never part of the client contract. What goes INSIDE `config` differs by who reads the bundle:
 
@@ -157,7 +168,7 @@ The wrapper is the ONE shape every OMEGA browser surface bakes ([#894](https://g
 | main, preload | the WHOLE resolved config, as a `define` + banner in their own bundles. The main process BOOTS from it (a packaged app's `config/omega.json5` is inside the asar), so `platforms`, `startup`, `autoUpdate`, `releases` and the rest have to be there. Both are Node, neither is a public surface |
 | renderer | the browser subset, `clientConfig(resolved)` from `@omega.js/config` (the config guide's "The browser subset"), written to `dist/build.js` and loaded by the page template as `../../build.js` ahead of the view's own bundle. A renderer is a public surface: its bundle is readable from DevTools, so the GCP account facts, the signing certificates and the account admins are not in it, and the bundle itself carries no copy of the snapshot at all |
 
-The build facts include `runtime: 'electron'` ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)): a packaged renderer is a browser with no Electron globals of its own, so @omega.js/client's sniff would answer `'web'` without the baked fact. `mode` is the three keys every surface records, `{ environment, build, publish }`; desktop's own `server` verdict stays inside `Manager.getMode()`.
+The build facts include `runtime: 'electron'` ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)): a packaged renderer is a browser with no Electron globals of its own, so @omega.js/client's sniff would answer `'web'` without the baked fact. `mode` is the three keys every surface records, `{ environment, build, publish }`; desktop's own `server` verdict stays inside `build.getMode()`.
 
 Both halves carry the same name, so `renderer.js` hands `OMEGA_BUILD_JSON.config` to `@omega.js/client` exactly as an extension page and a web page do.
 
@@ -165,11 +176,11 @@ Required fields: `brand.id` + `brand.name`. Everything else has defaults. See [d
 
 ### Schema validation
 
-Every field in `config/omega.json5` is declared in `@omega.js/config`: the shared OMEGA schema plus the desktop refinements (`TARGET_SCHEMAS.desktop`), vendored into `dist/vendor/config/` and exposed to consumers as `require('@omega.js/desktop/config')`. Runs at boot (hard-fails `manager.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). The audit reports the validator's WARNINGS too ([#911](https://github.com/Omega-JS-Stack/omega/issues/911)): `omega build` prints each one and counts it (`audit ok (1 warning)`), so a key the schema does not declare, which is exactly what a typo looks like, is seen at build time instead of dropped. See [docs/config-schema.md](../../packages/desktop/docs/config-schema.md).
+Every field in `config/omega.json5` is declared in `@omega.js/config`: the shared OMEGA schema plus the desktop refinements (`TARGET_SCHEMAS.desktop`), vendored into `dist/vendor/config/` and exposed to consumers as `require('@omega.js/desktop/config')`. Runs at boot (hard-fails `omega.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). The audit reports the validator's WARNINGS too ([#911](https://github.com/Omega-JS-Stack/omega/issues/911)): `omega build` prints each one and counts it (`audit ok (1 warning)`), so a key the schema does not declare, which is exactly what a typo looks like, is seen at build time instead of dropped. See [docs/config-schema.md](../../packages/desktop/docs/config-schema.md).
 
 ### Cross-context helpers
 
-Four Managers (main / renderer / preload / build-time) all mix in shared helpers via `attachTo(Manager)`: `isDevelopment()`, `isProduction()`, `isTesting()`, `getWebsiteUrl()`, `getEnvironment()`, `getFunctionsUrl()`, `getApiUrl()`, `getAuthUrl()` (the sign-in URL that round-trips an auth token back into the app via the `auth/token` deep link; never link the bare `/signin` page; apps launch it via **`manager.openAuthFlow()`** (main), which opens the user's REAL default browser and, in dev/test where the custom scheme isn't OS-registered, swaps the final hop for a one-shot nonce-checked loopback listener (RFC 8252) feeding the same deep-link pipeline, `lib/auth-flow.js`). Use these instead of grepping `process.env` ad-hoc. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive), and the three `is*()` checks DERIVE from it; gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test); never `!isDevelopment()`.
+The three process instances (main / preload / renderer) carry the shared helpers as methods, and the build module (`require('@omega.js/desktop/build')`) exports the environment four and `getVersion()` as plain functions: `isDevelopment()`, `isProduction()`, `isTesting()`, `getWebsiteUrl()`, `getEnvironment()`, `getFunctionsUrl()`, `getApiUrl()`, `getAuthUrl()` (the sign-in URL that round-trips an auth token back into the app via the `auth/token` deep link; never link the bare `/signin` page; apps launch it via **`omega.openAuthFlow()`** (main), which opens the user's REAL default browser and, in dev/test where the custom scheme isn't OS-registered, swaps the final hop for a one-shot nonce-checked loopback listener (RFC 8252) feeding the same deep-link pipeline, `lib/auth-flow.js`). Use these instead of grepping `process.env` ad-hoc. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive), and the three `is*()` checks DERIVE from it; gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test); never `!isDevelopment()`.
 
 **The environment four are `@omega.js/config`'s ONE module** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in full: [docs/shared/config.md](../shared/config.md)): `src/utils/mode-helpers.js` re-exports them beside desktop's own `getVersion()`, so all four frameworks hang the identical functions. They read ONE input and never guess: `OMEGA_ENVIRONMENT` in Node, and the baked `OMEGA_BUILD_JSON.config.environment` in a renderer (which has none). Nothing sniffs `app.isPackaged` or `NODE_ENV` any more, and a context with neither input throws by name rather than defaulting; the old default here was `production`, so a plain `npm start` bundled itself as a production artifact while @omega.js/extension's copy of the same function answered `development`. `src/build.js` names the input at load, from the lane (`OMEGA_BUILD_MODE` is production and wins over an inherited value; the test runners name `testing`; a bare dev boot is `development`), and `main.js` names it from the baked config for a packaged app that has no parent lane: a FALLBACK for the context with no input, never an override of a lane that named one ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). A renderer has no `process` either, so the preload hands it the running word on `window.desktop.environment` and the renderer bootstrap applies it over the bake, which is how a test lane booting a production artifact answers `testing` in every context of that app. See [docs/environment-detection.md](../../packages/desktop/docs/environment-detection.md).
 
@@ -227,8 +238,8 @@ See [docs/releasing.md](../../packages/desktop/docs/releasing.md) for the end-to
 
 - **Consumer code can `require()` any @omega.js/desktop dependency** — the bundler re-resolves every name @omega.js/desktop DECLARES from the framework's own installation (`@omega.js/devkit/bundle`'s framework-deps hook). Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `@omega.js/client`, or any other @omega.js/desktop dep. If a dep doesn't resolve, the fix is in @omega.js/desktop's `package.json` or its bundle task — not the consumer's `package.json`.
 - **The framework's copy wins ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** Every name @omega.js/desktop DECLARES is re-resolved from the framework root by `@omega.js/devkit/bundle`'s resolve hook, so a consumer that declares its own version of a framework dependency still bundles ONE copy — the framework's — the identical hook and guarantee @omega.js/web gives web consumers. npm nests a framework-private copy only when the consumer's declaration conflicts, so this picks the nested copy on a conflict and the shared hoisted copy otherwise. There is no per-dependency override today, so a consumer that genuinely needs its OWN copy of a framework-carried package should raise it upstream ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)) rather than pin and silently lose. Narrower than the webpack `resolve.modules` ordering it replaced ([#737](https://github.com/Omega-JS-Stack/omega/issues/737)): a package the framework only carries TRANSITIVELY is no longer forced to the framework's copy, because the hook reads the declared set. @omega.js/extension is on the same hook since [#738](https://github.com/Omega-JS-Stack/omega/issues/738); pinned by `src/test/suites/build/framework-deps.test.js` in each.
-- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge). Same rule in BXM and UJM.
-- **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). The bundle task's framework-deps hook handles the bundled case.
+- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). In renderers use `omega.auth` and `omega.firestore` on the renderer instance. In the main process, use `omega.auth` (the @omega.js/desktop bridge). Same rule on every OMEGA browser surface.
+- **`omega.require(name)`** (main) resolves from @omega.js/desktop's module context at runtime. Use in gulp tasks or unbundled code (e.g. test fixtures). The bundle task's framework-deps hook handles the bundled case.
 
 ## Development Workflow
 
@@ -272,7 +283,7 @@ Don't ship behavioral changes with stale docs. Validate first, then document —
 
 API references for each subsystem live in `docs/`. **Whenever you make a behavioral change, update both this overview AND the relevant `docs/*.md` deep reference.** Treat docs as a first-class deliverable, not an afterthought.
 
-- [docs/boot-sequence.md](../../packages/desktop/docs/boot-sequence.md) — full `manager.initialize()` ordered list + rationale
+- [docs/boot-sequence.md](../../packages/desktop/docs/boot-sequence.md): full `omega.initialize()` ordered list + rationale
 - [docs/lib-modules.md](../../packages/desktop/docs/lib-modules.md) — lib initialization contract, adding a new lib, flat-vs-split convention
 - [docs/storage.md](../../packages/desktop/docs/storage.md) — main + renderer storage, dot-notation, change broadcasts
 - [docs/ipc.md](../../packages/desktop/docs/ipc.md) — typed channel bus
@@ -283,7 +294,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/startup.md](../../packages/desktop/docs/startup.md) — launch modes, zero-bounce production
 - [docs/app-state.md](../../packages/desktop/docs/app-state.md) — launch flags, crash sentinel
 - [docs/deep-link.md](../../packages/desktop/docs/deep-link.md) — cross-platform deep links, single-instance, built-in routes
-- [docs/client-bridge.md](../../packages/desktop/docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omega.js/client auth cycle (`data-omega-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
+- [docs/auth.md](../../packages/desktop/docs/auth.md): `omega.auth`, Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omega.js/client auth cycle (`data-omega-bind` bindings live in every renderer) + the account push that builds main's `omega.auth.user`
 - [docs/auto-updater.md](../../packages/desktop/docs/auto-updater.md) — startup + periodic checks, 30-day pending-update gate, idle-aware install
 - [docs/analytics.md](../../packages/desktop/docs/analytics.md) — GA4 Measurement Protocol, cross-platform `uuidv5` identity
 - [docs/context.md](../../packages/desktop/docs/context.md) — runtime context block (geolocation, client, session, app)
@@ -295,12 +306,12 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/sentry.md](../../packages/desktop/docs/sentry.md) — the desktop half of `@omega.js/monitoring`, auto auth attribution
 - [docs/templating.md](../../packages/desktop/docs/templating.md) — `{{ }}` token replacement, page vars, HTML pipeline
 - [docs/logging.md](../../packages/desktop/docs/logging.md) — runtime logger (main + preload + renderer → one `runtime.log`)
-- [docs/themes.md](../../packages/desktop/docs/themes.md) — vendored classy + bootstrap themes, per-page CSS bundles, system-aware appearance (`manager.theme`)
+- [docs/themes.md](../../packages/desktop/docs/themes.md): vendored classy + bootstrap themes, per-page CSS bundles, system-aware appearance (`omega.theme`)
 - [docs/tooltips.md](../../packages/desktop/docs/tooltips.md) — Bootstrap JS ships in @omega.js/desktop (prebuilt bundle, Popper inlined): zero-setup auto-initialized tooltips, `window.bootstrap` namespace
 - [docs/css.md](../../packages/desktop/docs/css.md) — SCSS architecture: main entry, theme `@use` config, per-window bundles, Bootstrap-first
 - [docs/hooks.md](../../packages/desktop/docs/hooks.md): lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize/post, deploy/pre)
 - [docs/shared/icons.md](../../packages/desktop/docs/icons.md) — convention-only icon resolution (`global/` + per-platform), retina derivation, macOS Template magic
-- [docs/fontawesome.md](../../packages/desktop/docs/fontawesome.md) — Font Awesome Free served from the npm dep (icon semantics shared with web via @omega.js/client's icon-core): `<i class="fa-solid fa-*">` auto-render, `manager.fontawesome.get`
+- [docs/fontawesome.md](../../packages/desktop/docs/fontawesome.md): Font Awesome Free served from the npm dep (icon semantics shared with web via @omega.js/client's icon-core): `<i class="fa-solid fa-*">` auto-render, `omega.desktop.fontawesome.get`
 - [docs/verts.md](../../packages/desktop/docs/verts.md) — `[data-omega-vert]` auto-bind to @omega.js/client's verts module (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense in desktop surfaces)
 - [docs/installer-options.md](../../packages/desktop/docs/installer-options.md) — per-target installer config, defaults table
 - [docs/signing.md](../../packages/desktop/docs/signing.md) — code signing for macOS + Windows

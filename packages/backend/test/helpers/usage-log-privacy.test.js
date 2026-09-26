@@ -18,7 +18,8 @@
  */
 const assert = require('node:assert');
 
-const Usage = require('../../dist/manager/helpers/usage.js');
+const Usage = require('../../dist/omega/services/usage.js');
+const { User } = require('../../dist/omega/helpers/account.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The leak fixture: a user document shaped the way ctx.authenticate() resolves one.
@@ -38,16 +39,17 @@ async function captureUsage() {
   const captured = [];
   const record = (...args) => captured.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
 
-  const Manager = {
+  const omega = {
     config: {
       features: { requests: { name: 'API Requests', usage: { pace: false } } },
       payment: { products: [{ id: 'basic', features: { requests: 100 } }] },
     },
     storage: () => ({ get: () => ({ value: () => ({}) }), set: () => ({ write: () => {} }) }),
-    libraries: {},
+    firebase: {},
   };
 
   const ctx = {
+    omega,
     log: record,
     warn: record,
     error: record,
@@ -57,13 +59,11 @@ async function captureUsage() {
       error.code = (opts || {}).code || 500;
       return error;
     },
-    authenticate: async () => JSON.parse(JSON.stringify(USER_DOC)),
+    authenticate: async () => new User(JSON.parse(JSON.stringify(USER_DOC))),
     request: { data: {}, geolocation: { ip: '203.0.113.7' } },
   };
 
-  const usage = new Usage(Manager);
-
-  usage.attach(ctx, { log: true });
+  const usage = new Usage(ctx).configure({ log: true });
 
   // The write is the one thing that would need Firestore — the LINES are the subject
   usage.write = async () => {};

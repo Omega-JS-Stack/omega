@@ -13,7 +13,7 @@
 // shared registry (#16), registered once by the global module.
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { initializeSigninForm, initializeSignupForm, initializeResetForm } from '__main_assets__/js/libs/auth/forms.js';
 import { handleRedirectResult, shouldUseAuthPopup } from '__main_assets__/js/libs/auth/oauth.js';
 import { handleAuthSignout, handleCustomTokenSignin, handlePrivateKeySignin, updateAuthReturnUrl, checkSubdomainAuth } from '__main_assets__/js/libs/auth/session-params.js';
@@ -37,7 +37,7 @@ export default function () {
   };
 
   // Handle DOM ready
-  omega.dom().ready()
+  omega.dom.ready()
   .then(async () => {
     // Log
     logger.log('Initialized. useAuthPopup:', ctx.useAuthPopup);

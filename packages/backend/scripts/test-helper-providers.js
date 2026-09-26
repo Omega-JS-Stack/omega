@@ -7,12 +7,12 @@
  * clicking around in dashboards. Reuses the same provider helpers that
  * @omega.js/backend uses in production (findContact / removeContact).
  *
- * Usage (run from a consumer project's functions/ dir):
+ * Usage (run from a backend target's dir; <omega> is this monorepo's root):
  *
- *   node ../../../backend-manager/scripts/test-helper-providers.js find  user@example.com
- *   node ../../../backend-manager/scripts/test-helper-providers.js purge user@example.com
+ *   node <omega>/packages/backend/scripts/test-helper-providers.js find  user@example.com
+ *   node <omega>/packages/backend/scripts/test-helper-providers.js purge user@example.com
  *
- * Or symlink: `ln -s ../../../backend-manager/scripts/test-helper-providers.js ./prov`
+ * Or symlink: `ln -s <omega>/packages/backend/scripts/test-helper-providers.js ./prov`
  * then: `node ./prov find user@example.com`
  *
  * - find:  prints whether the contact exists in SendGrid + Beehiiv (and the data shape).
@@ -71,22 +71,20 @@ if (!process.env.BEEHIIV_API_KEY) {
   process.exit(1);
 }
 
-// --- bootstrap Manager so providers can read Manager.config.marketing.* ---
-// The providers require '../../../index.js' which is the Manager singleton.
+// --- boot the instance so providers can read its config.marketing.* ---
+// The providers read '../../../index.js', which is the one Omega instance.
 // We need to load @omega.js/backend from the consumer's node_modules (not the @omega.js/backend repo's own src)
 // so it picks up the consumer's config + service account.
-let Manager;
 try {
-  const BackendManager = require(path.join(cwd, 'node_modules', '@omega.js/backend'));
-  Manager = (new BackendManager()).init({}, { setupFunctionsLegacy: false, log: false });
+  require(path.join(cwd, 'node_modules', '@omega.js/backend')).initialize({});
 } catch (e) {
-  console.error('✗ Failed to bootstrap Manager from consumer node_modules:', e.message);
+  console.error('✗ Failed to boot @omega.js/backend from consumer node_modules:', e.message);
   process.exit(2);
 }
 
-// --- load providers via the @omega.js/backend Manager.libraries surface (preferred) or direct path ---
-const sendgridProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'sendgrid.js');
-const beehiivProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'beehiiv.js');
+// --- load providers by direct path ---
+const sendgridProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'omega', 'libraries', 'email', 'providers', 'sendgrid.js');
+const beehiivProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'omega', 'libraries', 'email', 'providers', 'beehiiv.js');
 
 const sendgrid = require(sendgridProviderPath);
 const beehiiv = require(beehiivProviderPath);

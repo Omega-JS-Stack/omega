@@ -2,24 +2,24 @@
 
 Storage-backed launch flags + crash sentinel. Tells you *whether* this is the first launch ever, *how many* times the app has launched, *whether* the previous run crashed, and *whether* the version changed.
 
-## Public API on `manager.appState`
+## Public API on `omega.appState`
 
 ```js
-manager.appState.isFirstLaunch()         // boolean — true ONLY on the very first boot
-manager.appState.getLaunchCount()        // number — total successful launches (including this one)
-manager.appState.getInstalledAt()        // Date  — first ever launch timestamp
-manager.appState.getLastLaunchAt()       // Date | null — previous launch (null on first)
-manager.appState.getLastQuitAt()         // Date | null — previous graceful quit; null if it crashed
-manager.appState.recoveredFromCrash()    // boolean — previous run did not exit cleanly
+omega.appState.isFirstLaunch()         // boolean: true ONLY on the very first boot
+omega.appState.getLaunchCount()        // number: total successful launches (including this one)
+omega.appState.getInstalledAt()        // Date: first ever launch timestamp
+omega.appState.getLastLaunchAt()       // Date | null: previous launch (null on first)
+omega.appState.getLastQuitAt()         // Date | null: previous graceful quit; null if it crashed
+omega.appState.recoveredFromCrash()    // boolean: previous run did not exit cleanly
 
-manager.appState.getVersion()            // string | null — package version of this launch
-manager.appState.getPreviousVersion()    // string | null — version before this launch
-manager.appState.wasUpgraded()           // boolean — true if THIS launch's version differs from the prior
+omega.appState.getVersion()            // string | null: package version of this launch
+omega.appState.getPreviousVersion()    // string | null: version before this launch
+omega.appState.wasUpgraded()           // boolean: true if THIS launch's version differs from the prior
 
-manager.appState.launchedAtLogin()       // boolean — OS booted us via openAtLogin
-manager.appState.launchedFromDeepLink()  // boolean — argv had a deep-link payload (set by lib/deep-link)
+omega.appState.launchedAtLogin()       // boolean: OS booted us via openAtLogin
+omega.appState.launchedFromDeepLink()  // boolean: argv had a deep-link payload (set by lib/deep-link)
 
-manager.appState.reset()                 // wipe persisted state (test helper / factory-reset command)
+omega.appState.reset()                 // wipe persisted state (test helper / factory-reset command)
 ```
 
 ## Storage shape (key `appState`)
@@ -66,24 +66,24 @@ appState.getPreviousVersion() // '1.0.0' (preserved — useful for "what's new" 
 ### Show onboarding on first launch
 
 ```js
-if (manager.appState.isFirstLaunch()) {
-  manager.windows.show('onboarding');
+if (omega.appState.isFirstLaunch()) {
+  omega.windows.show('onboarding');
 }
 ```
 
 ### Crash report ping
 
 ```js
-if (manager.appState.recoveredFromCrash()) {
-  manager.sentry.captureMessage('recovered from crash', 'warning');
+if (omega.appState.recoveredFromCrash()) {
+  omega.sentry.captureMessage('recovered from crash', 'warning');
 }
 ```
 
 ### What's new modal after upgrade
 
 ```js
-if (manager.appState.wasUpgraded()) {
-  manager.windows.show('changelog');
+if (omega.appState.wasUpgraded()) {
+  omega.windows.show('changelog');
 }
 ```
 

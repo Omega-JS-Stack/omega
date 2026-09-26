@@ -1,5 +1,5 @@
 // `npx omega cdp theme <dark|light|system>` — flip the app's theme live
-// (manager.theme via the main window's renderer).
+// (omega.theme via the main window's renderer).
 //
 // Flips every renderer (BrowserWindows AND WebContentsViews) with no restart —
 // nativeTheme.themeSource → prefers-color-scheme → the preload applier

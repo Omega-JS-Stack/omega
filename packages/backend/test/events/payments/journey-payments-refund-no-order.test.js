@@ -45,7 +45,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // The test provider writes a payments-webhooks doc directly, triggering the
         // on-write pipeline automatically — no manual webhook needed.
-        const response = await http.as('refund-no-order').post('backend-manager/payments/refund', {
+        const response = await http.as('refund-no-order').post('omega/payments/refund', {
           confirmed: true,
           reason: 'Not satisfied with the service',
         });

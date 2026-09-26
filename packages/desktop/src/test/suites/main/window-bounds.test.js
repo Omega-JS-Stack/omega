@@ -16,12 +16,12 @@ module.exports = defineCases({
   description: 'window-manager bounds persistence (main)',
   cleanup: (ctx) => {
     // Drop everything we wrote so reruns are clean.
-    ctx.manager.storage.delete('windows.settings.bounds');
-    ctx.manager.storage.delete('windows.about.bounds');
-    ctx.manager.storage.delete('windows.bounds-test.bounds');
+    ctx.omega.storage.delete('windows.settings.bounds');
+    ctx.omega.storage.delete('windows.about.bounds');
+    ctx.omega.storage.delete('windows.bounds-test.bounds');
     // Make sure no test-leftover windows remain.
     ['settings', 'about', 'bounds-test'].forEach((name) => {
-      const w = ctx.manager.windows.get(name);
+      const w = ctx.omega.windows.get(name);
       if (w) {
         w._emForceClose = true;
         w.close();
@@ -32,33 +32,33 @@ module.exports = defineCases({
     {
       name: '_loadBounds returns null when nothing is saved',
       run: (ctx) => {
-        ctx.manager.storage.delete('windows.bounds-test.bounds');
-        ctx.expect(ctx.manager.windows._loadBounds('bounds-test', ctx.manager)).toBeNull();
+        ctx.omega.storage.delete('windows.bounds-test.bounds');
+        ctx.expect(ctx.omega.windows._loadBounds('bounds-test', ctx.omega)).toBeNull();
       },
     },
     {
       name: '_loadBounds returns the saved object',
       run: (ctx) => {
         const saved = { x: 50, y: 60, width: 800, height: 600 };
-        ctx.manager.storage.set('windows.bounds-test.bounds', saved);
-        ctx.expect(ctx.manager.windows._loadBounds('bounds-test', ctx.manager)).toEqual(saved);
+        ctx.omega.storage.set('windows.bounds-test.bounds', saved);
+        ctx.expect(ctx.omega.windows._loadBounds('bounds-test', ctx.omega)).toEqual(saved);
       },
     },
     {
       name: '_loadBounds rejects malformed entries',
       run: (ctx) => {
-        ctx.manager.storage.set('windows.bounds-test.bounds', { width: 'oops' });
-        ctx.expect(ctx.manager.windows._loadBounds('bounds-test', ctx.manager)).toBeNull();
+        ctx.omega.storage.set('windows.bounds-test.bounds', { width: 'oops' });
+        ctx.expect(ctx.omega.windows._loadBounds('bounds-test', ctx.omega)).toBeNull();
 
-        ctx.manager.storage.set('windows.bounds-test.bounds', { width: 50, height: 50 }); // below sanity floor
-        ctx.expect(ctx.manager.windows._loadBounds('bounds-test', ctx.manager)).toBeNull();
+        ctx.omega.storage.set('windows.bounds-test.bounds', { width: 50, height: 50 }); // below sanity floor
+        ctx.expect(ctx.omega.windows._loadBounds('bounds-test', ctx.omega)).toBeNull();
       },
     },
     {
       name: '_clampToDisplays drops x/y when off-screen, keeps width/height',
       run: (ctx) => {
         // Way off-screen (huge negative coordinates).
-        const out = ctx.manager.windows._clampToDisplays({
+        const out = ctx.omega.windows._clampToDisplays({
           x: -99999, y: -99999, width: 800, height: 600,
         });
         ctx.expect(out.x).toBeUndefined();
@@ -71,7 +71,7 @@ module.exports = defineCases({
       name: '_clampToDisplays keeps x/y when on-screen',
       run: (ctx) => {
         // Use a primary-display point we know is on-screen: (100, 100).
-        const out = ctx.manager.windows._clampToDisplays({
+        const out = ctx.omega.windows._clampToDisplays({
           x: 100, y: 100, width: 800, height: 600,
         });
         ctx.expect(out.x).toBe(100);
@@ -83,9 +83,9 @@ module.exports = defineCases({
       run: async (ctx) => {
         // Pre-seed storage with bounds for the about window.
         const wanted = { x: 120, y: 140, width: 720, height: 540 };
-        ctx.manager.storage.set('windows.about.bounds', wanted);
+        ctx.omega.storage.set('windows.about.bounds', wanted);
 
-        const win = await ctx.manager.windows.createNamed('about');
+        const win = await ctx.omega.windows.createNamed('about');
         ctx.state.win = win;
         const got = win.getBounds();
         ctx.expect(got.width).toBe(720);
@@ -103,9 +103,9 @@ module.exports = defineCases({
 
         // Move + resize, then trigger save.
         win.setBounds({ x: 200, y: 220, width: 640, height: 480 });
-        ctx.manager.windows._saveBoundsNow('about');
+        ctx.omega.windows._saveBoundsNow('about');
 
-        const saved = ctx.manager.storage.get('windows.about.bounds');
+        const saved = ctx.omega.storage.get('windows.about.bounds');
         ctx.expect(saved).toBeTruthy();
         ctx.expect(saved.width).toBe(640);
         ctx.expect(saved.height).toBe(480);
@@ -123,10 +123,10 @@ module.exports = defineCases({
           if (win.isDestroyed()) return r();
           win.once('closed', r);
         });
-        ctx.manager.windows.close('about');
+        ctx.omega.windows.close('about');
         await closedPromise;
 
-        const saved = ctx.manager.storage.get('windows.about.bounds');
+        const saved = ctx.omega.storage.get('windows.about.bounds');
         ctx.expect(saved.width).toBe(555);
         ctx.expect(saved.height).toBe(444);
       },
@@ -135,13 +135,13 @@ module.exports = defineCases({
       name: 'persistBounds: false → no auto-save on resize, no restore on create',
       run: async (ctx) => {
         // Pre-seed bounds that SHOULD be ignored when persistBounds: false.
-        ctx.manager.storage.set('windows.about.bounds', { x: 50, y: 60, width: 999, height: 888 });
+        ctx.omega.storage.set('windows.about.bounds', { x: 50, y: 60, width: 999, height: 888 });
 
         // The `windows` config block is no longer required — pass persistBounds via the
         // call-site overrides arg instead. (The merge order is defaults < JSON config <
         // overrides, so this works whether or not config.windows.about is set.)
         try {
-          const win = await ctx.manager.windows.createNamed('about', undefined, { persistBounds: false });
+          const win = await ctx.omega.windows.createNamed('about', undefined, { persistBounds: false });
 
           // Saved 999x888 must NOT have been restored — should fall back to config defaults.
           const got = win.getBounds();
@@ -149,19 +149,19 @@ module.exports = defineCases({
           ctx.expect(got.height).not.toBe(888);
 
           // Now resize and confirm no auto-save fires past the debounce window.
-          ctx.manager.storage.delete('windows.about.bounds');
+          ctx.omega.storage.delete('windows.about.bounds');
           win.setBounds({ x: 30, y: 30, width: 700, height: 500 });
           await new Promise((r) => setTimeout(r, 350));
-          ctx.expect(ctx.manager.storage.get('windows.about.bounds')).toBeUndefined();
+          ctx.expect(ctx.omega.storage.get('windows.about.bounds')).toBeUndefined();
 
           const closedPromise = new Promise((r) => win.once('closed', r));
-          ctx.manager.windows.close('about');
+          ctx.omega.windows.close('about');
           await closedPromise;
 
           // close also must NOT have written under persistBounds:false.
-          ctx.expect(ctx.manager.storage.get('windows.about.bounds')).toBeUndefined();
+          ctx.expect(ctx.omega.storage.get('windows.about.bounds')).toBeUndefined();
         } finally {
-          ctx.manager.storage.delete('windows.about.bounds');
+          ctx.omega.storage.delete('windows.about.bounds');
         }
       },
     },

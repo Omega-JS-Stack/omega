@@ -31,8 +31,8 @@ const fs       = require('fs');
 const jetpack  = require('fs-jetpack');
 const { spawn } = require('child_process');
 
-const Manager = new (require('../build.js'));
-const logger  = Manager.logger('launch');
+const build = require('../build.js');
+const logger  = build.logger('launch');
 
 module.exports = async function (options) {
   options = options || {};

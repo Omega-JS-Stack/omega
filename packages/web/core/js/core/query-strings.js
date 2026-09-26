@@ -1,5 +1,3 @@
-import omega from '@omega.js/client';
-
 // The utm set and the ad-platform click ids read off the landing URL.
 const UTM_PARAMS = [
   'utm_source',
@@ -20,9 +18,9 @@ const CLICK_ID_PARAMS = [
 ];
 
 // Query Strings Module
-export default function () {
+export default function ({ omega }) {
   // Process query strings when DOM is ready
-  omega.dom().ready().then(() => {
+  omega.dom.ready().then(() => {
     processQueryStrings();
   });
 
@@ -31,7 +29,7 @@ export default function () {
     const urlParams = new URLSearchParams(window.location.search);
 
     // Get current attribution data
-    const attribution = omega.storage().get('attribution', {});
+    const attribution = omega.storage.get('attribution', {});
 
     // Fold a pre-first/last blob into the new shape before anything reads it
     migrateLegacyAttribution(attribution);
@@ -43,7 +41,7 @@ export default function () {
     processTouch(urlParams, attribution);
 
     // Save updated attribution
-    omega.storage().set('attribution', attribution);
+    omega.storage.set('attribution', attribution);
   }
 
   function processAffiliateParams(urlParams, attribution) {

@@ -5,8 +5,8 @@
  * non-quarantined, non-breaking set (`--major` opts into breaking) through
  * npu when present. The whole verb is the shared devkit implementation.
  */
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('update');
+const build = require('../build.js');
+const logger = build.logger('update');
 const { runUpdate } = require('@omega.js/devkit/update');
 
 module.exports = async function (options) {

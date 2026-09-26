@@ -50,7 +50,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -75,11 +75,11 @@ async function createIntent({ cookie = '', attribution = STORED_ATTRIBUTION } = 
   globalThis.__omegaClient = {
     config: { environment: 'production' },
     isDevelopment: () => false,
-    storage: () => ({
+    storage: {
       get: (keyPath, defaultValue) => _get(storage, keyPath, defaultValue),
       set: (keyPath, value) => _set(storage, keyPath, value),
       remove: (keyPath) => _set(storage, keyPath, undefined),
-    }),
+    },
     request: async (url, options) => {
       requests.push({ url, options });
       return { url: 'https://provider.test/checkout/abc' };

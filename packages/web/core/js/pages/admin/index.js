@@ -6,7 +6,7 @@
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { loadCharts, barChart, doughnutChart } from '__main_assets__/js/libs/charts.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // The plan doughnut paints STATUS hues, not the categorical ramp (#74, Ian's
@@ -26,10 +26,10 @@ const PLAN_HUES = [
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, async (state) => {
-      if (!state.user) {
+    omega.auth.listen({ once: true }, async (state) => {
+      if (!state.user.authenticated) {
         return;
       }
 
@@ -300,7 +300,7 @@ async function loadContent() {
   const $empty = document.getElementById('content-empty');
   const $list = document.getElementById('content-list');
   const $footer = document.getElementById('content-footer');
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
 
   const response = await fetch(siteUrl('/feeds/posts.json'), { cache: 'no-store' });
   if (!response.ok) {
@@ -356,7 +356,7 @@ async function loadRecentUsers() {
   const $table = document.getElementById('recent-users-table');
   const $tbody = document.getElementById('recent-users-tbody');
 
-  const firestore = omega.firestore();
+  const firestore = omega.firestore;
   const snapshot = await firestore.collection('users')
     .orderBy('metadata.created.timestampUNIX', 'desc')
     .limit(10)
@@ -387,9 +387,9 @@ async function loadRecentUsers() {
     const isPaid = plan !== 'basic';
     const $row = document.createElement('tr');
     $row.innerHTML = `
-      <td class="text-truncate" style="max-width: 200px;">${omega.utilities().escapeHTML(email)}</td>
-      <td><span class="omega-chip${isPaid ? ' omega-chip--accent' : ''}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
-      <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
+      <td class="text-truncate" style="max-width: 200px;">${omega.utilities.escapeHTML(email)}</td>
+      <td><span class="omega-chip${isPaid ? ' omega-chip--accent' : ''}">${omega.utilities.escapeHTML(capitalize(plan))}</span></td>
+      <td class="text-muted small">${omega.utilities.escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
   });
@@ -404,7 +404,7 @@ async function loadRecentOrders() {
   const $table = document.getElementById('recent-orders-table');
   const $tbody = document.getElementById('recent-orders-tbody');
 
-  const firestore = omega.firestore();
+  const firestore = omega.firestore;
   const snapshot = await firestore.collection('payments-orders')
     .orderBy('metadata.created.timestampUNIX', 'desc')
     .limit(10)
@@ -435,10 +435,10 @@ async function loadRecentOrders() {
 
     const $row = document.createElement('tr');
     $row.innerHTML = `
-      <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities().escapeHTML(orderId)}">${omega.utilities().escapeHTML(orderId)}</td>
-      <td><span class="omega-chip omega-chip--accent">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
-      <td class="small">${omega.utilities().escapeHTML(capitalize(provider))}</td>
-      <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
+      <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities.escapeHTML(orderId)}">${omega.utilities.escapeHTML(orderId)}</td>
+      <td><span class="omega-chip omega-chip--accent">${omega.utilities.escapeHTML(capitalize(product))}</span></td>
+      <td class="small">${omega.utilities.escapeHTML(capitalize(provider))}</td>
+      <td class="text-muted small">${omega.utilities.escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
   });
@@ -479,13 +479,13 @@ async function runCron($btn) {
 
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-success small mb-0 py-2">Cron <strong>${omega.utilities().escapeHTML(cronId)}</strong> completed successfully</div>`;
+      $result.innerHTML = `<div class="alert alert-success small mb-0 py-2">Cron <strong>${omega.utilities.escapeHTML(cronId)}</strong> completed successfully</div>`;
     }
   } catch (error) {
     console.error(`Cron ${cronId} failed:`, error);
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Cron <strong>${omega.utilities().escapeHTML(cronId)}</strong> failed: ${omega.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
+      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Cron <strong>${omega.utilities.escapeHTML(cronId)}</strong> failed: ${omega.utilities.escapeHTML(error.message || 'Unknown error')}</div>`;
     }
   }
 
@@ -522,7 +522,7 @@ async function runBackup() {
     console.error('Backup failed:', error);
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Backup failed: ${omega.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
+      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Backup failed: ${omega.utilities.escapeHTML(error.message || 'Unknown error')}</div>`;
     }
   }
 

@@ -25,10 +25,10 @@ module.exports = defineCases({
     },
     {
       // wave-5 F1: main.js must release the deep-link boot queue after full init.
-      name: 'main.js drains the deep-link boot queue via markManagerReady()',
+      name: 'main.js drains the deep-link boot queue via markOmegaReady()',
       run: (ctx) => {
         const source = fs.readFileSync(path.join(SRC, 'main.js'), 'utf8');
-        ctx.expect(source.includes('deepLink.markManagerReady()')).toBe(true);
+        ctx.expect(source.includes('deepLink.markOmegaReady()')).toBe(true);
       },
     },
   ],

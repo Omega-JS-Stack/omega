@@ -16,7 +16,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
@@ -27,10 +27,10 @@ let slugTouched = false;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, async (state) => {
-      if (!state.user) {
+    omega.auth.listen({ once: true }, async (state) => {
+      if (!state.user.authenticated) {
         return;
       }
 
@@ -151,7 +151,7 @@ async function enterEditMode() {
 // ============================================
 
 function initForm() {
-  formManager = new FormManager('#post-editor-form', {
+  formManager = new FormManager(omega, '#post-editor-form', {
     allowResubmit: true,
     submittingText: 'Saving...',
   });

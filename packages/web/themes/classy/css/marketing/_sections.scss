@@ -31,8 +31,7 @@
     }
   }
 
-  // Real combomarks (Ian 2026-07-16: the legacy UJM wordmark set, ported to
-  // core/logos): full-color originals inlined, muted to a uniform wall by the
+  // Real combomarks (core/logos): full-color originals inlined, muted to a uniform wall by the
   // item's grayscale — dark mode luminance-flips them so ink-dark marks stay
   // legible on charcoal. Hover restores the brand color (the item drops its
   // filter; the invert must go with it).

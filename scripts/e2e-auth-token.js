@@ -2,7 +2,7 @@
  * Root `npm run test:auth` — desktop/extension SIGN-IN TOKEN round trip (cp260).
  *
  * The custom-token sync flow (extension background `omega:syncAuth`, desktop
- * client-bridge renderer sync) had ZERO e2e coverage, which is how a broken
+ * lib/auth.js renderer sync) had ZERO e2e coverage, which is how a broken
  * response read (`data.response.token` against a `{ token }` body) shipped
  * unnoticed. This lane proves the whole loop against real infrastructure,
  * fully offline: the playground backend's emulator stack (auth + functions +
@@ -11,8 +11,8 @@
  * Proof, in order:
  *   1. A real user signs up + signs in against the AUTH emulator (real
  *      firebase SDK from @omega.js/client's dependency tree — no stubs).
- *   2. The DESKTOP caller — the real `client-bridge._fetchCustomToken` with
- *      the real url-helpers — exchanges the user's ID token for a custom
+ *   2. The DESKTOP caller, the real `lib/auth.js` `_fetchCustomToken` with
+ *      the real url-helpers, exchanges the user's ID token for a custom
  *      token at POST /omega/user/token.
  *   3. That custom token actually signs in a second app instance and lands
  *      on the SAME uid (the round trip, end to end).
@@ -194,8 +194,8 @@ async function main() {
 
     let customToken = null;
 
-    await step('the REAL desktop client-bridge fetches a custom token from /omega/user/token', async () => {
-      // Real desktop modules: the bridge whose _fetchCustomToken is the caller
+    await step('the REAL desktop auth fetches a custom token from /omega/user/token', async () => {
+      // Real desktop modules: lib/auth.js, whose _fetchCustomToken is the caller
       // under test, and the real mode/url helpers it resolves its URL with. In
       // the testing environment getApiUrl() maps to the local hosting emulator
       // via the resolved-port env channel (N7). The environment is the one
@@ -203,23 +203,32 @@ async function main() {
       process.env.OMEGA_ENVIRONMENT = 'testing';
       process.env.OMEGA_TEST_MODE = 'true';
       process.env.OMEGA_HOSTING_PORT = String(ports.hosting);
-      // A testing bridge points its own Firebase Auth at the auth emulator on
+      // A testing main process points its own Firebase Auth at the auth emulator on
       // this same channel (it never reaches real auth from here).
       process.env.OMEGA_AUTH_PORT = String(ports.auth);
       delete process.env.OMEGA_HTTPS_PORT;
 
       const desktopRequire = createRequire(path.join(ROOT, 'packages', 'desktop', 'package.json'));
-      const bridge = desktopRequire(path.join(DESKTOP_SRC, 'lib', 'client-bridge.js'));
-      const modeHelpers = desktopRequire(path.join(DESKTOP_SRC, 'utils', 'mode-helpers.js'));
-      const urlHelpers = desktopRequire(path.join(DESKTOP_SRC, 'utils', 'url-helpers.js'));
+      const auth = desktopRequire(path.join(DESKTOP_SRC, 'lib', 'auth.js'));
+      const { getEnvironment } = desktopRequire(path.join(DESKTOP_SRC, 'utils', 'mode-helpers.js'));
+      const { getApiUrl } = desktopRequire(path.join(DESKTOP_SRC, 'utils', 'url-helpers.js'));
+      const { createRequest } = desktopRequire('@omega.js/client/modules/request.js');
 
-      function HarnessManager(config) { this.config = config; }
-      modeHelpers.attachTo(HarnessManager);
-      urlHelpers.attachTo(HarnessManager);
+      // The one call lib/auth.js makes on the main-process instance,
+      // `omega.request()`, built the way src/main.js builds it: the same plain
+      // URL helpers, and the e2e user's ID token where main reads its own session's
+      const instance = {
+        config: { brand: { id: 'playground' } },
+        getEnvironment() { return getEnvironment.call(this); },
+        getApiUrl(environment) { return getApiUrl(this, environment); },
+      };
+      instance.request = createRequest({
+        getApiUrl: () => instance.getApiUrl(),
+        getIdToken: (force) => user.getIdToken(force),
+      });
+      auth._omega = instance;
 
-      bridge._manager = new HarnessManager({ brand: { id: 'playground' } });
-
-      customToken = await bridge._fetchCustomToken(user);
+      customToken = await auth._fetchCustomToken();
       assert.equal(typeof customToken, 'string', 'custom token should be a string');
       assert.equal(customToken.split('.').length, 3, 'custom token should be a JWT');
     });

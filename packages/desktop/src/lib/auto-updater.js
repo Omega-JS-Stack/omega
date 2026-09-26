@@ -49,16 +49,16 @@ const STORAGE_KEY = 'autoUpdater';
 //      install fires whenever the user eventually walks away. We never re-prompt
 //      for the same version (tracked via `_promptedForVersion`).
 //
-// Consumer hook: `manager.autoUpdater.markActive()` lets app code force-bump the
+// Consumer hook: `omega.autoUpdater.markActive()` lets app code force-bump the
 // activity timestamp from anywhere (e.g. just received an auth event, finished a
 // long-running renderer task, etc.). Use sparingly — the built-in signals cover
 // 99% of real activity.
 //
-// Test mode: when `manager.isTesting()` is true, the threshold collapses to 3s so
+// Test mode: when `omega.isTesting()` is true, the threshold collapses to 3s so
 // integration tests can drive a real download → idle wait → install in ~5s instead
 // of 15min. Both timers (feed-check + idle-eval) likewise drop to 500ms in tests so
 // the full sequence fires inside a test run. Wired in `_idleThresholdMs()` and the
-// initialize() timer setup based on the manager's `isTesting()` helper.
+// initialize() timer setup based on the omega instance's `isTesting()` helper.
 const IDLE_INSTALL_THRESHOLD_MS         = 15 * 60 * 1000;   // 15 min — production
 const IDLE_INSTALL_THRESHOLD_MS_TESTING =      3 * 1000;    // 3 sec  — when isTesting()
 const IDLE_TICK_MS_TESTING              =          500;     // 500ms periodic tick when testing
@@ -109,7 +109,7 @@ function freshState() {
 
 const autoUpdater = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _library:     null,
   _options:     null,
   _state:       freshState(),
@@ -125,12 +125,12 @@ const autoUpdater = {
   _promptedForVersion: null,           // version string we've already prompted about — never prompt twice for the same version
   _activityHooksWired: false,          // guard: only wire main-side activity listeners once per process
 
-  async initialize(manager) {
-    autoUpdater._manager = manager;
+  async initialize(omega) {
+    autoUpdater._omega = omega;
     autoUpdater._initialized = true;
     autoUpdater._state = freshState();
 
-    const cfg = (manager && manager.config && manager.config.autoUpdate) || {};
+    const cfg = (omega && omega.config && omega.config.autoUpdate) || {};
     autoUpdater._options = { ...DEFAULTS, ...cfg };
 
     if (autoUpdater._options.enabled === false) {
@@ -150,21 +150,21 @@ const autoUpdater = {
     }
 
     // 3. IPC: renderer status query + actions. Unhandle first so re-init is idempotent.
-    if (manager && manager.ipc) {
+    if (omega && omega.ipc) {
       const channels = [
         ['desktop:auto-updater:status',     async () => autoUpdater.getStatus()],
         ['desktop:auto-updater:check-now',  async () => autoUpdater.checkNow({ userInitiated: true })],
         ['desktop:auto-updater:install-now', async () => autoUpdater.installNow()],
       ];
       for (const [chan, fn] of channels) {
-        manager.ipc.unhandle(chan);
-        manager.ipc.handle(chan, fn);
+        omega.ipc.unhandle(chan);
+        omega.ipc.handle(chan, fn);
       }
       // Activity ping from preload (debounced renderer-side mouse/keyboard/focus).
       // Listener (not handle) — fire-and-forget, no response needed. Set-backed
       // listener registry deduplicates same-fn re-adds, so re-init is safe.
-      if (typeof manager.ipc.on === 'function') {
-        manager.ipc.on('desktop:auto-updater:activity', autoUpdater._onActivityIpc);
+      if (typeof omega.ipc.on === 'function') {
+        omega.ipc.on('desktop:auto-updater:activity', autoUpdater._onActivityIpc);
       }
     }
 
@@ -188,10 +188,10 @@ const autoUpdater = {
     //       a downloaded update based on user idle time. Default 1m cadence so a
     //       downloaded update installs promptly when the user steps away.
     //
-    // In tests (`manager.isTesting() === true`) both cadences collapse to
+    // In tests (`omega.isTesting() === true`) both cadences collapse to
     // IDLE_TICK_MS_TESTING (500ms) so an integration test sees the full sequence
     // fire within seconds of a download.
-    const isTesting = manager.isTesting();
+    const isTesting = omega.isTesting();
     const feedInterval = isTesting ? IDLE_TICK_MS_TESTING : autoUpdater._options.feedCheckIntervalMs;
     const idleInterval = isTesting ? IDLE_TICK_MS_TESTING : autoUpdater._options.idleEvalIntervalMs;
 
@@ -281,7 +281,7 @@ const autoUpdater = {
     // Same doctrine as _isSimulating(): a packaged production build may simulate, but
     // only when it was LAUNCHED for QA with OMEGA_DEV_UPDATE set. Without that opt-in a
     // shipped binary must never be talked into faking an update it cannot deliver.
-    if (autoUpdater._manager.isProduction() && !autoUpdater._isSimulating()) {
+    if (autoUpdater._omega.isProduction() && !autoUpdater._isSimulating()) {
       throw new Error('simulate(): refused in a production build. Relaunch with OMEGA_DEV_UPDATE set to simulate updates.');
     }
 
@@ -320,7 +320,7 @@ const autoUpdater = {
 
   // Bump the activity timestamp. Called automatically by the built-in activity hooks
   // (renderer mouse/keyboard, browser-window focus). Consumer code can also call this
-  // directly from anywhere (`manager.autoUpdater.markActive()`) to force-bump on
+  // directly from anywhere (`omega.autoUpdater.markActive()`) to force-bump on
   // app-specific activity.
   markActive() {
     autoUpdater._lastActivityAt = Date.now();
@@ -341,13 +341,13 @@ const autoUpdater = {
       logger.log('Dev mode — skipping real quitAndInstall().');
       return true;
     }
-    // Flip the manager's quit flag so the window-manager close handler lets the
+    // Flip the omega instance's quit flag so the window-manager close handler lets the
     // close events through instead of trapping them with hide-on-close. Without
     // this, quitAndInstall() fires before-quit but the BrowserWindow's close
     // handler (which runs FIRST since it has its own listener) would call
     // event.preventDefault() and the install would just hide the window.
-    if (autoUpdater._manager) {
-      autoUpdater._manager._allowQuit = true;
+    if (autoUpdater._omega) {
+      autoUpdater._omega._allowQuit = true;
     }
     if (autoUpdater._library && typeof autoUpdater._library.quitAndInstall === 'function') {
       autoUpdater._library.quitAndInstall();
@@ -372,10 +372,10 @@ const autoUpdater = {
     autoUpdater._promptedForVersion = null;
     autoUpdater._activityHooksWired = false;
 
-    const m = autoUpdater._manager;
-    if (m && m.ipc && typeof m.ipc.unhandle === 'function') {
+    const omega = autoUpdater._omega;
+    if (omega && omega.ipc && typeof omega.ipc.unhandle === 'function') {
       ['desktop:auto-updater:status', 'desktop:auto-updater:check-now', 'desktop:auto-updater:install-now'].forEach((c) => {
-        m.ipc.unhandle(c);
+        omega.ipc.unhandle(c);
       });
     }
   },
@@ -385,7 +385,7 @@ const autoUpdater = {
   // Auto-updater dev SIMULATION mode — controls whether checkForUpdates() is wired
   // to electron-updater (real) or our synthetic event sequence (fake). Triggered by
   // setting OMEGA_DEV_UPDATE=available|unavailable|error. NOT the same as
-  // `manager.isDevelopment()` (which is the runtime "are we packaged" signal); a
+  // `omega.isDevelopment()` (which is the runtime "are we packaged" signal); a
   // packaged production build can absolutely run with OMEGA_DEV_UPDATE set for QA.
   //
   // The runtime simulate() latches `_devSimulationSession` for the rest of the process
@@ -401,7 +401,7 @@ const autoUpdater = {
   },
 
   _idleThresholdMs() {
-    return autoUpdater._manager.isTesting() ? IDLE_INSTALL_THRESHOLD_MS_TESTING : IDLE_INSTALL_THRESHOLD_MS;
+    return autoUpdater._omega.isTesting() ? IDLE_INSTALL_THRESHOLD_MS_TESTING : IDLE_INSTALL_THRESHOLD_MS;
   },
 
   _readyToCheck() {
@@ -461,7 +461,7 @@ const autoUpdater = {
     // user can't dismiss programmatically — exactly what we don't want firing
     // during automated runs. Tests that want to assert prompt behavior should
     // override `_promptToInstall` per-test (see auto-updater.test.js).
-    if (autoUpdater._manager.isTesting()) {
+    if (autoUpdater._omega.isTesting()) {
       logger.log(`Test mode: _promptToInstall(${version}) — skipped native dialog.`);
       return;
     }
@@ -470,8 +470,8 @@ const autoUpdater = {
     if (!dialog) return;        // renderer/preload context — no dialog API
 
     const focusedWindow = BrowserWindow.getFocusedWindow();
-    const productName = autoUpdater._manager.config.app?.productName
-      || autoUpdater._manager.config.brand.name;
+    const productName = autoUpdater._omega.config.app?.productName
+      || autoUpdater._omega.config.brand.name;
 
     // showMessageBox CAN reject (e.g. dialog destroyed, no display) — wrap just
     // the call. Synchronous setup above doesn't need a try.
@@ -521,9 +521,9 @@ const autoUpdater = {
   },
 
   _broadcastStatus() {
-    const m = autoUpdater._manager;
-    if (m && m.ipc && typeof m.ipc.broadcast === 'function') {
-      m.ipc.broadcast('desktop:auto-updater:status', autoUpdater.getStatus());
+    const omega = autoUpdater._omega;
+    if (omega && omega.ipc && typeof omega.ipc.broadcast === 'function') {
+      omega.ipc.broadcast('desktop:auto-updater:status', autoUpdater.getStatus());
     }
     autoUpdater._updateMenuItem();
     autoUpdater._updateTrayItem();
@@ -551,36 +551,36 @@ const autoUpdater = {
   // Reflect updater state into the @omega.js/desktop Check-for-Updates item. The item lives under
   // `main/check-for-updates` on macOS (App menu) and `help/check-for-updates` on win/linux —
   // we just patch whichever one exists. Consumer can remove either via
-  // manager.menu.remove('main/check-for-updates') in their integrations/menu/index.js.
+  // omega.menu.remove('main/check-for-updates') in their integrations/menu/index.js.
   _updateMenuItem() {
-    const m = autoUpdater._manager;
+    const omega = autoUpdater._omega;
     const { label, enabled } = autoUpdater._menuItemFieldsForState();
 
     // Patch whichever id-path exists. .update() returns false (and warns) if missing,
     // so try both without doubling up on warnings — silence by checking has() first.
-    if (m.menu.has('main/check-for-updates')) {
-      m.menu.update('main/check-for-updates', { label, enabled });
-    } else if (m.menu.has('help/check-for-updates')) {
-      m.menu.update('help/check-for-updates', { label, enabled });
+    if (omega.menu.has('main/check-for-updates')) {
+      omega.menu.update('main/check-for-updates', { label, enabled });
+    } else if (omega.menu.has('help/check-for-updates')) {
+      omega.menu.update('help/check-for-updates', { label, enabled });
     }
   },
 
   // Reflect updater state into the tray's `check-for-updates` item, if present. Same
   // label/enabled semantics as the menu item — keeps both UIs in lockstep.
   _updateTrayItem() {
-    const m = autoUpdater._manager;
+    const omega = autoUpdater._omega;
     const { label, enabled } = autoUpdater._menuItemFieldsForState();
 
-    if (m.tray.has('check-for-updates')) {
-      m.tray.update('check-for-updates', { label, enabled });
+    if (omega.tray.has('check-for-updates')) {
+      omega.tray.update('check-for-updates', { label, enabled });
     }
   },
 
   // 30-day gate ────────────────────────────────────────────────────────────────────
 
   _reconcilePendingUpdate() {
-    const m = autoUpdater._manager;
-    const pending = m.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+    const omega = autoUpdater._omega;
+    const pending = omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
     if (!pending || !pending.downloadedAt) return;
 
     // A simulated record (written by a build from before the simulator stopped
@@ -590,14 +590,14 @@ const autoUpdater = {
     // force-installs the first REAL download the moment it lands.
     if (pending.version === SIMULATED_VERSION) {
       logger.log(`Discarding simulated pendingUpdate record (v${pending.version}) — the dev simulator never downloaded anything.`);
-      m.storage.set(`${STORAGE_KEY}.pendingUpdate`, null);
+      omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, null);
       return;
     }
 
-    const currentVersion = autoUpdater._manager.getVersion();
+    const currentVersion = autoUpdater._omega.getVersion();
     if (pending.version === currentVersion) {
       logger.log(`Pending update v${pending.version} appears to be applied — clearing flag.`);
-      m.storage.set(`${STORAGE_KEY}.pendingUpdate`, null);
+      omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, null);
       return;
     }
 
@@ -622,10 +622,10 @@ const autoUpdater = {
       return;
     }
 
-    const m = autoUpdater._manager;
-    if (!m || !m.storage) return;
+    const omega = autoUpdater._omega;
+    if (!omega || !omega.storage) return;
 
-    const existing = m.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+    const existing = omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
     // FIRST download wins for the TIMER — but the stored version must track the
     // NEWEST download, or the clear-on-apply check (version === getVersion())
     // never matches after the install and the stale flag force-installs every
@@ -633,13 +633,13 @@ const autoUpdater = {
     if (existing && existing.downloadedAt) {
       logger.log(`pendingUpdate already recorded (v${existing.version} @ ${new Date(existing.downloadedAt).toISOString()}) — keeping existing timestamp.`);
       if (existing.version !== version) {
-        m.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version, downloadedAt: existing.downloadedAt });
+        omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version, downloadedAt: existing.downloadedAt });
       }
       autoUpdater._state.downloadedAt = existing.downloadedAt;
       return;
     }
     const now = Date.now();
-    m.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version, downloadedAt: now });
+    omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version, downloadedAt: now });
     autoUpdater._state.downloadedAt = now;
     logger.log(`Recorded pendingUpdate v${version} @ ${new Date(now).toISOString()}`);
   },

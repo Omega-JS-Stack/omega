@@ -1,10 +1,8 @@
 // applyDefaults(config) — the shared OMEGA defaults-scaffolding engine.
 //
 // Every framework ships a defaults tree (src/defaults/ → dist/defaults/) that
-// setup copies into the consumer project. The copy rules lived as two divergent
-// implementations (BXM's gulp FILE_MAP task — the real one — and EM's plain-fs
-// copyDefaults; UJM carries a third copy of the BXM shape). This is the single
-// plain-fs engine, a normalized superset of both.
+// setup copies into the consumer project. This is the single plain-fs engine
+// every framework's scaffold runs.
 //
 // File-map rules: minimatch patterns (dot:true) matched against the RAW path
 // relative to defaultsDir, last-match-wins option merging. Per-rule options:
@@ -28,7 +26,7 @@
 // Engine built-ins (not expressed in the file map):
 //   - `_.name` segments lose the leading `_` (dotfiles ship past npm's filter)
 //   - non-final segments starting `_` (but not `_.`) are ARCHIVE dirs — skipped
-//     (reference material that ships in the framework package, e.g. EM's `_mas/`)
+//     (reference material that ships in the framework package, e.g. desktop's `_mas/`)
 //   - `.gitkeep` creates the destination directory, the file itself never copies
 //   - `.DS_Store` never copies
 //   - text writes are skipped when the destination is byte-identical (idempotent
@@ -46,7 +44,7 @@ const { minimatch } = require('minimatch');
 const { mergeLineBasedFiles, hasSectionMarkers, getCustomSection } = require('./merge-line-files');
 
 // Files with these extensions copy byte-for-byte and never go through
-// template/merge/transform (matches BXM's binary detection list).
+// template/merge/transform.
 const BINARY_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|svg|ico|woff|woff2|ttf|otf|eot|pdf|zip|tar|gz|mp3|mp4|avi|mov)$/i;
 
 const RULE_DEFAULTS = {
@@ -70,7 +68,7 @@ const RULE_DEFAULTS = {
  * @param {Object<string, object>} [config.fileMap] - minimatch pattern → rule options (see header)
  * @param {string[]} [config.files] - Only process these absolute source paths (watch single-file mode)
  * @param {Function} [config.transform] - `(contents, item) => contents` global hook, run on every
- *   non-binary file after per-rule processing (BXM's site-token templating pass)
+ *   non-binary file after per-rule processing (e.g. extension's site-token templating pass)
  * @param {object} [config.logger] - `{ log, warn, error }` (defaults to console)
  * @returns {{ written: string[], merged: string[], skipped: string[], removed: string[] }} destination-relative paths per outcome
  */
@@ -202,7 +200,7 @@ function applyDefaults(config) {
     let didMerge = false;
 
     // Per-rule template render happens BEFORE merging, so merges compare
-    // rendered framework defaults against the consumer's file (EM semantic).
+    // rendered framework defaults against the consumer's file.
     if (options.template) {
       contents = renderTemplate(contents, options.template);
     }
@@ -309,7 +307,7 @@ function strippedSegments(segments) {
   return segments.map((s) => (s.startsWith('_.') ? s.slice(1) : s));
 }
 
-// Last-match-wins option resolution across the file map (BXM's getFileOptions).
+// Last-match-wins option resolution across the file map.
 function resolveOptions(relativePath, fileMap) {
   let options = { ...RULE_DEFAULTS };
 
@@ -323,7 +321,7 @@ function resolveOptions(relativePath, fileMap) {
   return options;
 }
 
-// Minimal `{{ key.path }}` substitution (EM's tolerant renderer — the standard).
+// Minimal `{{ key.path }}` substitution, tolerant of unknown keys.
 // Unknown keys render as the original `{{ ... }}` string, so non-template content
 // with literal braces (e.g. GitHub Actions `${{ secrets.X }}`) survives.
 function renderTemplate(content, context) {
@@ -334,7 +332,7 @@ function renderTemplate(content, context) {
   });
 }
 
-// JSON5 defaults merge (BXM's mergeConfigs): framework defaults provide shape and
+// JSON5 defaults merge: framework defaults provide shape and
 // order; the consumer's values win unless they're the literal string 'default';
 // consumer-only keys survive at every nesting level, EXCEPT one holding the
 // 'default' sentinel, which is the framework's own unset marker and drops (#926).

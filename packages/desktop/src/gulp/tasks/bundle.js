@@ -15,8 +15,8 @@
 // three entry shapes, the Electron platform/target pair, the externals, the
 // renderer's Node-builtin shim, and the OMEGA_BUILD_JSON bake.
 
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('bundle');
+const build = require('../../build.js');
+const logger = build.logger('bundle');
 const path = require('path');
 const glob = require('glob').globSync;
 const jetpack = require('fs-jetpack');
@@ -29,8 +29,8 @@ const buildJsonKit = require('@omega.js/devkit/build-json');
 const { emptyModulesPlugin } = require('@omega.js/devkit/empty-modules-plugin');
 const electronTargets = require('../../utils/electron-targets.js');
 
-const projectRoot   = Manager.getRootPath('project');
-const frameworkRoot = Manager.getRootPath();
+const projectRoot   = build.getRootPath('project');
+const frameworkRoot = build.getRootPath();
 const outputRoot    = require('../../utils/dist-root.js')(projectRoot);
 
 // The renderer runs with contextIsolation on: a browser-like environment with
@@ -73,7 +73,7 @@ function buildFacts({ pkg, mode, dev }) {
 }
 
 // The wrapper's `mode`, the same three keys on every OMEGA surface (#894).
-// Desktop's own `server` verdict stays inside the Manager, which is the only
+// Desktop's own `server` verdict stays inside the build module, which is the only
 // thing that reads it: an artifact records what it WAS BUILT as.
 function artifactMode(mode) {
   return { environment: mode.environment, build: mode.build, publish: mode.publish };
@@ -118,9 +118,9 @@ function composeClientBuildJson({ config, facts, pkg, mode, license }) {
 }
 
 module.exports = function bundleTask(done) {
-  const mode = Manager.getMode();
+  const mode = build.getMode();
   const isProd = mode.environment === 'production';
-  const config = Manager.getConfig();
+  const config = build.getConfig();
 
   // The renderer's @omega.js/client reads `config.dev` to reach the local
   // stack (N7). A renderer has no env and no filesystem walk of its own, so
@@ -149,7 +149,7 @@ module.exports = function bundleTask(done) {
   // license server (a key that cannot be answered for THROWS, which is what
   // gates a bad-key release); a dev build is keyless by definition and never
   // phones home. The answer is stamped into the build blob below.
-  const projectPackage = Manager.getPackage('project');
+  const projectPackage = build.getPackage('project');
   resolveLicenseStamp({ config, production: isProd })
     .then((license) => {
       // OMEGA_BUILD_JSON: frozen at build time. The NODE pair reads it as a
@@ -203,9 +203,9 @@ async function runBundles(buildJson, isProd) {
 
   // esbuild rejects with every error already formatted, so a failed build
   // surfaces through gulp's own callback rather than a hand-rolled reporter.
-  const results = await Promise.all(builds.map(async (build) => ({
-    name: build.name,
-    result: await bundle(build.options),
+  const results = await Promise.all(builds.map(async (entry) => ({
+    name: entry.name,
+    result: await bundle(entry.options),
   })));
 
   // The metafile is what the wrapper turns on for exactly this: what each
@@ -225,7 +225,7 @@ async function runBundles(buildJson, isProd) {
 // version they must compile for.
 function resolveTargets() {
   try {
-    return electronTargets(Manager.require('electron'), { logger });
+    return electronTargets(require('electron'), { logger });
   } catch (e) {
     logger.warn(`Could not resolve electron (${e.message}) — bundles compile with no syntax floor.`);
     return { node: null, chrome: null, electron: null };
@@ -300,13 +300,13 @@ const BAKED_SOURCE_KEYS = bakeSourceKeys('desktop');
  * @param {object} config - The target's resolved omega.json5 config.
  * @param {object} env - The build env.
  * @param {object} [options]
- * @param {object} [options.mode] - The Manager's mode (`{ build, publish, … }`).
+ * @param {object} [options.mode] - The build module's mode (`{ build, publish, … }`).
  * @param {object} [options.logger] - Logger with `warn` (default: this task's).
  * @throws {Error} in build/publish mode, naming every brand-level key and the config path that requires it.
  */
 function assertBakeRules(config, env, options) {
   options = options || {};
-  const mode = options.mode || Manager.getMode();
+  const mode = options.mode || build.getMode();
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
   const violations = checkEnvRules(config, env, { target: 'desktop' })
@@ -469,7 +469,7 @@ function rendererBundle(shared) {
       format: 'iife',
       target: shared.targets.chrome,
       dev: shared.dev,
-      // Vendored core assets (#111) — mirrors the alias BXM/UJM use, so
+      // Vendored core assets (#111) — the same alias extension and web use, so
       // renderer code imports shared core modules by a stable name:
       //   import appShell from '__main_assets__/js/core/app-shell.js';
       alias: {
@@ -504,7 +504,7 @@ function nativeExternals() {
     'sqlite3',
   ];
 
-  const consumerPkg = Manager.getPackage('project');
+  const consumerPkg = build.getPackage('project');
   const declared = Object.assign({}, consumerPkg.dependencies || {}, consumerPkg.devDependencies || {});
 
   return Object.keys(declared).filter((name) => NATIVE.includes(name));

@@ -1,5 +1,5 @@
 /**
- * Test: Manager.storage()
+ * Test: omega.storage()
  * Unit tests for the lowdb-backed local JSON storage wrapper
  *
  * Run: npx omega test helpers/storage
@@ -17,7 +17,7 @@ const jetpack = require('fs-jetpack');
 const os = require('os');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// Create a minimal Manager mock with storage()
+// Create a minimal omega mock with storage()
 const STORAGE_DIR = path.join(os.tmpdir(), `backend-storage-test-${Date.now()}`);
 
 function createStorage(name) {
@@ -46,7 +46,7 @@ function createStorage(name) {
 }
 
 module.exports = defineCases({
-  description: 'Manager.storage()',
+  description: 'omega.storage()',
   type: 'group',
 
   tests: [

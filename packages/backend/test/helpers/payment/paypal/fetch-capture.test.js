@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/fetch-capture
  */
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 
 const FIXTURE_CAPTURE = require('../../../fixtures/paypal/capture-completed.json');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');

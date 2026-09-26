@@ -52,11 +52,11 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'buildPageVars produces brand/app/page/theme/cacheBust from a manager-like object',
+      name: 'buildPageVars produces brand/app/page/theme/cacheBust from an omega-like object',
       run: (ctx) => {
         const t = require(path.join(__dirname, '..', '..', '..', 'lib', 'templating.js'));
-        const fakeManager = { config: { brand: { name: 'MyApp', id: 'myapp' }, app: { productName: 'MyApp' } } };
-        const vars = t.buildPageVars('settings', { cacheBust: '12345' }, fakeManager);
+        const fakeOmega = { config: { brand: { name: 'MyApp', id: 'myapp' }, app: { productName: 'MyApp' } } };
+        const vars = t.buildPageVars('settings', { cacheBust: '12345' }, fakeOmega);
         ctx.expect(vars.page.name).toBe('settings');
         ctx.expect(vars.page.title).toBe('MyApp');
         ctx.expect(vars.brand.id).toBe('myapp');

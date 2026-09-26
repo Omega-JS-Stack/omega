@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', '..', 'core');
 const PAGE_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'payment', 'checkout', 'index.js');
@@ -39,7 +40,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -76,7 +77,7 @@ const SUBSCRIPTION = {
 /** The FormManager surface the page drives, with its gate + listener traffic recorded. */
 function makeFormManager(record) {
   return class StubFormManager {
-    constructor(selector, options) {
+    constructor(omega, selector, options) {
       record.options = options;
       record.gates = [];
       record.resolved = [];
@@ -146,20 +147,23 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
     getElementById: () => null,
   };
 
+  // The signed-in buyer: the one User the listener delivers and the page reads
+  const buyer = new User({}, { uid: 'u1', email: 'buyer@brand.test' });
+
   globalThis.__omegaClient = {
     config: { payment: { providers: { stripe: { publishableKey: 'pk_test_123' } }, products: [product] } },
     isDevelopment: () => false,
     getApiUrl: () => 'https://api.test',
-    dom: () => ({ ready: async () => {} }),
-    bindings: () => ({ update: (data) => updates.push(data) }),
+    dom: { ready: async () => {} },
+    bindings: { update: (data) => updates.push(data) },
     // Auth never settles on its own here: only the listener the page registers
     // decides when, and the page must have painted long before that.
-    auth: () => ({
-      listen: (options, callback) => setTimeout(() => callback({ user: null, account: null }), 0),
-      getUser: () => ({ uid: 'u1', email: 'buyer@brand.test' }),
-    }),
-    storage: () => ({ get: (key, fallback) => fallback, set: () => {}, remove: () => {} }),
-    firestore: () => ({ doc: () => ({ set: async () => {} }) }),
+    auth: {
+      user: buyer,
+      listen: (options, callback) => setTimeout(() => callback({ user: buyer, denied: false }), 0),
+    },
+    storage: { get: (key, fallback) => fallback, set: () => {}, remove: () => {} },
+    firestore: { doc: () => ({ set: async () => {} }) },
     request: async (url, options = {}) => {
       requests.push({ url, options });
 

@@ -3,10 +3,9 @@ const jetpack = require('fs-jetpack');
 const _ = require('lodash');
 
 // The expected source pattern for omega_api hosting rewrite
-// Includes /omega/* routes, the legacy /backend-manager/* alias (kept so
-// migrating brands’ in-the-wild clients keep working), and root-level MCP
-// OAuth paths that Claude Chat sends directly (e.g. /authorize, /token, /.well-known/*)
-const OMEGA_API_SOURCE = '{/omega,/omega/**,/backend-manager,/backend-manager/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}';
+// Includes /omega/* routes and the root-level MCP OAuth paths that Claude Chat
+// sends directly (e.g. /authorize, /token, /.well-known/*)
+const OMEGA_API_SOURCE = '{/omega,/omega/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}';
 
 class HostingRewritesTest extends BaseTest {
   getName() {

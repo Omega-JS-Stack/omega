@@ -20,13 +20,13 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { loadConfig } = require('./_shared-config.js');
-const Utilities = require('../../dist/manager/helpers/utilities.js');
+const Utilities = require('../../dist/omega/services/utilities.js');
 
 /**
  * A real brand config on disk, composed through the real backend loader.
  *
  * @param {object} targets - The `targets` map, e.g. `{ web: { type: 'web' }, backend: { type: 'backend' } }`.
- * @returns {object} The composed config a route receives as `Manager.config`.
+ * @returns {object} The composed config a route receives as `omega.config`.
  */
 function brandConfig(targets) {
   const root = jetpack.tmpDir({ prefix: 'cms-target-' }).path();
@@ -45,43 +45,42 @@ function brandConfig(targets) {
 }
 
 /**
- * The Manager surface the CMS routes actually touch: the composed config, the
+ * The omega surface the CMS routes actually touch: the composed config, the
  * module resolver, and Utilities (the real one, because slugify decides a
  * post's filename).
  *
  * @param {object} config - A brandConfig() result.
- * @param {object} [overrides] - Extra Manager members (e.g. a `require` that answers `wonderful-fetch`).
- * @returns {object} The Manager double.
+ * @param {object} [overrides] - Extra omega members (e.g. a `require` that answers `wonderful-fetch`).
+ * @returns {object} The omega double.
  */
-function fakeManager(config, overrides) {
-  const Manager = {
+function fakeOmega(config, overrides) {
+  const omega = {
     config: config,
     require: (name) => require(name),
     getApiUrl: () => 'https://example.com/api',
     ...overrides,
   };
 
-  const utilities = new Utilities(Manager);
-  Manager.Utilities = () => utilities;
+  omega.utilities = new Utilities(omega);
 
-  return Manager;
+  return omega;
 }
 
 /**
  * The route context double: `respond()` is the sink the handler writes its
  * answer to, and the rest is the ctx surface the CMS routes read.
  *
- * @param {object} Manager - A fakeManager() result.
+ * @param {object} omega - A fakeOmega() result.
  * @param {object} [options] - `{ now }` the request's start timestamp.
  * @returns {object} The ctx, carrying `sent` = `{ code, body }`.
  */
-function recordingCtx(Manager, options) {
+function recordingCtx(omega, options) {
   const settings = options || {};
   const sent = { code: null, body: null };
 
   return {
     sent: sent,
-    Manager: Manager,
+    omega: omega,
     tmpdir: jetpack.tmpDir({ prefix: 'cms-target-tmp-' }).path(),
     meta: { startTime: { timestamp: settings.now || new Date().toISOString() } },
     request: { data: settings.data || {} },
@@ -224,7 +223,7 @@ const ADMIN_USER = { authenticated: true, roles: { admin: true, blogger: false }
 module.exports = {
   ADMIN_USER,
   brandConfig,
-  fakeManager,
+  fakeOmega,
   recordingCtx,
   jsonResponse,
   githubDouble,

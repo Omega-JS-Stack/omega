@@ -33,15 +33,15 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 const { FieldValue } = require('firebase-admin/firestore');
 
-const postRoute = require('../../../dist/manager/routes/user/connections/post.js');
+const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
 const {
   acquireRefreshLease,
   clearRefreshLease,
   awaitRefreshedToken,
   INSTANCE_ID,
   LEASE_TTL_SECONDS,
-} = require('../../../dist/manager/routes/user/connections/_lease.js');
-const { REFRESH_TIMEOUT_MS } = require('../../../dist/manager/routes/user/connections/_grant.js');
+} = require('../../../dist/omega/routes/user/connections/_lease.js');
+const { REFRESH_TIMEOUT_MS } = require('../../../dist/omega/routes/user/connections/_grant.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDER_ID = 'lease-fixture-783';
@@ -210,18 +210,18 @@ function lane({ docs, provider, onRead } = {}) {
 
   const store = leaseFirestore(docs || {}, onRead);
 
-  const Manager = {
+  const omega = {
     cwd,
-    libraries: { admin: store.admin },
+    firebase: { admin: store.admin },
     project: { websiteUrl: 'https://brand.test' },
     config: {},
-    Metadata: () => ({ set: () => ({}) }),
   };
 
   const responses = [];
 
   const ctx = {
-    Manager,
+    omega,
+    metadata: () => ({}),
     log() {},
     respond: (message, options) => {
       responses.push({ message, options: options || {} });
@@ -230,7 +230,7 @@ function lane({ docs, provider, onRead } = {}) {
     meta: { startTime: { timestamp: 'now', timestampUNIX: Math.floor(Date.now() / 1000) } },
   };
 
-  return { ...store, ctx, Manager, responses };
+  return { ...store, ctx, omega, responses };
 }
 
 /** The caller's own record IS what the self path reads (it only goes to Firestore for another uid). */
@@ -276,7 +276,7 @@ module.exports = defineCases({
 
         // The relationship is enforced at LOAD, not just here: the module refuses
         // to boot rather than run with a lease that can expire under a refresh
-        const source = jetpack.read(path.join(__dirname, '../../../dist/manager/routes/user/connections/_lease.js'));
+        const source = jetpack.read(path.join(__dirname, '../../../dist/omega/routes/user/connections/_lease.js'));
 
         assert.match(source, /LEASE_TTL_SECONDS \* 1000 <= REFRESH_TIMEOUT_MS/, 'the guard reads the one home of the timeout, so the two cannot drift');
         assert.match(source, /throw new Error/, 'and it throws — a programmer error, not a warning');
@@ -402,7 +402,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);
@@ -448,7 +448,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         assert.equal(answered(responses).options.code, undefined, 'the refresh succeeded');
@@ -472,7 +472,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);
@@ -498,7 +498,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);
@@ -542,7 +542,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);
@@ -581,7 +581,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);
@@ -613,13 +613,13 @@ module.exports = defineCases({
           return {
             responses,
             ctx: {
-              Manager: {
+              omega: {
                 cwd,
-                libraries: { admin: store.admin },
+                firebase: { admin: store.admin },
                 project: { websiteUrl: 'https://brand.test' },
                 config: {},
-                Metadata: () => ({ set: () => ({}) }),
               },
+              metadata: () => ({}),
               log() {},
               respond: (message, options) => {
                 responses.push({ message, options: options || {} });
@@ -633,7 +633,7 @@ module.exports = defineCases({
         const call = (caller) => postRoute({
           ctx: caller.ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const first = call(callers[0]);
@@ -680,7 +680,7 @@ module.exports = defineCases({
         await postRoute({
           ctx,
           user: userWithConnection(),
-          settings: { provider: PROVIDER_ID, action: 'refresh' },
+          data: { provider: PROVIDER_ID, action: 'refresh' },
         });
 
         const response = answered(responses);

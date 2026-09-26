@@ -7,7 +7,7 @@
 const { Octokit } = require('@octokit/rest');
 const sharp = require('sharp');
 
-const { IMAGE_MAX_DIMENSION } = require('../../../dist/manager/routes/admin/post/post');
+const { IMAGE_MAX_DIMENSION } = require('../../../dist/omega/routes/admin/post/post');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({
@@ -24,7 +24,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           url: 'test-post',
           description: 'Test description',
           headerImageURL: 'https://example.com/image.jpg',
@@ -41,7 +41,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           description: 'Test description',
           headerImageURL: 'https://example.com/image.jpg',
@@ -58,7 +58,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
           headerImageURL: 'https://example.com/image.jpg',
@@ -75,7 +75,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
           description: 'Test description',
@@ -92,7 +92,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
           description: 'Test description',
@@ -136,7 +136,7 @@ module.exports = defineCases({
         // verify the resize step runs end-to-end and the committed file is clamped.
         const headerImageURL = 'https://picsum.photos/id/1/5000/3000.jpg';
 
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: '@omega.js/backend Test Create Post',
           url: 'backend-test-create-post',
           description: 'Test post created by @omega.js/backend test suite to verify @post/ body rewriting.',
@@ -246,7 +246,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
           description: 'Test description',
@@ -264,7 +264,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/post', {
+        const response = await http.post('omega/admin/post', {
           title: 'Test Post',
           url: 'test-post',
           description: 'Test description',

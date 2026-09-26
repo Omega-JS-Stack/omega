@@ -13,7 +13,7 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/resolve-plan-id
  */
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const PRODUCT = { id: 'premium', name: 'Premium', type: 'subscription', trial: { days: 7 }, prices: { monthly: 20 }, paypal: { productId: 'PROD-TEST' } };

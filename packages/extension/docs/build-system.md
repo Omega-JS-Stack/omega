@@ -102,7 +102,7 @@ A key nothing answers is left INTACT rather than emptied, so unrelated `%%%` tex
 
 ### Dev-only blocks
 
-Production bundles drop everything between `/* @dev-only:start */` and `/* @dev-only:end */`. The markers and the cut live in ONE home (`@omega.js/devkit/strip-dev-blocks`) and the wrapper registers the esbuild plugin for production builds only; dev builds keep the blocks. "Production" here is `Manager.actLikeProduction()`, so an `OMEGA_AUDIT_FORCE=true` audit run strips too — it inspects the artifact a release would ship.
+Production bundles drop everything between `/* @dev-only:start */` and `/* @dev-only:end */`. The markers and the cut live in ONE home (`@omega.js/devkit/strip-dev-blocks`) and the wrapper registers the esbuild plugin for production builds only; dev builds keep the blocks. "Production" here is `build.actLikeProduction()`, so an `OMEGA_AUDIT_FORCE=true` audit run strips too: it inspects the artifact a release would ship.
 
 ### Aliases
 
@@ -152,7 +152,7 @@ Env vars that drive the pipeline:
 - `OMEGA_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
 - `OMEGA_IS_PUBLISH=true` — also publish to extension stores after packaging
 - `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
-- `OMEGA_TEST_MODE=true` — running in @omega.js/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
+- `OMEGA_TEST_MODE=true`: running in @omega.js/extension's test framework. Powers `omega.isTesting()` in the test harness (see [test-framework.md](test-framework.md)).
 - `OMEGA_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
 
 ## Live reload

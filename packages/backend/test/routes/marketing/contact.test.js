@@ -25,7 +25,7 @@
 // mailbox there is the safest pick.
 
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
-const { MARKETING_RATE_LIMIT } = require('../../../dist/manager/libraries/rate-limits.js');
+const { MARKETING_RATE_LIMIT } = require('../../../dist/omega/libraries/rate-limits.js');
 const TEST_DOMAIN = 'itwcreativeworks.com';
 const TEST_EMAILS = {
   valid: () => `sarah.martinez+bem@${TEST_DOMAIN}`,         // Should infer: Sarah Martinez
@@ -48,7 +48,7 @@ module.exports = defineCases({
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
 
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: testEmail,
           source: 'backend-test',
           // skipValidation bypasses the mailbox verification check — the test email
@@ -98,7 +98,7 @@ module.exports = defineCases({
 
         console.log(`Cleaning up test contact: ${state.testEmail}`);
 
-        const result = await http.delete('backend-manager/marketing/contact', {
+        const result = await http.delete('omega/marketing/contact', {
           email: state.testEmail,
         });
         console.log('Cleanup result:', result.data);
@@ -112,7 +112,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: 'not-a-valid-email',
           source: 'backend-test',
         });
@@ -128,7 +128,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           firstName: 'Test',
           source: 'backend-test',
         });
@@ -144,7 +144,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: 'test@mailinator.com',
           source: 'backend-test',
         });
@@ -165,7 +165,7 @@ module.exports = defineCases({
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
 
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: testEmail,
           source: 'backend-test',
           // No firstName/lastName - should be inferred
@@ -197,7 +197,7 @@ module.exports = defineCases({
           return;
         }
 
-        await http.delete('backend-manager/marketing/contact', { email: state.testEmail });
+        await http.delete('omega/marketing/contact', { email: state.testEmail });
       },
     },
 
@@ -212,7 +212,7 @@ module.exports = defineCases({
         const testEmail = 'rachel.greene+bem@mailinator.com';
         state.testEmail = testEmail;
 
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: testEmail,
           source: 'backend-test',
           skipValidation: true,
@@ -232,7 +232,7 @@ module.exports = defineCases({
           return;
         }
 
-        await http.delete('backend-manager/marketing/contact', { email: state.testEmail });
+        await http.delete('omega/marketing/contact', { email: state.testEmail });
       },
     },
 
@@ -249,7 +249,7 @@ module.exports = defineCases({
         const testEmail = TEST_EMAILS.valid();
         state.testEmail = testEmail;
 
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: testEmail,
           source: 'backend-test',
         });
@@ -303,7 +303,7 @@ module.exports = defineCases({
           return;
         }
 
-        await http.delete('backend-manager/marketing/contact', { email: state.testEmail });
+        await http.delete('omega/marketing/contact', { email: state.testEmail });
       },
     },
 
@@ -321,7 +321,7 @@ module.exports = defineCases({
         // Must NOT trip earlier checks (localPart blocklist, disposable, corporate).
         const testEmail = TEST_EMAILS.invalid();
 
-        const response = await http.post('backend-manager/marketing/contact', {
+        const response = await http.post('omega/marketing/contact', {
           email: testEmail,
           source: 'backend-test',
         });
@@ -374,7 +374,7 @@ module.exports = defineCases({
         // bad token is a 403 before the gate is ever reached. The emulator
         // bypasses reCAPTCHA (OMEGA_TEST_MODE=true), which is what leaves the
         // rate limit as the visible protection here.
-        const send = () => http.post('backend-manager/marketing/contact', {
+        const send = () => http.post('omega/marketing/contact', {
           email: TEST_EMAILS.valid(),
           source: 'backend-test',
         });
@@ -405,7 +405,7 @@ module.exports = defineCases({
         // Clean up the rachel.greene+bem test contact from marketing providers
         const testEmail = TEST_EMAILS.valid();
 
-        const response = await http.delete('backend-manager/marketing/contact', {
+        const response = await http.delete('omega/marketing/contact', {
           email: testEmail,
         });
 

@@ -23,7 +23,7 @@
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/omega/routes/payments/intent/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
@@ -94,19 +94,19 @@ module.exports = defineCases({
 
     {
       name: 'resubscribe-through-a-declining-checkout',
-      async run({ assert, Manager, state }) {
-        const user = buildUser(Manager, {
+      async run({ assert, omega, state }) {
+        const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: {
+          data: {
             provider: 'test',
             productId: state.productId,
             frequency: state.frequency,

@@ -10,7 +10,7 @@
  * shape, and a provider needing PKCE (Kick's OAuth 2.1) could not be connected
  * at all. What this pins is the extension points:
  *
- *   1. a BRAND file (`${Manager.cwd}/connections/<name>.js`) wins over the package's
+ *   1. a BRAND file (`${omega.cwd}/connections/<name>.js`) wins over the package's
  *      own, and an unknown name is still the same 400;
  *   2. `pkce: 'S256'` is a DECLARATION — the verifier/challenge pair is the
  *      RFC 7636 one, the authorize URL carries the challenge and the exchange
@@ -49,18 +49,18 @@ require.cache[originalFetchPath] = {
   },
 };
 
-const postRoute = require('../../../dist/manager/routes/user/connections/post.js');
-const deleteRoute = require('../../../dist/manager/routes/user/connections/delete.js');
-const twitch = require('../../../dist/manager/routes/user/connections/providers/twitch.js');
-const kick = require('../../../dist/manager/routes/user/connections/providers/kick.js');
-const spotify = require('../../../dist/manager/routes/user/connections/providers/spotify.js');
+const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
+const deleteRoute = require('../../../dist/omega/routes/user/connections/delete.js');
+const twitch = require('../../../dist/omega/routes/user/connections/providers/twitch.js');
+const kick = require('../../../dist/omega/routes/user/connections/providers/kick.js');
+const spotify = require('../../../dist/omega/routes/user/connections/providers/spotify.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const {
   generatePkcePair,
   pkceChallenge,
   encryptState,
-} = require('../../../dist/manager/routes/user/connections/_state.js');
+} = require('../../../dist/omega/routes/user/connections/_state.js');
 const {
   defaultAuthorize,
   defaultExchange,
@@ -68,8 +68,8 @@ const {
   defaultRevoke,
   runStep,
   REVOKE_UNSUPPORTED,
-} = require('../../../dist/manager/routes/user/connections/_grant.js');
-const { loadProvider } = require('../../../dist/manager/routes/user/connections/_providers.js');
+} = require('../../../dist/omega/routes/user/connections/_grant.js');
+const { loadProvider } = require('../../../dist/omega/routes/user/connections/_providers.js');
 
 function restoreFetch() {
   if (originalFetchCacheEntry) {
@@ -113,7 +113,7 @@ function stepContext(provider, extra) {
   const context = {
     provider,
     providerName: provider.provider,
-    Manager: null,
+    omega: null,
     ctx: { log() {} },
     uid: 'user-793',
     clientId: 'client-id-771',
@@ -324,7 +324,7 @@ module.exports = defineCases({
       name: 'the-delete-removes-the-record-even-when-the-revoke-cannot-run',
 
       async run({ assert }) {
-        const Manager = brandDir({
+        const omega = brandDir({
           'unrevokable-793': [
             'module.exports = {',
             "  provider: 'unrevokable-793',",
@@ -337,17 +337,17 @@ module.exports = defineCases({
 
         const { admin, writes } = recordingFirestore(null);
 
-        Object.assign(Manager, {
-          libraries: { admin },
+        Object.assign(omega, {
+          firebase: { admin },
           project: { websiteUrl: 'https://brand.test' },
           config: { brand: { name: 'Test Brand' } },
-          Metadata: () => ({ set: () => ({}) }),
         });
 
         const logged = [];
         const responses = [];
         const ctx = {
-          Manager,
+          omega,
+          metadata: () => ({}),
           log: (...args) => logged.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')),
           respond: (message, options) => {
             responses.push({ message, options: options || {} });
@@ -363,7 +363,7 @@ module.exports = defineCases({
             roles: { admin: false },
             connections: { 'unrevokable-793': { token: { access_token: 'access-793' } } },
           },
-          settings: { provider: 'unrevokable-793' },
+          data: { provider: 'unrevokable-793' },
         });
 
         assert.equal(responses[0].message.success, true, 'the disconnect succeeds');
@@ -384,13 +384,13 @@ module.exports = defineCases({
       name: 'a-public-client-sends-no-client_secret-key-at-all',
 
       async run({ assert }) {
-        const Manager = brandDir({
+        const omega = brandDir({
           'public-fixture-785': "module.exports = { provider: 'public-fixture-785', name: 'Public Fixture', urls: { authorize: 'https://brand.test/a', token: 'https://brand.test/t' }, async identity() { return { id: 'x' }; } };",
         });
 
         // The credentials as the LANE resolves them for a provider whose
         // CONNECTIONS_<PROVIDER>_CLIENT_SECRET is not in the brand's .env
-        const resolved = loadProvider('public-fixture-785', Manager);
+        const resolved = loadProvider('public-fixture-785', omega);
 
         assert.equal(resolved.clientSecret, undefined, 'an unset CONNECTIONS_<PROVIDER>_CLIENT_SECRET resolves to nothing');
 
@@ -533,16 +533,16 @@ module.exports = defineCases({
       async run({ assert }) {
         const shape = "urls: { authorize: 'https://brand.test/a', token: 'https://brand.test/t' }, async identity() { return { id: 'x' }; }";
 
-        const Manager = brandDir({
+        const omega = brandDir({
           google: `module.exports = { provider: 'google', name: 'Brand Google', ${shape} };`,
           'house-provider': `module.exports = { provider: 'house-provider', name: 'House', ${shape} };`,
         });
 
-        const shadowed = loadProvider('google', Manager);
+        const shadowed = loadProvider('google', omega);
 
         assert.equal(shadowed.connectionProvider.name, 'Brand Google', "the brand's own file wins for a name the package also ships");
 
-        const brandOnly = loadProvider('house-provider', Manager);
+        const brandOnly = loadProvider('house-provider', omega);
 
         assert.equal(brandOnly.connectionProvider.name, 'House', 'a provider only the brand has loads');
 
@@ -552,7 +552,7 @@ module.exports = defineCases({
 
         const noBrand = loadProvider('discord', null);
 
-        assert.equal(noBrand.connectionProvider.provider, 'discord', 'and a caller with no Manager reads the package dir alone');
+        assert.equal(noBrand.connectionProvider.provider, 'discord', 'and a caller with no omega reads the package dir alone');
       },
     },
 
@@ -560,14 +560,14 @@ module.exports = defineCases({
       name: 'an-unknown-provider-is-still-the-same-400',
 
       async run({ assert }) {
-        const Manager = brandDir({});
+        const omega = brandDir({});
 
-        const unknown = loadProvider('not-a-provider', Manager);
+        const unknown = loadProvider('not-a-provider', omega);
 
         assert.equal(unknown.error.code, 400, 'the code the route answers');
         assert.equal(unknown.error.message, 'Unknown connection provider: not-a-provider', 'and the message it has always answered');
 
-        const traversal = loadProvider('../../../../etc/passwd', Manager);
+        const traversal = loadProvider('../../../../etc/passwd', omega);
 
         assert.equal(traversal.error.code, 400, 'a name that could escape the directory is just unknown');
       },
@@ -579,7 +579,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const identity = "async identity() { return { id: 'x' }; }";
 
-        const Manager = brandDir({
+        const omega = brandDir({
           'no-authorize': `module.exports = { provider: 'no-authorize', urls: { token: 'https://brand.test/t' }, ${identity} };`,
           'no-token': `module.exports = { provider: 'no-token', urls: { authorize: 'https://brand.test/a' }, ${identity} };`,
           'no-identity': "module.exports = { provider: 'no-identity', urls: { authorize: 'https://brand.test/a', token: 'https://brand.test/t' } };",
@@ -597,7 +597,7 @@ module.exports = defineCases({
           let thrown = null;
 
           try {
-            loadProvider(name, Manager);
+            loadProvider(name, omega);
           } catch (e) {
             thrown = e;
           }
@@ -605,7 +605,7 @@ module.exports = defineCases({
           assert.ok(thrown, `${name} is a broken provider, not an unknown one — it throws`);
           assert.equal(thrown.message.includes(`${name}.js`), true, `the message names the file: ${thrown.message}`);
           assert.equal(thrown.message.includes(missing), true, `and the missing field: ${thrown.message}`);
-          assert.equal(thrown.message.includes(Manager.cwd), false, `never the deployed path, which is not a caller's to see: ${thrown.message}`);
+          assert.equal(thrown.message.includes(omega.cwd), false, `never the deployed path, which is not a caller's to see: ${thrown.message}`);
         }
       },
     },
@@ -620,7 +620,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const uid = 'user-771';
         const providerName = 'failing-exchange';
-        const Manager = brandDir({
+        const omega = brandDir({
           [providerName]: [
             'module.exports = {',
             `  provider: '${providerName}',`,
@@ -637,16 +637,16 @@ module.exports = defineCases({
           connections: { [providerName]: { csrf: 'csrf-771', verifier: 'verifier-771', createdAt: Date.now() } },
         });
 
-        Object.assign(Manager, {
-          libraries: { admin },
+        Object.assign(omega, {
+          firebase: { admin },
           project: { websiteUrl: 'https://brand.test' },
           config: { brand: { name: 'Test Brand' } },
-          Metadata: () => ({ set: () => ({}) }),
         });
 
         const responses = [];
         const ctx = {
-          Manager,
+          omega,
+          metadata: () => ({}),
           log() {},
           respond: (message, options) => {
             responses.push({ message, options });
@@ -657,7 +657,7 @@ module.exports = defineCases({
 
         const encryptedState = encryptState({ provider: providerName, uid, csrf: 'csrf-771', ts: Date.now() });
 
-        await postRoute({ ctx, user: {}, settings: { action: 'tokenize', code: 'auth-code-771', encryptedState } });
+        await postRoute({ ctx, user: {}, data: { action: 'tokenize', code: 'auth-code-771', encryptedState } });
 
         assert.equal(responses[0].options.code, 500, 'the exchange failure is still reported');
         assert.equal(responses[0].message.includes('Token exchange failed'), true, `with its own message: ${responses[0].message}`);

@@ -5,8 +5,8 @@
  * /{lang}/... copies with localized <html lang|dir>, canonical/og tags,
  * rewritten internal links, and hreflang alternates stitched into both the
  * copies and the originals (only the languages actually produced — hreflang
- * never lies; a provider failure skips its page-language pair whole rather
- * than shipping a mixed-language copy). No GitHub-branch cache, no separate
+ * never lies; a pair with no translation, cold or failed, ships the source
+ * page unadvertised at its path rather than a mixed-language copy). No GitHub-branch cache, no separate
  * credentials: the cache is part of the repo, and the default claude provider
  * rides the local Claude Code install.
  *
@@ -240,10 +240,14 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  * @param {string} options.baseUrl - site origin (carries the base path when mounted)
  * @param {Function} options.isExcluded - route exclusion test
  * @param {string} options.pathPrefix - the base path the site is served under
+ * @param {string} [options.textLang] - the language the copy's TEXT is in
+ *   (default: lang); an untranslated copy passes the source language, so its
+ *   <html lang|dir> and og:locale name the text a reader actually gets (#953)
  * @returns {object} cheerio root, ready for alternates + write
  */
 function renderCopy(options) {
   const { sourceHtml, translated, lang, route, baseUrl, isExcluded, pathPrefix } = options;
+  const textLang = options.textLang || lang;
   const $ = cheerio.load(sourceHtml);
 
   collectTextNodes($).forEach((n, i) => {
@@ -263,11 +267,17 @@ function renderCopy(options) {
 
   // Localize the document chrome
   const pageUrl = `${baseUrl}/${lang}${route ? `/${route}` : ''}`;
-  $('html').attr('lang', lang);
-  $('html').attr('dir', isRTL(lang) ? 'rtl' : 'ltr');
-  $('link[rel="canonical"]').attr('href', pageUrl);
-  $('meta[property="og:url"]').attr('content', pageUrl);
-  $('meta[property="og:locale"]').attr('content', ogLocale(lang));
+  $('html').attr('lang', textLang);
+  $('html').attr('dir', isRTL(textLang) ? 'rtl' : 'ltr');
+  $('meta[property="og:locale"]').attr('content', ogLocale(textLang));
+
+  // An untranslated copy duplicates the source page, so its canonical and
+  // og:url stay the source's (as the page wrote them); only a translated
+  // copy is its own canonical page
+  if (textLang === lang) {
+    $('link[rel="canonical"]').attr('href', pageUrl);
+    $('meta[property="og:url"]').attr('content', pageUrl);
+  }
 
   rewriteLinks($, lang, baseUrl, isExcluded, pathPrefix);
 
@@ -390,14 +400,14 @@ function translateDefaultPages(options) {
  * @param {object} [options.logger] - devkit logger (silent when omitted)
  * @param {Function} [options.send] - provider send override (tests)
  * @param {string} [options.only] - translate only the page whose route/relPath matches
- * @param {boolean} [options.cachedOnly] - never call the provider: pages with
- *   any cold (uncached) string are skipped whole (listed in stats.skippedCold)
- *   instead of shipping mixed-language copies — `omega build` runs this way;
- *   explicit `omega translate` owns live-LLM translation (friction #24)
+ * @param {boolean} [options.cachedOnly] - never call the provider: a page
+ *   with any cold (uncached) string ships its copy UNTRANSLATED, unadvertised
+ *   (listed in stats.skippedCold), instead of a mixed-language one; `omega build`
+ *   runs this way, explicit `omega translate` owns live-LLM translation (friction #24)
  * @param {string} [options.packagedRoot] - the default-page translations
  *   packaged with @omega.js/web (#621); default: the ones in this install
  * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings,
- *   cachedStrings, failures (page-language pairs skipped whole), usage,
+ *   cachedStrings, failures (page-language pairs shipped untranslated), usage,
  *   skippedCold, defaultPages, packagedStrings, packagedMisses }
  */
 async function translateSite(options) {
@@ -471,6 +481,17 @@ async function translateSite(options) {
     const producedLangs = [];
     const copies = [];
 
+    // A pair with no translation still lands the SOURCE page at its path
+    // (#953): every produced copy of another page links there, so a missing
+    // file is a dead link. It is untranslated, so it is never advertised: it
+    // joins neither producedLangs (hreflang) nor translatedRoutes (sitemap).
+    // `translated: []` leaves every node untouched (the collector normalizes
+    // whitespace, so writing `strings` back would reflow the source)
+    const writeUntranslated = (lang) => {
+      const $ = renderCopy({ sourceHtml, translated: [], lang, textLang: settings.default, route, baseUrl, isExcluded, pathPrefix });
+      jetpack.write(path.join(outDir, copyTargetRel(relPath, lang)), $.html());
+    };
+
     for (const lang of settings.languages) {
       done++;
       const logTag = `[${done}/${total}] [${lang}] /${route}`;
@@ -490,12 +511,12 @@ async function translateSite(options) {
         }
       });
 
-      // Cold strings under cachedOnly: skip the whole page-language pair —
-      // a partially translated page is worse than none, and hreflang stays
-      // honest because only produced copies get alternates
+      // Cold strings under cachedOnly: no translated copy for this pair, since
+      // a partially translated page is worse than an untranslated one
       if (options.cachedOnly && missIndices.length) {
         stats.skippedCold.push(`${lang} /${route}`);
-        logger.log(`⊘ ${logTag} — ${missIndices.length} cold string(s), skipped`);
+        logger.log(`⊘ ${logTag}: ${missIndices.length} cold string(s), shipped untranslated`);
+        writeUntranslated(lang);
         continue;
       }
 
@@ -520,11 +541,12 @@ async function translateSite(options) {
           stats.usage.output += usage.output;
           logger.log(`✓ ${logTag} — ${missIndices.length} new + ${strings.length - missIndices.length} cached`);
         } catch (e) {
-          // Skip the whole page-language pair, exactly like a cold cache
-          // under cachedOnly: a half-translated copy is worse than none, and
-          // it would ship silently behind full language chrome
+          // Ship the pair untranslated, exactly like a cold cache under
+          // cachedOnly: a half-translated copy would ship silently behind full
+          // language chrome, and no copy at all is a dead link
           stats.failures.push(`${lang} /${route}: ${e.message}`);
-          logger.warn(`✗ ${logTag} — ${e.message} — page skipped (no ${lang} copy)`);
+          logger.warn(`✗ ${logTag}: ${e.message}; ${lang} copy shipped untranslated`);
+          writeUntranslated(lang);
           continue;
         }
       } else {
@@ -541,8 +563,8 @@ async function translateSite(options) {
     }
 
     // Copies land after the page's whole language pass so their alternates
-    // name only the languages actually produced — a skipped pair (cold cache
-    // or provider failure) is never advertised (hreflang never lies)
+    // name only the languages actually produced: an untranslated pair (cold
+    // cache or provider failure) is never advertised (hreflang never lies)
     for (const { targetRel, $ } of copies) {
       insertAlternates($, producedLangs, settings.default, route, baseUrl);
       jetpack.write(path.join(outDir, targetRel), $.html());

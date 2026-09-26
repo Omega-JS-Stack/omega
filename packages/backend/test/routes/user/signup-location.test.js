@@ -14,12 +14,12 @@
  *   - Nothing to fill returns an EMPTY object, so the write carries no
  *     `personal.location` key at all rather than a map of nulls.
  */
-const post = require('../../../dist/manager/routes/user/signup/post.js');
+const post = require('../../../dist/omega/routes/user/signup/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { locationFromGeolocation } = post;
 
-// The shape RouteContext resolves from the request headers (cf-ipcountry /
+// The shape the Context resolves from the request headers (cf-ipcountry /
 // x-country-code / x-appengine-*) — the extra fields are ignored by the fill.
 const GEOLOCATION = {
   ip: '203.0.113.7',

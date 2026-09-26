@@ -17,9 +17,9 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
-const format = require('../../dist/manager/libraries/ai/providers/anthropic-format.js');
-const AI = require('../../dist/manager/libraries/ai/index.js');
+const OpenAI = require('../../dist/omega/libraries/ai/providers/openai.js');
+const format = require('../../dist/omega/libraries/ai/providers/anthropic-format.js');
+const AI = require('../../dist/omega/libraries/ai/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { normalizePrompt, loadContent, formatHistory, VALID_PROMPT_ROLES } = OpenAI._internals;
 const { normalizeOptions, SYSTEM_PROMPT_INJECTIONS } = AI._internals;

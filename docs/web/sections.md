@@ -155,9 +155,9 @@ popup; the chat widget moved to `inbound.chat.providers.chatsy` in #23), which
 the core chrome reads into the Configuration payload via
 `resolved.config.client`. The layout chain still merges underneath, key by key.
 A config section restated BARE is a build ERROR naming the file and the key —
-no dual-read, and `omega migrate`'s `config-parent` rule moves it. (`client`
-was `web_manager` through the UJM era; WebManager is not an OMEGA concept —
-see the [config mapping tables](../shared/config.md).) Any other key is
+no dual-read, and `omega migrate`'s `config-parent` rule moves it. (The
+legacy `web_manager` key maps onto `client`: see the
+[config mapping tables](../shared/config.md).) Any other key is
 content-in-frontmatter — a lane that doesn't
 exist: the engine STRIPS it from the data cascade before resolution (and the
 collections parity-repair lane filters pages to the same allow set, so
@@ -257,7 +257,7 @@ another page's words.
   library automatically; a full-fork main that skips `omega:main` opts out.
 - **JS**: every `section.js` bundles into the MAIN bundle; the generated boot
   stub registers `id → init` and `bootSections` initializes AFTER the main
-  boot, once per present element: `init(el, { manager, options })` for each
+  boot, once per present element: `init(el, { omega, options })` for each
   `[data-omega-section="<id>"]` (components: `data-omega-component`).
   Sections with behavior carry the attribute on their own root element;
   absent sections cost one querySelectorAll. One section's init failure never
@@ -539,7 +539,7 @@ composition** — sections render on the same engine, so `{% component %}`
 works inside section markup, args evaluating against the section's own
 `{ args }` scope).
 newsletter-cta is the §7 reference consumer: its `section.js` owns the
-FormManager binding (`export default (el, { manager, options })`), its root
+FormManager binding (`export default (el, { omega }) => { new FormManager(omega, ...) }`), its root
 carries `data-omega-section="marketing/newsletter-cta"`, and any page
 composing the band gets the working managed form — live-proven on blog index
 AND posts (whose old plain-action form posted to a nonexistent page).

@@ -8,9 +8,9 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const STORAGE_KEY = 'autoUpdater';
 
 async function reinit(ctx, env) {
-  const updater = ctx.manager.autoUpdater;
+  const updater = ctx.omega.autoUpdater;
   updater.shutdown();
-  ctx.manager.storage.set(STORAGE_KEY, null);
+  ctx.omega.storage.set(STORAGE_KEY, null);
 
   // Snapshot + override env for this run.
   const saved = { OMEGA_DEV_UPDATE: process.env.OMEGA_DEV_UPDATE };
@@ -18,7 +18,7 @@ async function reinit(ctx, env) {
     if (v == null) delete process.env[k];
     else process.env[k] = v;
   }
-  await updater.initialize(ctx.manager);
+  await updater.initialize(ctx.omega);
   return async () => {
     updater.shutdown();
     for (const [k, v] of Object.entries(saved)) {
@@ -26,7 +26,7 @@ async function reinit(ctx, env) {
       else process.env[k] = v;
     }
     // Re-init with the original env so subsequent tests have a working updater + IPC handlers.
-    await updater.initialize(ctx.manager);
+    await updater.initialize(ctx.omega);
   };
 }
 
@@ -49,16 +49,16 @@ module.exports = defineCases({
   layer: 'main',
   description: 'auto-updater (main)',
   cleanup: async (ctx) => {
-    ctx.manager.autoUpdater.shutdown();
-    ctx.manager.storage.set(STORAGE_KEY, null);
+    ctx.omega.autoUpdater.shutdown();
+    ctx.omega.storage.set(STORAGE_KEY, null);
     delete process.env.OMEGA_DEV_UPDATE;
-    await ctx.manager.autoUpdater.initialize(ctx.manager);
+    await ctx.omega.autoUpdater.initialize(ctx.omega);
   },
   tests: [
     {
       name: 'initialize ran during boot — initial status is idle',
       run: (ctx) => {
-        const status = ctx.manager.autoUpdater.getStatus();
+        const status = ctx.omega.autoUpdater.getStatus();
         ctx.expect(status.code).toBe('idle');
         ctx.expect(status.percent).toBe(0);
         ctx.expect(status.error).toBe(null);
@@ -69,10 +69,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
-          await ctx.manager.autoUpdater.checkNow({ userInitiated: true });
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+          await ctx.omega.autoUpdater.checkNow({ userInitiated: true });
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
 
-          const s = ctx.manager.autoUpdater.getStatus();
+          const s = ctx.omega.autoUpdater.getStatus();
           ctx.expect(s.code).toBe('downloaded');
           ctx.expect(s.version).toBe('999.0.0');
           ctx.expect(s.percent).toBe(100);
@@ -85,10 +85,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'unavailable' });
         try {
-          await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
+          await ctx.omega.autoUpdater.checkNow({ userInitiated: false });
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'not-available');
 
-          const s = ctx.manager.autoUpdater.getStatus();
+          const s = ctx.omega.autoUpdater.getStatus();
           ctx.expect(s.code).toBe('not-available');
           ctx.expect(s.error).toBe(null);
         } finally { await restore(); }
@@ -99,10 +99,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'error' });
         try {
-          await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'error');
+          await ctx.omega.autoUpdater.checkNow({ userInitiated: false });
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'error');
 
-          const s = ctx.manager.autoUpdater.getStatus();
+          const s = ctx.omega.autoUpdater.getStatus();
           ctx.expect(s.code).toBe('error');
           ctx.expect(s.error).toBeDefined();
           ctx.expect(s.error.message).toMatch(/Simulated/);
@@ -114,10 +114,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
-          await ctx.manager.autoUpdater.simulate('available');
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+          await ctx.omega.autoUpdater.simulate('available');
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
 
-          const s = ctx.manager.autoUpdater.getStatus();
+          const s = ctx.omega.autoUpdater.getStatus();
           ctx.expect(s.code).toBe('downloaded');
           ctx.expect(s.version).toBe('999.0.0');
           ctx.expect(s.percent).toBe(100);
@@ -129,10 +129,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
-          await ctx.manager.autoUpdater.simulate('unavailable');
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
+          await ctx.omega.autoUpdater.simulate('unavailable');
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'not-available');
 
-          ctx.expect(ctx.manager.autoUpdater.getStatus().error).toBe(null);
+          ctx.expect(ctx.omega.autoUpdater.getStatus().error).toBe(null);
         } finally { await restore(); }
       },
     },
@@ -141,10 +141,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
-          await ctx.manager.autoUpdater.simulate('error');
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'error');
+          await ctx.omega.autoUpdater.simulate('error');
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'error');
 
-          ctx.expect(ctx.manager.autoUpdater.getStatus().error.message).toMatch(/Simulated/);
+          ctx.expect(ctx.omega.autoUpdater.getStatus().error.message).toMatch(/Simulated/);
         } finally { await restore(); }
       },
     },
@@ -153,8 +153,8 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
-          await ctx.expect(() => ctx.manager.autoUpdater.simulate('sideways')).toThrow(/unknown scenario/i);
-          await ctx.expect(() => ctx.manager.autoUpdater.simulate()).toThrow(/scenario required/i);
+          await ctx.expect(() => ctx.omega.autoUpdater.simulate('sideways')).toThrow(/unknown scenario/i);
+          await ctx.expect(() => ctx.omega.autoUpdater.simulate()).toThrow(/scenario required/i);
         } finally { await restore(); }
       },
     },
@@ -162,19 +162,19 @@ module.exports = defineCases({
       name: 'simulate(): refuses in a production build unless OMEGA_DEV_UPDATE is set',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const origIsProduction = ctx.manager.isProduction;
-        ctx.manager.isProduction = () => true;
+        const origIsProduction = ctx.omega.isProduction;
+        ctx.omega.isProduction = () => true;
         try {
-          await ctx.expect(() => ctx.manager.autoUpdater.simulate('available')).toThrow(/production/i);
-          ctx.expect(ctx.manager.autoUpdater.getStatus().code).toBe('idle');
+          await ctx.expect(() => ctx.omega.autoUpdater.simulate('available')).toThrow(/production/i);
+          ctx.expect(ctx.omega.autoUpdater.getStatus().code).toBe('idle');
 
           // ...but a packaged QA build launched with the env var set may still simulate.
           process.env.OMEGA_DEV_UPDATE = 'available';
-          await ctx.manager.autoUpdater.simulate('unavailable');
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
+          await ctx.omega.autoUpdater.simulate('unavailable');
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'not-available');
         } finally {
           delete process.env.OMEGA_DEV_UPDATE;
-          ctx.manager.isProduction = origIsProduction;
+          ctx.omega.isProduction = origIsProduction;
           await restore();
         }
       },
@@ -183,11 +183,11 @@ module.exports = defineCases({
       // The whole point of the session flag: simulate() leaves the synthetic library
       // wired, so every LATER trigger (the hourly feed tick) drives the simulator too.
       // Without _isSimulating() latching, that fake 'downloaded' walks into the real
-      // install path and flips the manager's quit latch.
+      // install path and flips the omega instance's quit latch.
       name: 'simulate(): latches the session so a later feed tick cannot reach the real install path',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origPrompt = u._promptToInstall;
         let promptCalls = 0;
         u._promptToInstall = async () => { promptCalls++; };
@@ -207,11 +207,11 @@ module.exports = defineCases({
           u._lastActivityAt = Date.now() - (10 * 60 * 1000);
           u._evaluateIdleInstall();
 
-          ctx.expect(ctx.manager._allowQuit).toBe(false);
+          ctx.expect(ctx.omega._allowQuit).toBe(false);
           ctx.expect(promptCalls).toBe(0);
         } finally {
           u._promptToInstall = origPrompt;
-          ctx.manager._allowQuit = false;
+          ctx.omega._allowQuit = false;
           await restore();
         }
       },
@@ -220,7 +220,7 @@ module.exports = defineCases({
       name: 'simulate(): shutdown clears the session flag',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         try {
           await u.simulate('unavailable');
           ctx.expect(u._isSimulating()).toBe(true);
@@ -234,7 +234,7 @@ module.exports = defineCases({
       name: 'simulate(): refuses while a cascade is already running',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         try {
           await u.simulate('available');
           ctx.expect(u._devSimulating).toBe(true);
@@ -251,13 +251,13 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
-          await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+          await ctx.omega.autoUpdater.checkNow({ userInitiated: false });
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
 
           // The fake download stamps memory (the in-session UI flow reads the
           // same as a real one) but must leave the production record alone.
-          ctx.expect(typeof ctx.manager.autoUpdater.getStatus().downloadedAt).toBe('number');
-          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
+          ctx.expect(typeof ctx.omega.autoUpdater.getStatus().downloadedAt).toBe('number');
+          ctx.expect(ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
         } finally { await restore(); }
       },
     },
@@ -266,11 +266,11 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
         try {
-          await ctx.manager.autoUpdater.simulate('available');
-          await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
+          await ctx.omega.autoUpdater.simulate('available');
+          await waitFor(() => ctx.omega.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
 
-          ctx.expect(typeof ctx.manager.autoUpdater.getStatus().downloadedAt).toBe('number');
-          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
+          ctx.expect(typeof ctx.omega.autoUpdater.getStatus().downloadedAt).toBe('number');
+          ctx.expect(ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBeUndefined();
         } finally { await restore(); }
       },
     },
@@ -281,17 +281,17 @@ module.exports = defineCases({
       name: 'a stale simulated pendingUpdate cannot seed a real download (30-day gate does not force install)',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const updater = ctx.manager.autoUpdater;
+        const updater = ctx.omega.autoUpdater;
         let quitCalled = false;
         let origQuit;
         try {
           // A 40-day-old simulator record, then a boot so the reconciler sees it.
           const staleTs = Date.now() - (40 * 24 * 60 * 60 * 1000);
-          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '999.0.0', downloadedAt: staleTs });
+          ctx.omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '999.0.0', downloadedAt: staleTs });
           updater.shutdown();
-          await updater.initialize(ctx.manager);
+          await updater.initialize(ctx.omega);
 
-          ctx.expect(ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBe(null);
+          ctx.expect(ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`)).toBe(null);
           ctx.expect(updater._state.downloadedAt).toBe(null);
 
           // A real update downloads: it starts its OWN 30-day clock.
@@ -300,7 +300,7 @@ module.exports = defineCases({
           updater._library.quitAndInstall = () => { quitCalled = true; };
           updater._library.emit('update-downloaded', { version: '2.0.0' });
 
-          const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+          const stored = ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           ctx.expect(stored.version).toBe('2.0.0');
           ctx.expect(stored.downloadedAt).not.toBeLessThan(before);
           ctx.expect(updater._state.downloadedAt).toBe(stored.downloadedAt);
@@ -308,7 +308,7 @@ module.exports = defineCases({
         } finally {
           // The spy sat on the shared electron-updater singleton.
           if (origQuit) updater._library.quitAndInstall = origQuit;
-          ctx.manager._allowQuit = false;
+          ctx.omega._allowQuit = false;
           await restore();
         }
       },
@@ -319,12 +319,12 @@ module.exports = defineCases({
       name: 'first download persists pendingUpdate to storage',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const updater = ctx.manager.autoUpdater;
+        const updater = ctx.omega.autoUpdater;
         try {
           updater._library.emit('update-downloaded', { version: '2.0.0' });
           ctx.expect(updater.getStatus().code).toBe('downloaded');
 
-          const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+          const stored = ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           ctx.expect(stored).toBeDefined();
           ctx.expect(stored.version).toBe('2.0.0');
           ctx.expect(typeof stored.downloadedAt).toBe('number');
@@ -338,12 +338,12 @@ module.exports = defineCases({
         try {
           // Plant an older pending-update record manually.
           const oldTs = Date.now() - (10 * 24 * 60 * 60 * 1000);  // 10 days ago
-          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '888.0.0', downloadedAt: oldTs });
+          ctx.omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '888.0.0', downloadedAt: oldTs });
 
           // Call _recordDownloadedAt for a "new" download.
-          ctx.manager.autoUpdater._recordDownloadedAt('2.0.0');
+          ctx.omega.autoUpdater._recordDownloadedAt('2.0.0');
 
-          const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+          const stored = ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           // Timer unchanged (first-download-wins) — but the version must track
           // the newest download: after installing 2.0.0, the clear-on-apply
           // check (pending.version === getVersion()) has to match, or the stale
@@ -360,19 +360,19 @@ module.exports = defineCases({
         let installCalled = false;
         try {
           // Override installNow to capture the trigger without actually quitting.
-          const origInstall = ctx.manager.autoUpdater.installNow;
-          ctx.manager.autoUpdater.installNow = async () => { installCalled = true; return true; };
+          const origInstall = ctx.omega.autoUpdater.installNow;
+          ctx.omega.autoUpdater.installNow = async () => { installCalled = true; return true; };
 
           // Plant an old pending-update.
           const oldTs = Date.now() - (31 * 24 * 60 * 60 * 1000);
-          ctx.manager.autoUpdater._state.downloadedAt = oldTs;
-          ctx.manager.autoUpdater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+          ctx.omega.autoUpdater._state.downloadedAt = oldTs;
+          ctx.omega.autoUpdater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
 
-          const triggered = ctx.manager.autoUpdater._enforceMaxAgeGate();
+          const triggered = ctx.omega.autoUpdater._enforceMaxAgeGate();
           ctx.expect(triggered).toBe(true);
           ctx.expect(installCalled).toBe(true);
 
-          ctx.manager.autoUpdater.installNow = origInstall;
+          ctx.omega.autoUpdater.installNow = origInstall;
         } finally { await restore(); }
       },
     },
@@ -383,13 +383,13 @@ module.exports = defineCases({
       name: '30-day gate: carried-over stale pending installs when update-downloaded fires (real installNow state guard)',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
-        const updater = ctx.manager.autoUpdater;
+        const updater = ctx.omega.autoUpdater;
         let quitCalled = false;
         let origQuit;
         try {
           // Plant a >30-day pending update, then reconcile like a fresh boot.
           const oldTs = Date.now() - (31 * 24 * 60 * 60 * 1000);
-          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '777.0.0', downloadedAt: oldTs });
+          ctx.omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '777.0.0', downloadedAt: oldTs });
           updater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
           updater._reconcilePendingUpdate();
 
@@ -407,9 +407,9 @@ module.exports = defineCases({
           ctx.expect(quitCalled).toBe(true);
         } finally {
           // The spy sat on the shared electron-updater singleton; the install
-          // path also flipped the manager's quit latch — undo both.
+          // path also flipped the omega instance's quit latch — undo both.
           if (origQuit) updater._library.quitAndInstall = origQuit;
-          ctx.manager._allowQuit = false;
+          ctx.omega._allowQuit = false;
           await restore();
         }
       },
@@ -419,10 +419,10 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, {});
         try {
-          ctx.manager.autoUpdater._state.downloadedAt = Date.now() - (5 * 24 * 60 * 60 * 1000);
-          ctx.manager.autoUpdater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+          ctx.omega.autoUpdater._state.downloadedAt = Date.now() - (5 * 24 * 60 * 60 * 1000);
+          ctx.omega.autoUpdater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
 
-          const triggered = ctx.manager.autoUpdater._enforceMaxAgeGate();
+          const triggered = ctx.omega.autoUpdater._enforceMaxAgeGate();
           ctx.expect(triggered).toBe(false);
         } finally { await restore(); }
       },
@@ -433,19 +433,19 @@ module.exports = defineCases({
         const restore = await reinit(ctx, {});
         try {
           // Stash a pending-update entry whose version matches our current package version.
-          const currentVersion = ctx.manager.getVersion();
+          const currentVersion = ctx.omega.getVersion();
           ctx.expect(typeof currentVersion).toBe('string');
 
-          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, {
+          ctx.omega.storage.set(`${STORAGE_KEY}.pendingUpdate`, {
             version: currentVersion,
             downloadedAt: Date.now() - (5 * 24 * 60 * 60 * 1000),
           });
 
           // Re-init triggers the reconciler.
-          ctx.manager.autoUpdater.shutdown();
-          await ctx.manager.autoUpdater.initialize(ctx.manager);
+          ctx.omega.autoUpdater.shutdown();
+          await ctx.omega.autoUpdater.initialize(ctx.omega);
 
-          const stillThere = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
+          const stillThere = ctx.omega.storage.get(`${STORAGE_KEY}.pendingUpdate`);
           ctx.expect(stillThere).toBe(null);
         } finally { await restore(); }
       },
@@ -455,7 +455,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'unavailable' });
         try {
-          const result = await ctx.manager.autoUpdater.checkNow();
+          const result = await ctx.omega.autoUpdater.checkNow();
           ctx.expect(typeof result.code).toBe('string');
           ctx.expect('percent' in result).toBe(true);
         } finally { await restore(); }
@@ -464,26 +464,26 @@ module.exports = defineCases({
     {
       name: 'IPC handler registered: desktop:auto-updater:status returns status',
       run: async (ctx) => {
-        const result = await ctx.manager.ipc.invoke('desktop:auto-updater:status');
+        const result = await ctx.omega.ipc.invoke('desktop:auto-updater:status');
         ctx.expect(typeof result.code).toBe('string');
       },
     },
     {
       name: 'enabled=false: skip wiring, no library, no interval',
       run: async (ctx) => {
-        ctx.manager.autoUpdater.shutdown();
-        const cfg = ctx.manager.config;
+        ctx.omega.autoUpdater.shutdown();
+        const cfg = ctx.omega.config;
         const orig = cfg.autoUpdate;
         cfg.autoUpdate = { enabled: false };
         try {
-          await ctx.manager.autoUpdater.initialize(ctx.manager);
-          ctx.expect(ctx.manager.autoUpdater._feedCheckIntervalId).toBe(null);
-          ctx.expect(ctx.manager.autoUpdater._idleEvalIntervalId).toBe(null);
-          ctx.expect(ctx.manager.autoUpdater._library).toBe(null);
+          await ctx.omega.autoUpdater.initialize(ctx.omega);
+          ctx.expect(ctx.omega.autoUpdater._feedCheckIntervalId).toBe(null);
+          ctx.expect(ctx.omega.autoUpdater._idleEvalIntervalId).toBe(null);
+          ctx.expect(ctx.omega.autoUpdater._library).toBe(null);
         } finally {
           cfg.autoUpdate = orig;
-          ctx.manager.autoUpdater.shutdown();
-          await ctx.manager.autoUpdater.initialize(ctx.manager);
+          ctx.omega.autoUpdater.shutdown();
+          await ctx.omega.autoUpdater.initialize(ctx.omega);
         }
       },
     },
@@ -497,7 +497,7 @@ module.exports = defineCases({
     {
       name: 'markActive() bumps _lastActivityAt to current time',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         u._lastActivityAt = 0;
         const before = Date.now();
         u.markActive();
@@ -509,7 +509,7 @@ module.exports = defineCases({
     {
       name: '_onActivityIpc routes through to markActive',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         u._lastActivityAt = 0;
         u._onActivityIpc();
         ctx.expect(u._lastActivityAt > 0).toBe(true);
@@ -518,11 +518,11 @@ module.exports = defineCases({
     {
       name: 'IPC channel desktop:auto-updater:activity is registered + bumps activity timestamp',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         // initialize() registered the listener — verify presence + simulate an inbound
         // renderer message by invoking each registered listener directly. In-process
         // this matches what `ipcMain.on(channel, ...)` does on a real `ipcRenderer.send`.
-        const listeners = ctx.manager.ipc._listeners['desktop:auto-updater:activity'];
+        const listeners = ctx.omega.ipc._listeners['desktop:auto-updater:activity'];
         ctx.expect(listeners).toBeDefined();
         ctx.expect(listeners.size > 0).toBe(true);
         u._lastActivityAt = 0;
@@ -533,7 +533,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: when idle ≥ threshold + state=downloaded, installNow fires',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         let installCalled = false;
         u.installNow = async () => { installCalled = true; return true; };
@@ -557,7 +557,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: when active, prompt fires once per version (no install)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
         let installCalled = false;
@@ -588,7 +588,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: a NEW downloaded version re-arms the prompt',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origPrompt = u._promptToInstall;
         let promptCalls  = 0;
         u._promptToInstall = async (v) => { promptCalls++; };
@@ -616,7 +616,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: skipped entirely when state !== downloaded',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
         let installCalled = false;
@@ -643,7 +643,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: skipped when _userInitiated=true (consumer UI owns the path)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
         let installCalled = false;
@@ -669,7 +669,7 @@ module.exports = defineCases({
     {
       name: 'idle-install: dev mode bails out (no install, no prompt)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
         let installCalled = false;
@@ -697,7 +697,7 @@ module.exports = defineCases({
     {
       name: 'checkNow: dedupes — second call while state=checking returns without re-checking',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         // Stub the underlying library so we can count calls.
         const origLib = u._library;
         let checkCalls = 0;
@@ -720,7 +720,7 @@ module.exports = defineCases({
     {
       name: 'checkNow: dedupes from each non-ready state (downloading, available, downloaded)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origLib = u._library;
         let checkCalls = 0;
         u._library = {
@@ -745,7 +745,7 @@ module.exports = defineCases({
         // User clicks "Check for Updates" — IPC invokes checkNow({userInitiated: true}).
         // Pre-fix: that flipped _userInitiated to true even though the second check was
         // skipped, breaking idle-install when the download completes.
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         u._state = { ...u._state, code: 'downloading' };   // mid-flight
         u._userInitiated = false;                          // initial periodic check
 
@@ -757,7 +757,7 @@ module.exports = defineCases({
     {
       name: 'checkNow: _userInitiated DOES flip when the call actually performs a check',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origLib = u._library;
         u._library = {
           checkForUpdates: async () => {},   // no-op so the test runs synchronously
@@ -779,7 +779,7 @@ module.exports = defineCases({
         // Behavior contract: the timestamp tracks "we considered checking at this moment,"
         // not "we successfully checked." A user click that hits the dedup guard still updates
         // the timestamp so UI surfaces show fresh "checked just now" feedback.
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         u._state = { ...u._state, code: 'checking', lastCheckedAt: 0 };
         const before = Date.now();
         await u.checkNow({ userInitiated: true });
@@ -798,7 +798,7 @@ module.exports = defineCases({
     {
       name: 'feed-check tick: hits the library + runs 30-day gate (no idle eval)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origLib = u._library;
         const origGate = u._enforceMaxAgeGate;
         const origIdle = u._evaluateIdleInstall;
@@ -825,7 +825,7 @@ module.exports = defineCases({
     {
       name: 'idle-eval tick: only runs idle eval (no HTTP, no gate)',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origLib = u._library;
         const origGate = u._enforceMaxAgeGate;
         const origIdle = u._evaluateIdleInstall;
@@ -851,7 +851,7 @@ module.exports = defineCases({
     {
       name: 'feed-check default cadence is 1h (production), not 1m',
       run: (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         // Sanity-guard: if someone re-merges the timers or drops the cadence to
         // 60s again, this test fails. Production builds must not hammer the feed.
         ctx.expect(u._options.feedCheckIntervalMs).toBe(60 * 60 * 1000);
@@ -864,7 +864,7 @@ module.exports = defineCases({
         // The whole point of the new system: drive a real update through the dev simulator,
         // then exercise the post-download decision path with stubbed installNow.
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origIsSimulating = u._isSimulating;
         let installCalled = false;
@@ -890,7 +890,7 @@ module.exports = defineCases({
       name: 'full update sequence: download → user-active → prompt fires (no install)',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
         const origIsSimulating = u._isSimulating;
@@ -922,7 +922,7 @@ module.exports = defineCases({
     //
     // Where the unit tests above fake the clock + poke `_evaluateIdleInstall` directly,
     // this one drives a REAL update through the dev simulator AND lets the actual
-    // periodic tick fire on its own. With `manager.isTesting() === true`, the tick
+    // periodic tick fire on its own. With `omega.isTesting() === true`, the tick
     // cadence drops to IDLE_TICK_MS_TESTING (500ms) and the idle threshold drops to
     // IDLE_INSTALL_THRESHOLD_MS_TESTING (3s) — so the full sequence completes inside
     // ~5s instead of ~15min.
@@ -935,7 +935,7 @@ module.exports = defineCases({
       name: 'real-time end-to-end: download fires, threshold elapses, install triggers via periodic tick',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall   = u.installNow;
         const origIsSimulating = u._isSimulating;
         let installCalled = false;
@@ -965,7 +965,7 @@ module.exports = defineCases({
       name: 'real-time end-to-end: download fires while user-active → prompt fires, install does NOT',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall   = u.installNow;
         const origPrompt    = u._promptToInstall;
         const origIsSimulating = u._isSimulating;
@@ -1006,43 +1006,43 @@ module.exports = defineCases({
     // ─── Mode helpers (@omega.js/backend-pattern: isDevelopment / isProduction / isTesting) ────
 
     {
-      name: 'manager.isTesting() returns true under OMEGA_ENVIRONMENT=testing (named by the test runner)',
+      name: 'omega.isTesting() returns true under OMEGA_ENVIRONMENT=testing (named by the test runner)',
       run: (ctx) => {
-        ctx.expect(typeof ctx.manager.isTesting).toBe('function');
-        ctx.expect(ctx.manager.isTesting()).toBe(true);
+        ctx.expect(typeof ctx.omega.isTesting).toBe('function');
+        ctx.expect(ctx.omega.isTesting()).toBe(true);
       },
     },
     {
-      name: 'manager.isDevelopment() is false during tests (testing takes precedence)',
+      name: 'omega.isDevelopment() is false during tests (testing takes precedence)',
       run: (ctx) => {
         // The test runs unpackaged, but the lane named testing, so this is a
         // TEST environment, not development. isDevelopment() is therefore false.
-        ctx.expect(typeof ctx.manager.isDevelopment).toBe('function');
-        ctx.expect(ctx.manager.isDevelopment()).toBe(false);
-        ctx.expect(ctx.manager.isTesting()).toBe(true);
+        ctx.expect(typeof ctx.omega.isDevelopment).toBe('function');
+        ctx.expect(ctx.omega.isDevelopment()).toBe(false);
+        ctx.expect(ctx.omega.isTesting()).toBe(true);
       },
     },
     {
-      name: 'manager environments are mutually exclusive (exactly one true)',
+      name: 'omega environments are mutually exclusive (exactly one true)',
       run: (ctx) => {
-        const flags = [ctx.manager.isDevelopment(), ctx.manager.isTesting(), ctx.manager.isProduction()];
+        const flags = [ctx.omega.isDevelopment(), ctx.omega.isTesting(), ctx.omega.isProduction()];
         ctx.expect(flags.filter(Boolean).length).toBe(1);
-        ctx.expect(ctx.manager.isProduction()).toBe(false);
+        ctx.expect(ctx.omega.isProduction()).toBe(false);
       },
     },
     {
       name: 'auto-updater._idleThresholdMs() returns 3s in tests, 15min in prod',
       run: (ctx) => {
-        const u = ctx.manager.autoUpdater;
-        // Test mode currently active (manager.isTesting() === true).
+        const u = ctx.omega.autoUpdater;
+        // Test mode currently active (omega.isTesting() === true).
         ctx.expect(u._idleThresholdMs()).toBe(3000);
 
-        // Stub manager.isTesting() to simulate prod and verify the threshold flips.
-        const origIsTesting = ctx.manager.isTesting;
-        ctx.manager.isTesting = () => false;
+        // Stub omega.isTesting() to simulate prod and verify the threshold flips.
+        const origIsTesting = ctx.omega.isTesting;
+        ctx.omega.isTesting = () => false;
         try {
           ctx.expect(u._idleThresholdMs()).toBe(15 * 60 * 1000);
-        } finally { ctx.manager.isTesting = origIsTesting; }
+        } finally { ctx.omega.isTesting = origIsTesting; }
       },
     },
 
@@ -1052,7 +1052,7 @@ module.exports = defineCases({
       name: 'shutdown clears pending timers + interval + idle-install state',
       run: async (ctx) => {
         const restore = await reinit(ctx, {});
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         try {
           u._pendingTimers.push(setTimeout(() => {}, 1000000));
           u._promptedForVersion = '1.2.3';
@@ -1071,7 +1071,7 @@ module.exports = defineCases({
     {
       name: '_menuItemFieldsForState produces correct label per state',
       run: (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const cases = [
           ['idle',          'Check for Updates...',                                 true],
           ['error',         'Check for Updates...',                                 true],
@@ -1101,12 +1101,12 @@ module.exports = defineCases({
     {
       name: 'IPC: desktop:auto-updater:check-now invokes checkNow with userInitiated=true',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origCheck = u.checkNow;
         let receivedOpts = null;
         u.checkNow = async (opts) => { receivedOpts = opts; return u.getStatus(); };
         try {
-          await ctx.manager.ipc.invoke('desktop:auto-updater:check-now');
+          await ctx.omega.ipc.invoke('desktop:auto-updater:check-now');
           ctx.expect(receivedOpts).toBeDefined();
           ctx.expect(receivedOpts.userInitiated).toBe(true);
         } finally { u.checkNow = origCheck; }
@@ -1115,12 +1115,12 @@ module.exports = defineCases({
     {
       name: 'IPC: desktop:auto-updater:install-now invokes installNow',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         const origInstall = u.installNow;
         let installCalled = false;
         u.installNow = async () => { installCalled = true; return false; };
         try {
-          await ctx.manager.ipc.invoke('desktop:auto-updater:install-now');
+          await ctx.omega.ipc.invoke('desktop:auto-updater:install-now');
           ctx.expect(installCalled).toBe(true);
         } finally { u.installNow = origInstall; }
       },
@@ -1128,7 +1128,7 @@ module.exports = defineCases({
     {
       name: 'installNow: returns false when state is not "downloaded"',
       run: async (ctx) => {
-        const u = ctx.manager.autoUpdater;
+        const u = ctx.omega.autoUpdater;
         u._state = { ...u._state, code: 'idle' };
         const r = await u.installNow();
         ctx.expect(r).toBe(false);

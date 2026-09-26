@@ -63,16 +63,16 @@ default set. Desktop's own `process.on('uncaughtException'|'unhandledRejection')
 Same surface in main and renderer:
 
 ```js
-manager.sentry.captureException(error, { extra: { ...context } })
-manager.sentry.captureMessage('explicit log', 'info' | 'warning' | 'error')
-manager.sentry.setUser({ id, email })   // or null to clear
+omega.sentry.captureException(error, { extra: { ...context } })
+omega.sentry.captureMessage('explicit log', 'info' | 'warning' | 'error')
+omega.sentry.setUser({ id, email })   // or null to clear
 ```
 
 In renderer (via preload bridge): `window.desktop.sentry` would expose the same surface — currently not wired (preload doesn't yet bridge sentry; renderer code can call `@sentry/electron/renderer` directly if it needs to).
 
 ## Auth attribution
 
-When the user signs in via `client-bridge`, @omega.js/desktop automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
+When the user signs in via `client-bridge`, @omega.js/desktop automatically calls `omega.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
 
 The user object is **normalized** before being sent — only `uid`/`id` is kept, and everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 

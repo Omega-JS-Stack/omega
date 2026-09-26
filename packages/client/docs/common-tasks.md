@@ -10,12 +10,11 @@
 ## Adding a New Module
 
 1. Create `src/modules/my-module.js`
-2. Export class: `export default class MyModule { constructor(manager) { ... } }`
+2. Export class: `export default class MyModule { constructor(omega) { ... } }` (the instance arrives in the constructor; never import one)
 3. Import in `src/index.js`: `import MyModule from './modules/my-module.js'`
-4. Add to Manager constructor: `this._myModule = new MyModule(this)`
-5. Add getter: `myModule() { return this._myModule; }`
-6. Update README.md
-7. Run `npm run prepare`
+4. Add it to the `Omega` constructor as a plain property: `this.myModule = new MyModule(this)`
+5. Update README.md
+6. Run `npm run prepare`
 
 ## Modifying Configuration Defaults
 

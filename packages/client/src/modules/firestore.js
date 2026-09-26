@@ -1,6 +1,6 @@
 class Firestore {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this._db = null;
     this._initialized = false;
     this._initPromise = null;
@@ -21,7 +21,7 @@ class Firestore {
   async _initializeFirestore() {
     try {
       // Check if Firebase app is initialized
-      if (!this.manager._firebaseApp) {
+      if (!this.omega._firebaseApp) {
         throw new Error('Firebase app not initialized. Please initialize Firebase first.');
       }
 
@@ -48,7 +48,7 @@ class Firestore {
 
       // Reuse the Firestore instance already initialized in index.js — emulator
       // connection (when enabled) already happened there, at creation time.
-      this._db = getFirestore(this.manager._firebaseApp);
+      this._db = getFirestore(this.omega._firebaseApp);
 
       this._initialized = true;
 

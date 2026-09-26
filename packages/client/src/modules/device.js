@@ -18,8 +18,8 @@ const STORAGE_KEY = 'omega_device';
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 
 class Device {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this.data = null;
     this.initialized = false;
     this.isNewVersion = false;
@@ -27,7 +27,7 @@ class Device {
 
   // Check if we're in a browser extension context
   _isExtension() {
-    return this.manager.utilities().getRuntime() === 'browser-extension';
+    return this.omega.utilities.getRuntime() === 'browser-extension';
   }
 
   // Get extension storage API
@@ -58,7 +58,7 @@ class Device {
     }
 
     const now = Date.now();
-    const currentVersion = this.manager.config?.version || null;
+    const currentVersion = this.omega.config?.version || null;
 
     // Stored data is raw JSON.parse output — only a plain object is usable;
     // a primitive or array entry falls through to the first-time payload
@@ -76,7 +76,7 @@ class Device {
       const timeSinceLastActive = now - (this.data.lastActive || 0);
       if (timeSinceLastActive > SESSION_TIMEOUT) {
         // A malformed entry missing `session` (or carrying a non-object
-        // there) must not break the whole manager boot
+        // there) must not break the whole boot
         if (!this.data.session || typeof this.data.session !== 'object') {
           this.data.session = {};
         }
@@ -223,7 +223,7 @@ class Device {
   // Reset usage data (for testing or user request)
   async reset() {
     const now = Date.now();
-    const currentVersion = this.manager.config?.version || null;
+    const currentVersion = this.omega.config?.version || null;
 
     this.data = {
       installed: now,

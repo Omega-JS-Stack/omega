@@ -13,7 +13,7 @@
  * exception: nothing failed — the pipeline decided, correctly.
  *
  * The monitoring contract is the other half ([docs/shared/monitoring.md]):
- * `libraries.sentry` is the backend's ONE capture handle and is null whenever no
+ * `omega.sentry` is the backend's ONE capture handle and is null whenever no
  * DSN is configured, so an unconfigured brand reports nothing, and only IDS ride
  * — the refusal stamp's own fields plus the event's, never the payload.
  *
@@ -30,7 +30,7 @@
  */
 const assert = require('node:assert');
 const { runTrigger, subscriptionPayload } = require('./_webhook-harness.js');
-const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
+const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The subscriber Stripe's own record names, and the uid the forged event claims
@@ -177,7 +177,7 @@ module.exports = defineCases({
       name: 'with no DSN configured the refusal still lands, reporting nothing',
 
       async run() {
-        // `libraries.sentry` is null whenever no DSN is set — the capture must be
+        // `omega.sentry` is null whenever no DSN is set — the capture must be
         // a clean no-op, never a second failure on top of the refusal
         const { captures, store } = await runSubscriptionUpdated({ sdk: sdkAnswering(), payloadUid: FORGED_UID, reporting: false });
 

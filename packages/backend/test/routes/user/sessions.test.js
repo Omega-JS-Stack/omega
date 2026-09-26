@@ -19,7 +19,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/user/sessions', {});
+        const response = await http.get('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Get active sessions should succeed for authenticated user');
         assert.ok(
@@ -37,7 +37,7 @@ module.exports = defineCases({
 
       async run({ http, assert }) {
         // With no id specified, should query sessions/app
-        const response = await http.get('backend-manager/user/sessions', {});
+        const response = await http.get('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Get active sessions should succeed');
         // Response is an object (may be empty if no sessions)
@@ -55,7 +55,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/user/sessions', {
+        const response = await http.get('omega/user/sessions', {
           id: 'custom-session-type',
         });
 
@@ -75,7 +75,7 @@ module.exports = defineCases({
 
       async run({ http, assert }) {
         // Query a session type that definitely doesn't exist
-        const response = await http.get('backend-manager/user/sessions', {
+        const response = await http.get('omega/user/sessions', {
           id: 'nonexistent-session-type-12345',
         });
 
@@ -94,7 +94,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, accounts }) {
-        const response = await http.get('backend-manager/user/sessions', {});
+        const response = await http.get('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Get active sessions should succeed');
 
@@ -124,7 +124,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/user/sessions', {});
+        const response = await http.get('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Get active sessions should succeed for admin');
       },
@@ -137,7 +137,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/user/sessions', {});
+        const response = await http.get('omega/user/sessions', {});
 
         assert.isError(response, 401, 'Get active sessions should fail without authentication');
       },
@@ -152,7 +152,7 @@ module.exports = defineCases({
       timeout: 30000, // Longer timeout due to session cleanup
 
       async run({ http, assert }) {
-        const response = await http.delete('backend-manager/user/sessions', {});
+        const response = await http.delete('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Sign out all sessions should succeed for authenticated user');
         assert.hasProperty(response, 'data.sessions', 'Response should contain sessions count');
@@ -175,7 +175,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.delete('backend-manager/user/sessions', {
+        const response = await http.delete('omega/user/sessions', {
           id: 'custom-session-type',
         });
 
@@ -192,7 +192,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.delete('backend-manager/user/sessions', {});
+        const response = await http.delete('omega/user/sessions', {});
 
         assert.isSuccess(response, 'Sign out all sessions should succeed for premium user');
         assert.hasProperty(response, 'data.sessions', 'Response should contain sessions count');
@@ -207,8 +207,8 @@ module.exports = defineCases({
 
       async run({ http, assert }) {
         // Call twice in a row - both should succeed
-        const response1 = await http.delete('backend-manager/user/sessions', {});
-        const response2 = await http.delete('backend-manager/user/sessions', {});
+        const response1 = await http.delete('omega/user/sessions', {});
+        const response2 = await http.delete('omega/user/sessions', {});
 
         assert.isSuccess(response1, 'First sign out should succeed');
         assert.isSuccess(response2, 'Second sign out should succeed (idempotent)');
@@ -222,7 +222,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.delete('backend-manager/user/sessions', {});
+        const response = await http.delete('omega/user/sessions', {});
 
         assert.isError(response, 401, 'Sign out all sessions should fail without authentication');
       },

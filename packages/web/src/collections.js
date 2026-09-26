@@ -113,8 +113,8 @@ function registerCollections(eleventyConfig, collectionsHolder, dynamicCollectio
 }
 
 /**
- * The DISPLAY name of a taxonomy term. Legacy UJM titleized every term it
- * named a page after — hyphens and underscores are word breaks, then each
+ * The DISPLAY name of a taxonomy term. Every term a page is named after is
+ * titleized — hyphens and underscores are word breaks, then each
  * word capitalizes Ruby-style (first char up, rest down) — so
  * `time-tracking-tools` reads "Time Tracking Tools" in its page's title, h1
  * and description. Keeping the corpus's own spelling drifted every migrating
@@ -156,7 +156,7 @@ function aggregateTaxonomy(api, { tag, field, order }) {
   const posts = api.getFilteredByTag(tag).sort(order);
 
   for (const item of posts) {
-    // A field holding ONE value (legacy UJM's `recipe.cuisine`) is that
+    // A field holding ONE value (e.g. `recipe.cuisine`) is that
     // document's single term — the list form is the blog's.
     const value = field.split('.').reduce((node, key) => (node == null ? node : node[key]), item.data);
     const names = Array.isArray(value) ? value : (typeof value === 'string' ? [value] : []);

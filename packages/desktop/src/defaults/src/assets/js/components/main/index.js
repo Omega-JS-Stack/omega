@@ -1,11 +1,9 @@
 // Main window renderer entry.
-const Manager = require('@omega.js/desktop/renderer');
+import omega from '@omega.js/desktop/renderer';
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { logger, ipc, storage, omega } = manager;
+    const { logger, desktop } = omega;
 
     // Add your main-window UI logic here.
     // ...

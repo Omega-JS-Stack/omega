@@ -18,30 +18,30 @@ Scope: **C** consumer · **F** framework repo · **B** both.
 
 ## Universal checks (U-xx)
 
-Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / EM) — same ID means the same check everywhere.
+Mirrored across all four OMEGA frameworks (web, backend, extension, desktop): the same ID means the same check everywhere.
 
 | ID | Sev | Scope | Check |
 |----|-----|-------|-------|
 | U-01 | HIGH | B | Every feature has tests at EVERY surface it exposes — handler suites + `http.as(...)` route round-trips + rules suites; never mocked, real emulator only ([test-framework.md](test-framework.md)) |
 | U-02 | HIGH | B | Test hygiene — side-effect tests use dedicated `journey-*` accounts; real-external-API tests gated behind `TEST_EXTENDED_MODE` in-source (not mocked); files export `{ description, type, tests }` (no raw Mocha); no trailing cleanup steps ([test-framework.md](test-framework.md)) |
-| U-03 | CRIT | B | Sanitization — middleware is trim-only by default; HTML strip via opt-in `{ sanitize: true }`; every HTML-insertion site calls `utilities.sanitize()` ([sanitization.md](sanitization.md)) |
-| U-04 | HIGH | B | Firebase ownership — server code uses `firebase-admin` via Manager (correct here); NO client `firebase` SDK in functions code; consuming frontends go through @omega.js/client ([the framework guide](../../../docs/backend/index.md) §Dependency Resolution) |
-| U-05 | HIGH | C | No @omega.js/backend transitive deps installed directly in `functions/package.json` — use `Manager.require(name)` ([the framework guide](../../../docs/backend/index.md) §Dependency Resolution) |
-| U-06 | HIGH | B | Env behavior gated on the INTENTIONAL check — `isProduction()` or `isDevelopment() \|\| isTesting()`, never `!isDevelopment()`; always `Manager.getApiUrl()`, never the cached `Manager.project.apiUrl` ([environment-detection.md](environment-detection.md)) |
+| U-03 | CRIT | B | Sanitization: the request pipeline is trim-only by default; HTML strip via opt-in `{ sanitize: true }`; every HTML-insertion site calls `omega.utilities.sanitize()` ([sanitization.md](sanitization.md)) |
+| U-04 | HIGH | B | Firebase ownership: server code uses `firebase-admin` via `omega.firebase.admin` (correct here); NO client `firebase` SDK in functions code; consuming frontends go through @omega.js/client ([the framework guide](../../../docs/backend/index.md) §Dependency Resolution) |
+| U-05 | HIGH | C | No @omega.js/backend transitive deps installed directly in `functions/package.json`; use `omega.require(name)` ([the framework guide](../../../docs/backend/index.md) §Dependency Resolution) |
+| U-06 | HIGH | B | Env behavior gated on the INTENTIONAL check: `isProduction()` or `isDevelopment() \|\| isTesting()`, never `!isDevelopment()`; always `omega.getApiUrl()`, never the cached `omega.project.apiUrl` ([environment-detection.md](environment-detection.md)) |
 | U-07 | HIGH | B | Config canon — `config/omega.json5` matches the documented shape; canonical cross-framework blocks (`brand`, payment products, …) not reinvented ([architecture.md](architecture.md), [payment-system.md](payment-system.md)) |
 | U-08 | CRIT | B | No private credentials committed — `service-account.json`, `.env` secrets, API keys (Stripe `sk_`, SendGrid `SG.`, …); `.gitignore` covers them. (The Firebase WEB `apiKey` is public by design — do NOT flag it.) |
 | U-09 | HIGH | B | Source discipline — no live code referencing `_legacy/` / `_backup/`; framework edits in `src/` (never `dist/`) ([common-mistakes.md](common-mistakes.md)) |
 | U-10 | MED | B | Doc parity — README / the framework guide / `docs/` / CHANGELOG match shipped behavior; the docs index lists every `docs/*.md`; no stale names for renamed commands/patterns |
 | U-11 | MED | B | SSOT/DRY — no duplicated constants/config/logic; one authoritative home per value, imported everywhere else |
 | U-12 | MED | B | JS conventions — file structure, JSDoc, short-circuit returns, leading logical operators, `fs-jetpack`, one `module.exports` per file ([code-patterns.md](code-patterns.md) + global `js:patterns` skill) |
-| U-13 | MED | B | Dead code & stale patterns — no orphaned files nothing imports; no leftovers of migrated-away formats (constructor routes, tiered schemas, `Manager.config.*` reads — [migration.md](migration.md)); inventory TODO/FIXME (report only) |
+| U-13 | MED | B | Dead code & stale patterns: no orphaned files nothing imports; no leftovers of migrated-away formats (constructor routes, tiered schemas, legacy config reads, see [migration.md](migration.md)); inventory TODO/FIXME (report only) |
 | U-14 | LOW | B | Dependency health — review `npm outdated` / `npm audit` (in `functions/`); apply fixes via the `general:update-packages` workflow (includes supply-chain checks) |
 
 ## @omega.js/backend-specific checks
 
 | ID | Sev | Scope | Check |
 |----|-----|-------|-------|
-| BKD-01 | HIGH | B | Every custom route has a name-matched schema; handlers are context-object exports (`async ({ Manager, ctx, … }) => {}`) — no legacy constructor routes ([routes.md](routes.md), [schemas.md](schemas.md)) |
+| BKD-01 | HIGH | B | Every custom route has a name-matched schema; handlers are one-object exports (`async ({ ctx, omega, user, data }) => {}`), no legacy constructor routes ([routes.md](routes.md), [schemas.md](schemas.md)) |
 | BKD-02 | HIGH | B | Schema field rules — never `required: true` + `default` together (required is checked BEFORE defaults; use `min: 1` for path-extracted IDs); flat schema with in-function plan branching, no tier arrays ([schemas.md](schemas.md)) |
 | BKD-03 | HIGH | B | Route handlers — ownership checks on PUT/DELETE; plural-noun route names; `ctx.respond()` only (never `res.send()`) ([routes.md](routes.md), [common-operations.md](common-operations.md)) |
 | BKD-04 | HIGH | C | Wiring — every route exported in `functions/index.js`; `firebase.json` rewrites use bracket syntax, ordered most-specific-first ([routes.md](routes.md)) |
@@ -57,7 +57,7 @@ Only when auditing the @omega.js/backend repo itself. Mirrored across the four f
 
 | ID | Sev | Check |
 |----|-----|-------|
-| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, guide skeleton, shared env/test conventions) in sync with UJM / BXM / EM; deviations are deliberate and documented |
+| F-01 | MED | Sister parity: mirrored sections (config shapes, test contract, guide skeleton, shared env/test conventions) in sync with web, extension and desktop; deviations are deliberate and documented |
 | F-02 | HIGH | Consumer-shipped defaults in sync — what `ensureTarget()` scaffolds (every verb runs it) matches current conventions and docs |
 | F-03 | MED | Docs completeness — every `docs/*.md` indexed in the framework guide; every subsystem has a doc; no "(planned)" links for things that have shipped |
 | F-04 | HIGH | `npx omega test mgr:` green before treating the audit as complete |

@@ -1,16 +1,16 @@
 # Cross-Browser API Wrapper (`lib/extension.js`)
 
-A singleton that normalizes the `chrome.*` / `browser.*` extension API surface so consumers write their extension once and it works on Chrome, Firefox, Edge, and other Chromium-based browsers.
+One shared module object that normalizes the `chrome.*` / `browser.*` extension API surface so consumers write their extension once and it works on Chrome, Firefox, Edge, and other Chromium-based browsers.
 
 ## Import
 
 ```js
 const ext = require('@omega.js/extension/lib/extension');
 
-// or as a Manager property:
-const Manager = new (require('@omega.js/extension/popup'));
-await Manager.initialize();
-const { extension } = Manager;     // same singleton
+// or as a property of the context's instance:
+import omega from '@omega.js/extension/popup';
+await omega.initialize();
+const { extension } = omega;     // the same object
 ```
 
 ## How it works
@@ -20,7 +20,7 @@ For each known extension API, the wrapper tries in order:
 2. `browser.<api>` (Firefox)
 3. `browser.extension.<api>` (legacy Firefox fallback)
 
-The first one that resolves becomes the singleton's `<api>` property. `window` is deliberately never probed: no chrome extension API lives on it, and DOM globals of the same name (`window.history` in any DOM context) would shadow the real API. Each lookup is wrapped in try/catch so unknown globals don't throw at module-load time — that's what makes the wrapper safe to import from Node contexts too (where none of these globals exist).
+The first one that resolves becomes the wrapper's `<api>` property. `window` is deliberately never probed: no chrome extension API lives on it, and DOM globals of the same name (`window.history` in any DOM context) would shadow the real API. Each lookup is wrapped in try/catch so unknown globals don't throw at module-load time, which is what makes the wrapper safe to import from Node contexts too (where none of these globals exist).
 
 ## Supported APIs
 
@@ -43,30 +43,28 @@ If a browser doesn't expose a given API, the property is `null` (not undefined),
 ## Usage
 
 ```js
-const Manager = new (require('@omega.js/extension/popup'));
-await Manager.initialize();
-const { extension } = Manager;
+import omega from '@omega.js/extension/popup';
+await omega.initialize();
+const { extension } = omega;
 
 // Works on Chrome, Firefox, Edge — identical call sites
 extension.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   console.log('Active tab:', tabs[0]);
 });
 
-extension.storage.get('key', (result) => { /* ... */ });
+extension.storage.sync.get('key', (result) => { /* ... */ });
 extension.runtime.sendMessage({ type: 'hello' });
 extension.notifications.create({ /* ... */ });
 ```
 
-## Storage normalization
+## Storage
 
-The wrapper auto-resolves `storage` to `storage.sync` when available (preferred — synced across the user's Chrome sign-in), falling back to `storage.local` when sync isn't available (e.g. some Firefox MV2 contexts).
+`extension.storage` is the browser's whole `storage` namespace, the same object `chrome.storage` is, so pick the area on every call: `.sync` (synced across the user's browser sign-in, small quota), `.local` (this machine, larger quota) or `.session` (in memory, gone when the browser closes).
 
 ```js
-extension.storage.set({ foo: 'bar' });
-extension.storage.get('foo', (result) => console.log(result.foo));
+await extension.storage.sync.set({ foo: 'bar' });
+const { foo } = await extension.storage.sync.get('foo');
 ```
-
-If you specifically need local-only storage (per-machine, larger quota), use `chrome.storage.local.*` directly — bypass the wrapper.
 
 ## Node-safe by design
 
@@ -89,5 +87,5 @@ ctx.expect(ext.runtime).toBeNull();   // no chrome global in Node
 
 ## See also
 
-- [managers.md](managers.md) — every Manager exposes `extension` after `initialize()`
+- [contexts.md](contexts.md): every context's `omega` carries `extension`
 - [components.md](components.md) — which API surface is available in which context

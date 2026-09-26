@@ -35,7 +35,7 @@ drift on how an icon name resolves or what the served SVG looks like.
   `metadata/icon-families.json` for aliases (`search` → `magnifying-glass`).
   Declared dependencies ride into packaged apps automatically (fs reads
   through the asar transparently).
-- **Main lib** (`lib/fontawesome.js`) — `manager.fontawesome.get(name, style)`
+- **Main lib** (`lib/fontawesome.js`): `omega.fontawesome.get(name, style)`
   resolves an icon to its SVG string (`null` for unknown names — never
   throws). Lookups are slug-sanitized via icon-core (the IPC channel can
   never read outside the icon directories) and cached per app run. Serves
@@ -61,11 +61,13 @@ drift on how an icon name resolves or what the served SVG looks like.
 ## Minimal surfaces
 
 The auto-render is wired by `initialize()`. A renderer that deliberately skips
-the full init (no @omega.js/client / auth — e.g. a lightweight popover overlay) can
-enable JUST the icon pipeline:
+`initialize()` (e.g. a lightweight popover overlay with no auth) can enable JUST
+the icon pipeline on the same instance:
 
 ```js
-new (require('@omega.js/desktop/renderer'))().enableFontAwesome();
+import omega from '@omega.js/desktop/renderer';
+
+omega.enableFontAwesome();
 ```
 
 ## Supplying Font Awesome Pro (C4 cp111)
@@ -88,7 +90,7 @@ own **prod dependency** so the set ships inside the asar.
   `window.desktop.fontawesome.get()` and swap yourself.
 - **Free set = solid + regular + brands.** Pro styles (light/duotone/sharp)
   need a supplied Pro set (above); otherwise
-  `manager.fontawesome.get(name, 'duotone')` returns `null`.
+  `omega.fontawesome.get(name, 'duotone')` returns `null`.
 - **Updating the set** — bump the `@fortawesome/fontawesome-free` dependency
   (or reinstall/refresh the brand's Pro supply).
 

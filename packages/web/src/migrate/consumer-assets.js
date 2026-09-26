@@ -9,7 +9,7 @@
  *   main takes over. Detected by comment/whitespace-insensitive comparison.
  * - Customized main.js → error finding with the port recipe (compose the
  *   core main: `import coreMain from '__main_assets__/js/main.js'` inside an
- *   `export default async ({ manager, options })` module). Custom logic is
+ *   `export default async ({ omega, options })` module). Custom logic is
  *   not mechanically separable from the seed boilerplate.
  * - Any OTHER src/assets/js file importing 'ultimate-jekyll-manager' →
  *   error finding (no equivalent module exists to alias).
@@ -28,9 +28,9 @@
  * them all in layer order (#624), so the self-@use would double every
  * framework rule AND self-loop through the loadPaths. The line is dropped.
  *
- * Page modules (`js/pages/**`) already match the new `{ manager, options }`
- * export-default convention and import '@omega.js/client' (aliased by the asset
- * pipeline) — they port verbatim, nothing to do.
+ * Page modules (`js/pages/**`) keep their export-default convention and port
+ * verbatim here. The context they receive is `{ omega, options }` and the
+ * instance import is '@omega.js/web/runtime' (aliased by the asset pipeline).
  */
 const fs = require('node:fs');
 const path = require('node:path');

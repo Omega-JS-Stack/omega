@@ -25,14 +25,14 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const postRoute = require('../../../dist/manager/routes/user/connections/post.js');
-const { encryptState } = require('../../../dist/manager/routes/user/connections/_state.js');
-const { assertProviderShape } = require('../../../dist/manager/routes/user/connections/_providers.js');
-const google = require('../../../dist/manager/routes/user/connections/providers/google.js');
-const discord = require('../../../dist/manager/routes/user/connections/providers/discord.js');
-const spotify = require('../../../dist/manager/routes/user/connections/providers/spotify.js');
-const twitch = require('../../../dist/manager/routes/user/connections/providers/twitch.js');
-const kick = require('../../../dist/manager/routes/user/connections/providers/kick.js');
+const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
+const { encryptState } = require('../../../dist/omega/routes/user/connections/_state.js');
+const { assertProviderShape } = require('../../../dist/omega/routes/user/connections/_providers.js');
+const google = require('../../../dist/omega/routes/user/connections/providers/google.js');
+const discord = require('../../../dist/omega/routes/user/connections/providers/discord.js');
+const spotify = require('../../../dist/omega/routes/user/connections/providers/spotify.js');
+const twitch = require('../../../dist/omega/routes/user/connections/providers/twitch.js');
+const kick = require('../../../dist/omega/routes/user/connections/providers/kick.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDER_ID = 'identity-fixture-793';
@@ -91,18 +91,18 @@ function lane({ source = providerSource(), matches = [] } = {}) {
     matches,
   });
 
-  const Manager = {
+  const omega = {
     cwd,
-    libraries: { admin },
+    firebase: { admin },
     project: { websiteUrl: 'https://brand.test' },
     config: { brand: { name: 'Test Brand' } },
-    Metadata: () => ({ set: () => ({}) }),
   };
 
   const responses = [];
 
   const ctx = {
-    Manager,
+    omega,
+    metadata: () => ({}),
     log() {},
     respond: (message, options) => {
       responses.push({ message, options: options || {} });
@@ -123,7 +123,7 @@ async function tokenize(options) {
   const thrown = await postRoute({
     ctx: wired.ctx,
     user: {},
-    settings: { action: 'tokenize', code: 'auth-code-793', encryptedState },
+    data: { action: 'tokenize', code: 'auth-code-793', encryptedState },
   }).catch((e) => e);
 
   return { ...wired, thrown, answer: wired.responses[wired.responses.length - 1] || {} };

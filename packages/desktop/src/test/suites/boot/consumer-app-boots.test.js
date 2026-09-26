@@ -1,8 +1,8 @@
-// Boot-layer self-test — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the
-// site boot?" (UJM). The boot runner esbuild-builds the bundled fixture consumer
+// Boot-layer self-test — @omega.js/desktop's analog of "does the extension load?" /
+// "does the site boot?". The boot runner esbuild-builds the bundled fixture consumer
 // (src/test/fixtures/consumer-app) into a real main.bundle.js, spawns Electron with
 // it (the actual production boot path — bundled, not the unbundled lib code that the
-// `main` layer exercises), then runs these inspects against the live manager.
+// `main` layer exercises), then runs these inspects against the live omega instance.
 //
 // In @omega.js/desktop's own test run, OMEGA_TEST_BOOT_PROJECT points at the fixture (auto-set in
 // src/commands/test.js when the cwd is the @omega.js/desktop repo). In a real consumer's
@@ -11,7 +11,7 @@
 // boot tests under <cwd>/test/boot/.
 //
 // NOTE: inspect bodies are serialized to the spawned Electron process — no closures over
-// module scope. `require`, `process`, and `Buffer` are injected; { manager, expect,
+// module scope. `require`, `process`, and `Buffer` are injected; { omega, expect,
 // projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore } is the inspect argument
 // (projectRoot = the fixture root; appRoot = the staged target root holding the build).
 
@@ -24,25 +24,25 @@ module.exports = defineCases({
   timeout: 30000,
   tests: [
     {
-      description: 'manager initialized with all core libs wired',
-      inspect: async ({ manager, expect }) => {
-        expect(manager).toBeTruthy();
-        expect(manager._initialized).toBe(true);
-        for (const lib of ['storage', 'ipc', 'windows', 'tray', 'menu', 'contextMenu', 'omega']) {
-          expect(Boolean(manager[lib])).toBe(true);
+      description: 'omega initialized with all core libs wired',
+      inspect: async ({ omega, expect }) => {
+        expect(omega).toBeTruthy();
+        expect(omega._initialized).toBe(true);
+        for (const lib of ['storage', 'ipc', 'windows', 'tray', 'menu', 'contextMenu', 'auth']) {
+          expect(Boolean(omega[lib])).toBe(true);
         }
       },
     },
 
     {
       description: 'the fixture main.js created the main window and loaded the built view',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const { BrowserWindow } = require('electron');
 
         // windows.create() runs inside the consumer's initialize().then(); poll for it.
         let url = '';
         for (let i = 0; i < 40; i++) {
-          const win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
           if (win && !win.isDestroyed()) {
             url = win.webContents.getURL();
             if (url.includes('/views/main/')) break;
@@ -50,23 +50,23 @@ module.exports = defineCases({
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        expect(Boolean(manager.windows.get('main'))).toBe(true);
+        expect(Boolean(omega.windows.get('main'))).toBe(true);
         expect(url.includes('/views/main/')).toBe(true);
       },
     },
 
     {
       description: 'test stealth: app activation suppressed — dock hidden (macOS)',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         if (process.platform !== 'darwin') {
           return; // accessory activation policy / dock is macOS-only
         }
-        // Manager.initialize step 1a hides the dock under the stealth predicate,
+        // omega.initialize step 1a hides the dock under the stealth predicate,
         // so the spawned consumer app never activates and never steals keyboard
         // focus from the developer's editor.
         const { app } = require('electron');
         expect(app.dock.isVisible()).toBe(false);
-        expect(manager.isTesting()).toBe(true);
+        expect(omega.isTesting()).toBe(true);
       },
     },
 
@@ -83,8 +83,8 @@ module.exports = defineCases({
     {
       // #111 — the fixture's renderer entry imports the vendored app-shell
       // module through the `__main_assets__` alias. Its declarative contract
-      // showing up in the built bundle proves the whole chain: esbuild alias →
-      // @omega.js/desktop's vendored dist asset → its @omega.js/client import.
+      // showing up in the built bundle proves the chain: esbuild alias →
+      // @omega.js/desktop's vendored dist asset.
       description: 'renderer bundle carries the vendored app-shell module via __main_assets__',
       inspect: async ({ expect, appRoot }) => {
         const fs = require('fs');
@@ -105,12 +105,12 @@ module.exports = defineCases({
       // line the bridge logs next is out of reach here, because the fixture's
       // `cloud.config` is empty and this boot never initializes Firebase auth.)
       description: 'the booted app runs in the lane environment, not the one baked into its bundle (#925)',
-      inspect: async ({ manager, expect, projectRoot }) => {
+      inspect: async ({ omega, expect, projectRoot }) => {
         const fs = require('fs');
         const path = require('path');
 
-        expect(manager.isTesting()).toBe(true);
-        expect(manager.config.environment).toBe('production');   // the artifact IS a production build
+        expect(omega.isTesting()).toBe(true);
+        expect(omega.config.environment).toBe('production');   // the artifact IS a production build
 
         const log = fs.readFileSync(path.join(projectRoot, 'logs', 'runtime.log'), 'utf8');
         expect(log.includes('auth persistence: none (test mode)')).toBe(true);
@@ -118,11 +118,11 @@ module.exports = defineCases({
     },
 
     {
-      // #925: a page has no `process`, so its Manager reads the baked word. The
+      // #925: a page has no `process`, so its instance reads the baked word. The
       // preload hands the running one over on `window.desktop`, and the renderer
       // bootstrap applies it, so this window answers what main answers.
       description: 'the main window renderer answers the lane environment too (#925)',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const { BrowserWindow } = require('electron');
 
         // The window is created in the consumer's initialize().then(), and its
@@ -131,10 +131,10 @@ module.exports = defineCases({
         let answer = null;
         let win = null;
         for (let i = 0; i < 40; i++) {
-          win = manager.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
           if (win && !win.isDestroyed() && !win.webContents.isLoading()) {
             answer = await win.webContents.executeJavaScript(
-              'window.__omegaManager && window.__omegaManager.config ? window.__omegaManager.getEnvironment() : null',
+              'window.__omegaInstance && window.__omegaInstance.config.environment ? window.__omegaInstance.getEnvironment() : null',
             );
             if (answer) break;
           }
@@ -146,7 +146,38 @@ module.exports = defineCases({
 
         expect(baked).toBe('production');     // what the build baked
         expect(bridged).toBe('testing');      // what the preload read off the lane
-        expect(answer).toBe('testing');       // what the renderer's Manager answers
+        expect(answer).toBe('testing');       // what the renderer's instance answers
+      },
+    },
+
+    {
+      // The renderer builds `omega.shell` from ITSELF with the vendored app
+      // shell's createShell(omega), exactly as web builds it; the fixture binds
+      // the same export through the `__main_assets__` alias (#111).
+      description: 'the main window renderer carries omega.shell, built by createShell(omega)',
+      inspect: async ({ omega, expect }) => {
+        const { BrowserWindow } = require('electron');
+
+        let probe = null;
+        for (let i = 0; i < 40; i++) {
+          const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
+          if (win && !win.isDestroyed() && !win.webContents.isLoading()) {
+            probe = await win.webContents.executeJavaScript(`(() => {
+              const instance = window.__omegaInstance;
+              if (!instance || !instance.shell) return null;
+              return {
+                createShell: typeof window.__omegaCreateShell,
+                isCollapsed: typeof instance.shell.isCollapsed,
+                toggleOpen: typeof instance.shell.toggleOpen,
+                desktopIsBridge: instance.desktop === window.desktop,
+              };
+            })()`);
+            if (probe) break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        expect(probe).toEqual({ createShell: 'function', isCollapsed: 'function', toggleOpen: 'function', desktopIsBridge: true });
       },
     },
   ],

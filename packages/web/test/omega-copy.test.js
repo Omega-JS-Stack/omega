@@ -48,7 +48,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -153,7 +153,7 @@ function makeClient({ fail = false } = {}) {
   return {
     copied,
     notifications,
-    utilities: () => ({
+    utilities: {
       clipboardCopy: async (value) => {
         if (fail) {
           throw new Error('clipboard denied');
@@ -161,7 +161,7 @@ function makeClient({ fail = false } = {}) {
         copied.push(value);
       },
       showNotification: (message, type) => { notifications.push({ message, type }); },
-    }),
+    },
   };
 }
 

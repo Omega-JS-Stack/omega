@@ -98,7 +98,7 @@ pinned by `packages/manager/test/workspace-translation-sdk.test.js`).
   only fail the same way — the playground's ship-the-docs page came back
   25-for-26 on all six attempts, in both languages, and shipped untranslated.
   A single string that still will not come back whole throws, and the caller
-  skips that page-language pair whole (never half-translated).
+  ships that page-language pair untranslated (never half-translated).
 - Original leading/trailing whitespace is re-applied to every translation.
 - Rules baked into the system prompt: preserve HTML/URLs/placeholders
   (`$1`, `{name}`, `{{ value }}`), never translate the brand name.
@@ -133,12 +133,20 @@ pages, inside the package ([below](#framework-shipped-default-page-translations-
 strings come from the committed cache instantly, cold strings translate live
 through the provider — a build ships the COMPLETE translated site whenever
 the provider delivers, and a warm cache means zero provider calls. A provider
-FAILURE skips that page-language pair whole, warning loudly with the page and
-the language (the build still exits 0): no half-translated copy ever ships
+FAILURE ships that page-language pair UNTRANSLATED, warning loudly with the page
+and the language (the build still exits 0): no half-translated copy ever ships
 behind full language chrome.
-`omega build --cached-only` skips cold page-language pairs WHOLE instead (no
-mixed-language copies, hreflang stays honest; the warning lists them) for
-provider-free builds.
+`omega build --cached-only` ships cold page-language pairs UNTRANSLATED instead
+(the warning lists them) for provider-free builds; `omega translate` fills them.
+An untranslated pair still lands the SOURCE page at its translated path
+(`dist/{lang}/...`, `{lang}.html` for the home) with its links rewritten into
+the language, because every produced copy links there and a missing file is a
+dead link that fails `omega test`'s link check and ships with `omega deploy`
+([#953](https://github.com/Omega-JS-Stack/omega/issues/953)). It is never
+ADVERTISED: its `<html lang dir>` and `og:locale` name the source language its
+text is in, its canonical and `og:url` stay the source page's (it duplicates
+that page), no hreflang alternate names it (on it or on the original), and the
+sitemap does not list it.
 `omega translate` still runs the live pass standalone against an existing
 dist/ and exits 1 on failures. `OMEGA_TRANSLATE_ONLY=<route>` limits any of
 these to one page (canary/debug).
@@ -148,7 +156,7 @@ Per page × language: text nodes/`<title>`/meta/attribute copy translate
 (RTL-aware), canonical + `og:url` + `og:locale` localized, internal links
 rewritten to `/{lang}/...`, and hreflang + `og:locale:alternate` tags
 stitched into BOTH the copy and the original — naming only the languages
-actually PRODUCED for that page (a pair skipped cold or failed is never
+actually PRODUCED for that page (a pair left untranslated, cold or failed, is never
 advertised, on the copies as on the originals), so hreflang never lies.
 `og:locale` carries Open Graph's `language_TERRITORY` form (`en_US`,
 `es_ES`) from the devkit language SSOT's locale map — on translated copies
@@ -281,8 +289,8 @@ as its own `<url>`, and each entry of a translated set — source and copies
 alike — carries the full `xhtml:link rel="alternate"` list (`x-default` at the
 source language) plus the source entry's `lastmod`/`changefreq`/`priority`.
 Entries stay in loc byte order. The language-prefixed entries are owned by that
-pass: each run drops them all and re-emits only what it produced, so a skipped
-or failed pair is listed nowhere.
+pass: each run drops them all and re-emits only what it produced, so an
+untranslated pair (cold or failed) is listed nowhere.
 
 The visitor-facing **language switcher** is the footer dropup in the shared
 base footer include (`_includes/frontend/sections/footer.html`, the base layer
@@ -322,7 +330,8 @@ list in `gulp/config/locales.js` is gone (only the CWS `limits` remain there).
   language SSOT, settings reader (fake `send`).
 - web `test/translate.test.js` — handcrafted dist through the real pipeline:
   copies/chrome/links/exclusions/alternates/cache/override/only-filter, the
-  produced-languages-only alternates, and the loud failure skip.
+  produced-languages-only alternates, and the untranslated-copy fallback
+  (cold and failed pairs land unadvertised, no language link dangles).
 - web `test/language-switcher.test.js` — the switcher's DOM read (x-default
   dropped, duplicates collapsed, current marked, escaping) and the built footer
   mount in classy and newsflash.

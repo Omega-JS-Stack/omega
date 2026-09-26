@@ -13,7 +13,7 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-code',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/payments/discount');
+        const response = await http.as('none').get('omega/payments/discount');
 
         assert.isError(response, 400, 'Should reject missing code');
       },
@@ -22,7 +22,7 @@ module.exports = defineCases({
     {
       name: 'returns-valid-for-known-code',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/payments/discount', {
+        const response = await http.as('none').get('omega/payments/discount', {
           code: 'FLASH20',
         });
 
@@ -37,7 +37,7 @@ module.exports = defineCases({
     {
       name: 'returns-valid-case-insensitive',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/payments/discount', {
+        const response = await http.as('none').get('omega/payments/discount', {
           code: 'flash20',
         });
 
@@ -50,7 +50,7 @@ module.exports = defineCases({
     {
       name: 'returns-invalid-for-unknown-code',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/payments/discount', {
+        const response = await http.as('none').get('omega/payments/discount', {
           code: 'NOTAREALCODE',
         });
 
@@ -69,7 +69,7 @@ module.exports = defineCases({
         ];
 
         for (const { code, percent } of codes) {
-          const response = await http.as('none').get('backend-manager/payments/discount', { code });
+          const response = await http.as('none').get('omega/payments/discount', { code });
 
           assert.isSuccess(response, `Should succeed for ${code}`);
           assert.equal(response.data.valid, true, `${code} should be valid`);

@@ -4,7 +4,7 @@
  * States: initializing → ready ⇄ submitting → ready (or submitted)
  *
  * Usage:
- *   const formManager = new FormManager('#my-form', { options });
+ *   const formManager = new FormManager(omega, '#my-form', { options });
  *   formManager.on('submit', async (data) => {
  *     const response = await fetch('/api', { body: JSON.stringify(data) });
  *     if (!response.ok) throw new Error('Failed');
@@ -13,7 +13,6 @@
 
 // Libraries
 import { ready as domReady } from './dom.js';
-import omega from '../index.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('form-manager');
@@ -40,8 +39,20 @@ function _sharedBeforeUnloadHandler(e) {
   }
 }
 
+/**
+ * One form's state machine. Constructed per form, and handed the Omega
+ * instance it runs on (for utilities) instead of importing one.
+ */
 export class FormManager {
-  constructor(selector, options = {}) {
+  /**
+   * @param {object} omega - the Omega instance this form runs on.
+   * @param {string|HTMLFormElement} selector - the form, or a selector for it.
+   * @param {object} [options] - see the configuration defaults below.
+   */
+  constructor(omega, selector, options = {}) {
+    // The instance this form runs on
+    this.omega = omega;
+
     // Get form element
     this.$form = typeof selector === 'string'
       ? document.querySelector(selector)
@@ -321,7 +332,7 @@ export class FormManager {
 
     // Focus the field with autofocus attribute if it exists (desktop only)
     const $autofocusField = this.$form.querySelector('[autofocus]');
-    if ($autofocusField && !$autofocusField.disabled && omega.utilities().getDevice() === 'desktop') {
+    if ($autofocusField && !$autofocusField.disabled && this.omega.utilities.getDevice() === 'desktop') {
       this._focusField($autofocusField);
     }
   }
@@ -924,7 +935,7 @@ export class FormManager {
         $btn._originalHTML = $btn.innerHTML;
         const text = this.config.submittingText;
         $btn.innerHTML = text
-          ? `<span class="spinner-border spinner-border-sm me-2"></span>${omega.utilities().escapeHTML(text)}`
+          ? `<span class="spinner-border spinner-border-sm me-2"></span>${this.omega.utilities.escapeHTML(text)}`
           : '<span class="spinner-border spinner-border-sm"></span>';
       } else if ($btn._originalHTML) {
         $btn.innerHTML = $btn._originalHTML;
@@ -1080,7 +1091,7 @@ export class FormManager {
     }
     /* @dev-only:end */
 
-    omega.utilities().showNotification(message, { type: 'success' });
+    this.omega.utilities.showNotification(message, { type: 'success' });
   }
 
   /**
@@ -1093,7 +1104,7 @@ export class FormManager {
     }
     /* @dev-only:end */
 
-    omega.utilities().showNotification(message, { type: 'danger' });
+    this.omega.utilities.showNotification(message, { type: 'danger' });
   }
 
   /**

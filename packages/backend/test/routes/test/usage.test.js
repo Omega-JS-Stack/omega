@@ -35,7 +35,7 @@ module.exports = defineCases({
     {
       name: 'consume-default',
       async run({ http, assert, state }) {
-        const response = await http.as('basic').post('backend-manager/test/usage', {});
+        const response = await http.as('basic').post('omega/test/usage', {});
 
         assert.isSuccess(response, 'Usage consume should succeed');
         assert.hasProperty(response, 'data.feature', 'Response should contain the feature name');
@@ -98,7 +98,7 @@ module.exports = defineCases({
     {
       name: 'consume-custom-amount',
       async run({ http, assert, state }) {
-        const response = await http.as('basic').post('backend-manager/test/usage', {
+        const response = await http.as('basic').post('omega/test/usage', {
           amount: 5,
         });
 
@@ -147,17 +147,17 @@ module.exports = defineCases({
       name: 'multiple-consumes-accumulate',
       async run({ http, assert, state }) {
         // First consume
-        const response1 = await http.as('basic').post('backend-manager/test/usage', {});
+        const response1 = await http.as('basic').post('omega/test/usage', {});
 
         assert.isSuccess(response1, 'First consume should succeed');
 
         // Second consume
-        const response2 = await http.as('basic').post('backend-manager/test/usage', {});
+        const response2 = await http.as('basic').post('omega/test/usage', {});
 
         assert.isSuccess(response2, 'Second consume should succeed');
 
         // Third consume with a custom amount
-        const response3 = await http.as('basic').post('backend-manager/test/usage', {
+        const response3 = await http.as('basic').post('omega/test/usage', {
           amount: 3,
         });
 
@@ -187,7 +187,7 @@ module.exports = defineCases({
         // Unauthenticated requests use IP as key (no proxy headers in emulator, so falls back to 'unknown')
         state.unauthKey = 'unknown';
 
-        const response = await http.as('none').post('backend-manager/test/usage', {});
+        const response = await http.as('none').post('omega/test/usage', {});
 
         assert.isSuccess(response, 'Unauthenticated usage consume should succeed');
         assert.equal(response.data.authenticated, false, 'Should report as unauthenticated');
@@ -306,7 +306,7 @@ module.exports = defineCases({
       name: 'daily-counter-accumulates-after-reset',
       async run({ http, assert }) {
         // After cron reset the day counter to 0, new consumes start from 0
-        const response = await http.as('basic').post('backend-manager/test/usage', {
+        const response = await http.as('basic').post('omega/test/usage', {
           amount: 3,
         });
 
@@ -331,7 +331,7 @@ module.exports = defineCases({
     {
       name: 'negative-amount-clamps-to-zero',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/test/usage', {
+        const response = await http.as('basic').post('omega/test/usage', {
           amount: -5,
         });
 
@@ -356,7 +356,7 @@ module.exports = defineCases({
     {
       name: 'negative-amount-clamps-for-unauthenticated-callers',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/test/usage', {
+        const response = await http.as('none').post('omega/test/usage', {
           amount: -5,
         });
 

@@ -1,6 +1,6 @@
-// Auth Flow — the framework-owned sign-in round trip: `manager.openAuthFlow()`.
+// Auth Flow — the framework-owned sign-in round trip: `omega.openAuthFlow()`.
 //
-// Opens the user's REAL default browser on manager.getAuthUrl()'s /signin → /token
+// Opens the user's REAL default browser on omega.getAuthUrl()'s /signin → /token
 // chain — never an embedded window, so sign-in rides the user's own browser session
 // (SSO with whatever they're already logged into). What differs per environment is
 // only the RETURN CHANNEL for the minted token:
@@ -25,12 +25,12 @@
 // return), and self-expiring (default 5 min). The browser tab gets a tiny
 // "return to the app" page on success.
 //
-// Public API (via manager):
-//   manager.openAuthFlow(options?)  → Promise<{ url, port? }> — resolves once the flow
+// Public API (via omega):
+//   omega.openAuthFlow(options?)  → Promise<{ url, port? }> — resolves once the flow
 //                                     is LAUNCHED; completion arrives later through
-//                                     auth/token → omega.handleAuthToken →
+//                                     auth/token → auth.handleToken →
 //                                     the desktop:auth:sign-in-with-token broadcast.
-//   manager.authFlow.cancel()       → tear down a pending dev listener (idempotent).
+//   omega.authFlow.cancel()       → tear down a pending dev listener (idempotent).
 
 const crypto = require('crypto');
 const http = require('http');
@@ -43,26 +43,26 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 const authFlow = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _pending:     null,   // { server, nonce, timer, port } — the one in-flight dev listener
 
-  initialize(manager) {
+  initialize(omega) {
     if (authFlow._initialized) {
       return;
     }
-    authFlow._manager = manager;
+    authFlow._omega = omega;
     authFlow._initialized = true;
   },
 
   // Open the sign-in flow in the user's default browser. Resolves once the flow is
   // launched — NOT when the user finishes signing in.
   async open(options) {
-    const manager = authFlow._manager;
+    const omega = authFlow._omega;
     options = options || {};
 
     // Production: the OS routes the custom scheme back to us — plain external open.
-    if (manager.isProduction()) {
-      const url = manager.getAuthUrl();
+    if (omega.isProduction()) {
+      const url = omega.getAuthUrl();
       require('electron').shell.openExternal(url);
       logger.log(`production — opened ${url}`);
       return { url };
@@ -89,7 +89,7 @@ const authFlow = {
     authFlow._pending = { server, nonce, timer, port };
 
     const returnUrl = `http://127.0.0.1:${port}/auth/token?state=${nonce}`;
-    const url = manager.getAuthUrl(null, returnUrl);
+    const url = omega.getAuthUrl(null, returnUrl);
     require('electron').shell.openExternal(url);
     logger.log(`dev — loopback listener on 127.0.0.1:${port}, opened ${url}`);
     return { url, port };
@@ -113,7 +113,7 @@ const authFlow = {
   },
 
   _handleRequest(req, res) {
-    const manager = authFlow._manager;
+    const omega = authFlow._omega;
     const pending = authFlow._pending;
     const url = new URL(req.url, 'http://127.0.0.1');
 
@@ -136,18 +136,18 @@ const authFlow = {
     }
 
     // Valid return: reply, tear down, then feed the SAME pipeline production uses.
-    const appName = manager.config?.brand?.name || 'the app';
+    const appName = omega.config?.brand?.name || 'the app';
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', Connection: 'close' });
     res.end(authFlow._page('Signed in', `You can close this tab and return to ${appName}.`));
     authFlow.cancel();
 
-    const brandId = manager.config.brand.id;
-    manager.deepLink.dispatch(`${brandId}://auth/token?authToken=${encodeURIComponent(token)}`);
+    const brandId = omega.config.brand.id;
+    omega.deepLink.dispatch(`${brandId}://auth/token?authToken=${encodeURIComponent(token)}`);
 
     // The browser held focus during sign-in — bring the app back to the front,
     // mirroring what a real OS deep-link arrival does. windows.show is the
     // stealth-aware surface (raw win.show() would flash windows during tests).
-    manager.windows.show('main');
+    omega.windows.show('main');
   },
 
   _page(title, message) {

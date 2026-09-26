@@ -2,19 +2,19 @@
 
 Runtime info block. Mirrors @omega.js/backend's `assistant.request.{geolocation,client}` shape so @omega.js/desktop apps + sister projects (@omega.js/backend, UJM, @omega.js/client) all reference the same property paths when reading user info.
 
-Populated asynchronously during `manager.initialize()`.
+Populated asynchronously during `omega.initialize()`.
 
 ## Shape
 
 ```js
-manager.context.geolocation = {
+omega.context.geolocation = {
   ip:      '203.0.113.42',     // async-fetched via ipify
   country: null,               // future enhancement
   region:  null,
   city:    null,
 };
 
-manager.context.client = {
+omega.context.client = {
   userAgent: 'Mozilla/5.0 ...',  // app.userAgentFallback
   locale:    'en-US',            // app.getLocale()
   platform:  'darwin',           // os.platform()
@@ -22,15 +22,15 @@ manager.context.client = {
   mobile:    false,              // always false on @omega.js/desktop (desktop framework)
 };
 
-manager.context.session = {
+omega.context.session = {
   id:        '<uuid>',           // fresh per launch (crypto.randomUUID)
   startTime: '2026-05-08T...',   // ISO at boot
   deviceId:  '<uuid or MAC>',    // stable per-machine
 };
 
-manager.context.app = {
-  version:     '1.2.3',          // manager.getVersion()
-  environment: 'production',     // manager.getEnvironment()
+omega.context.app = {
+  version:     '1.2.3',          // omega.getVersion()
+  environment: 'production',     // omega.getEnvironment()
   isPackaged:  true,             // app.isPackaged
 };
 ```
@@ -54,9 +54,9 @@ Failure mode: a failed ipify fetch leaves the previous cached value untouched. T
 ## API
 
 ```js
-manager.context.geolocation.ip            // direct read
-manager.context.session.deviceId          // direct read
-const snap = manager.context.toJSON();    // structured-cloneable snapshot
+omega.context.geolocation.ip            // direct read
+omega.context.session.deviceId          // direct read
+const snap = omega.context.toJSON();    // structured-cloneable snapshot
 ```
 
 Renderer:
@@ -71,7 +71,7 @@ console.log(snap.session.deviceId);
 Sister projects (@omega.js/backend, @omega.js/client, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omega.js/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
 
 ```js
-const country = manager.context.geolocation.country
+const country = omega.context.geolocation.country
              || assistant.request.geolocation.country  // @omega.js/backend
              || omega.context.geolocation.country;
 ```

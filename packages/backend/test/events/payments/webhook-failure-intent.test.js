@@ -51,7 +51,7 @@ module.exports = defineCases({
       async run({ http, assert, state, config }) {
         // Carries the orderId but no uid, and names a subscription no order was ever
         // written for — so nothing can reconstruct the uid and processing throws
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'customer.subscription.updated',
           data: {

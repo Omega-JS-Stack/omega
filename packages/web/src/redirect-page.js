@@ -1,7 +1,6 @@
 /**
  * The ONE shape of a GENERATED redirect page (#429 socials, #561 download and
- * extension shortlinks). Legacy UJM hand-maintained these as default pages in
- * `src/defaults/dist/redirects/**`; here they are source strings registered as
+ * extension shortlinks): source strings registered as
  * virtual templates on the same lane as the framework's default pages
  * (engine.js), so they ride `modules/utilities/redirect` (noindex +
  * sitemap-excluded by the layout) and a consumer page at the same permalink

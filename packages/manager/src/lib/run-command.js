@@ -9,7 +9,7 @@
  * brand can span Node majors (web 24, backend 22) without a single nvm
  * switch. A pinned-but-missing major fails fast with
  * the `nvm install` to run. If a command rewrites the .nvmrc and THEN
- * fails (EM setup bumps the pin when Electron's bundled Node moved), it is
+ * fails (the desktop target's ensure step bumps the pin when Electron's bundled Node moved), it is
  * re-resolved and retried once — one run self-heals instead of two.
  *
  * A `prefix` turns on the PREFIXED mode the deploy fan-out's parallel group
@@ -112,8 +112,8 @@ async function runCommand(command, args, cwd, extraEnv, options = {}) {
     return result;
   }
 
-  // Self-heal: the command may have rewritten the .nvmrc mid-run (EM setup
-  // writes the pin BEFORE its own Node check). Re-resolve; a changed pin
+  // Self-heal: the command may have rewritten the .nvmrc mid-run (the desktop
+  // target writes the pin BEFORE its own Node check). Re-resolve; a changed pin
   // gets one retry under the newly pinned Node.
   resolved = resolveTargetNode(cwd);
   if (!resolved || resolved.error || (resolved.spec || null) === specBefore) {

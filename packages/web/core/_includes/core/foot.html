@@ -49,10 +49,9 @@
           <hr class="my-4">
 
           <!-- Social proof: the subscriber line keeps its faces (#44 item 21).
-               Four real faces by default — the legacy UJM row hotlinked
-               i.pravatar.cc portraits; the shipped set is the same source's
-               adult portraits (img=5, 8, 16, 60 at 64px — the literal legacy
-               img=1..4 included a toddler and a shirtless smoker) and they
+               Four real faces by default: i.pravatar.cc's
+               adult portraits (img=5, 8, 16, 60 at 64px; img=1..4
+               include a toddler and a shirtless smoker) and they
                SHIP with the framework (core/images/exit-popup, bridged to
                /assets/images/core by the static-asset channel) because the
                framework never loads an external image at runtime. A brand
@@ -115,7 +114,8 @@
       // Read and parse localStorage data
       var managerData = localStorage.getItem('_manager');
       var parsedData = managerData ? JSON.parse(managerData) : null;
-      var isLoggedIn = !!(parsedData && parsedData.auth && parsedData.auth.user && parsedData.auth.user.uid);
+      // The stored auth state carries the User's document, so the uid sits under its `auth` branch
+      var isLoggedIn = !!(parsedData && parsedData.auth && parsedData.auth.user && parsedData.auth.user.auth && parsedData.auth.user.auth.uid);
 
       // Quit if NOT logged in
       if (!isLoggedIn) {
@@ -128,10 +128,10 @@
       $bindElements.forEach(function($el) {
         var bindValue = $el.getAttribute('data-omega-bind');
 
-        if (bindValue === '@show auth.user') {
+        if (bindValue === '@show auth.user.authenticated') {
           // Show element when user is logged in
           $el.removeAttribute('hidden');
-        } else if (bindValue === '@show !auth.user') {
+        } else if (bindValue === '@hide auth.user.authenticated') {
           // Hide element when user is logged in (show when not logged in)
           $el.setAttribute('hidden', '');
         }

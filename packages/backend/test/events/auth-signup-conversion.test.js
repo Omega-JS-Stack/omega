@@ -15,15 +15,16 @@
  * platforms that merge them and two on the one that does not, so a well-meaning
  * re-add here is exactly the regression worth a test.
  *
- * Real handler, real Manager, real ctx, real Firestore write. The record handed
+ * Real handler, real omega, real ctx, real Firestore write. The record handed
  * in is a UserRecord shape for a uid that has no doc yet — the branch a genuine
  * new account takes. No Auth user is created, so the emulator's own trigger
  * never races this one; the doc it writes is deleted afterwards.
  *
  * Run: npx omega test framework:events/auth-signup-conversion
  */
-const onCreate = require('../../dist/manager/events/auth/on-create.js');
+const onCreate = require('../../dist/omega/events/auth/on-create.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 const EVENT_CONTEXT = {
   eventType: 'providers/firebase.auth/eventTypes/user.create',
@@ -63,17 +64,16 @@ async function withConsoleRecorder(fn) {
 }
 
 /** Run the real handler for a brand-new user; hand back any delivery lines. */
-async function runHandler({ Manager, user }) {
-  const ctx = Manager.RouteContext({}, { functionName: 'omega_authOnCreate' });
-  const admin = Manager.libraries.admin;
+async function runHandler({ omega, user }) {
+  const ctx = new Context(omega, {}, { functionName: 'omega_authOnCreate' });
+  const admin = omega.firebase.admin;
 
   const calls = await withConsoleRecorder(async () => {
     await onCreate({
-      Manager: Manager,
+      omega: omega,
       ctx: ctx,
       user: user,
       context: EVENT_CONTEXT,
-      libraries: { admin: admin },
     });
   });
 
@@ -92,11 +92,11 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-new-account-writes-its-doc-and-delivers-nothing',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const user = newUserRecord('password');
 
         try {
-          const { delivery } = await runHandler({ Manager: Manager, user: user });
+          const { delivery } = await runHandler({ omega: omega, user: user });
 
           assert.deepEqual(delivery, [], `the trigger must fire no conversion — the post-auth request owns it: ${delivery.join(' | ')}`);
 
@@ -110,11 +110,11 @@ module.exports = defineCases({
 
     {
       name: 'a-provider-signup-delivers-nothing-either',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const user = newUserRecord('google.com');
 
         try {
-          const { delivery } = await runHandler({ Manager: Manager, user: user });
+          const { delivery } = await runHandler({ omega: omega, user: user });
 
           assert.deepEqual(delivery, [], `no signup path fires from the trigger: ${delivery.join(' | ')}`);
         } finally {
@@ -125,14 +125,14 @@ module.exports = defineCases({
 
     {
       name: 'an-existing-account-fires-nothing',
-      async run({ assert, Manager, accounts, firestore }) {
+      async run({ assert, omega, accounts, firestore }) {
         // A provider link or a re-fired trigger is not a registration. The
         // handler returns at its "already exists" branch, before any work.
-        const existing = await Manager.libraries.admin.auth().getUser(accounts.basic.uid);
+        const existing = await omega.firebase.admin.auth().getUser(accounts.basic.uid);
 
         assert.equal(await firestore.exists(`users/${existing.uid}`), true, 'precondition: the persona already has a doc');
 
-        const { delivery } = await runHandler({ Manager: Manager, user: existing });
+        const { delivery } = await runHandler({ omega: omega, user: existing });
 
         assert.deepEqual(delivery, [], `an existing account must fire no conversion: ${delivery.join(' | ')}`);
       },

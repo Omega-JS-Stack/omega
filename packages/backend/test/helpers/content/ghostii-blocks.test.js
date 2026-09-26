@@ -19,7 +19,7 @@
  *   - section images (non-first image blocks) STAY in the body
  *   - non-array / empty input → all empty strings
  */
-const { blocksToPost } = require('../../../dist/manager/libraries/content/ghostii.js');
+const { blocksToPost } = require('../../../dist/omega/libraries/content/ghostii.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({

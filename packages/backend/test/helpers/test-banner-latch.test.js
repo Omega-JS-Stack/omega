@@ -8,13 +8,14 @@
  * what the emulator itself already says.
  *
  * A DEPLOYED process that resolves test mode is the opposite case — that is a
- * genuine alarm, so it stays loud there, once: `Manager.init()` can run more than
+ * genuine alarm, so it stays loud there, once: `omega.initialize()` can run more than
  * once inside a single process (the test runner, a custom server, a re-entrant
  * boot), and the banner is boot information, not per-init information.
  *
- * Real everything: the real Manager module, required fresh so its process-level
- * latch starts unset (this process already spent the booted Manager's one line),
- * booted against the same project dir the suite's Manager booted from. The only
+ * Real everything: the real omega module and the test-mode watcher module,
+ * required fresh so their process-level latches start unset (this process
+ * already spent the booted omega's one line),
+ * booted against the same project dir the suite's omega booted from. The only
  * stand-in is `console`, the sink the logger writes to.
  *
  * Run: npx omega test framework:helpers/test-banner-latch
@@ -22,13 +23,16 @@
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
+const OMEGA_PATH = require.resolve('../../dist/omega/index.js');
+const TEST_MODE_PATH = require.resolve('../../dist/test/utils/test-mode-file.js');
 
-// A FRESH copy of the manager module, so the banner latch starts unset.
-function freshManagerModule() {
-  delete require.cache[MANAGER_PATH];
+// A FRESH copy of the omega module (and the watcher it installs), so the banner
+// and the resolved-mode latches start unset.
+function freshOmegaModule() {
+  delete require.cache[OMEGA_PATH];
+  delete require.cache[TEST_MODE_PATH];
 
-  return require(MANAGER_PATH);
+  return require(OMEGA_PATH);
 }
 
 // Record every console call the thunk makes, restoring console afterward.
@@ -84,18 +88,18 @@ function withTestEnvironment({ emulator }, fn) {
 const BANNER = 'Running in TEST environment';
 const RESOLVED = 'test-mode resolved TEST_EXTENDED_MODE=';
 
-// Two inits of a freshly-required manager module, with the console recorded.
-function initTwice({ Manager, assert, emulator }) {
-  const FreshManager = freshManagerModule();
+// Two boots of a freshly-required omega module, with the console recorded.
+function initTwice({ omega, assert, emulator }) {
+  const { Omega } = freshOmegaModule();
 
   return withConsoleRecorder(() => {
     withTestEnvironment({ emulator: emulator }, () => {
-      const first = new FreshManager();
-      first.init(null, { cwd: Manager.cwd, log: false });
+      const first = new Omega();
+      first.initialize({ cwd: omega.cwd });
 
       assert.equal(first.isTesting(), true, 'the test-environment branch was not reached');
 
-      new FreshManager().init(null, { cwd: Manager.cwd, log: false });
+      new Omega().initialize({ cwd: omega.cwd });
     });
   });
 }
@@ -107,8 +111,8 @@ module.exports = defineCases({
   tests: [
     {
       name: 'deployed-two-inits-log-the-banner-once',
-      run: async ({ assert, Manager }) => {
-        const calls = initTwice({ Manager: Manager, assert: assert, emulator: false });
+      run: async ({ assert, omega }) => {
+        const calls = initTwice({ omega: omega, assert: assert, emulator: false });
         const banners = calls.log.filter((args) => String(args[1]).includes(BANNER));
 
         assert.equal(banners.length, 1, `the banner should log once per process, got ${banners.length}`);
@@ -117,10 +121,10 @@ module.exports = defineCases({
 
     {
       name: 'deployed-two-inits-log-the-resolved-test-mode-once',
-      run: async ({ assert, Manager }) => {
+      run: async ({ assert, omega }) => {
         // The resolved-mode line rides the test-mode watcher, which installs
         // exactly once per process — this pins that it stays that way.
-        const calls = initTwice({ Manager: Manager, assert: assert, emulator: false });
+        const calls = initTwice({ omega: omega, assert: assert, emulator: false });
         const resolved = calls.log.filter((args) => String(args[1]).includes(RESOLVED));
 
         assert.equal(resolved.length, 1, `the resolved test-mode line should log once per process, got ${resolved.length}`);
@@ -129,8 +133,8 @@ module.exports = defineCases({
 
     {
       name: 'under-the-emulator-neither-line-prints',
-      run: async ({ assert, Manager }) => {
-        const calls = initTwice({ Manager: Manager, assert: assert, emulator: true });
+      run: async ({ assert, omega }) => {
+        const calls = initTwice({ omega: omega, assert: assert, emulator: true });
         const banners = calls.log.filter((args) => String(args[1]).includes(BANNER));
         const resolved = calls.log.filter((args) => String(args[1]).includes(RESOLVED));
 

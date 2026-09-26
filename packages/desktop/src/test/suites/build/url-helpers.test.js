@@ -11,13 +11,13 @@
 // published, then composes OMEGA_WEBSITE_PORT / the baked port over https, then
 // the classic dev origin ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)).
 //
-// The last case pins the auth emulator port client-bridge connects a testing
+// The last case pins the auth emulator port lib/auth.js connects a testing
 // run to: the same three-step chain, off the same baked map.
 
 const path = require('path');
 
 const helpers = require(path.join(__dirname, '..', '..', '..', 'utils', 'url-helpers.js'));
-const clientBridge = require(path.join(__dirname, '..', '..', '..', 'lib', 'client-bridge.js'));
+const auth = require(path.join(__dirname, '..', '..', '..', 'lib', 'auth.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function withEnv(overrides, fn) {
@@ -35,9 +35,9 @@ function withEnv(overrides, fn) {
   }
 }
 
-// The shape the helpers see at runtime: a Manager carrying the resolved config
+// The shape the helpers see at runtime: an omega instance carrying the resolved config
 // (OMEGA_BUILD_JSON.config, `dev` block and all) plus mode-helpers' getEnvironment().
-function fakeManager(environment, ports, origin) {
+function fakeOmega(environment, ports, origin) {
   return {
     getEnvironment: () => environment,
     isTesting: () => environment === 'testing',
@@ -51,11 +51,11 @@ function fakeManager(environment, ports, origin) {
   };
 }
 
-// Run `fn` with the bridge pointed at a stand-in Manager, then put the real one back.
-function withBridgeManager(manager, fn) {
-  const original = clientBridge._manager;
-  clientBridge._manager = manager;
-  try { return fn(); } finally { clientBridge._manager = original; }
+// Run `fn` with auth pointed at a stand-in instance, then put the real one back.
+function withAuthOmega(omega, fn) {
+  const original = auth._omega;
+  auth._omega = omega;
+  try { return fn(); } finally { auth._omega = original; }
 }
 
 // No env channel published: the state a packaged main process is in.
@@ -72,9 +72,11 @@ module.exports = defineCases({
   description: 'utils/url-helpers: every local helper resolves env, then the baked dev.ports, then throws',
   tests: [
     {
-      name: 'exports { attachTo, getApiUrl, localPort, requiredPort }',
+      // Plain functions the `Omega` classes call with themselves as `context`:
+      // no mixin onto a constructor any more
+      name: 'exports { getApiUrl, localPort, requiredPort } and no attachTo',
       run: (ctx) => {
-        ctx.expect(typeof helpers.attachTo).toBe('function');
+        ctx.expect(helpers.attachTo).toBeUndefined();
         ctx.expect(typeof helpers.getApiUrl).toBe('function');
         ctx.expect(typeof helpers.localPort).toBe('function');
         ctx.expect(typeof helpers.requiredPort).toBe('function');
@@ -84,8 +86,8 @@ module.exports = defineCases({
       name: 'a BUMPED baked dev.ports.hosting is the api base in testing',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('testing', { hosting: 5012, auth: 9109 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5012');
+          const omega = fakeOmega('testing', { hosting: 5012, auth: 9109 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
         });
       },
     },
@@ -93,8 +95,8 @@ module.exports = defineCases({
       name: 'a BUMPED baked dev.ports.hosting is the api base in development too',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('development', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5012');
+          const omega = fakeOmega('development', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
         });
       },
     },
@@ -102,8 +104,8 @@ module.exports = defineCases({
       name: 'OMEGA_HOSTING_PORT wins over the baked value',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
-          const manager = fakeManager('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('http://localhost:5022');
+          const omega = fakeOmega('testing', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5022');
         });
       },
     },
@@ -116,9 +118,9 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           for (const environment of ['testing', 'development']) {
-            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment)))
+            ctx.expect(() => helpers.getApiUrl(fakeOmega(environment)))
               .toThrow(/dev port for `hosting`/);
-            ctx.expect(() => helpers.getApiUrl.call(fakeManager(environment)))
+            ctx.expect(() => helpers.getApiUrl(fakeOmega(environment)))
               .toThrow(/bundle task/);
           }
         });
@@ -128,8 +130,8 @@ module.exports = defineCases({
       name: 'OMEGA_HTTPS_PORT means the mkcert proxy is up: https, not hosting',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HTTPS_PORT: '5003' }, () => {
-          const manager = fakeManager('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://localhost:5003');
+          const omega = fakeOmega('testing', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://localhost:5003');
         });
       },
     },
@@ -137,8 +139,8 @@ module.exports = defineCases({
       name: 'a baked dev.ports.https does the same with no env published',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('testing', { https: 5003, hosting: 5443 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://localhost:5003');
+          const omega = fakeOmega('testing', { https: 5003, hosting: 5443 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://localhost:5003');
         });
       },
     },
@@ -146,8 +148,8 @@ module.exports = defineCases({
       name: 'production ignores every local channel, giving api.<brand host>',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
-          const manager = fakeManager('production', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl.call(manager)).toBe('https://api.playground.omegajs.dev');
+          const omega = fakeOmega('production', { hosting: 5012 });
+          ctx.expect(helpers.getApiUrl(omega)).toBe('https://api.playground.omegajs.dev');
         });
       },
     },
@@ -155,8 +157,8 @@ module.exports = defineCases({
       name: 'getFunctionsUrl: a BUMPED baked dev.ports.functions is the functions base',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('development', { functions: 5011 });
-          ctx.expect(helpers.getFunctionsUrl.call(manager))
+          const omega = fakeOmega('development', { functions: 5011 });
+          ctx.expect(helpers.getFunctionsUrl(omega))
             .toBe('http://localhost:5011/demo-app/us-central1');
         });
       },
@@ -165,8 +167,8 @@ module.exports = defineCases({
       name: 'getFunctionsUrl: OMEGA_FUNCTIONS_PORT wins over the baked value',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_FUNCTIONS_PORT: '5021' }, () => {
-          const manager = fakeManager('testing', { functions: 5011 });
-          ctx.expect(helpers.getFunctionsUrl.call(manager))
+          const omega = fakeOmega('testing', { functions: 5011 });
+          ctx.expect(helpers.getFunctionsUrl(omega))
             .toBe('http://localhost:5021/demo-app/us-central1');
         });
       },
@@ -175,7 +177,7 @@ module.exports = defineCases({
       name: 'getFunctionsUrl: neither channel → a throw naming the port (#834)',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(() => helpers.getFunctionsUrl.call(fakeManager('development')))
+          ctx.expect(() => helpers.getFunctionsUrl(fakeOmega('development')))
             .toThrow(/dev port for `functions`/);
         });
       },
@@ -184,8 +186,8 @@ module.exports = defineCases({
       name: 'getFunctionsUrl: production ignores every local channel',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_FUNCTIONS_PORT: '5021' }, () => {
-          const manager = fakeManager('production', { functions: 5011 });
-          ctx.expect(helpers.getFunctionsUrl.call(manager))
+          const omega = fakeOmega('production', { functions: 5011 });
+          ctx.expect(helpers.getFunctionsUrl(omega))
             .toBe('https://us-central1-demo-app.cloudfunctions.net');
         });
       },
@@ -194,8 +196,8 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: a BUMPED baked dev.ports.website is the website base',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          const manager = fakeManager('development', { website: 4001 });
-          ctx.expect(helpers.getWebsiteUrl.call(manager)).toBe('https://localhost:4001');
+          const omega = fakeOmega('development', { website: 4001 });
+          ctx.expect(helpers.getWebsiteUrl(omega)).toBe('https://localhost:4001');
         });
       },
     },
@@ -203,8 +205,8 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: OMEGA_WEBSITE_PORT wins over the baked value',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_WEBSITE_PORT: '4002' }, () => {
-          const manager = fakeManager('testing', { website: 4001 });
-          ctx.expect(helpers.getWebsiteUrl.call(manager)).toBe('https://localhost:4002');
+          const omega = fakeOmega('testing', { website: 4001 });
+          ctx.expect(helpers.getWebsiteUrl(omega)).toBe('https://localhost:4002');
         });
       },
     },
@@ -212,7 +214,7 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: neither channel → a throw naming the port (#834)',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          ctx.expect(() => helpers.getWebsiteUrl.call(fakeManager('development')))
+          ctx.expect(() => helpers.getWebsiteUrl(fakeOmega('development')))
             .toThrow(/dev port for `website`/);
         });
       },
@@ -224,8 +226,8 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: a baked dev.origin wins over OMEGA_WEBSITE_PORT',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_WEBSITE_PORT: '4002' }, () => {
-          const manager = fakeManager('development', { website: 4001 }, 'https://localhost:4123');
-          ctx.expect(helpers.getWebsiteUrl.call(manager)).toBe('https://localhost:4123');
+          const omega = fakeOmega('development', { website: 4001 }, 'https://localhost:4123');
+          ctx.expect(helpers.getWebsiteUrl(omega)).toBe('https://localhost:4123');
         });
       },
     },
@@ -233,7 +235,7 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: OMEGA_WEBSITE_PORT with no baked origin composes over https',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_WEBSITE_PORT: '4321' }, () => {
-          ctx.expect(helpers.getWebsiteUrl.call(fakeManager('development'))).toBe('https://localhost:4321');
+          ctx.expect(helpers.getWebsiteUrl(fakeOmega('development'))).toBe('https://localhost:4321');
         });
       },
     },
@@ -258,11 +260,8 @@ module.exports = defineCases({
       name: 'getAuthUrl: dev builds /signin and /token on the https dev origin',
       run: (ctx) => {
         withEnv(NO_ENV, () => {
-          // getAuthUrl calls `this.getWebsiteUrl()`, which attachTo() supplies on a
-          // real Manager — hand the stand-in the same helper.
-          const manager = fakeManager('development', { website: 4000 });
-          manager.getWebsiteUrl = helpers.getWebsiteUrl;
-          const url = new URL(helpers.getAuthUrl.call(manager));
+          const omega = fakeOmega('development', { website: 4000 });
+          const url = new URL(helpers.getAuthUrl(omega));
           ctx.expect(url.origin).toBe('https://localhost:4000');
           ctx.expect(url.pathname).toBe('/signin');
           const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
@@ -276,31 +275,31 @@ module.exports = defineCases({
       name: 'getWebsiteUrl: production ignores every local channel',
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_WEBSITE_PORT: '4002' }, () => {
-          const manager = fakeManager('production', { website: 4001 });
-          ctx.expect(helpers.getWebsiteUrl.call(manager)).toBe('https://playground.omegajs.dev');
+          const omega = fakeOmega('production', { website: 4001 });
+          ctx.expect(helpers.getWebsiteUrl(omega)).toBe('https://playground.omegajs.dev');
         });
       },
     },
     {
-      // client-bridge connects a TESTING run's auth to the emulator. Same chain:
+      // lib/auth.js connects a TESTING run's auth to the emulator. Same chain:
       // env, then the baked map, then classic 9099.
-      name: 'the auth emulator port rides the same chain (client-bridge)',
+      name: 'the auth emulator port rides the same chain (lib/auth.js)',
       run: (ctx) => {
         withEnv({ OMEGA_AUTH_PORT: null }, () => {
-          withBridgeManager(fakeManager('testing', { auth: 9109 }), () => {
-            ctx.expect(clientBridge._authEmulatorPort()).toBe(9109);
+          withAuthOmega(fakeOmega('testing', { auth: 9109 }), () => {
+            ctx.expect(auth._authEmulatorPort()).toBe(9109);
           });
           // The classic 9099 used to answer here (#834): nothing identity-checks
           // what holds that port, so a neighbouring project's emulator read as
           // an auth mystery instead of a port problem.
-          withBridgeManager(fakeManager('testing'), () => {
-            ctx.expect(() => clientBridge._authEmulatorPort()).toThrow(/dev port for `auth`/);
-            ctx.expect(() => clientBridge._authEmulatorPort()).toThrow(/bundle task/);
+          withAuthOmega(fakeOmega('testing'), () => {
+            ctx.expect(() => auth._authEmulatorPort()).toThrow(/dev port for `auth`/);
+            ctx.expect(() => auth._authEmulatorPort()).toThrow(/bundle task/);
           });
         });
         withEnv({ OMEGA_AUTH_PORT: '9119' }, () => {
-          withBridgeManager(fakeManager('testing', { auth: 9109 }), () => {
-            ctx.expect(clientBridge._authEmulatorPort()).toBe('9119');
+          withAuthOmega(fakeOmega('testing', { auth: 9109 }), () => {
+            ctx.expect(auth._authEmulatorPort()).toBe('9119');
           });
         });
       },

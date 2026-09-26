@@ -87,13 +87,13 @@ theme: {
 }
 ```
 
-## Appearance (light / dark / system) — `manager.theme`
+## Appearance (light / dark / system): `omega.theme`
 
 @omega.js/desktop owns appearance at runtime. `config.theme.appearance` is only the **app default**; the resolved appearance is applied and kept live by the theme lib:
 
 - **`'system'` (default)** follows the OS preference **live** — when the OS flips, every page updates without a reload or restart.
 - **`'light'` / `'dark'`** are explicit overrides.
-- A user's runtime choice (`manager.theme.set(...)`) is **persisted in `manager.storage`** (`theme.appearance`) and wins over the config default on every boot.
+- A user's runtime choice (`omega.theme.set(...)`) is **persisted in `omega.storage`** (`theme.appearance`) and wins over the config default on every boot.
 
 ### How it propagates
 
@@ -105,10 +105,10 @@ The applier is **opt-in by presence**: it only manages pages whose `<html>` alre
 
 ```js
 // Main
-manager.theme.get();          // 'system' | 'light' | 'dark'  (the chosen source)
-manager.theme.resolved();     // 'light' | 'dark'             (what's showing)
-manager.theme.set('dark');    // apply + persist (throws on invalid values)
-const unsub = manager.theme.onChange(({ source, resolved }) => { ... });
+omega.theme.get();          // 'system' | 'light' | 'dark'  (the chosen source)
+omega.theme.resolved();     // 'light' | 'dark'             (what's showing)
+omega.theme.set('dark');    // apply + persist (throws on invalid values)
+const unsub = omega.theme.onChange(({ source, resolved }) => { ... });
 
 // Renderer (any page with the @omega.js/desktop preload)
 await window.desktop.theme.get();        // { source, resolved }
@@ -120,7 +120,7 @@ Main also broadcasts `desktop:theme:changed { source, resolved }` to BrowserWind
 
 ### Declarative controls
 
-Any element with `data-omega-theme-set` becomes a theme switch (wired by the renderer Manager's initialize — event-delegated, so late-rendered controls work):
+Any element with `data-omega-theme-set` becomes a theme switch (wired by the renderer's `omega.initialize()`, event-delegated, so late-rendered controls work):
 
 ```html
 <button data-omega-theme-set="light">Day</button>

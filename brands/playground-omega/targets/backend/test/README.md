@@ -10,6 +10,7 @@ Match the framework's layout — OMEGA Backend's test runner discovers files by 
 |---|---|
 | `test/routes/` | Custom HTTP route handlers (`functions/routes/<verb>/<path>.js`) |
 | `test/events/` | Pub/Sub / Firestore-trigger handlers |
+| `test/mcp/` | Consumer MCP tools called over `/omega/mcp` as a persona (`count-notes.test.js`: `count_notes` answers the caller's own count) |
 | `test/helpers/` | Shared test utilities for your project |
 | `test/fixtures/` | Static test data (JSON, sample docs) |
 | `test/_init/` | Per-suite setup (Firestore seed data, user accounts) |

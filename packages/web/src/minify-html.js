@@ -1,9 +1,9 @@
 /**
- * Production HTML minification — the UJM minifyHtml successor, as an
+ * Production HTML minification, as an
  * Eleventy transform (engine.js mounts it for production builds only; dev
  * and the test harness ship readable HTML). The Rust minifier
  * (@minify-html/node) does the heavy lifting; three content classes are
- * extracted first and restored after, exactly the legacy dance:
+ * extracted first and restored after:
  *
  *   1. JSON-LD scripts — minified as JSON (parse → stringify; unparseable
  *      blocks pass through verbatim), because the HTML minifier can mangle
@@ -28,7 +28,7 @@
 const { minify } = require('@minify-html/node');
 const esbuild = require('esbuild');
 
-// UJM's proven option set. minify_js stays OFF: inline scripts are
+// The option set. minify_js stays OFF: inline scripts are
 // extracted and esbuild-minified instead (minify-html's JS pass is buggy).
 const MINIFY_OPTIONS = {
   keep_closing_tags: false,

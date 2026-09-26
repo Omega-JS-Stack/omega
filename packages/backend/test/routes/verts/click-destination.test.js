@@ -8,7 +8,7 @@
  *
  * Run: npx omega test backend:routes/verts/click-destination
  */
-const { buildClickDestination } = require('../../../dist/manager/routes/verts/utils.js');
+const { buildClickDestination } = require('../../../dist/omega/routes/verts/utils.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({

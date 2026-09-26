@@ -112,6 +112,24 @@ function fakeSend(calls) {
   };
 }
 
+/**
+ * Every language-prefixed internal link in every copy under dist/<lang>
+ * resolves to a file (#953): a produced copy links its siblings at /<lang>/…,
+ * so a pair with no file there ships a dead link. /es → es.html (the language
+ * home is a file), /es/about → es/about/index.html.
+ */
+function danglingLanguageLinks(dist, langs) {
+  const copies = langs.flatMap((lang) => [
+    `${lang}.html`,
+    ...(fs.existsSync(path.join(dist, lang)) ? fs.readdirSync(path.join(dist, lang), { recursive: true }).map((rel) => path.join(lang, rel)) : []),
+  ]).filter((rel) => rel.endsWith('.html') && fs.existsSync(path.join(dist, rel)));
+
+  return copies.flatMap((rel) => [...fs.readFileSync(path.join(dist, rel), 'utf8').matchAll(/href="\/([a-z]{2})(\/[^"#?]*)?"/g)]
+    .filter(([, lang]) => langs.includes(lang))
+    .map(([href, lang, sub]) => ({ from: rel, href, file: sub ? path.join(lang, sub, 'index.html') : `${lang}.html` }))
+    .filter(({ file }) => !fs.existsSync(path.join(dist, file))));
+}
+
 test('translateSite: copies, chrome, links, exclusions, alternates, cache', async () => {
   const { root, dist } = stage();
   const calls = [];
@@ -242,7 +260,7 @@ test('translateSite: only-filter limits the run to one page', async () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('translateSite: provider failure skips the page-language pair whole and warns loudly', async () => {
+test('translateSite: provider failure ships the pair untranslated, unadvertised, and warns loudly (#953)', async () => {
   const { root, dist } = stage();
   const warnings = [];
 
@@ -262,12 +280,22 @@ test('translateSite: provider failure skips the page-language pair whole and war
   assert.ok(stats.failures.length >= 1);
   assert.ok(stats.failures.every((f) => f.startsWith('ar ')), 'only ar failed');
 
-  // No mixed-language copy: the ar pair is skipped whole, like a cold cache
-  assert.ok(!fs.existsSync(path.join(dist, 'ar.html')), 'no half-translated language home');
-  assert.ok(!fs.existsSync(path.join(dist, 'ar')), 'no half-translated ar copies at all');
+  // No mixed-language copy, and no dead link either: the ar pair lands the
+  // SOURCE page at its path, like a cold cache under cachedOnly, with its
+  // <html lang dir> naming the text it carries (English, so ltr, not ar's rtl)
+  for (const rel of ['ar.html', path.join('ar', 'about', 'index.html')]) {
+    const copy = fs.readFileSync(path.join(dist, rel), 'utf8');
+    assert.ok(!copy.includes('·'), `${rel}: source text only, never half-translated`);
+    assert.ok(copy.includes('<html lang="en" dir="ltr"'), `${rel}: lang and dir name the source text`);
+    assert.ok(!copy.includes('hreflang="ar"') && !copy.includes('hreflang="es"'), `${rel}: an untranslated copy advertises nothing`);
+  }
+  const arHome = fs.readFileSync(path.join(dist, 'ar.html'), 'utf8');
+  assert.ok(arHome.includes('Grow faster with MiniCo'), 'the source copy');
+  assert.ok(arHome.includes('href="/ar/about"'), 'its links stay in the ar link graph');
+  assert.deepStrictEqual(danglingLanguageLinks(dist, ['es', 'ar']), [], 'no language link dangles');
 
   // The failure is loud, naming the page and the language
-  const loud = warnings.filter((m) => m.includes('[ar]') && m.includes('boom') && /skipped/i.test(m));
+  const loud = warnings.filter((m) => m.includes('[ar]') && m.includes('boom') && /untranslated/i.test(m));
   assert.strictEqual(loud.length, 2, 'both translatable pages warn by page + language');
   assert.strictEqual(stats.failures.length, 2);
 
@@ -311,31 +339,57 @@ test('translateSite: disabled config skips cleanly', async () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('translateSite: cachedOnly never calls the provider and skips cold pages whole (friction #24)', async () => {
+test('translateSite: cachedOnly never calls the provider and ships cold pairs untranslated, unadvertised (friction #24, #953)', async () => {
   const { root, dist } = stage();
   const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
+  const wipeCopies = () => ['es', 'ar', 'es.html', 'ar.html'].forEach((rel) => fs.rmSync(path.join(dist, rel), { recursive: true, force: true }));
 
-  // Everything cold → everything skipped, zero copies, zero provider calls
+  // Everything cold: nothing translated, zero provider calls, yet every pair
+  // lands the SOURCE page at its path, so no produced link can dangle
   const cold = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
   assert.strictEqual(cold.pages, 0);
   assert.strictEqual(cold.newStrings, 0);
   assert.ok(cold.skippedCold.includes('es /about'), 'about is reported cold for es');
   assert.ok(cold.skippedCold.includes('ar /'), 'home is reported cold for ar');
-  assert.ok(!fs.existsSync(path.join(dist, 'es')), 'no copies produced from a cold cache');
+  for (const rel of ['es.html', 'ar.html', path.join('es', 'about', 'index.html'), path.join('ar', 'about', 'index.html')]) {
+    assert.ok(fs.existsSync(path.join(dist, rel)), `${rel}: a cold pair still lands a copy`);
+  }
 
   // Warm ONE page (the explicit `omega translate` path), wipe its copies…
   const calls = [];
   await translate({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
   assert.ok(calls.length > 0);
-  fs.rmSync(path.join(dist, 'es'), { recursive: true, force: true });
-  fs.rmSync(path.join(dist, 'ar'), { recursive: true, force: true });
+  wipeCopies();
 
-  // …then cachedOnly produces the warm page and still skips the cold one
+  // …then cachedOnly translates the warm page and ships the cold home untranslated
   const warm = await translate({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
-  assert.strictEqual(warm.pages, 1, 'only the warmed page ships');
-  assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'cold home has no copy');
+  assert.strictEqual(warm.pages, 1, 'only the warmed page counts as translated');
   assert.ok(warm.skippedCold.includes('es /'), 'cold home still reported');
+
+  // The warm page: its translated copy, advertising every produced language
+  const about = fs.readFileSync(path.join(dist, 'es', 'about', 'index.html'), 'utf8');
+  assert.ok(about.includes('The consumer about page·es'), 'the warm page is translated');
+  assert.ok(about.includes('lang="es"'));
+  assert.ok(about.includes('hreflang="es"') && about.includes('hreflang="ar"'), 'the warm copy carries its alternates');
+
+  // The cold home: the SOURCE text at the translated path, in the language's
+  // link graph, honest about its language, and advertised nowhere
+  const home = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
+  assert.ok(home.includes('Grow faster with MiniCo') && !home.includes('·es'), 'the source text, untranslated');
+  assert.ok(home.includes('<html lang="en" dir="ltr"'), '<html lang> names the source language the text is in');
+  assert.ok(home.includes('property="og:locale" content="en_US"'), 'og:locale is honest too');
+  assert.ok(home.includes('<link rel="canonical" href="https://mini.co/"'), 'canonical stays the source page: the copy duplicates it');
+  assert.ok(home.includes('href="/es/about"'), 'internal links rewritten into the language');
+  assert.ok(home.includes('href="/signin"'), 'excluded route link untouched');
+  assert.ok(!home.includes('hreflang="es"') && !home.includes('hreflang="ar"'), 'the untranslated copy advertises no alternates');
+  assert.deepStrictEqual(danglingLanguageLinks(dist, ['es', 'ar']), [], 'no language link dangles');
+
+  const original = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+  assert.ok(!original.includes('hreflang="es"') && !original.includes('hreflang="ar"'), 'the original never advertises an untranslated copy');
+
+  const locs = [...fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.ok(locs.includes('https://mini.co/es/about'), 'the translated copy is listed');
+  assert.ok(!locs.includes('https://mini.co/es') && !locs.includes('https://mini.co/ar'), 'an untranslated copy is never listed');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -5,7 +5,7 @@
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type. Mirrors stripe-parse-webhook.js for consistent coverage.
  */
-const paypalProvider = require('../../../../dist/manager/routes/payments/webhook/providers/paypal.js');
+const paypalProvider = require('../../../../dist/omega/routes/payments/webhook/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');

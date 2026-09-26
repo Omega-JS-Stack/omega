@@ -23,13 +23,13 @@ Every feature ships with tests at every layer it has a surface in — logic (`bu
 
 ```js
 // test/build/my-feature.test.js
-const Manager = require('@omega.js/desktop/build');
+const build = require('@omega.js/desktop/build');
 
 module.exports = {
   layer: 'build',
   description: 'the project config carries a brand id',
   run: (ctx) => {
-    ctx.expect(Manager.getConfig().brand.id).toBeTruthy();
+    ctx.expect(build.getConfig().brand.id).toBeTruthy();
   },
 };
 ```

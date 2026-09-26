@@ -1,5 +1,5 @@
 const { describe, it, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert, setPathPrefix } = require('./helpers.js');
 
 // Count the calls the real ServiceWorker module makes into the harness's inert
 // navigator.serviceWorker container — the assertions watch the actual code path.
@@ -56,7 +56,7 @@ describe('Service Worker origin gate', () => {
     restoreLocation = setLocation('file:', 'file:///Applications/Brand.app/index.html', 'file://');
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG });
+    await getOmega().initialize({ ...TEST_CONFIG });
 
     assert.strictEqual(container.calls.register, 0);
     assert.strictEqual(container.calls.getRegistrations, 0);
@@ -66,7 +66,7 @@ describe('Service Worker origin gate', () => {
     restoreLocation = setLocation('chrome-extension:', 'chrome-extension://abc/popup.html', 'chrome-extension://abc');
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
+    await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
 
     assert.strictEqual(container.calls.register, 0);
     assert.strictEqual(container.calls.getRegistrations, 0);
@@ -75,7 +75,7 @@ describe('Service Worker origin gate', () => {
   it('should register on an http(s) origin when enabled', async () => {
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG });
+    await getOmega().initialize({ ...TEST_CONFIG });
 
     assert.strictEqual(container.calls.register, 1);
     assert.strictEqual(container.calls.getRegistrations, 0);
@@ -84,7 +84,7 @@ describe('Service Worker origin gate', () => {
   it('should sweep the origin on an http(s) origin when disabled', async () => {
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
+    await getOmega().initialize({ ...TEST_CONFIG, serviceWorker: { enabled: false } });
 
     assert.strictEqual(container.calls.register, 0);
     assert.strictEqual(container.calls.getRegistrations, 1);
@@ -110,7 +110,7 @@ describe('Service Worker under a URL-path mount', () => {
     restorePrefix = setPathPrefix('/workkit');
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG });
+    await getOmega().initialize({ ...TEST_CONFIG });
 
     assert.deepStrictEqual(container.registered, [{
       url: '/workkit/service-worker.js?omega-path-prefix=%2Fworkkit',
@@ -122,7 +122,7 @@ describe('Service Worker under a URL-path mount', () => {
     restorePrefix = setPathPrefix('/workkit');
     container = instrumentContainer();
 
-    await getManager().initialize({
+    await getOmega().initialize({
       ...TEST_CONFIG,
       serviceWorker: { enabled: true, config: { path: '/sw.js' } },
     });
@@ -134,7 +134,7 @@ describe('Service Worker under a URL-path mount', () => {
   it('should leave the unprefixed default byte-identical', async () => {
     container = instrumentContainer();
 
-    await getManager().initialize({ ...TEST_CONFIG });
+    await getOmega().initialize({ ...TEST_CONFIG });
 
     assert.deepStrictEqual(container.registered, [{
       url: '/service-worker.js',
@@ -156,15 +156,15 @@ describe('Service Worker environment fact', () => {
   });
 
   it('should fail registration by name when the artifact baked no environment', async () => {
-    const manager = getManager();
+    const omega = getOmega();
     const { environment, ...withoutEnvironment } = TEST_CONFIG;
 
     // Registered by hand, off a boot whose own SW branch is disabled, so the
     // rejection under test is this call's and not the boot's.
-    await manager.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
+    await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
     container = instrumentContainer();
 
-    await assert.rejects(() => manager.serviceWorker().register({}), /OMEGA_ENVIRONMENT/);
+    await assert.rejects(() => omega.serviceWorker.register({}), /OMEGA_ENVIRONMENT/);
     assert.strictEqual(container.calls.register, 0, 'nothing was registered on a broken artifact');
   });
 });

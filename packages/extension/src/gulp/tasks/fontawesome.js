@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('fontawesome');
+const build = require('../../build.js');
+const logger = build.logger('fontawesome');
 const { series } = require('gulp');
 const { emitIcons } = require('@omega.js/devkit/icons');
 

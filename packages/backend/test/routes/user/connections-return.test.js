@@ -22,9 +22,9 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const getRoute = require('../../../dist/manager/routes/user/connections/get.js');
-const postRoute = require('../../../dist/manager/routes/user/connections/post.js');
-const { decryptState } = require('../../../dist/manager/routes/user/connections/_state.js');
+const getRoute = require('../../../dist/omega/routes/user/connections/get.js');
+const postRoute = require('../../../dist/omega/routes/user/connections/post.js');
+const { decryptState } = require('../../../dist/omega/routes/user/connections/_state.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const PROVIDER_ID = 'return-fixture-784';
@@ -94,18 +94,18 @@ function lane(docs) {
 
   const { admin, writes } = recordingFirestore(docs || {});
 
-  const Manager = {
+  const omega = {
     cwd,
-    libraries: { admin },
+    firebase: { admin },
     project: { websiteUrl: 'https://brand.test' },
     config: {},
-    Metadata: () => ({ set: () => ({}) }),
   };
 
   const responses = [];
 
   const ctx = {
-    Manager,
+    omega,
+    metadata: () => ({}),
     log() {},
     respond: (message, options) => {
       responses.push({ message, options: options || {} });
@@ -138,7 +138,7 @@ async function authorize(settings) {
   await getRoute({
     ctx,
     user: userFor(CALLER_UID),
-    settings: { provider: PROVIDER_ID, action: 'authorize', redirect: false, ...settings },
+    data: { provider: PROVIDER_ID, action: 'authorize', redirect: false, ...settings },
   });
 
   const response = answered(responses);
@@ -162,7 +162,7 @@ async function tokenize({ csrf, encryptedState }) {
   await postRoute({
     ctx,
     user: userFor(CALLER_UID),
-    settings: { action: 'tokenize', code: 'auth-code-784', encryptedState },
+    data: { action: 'tokenize', code: 'auth-code-784', encryptedState },
   });
 
   return answered(responses);

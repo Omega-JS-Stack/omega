@@ -6,7 +6,7 @@
  * `connections` entry in the brand config, and the
  * CONNECTIONS_SANDBOX_PKCE_CLIENT_ID / _SECRET pair in the .env. Nothing in the
  * framework knows this provider exists — the lane resolves
- * `${Manager.cwd}/connections/<name>.js` before its own directory.
+ * `${omega.cwd}/connections/<name>.js` before its own directory.
  *
  * `pkce: 'S256'` is the only thing this provider declares beyond the shape:
  * the lane mints the verifier, stores it beside the CSRF token, sends the

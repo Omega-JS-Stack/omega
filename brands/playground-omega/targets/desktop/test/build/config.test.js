@@ -14,7 +14,7 @@
  * so the expected values are hard-coded here, never read back out of the config.
  */
 
-const Manager = require('@omega.js/desktop/build');
+const build = require('@omega.js/desktop/build');
 const { sourceRepo, releasesRepo } = require('@omega.js/desktop/config');
 
 module.exports = {
@@ -25,7 +25,7 @@ module.exports = {
     {
       name: 'resolves this brand and the product name the app is built under',
       run: (ctx) => {
-        const config = Manager.getConfig();
+        const config = build.getConfig();
 
         ctx.expect(config.brand.id).toBe('playground');
         // Not declared under targets.desktop.app, so derived from brand.name.
@@ -36,7 +36,7 @@ module.exports = {
     {
       name: 'the desktop target is enabled and opts into release downloads',
       run: (ctx) => {
-        const config = Manager.getConfig();
+        const config = build.getConfig();
 
         // Key presence under `targets` IS the enable switch.
         ctx.expect(typeof config.targets.desktop).toBe('object');
@@ -49,7 +49,7 @@ module.exports = {
     {
       name: 'derives the releases repo and the source repo this target publishes to',
       run: (ctx) => {
-        const config = Manager.getConfig();
+        const config = build.getConfig();
 
         // No repo NAME is ever configured (#883): the one `repo.org` block plus
         // brand.id derive `<brand.id>-releases`, the address every release verb

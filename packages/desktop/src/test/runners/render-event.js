@@ -1,4 +1,4 @@
-// Harness-event rendering: the ONE home of "what a `__EM_TEST__` envelope looks like on
+// Harness-event rendering: the ONE home of "what a `__OMEGA_TEST__` envelope looks like on
 // screen" and of the counts it folds into.
 //
 // Both runners parse the same JSON-line protocol (runners/electron.js from the spawned
@@ -10,7 +10,7 @@ const chalk = require('chalk').default;
 
 /**
  * Render one harness event and fold it into the run's counts.
- * @param {object} evt - A parsed `__EM_TEST__` envelope from a harness.
+ * @param {object} evt - A parsed `__OMEGA_TEST__` envelope from a harness.
  * @param {object} counts - `{ passed, failed, skipped }`, mutated in place.
  * @returns {void}
  */

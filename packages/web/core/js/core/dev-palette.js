@@ -9,7 +9,7 @@
 // merged into a built-in section when it reuses its id.
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { getDevSections } from '__main_assets__/js/core/dev-sections.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { PLATFORM_COOKIES, readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
@@ -341,7 +341,7 @@ export default function devPalette() {
 
     personaSelect.dataset.busy = 'true';
     try {
-      await omega.auth().signInWithEmailAndPassword(`${localpart}@${domain}`, TEST_PASSWORD);
+      await omega.auth.signInWithEmailAndPassword(`${localpart}@${domain}`, TEST_PASSWORD);
       window.location.reload();
     } catch (error) {
       personaSelect.dataset.busy = 'false';
@@ -357,7 +357,7 @@ export default function devPalette() {
   let personas = [];
 
   const syncSelection = () => {
-    const localpart = (omega.auth().getUser()?.email || '').split('@')[0];
+    const localpart = (omega.auth.user.email || '').split('@')[0];
     personaSelect.value = personas.some((persona) => persona.localpart === localpart) ? localpart : '';
   };
 
@@ -419,7 +419,7 @@ export default function devPalette() {
   reset.style.marginTop = '0.375rem';
   reset.style.width = '100%';
   reset.addEventListener('click', async () => {
-    const email = omega.auth().getUser()?.email;
+    const email = omega.auth.user.email;
     if (!email) {
       return;
     }
@@ -429,7 +429,7 @@ export default function devPalette() {
       await omega.request('/omega/test/reset-account', { method: 'POST' });
       // The reset recreates the auth user, which kills this session — sign the
       // same persona straight back in before reloading onto its seeded state.
-      await omega.auth().signInWithEmailAndPassword(email, TEST_PASSWORD);
+      await omega.auth.signInWithEmailAndPassword(email, TEST_PASSWORD);
       window.location.reload();
     } catch (error) {
       reset.dataset.busy = 'false';
@@ -461,7 +461,7 @@ export default function devPalette() {
   storageTarget.setAttribute('aria-label', 'Storage target');
 
   const renderStorage = () => {
-    const keys = Object.keys(omega.storage().get() || {});
+    const keys = Object.keys(omega.storage.get() || {});
     const previous = storageTarget.value;
     storageTarget.replaceChildren();
 
@@ -492,9 +492,9 @@ export default function devPalette() {
     // An ARRAY path, not the bare string: storage paths are lodash paths, and
     // a top-level key carrying a dot would otherwise read a nested one.
     if (key) {
-      logger.log(`storage.${key}:`, omega.storage().get([key]));
+      logger.log(`storage.${key}:`, omega.storage.get([key]));
     } else {
-      logger.log('storage:', omega.storage().get());
+      logger.log('storage:', omega.storage.get());
     }
   });
 
@@ -506,9 +506,9 @@ export default function devPalette() {
     const key = storageTarget.value;
     if (key) {
       // The same array-path rule as Log, for the same dotted-key reason.
-      omega.storage().remove([key]);
+      omega.storage.remove([key]);
     } else {
-      omega.storage().clear();
+      omega.storage.clear();
     }
     renderStorage();
   });
@@ -542,7 +542,7 @@ export default function devPalette() {
     }
 
     const cookies = readPlatformCookies();
-    const attribution = omega.storage().get('attribution', {}) || {};
+    const attribution = omega.storage.get('attribution', {}) || {};
     const touch = attribution.last || attribution.first || {};
     const pixels = [['gtag', typeof gtag === 'function'], ['fbq', typeof fbq === 'function'], ['ttq', typeof ttq !== 'undefined']];
     const present = Object.values(PLATFORM_COOKIES).filter((key) => cookies[key]);
@@ -656,11 +656,11 @@ export default function devPalette() {
   loadPersonas();
 
   // Live auth readout
-  omega.auth().listen({}, () => {
-    const user = omega.auth().getUser();
-    identity = user?.email || 'Signed out';
+  omega.auth.listen({}, () => {
+    const user = omega.auth.user;
+    identity = user.email || 'Signed out';
     renderWho();
-    reset.hidden = !isPersona(user?.email);
+    reset.hidden = !isPersona(user.email);
 
     // The dropdown reads as state, not just a menu: it shows the persona you
     // are actually signed in as, and falls back to the placeholder for anybody

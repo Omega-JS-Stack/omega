@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 let formManager = null;
 
@@ -14,8 +14,8 @@ export function init() {
 }
 
 // Load profile data
-export function loadData(account, user) {
-  if (!account) {
+export function loadData(account) {
+  if (!account.authenticated) {
     return;
   }
 
@@ -36,8 +36,8 @@ export function loadData(account, user) {
   // Build nested data structure matching our form field names
   const formData = {
     auth: {
-      email: account.auth?.email || user?.email || '',
-      uid: user?.uid || account.auth?.uid || '',
+      email: account.email || '',
+      uid: account.uid,
     },
     personal: {
       name: {
@@ -66,7 +66,7 @@ export function loadData(account, user) {
   formManager.ready();
 
   // Update join date
-  updateJoinDate(user);
+  updateJoinDate();
 
   // Update role badges
   updateRoleBadges(account);
@@ -74,7 +74,7 @@ export function loadData(account, user) {
 
 // Setup profile form
 function setupProfileForm() {
-  formManager = new FormManager('#profile-form', {
+  formManager = new FormManager(omega, '#profile-form', {
     autoReady: false, // Start in initializing state until data loads
     submittingText: 'Saving...',
   });
@@ -124,8 +124,8 @@ async function updateUserProfile(data) {
   console.log('Profile update data:', data);
 
   // Get current user and update Firestore
-  const user = omega.auth().getUser();
-  const firestore = omega.firestore();
+  const user = omega.auth.user;
+  const firestore = omega.firestore;
   const userDocRef = firestore.doc(`users/${user.uid}`);
 
   // Use merge to only update specified fields
@@ -134,15 +134,16 @@ async function updateUserProfile(data) {
   console.log('Profile successfully updated in Firestore');
 }
 
-// Update join date from Firebase user
-function updateJoinDate(user) {
+// Update join date from the Firebase session: the sign-up time is Firebase's
+// own metadata, which neither the stored document nor the User's profile holds
+function updateJoinDate() {
   const $joinDate = document.getElementById('profile-join-date');
   if (!$joinDate) {
     return;
   }
 
   // Get creation time from Firebase user metadata
-  const creationTime = user?.metadata?.creationTime;
+  const creationTime = omega.firebaseAuth.currentUser?.metadata?.creationTime;
 
   if (creationTime) {
     const joinDate = new Date(creationTime);

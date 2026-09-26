@@ -1,10 +1,10 @@
 # Common Mistakes to Avoid
 
-1. **Don't modify Manager internals directly** — Use factory methods and public APIs
+1. **Don't modify framework internals directly**: read the services off `ctx` and `omega`, and use the public APIs
 2. **Always use `ctx.respond()` for responses** — Don't use `res.send()` directly
 3. **Match schema names to route names** — If route is `myEndpoint`, schema should be `myEndpoint`
 4. **Always await async operations** — Don't forget `await` on Firestore operations
-5. **Handle errors properly** — Use `ctx.report()` with appropriate status codes
+5. **Handle errors properly**: `ctx.respond(error, { code })` answers with the status code; `throw ctx.report(error, { code })` reports and lets the pipeline answer
 6. **Don't call `respond()` multiple times** — Only one response per request
 7. **Use short-circuit returns** — Return early from error conditions
 8. **One call counts** — `await ctx.usage.consume('<feature>')` checks, counts and writes, and throws the 429 itself. Never hand-roll a gate around a counter read

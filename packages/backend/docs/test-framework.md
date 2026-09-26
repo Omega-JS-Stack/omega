@@ -2,9 +2,9 @@
 
 ## 🚫 NEVER mock — test against the real emulator (HARD RULE)
 
-Tests run against a **real Firebase emulator** (real Firestore/Auth). **Do NOT hand-roll fake/stub/mock objects** — no `mockManager`, `mockAdmin`, `makeManager()`, fake `firestore()`/`admin`, stubbed `ctx`, or fake HTTP. Every test `run()` receives the **real** booted `Manager`, `ctx`, `firestore`, `http`, and `accounts` (see [the test context](#test-context)). Use them.
+Tests run against a **real Firebase emulator** (real Firestore/Auth). **Do NOT hand-roll fake/stub/mock objects**: no mock instance, mock admin, hand-built `omega`, fake Firestore or admin, stubbed `ctx`, or fake HTTP. Every test `run()` receives the **real** booted `omega`, `ctx`, `firestore`, `http`, and `accounts` (see [the test context](#context-object)). Use them.
 
-- Call routes over `http.as(...)`; call handlers/helpers with the real `Manager`/`ctx` from context; read/write/verify with the real `firestore` helper.
+- Call routes over `http.as(...)`; call handlers/helpers with the real `omega`/`ctx` from context; read/write/verify with the real `firestore` helper.
 - **Pure functions are the only exception** — a function with zero I/O can be `require()`d and called with plain inputs (nothing to mock). The instant it touches Firestore or any external system, it must run for real against the emulator.
 - **Real external APIs (OpenAI, PayPal, GitHub, SendGrid, Beehiiv, Stripe) are gated behind `TEST_EXTENDED_MODE` in the source, NOT mocked** — see [Extended Mode](#extended-mode-test_extended_mode). Normal mode skips them; extended mode runs them for real.
 - **Anything an extended test creates in an external system must be cleaned up by the test** (delete the GitHub file, cancel the PayPal invoice, etc.) — the runner's pre-test wipe only covers local Firestore/Auth.
@@ -13,7 +13,7 @@ If you're writing `const mockX = {...}` to satisfy a function under test, STOP a
 
 ### The ONLY two exceptions where a stub is allowed
 
-Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`ctx`:
+Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment, and even then, stub the *smallest possible seam*, never a whole `omega`/`ctx`:
 
 1. **A side effect that would destroy the test run itself.** If invoking the real method would kill or corrupt the harness — e.g. a process-exit, an `app.quit()`, a destructive filesystem wipe, a recursive re-invocation of the test/build command — you may stub *that one call* to a no-op, assert the surrounding logic, then restore it. You are not faking behavior; you are preventing the harness from terminating mid-assertion.
 2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omega.js/backend backends (parent → child brand servers). Only **one** @omega.js/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.test.js`.)
@@ -26,11 +26,11 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 | Coverage | Where | Proves |
 |---|---|---|
-| **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `ctx`, Firestore) |
+| **Logic** | `test/routes/` / `test/events/` | The handler does the right thing, exercised against the real emulator (real `omega`, `ctx`, Firestore) |
 | **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omega.js/backend's end-to-end |
 | **Rules** | `test/rules/` suites | Firestore AND Realtime Database security rules permit/deny exactly as intended (required whenever rules change) |
 
-@omega.js/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
+@omega.js/backend has no UI layer: a feature's UI coverage lives in the consuming frontend (web, extension, desktop), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
 
 **Skipping a surface is the exception, not the default.** Skip ONLY when the feature genuinely doesn't expose that surface (a pure helper has no route; a route that touches no Firestore docs needs no rules test). Convenience is never a reason: "the handler test already covers it" does NOT excuse the route round-trip — handler tests prove the logic, round-trips prove the wiring (a route can be unregistered or mis-gated while every handler test stays green). When in doubt, write the test.
 
@@ -49,7 +49,7 @@ npx omega test
 
 ### Self-test from the framework repo (bundled fixture)
 
-`npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `omega_api` → health returns 200). Mirrors BXM's `OMEGA_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `OMEGA_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx omega install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
+`npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → the fixture's `initialize()` wires `omega_api` → health returns 200). Mirrors the extension's `OMEGA_TEST_BOOT_PROJECT` and web's site-boot layer. Set `OMEGA_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx omega install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
 
 ### Filtering tests
 
@@ -100,9 +100,9 @@ Nothing in the CLI's adoption decision aborts. An unadopted port means the run b
 
 ## The stack the runner child resolves
 
-The runner loads route handlers **in-process** (journey suites call them directly), so its `Manager` builds URLs from `OMEGA_*_PORT` exactly like a function worker does. The test command therefore hands the child the **resolved** port map — bumped ports and all — minus the `https` front: the runner carries no mkcert CA and talks plain http to the stack, hosting's internal port included.
+The runner loads route handlers **in-process** (journey suites call them directly), so its `omega` builds URLs from `OMEGA_*_PORT` exactly like a function worker does. The test command therefore hands the child the **resolved** port map (bumped ports and all) minus the `https` front: the runner carries no mkcert CA and talks plain http to the stack, hosting's internal port included.
 
-Unset, those getters fell back to the classic defaults, and `omega emulator` puts the mkcert TLS proxy on classic 5002. The test provider's auto-webhook (`Manager.getApiUrl()` in `routes/payments/intent/providers/test.js`) followed the proxy's plain-http 307 to https and died on the untrusted cert — every declined-winback and reactivation journey failed against a two-terminal HTTPS emulator while passing when `omega test` booted its own ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)).
+Unset, those getters fell back to the classic defaults, and `omega emulator` puts the mkcert TLS proxy on classic 5002. The test provider's auto-webhook (`omega.getApiUrl()` in `routes/payments/intent/providers/test.js`) followed the proxy's plain-http 307 to https and died on the untrusted cert: every declined-winback and reactivation journey failed against a two-terminal HTTPS emulator while passing when `omega test` booted its own ([#291](https://github.com/Omega-JS-Stack/omega/issues/291)).
 
 ## Cross-project API calls (single-emulator limitation)
 
@@ -134,7 +134,7 @@ Every seeded account is a **persona** usable two ways: backend tests authenticat
 
 ### Marketing-provider cleanup
 
-Test signups never reach SendGrid + Beehiiv. The validation pipeline (`src/manager/libraries/email/validation.js`) blocks all `_test.*` emails at the marketing-library layer via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`.
+Test signups never reach SendGrid + Beehiiv. The validation pipeline (`src/omega/libraries/email/validation.js`) blocks all `_test.*` emails at the marketing-library layer via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`.
 
 The single exception is the `_test.allow_*` prefix. Two long-lived test accounts (`_test.allow_consent-granted@...` and `_test.allow_consent-declined@...`) intentionally round-trip through SendGrid + Beehiiv as the live-provider integration sentinels. They are exercised by `test/marketing/consent-lifecycle.js`, which manages its own setup, assertions, and teardown.
 
@@ -154,10 +154,10 @@ The rule: **never put cleanup at the END of a test file or suite for the purpose
 
 The runner loads an optional `test/_init.js` from **both** test roots — @omega.js/backend core (`<backend>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
 
-The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ config, Manager }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
+The module **must export a function**, `module.exports = (ctx) => ({ ... })`, called with `{ config, omega }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
 
 - `accounts` — array of extra test accounts to create alongside the built-in ones (admin/basic/premium-*/journey-*), so this project has a user for each lifecycle it exercises. Each entry is `{ id, uid, email, palette, properties }` (email may use the `{domain}` placeholder, which resolves to the brand's HOST — `brand.url`'s hostname, the one derivation the dev palette signs in on; `properties` is merged into the user doc after `auth:on-create`). These accounts are created, fetched (privateKeys), and deleted on the same path as the built-ins, and show up in the `accounts` map that tests and `setup()` receive. A project account may override a built-in one by reusing its `id`. A `palette: '<Label>'` label offers the persona in the dev palette's account switcher, exactly like a built-in one — `GET /test/roster` reads both halves of the seed ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)); an account without a label is machinery and stays invisible. The functions process reads the file once and remembers what it got — a CHANGED persona has to be re-seeded to exist at all, which is an emulator restart — but a read that FAILED is never remembered ([#733](https://github.com/Omega-JS-Stack/omega/issues/733)): a broken `_init.js` logs its error, serves an empty project half, and is re-read (module cache and all) on the next roster request, so fixing the file is enough.
-- `async setup({ admin, config, accounts, Manager, ctx })` — seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed — the whole DB is wiped each run).
+- `async setup({ admin, config, accounts, omega, ctx })`: seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed: the whole DB is wiped each run).
 
 There is **no `cleanup` hook**: the entire emulator Firestore is flushed before every run and each test cleans up after itself, so there is nothing project-level to tear down.
 
@@ -183,7 +183,7 @@ module.exports = ({ config }) => ({
 
 ## Extended Mode (`TEST_EXTENDED_MODE`)
 
-`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across @omega.js/backend/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx omega test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx omega test`. Either form works; the flag is just sugar over the env var.
+`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across all four frameworks. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx omega test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx omega test`. Either form works; the flag is just sugar over the env var.
 
 Several routes/handlers skip external API calls (Beehiiv, Stripe webhooks, dispute handlers, marketing libraries) when `process.env.TEST_EXTENDED_MODE` is unset, so unit tests don't fire real webhook side effects. Transactional email is the one that no longer SKIPS: it is built, rendered and [captured](#testing-mode-email-capture--how-a-test-reads-what-was-sent) instead of delivered, which is what makes an email assertable offline ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). Set the flag (or pass `--extended`) to opt **in** to real delivery and the rest of those side effects for a full end-to-end run.
 
@@ -237,17 +237,17 @@ npx omega test ...                                 # ← this still flips it bac
 
 Extended mode's counterpart: **outside** extended mode, `Transactional.send()` does not call SendGrid at all — it RECORDS the email it built and returns `{ status: 'captured' }` ([#774](https://github.com/Omega-JS-Stack/omega/issues/774)). The seam sits past `build()`, so the brand, the recipients, the template data and the MJML render are the real ones: a template that throws fails a test instead of reaching production. No caller gates itself on `ctx.isTesting()` around a send any more; the seam decides for all of them.
 
-The store is `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `Manager.cwd`, which is `<projectDir>/dist` in both processes — the test runner boots there, and so do the emulator's function workers, since `dist` is the source directory `firebase.json` names) — so the workers and the runner write and read the ONE store. Full rationale: the module header on [src/test/utils/email-capture.js](../src/test/utils/email-capture.js), and [email-system.md](email-system.md#testing) § Testing.
+The store is `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `omega.cwd`, which is `<projectDir>/dist` in both processes: the test runner boots there, and so do the emulator's function workers, since `dist` is the source directory `firebase.json` names), so the workers and the runner write and read the ONE store. Full rationale: the module header on [src/test/utils/email-capture.js](../src/test/utils/email-capture.js), and [email-system.md](email-system.md#testing) § Testing.
 
 ```javascript
 const capture = require('../../dist/test/utils/email-capture.js');
 
 // Clear BEFORE the act, so what you read back is your own
-capture.clearCaptured(Manager);
+capture.clearCaptured(omega);
 
-await http.as('signup-emails').post('backend-manager/user/signup', {});
+await http.as('signup-emails').post('omega/user/signup', {});
 
-const sent = capture.readCaptured(Manager);
+const sent = capture.readCaptured(omega);
 // [{ to: ['a@b.dev'], template: 'card', subject: 'Welcome to …!', summary: '…', sendAt: null }]
 ```
 
@@ -291,7 +291,7 @@ Runs the payment pipeline against REAL Stripe test-mode events: real objects in 
 
 The gate, in order — any failure is one skip line:
 
-1. A Stripe secret resolves through the ONE env reader (`src/manager/libraries/env.js`). A test lane composes its `.env` from the base plus `.env.testing` ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)), so the TEST credential goes in that overlay under the plain `STRIPE_SECRET_KEY` name.
+1. A Stripe secret resolves through the ONE env reader (`src/omega/libraries/env.js`). A test lane composes its `.env` from the base plus `.env.testing` ([#586](https://github.com/Omega-JS-Stack/omega/issues/586)), so the TEST credential goes in that overlay under the plain `STRIPE_SECRET_KEY` name.
 2. That secret is **test-shaped** (`sk_test_`). Nothing upstream vets the value — the env reader hands back whatever the resolved cascade holds — so this gate is the ONLY thing standing between the lane and a live account, and it refuses everything that is not an `sk_test_`: a live key, a restricted key, a publishable key, a paste of the wrong line.
 3. The **Stripe CLI** is installed, because the forwarding and the event triggers are its job.
 
@@ -315,7 +315,7 @@ Use `backend:` or `project:` prefix to filter by source. **Mirror the source pat
 
 **The `.test.js` suffix IS discovery:** the runner only picks up files ending in `.test.js` (the mirrored suite shape shared by every OMEGA package — monorepo `docs/shared/testing.md`). A `.js` file under `test/` without the suffix is support code, never a test, and never runs.
 
-**The underscore convention:** `_`-prefixed files and directories at any depth under `test/` are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`, `test/routes/_shared-utils.js`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in EM/BXM/UJM.
+**The underscore convention:** `_`-prefixed files and directories at any depth under `test/` are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths, e.g. `test/_fixtures/`, `test/_helpers/`, `test/routes/_shared-utils.js`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in desktop, extension and web.
 
 ## Test Types
 
@@ -379,7 +379,9 @@ module.exports = {
 | `state` | Shared state (suites only) |
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
 | `config` | Test configuration — `config.apiUrl` is the base URL of the lane THIS run booted (the resolved hosting port, not a literal): a suite that fetches directly instead of through `http` builds its URL from it |
-| `Manager` | Real booted @omega.js/backend Manager (+ `Manager.RouteContext()` etc.) |
+| `omega` | The real booted @omega.js/backend instance (`omega.email`, `omega.utilities`, `omega.firebase.admin`) |
+| `ctx` | A real `Context` on that instance (`ctx.ai`, `ctx.email`) |
+| `admin` | The Firebase Admin SDK the runner initialized |
 
 ## HTTP Routing
 
@@ -387,9 +389,9 @@ The `http` client sends requests directly to the hosting emulator (`config.apiUr
 
 ```javascript
 // @omega.js/backend built-in routes — go through omega_api via firebase.json rewrite
-http.post('backend-manager/payments/intent', { ... })
-http.as('admin').get('backend-manager/admin/stats')
-http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid&key=...', [...])
+http.post('omega/payments/intent', { ... })
+http.as('admin').get('omega/admin/stats')
+http.as('none').post('omega/marketing/webhook?provider=sendgrid&key=...', [...])
 
 // Consumer project routes — go to their own Cloud Functions via firebase.json rewrites
 http.post('projects', { name: 'My Project' })
@@ -423,7 +425,7 @@ assert.fail(message)                           // Explicit fail
 
 ## Email Tests (`test/email/`)
 
-All email tests live under `test/email/`, mirroring `src/manager/libraries/email/`. The pipeline was unified under MJML — all templates are rendered server-side (no SendGrid dynamic templates).
+All email tests live under `test/email/`, mirroring `src/omega/libraries/email/`. The pipeline was unified under MJML: all templates are rendered server-side (no SendGrid dynamic templates).
 
 | Test file | What it tests | Extended? |
 |---|---|---|

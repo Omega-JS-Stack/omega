@@ -1,15 +1,13 @@
 // Minimal main entry for @omega.js/desktop's boot-layer self-test fixture. Mirrors a real consumer:
 // one-line bootstrap, then create the main window once initialize() resolves. The boot
-// harness (src/test/harness/boot-entry.js) inspects the live manager after this runs.
-const Manager = require('@omega.js/desktop/main');
+// harness (src/test/harness/boot-entry.js) inspects the live instance after this runs.
+const omega = require('@omega.js/desktop/main');
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { windows, logger } = manager;
+    const { windows, logger } = omega;
 
-    // Force show:false — the boot harness runs headless and only asserts the window
+    // Force show:false: the boot harness runs headless and only asserts the window
     // EXISTS + loaded the built view, never that it's visible on screen.
     windows.create('main', { show: false });
 

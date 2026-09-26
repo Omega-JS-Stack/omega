@@ -3,15 +3,15 @@
  * VAPID resolution, and the localStorage reconciliation that decides whether
  * a browser is really subscribed.
  *
- * Driven through the REAL singleton (`Manager.notifications()`) against the
+ * Driven through a REAL Omega instance (`omega.notifications`) against the
  * REAL Storage module, so the stale-subscription paths are proven against
  * actual localStorage round-trips. The only stand-ins are the browser APIs
  * Node does not ship — `Notification` and the messaging/service-worker
- * handles the module reads off the manager, which are exactly the surfaces
+ * handles the module reads off the instance, which are exactly the surfaces
  * the module treats as injected.
  */
 const { describe, it, before, beforeEach, afterEach } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 // The shared harness (test/setup.js) installs the mock `navigator` — Node's
 // own is a getter-only global, so it is defined there with defineProperty and
@@ -36,14 +36,14 @@ function removeNotification() {
 }
 
 describe('Notifications Module', () => {
-  let manager;
+  let omega;
   let notifications;
   let quiet;
 
   before(async () => {
-    manager = getManager();
-    await manager.initialize(TEST_CONFIG);
-    notifications = manager.notifications();
+    omega = getOmega();
+    await omega.initialize(TEST_CONFIG);
+    notifications = omega.notifications;
   });
 
   beforeEach(() => {
@@ -57,20 +57,20 @@ describe('Notifications Module', () => {
     console.log = quiet.log;
     console.error = quiet.error;
     removeNotification();
-    manager._firebaseMessaging = undefined;
-    manager.state.serviceWorker = null;
+    omega._firebaseMessaging = undefined;
+    omega.state.serviceWorker = null;
     notifications._requestInProgress = false;
-    manager.storage().remove('notifications');
+    omega.storage.remove('notifications');
   });
 
   describe('support gate', () => {
     it('needs Notification, a service worker, AND firebase messaging', () => {
       // serviceWorker is a declared key on the suite's navigator.
       installNotification('default');
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
       assert.strictEqual(notifications.isSupported(), false, 'no messaging handle');
 
-      manager._firebaseMessaging = null;
+      omega._firebaseMessaging = null;
       assert.strictEqual(notifications.isSupported(), false, 'a null handle means messaging is disabled');
 
       removeNotification();
@@ -80,7 +80,7 @@ describe('Notifications Module', () => {
     it('isSubscribed is false without support, and tracks the permission otherwise', async () => {
       assert.strictEqual(await notifications.isSubscribed(), false);
 
-      manager._firebaseMessaging = {};
+      omega._firebaseMessaging = {};
       installNotification('granted');
       assert.strictEqual(await notifications.isSubscribed(), true);
 
@@ -94,7 +94,7 @@ describe('Notifications Module', () => {
 
   describe('requestPermission', () => {
     it('returns true only when the browser grants', async () => {
-      manager._firebaseMessaging = {};
+      omega._firebaseMessaging = {};
 
       installNotification('granted');
       assert.strictEqual(await notifications.requestPermission(), true);
@@ -104,7 +104,7 @@ describe('Notifications Module', () => {
     });
 
     it('returns false rather than throwing when unsupported', async () => {
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
 
       assert.strictEqual(await notifications.requestPermission(), false);
     });
@@ -113,11 +113,11 @@ describe('Notifications Module', () => {
   describe('initialize', () => {
     let savedConfig;
 
-    beforeEach(() => { savedConfig = manager.config; });
-    afterEach(() => { manager.config = savedConfig; });
+    beforeEach(() => { savedConfig = omega.config; });
+    afterEach(() => { omega.config = savedConfig; });
 
     it('reads the VAPID key from cloud.messaging first', () => {
-      manager.config = {
+      omega.config = {
         cloud: { messaging: { vapidKey: 'CLOUD_KEY' } },
         firebase: { messaging: { config: { vapidKey: 'BRIDGE_KEY' } } },
       };
@@ -131,18 +131,18 @@ describe('Notifications Module', () => {
     it('falls back to the firebase.messaging bridge shape, then to null', () => {
       installNotification('default');
 
-      manager.config = { firebase: { messaging: { config: { vapidKey: 'BRIDGE_KEY' } } } };
+      omega.config = { firebase: { messaging: { config: { vapidKey: 'BRIDGE_KEY' } } } };
       notifications.initialize({});
       assert.strictEqual(notifications._vapidKey, 'BRIDGE_KEY');
 
-      manager.config = {};
+      omega.config = {};
       notifications.initialize({});
       assert.strictEqual(notifications._vapidKey, null);
     });
 
     it('clears a stored subscription the browser no longer backs', () => {
-      const storage = manager.storage();
-      manager.config = {};
+      const storage = omega.storage;
+      omega.config = {};
       storage.set('notifications', { subscribed: true, token: 'stale-token-12345678' });
       installNotification('denied');
 
@@ -152,9 +152,9 @@ describe('Notifications Module', () => {
     });
 
     it('leaves a granted subscription alone', () => {
-      const storage = manager.storage();
-      manager.config = {};
-      manager._firebaseMessaging = undefined;
+      const storage = omega.storage;
+      omega.config = {};
+      omega._firebaseMessaging = undefined;
       storage.set('notifications', { subscribed: true, token: 'live-token-12345678' });
       installNotification('granted');
 
@@ -170,7 +170,7 @@ describe('Notifications Module', () => {
       global.document.addEventListener = (event, handler) => listeners.push([event, handler]);
 
       try {
-        manager.config = {};
+        omega.config = {};
         installNotification('default');
 
         notifications.initialize({ autoRequest: 5000 });
@@ -187,7 +187,7 @@ describe('Notifications Module', () => {
 
   describe('subscribe', () => {
     it('refuses when push is unsupported', async () => {
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
 
       await assert.rejects(
         () => notifications.subscribe(),
@@ -196,7 +196,7 @@ describe('Notifications Module', () => {
     });
 
     it('refuses a second concurrent request', async () => {
-      manager._firebaseMessaging = {};
+      omega._firebaseMessaging = {};
       installNotification('granted');
       notifications._requestInProgress = true;
 
@@ -207,7 +207,7 @@ describe('Notifications Module', () => {
     });
 
     it('refuses without a messaging handle, and releases the in-progress latch', async () => {
-      manager._firebaseMessaging = null;
+      omega._firebaseMessaging = null;
       installNotification('granted');
 
       // A null handle now fails the support gate itself — the honest diagnostic.
@@ -219,8 +219,8 @@ describe('Notifications Module', () => {
     });
 
     it('refuses without a registered service worker', async () => {
-      manager._firebaseMessaging = {};
-      manager.state.serviceWorker = null;
+      omega._firebaseMessaging = {};
+      omega.state.serviceWorker = null;
       installNotification('granted');
 
       await assert.rejects(
@@ -230,8 +230,8 @@ describe('Notifications Module', () => {
     });
 
     it('refuses when the browser has already denied', async () => {
-      manager._firebaseMessaging = {};
-      manager.state.serviceWorker = { scope: '/' };
+      omega._firebaseMessaging = {};
+      omega.state.serviceWorker = { scope: '/' };
       installNotification('denied');
 
       await assert.rejects(
@@ -242,8 +242,8 @@ describe('Notifications Module', () => {
 
     it('asks on first run, and refuses when the answer is not a grant', async () => {
       let asked = 0;
-      manager._firebaseMessaging = {};
-      manager.state.serviceWorker = { scope: '/' };
+      omega._firebaseMessaging = {};
+      omega.state.serviceWorker = { scope: '/' };
       const stub = installNotification('default', { onRequest: () => { asked += 1; } });
       stub.requestPermission = async () => { asked += 1; return 'denied'; };
 
@@ -257,7 +257,7 @@ describe('Notifications Module', () => {
 
   describe('unsubscribe', () => {
     it('returns false when push is unsupported', async () => {
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
 
       assert.strictEqual(await notifications.unsubscribe(), false);
     });
@@ -265,7 +265,7 @@ describe('Notifications Module', () => {
 
   describe('syncSubscription', () => {
     it('clears localStorage when the permission is gone', async () => {
-      const storage = manager.storage();
+      const storage = omega.storage;
       storage.set('notifications', { subscribed: true, token: 'stale-token-12345678' });
       installNotification('denied');
 
@@ -274,7 +274,7 @@ describe('Notifications Module', () => {
     });
 
     it('does nothing when the permission is gone and nothing was stored', async () => {
-      const storage = manager.storage();
+      const storage = omega.storage;
       installNotification('default');
 
       assert.strictEqual(await notifications.syncSubscription(), false);
@@ -282,11 +282,11 @@ describe('Notifications Module', () => {
     });
 
     it('clears localStorage when the token can no longer be fetched', async () => {
-      const storage = manager.storage();
+      const storage = omega.storage;
       storage.set('notifications', { subscribed: true, token: 'gone-token-12345678' });
       installNotification('granted');
       // Granted permission but no messaging handle — getToken() answers null.
-      manager._firebaseMessaging = null;
+      omega._firebaseMessaging = null;
 
       assert.strictEqual(await notifications.syncSubscription(), false);
       assert.deepStrictEqual(storage.get('notifications'), { subscribed: false, token: null });
@@ -295,24 +295,24 @@ describe('Notifications Module', () => {
 
   describe('getToken', () => {
     it('answers null instead of throwing when unsupported or unwired', async () => {
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
       assert.strictEqual(await notifications.getToken(), null);
 
       installNotification('granted');
-      manager._firebaseMessaging = null;
+      omega._firebaseMessaging = null;
       assert.strictEqual(await notifications.getToken(), null);
     });
   });
 
   describe('onMessage', () => {
     it('answers a no-op unsubscriber when unsupported or unwired', async () => {
-      manager._firebaseMessaging = undefined;
+      omega._firebaseMessaging = undefined;
       const unsupported = await notifications.onMessage(() => {});
       assert.strictEqual(typeof unsupported, 'function');
       assert.strictEqual(unsupported(), undefined);
 
       installNotification('granted');
-      manager._firebaseMessaging = null;
+      omega._firebaseMessaging = null;
       const unwired = await notifications.onMessage(() => {});
       assert.strictEqual(typeof unwired, 'function');
     });

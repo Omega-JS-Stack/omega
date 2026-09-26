@@ -8,7 +8,7 @@
 //     description: 'config has brand.id',
 //     timeout: 5000,
 //     run: async (ctx) => {
-//       const cfg = Manager.getConfig();
+//       const cfg = require('../build.js').getConfig();
 //       ctx.expect(cfg.brand.id).toBeTruthy();
 //     },
 //     cleanup: async (ctx) => { ... },
@@ -55,7 +55,7 @@
 //   - ctx.state        — shared object across tests in a suite/group
 //   - ctx.skip(reason) — throw to skip the current test at runtime
 //   - ctx.layer        — current layer name
-//   - ctx.manager      — BXM Manager instance (background / view layers only)
+//   - ctx.omega        : the context's omega instance (background / view layers only)
 //   - ctx.page         — Puppeteer Page (view layer only)
 
 module.exports = {

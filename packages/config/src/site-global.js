@@ -3,8 +3,7 @@
  * `site.*` global, so existing template references port verbatim to the new
  * SSG (plan §2: toSiteGlobal()).
  *
- * Scoped by the real-usage audit (2026-07-06) of UJM's theme/blueprints +
- * somiibo: config-owned keys referenced in templates are the resolved
+ * Config-owned keys referenced in templates are the resolved
  * config's own shape, so this is an identity mapping plus: machinery keys
  * stripped (`targets`, `enabled`), `url` derived (explicit url, else
  * brand.url), `baseurl` defaulted. ENGINE-owned keys (posts, pages, data,
@@ -24,7 +23,7 @@
  * ([#610](https://github.com/Omega-JS-Stack/omega/issues/610)): the
  * `/download` page, the `/extension` page and the shortlink generator all
  * read `site.targets.desktop.releasesUrl` and
- * `site.targets.extension.listings` directly. The legacy UJM-shaped
+ * `site.targets.extension.listings` directly. The hand-written
  * `download`/`extension` page maps — and the derivation that filled them —
  * are gone; the validator refuses a config still carrying either key.
  *

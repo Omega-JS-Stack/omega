@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
@@ -19,7 +19,7 @@ export default () => {
     omega.request(WAKEUP_ROUTE, { wakeup: true });
 
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupForm();
     setupRatingButtons();
@@ -66,7 +66,7 @@ function selectRating(ratingId) {
 
 // Setup form handling
 function setupForm() {
-  const formManager = new FormManager('#feedback-form', {
+  const formManager = new FormManager(omega, '#feedback-form', {
     allowResubmit: false,
     resetOnSuccess: false,
     autoReady: false,
@@ -107,7 +107,7 @@ function setupForm() {
   });
 
   // Wait for auth state before enabling the form
-  omega.auth().listen({ once: true }, () => {
+  omega.auth.listen({ once: true }, () => {
     formManager.ready();
   });
 }
@@ -126,7 +126,7 @@ function showReviewModal(reviewURL, data) {
   // Extract site name for display
   try {
     const siteName = new URL(fullURL).hostname.replace('www.', '');
-    $link.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square me-2"></i> Post your review on ${omega.utilities().escapeHTML(siteName)}`;
+    $link.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square me-2"></i> Post your review on ${omega.utilities.escapeHTML(siteName)}`;
   } catch (e) {
     // Use default text
   }
@@ -144,7 +144,7 @@ function showReviewModal(reviewURL, data) {
     $copyBtn.addEventListener('click', () => {
       // The clipboard rejects on a real refusal since #726: confirm only what
       // was copied, and never leave the rejection unhandled.
-      omega.utilities().clipboardCopy($feedbackTextarea.value)
+      omega.utilities.clipboardCopy($feedbackTextarea.value)
         .then(() => {
           $copyBtn.innerHTML = `<i class="fa-solid fa-check me-1"></i> Copied!`;
           setTimeout(() => {

@@ -17,8 +17,10 @@ describe('Wave-4 source pins', () => {
   it('sentry beforeSend never derefs config.page and reads the auth storage paths auth actually writes (F1/F4)', () => {
     const source = read('sentry.js');
     assert(!source.includes('config.page.startTime'), 'the config.page.startTime deref is gone — nothing ever writes config.page');
-    assert(source.includes("get('auth.user.email'"), 'user email comes from the auth storage key');
-    assert(source.includes("get('auth.user.uid'"), 'uid comes from the auth storage key');
+    // auth stores { user, denied } with the User serialized to its stored
+    // document, so identity sits under the document's `auth` branch
+    assert(source.includes("get('auth.user.auth.email'"), 'user email comes from the auth storage key');
+    assert(source.includes("get('auth.user.auth.uid'"), 'uid comes from the auth storage key');
     assert(!source.includes("get('user.auth."), 'legacy user.auth.* paths are gone');
   });
 

@@ -36,7 +36,7 @@ npx omega cdp status                          # running? targets, window rect, t
 npx omega cdp eval <match> '<expr>'           # evaluate JS in any webContents
 npx omega cdp shot <match> <out.png>          # ONE renderer's own pixels
 npx omega cdp capture <out.png>               # the COMPOSITED window (macOS)
-npx omega cdp theme <dark|light|system>       # flip the live theme (manager.theme)
+npx omega cdp theme <dark|light|system>       # flip the live theme (omega.theme)
 npx omega cdp relaunch                        # quit → npm start → wait for boot
 npx omega cdp quit                            # quit + wait for the process tree to drain
 ```

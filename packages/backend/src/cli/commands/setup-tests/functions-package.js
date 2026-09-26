@@ -24,7 +24,7 @@ class FunctionsPackageTest extends BaseTest {
     return !!staged
       && staged.main === 'index.js'
       && !!(staged.engines && staged.engines.node)
-      && JSON.stringify(staged.dependencies) === JSON.stringify(app.dependencies)
+      && JSON.stringify(staged.dependencies) === JSON.stringify(manifest.dependencies)
       && staged.scripts === undefined;
   }
 

@@ -48,7 +48,7 @@ module.exports = defineCases({
 
         assert.equal(state.before.subscription.product.id, 'basic', 'The persona starts on basic');
 
-        const response = await http.as(PERSONA).post('backend-manager/payments/intent', {
+        const response = await http.as(PERSONA).post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,

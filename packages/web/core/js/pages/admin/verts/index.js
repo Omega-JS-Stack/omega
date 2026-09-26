@@ -10,7 +10,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // State
 let editorFormManager = null;
@@ -20,10 +20,10 @@ let rows = [];
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, async (state) => {
-      if (!state.user) {
+    omega.auth.listen({ once: true }, async (state) => {
+      if (!state.user.authenticated) {
         return;
       }
 
@@ -122,7 +122,7 @@ function renderVerts() {
 
 // Build one inventory row
 function renderRow(vert) {
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
   const enabled = vert.enabled !== false;
 
   // Link cell — the destination host
@@ -267,7 +267,7 @@ function setField(id, value) {
 }
 
 function initEditorForm() {
-  editorFormManager = new FormManager('#vert-editor-form', {
+  editorFormManager = new FormManager(omega, '#vert-editor-form', {
     allowResubmit: true,
     submittingText: 'Saving...',
   });

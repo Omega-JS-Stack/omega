@@ -8,7 +8,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { fetchOrders, requestRefundFor } from '../modules/orders.js';
 
 // Status pill config — the billing card's own vocabulary (dot + label, never
@@ -75,7 +75,7 @@ function render(orders) {
 
 function row(order) {
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.unknown;
-  const escape = (value) => omega.utilities().escapeHTML(String(value ?? ''));
+  const escape = (value) => omega.utilities.escapeHTML(String(value ?? ''));
 
   // A refunded purchase says so in its pill; only an order the BACKEND calls
   // refundable is offered the button, so a button here is a refund the route
@@ -105,7 +105,7 @@ function row(order) {
 }
 
 function message(text) {
-  return `<div class="text-center text-muted py-3">${omega.utilities().escapeHTML(text)}</div>`;
+  return `<div class="text-center text-muted py-3">${omega.utilities.escapeHTML(text)}</div>`;
 }
 
 // ─── Refund handoff ─────────────────────────────────────────

@@ -15,7 +15,7 @@
  * the assertions run against the real Transactional.build().
  */
 const assert = require('node:assert');
-const { GROUP_KEYS, DEFAULT_GROUP_KEY } = require('../../dist/manager/libraries/email/constants.js');
+const { GROUP_KEYS, DEFAULT_GROUP_KEY } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // This brand's own account ids — deliberately nothing like the ITW ids that
@@ -30,24 +30,23 @@ const GROUP_IDS = {
   internal: 900007,
 };
 
-function makeManager(groups) {
+function makeOmega(groups) {
   return {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
       ...(groups ? { marketing: { campaigns: { providers: { sendgrid: { groups } } } } } : {}),
     },
     project: { websiteUrl: 'https://test.dev' },
-    libraries: { admin: {} },
-    User: () => ({ properties: {} }),
+    firebase: { admin: {} },
   };
 }
 
 function build(settings, { groups = GROUP_IDS } = {}) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
-  const Manager = makeManager(groups);
-  const ctx = { Manager, log: () => {}, error: () => {} };
+  const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
+  const omega = makeOmega(groups);
+  const ctx = { omega, log: () => {}, error: () => {} };
 
   return new Transactional(ctx).build({
     to: 'user@test.dev',
@@ -66,7 +65,7 @@ module.exports = defineCases({
       name: 'constants carry KEYS only — no compiled-in ASM ids',
 
       run() {
-        const constants = require('../../dist/manager/libraries/email/constants.js');
+        const constants = require('../../dist/omega/libraries/email/constants.js');
 
         assert.ok(!('GROUPS' in constants), 'the hardcoded id map is gone');
         assert.deepEqual(GROUP_KEYS, ['orders', 'hello', 'account', 'marketing', 'security', 'newsletter', 'internal']);
@@ -90,7 +89,7 @@ module.exports = defineCases({
       name: 'every sender category resolves its own configured id',
 
       async run() {
-        const { SENDERS } = require('../../dist/manager/libraries/email/constants.js');
+        const { SENDERS } = require('../../dist/omega/libraries/email/constants.js');
 
         for (const [sender, config] of Object.entries(SENDERS)) {
           const email = await build({ sender });

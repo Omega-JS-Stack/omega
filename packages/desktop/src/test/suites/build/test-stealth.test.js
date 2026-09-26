@@ -68,19 +68,17 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'a provided manager answers from the config IT was baked with',
+      name: 'a provided instance answers from the config IT was baked with',
       run: (ctx) => {
-        // The build-time Manager carries the same mixin as the runtime Managers,
-        // and since #817 they all read the ONE input: the process variable, or
-        // the baked `config.environment` when the process has none.
-        const Manager = require('../../../build.js');
+        // An instance carrying the shared isTesting() answers like the runtime
+        // `omega` instances: since #817 they all read the ONE input, the process
+        // variable, or the baked `config.environment` when the process has none.
+        const { isTesting } = require('../../../utils/mode-helpers.js');
         withEnv({ OMEGA_ENVIRONMENT: undefined, OMEGA_TEST_SHOW: undefined }, () => {
-          const testing = new Manager();
-          testing.config = { environment: 'testing' };
+          const testing = { isTesting, config: { environment: 'testing' } };
           ctx.expect(isTestStealth(testing)).toBe(true);
 
-          const production = new Manager();
-          production.config = { environment: 'production' };
+          const production = { isTesting, config: { environment: 'production' } };
           ctx.expect(isTestStealth(production)).toBe(false);
         });
       },

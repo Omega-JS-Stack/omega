@@ -7,11 +7,12 @@
 // querySelectorAll loop, which meant two copies of the behavior and neither one
 // seeing input groups rendered after boot. Delegation covers both.
 
-// Libraries
-import { registerTrigger } from '@omega.js/client/modules/triggers.js';
-
-export function setupPasswordToggle() {
-  registerTrigger('password-toggle', (event, $button) => {
+/**
+ * Register the password eye on the instance's trigger registry.
+ * @param {object} omega - the web runtime instance (`omega.triggers`)
+ */
+export function setupPasswordToggle(omega) {
+  omega.triggers.register('password-toggle', (event, $button) => {
     // Find the password input in the same input group
     const $inputGroup = $button.closest('.input-group');
     const $passwordInput = $inputGroup?.querySelector('input');

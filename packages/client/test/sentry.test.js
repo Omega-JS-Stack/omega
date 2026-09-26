@@ -1,5 +1,5 @@
 const { describe, it } = require('node:test');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 // The release tag every browser surface reports under. `init()` builds the
 // @sentry/browser options for real and only THEN hands them to the SDK, whose
@@ -7,10 +7,10 @@ const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 // so the boot is allowed to fail here and the options it was handed are what
 // gets asserted. The tag itself is @omega.js/monitoring's: `brand.id@version`.
 async function initOptions(config) {
-  const manager = getManager();
-  await manager.initialize({ ...TEST_CONFIG, ...config });
+  const omega = getOmega();
+  await omega.initialize({ ...TEST_CONFIG, ...config });
 
-  const sentry = manager.sentry();
+  const sentry = omega.sentry;
   // The flat SENTRY PROVIDER block the build maps from monitoring.providers.sentry (#425)
   await sentry.init({ dsn: 'https://key@o1.ingest.sentry.io/1' }).catch(() => {});
 
@@ -43,15 +43,15 @@ describe('Sentry environment tagging', () => {
   });
 
   it('should refuse to initialize by name when the artifact baked no environment', async () => {
-    const manager = getManager();
+    const omega = getOmega();
     const { environment, ...withoutEnvironment } = TEST_CONFIG;
 
     // A build that baked no environment is a broken artifact, so the reporter
     // says which fact is missing instead of tagging every event `undefined`.
-    await manager.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
+    await omega.initialize({ ...withoutEnvironment, serviceWorker: { enabled: false } });
 
     await assert.rejects(
-      () => manager.sentry().init({ dsn: 'https://key@o1.ingest.sentry.io/1' }),
+      () => omega.sentry.init({ dsn: 'https://key@o1.ingest.sentry.io/1' }),
       /OMEGA_ENVIRONMENT/,
     );
   });

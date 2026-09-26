@@ -5,5 +5,5 @@
 // auxiliary files (changelog, license bundling, etc.).
 
 module.exports = async (ctx) => {
-  // ctx = { manager, mode, projectRoot, distDir }
+  // ctx = { build, mode, projectRoot, distDir }
 };

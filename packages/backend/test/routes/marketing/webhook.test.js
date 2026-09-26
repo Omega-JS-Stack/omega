@@ -56,7 +56,7 @@ module.exports = defineCases({
       name: 'rejects-missing-provider',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/marketing/webhook', []);
+        const response = await http.as('none').post('omega/marketing/webhook', []);
         assert.isError(response, 400, 'Should reject missing provider');
       },
     },
@@ -65,7 +65,7 @@ module.exports = defineCases({
       name: 'rejects-missing-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid', []);
+        const response = await http.as('none').post('omega/marketing/webhook?provider=sendgrid', []);
         assert.isError(response, 401, 'Should reject missing key');
       },
     },
@@ -74,7 +74,7 @@ module.exports = defineCases({
       name: 'rejects-invalid-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid&key=wrong-key', []);
+        const response = await http.as('none').post('omega/marketing/webhook?provider=sendgrid&key=wrong-key', []);
         assert.isError(response, 401, 'Should reject invalid key');
       },
     },
@@ -84,7 +84,7 @@ module.exports = defineCases({
       auth: 'none',
       async run({ http, assert }) {
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           []
         );
         assert.isError(response, 400, 'Should reject unknown provider');
@@ -97,7 +97,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // Brand filter should silently ignore (200 with ignored: true), not error
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}&brand=some-other-brand-that-does-not-exist`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}&brand=some-other-brand-that-does-not-exist`,
           []
         );
         assert.isSuccess(response, 'Should silently ignore mismatched brand (200 OK)');
@@ -117,7 +117,7 @@ module.exports = defineCases({
         const eventTimestamp = Math.floor(Date.now() / 1000);
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email, timestamp: eventTimestamp, asmGroupId: 25928 })]
         );
 
@@ -141,7 +141,7 @@ module.exports = defineCases({
         const eventId = sgEventId('unsub');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'unsubscribe', email })]
         );
 
@@ -163,7 +163,7 @@ module.exports = defineCases({
         const eventId = sgEventId('spamreport');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'spamreport', email })]
         );
 
@@ -185,7 +185,7 @@ module.exports = defineCases({
 
         // Only hard bounces (bounce_classification='Invalid Address') revoke consent.
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'bounce', email, bounceClassification: 'Invalid Address' })]
         );
 
@@ -207,7 +207,7 @@ module.exports = defineCases({
 
         // 'dropped' follows the same classification filter as 'bounce'.
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'dropped', email, bounceClassification: 'Invalid Address' })]
         );
 
@@ -231,7 +231,7 @@ module.exports = defineCases({
         // Technical bounces (DMARC, TLS, DNS) are sender-side issues — the recipient's
         // mailbox is still valid, so consent must NOT be revoked.
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'bounce', email, bounceClassification: 'Technical Failure' })]
         );
 
@@ -250,7 +250,7 @@ module.exports = defineCases({
 
         // No bounce_classification — can't confirm a hard bounce, so skip.
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'bounce', email })]
         );
 
@@ -268,7 +268,7 @@ module.exports = defineCases({
         const eventId = sgEventId('delivered');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'delivered', email })]
         );
 
@@ -286,7 +286,7 @@ module.exports = defineCases({
         const eventId = sgEventId('open');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'open', email })]
         );
 
@@ -305,7 +305,7 @@ module.exports = defineCases({
         const eventId = sgEventId('unknown-email');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email: '_test.never-existed@example.com' })]
         );
 
@@ -330,7 +330,7 @@ module.exports = defineCases({
         const e3 = sgEventId('batch-3');
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [
             sgEvent({ id: e1, type: 'group_unsubscribe', email }),
             sgEvent({ id: e2, type: 'open', email }), // ignored — unsupported type
@@ -360,7 +360,7 @@ module.exports = defineCases({
 
         // First delivery
         const response1 = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email })]
         );
         assert.isSuccess(response1);
@@ -369,7 +369,7 @@ module.exports = defineCases({
         // Second delivery — same eventId. With no dedup ledger the handler runs
         // again, but the revoke is idempotent so the end state is unchanged.
         const response2 = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [sgEvent({ id: eventId, type: 'group_unsubscribe', email })]
         );
         assert.isSuccess(response2);
@@ -390,7 +390,7 @@ module.exports = defineCases({
         const email = accounts['journey-webhook-revoke'].email;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           [{ event: 'group_unsubscribe', email, timestamp: Math.floor(Date.now() / 1000) }] // NO sg_event_id
         );
 
@@ -421,7 +421,7 @@ module.exports = defineCases({
         }
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.unsubscribed',
@@ -451,7 +451,7 @@ module.exports = defineCases({
         const publicationId = config.marketing?.newsletter?.providers?.beehiiv?.publicationId;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.deleted',
@@ -480,7 +480,7 @@ module.exports = defineCases({
         const publicationId = config.marketing?.newsletter?.providers?.beehiiv?.publicationId;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.paused',
@@ -515,7 +515,7 @@ module.exports = defineCases({
         const beforeRevokedAt = beforeDoc?.consent?.marketing?.revokedAt || null;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.unsubscribed',
@@ -554,7 +554,7 @@ module.exports = defineCases({
         const eventId = `_test-bh-unknown-${Date.now()}`;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.unsubscribed',
@@ -579,7 +579,7 @@ module.exports = defineCases({
         const eventId = `_test-bh-created-${Date.now()}`;
 
         const response = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           {
             id: eventId,
             event: 'subscription.created',
@@ -618,7 +618,7 @@ module.exports = defineCases({
 
         // First delivery
         const r1 = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           payload
         );
         assert.isSuccess(r1);
@@ -627,7 +627,7 @@ module.exports = defineCases({
         // Second delivery — same id. No dedup ledger, so it reprocesses; the
         // revoke is idempotent so the end state is unchanged.
         const r2 = await http.as('none').post(
-          `backend-manager/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
+          `omega/marketing/webhook?provider=beehiiv&key=${process.env.OMEGA_WEBHOOK_KEY}`,
           payload
         );
         assert.isSuccess(r2);

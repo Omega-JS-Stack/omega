@@ -1,7 +1,5 @@
 /**
- * Cloudflare cache purge — the UJM cloudflare-purge successor, de-ITW'd:
- * legacy proxied through the hardcoded ITW wrapper API (which held the
- * token server-side); this talks to the Cloudflare API directly with the
+ * Cloudflare cache purge — talks to the Cloudflare API directly with the
  * BRAND's own CLOUDFLARE_TOKEN from the .env cascade.
  *
  * Zone resolution: config `edge.providers.cloudflare.zone` wins;

@@ -22,14 +22,14 @@
  * The RUNNER is `@omega.js/devkit/deploy-precheck` (one copy for every
  * framework); this file is desktop's STEPS.
  */
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 const { runDeployPrecheck } = require('@omega.js/devkit/deploy-precheck');
 const { releasesRepo } = require('@omega.js/config');
 const { publishTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const { resolveToken } = require('@omega.js/devkit/deploy');
 const { updateManager } = require('./dependencies.js');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 /**
  * Auto-provision the brand's ONE public releases repo, addressed by
@@ -57,7 +57,7 @@ const package = Manager.getPackage('main');
 async function provisionReleaseRepos({ log, warn, config, execFn, dryRun }) {
   const { ensureRepo } = require('@omega.js/devkit/github-repo');
 
-  const resolved = config || Manager.getConfig() || {};
+  const resolved = config || build.getConfig() || {};
   if (resolved.releases?.enabled === false) return;
 
   const releases = releasesRepo(resolved);

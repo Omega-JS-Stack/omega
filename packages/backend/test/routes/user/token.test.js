@@ -16,7 +16,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/token', {});
+        const response = await http.post('omega/user/token', {});
 
         assert.isSuccess(response, 'Create custom token should succeed for authenticated user');
         assert.hasProperty(response, 'data.token', 'Response should contain token');
@@ -34,7 +34,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/token', {});
+        const response = await http.post('omega/user/token', {});
 
         assert.isSuccess(response, 'Create custom token should succeed');
 
@@ -52,7 +52,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/token', {});
+        const response = await http.post('omega/user/token', {});
 
         assert.isSuccess(response, 'Create custom token should succeed for premium user');
         assert.hasProperty(response, 'data.token', 'Response should contain token');
@@ -66,7 +66,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/token', {});
+        const response = await http.post('omega/user/token', {});
 
         assert.isError(response, 401, 'Create custom token should fail without authentication');
       },
@@ -83,7 +83,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/token', {});
+        const response = await http.post('omega/user/token', {});
 
         assert.isSuccess(response, 'Create custom token should succeed');
         assert.equal(typeof response.data.token, 'string', 'Token should be at the TOP level of the body');
@@ -99,7 +99,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager', {
+        const response = await http.post('omega', {
           command: 'user:create-custom-token',
           payload: {},
         });

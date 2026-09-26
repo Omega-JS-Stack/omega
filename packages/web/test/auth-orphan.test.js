@@ -25,6 +25,7 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const lodash = require('lodash');
 const { firebaseAuthStub } = require('./lib/firebase-auth-stub.js');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const AUTH_ENTRY = path.join(CORE_DIR, 'js', 'core', 'auth.js');
@@ -58,7 +59,7 @@ function bundleModule(entryPoint, outfile, stubs) {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -116,22 +117,22 @@ function makeClient({ policy = 'authenticated', storage = makeStorage() } = {}) 
       auth: { config: { policy, roles: null, redirects: { authenticated: '/dashboard/account', unauthenticated: '/signin' } } },
       analytics: {},
     },
-    auth: () => ({
+    auth: {
+      user: new User(),
       listen: (options, handler) => client.listeners.push(handler),
       signOut: async () => signOuts.push(true),
-      isAuthenticated: () => false,
-    }),
+    },
     listeners: [],
-    dom: () => ({ ready: async () => {} }),
+    dom: { ready: async () => {} },
     isDevelopment: () => false,
     isValidRedirectUrl: () => true,
-    notifications: () => ({ subscribe: async () => {} }),
-    sentry: () => ({ captureException: (error) => sentryCaptures.push(error.message) }),
-    utilities: () => ({
+    notifications: { subscribe: async () => {} },
+    sentry: { captureException: (error) => sentryCaptures.push(error.message) },
+    utilities: {
       showNotification: (message, options) => notificationsShown.push({ message, options }),
       getContext: () => ({}),
-    }),
-    storage: () => storage,
+    },
+    storage: storage,
     request: async (url, options) => {
       requests.push({ url, options });
 
@@ -186,7 +187,7 @@ async function bootPolicy({ href, pagePath, policy, storage, firebaseAuth }) {
   // require.resolve, not the path: the cache is keyed by the REAL path, and
   // macOS's tmpdir is a symlink (/var → /private/var).
   delete require.cache[require.resolve(AUTH_BUNDLE)];
-  require(AUTH_BUNDLE).default();
+  require(AUTH_BUNDLE).default({ omega: globalThis.__omegaClient });
 
   return { client, navigations, fire: (state) => client.listeners[0](state) };
 }
@@ -232,7 +233,7 @@ test('orphan: a marked account is deleted on return, and the marker is dropped (
     firebaseAuth,
   });
 
-  await fire({ user: { uid: ORPHAN_UID }, account: ORPHAN_ACCOUNT });
+  await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
 
   assert.deepStrictEqual(firebaseAuth.deletes, [ORPHAN_UID], 'the reversal that failed is re-attempted');
   assert.strictEqual(storage.get(`temporary.orphanedAccount.${ORPHAN_UID}`, null), null, 'a cleaned-up orphan is not marked any more');
@@ -251,7 +252,7 @@ test('orphan: a second delete failure signs the user out and reports it, marker 
     firebaseAuth,
   });
 
-  await fire({ user: { uid: ORPHAN_UID }, account: ORPHAN_ACCOUNT });
+  await fire({ user: new User(ORPHAN_ACCOUNT, { uid: ORPHAN_UID }), denied: false });
 
   assert.deepStrictEqual(firebaseAuth.signOuts, [true], 'the old backstop\'s effect: the orphan does not stay signed in');
   assert.strictEqual(client.sentryCaptures.length, 1, 'a delete that failed twice is worth a report');
@@ -276,7 +277,7 @@ test('orphan: an unmarked mid-signup user is never touched (#703)', async () => 
   });
 
   // The seconds after a legitimate signup: consent-less doc, post still to come.
-  await fire({ user: { uid: 'fresh-uid' }, account: { flags: { signupProcessed: false }, consent: {} } });
+  await fire({ user: new User({ flags: { signupProcessed: false }, consent: {} }, { uid: 'fresh-uid' }), denied: false });
 
   assert.deepStrictEqual(firebaseAuth.deletes, [], 'no marker, no delete — this is the normal post-signup state');
   assert.deepStrictEqual(firebaseAuth.signOuts, []);
@@ -298,8 +299,8 @@ test('orphan: a marked account that HAS legal consent is left alone and unmarked
   // Signed up for real since (on another device, say): consent on record wins
   // over any marker this browser is holding.
   await fire({
-    user: { uid: ORPHAN_UID },
-    account: { flags: { signupProcessed: true }, consent: { legal: { status: 'granted' } } },
+    user: new User({ flags: { signupProcessed: true }, consent: { legal: { status: 'granted' } } }, { uid: ORPHAN_UID }),
+    denied: false,
   });
 
   assert.deepStrictEqual(firebaseAuth.deletes, [], 'a consented account is somebody\'s real account');

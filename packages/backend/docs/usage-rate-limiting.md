@@ -68,7 +68,7 @@ Pacing by day is the **default**. `usage: { pace: false }` on the catalog entry 
 
 ## The API
 
-`ctx.usage` is attached to every route by the middleware. Attaching is **synchronous and I/O-free**: the counter resolves the account on the first `consume`/`read`, so a route that never counts pays nothing.
+`ctx.usage` is attached to every route by the request pipeline. Attaching is **synchronous and I/O-free**: the counter resolves the account on the first `consume`/`read`, so a route that never counts pays nothing.
 
 | Method | What it does |
 |---|---|

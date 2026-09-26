@@ -7,16 +7,16 @@
 //            warm-start via `app.on('second-instance')` (read from the `additionalData` argument,
 //            which carries the duplicate's real argv; the event's own `argv` is Chromium-processed).
 //
-// Public API on manager.deepLink:
+// Public API on omega.deepLink:
 //
-//   manager.deepLink.on(routeOrPattern, fn)    // register a handler. Returns unsubscribe fn.
-//   manager.deepLink.off(routeOrPattern, fn)
-//   manager.deepLink.dispatch(url)             // manually fire (for testing or custom triggers)
-//   manager.deepLink.getColdStartUrl()         // the deep-link URL the app was launched with, or null
+//   omega.deepLink.on(routeOrPattern, fn)    // register a handler. Returns unsubscribe fn.
+//   omega.deepLink.off(routeOrPattern, fn)
+//   omega.deepLink.dispatch(url)             // manually fire (for testing or custom triggers)
+//   omega.deepLink.getColdStartUrl()         // the deep-link URL the app was launched with, or null
 //
 // Handler signature:
 //
-//   manager.deepLink.on('user/profile/:id', (ctx) => {
+//   omega.deepLink.on('user/profile/:id', (ctx) => {
 //     ctx.url      // 'myapp://user/profile/42?ref=abc'
 //     ctx.scheme   // 'myapp'
 //     ctx.route    // 'user/profile/42'
@@ -38,8 +38,8 @@
 // the fall-through to wildcard handlers (concrete-pattern handlers always run).
 //
 // Built-in routes (registered by @omega.js/desktop, can be overridden by registering your own handler):
-//   auth/token   → manager.omega.handleAuthToken(query.token)  [Pass 2.12 wires this up]
-//   app/show     → manager.windows.show(query.window || 'main')
+//   auth/token   → omega.auth.handleToken(query.authToken)
+//   app/show     → omega.windows.show(query.window || 'main')
 //   app/quit     → app.quit()
 //
 // Built-in handlers run AFTER consumer handlers, so a consumer can shadow any built-in
@@ -51,21 +51,21 @@ const logger = new LoggerLite('deep-link');
 
 const deepLink = {
   _initialized:    false,
-  _manager:        null,
+  _omega:          null,
   _electron:       null,
   _handlers:       [],          // [{ pattern, fn, builtin: bool }]
   _coldStartUrl:   null,        // the URL the app was launched with (if any)
   _wired:          false,       // open-url + second-instance + queueing wired?
   _pendingUrls:    [],          // urls received before whenReady — drained on init
-  _managerReady:   false,       // manager.initialize() finished — safe to dispatch
-  _bootQueue:      [],          // dispatches held until _managerReady (client-bridge et al. are up)
+  _omegaReady:     false,       // omega.initialize() finished — safe to dispatch
+  _bootQueue:      [],          // dispatches held until _omegaReady (auth et al. are up)
 
-  initialize(manager) {
+  initialize(omega) {
     if (deepLink._initialized) {
       return;
     }
 
-    deepLink._manager = manager;
+    deepLink._omega = omega;
     deepLink._electron = require('electron');
 
     deepLink._wireElectronEvents();
@@ -76,9 +76,9 @@ const deepLink = {
     const coldUrl = deepLink._extractUrlFromArgv(process.argv);
     if (coldUrl) {
       deepLink._coldStartUrl = coldUrl;
-      manager.appState.setLaunchedFromDeepLink(true);
-      // _handle queues until markManagerReady() — a cold-start auth/token must
-      // not dispatch before client-bridge has booted Firebase.
+      omega.appState.setLaunchedFromDeepLink(true);
+      // _handle queues until markOmegaReady() — a cold-start auth/token must
+      // not dispatch before auth has booted Firebase.
       deepLink._handle(coldUrl, 'cold-start', { argv: process.argv, cwd: process.cwd() });
     }
 
@@ -88,7 +88,7 @@ const deepLink = {
       deepLink._pendingUrls = [];
       if (!deepLink._coldStartUrl) {
         deepLink._coldStartUrl = urls[0];
-        manager.appState.setLaunchedFromDeepLink(true);
+        omega.appState.setLaunchedFromDeepLink(true);
       }
       urls.forEach((u) => deepLink._handle(u, 'cold-start', { argv: process.argv, cwd: process.cwd() }));
     }
@@ -130,11 +130,11 @@ const deepLink = {
       // Surface the main window. With hidden-mode apps, the consumer typically created
       // `main` with `show: false` at boot, so it's in the registry but invisible — we
       // just need to show it now that the user explicitly asked.
-      const main = deepLink._manager.windows.get('main');
+      const main = deepLink._omega.windows.get('main');
       if (main) {
         logger.log(`second-instance — surfacing main (visible=${main.isVisible()}, minimized=${main.isMinimized()})`);
         if (main.isMinimized()) main.restore();
-        deepLink._manager.windows._ensureDockVisible();
+        deepLink._omega.windows._ensureDockVisible();
         main.show();
         main.focus();
       } else {
@@ -149,10 +149,10 @@ const deepLink = {
   },
 
   _registerBuiltins() {
-    // auth/token — hand off to client-bridge. The receiving end of
-    // manager.getAuthUrl()'s sign-in round-trip: the website's token page redirects
-    // here with ?authToken=<custom-token>. MODERN shape only — legacy-app formats
-    // (?payload=, ?token=) are UJM's concern, not @omega.js/desktop's.
+    // auth/token: hand off to lib/auth.js. The receiving end of
+    // omega.getAuthUrl()'s sign-in round-trip: the website's token page redirects
+    // here with ?authToken=<custom-token>. MODERN shape only — older formats
+    // (?payload=, ?token=) are not read.
     deepLink._handlers.push({
       pattern: 'auth/token',
       builtin: true,
@@ -162,7 +162,7 @@ const deepLink = {
           logger.warn('auth/token: no authToken in query string.');
           return;
         }
-        deepLink._manager.omega.handleAuthToken(token);
+        deepLink._omega.auth.handleToken(token);
       },
     });
 
@@ -172,7 +172,7 @@ const deepLink = {
       builtin: true,
       fn: (ctx) => {
         const name = ctx.query?.window || 'main';
-        deepLink._manager.windows.show(name);
+        deepLink._omega.windows.show(name);
       },
     });
 
@@ -189,7 +189,7 @@ const deepLink = {
   // Pull a `<scheme>://...` URL out of an argv array. Returns null if none of our schemes match.
   _extractUrlFromArgv(argv) {
     if (!Array.isArray(argv)) return null;
-    const schemes = deepLink._manager.protocol.getSchemes();
+    const schemes = deepLink._omega.protocol.getSchemes();
     if (schemes.length === 0) return null;
 
     // Walk argv backward — the URL is typically the last meaningful arg.
@@ -246,13 +246,13 @@ const deepLink = {
     return params;
   },
 
-  // Called by main.js once manager.initialize() completes — every LIB a handler
-  // touches (client-bridge Firebase, the windows registry, tray) is up from here
+  // Called by main.js once omega.initialize() completes — every LIB a handler
+  // touches (auth's Firebase, the windows registry, tray) is up from here
   // on. (Consumer-created windows may still be pending — consumers create them
   // in initialize().then(); app/show on a not-yet-created window warns + drops,
   // same as always.) Any dispatch that arrived earlier drains now.
-  markManagerReady() {
-    deepLink._managerReady = true;
+  markOmegaReady() {
+    deepLink._omegaReady = true;
     const queued = deepLink._bootQueue.slice();
     deepLink._bootQueue = [];
     queued.forEach(({ url, source, env }) => deepLink._handle(url, source, env));
@@ -260,10 +260,10 @@ const deepLink = {
 
   // Run the dispatch pipeline for a single URL.
   _handle(url, source, env) {
-    // Hold every dispatch until the manager is fully initialized — handlers
-    // deref manager surfaces that don't exist yet during boot.
-    if (!deepLink._managerReady) {
-      logger.log(`queueing ${source} dispatch until manager ready — ${url}`);
+    // Hold every dispatch until omega is fully initialized: handlers
+    // deref omega surfaces that do not exist yet during boot.
+    if (!deepLink._omegaReady) {
+      logger.log(`queueing ${source} dispatch until omega ready — ${url}`);
       deepLink._bootQueue.push({ url, source, env });
       return;
     }

@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Initialize section
 export function init() {
@@ -14,7 +14,7 @@ export function init() {
 
 // Load data
 export function loadData(account) {
-  if (!account) {
+  if (!account.authenticated) {
     return;
   }
 
@@ -118,7 +118,7 @@ function setupMcp() {
 
 // Setup reset API key form
 function setupResetApiKeyForm() {
-  const formManager = new FormManager('#reset-api-key-form', {
+  const formManager = new FormManager(omega, '#reset-api-key-form', {
     allowResubmit: false,
     submittingText: 'Resetting...',
     submittedText: 'Reset!',

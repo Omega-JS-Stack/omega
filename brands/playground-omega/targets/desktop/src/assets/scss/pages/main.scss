@@ -1,4 +1,42 @@
 // Main window — page-specific styles. Compiled to dist/assets/css/components/main.bundle.css
 // and loaded only on the main window's HTML page.
 
-// Add your page-only styles below.
+// The notes panel (src/views/main/index.html), painted in the --omega-* tokens
+// so it follows the theme, the brand ramp and dark mode with no overrides.
+.notes-panel {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  background: var(--omega-surface);
+  box-shadow: var(--omega-shadow-1);
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  &__count {
+    color: var(--omega-ink-muted);
+  }
+}
+
+.notes-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--omega-line);
+}
+
+.notes-list__text {
+  color: var(--omega-ink);
+}
+
+.notes-list__date {
+  color: var(--omega-ink-faint);
+}

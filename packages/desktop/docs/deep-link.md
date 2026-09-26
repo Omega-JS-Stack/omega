@@ -10,7 +10,7 @@ Cross-platform deep-link handling that's simple to use and hard to get wrong. @o
 }
 ```
 
-@omega.js/desktop registers each scheme with the OS via `app.setAsDefaultProtocolClient` so the system routes matching URLs to your app. Registration is **production-only** — dev/test runs never claim OS-wide protocol handlers for unpackaged Electron binaries. In dev, exercise your handlers with `manager.deepLink.dispatch(url)` instead.
+@omega.js/desktop registers each scheme with the OS via `app.setAsDefaultProtocolClient` so the system routes matching URLs to your app. Registration is **production-only**: dev/test runs never claim OS-wide protocol handlers for unpackaged Electron binaries. In dev, exercise your handlers with `omega.deepLink.dispatch(url)` instead.
 
 ## How it works (so you don't have to think about it)
 
@@ -20,15 +20,15 @@ Cross-platform deep-link handling that's simple to use and hard to get wrong. @o
 | **Windows** | URL appended to `process.argv`; @omega.js/desktop extracts it | OS forwards argv to the existing instance via `app.on('second-instance')`; @omega.js/desktop reads the duplicate's real argv from that event's `additionalData` |
 | **Linux** | Same as Windows | Same as Windows |
 
-@omega.js/desktop handles all of these and dispatches them through the same `manager.deepLink.on()` event registry. Your code looks identical regardless of platform or cold/warm start. Single-instance lock is acquired automatically (via `lib/protocol.js`); duplicate launches exit cleanly and forward their argv to the original instance.
+@omega.js/desktop handles all of these and dispatches them through the same `omega.deepLink.on()` event registry. Your code looks identical regardless of platform or cold/warm start. Single-instance lock is acquired automatically (via `lib/protocol.js`); duplicate launches exit cleanly and forward their argv to the original instance.
 
 ## Public API
 
 ```js
-manager.deepLink.on(pattern, handler)    // register a handler. Returns unsubscribe fn.
-manager.deepLink.off(pattern, handler)
-manager.deepLink.dispatch(url)           // manually fire (testing, custom triggers)
-manager.deepLink.getColdStartUrl()       // the URL the app was launched with, or null
+omega.deepLink.on(pattern, handler)    // register a handler. Returns unsubscribe fn.
+omega.deepLink.off(pattern, handler)
+omega.deepLink.dispatch(url)           // manually fire (testing, custom triggers)
+omega.deepLink.getColdStartUrl()       // the URL the app was launched with, or null
 ```
 
 ## Patterns
@@ -43,7 +43,7 @@ manager.deepLink.getColdStartUrl()       // the URL the app was launched with, o
 ## Handler signature
 
 ```js
-manager.deepLink.on('user/profile/:id', (ctx) => {
+omega.deepLink.on('user/profile/:id', (ctx) => {
   ctx.url       // 'myapp://user/profile/42?ref=tray'
   ctx.scheme    // 'myapp'
   ctx.route     // 'user/profile/42'
@@ -63,16 +63,16 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 
 | Route | Default behavior |
 |---|---|
-| `auth/token` | Calls `manager.omega.handleAuthToken(query.authToken)` — the receiving end of the `manager.openAuthFlow()` sign-in round-trip. MODERN shape only (`?authToken=`, what the website's token page sends); legacy-app formats (`?token=`, `?payload=`) are UJM's concern and are ignored. In production the URL arrives via the OS scheme; in dev/test `lib/auth-flow.js`'s loopback listener dispatches the same URL manually (the scheme isn't OS-registered in dev — protocol.js registers only in production, and macOS can't runtime-register unlisted schemes at all) |
-| `app/show` | `manager.windows.show(query.window || 'main')` |
+| `auth/token` | Calls `omega.auth.handleToken(query.authToken)`: the receiving end of the `omega.openAuthFlow()` sign-in round-trip. MODERN shape only (`?authToken=`, what the website's token page sends); other formats (`?token=`, `?payload=`) are ignored. In production the URL arrives via the OS scheme; in dev/test `lib/auth-flow.js`'s loopback listener dispatches the same URL manually (the scheme isn't OS-registered in dev: protocol.js registers only in production, and macOS can't runtime-register unlisted schemes at all) |
+| `app/show` | `omega.windows.show(query.window || 'main')` |
 | `app/quit` | `app.quit()` |
 
 ### Overriding a built-in
 
 ```js
 // Replace the built-in app/show with custom logic.
-manager.deepLink.on('app/show', (ctx) => {
-  if (ctx.query.window === 'admin' && !manager.appState.isAdminUser()) {
+omega.deepLink.on('app/show', (ctx) => {
+  if (ctx.query.window === 'admin' && !omega.appState.isAdminUser()) {
     showError('not authorized');
     ctx.handled = true;       // suppress built-in
     return;
@@ -96,9 +96,9 @@ Setting `ctx.handled = true` in any handler stops the cascade. Within a single t
 ### Route to a window + send IPC
 
 ```js
-manager.deepLink.on('user/profile/:id', (ctx) => {
-  manager.windows.show('main');
-  manager.windows.get('main').webContents.send('navigate', {
+omega.deepLink.on('user/profile/:id', (ctx) => {
+  omega.windows.show('main');
+  omega.windows.get('main').webContents.send('navigate', {
     to: `/profile/${ctx.params.id}`,
   });
 });
@@ -107,17 +107,17 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 ### Catch-all logger
 
 ```js
-manager.deepLink.on('*', (ctx) => {
-  manager.logger.warn(`Unrouted deep link: ${ctx.url}`);
+omega.deepLink.on('*', (ctx) => {
+  omega.logger.warn(`Unrouted deep link: ${ctx.url}`);
 });
 ```
 
 ### Cold-start branching
 
 ```js
-const coldUrl = manager.deepLink.getColdStartUrl();
+const coldUrl = omega.deepLink.getColdStartUrl();
 if (coldUrl) {
-  manager.logger.log(`Launched from deep link: ${coldUrl}`);
+  omega.logger.log(`Launched from deep link: ${coldUrl}`);
   // appState.launchedFromDeepLink() is also set automatically
 }
 ```
@@ -127,13 +127,13 @@ if (coldUrl) {
 ```js
 tray.item({
   label: 'Open Profile',
-  click: () => manager.deepLink.dispatch('myapp://user/profile/me'),
+  click: () => omega.deepLink.dispatch('myapp://user/profile/me'),
 });
 ```
 
 ## Boot queueing
 
-Every dispatch is held until `manager.initialize()` completes (main.js calls `deepLink.markManagerReady()` as its last step). A cold-start `auth/token` link — the OS launching the app from the sign-in round trip — therefore never fires before client-bridge has Firebase up; it queues and drains the moment the manager is ready. Warm-start dispatches on a running app pass straight through.
+Every dispatch is held until `omega.initialize()` completes (main.js calls `deepLink.markOmegaReady()` as its last step). A cold-start `auth/token` link (the OS launching the app from the sign-in round trip) therefore never fires before `omega.auth` has Firebase up; it queues and drains the moment the instance is ready. Warm-start dispatches on a running app pass straight through.
 
 ## Single-instance behavior
 
@@ -141,7 +141,7 @@ Every dispatch is held until `manager.initialize()` completes (main.js calls `de
 
 1. The new instance loses the lock.
 2. The OS forwards its argv to the original instance.
-3. The new instance's `Manager.initialize()` returns early (after `protocol.hasSingleInstanceLock() === false`).
+3. The new instance's `omega.initialize()` halts (after `protocol.hasSingleInstanceLock() === false`): the duplicate quits and its promise never settles.
 4. The original instance's `app.on('second-instance')` fires with the Chromium-processed argv as its second argument AND the duplicate's real argv as its fourth, `additionalData` (@omega.js/desktop passes `{ argv, cwd }` to `app.requestSingleInstanceLock()` for you).
 5. @omega.js/desktop extracts the deep-link URL from that argv and dispatches normally — but as `source: 'warm-start'`.
 6. @omega.js/desktop also focuses the existing main window automatically (consumer can override by registering a route handler that does its own thing).
@@ -156,10 +156,10 @@ Never parse the event's own `argv` for flags: Chromium re-serializes it (switche
 
 ## Linking with `appState`
 
-When a deep link is detected at cold-start, @omega.js/desktop calls `manager.appState.setLaunchedFromDeepLink(true)`. This means:
+When a deep link is detected at cold-start, @omega.js/desktop calls `omega.appState.setLaunchedFromDeepLink(true)`. This means:
 
 ```js
-if (manager.appState.launchedFromDeepLink()) {
+if (omega.appState.launchedFromDeepLink()) {
   // user clicked a link to launch the app — handle differently than a tray click or login launch
 }
 ```
@@ -171,7 +171,7 @@ Combine with `appState.isFirstLaunch()` to detect "first launch via deep link" (
 The dispatch pipeline is unit-testable without actually triggering an OS event:
 
 ```js
-manager.deepLink.dispatch('myapp://auth/token?token=test');
+omega.deepLink.dispatch('myapp://auth/token?token=test');
 // Fires source='manual'. Handlers run synchronously.
 ```
 
@@ -180,7 +180,7 @@ See `src/test/suites/main/deep-link.test.js` for the full coverage.
 ## Implementation notes
 
 - `lib/protocol.js` owns the single-instance lock + scheme registration; `lib/deep-link.js` owns the dispatch pipeline. They're separate modules but tightly coupled.
-- OS scheme registration is gated on `manager.isProduction()` (in `lib/protocol.js`) — unpackaged dev/test binaries are never registered as system protocol handlers (unconditional registration also intermittently triggered macOS Launch Services `-600` dialogs during test runs).
+- OS scheme registration is gated on `omega.isProduction()` (in `lib/protocol.js`): unpackaged dev/test binaries are never registered as system protocol handlers (unconditional registration also intermittently triggered macOS Launch Services `-600` dialogs during test runs).
 - On Windows/Linux, scheme registration uses `app.setAsDefaultProtocolClient(scheme, process.execPath, [process.cwd()])` so `app.exe scheme://...` style invocations route argv correctly.
 - macOS open-url events that arrive before `whenReady` are queued internally and drained on `deepLink.initialize()`.
 - Argv extraction walks backward from the end of argv (where the URL typically sits) and matches against registered schemes.

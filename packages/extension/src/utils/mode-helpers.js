@@ -1,5 +1,5 @@
-// Runtime mode helpers, shared across BXM's eight context Managers (build /
-// background / popup / options / content / sidepanel / page / offscreen).
+// Runtime mode helpers: plain functions the context `Omega` classes (src/omega.js,
+// src/page-context.js) and the build-time module (src/build.js) call.
 //
 // The environment half is NOT implemented here any more
 // ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). It is
@@ -24,7 +24,7 @@
 //
 // The shared module requires nothing, so it rides every browser bundle exactly
 // as this file always has.
-const environment = require('@omega.js/config/environment');
+const { getEnvironment, isDevelopment, isProduction, isTesting } = require('@omega.js/config/environment');
 
 // `getVersion()` returns the extension's version string.
 //   1. `chrome.runtime.getManifest().version` when running inside an extension context.
@@ -45,22 +45,10 @@ function getVersion() {
   }
 }
 
-// Mix the helpers into a Manager constructor's prototype + the constructor itself
-// (so `Manager.isTesting()` works statically too). The environment four come from
-// the shared module's own attachTo(), so every extension context and every
-// sibling framework hangs the identical functions; getVersion() is the
-// extension's and is attached beside them.
-function attachTo(Manager) {
-  environment.attachTo(Manager);
-  Manager.prototype.getVersion = getVersion;
-  Manager.getVersion = getVersion;
-}
-
 module.exports = {
-  attachTo,
-  getEnvironment: environment.getEnvironment,
-  isDevelopment: environment.isDevelopment,
-  isProduction: environment.isProduction,
-  isTesting: environment.isTesting,
+  getEnvironment,
+  isDevelopment,
+  isProduction,
+  isTesting,
   getVersion,
 };

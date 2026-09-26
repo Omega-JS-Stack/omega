@@ -1,7 +1,7 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('sass');
-const watcherLogger = Manager.logger('sass:watcher');
+const build = require('../../build.js');
+const logger = build.logger('sass');
+const watcherLogger = build.logger('sass:watcher');
 const { src, dest, watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const path = require('path');
@@ -14,11 +14,11 @@ const { composeBrandTokens, renderBrandScss } = require('@omega.js/devkit/brand-
 const { resolveThemeId } = require('../../lib/theme.js');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Themes are per-framework (#261) — a shared theme.id naming a WEB theme falls
 // back to the extension's default instead of dying on a raw sass import error.
@@ -71,7 +71,7 @@ const MAIN_BUNDLE_COMPONENT_PARTIALS = false; // Set to true to merge components
 function sass(complete) {
   // Log
   logger.log('Starting...');
-  Manager.logMemory(logger, 'Start');
+  build.logMemory(logger, 'Start');
 
   // Generate component-specific scss
   generateComponentScss();
@@ -103,12 +103,12 @@ function sass(complete) {
       // Only show warnings once
       verbose: false
     })
-    .on('error', (error) => Manager.reportBuildError(Object.assign(error, { plugin: 'SASS' }), complete)));
+    .on('error', (error) => build.reportBuildError(Object.assign(error, { plugin: 'SASS' }), complete)));
 
   // Process
   return stream
     .pipe(cleanCSS({
-      format: Manager.actLikeProduction() ? 'compressed' : 'beautify',
+      format: build.actLikeProduction() ? 'compressed' : 'beautify',
     }))
     .pipe(rename((file) => {
       // Get list of expected bundle names from the bundle files glob
@@ -185,7 +185,7 @@ function sass(complete) {
       logger.log('Finished!');
 
       // Trigger rebuild
-      Manager.triggerRebuild(compiled);
+      build.triggerRebuild(compiled, logger);
 
       // Complete
       return complete();
@@ -195,7 +195,7 @@ function sass(complete) {
 // Watcher Task
 function sassWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
@@ -227,7 +227,7 @@ function generateComponentScss() {
 `;
 
     jetpack.write(outputPath, content);
-    Manager.triggerRebuild(outputPath);
+    build.triggerRebuild(outputPath, logger);
     return;
   }
 

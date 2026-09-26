@@ -11,7 +11,7 @@
 //     sentinel:       true,             // set on launch, cleared on graceful quit; survival = crash
 //   }
 //
-// Public API on `manager.appState`:
+// Public API on `omega.appState`:
 //   isFirstLaunch()        — true only for the very first boot of the app on this machine
 //   getLaunchCount()       — total successful launches (including this one)
 //   getInstalledAt()       — Date of first launch
@@ -40,7 +40,7 @@ const STORAGE_KEY = 'appState';
 const appState = {
   _initialized:        false,
   _quitWired:          false,
-  _manager:            null,
+  _omega:              null,
   _electron:           null,
 
   // Cached snapshot of the state AS LOADED at the start of this launch.
@@ -54,15 +54,15 @@ const appState = {
   // Set by lib/deep-link.initialize when argv contains a deep-link payload.
   _launchedFromDeepLink: false,
 
-  async initialize(manager) {
+  async initialize(omega) {
     if (appState._initialized) {
       return;
     }
 
-    appState._manager = manager;
+    appState._omega = omega;
     appState._electron = require('electron');
 
-    const storage = manager.storage;
+    const storage = omega.storage;
 
     const now = Date.now();
     const previous = storage.get(STORAGE_KEY) || {};
@@ -74,11 +74,11 @@ const appState = {
     const previousQuitAt   = previous.lastQuitAt || null;
     appState._recoveredFromCrash = !isFirstLaunch && previousSentinel && !previousQuitAt;
 
-    // Version detection. Prefer the cross-context manager.getVersion() helper —
+    // Version detection. Prefer the cross-context omega.getVersion() helper —
     // it tries `app.getVersion()` first (authoritative in main, reads asar
     // package.json in packaged builds) and falls back to project package.json.
-    const currentVersion  = manager.config.app?.version
-                         || manager.getVersion()
+    const currentVersion  = omega.config.app?.version
+                         || omega.getVersion()
                          || tryGetVersionFromPackage()
                          || null;
     const previousVersion = previous.version || null;
@@ -122,7 +122,7 @@ const appState = {
     const onQuit = () => {
       if (cleared) return;
       cleared = true;
-      const storage = appState._manager.storage;
+      const storage = appState._omega.storage;
       const cur = storage.get(STORAGE_KEY) || {};
       cur.sentinel  = false;
       cur.lastQuitAt = Date.now();
@@ -157,7 +157,7 @@ const appState = {
     // The CURRENT snapshot's lastQuitAt is null (we cleared it on init).
     // What the consumer wants is "when did we previously quit gracefully" — read storage live,
     // because at the moment of the call this launch hasn't quit yet.
-    const cur = appState._manager.storage.get(STORAGE_KEY) || {};
+    const cur = appState._omega.storage.get(STORAGE_KEY) || {};
     const ms  = cur.lastQuitAt;
     return ms ? new Date(ms) : null;
   },
@@ -201,7 +201,7 @@ const appState = {
   // Test helper — wipe persisted state and reset the in-memory snapshot.
   // (Public, intentionally — used by integration tests + by consumers who want a "reset to factory" command.)
   reset() {
-    appState._manager.storage.delete(STORAGE_KEY);
+    appState._omega.storage.delete(STORAGE_KEY);
     appState._snapshot = null;
     appState._recoveredFromCrash = false;
     appState._launchedFromDeepLink = false;
@@ -209,11 +209,11 @@ const appState = {
 };
 
 function tryGetVersionFromPackage() {
-  // Last-resort fallback used only when manager.getVersion() is unavailable.
+  // Last-resort fallback used only when omega.getVersion() is unavailable.
   // Reads via build.js's getPackage helper which already handles "no package.json
   // at projectRoot" by returning null — no try/catch needed.
-  const Manager = require('../build.js');
-  const pkg = Manager.getPackage('project');
+  const build = require('../build.js');
+  const pkg = build.getPackage('project');
   return pkg?.version || null;
 }
 

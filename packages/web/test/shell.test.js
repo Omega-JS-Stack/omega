@@ -104,10 +104,10 @@ test('purge keeps the shell mechanics — runtime-stamped states never appear in
 
 // ─── JS wiring ───────────────────────────────────────────────────────────────
 
-test('app-shell module is wired into main.js and speaks the declarative contract', () => {
-  const main = fs.readFileSync(path.join(PKG, 'core', 'js', 'main.js'), 'utf8');
-  assert.ok(main.includes("__main_assets__/js/core/app-shell.js"), 'module statically imported');
-  assert.ok(main.includes('appShellModule({ manager, options })'), 'module invoked with the core signature');
+test('app-shell module is wired into the web runtime and speaks the declarative contract', () => {
+  const runtime = fs.readFileSync(path.join(PKG, 'runtime', 'omega.js'), 'utf8');
+  assert.ok(runtime.includes("'../core/js/core/app-shell.js'"), 'module statically imported');
+  assert.ok(runtime.includes('this.shell = createShell(this)'), 'built as omega.shell from the instance');
 
   const module = fs.readFileSync(path.join(PKG, 'core', 'js', 'core', 'app-shell.js'), 'utf8');
   for (const hook of ['data-omega-shell', 'data-shell-toggle', 'data-shell-dismiss', "'shell.collapsed'", 'Escape', 'aria-expanded']) {

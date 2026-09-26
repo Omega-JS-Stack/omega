@@ -36,7 +36,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
@@ -60,7 +60,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -121,7 +121,7 @@ const HOUR_FROM_NOW = Math.floor(Date.now() / 1000) + 3600;
 
 /** A paid subscription in whatever state the case needs. */
 function paidAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -129,7 +129,7 @@ function paidAccount(subscription) {
       expires: { timestampUNIX: HOUR_FROM_NOW },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /**
@@ -281,12 +281,11 @@ function makeClient() {
     // (`core/js/core/motion.js` registers it) — the modal hands it the freshly
     // rendered toggle so the gliding thumb is adopted.
     library: () => ({ motion: { scan: ($el) => motionScans.push($el) } }),
-    auth: () => ({ resolveSubscription: (account) => resolveSubscription(account) }),
-    bindings: () => ({ update: () => {} }),
-    utilities: () => ({
+    bindings: { update: () => {} },
+    utilities: {
       showNotification: () => {},
       escapeHTML: (value) => value,
-    }),
+    },
     request: async () => ({}),
   };
 }

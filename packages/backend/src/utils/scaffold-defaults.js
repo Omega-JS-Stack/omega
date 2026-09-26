@@ -2,7 +2,7 @@
 // (src/defaults/ → dist/defaults/ at runtime) to the consumer project root via
 // the shared devkit engine. Exported standalone (rather than living inside the
 // setup command) so the framework self-test can exercise the REAL file map
-// against a temp dir — mirrors BXM's exported scaffoldDefaults.
+// against a temp dir, the same shape as @omega.js/extension's scaffoldDefaults.
 
 const path = require('path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');

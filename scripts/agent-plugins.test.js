@@ -944,10 +944,10 @@ const guardBrand = () => {
   install(dir, 'backend', {
     'templates/firestore.framework.rules': '// the framework half\n',
     'templates/firestore.rules': '// the seed a brand owns after setup\n',
-    'src/manager/routes/general/email/post.js': 'module.exports = {};\n',
-    'src/manager/schemas/general/email/post.js': 'module.exports = {};\n',
-    'src/manager/index.js': '// the Manager class\n',
-    'src/manager/libraries/email/index.js': '// framework internals\n',
+    'src/omega/routes/general/email/post.js': 'module.exports = {};\n',
+    'src/omega/schemas/general/email/post.js': 'module.exports = {};\n',
+    'src/omega/index.js': '// the Omega class\n',
+    'src/omega/libraries/email/index.js': '// framework internals\n',
   });
   return dir;
 };
@@ -994,8 +994,8 @@ test('guard: a shadow copy is refused and names the framework file it mirrors', 
     ['targets/web/src/assets/css/pages/404/index.scss', '@omega.js/web/core/css/pages/404/index.scss'],
     ['targets/web/src/assets/css/base/_type.scss', '@omega.js/web/themes/classy/css/base/_type.scss'],
     ['targets/backend/firestore.framework.rules', '@omega.js/backend/templates/firestore.framework.rules'],
-    ['targets/backend/src/routes/general/email/post.js', '@omega.js/backend/src/manager/routes/general/email/post.js'],
-    ['targets/backend/src/schemas/general/email/post.js', '@omega.js/backend/src/manager/schemas/general/email/post.js'],
+    ['targets/backend/src/routes/general/email/post.js', '@omega.js/backend/src/omega/routes/general/email/post.js'],
+    ['targets/backend/src/schemas/general/email/post.js', '@omega.js/backend/src/omega/schemas/general/email/post.js'],
   ];
 
   for (const [rel, mirrored] of table) {

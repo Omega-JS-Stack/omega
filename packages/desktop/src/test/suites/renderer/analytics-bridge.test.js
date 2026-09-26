@@ -38,15 +38,15 @@ module.exports = defineCases({
       },
     },
     {
-      // #411: a renderer's own `omega.analytics().event(...)` used to no-op
+      // #411: a renderer's own `omega.analytics.event(...)` used to no-op
       // silently — the embedded client had no way to deliver. It now forwards
       // over this bridge, and main's sender is the one that fires it.
-      name: 'a renderer-originated omega.analytics() event reaches main\'s sender exactly once, with main\'s identity',
+      name: 'a renderer-originated omega.analytics event reaches main\'s sender exactly once, with main\'s identity',
       run: async (ctx) => {
         const read = () => window.desktop.ipc.invoke('desktop:__test:read-analytics-sends');
         const baseline = (await read()).length;
 
-        window.__emTestClientAnalytics.event('vert_click', { vert_id: 'pin-411' });
+        window.__omegaTestClientAnalytics.event('vert_click', { vert_id: 'pin-411' });
 
         // The forward is fire-and-forget IPC — poll until main records it.
         let sends = [];
@@ -54,7 +54,7 @@ module.exports = defineCases({
         while (sends.length <= baseline) {
           // The client's own state says WHY when this fails: an unbridged one
           // carries a client id of its own — the identity fork (#411).
-          if (Date.now() - t0 > 3000) throw new Error(`timed out waiting for main to record the forwarded event — client state ${JSON.stringify(window.__emTestClientAnalytics.state())}`);
+          if (Date.now() - t0 > 3000) throw new Error(`timed out waiting for main to record the forwarded event, client state ${JSON.stringify(window.__omegaTestClientAnalytics.state())}`);
           await new Promise((r) => setTimeout(r, 25));
           sends = await read();
         }
@@ -79,7 +79,7 @@ module.exports = defineCases({
     {
       name: 'the bridged renderer holds no sender of its own — no secret, no second device id',
       run: (ctx) => {
-        const state = window.__emTestClientAnalytics.state();
+        const state = window.__omegaTestClientAnalytics.state();
         ctx.expect(state.initialized).toBe(true);
         ctx.expect(state.bridged).toBe(true);
         ctx.expect(state.secret).toBe(null);

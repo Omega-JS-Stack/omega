@@ -3,8 +3,9 @@
  * `translation.languages`, using the committed per-string cache in
  * translations/ and the configured provider (claude via local Claude Code by
  * default; chatgpt via OPENAI_API_KEY). Run `omega build` first. This command
- * OWNS live-LLM translation: build applies the committed cache only and
- * skips cold pages with a warning (friction #24 decision).
+ * OWNS live-LLM translation on demand: a default build also translates cold
+ * strings live, while `omega build --cached-only` (what deploy runs) applies
+ * the committed cache only and ships cold pages untranslated with a warning.
  *
  * Env: OMEGA_TRANSLATE_ONLY=<route|file> limits the run to one page.
  */
@@ -50,7 +51,7 @@ module.exports = async function (options) {
   }
 
   if (stats.failures.length) {
-    logger.error(`${stats.failures.length} page-language pair(s) failed (skipped whole — no copy shipped):`);
+    logger.error(`${stats.failures.length} page-language pair(s) failed (each copy shipped untranslated):`);
     stats.failures.forEach((failure) => logger.error(`  ${failure}`));
     process.exitCode = 1;
   }

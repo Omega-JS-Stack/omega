@@ -1,16 +1,16 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('serve');
+const build = require('../../build.js');
+const logger = build.logger('serve');
 const path = require('path');
 const WebSocket = require('ws');
 const { watchEnvChain } = require('@omega.js/devkit/env-watch');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 /**
  * The ENV lane's watcher (#681): every layer of the `.env` chain — company,

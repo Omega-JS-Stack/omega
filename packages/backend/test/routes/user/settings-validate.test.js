@@ -19,7 +19,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/settings/validate', {
+        const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });
@@ -35,7 +35,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/settings/validate', {
+        const response = await http.post('omega/user/settings/validate', {
           existingSettings: {
             theme: 'dark',
             notifications: true,
@@ -56,7 +56,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/settings/validate', {
+        const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });
@@ -72,7 +72,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/settings/validate', {
+        const response = await http.post('omega/user/settings/validate', {
           existingSettings: {},
           newSettings: {},
         });

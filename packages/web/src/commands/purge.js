@@ -1,6 +1,6 @@
 /**
  * `omega purge` — purge the site's Cloudflare zone cache (purge_everything).
- * The UJM `uj cloudflare-purge` successor, hitting the Cloudflare API
+ * Hits the Cloudflare API
  * directly with the brand's own CLOUDFLARE_TOKEN (env cascade). Also runs
  * automatically after `omega deploy --direct`, and the scaffolded CI
  * workflow runs it after the gh-pages publish when the repo has the token

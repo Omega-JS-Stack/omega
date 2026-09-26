@@ -15,7 +15,7 @@
  * different places and only a file serves all three:
  *   - the emulator's function worker (a route, a trigger, a cron) — another process
  *     entirely from the test runner, which is why an in-memory array cannot work,
- *   - the test-runner process itself (`Manager.Email(ctx).send()` in a case),
+ *   - the test-runner process itself (`ctx.email.send()` in a case),
  *   - a plain-node case with no emulator at all (the transition handlers, driven
  *     directly) — which has no Firestore to read a `_test/emails` collection out of.
  *
@@ -32,9 +32,9 @@
  *
  *   const capture = require('<dist>/test/utils/email-capture.js');
  *
- *   capture.clearCaptured(Manager);            // before the act
+ *   capture.clearCaptured(omega);            // before the act
  *   await http.as('...').post('...');          // the act
- *   const sent = capture.readCaptured(Manager); // [{ to, template, subject, summary, sendAt }]
+ *   const sent = capture.readCaptured(omega); // [{ to, template, subject, summary, sendAt }]
  *
  * `readCaptured()` / `clearCaptured()` are TEST helpers — nothing in the framework's
  * public surface exports them, exactly like `test-mode-file.js`.
@@ -69,27 +69,27 @@ function getCaptureFilePath(projectDir) {
 }
 
 /**
- * Resolve the consumer project root from a booted Manager.
+ * Resolve the consumer project root from a booted Omega instance.
  *
- * `Manager.cwd` is the staged tree the process booted with, and it is
+ * `omega.cwd` is the staged tree the process booted with, and it is
  * `<projectDir>/dist` in BOTH processes — the test runner boots there
  * (src/test/run-tests.js) and so do the emulator's function workers, whose source
  * directory `firebase.json` names is `dist`. So the parent is the project root
  * either way, which is exactly how the test-mode watcher resolves the file it
  * shares with the test command (src/manager/index.js).
  *
- * @param {object} Manager - A booted BackendManager
+ * @param {object} omega - A booted Omega instance
  * @returns {string} The consumer project root
  */
-function resolveProjectDir(Manager) {
-  // A Manager that never booted has no project, and a capture written to the
+function resolveProjectDir(omega) {
+  // An Omega instance that never booted has no project, and a capture written to the
   // wrong directory is worse than none: the reader would see an empty store and
   // report a missing email.
-  if (!Manager || !Manager.cwd) {
-    throw new Error('email-capture: Manager.cwd is unset — cannot resolve the project the capture store lives under');
+  if (!omega || !omega.cwd) {
+    throw new Error('email-capture: omega.cwd is unset — cannot resolve the project the capture store lives under');
   }
 
-  return path.dirname(Manager.cwd);
+  return path.dirname(omega.cwd);
 }
 
 /**
@@ -103,7 +103,7 @@ function resolveProjectDir(Manager) {
  * on a RUNNING emulator through `.temp/test-mode.json`.
  *
  * A ctx that cannot answer `isTesting()` is a PROGRAMMER error and throws: every
- * real ctx forwards the call to the Manager, and the only other outcome a fallback
+ * real ctx forwards the call to the Omega instance, and the only other outcome a fallback
  * could produce here is "not testing", i.e. handing a test's email to SendGrid.
  * The gate never fails toward delivering real mail.
  *
@@ -158,7 +158,7 @@ function summarize(html) {
 /**
  * Record one captured email. Called by the mailer's seam, never by a test.
  *
- * @param {object} Manager - The booted Manager whose project owns the store
+ * @param {object} omega - The booted Omega instance whose project owns the store
  * @param {object} options
  * @param {object[]} options.to - The built email's `to` list (`[{ email, name }]`)
  * @param {string} options.template - The template that rendered it (post legacy-name resolution)
@@ -167,7 +167,7 @@ function summarize(html) {
  * @param {number|null} [options.sendAt] - The scheduled UNIX second, or null for "now"
  * @returns {object} The record as written
  */
-function recordCaptured(Manager, { to, template, subject, html, sendAt }) {
+function recordCaptured(omega, { to, template, subject, html, sendAt }) {
   const record = {
     to: (to || []).map((entry) => entry.email).filter(Boolean),
     template: template || null,
@@ -195,7 +195,7 @@ function recordCaptured(Manager, { to, template, subject, html, sendAt }) {
     throw new Error(`email-capture: record for "${record.subject}" is ${Buffer.byteLength(line)} bytes with nothing left to trim, over the ${LINE_LIMIT}-byte atomic-append bound (${record.to.length} recipients)`);
   }
 
-  jetpack.append(getCaptureFilePath(resolveProjectDir(Manager)), `${line}\n`);
+  jetpack.append(getCaptureFilePath(resolveProjectDir(omega)), `${line}\n`);
 
   return record;
 }
@@ -203,11 +203,11 @@ function recordCaptured(Manager, { to, template, subject, html, sendAt }) {
 /**
  * Read every captured email, in the order it was sent.
  *
- * @param {object} Manager - The booted Manager whose project owns the store
+ * @param {object} omega - The booted Omega instance whose project owns the store
  * @returns {object[]} `[{ to, template, subject, summary, sendAt }]` — empty when nothing was captured
  */
-function readCaptured(Manager) {
-  const filePath = getCaptureFilePath(resolveProjectDir(Manager));
+function readCaptured(omega) {
+  const filePath = getCaptureFilePath(resolveProjectDir(omega));
   const contents = jetpack.read(filePath, 'utf8');
 
   if (!contents) {
@@ -232,10 +232,10 @@ function readCaptured(Manager) {
  * Delete the capture store. A test clears BEFORE the act it is proving, so the
  * records it reads back are its own.
  *
- * @param {object} Manager - The booted Manager whose project owns the store
+ * @param {object} omega - The booted Omega instance whose project owns the store
  */
-function clearCaptured(Manager) {
-  jetpack.remove(getCaptureFilePath(resolveProjectDir(Manager)));
+function clearCaptured(omega) {
+  jetpack.remove(getCaptureFilePath(resolveProjectDir(omega)));
 }
 
 module.exports = {

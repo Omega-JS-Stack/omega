@@ -17,8 +17,8 @@
  */
 const { callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
-const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
+const handler = require('../../../dist/omega/routes/payments/webhook/post.js');
+const stripeProvider = require('../../../dist/omega/routes/payments/webhook/providers/stripe.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const VALID_KEY = () => process.env.OMEGA_WEBHOOK_KEY;
@@ -47,9 +47,9 @@ const refundEvent = (id, charge) => ({
 });
 
 // This suite is about which events get through the door at all.
-function deliver(Manager, event) {
+function deliver(omega, event) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-webhook',
     req: {
@@ -110,10 +110,10 @@ module.exports = defineCases({
     {
       name: 'a-one-time-refund-delivery-lands-a-pipeline-doc',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const eventId = '_test-evt-one-time-refund-ingest';
 
-        const sent = await deliver(Manager, refundEvent(eventId, oneTimeRefundedCharge()));
+        const sent = await deliver(omega, refundEvent(eventId, oneTimeRefundedCharge()));
 
         assert.equal(sent.code, 200, `A one-time refund should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.ok(!sent.body?.ignored, 'A one-time refund must not be ignored as an uncategorized event');

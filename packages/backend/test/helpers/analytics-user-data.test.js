@@ -10,7 +10,7 @@
  * `personal.telephone.national`. A key that is silently always absent looks
  * exactly like a user with no phone, so nothing ever complained.
  *
- * The authenticated user is a REAL resolved account doc (`Manager.User()` is the
+ * The authenticated user is a REAL resolved account doc (`User` is the
  * production resolver) rather than a hand-written stand-in — which is what makes
  * the phoneless case honest: it carries the schema's own `0` default, the value
  * whose hash would hand every phoneless account one shared junk match key.
@@ -23,8 +23,10 @@
  */
 
 const crypto = require('crypto');
-const Analytics = require('../../dist/manager/helpers/analytics.js');
+const Analytics = require('../../dist/omega/services/analytics.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { User } = require('../../dist/omega/helpers/account.js');
+const Context = require('../../dist/omega/context.js');
 
 const UID = '_test-ga4-user-data-uid';
 const EMAIL = 'buyer@example.com';
@@ -50,12 +52,12 @@ function sha256(value) {
 
 // The helper reads its user off `ctx.usage.user` — the resolved account doc the
 // middleware attaches on an authenticated request.
-function userDataFor(Manager, settings) {
-  const ctx = Manager.RouteContext({}, { functionName: 'analytics-user-data' });
+function userDataFor(omega, settings) {
+  const ctx = new Context(omega, {}, { functionName: 'analytics-user-data' });
 
-  ctx.usage = { user: Manager.User(settings).properties };
+  ctx.usage.user = new User(settings).toJSON();
 
-  return { userData: new Analytics(Manager, { ctx: ctx }).userData, user: ctx.usage.user };
+  return { userData: new Analytics(ctx).userData, user: ctx.usage.user };
 }
 
 module.exports = defineCases({
@@ -67,8 +69,8 @@ module.exports = defineCases({
       name: 'an-account-with-a-phone-sends-the-hashed-number',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData } = userDataFor(Manager, {
+      run: async ({ assert, omega }) => {
+        const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { telephone: { countryCode: 1, national: NATIONAL } },
         });
@@ -85,8 +87,8 @@ module.exports = defineCases({
       name: 'the-schema-default-sends-no-phone-hash',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData, user } = userDataFor(Manager, { auth: { uid: UID, email: EMAIL } });
+      run: async ({ assert, omega }) => {
+        const { userData, user } = userDataFor(omega, { auth: { uid: UID, email: EMAIL } });
 
         // The premise: an account with no phone carries 0, not an absent branch.
         assert.equal(user.personal.telephone.national, 0, 'the schema default is 0');
@@ -100,8 +102,8 @@ module.exports = defineCases({
       name: 'a-messy-email-hashes-its-canonical-form',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData } = userDataFor(Manager, { auth: { uid: UID, email: MESSY_EMAIL } });
+      run: async ({ assert, omega }) => {
+        const { userData } = userDataFor(omega, { auth: { uid: UID, email: MESSY_EMAIL } });
 
         // Casing and padding are the account doc's business, never the match
         // key's: GA4 matches the digest of the trimmed, lowercased address, and
@@ -115,8 +117,8 @@ module.exports = defineCases({
       name: 'messy-names-hash-their-canonical-form',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData } = userDataFor(Manager, {
+      run: async ({ assert, omega }) => {
+        const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { name: { first: MESSY_FIRST, last: MESSY_LAST } },
         });
@@ -133,8 +135,8 @@ module.exports = defineCases({
       name: 'an-account-with-no-name-sends-no-name-hash',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData, user } = userDataFor(Manager, { auth: { uid: UID, email: EMAIL } });
+      run: async ({ assert, omega }) => {
+        const { userData, user } = userDataFor(omega, { auth: { uid: UID, email: EMAIL } });
 
         // The schema's default is null, and a normalizer must never turn an
         // absent name into the digest of '' — one junk key shared by everybody.
@@ -155,8 +157,8 @@ module.exports = defineCases({
       name: 'the-address-block-comes-off-the-account-per-ga4-spec',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData } = userDataFor(Manager, {
+      run: async ({ assert, omega }) => {
+        const { userData } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { location: { country: 'us', region: 'California', city: 'San Diego' } },
         });
@@ -178,8 +180,8 @@ module.exports = defineCases({
       name: 'the-postal-code-and-street-come-off-the-account-schema',
       auth: 'none',
 
-      run: async ({ assert, Manager }) => {
-        const { userData, user } = userDataFor(Manager, {
+      run: async ({ assert, omega }) => {
+        const { userData, user } = userDataFor(omega, {
           auth: { uid: UID, email: EMAIL },
           personal: { location: { postalCode: '94035-1234', street: ' 123 Main Street. ' } },
         });

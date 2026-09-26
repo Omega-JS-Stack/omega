@@ -71,7 +71,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^@omega\.js\/client\/modules\/analytics\.js$/ }, () => {
           return { path: CLIENT_ANALYTICS };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -108,16 +108,16 @@ async function land(href) {
   };
   globalThis.__omegaClient = {
     config: { analytics: { providers: {} } },
-    dom: () => ({ ready: async () => {} }),
-    sentry: () => ({ captureException: (e) => reported.push(e.message) }),
+    dom: { ready: async () => {} },
+    sentry: { captureException: (e) => reported.push(e.message) },
     // The visitor consented to everything — a denied category is its own suite
     // (consent-gating.test.js).
-    storage: () => ({
+    storage: {
       get: (key, fallback) => (key === 'trackingConsent'
         ? { analytics: true, marketing: true, region: 'opt-out', version: 1 }
         : fallback),
       set: () => {},
-    }),
+    },
   };
 
   globalThis.gtag = (...args) => tracked.push(['gtag', ...args]);

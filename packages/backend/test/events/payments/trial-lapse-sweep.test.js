@@ -15,8 +15,8 @@
  * says X" is seeded as an order doc — or, for "the subscription is gone", as no order
  * doc at all.
  */
-const sweep = require('../../../dist/manager/events/cron/daily/trial-lapse-sweep.js');
-const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
+const sweep = require('../../../dist/omega/events/cron/daily/trial-lapse-sweep.js');
+const analytics = require('../../../dist/omega/events/firestore/payments-webhooks/analytics.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const DAY = 24 * 60 * 60;

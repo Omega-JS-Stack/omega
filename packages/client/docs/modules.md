@@ -10,36 +10,39 @@
 ## Auth (`auth.js`)
 
 - **Class**: `Auth`
-- **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `probeSession()`, `resolveSubscription(account?)`
+- **Key Properties**: `user` (the current `User`, never null), `state` (the newest landed `{ user, denied }`, or null before the first), `settled` (resolves when the first state lands)
+- **Key Methods**: `listen(options, callback)`, `reload()`, `signInWithEmailAndPassword()`, `signInWithCustomToken()`, `signOut()`, `getIdToken()`, `probeSession()`
 - **Bindings**: Updates `auth` and `usage` context on auth settle
 - **`probeSession()`** ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): the forced token refresh the client runs at a moment of doubt (tab visible, network back, a 401). Resolves `'signed-out' | 'alive' | 'gone' | 'unknown'`; a non-network `auth/*` error signs the user out, a network error keeps them, and probes coalesce to one in flight. Full contract: [docs/client/index.md](../../../docs/client/index.md)
-- **Listener state**: `callback({ user, account, resolved, accountDenied? })` — `account` resolves to the empty schema shape when the doc is not written yet (a NORMAL pending state); `accountDenied: true` rides along only when Firestore rules refused the read, the one REAL failure ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)); web signs out on it
-- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with the EFFECTIVE limits of the resolved plan to produce the `usage` bindings key. Both halves are config — the `features` catalog says what a feature is and whether it is counted, the product's `features` map says what the tier promises — and the arithmetic is `@omega.js/account`'s, the same module @omega.js/backend's gate reads ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). Per feature: `{ monthly, daily, total, limit, left, override, day: { limit, used, left } }`, with a per-user `usage.overrides.<feature>` winning over the plan's number
+- **Listener state**: `callback({ user, denied })`. `user` builds from the empty schema shape when the doc is not written yet (a NORMAL pending state); `denied` is true only when Firestore rules refused the read, the one REAL failure; web signs out on it
+- **Usage Resolution**: `_resolveUsage(user)` merges `user.usage` (Firestore) with the EFFECTIVE limits of `user.plan` to produce the `usage` bindings key. Both halves are config (the `features` catalog says what a feature is and whether it is counted, the product's `features` map says what the tier promises), and the arithmetic is `@omega.js/account`'s, the same module @omega.js/backend's gate reads ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)). Per feature: `{ monthly, daily, total, limit, left, override, day: { limit, used, left } }`, with a per-user `usage.overrides.<feature>` winning over the plan's number
 
-### resolveSubscription(account?)
+### auth.user
 
-Derives calculated subscription fields from raw account data. Returns only fields that require derivation logic — raw data (product.id, status, trial, cancellation) lives on `account.subscription` directly.
+`auth.user` is a `User` from `@omega.js/account`, the same class @omega.js/backend builds as `ctx.user`, so a document resolved here is identical to one resolved there. Signed out, it is a `User` with `authenticated` false and `plan` basic, never null.
 
 ```javascript
-const resolved = auth.resolveSubscription(account);
-// Returns: { plan, active, trialing, cancelling }
+const { user } = omega.auth;
+// Stored document as own fields: user.auth.uid, user.subscription.status, user.roles.admin
+// Getters: authenticated, uid, email, plan, active, trialing, cancelling, everPaid
+// From the sign-in: user.profile.{ displayName, photoURL, emailVerified }
 ```
 
 - `plan`: Effective plan ID the user has access to RIGHT NOW (`'basic'` if cancelled/suspended)
-- `active`: User has active access (active, trialing, or cancelling — all mean the user can use the product)
+- `active`: User has active access (active, trialing, or cancelling: all mean the user can use the product)
 - `trialing`: In an active trial (status `'active'` + `trial.claimed` + unexpired `trial.expires`)
 - `cancelling`: Cancellation pending (status `'active'` + `cancellation.pending` + NOT trialing)
+- `everPaid`: A payment start date exists
+- `toJSON()`: the stored document alone, never the getters or the profile
 
-**Unified with @omega.js/backend**: The same function exists on `User.resolveSubscription(account)` in @omega.js/backend (`helpers/user.js`) with identical logic and return shape.
+### One State Per Auth Change
 
-### Auth Settler Pattern
+`_landState` (reached from `index.js`'s `onAuthStateChanged` through `_handleAuthStateChange`, not awaited, and from `reload()`) is the ONE place an auth state is built: one account fetch, one `User`, one `{ user, denied }` state per change. It sets `auth.user` and `auth.state`, updates the bindings and storage once, resolves `auth.settled`, then delivers the state to every persistent listener. A build superseded by a newer change while its fetch was in flight is dropped (#196).
 
-Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's first `onAuthStateChanged` fires — the moment auth state is guaranteed (authenticated user OR null). This eliminates race conditions.
-
-- **`once` listeners** (`listen({ once: true }, cb)`): Wait for `_authReady`, fire once, done. No cleanup needed.
-- **Persistent listeners** (`listen({}, cb)`): Subscribe to `_authStateCallbacks`. If auth already settled when registered, catch up via `_authReady.then()`. Otherwise, `_handleAuthStateChange` handles the initial call naturally.
-- **`_hasProcessedStateChange`**: Ensures bindings/storage updates run only once per auth state change across all listeners.
-- **Manager owns the promise**: `_authReady` and `_authReadyResolve` live on the Manager instance. The `onAuthStateChanged` callback in `index.js` resolves it on first fire and sets `_firebaseAuthInitialized = true`.
+- **`once` listeners** (`listen({ once: true }, cb)`): wait for `auth.settled` (the first landed state), then receive the newest landed state. No cleanup needed.
+- **Persistent listeners** (`listen({}, cb)`): receive every landed state. One registered after a state already landed catches up with it once, on the next microtask.
+- Every consumer of one change holds the SAME `User` instance, which is also `auth.user`.
+- **`reload()`**: re-reads the account for the current Firebase user, lands it as a new state, and resolves with it (following a newer build when one superseded it mid-fetch).
 
 ## Bindings (`bindings.js`)
 
@@ -51,17 +54,17 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 
 ## Request (`request.js`) — harmonized API fetch
 
-- **Singleton API**: `await omega.request('/omega/user/token', { method: 'POST', body: {} })`
+- **Instance API**: `await omega.request('/omega/user/token', { method: 'POST', body: {} })`
 - **Options**: `method` (default GET), `headers`, `body` (objects JSON-encoded automatically), `auth: false` (skip the Bearer token for public routes), `output: 'complete'` (returns `{ status, ok, headers, data, properties }` instead of just the body), `tries` (bounded retries on network errors + 5xx), `timeout` (per-attempt `AbortSignal.timeout`), `wakeup: true` (below)
 - **`wakeup: true`** ([#637](https://github.com/Omega-JS-Stack/omega/issues/637)): a fire-and-forget GET that warms a cold backend and nothing else — `omega.request(WAKEUP_ROUTE, { wakeup: true })`, with `WAKEUP_ROUTE` exported by this module (the ONE route every surface pings, [#644](https://github.com/Omega-JS-Stack/omega/issues/644)). It appends `wakeup=true` to the URL, mints no ID token, reads no response body, returns `undefined`, and RESOLVES rather than throwing when the network is down. @omega.js/backend's middleware answers a wakeup before it loads a route or authenticates, so every route is the same warm-up at the same price and none of them runs.
 - **Behavior**: leading-`/` paths resolve through `getApiUrl()`; absolute URLs pass through. A fresh Firebase ID token rides as `Authorization: Bearer` when signed in. Non-ok responses THROW an `Error` carrying `.code` (HTTP status), `.data` (parsed body), and `.properties`.
 - **omega-properties**: the backend assistant attaches this header (code, tag, usage current+limits, schema, additional) to every response; `omega.request()` parses it on success AND error, and merges server usage into the `usage` bindings key — `data-omega-bind` elements refresh automatically.
-- **Standalone**: non-singleton contexts (desktop main, extension service worker) build their own via `createRequest({ getApiUrl, getIdToken, onProperties, onUnauthorized })` from `@omega.js/client/modules/request.js` — the desktop client-bridge and the extension background token sync both do. `onProperties` and `onUnauthorized` are optional; only `getApiUrl` and `getIdToken` are required.
-- **401 probes the session** ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): a 401 on a request that asked for auth calls the optional `onUnauthorized` dep (the singleton passes `omega.auth().probeSession()`) without awaiting it and swallowing its rejection, then throws the caller's error unchanged. `auth: false` requests and every other status never call it.
+- **Standalone**: contexts with no browser instance build their own via `createRequest({ getApiUrl, getIdToken, onProperties, onUnauthorized })` from `@omega.js/client/modules/request.js`: the extension background and desktop main each build their `omega.request()` on their own session this way, once per instance, and their token sync fetches through it. `onProperties` and `onUnauthorized` are optional; only `getApiUrl` and `getIdToken` are required.
+- **401 probes the session** ([#798](https://github.com/Omega-JS-Stack/omega/issues/798)): a 401 on a request that asked for auth calls the optional `onUnauthorized` dep (the instance passes `omega.auth.probeSession()`) without awaiting it and swallowing its rejection, then throws the caller's error unchanged. `auth: false` requests and every other status never call it.
 
 ## Device (`device.js`) — local device stats
 
-- **Class**: `Device` (`omega.device()`)
+- **Class**: `Device` (`omega.device`)
 - **Key Methods**: `getUsageDuration(unit)`, `getSessionDuration(unit)`, `getInstalledDate()`, `getSessionCount()`, `getBindingData()`, `reset()`
 - **Storage**: localStorage (web) or extension storage, key `omega_device`
 - **Bindings**: seeds the `device` key on initialize (installed / session / version / duration) — distinct from the server-derived `usage` key (see [bindings.md](bindings.md))
@@ -108,13 +111,13 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
   runtime helper (`core/js/libs/path-prefix.js`); nothing imports across the
   package boundary.
 - **Read by**: the ServiceWorker registration above ([#360](https://github.com/Omega-JS-Stack/omega/issues/360))
-  and the Manager's refresh-new-version poll, which fetches the build manifest
+  and the instance's refresh-new-version poll, which fetches the build manifest
   at `<prefix>/build.json` ([#364](https://github.com/Omega-JS-Stack/omega/issues/364))
   — root-relative, that poll 404s forever under a path mount.
 
 ## Sentry (`sentry.js`)
 
-- **Class**: `Sentry` (named `mod` internally)
+- **Class**: `Sentry` (`omega.sentry`)
 - **Key Methods**: `init(config)`, `captureException(error, context)`
 - **Filtering**: Blocks dev mode, Lighthouse, Selenium/Puppeteer
 
@@ -142,10 +145,10 @@ Untrusted text as safe markup — an escape-first mini renderer for API answers 
 ## Live Page (`live-page.js`) — the self-refreshing page primitives
 
 - **Exports**: `loading(message)`, `swap(host, markup)`, `createFeedPoller(options)`
-- **Pattern**: transport-free standalone module (like `motion`) with the deps-injected seam `request` uses — the page boots it and hands it a fetcher; there is no singleton coupling. Ported from the workkit tower's page runtime.
+- **Pattern**: transport-free standalone module with the deps-injected seam `request` uses: the page boots it and hands it a fetcher, and it never reaches the instance. Ported from the workkit tower's page runtime.
 - **`swap($host, markup)`**: writes `innerHTML` ONLY when the markup differs from what swap itself last wrote (a WeakMap keyed by the element), so an unchanged section keeps its DOM, focus, scroll position and open `details` across a poll. The comparison never reads `host.innerHTML` back — the browser re-serializes what it parses, so a read-back never matches the string that produced it and every tick would count as a change. Returns `true` when it wrote, which is what post-draw work (charts, listeners) hangs off.
 - **`loading(message)`**: the spinner line a section shows while its feed has never answered — a first paint says which read it is waiting on instead of drawing an empty region. The message is escaped through `utilities.escapeHTML`.
-- **`createFeedPoller({ feeds, fetcher, onChange })`**: `feeds` is the declared table (`{ name: { path, every, fresh? } }` — `fresh` is the cache-bypass path a user-triggered refresh uses); `fetcher` is an `omega.request`-shaped function (resolves with the body, throws an `Error` carrying `.code`), so a page passes `omega.request` and a non-singleton context passes its own `createRequest(...)`; `onChange` fires at every state transition (a read starting, a read landing) and is where the page repaints.
+- **`createFeedPoller({ feeds, fetcher, onChange })`**: `feeds` is the declared table (`{ name: { path, every, fresh? } }`, where `fresh` is the cache-bypass path a user-triggered refresh uses); `fetcher` is an `omega.request`-shaped function (resolves with the body, throws an `Error` carrying `.code`), so a page passes `omega.request` and a context with no browser instance passes its own `createRequest(...)`; `onChange` fires at every state transition (a read starting, a read landing) and is where the page repaints.
 - **Poller surface**: `state` (`{ feeds, pending, stamp }`), `read(name, fresh)`, `readAll(fresh)`, `staleFeeds()`, `start()` (first pass, then arms one interval per feed; idempotent), `stop()` (also lets go of the visibility listener).
 - **Hidden-tab pause**: the cadence stops while the page is hidden (a covered tab) and resumes with one immediate read on return. A visible-but-unfocused window keeps polling, and a context with no `document` (the extension service worker) keeps its cadence. There is no option for it.
 - **Feed result shape**: `{ ok, data, status, reason }` — `status` is the thrown error's `.code` (null for a transport failure), `reason` its message.
@@ -174,7 +177,7 @@ Untrusted text as safe markup — an escape-first mini renderer for API answers 
 ## Motion (`motion.js`)
 
 - **Exports**: `createMotion()`, `parseCountTarget(text)`, `formatCount(target, value)`
-- **Pattern**: transport-free factory like icon-renderer — not a singleton module; each embedding framework boots it (`@omega.js/web` does in `core/js/core/motion.js`)
+- **Pattern**: transport-free factory like icon-renderer: the base class builds one as `omega.motion` (`createMotion()`), and `@omega.js/web` adopts its first-paint engine in its place (`core/js/core/motion.js`)
 - **Engine surface**: `start(doc?)` (idempotent scan + IntersectionObserver + MutationObserver + scroll watcher), `stop()`, `scan(root)` for manually rendered roots
 - **Attribute contract** (styled by the embedding framework's motion stylesheet): `data-omega-reveal[="up|fade|left|right|scale"]`, `data-omega-reveal-stagger`, `data-omega-countup`, `data-omega-rotate`, `data-omega-marquee` (+ `.omega-marquee__track` — the set is cloned until half the track covers the container; attr value = px/s), `data-omega-scroll-watch`, `data-omega-segmented` (gliding `.omega-segmented__thumb` under the checked/`.active` segment), `data-omega-dotfield` (canvas dot grid: traveling wave + drifting rainbow tint + window-tracked pointer glow; attr value = px spacing)
 - **Resilience**: no-JS pages render visible (the hiding styles are gated on an inline `html[data-omega-motion]` stamp); `prefers-reduced-motion` renders final states with no animation; missing observers (exotic embeds) degrade to instant reveal

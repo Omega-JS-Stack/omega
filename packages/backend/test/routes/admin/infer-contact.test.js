@@ -18,7 +18,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
@@ -32,7 +32,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
@@ -51,7 +51,7 @@ module.exports = defineCases({
         : false,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'john.smith@gmail.com',
         });
 
@@ -83,7 +83,7 @@ module.exports = defineCases({
           'admin@acme.com',
         ];
 
-        const response = await http.post('backend-manager/admin/infer-contact', { emails });
+        const response = await http.post('omega/admin/infer-contact', { emails });
 
         assert.isSuccess(response, 'Should succeed for batch');
         assert.equal(response.data.results.length, 3, 'Should have 3 results');
@@ -109,7 +109,7 @@ module.exports = defineCases({
         // Use a name unlikely to trigger the "fictional/brand" rejection in the AI prompt.
         // The infer-contact prompt rejects placeholder + fictional names (e.g. alice.wonderland,
         // john.doe). Use a generic-but-realistic name to exercise dot-separated parsing.
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'sarah.martinez@example.com',
         });
 
@@ -130,7 +130,7 @@ module.exports = defineCases({
         : false,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'ceo@my-startup.com',
         });
 
@@ -149,7 +149,7 @@ module.exports = defineCases({
         : false,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           email: 'someone@gmail.com',
         });
 
@@ -170,7 +170,7 @@ module.exports = defineCases({
         : false,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           emails: [
             'john.smith@microsoft.com',
             'xkcd42@gmail.com',
@@ -208,7 +208,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/infer-contact', {
+        const response = await http.post('omega/admin/infer-contact', {
           emails: [],
         });
 

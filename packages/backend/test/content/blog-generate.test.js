@@ -41,9 +41,9 @@ module.exports = defineCases({
   description: 'Generate a blog article (config check by default, full AI pipeline with TEST_EXTENDED_MODE)',
   auth: 'none',
   timeout: 300000,
-  async run({ assert, config, Manager, ctx, skip }) {
+  async run({ assert, config, omega, ctx, skip }) {
     const env = process.env;
-    const blogConfig = Manager.config.blog;
+    const blogConfig = omega.config.blog;
     // Same tri-state read the auto-publisher uses: the enabled key under
     // blog.providers names the article provider
     const providerName = Object.keys(blogConfig?.providers || {}).find((key) => blogConfig.providers[key]) || 'ghostii';
@@ -72,7 +72,7 @@ module.exports = defineCases({
       }
 
       // Verify provider exists
-      const providerPath = path.join(__dirname, '..', '..', 'dist', 'manager', 'libraries', 'content', `${providerName}.js`);
+      const providerPath = path.join(__dirname, '..', '..', 'dist', 'omega', 'libraries', 'content', `${providerName}.js`);
       assert.ok(jetpack.exists(providerPath), `provider "${providerName}" exists at ${providerPath}`);
 
       console.log(`\n[blog-generate] Config OK:`);
@@ -91,7 +91,7 @@ module.exports = defineCases({
       return skip('blog.enabled is false in config');
     }
 
-    const publisherPath = path.join(__dirname, '..', '..', 'dist', 'manager', 'events', 'cron', 'daily', 'blog-auto-publisher.js');
+    const publisherPath = path.join(__dirname, '..', '..', 'dist', 'omega', 'events', 'cron', 'daily', 'blog-auto-publisher.js');
     const publisher = require(publisherPath);
 
     // Get content entries
@@ -108,7 +108,7 @@ module.exports = defineCases({
       content[0].sources = [env.BLOG_SOURCE];
     }
 
-    Manager.config.blog.content = content;
+    omega.config.blog.content = content;
 
     // Output dir
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/-(\d{3})Z$/, '');
@@ -123,7 +123,7 @@ module.exports = defineCases({
 
     // Intercept publishArticle if BLOG_NO_PUBLISH is set
     if (env.BLOG_NO_PUBLISH) {
-      const provider = require(path.join(__dirname, '..', '..', 'dist', 'manager', 'libraries', 'content', `${providerName}.js`));
+      const provider = require(path.join(__dirname, '..', '..', 'dist', 'omega', 'libraries', 'content', `${providerName}.js`));
       const originalPublish = provider.publishArticle;
       provider.publishArticle = async (ast, args) => {
         console.log(`[blog-generate] SKIPPED publishArticle (BLOG_NO_PUBLISH=1)`);
@@ -137,10 +137,9 @@ module.exports = defineCases({
 
     // Run the publisher
     await publisher({
-      Manager,
+      omega,
       ctx,
       context: {},
-      libraries: Manager.libraries,
     });
 
     // Write metadata

@@ -20,11 +20,11 @@
  */
 const fs = require('fs');
 const path = require('path');
-const transitions = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/index.js');
-const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
-const paypalProvider = require('../../../dist/manager/routes/payments/webhook/providers/paypal.js');
-const chargebeeProvider = require('../../../dist/manager/routes/payments/webhook/providers/chargebee.js');
-const coinbaseProvider = require('../../../dist/manager/routes/payments/webhook/providers/coinbase.js');
+const transitions = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/index.js');
+const stripeProvider = require('../../../dist/omega/routes/payments/webhook/providers/stripe.js');
+const paypalProvider = require('../../../dist/omega/routes/payments/webhook/providers/paypal.js');
+const chargebeeProvider = require('../../../dist/omega/routes/payments/webhook/providers/chargebee.js');
+const coinbaseProvider = require('../../../dist/omega/routes/payments/webhook/providers/coinbase.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Every transition name the detector can return, and the category whose folder
@@ -411,7 +411,7 @@ module.exports = defineCases({
       async run({ assert }) {
         // dispatch() resolves <category>/<name>.js by name — a rule whose handler
         // file is missing logs "not found" and silently sends the customer nothing
-        const root = path.join(__dirname, '../../../dist/manager/events/firestore/payments-webhooks/transitions');
+        const root = path.join(__dirname, '../../../dist/omega/events/firestore/payments-webhooks/transitions');
 
         for (const [category, name] of HANDLED_TRANSITIONS) {
           const handlerPath = path.join(root, category, `${name}.js`);

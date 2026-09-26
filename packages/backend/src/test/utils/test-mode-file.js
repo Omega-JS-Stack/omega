@@ -9,7 +9,7 @@
  * code-branch refactor needed.
  *
  * File lives at `<consumerProject>/.temp/test-mode.json` — `.temp/` is the
- * standard transient cache directory across UJM/BXM/EM/@omega.js/backend consumer projects
+ * standard transient cache directory across every OMEGA target
  * (sits at the repo root, gitignored by default).
  *
  * ## Allowlist
@@ -180,7 +180,64 @@ function applyEnvFromFile(data) {
   return changed;
 }
 
+/**
+ * Install the test-mode-file watcher: sync the env vars an earlier test command
+ * wrote before this process booted, then watch the file for live changes.
+ * Called once by omega.initialize() in the test environment.
+ *
+ * Idempotent: guarded by a module-level flag so reload-during-nodemon doesn't
+ * stack listeners.
+ *
+ * @param {string} projectDir - the consumer project root (the parent of its functions dir).
+ * @param {object} logger - where the sync and flip lines go (omega.logger).
+ * @param {object} [options] - { quiet }: skip the resolved-mode line (per-worker noise under the emulator).
+ */
+let watcherInstalled = false;
+function watchTestMode(projectDir, logger, options) {
+  if (watcherInstalled) {
+    return;
+  }
+  watcherInstalled = true;
+
+  const fs = require('fs');
+  const tempDir = path.join(projectDir, TEMP_DIR_NAME);
+
+  // Initial sync: apply any state the test/emulator command wrote before this
+  // process booted. A sync/flip is an EVENT and always says so; the resolved
+  // mode only announces itself when not quiet.
+  const initial = readTestMode(projectDir);
+  const changed = applyEnvFromFile(initial);
+  for (const c of changed) {
+    logger.log(`test-mode sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+  }
+  if (!(options || {}).quiet) {
+    logger.log(`test-mode resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
+  }
+
+  // Ensure .temp/ exists so we can watch the directory (fs.watch on a missing
+  // path throws synchronously). Watching the directory rather than the file
+  // means deletes/recreations of test-mode.json don't break the watcher.
+  jetpack.dir(tempDir);
+
+  try {
+    fs.watch(tempDir, { persistent: false }, (eventType, filename) => {
+      // Only react to our file. fs.watch may emit for any change in the dir.
+      if (filename && filename !== TEST_MODE_FILENAME) {
+        return;
+      }
+      const next = readTestMode(projectDir);
+      const flipped = applyEnvFromFile(next);
+      for (const c of flipped) {
+        logger.log(`test-mode flip ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+      }
+    });
+  } catch (e) {
+    logger.log(`test-mode watcher failed to install (${e.message}), live sync disabled`);
+  }
+}
+
 module.exports = {
+  watchTestMode,
   TEST_MODE_FILENAME,
   TEMP_DIR_NAME,
   SYNCED_ENV_KEYS,

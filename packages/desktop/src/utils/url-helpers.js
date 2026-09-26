@@ -1,13 +1,14 @@
-// Backend URL helpers, shared across all Manager contexts (main / renderer / preload /
-// build). Mirror @omega.js/client's contract so @omega.js/desktop apps can hit the same dev/prod backends as
-// UJM and BXM consumers.
+// Backend URL helpers: plain functions the process `Omega` classes (main / renderer /
+// preload) call, each passing itself as `context`. Mirror
+// @omega.js/client's contract so @omega.js/desktop apps can hit the same dev/prod backends as
+// @omega.js/web and @omega.js/extension consumers.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
-// (alongside the is*() family; mirrors @omega.js/backend/UJM/BXM). It returns exactly ONE of
+// (alongside the is*() family, the same on every framework). It returns exactly ONE of
 // 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
 //
-// `getFunctionsUrl()` / `getApiUrl()` / `getWebsiteUrl()` route through
-// `this.getEnvironment()` and resolve to LOCAL urls in BOTH development AND testing —
+// `getFunctionsUrl()` / `getApiUrl()` / `getWebsiteUrl()` route through the context's
+// `getEnvironment()` and resolve to LOCAL urls in BOTH development AND testing,
 // callers normally pass NO argument. An explicit `environment` arg is an override
 // (used mainly by tests to pin a specific environment's mapping).
 
@@ -54,9 +55,16 @@ function requiredPort(context, envName, name) {
   return port;
 }
 
-function getFunctionsUrl(environment) {
-  const env = environment || this.getEnvironment();
-  const projectId = this?.config?.cloud?.config?.projectId;
+/**
+ * The Cloud Functions base: the local emulator in development and testing, the
+ * project's cloudfunctions.net host in production.
+ * @param {object} context - the instance asking (its `config` and `getEnvironment()`).
+ * @param {string} [environment] - an override of the running environment.
+ * @returns {string} the functions base URL.
+ */
+function getFunctionsUrl(context, environment) {
+  const env = environment || context.getEnvironment();
+  const projectId = context.config?.cloud?.config?.projectId;
 
   if (!projectId) {
     throw new Error('cloud.config.projectId not set in config/omega.json5');
@@ -66,15 +74,22 @@ function getFunctionsUrl(environment) {
   // same three-step chain getApiUrl() walks: the OMEGA_*_PORT env channel (N7),
   // then the baked map, then the classic default.
   if (env === 'development' || env === 'testing') {
-    const port = requiredPort(this, 'OMEGA_FUNCTIONS_PORT', 'functions');
+    const port = requiredPort(context, 'OMEGA_FUNCTIONS_PORT', 'functions');
     return `http://localhost:${port}/${projectId}/us-central1`;
   }
 
   return `https://us-central1-${projectId}.cloudfunctions.net`;
 }
 
-function getApiUrl(environment) {
-  const env = environment || this.getEnvironment();
+/**
+ * The API base: the local stack in development and testing, the brand's api
+ * subdomain in production.
+ * @param {object} context - the instance asking (its `config` and `getEnvironment()`).
+ * @param {string} [environment] - an override of the running environment.
+ * @returns {string} the API base URL.
+ */
+function getApiUrl(context, environment) {
+  const env = environment || context.getEnvironment();
 
   // Local for development OR testing; production otherwise. Mirrors
   // @omega.js/backend's getApiUrl (N7): a resolved OMEGA_HTTPS_PORT means
@@ -82,16 +97,16 @@ function getApiUrl(environment) {
   // hosting emulator (env port, then baked port). Neither resolved is a broken
   // build, not a case to assume the classic 5002 through (#834).
   if (env === 'development' || env === 'testing') {
-    const httpsPort = localPort(this, 'OMEGA_HTTPS_PORT', 'https');
+    const httpsPort = localPort(context, 'OMEGA_HTTPS_PORT', 'https');
     return httpsPort
       ? `https://localhost:${httpsPort}`
-      : `http://localhost:${requiredPort(this, 'OMEGA_HOSTING_PORT', 'hosting')}`;
+      : `http://localhost:${requiredPort(context, 'OMEGA_HOSTING_PORT', 'hosting')}`;
   }
 
   // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
   // from authDomain — it is an auth concern (the brand host, with /__/auth/*
   // self-hosted at build time) and must stay free to change independently.
-  const brandUrl = this?.config?.brand?.url;
+  const brandUrl = context.config?.brand?.url;
   if (!brandUrl) {
     throw new Error('brand.url not set in config/omega.json5');
   }
@@ -113,20 +128,25 @@ function getApiUrl(environment) {
 // Prod → `config.brand.url`. Use this whenever app code wants to link out to "the
 // website" (Help → Website tray/menu items, "Open in browser," billing portal
 // landings) so dev runs don't punch out to the real domain.
-function getWebsiteUrl(environment) {
-  const env = environment || this.getEnvironment();
+/**
+ * @param {object} context - the instance asking (its `config` and `getEnvironment()`).
+ * @param {string} [environment] - an override of the running environment.
+ * @returns {string} the website origin (dev) or brand.url (production).
+ */
+function getWebsiteUrl(context, environment) {
+  const env = environment || context.getEnvironment();
 
   // Local for development OR testing; production otherwise.
   if (env === 'development' || env === 'testing') {
-    const origin = this?.config?.dev?.origin;
+    const origin = context.config?.dev?.origin;
     if (origin) {
       return origin;
     }
 
-    return `https://localhost:${requiredPort(this, 'OMEGA_WEBSITE_PORT', 'website')}`;
+    return `https://localhost:${requiredPort(context, 'OMEGA_WEBSITE_PORT', 'website')}`;
   }
 
-  const url = this?.config?.brand?.url;
+  const url = context.config?.brand?.url;
   if (!url) {
     throw new Error('brand.url not set in config/omega.json5');
   }
@@ -134,19 +154,25 @@ function getWebsiteUrl(environment) {
 }
 
 // Sign-in URL that round-trips an auth token back to the app. Points at the brand
-// website's /signin page (UJM), chained through its /token page so a successful login
+// website's /signin page, chained through its /token page so a successful login
 // mints a Firebase custom token and redirects to `<brand.id>://auth/token` — the
-// deep-link built-in that hands the token to client-bridge (signInWithCustomToken).
+// deep-link built-in that hands the token to lib/auth.js (signInWithCustomToken).
 // Same env split as getWebsiteUrl: dev/test → the local website, prod → brand.url.
 // The token page redirects with ?authToken=<token> — the ONE modern shape the
-// auth/token route reads (legacy-app formats are UJM's concern, not @omega.js/desktop's).
+// auth/token route reads (older formats are not read).
 //
 // `returnUrl` overrides the final hop (default: `<brand.id>://auth/token`). Used by
 // lib/auth-flow.js in dev, where the custom scheme isn't OS-registered — the flow
 // returns to a loopback HTTP listener instead (RFC 8252 §7.3).
-function getAuthUrl(environment, returnUrl) {
-  const site = this.getWebsiteUrl(environment);
-  const brandId = this?.config?.brand?.id;
+/**
+ * @param {object} context - the instance asking (its `config` and `getEnvironment()`).
+ * @param {string} [environment] - an override of the running environment.
+ * @param {string} [returnUrl] - the final hop, `<brand.id>://auth/token` by default.
+ * @returns {string} the sign-in URL.
+ */
+function getAuthUrl(context, environment, returnUrl) {
+  const site = getWebsiteUrl(context, environment);
+  const brandId = context.config?.brand?.id;
   if (!brandId) {
     throw new Error('brand.id not set in config/omega.json5');
   }
@@ -159,23 +185,7 @@ function getAuthUrl(environment, returnUrl) {
   return signinUrl.toString();
 }
 
-// Mix the URL helpers into a Manager constructor's prototype + the constructor itself.
-// getEnvironment() is NOT attached here — it's the SSOT in src/utils/mode-helpers.js.
-// These helpers call `this.getEnvironment()`, so mode-helpers' attachTo() must run before
-// (or alongside) this one — every Manager entry point attaches mode-helpers first.
-function attachTo(Manager) {
-  Manager.prototype.getFunctionsUrl  = getFunctionsUrl;
-  Manager.prototype.getApiUrl        = getApiUrl;
-  Manager.prototype.getWebsiteUrl    = getWebsiteUrl;
-  Manager.prototype.getAuthUrl       = getAuthUrl;
-  Manager.getFunctionsUrl  = getFunctionsUrl;
-  Manager.getApiUrl        = getApiUrl;
-  Manager.getWebsiteUrl    = getWebsiteUrl;
-  Manager.getAuthUrl       = getAuthUrl;
-}
-
 module.exports = {
-  attachTo,
   localPort,
   requiredPort,
   getFunctionsUrl,

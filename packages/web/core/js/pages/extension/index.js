@@ -3,7 +3,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 /* @dev-only:start */
@@ -16,7 +16,7 @@ import { registerDevSection } from '__main_assets__/js/core/dev-sections.js';
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupBrowserDetection();
     setupInstallTracking();
@@ -82,7 +82,7 @@ const config = {
 // href, and browser mark come from the detected browser's card. No card or
 // no store listing → the "See supported browsers" fallback stays.
 function setupBrowserDetection() {
-  const detectedBrowser = omega.utilities().getBrowser();
+  const detectedBrowser = omega.utilities.getBrowser();
   console.log('Detected browser:', detectedBrowser);
 
   const $hero = document.getElementById('extension-hero');
@@ -141,7 +141,7 @@ function trackInstallClick(browser, installUrl) {
 
 // Trigger install for testing (simulates clicking the install button)
 function triggerInstall(browser) {
-  const browserId = browser || omega.utilities().getBrowser();
+  const browserId = browser || omega.utilities.getBrowser();
   const $button = document.querySelector(`[data-download-card][data-browser="${browserId}"] a[data-install]`);
 
   if (!$button) {

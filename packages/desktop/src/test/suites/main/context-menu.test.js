@@ -12,13 +12,13 @@ module.exports = defineCases({
   description: 'context-menu (main)',
   cleanup: (ctx) => {
     // Reset to the built-in default fn so subsequent test runs aren't affected.
-    ctx.manager.contextMenu._definitionFn = null;
+    ctx.omega.contextMenu._definitionFn = null;
   },
   tests: [
     {
       name: 'initialize ran (enabled by default)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.contextMenu._initialized).toBe(true);
+        ctx.expect(ctx.omega.contextMenu._initialized).toBe(true);
       },
     },
     {
@@ -30,19 +30,19 @@ module.exports = defineCases({
         // In the test harness, appRoot() === app.getAppPath() === the @omega.js/desktop harness dir, which
         // differs from process.cwd() (the consumer project dir when run from a consumer).
         // Comparing against process.cwd() made this assert a false mismatch in consumers:
-        // the consumer has src/integrations/context-menu/index.js, but the manager never
+        // the consumer has src/integrations/context-menu/index.js, but the omega instance never
         // looks there — it looks under appRoot(). Keying the expectation off appRoot() makes
         // the invariant self-consistent in both the @omega.js/desktop self-test and any consumer run.
         const appRoot = require('../../../utils/app-root.js')();
         const consumerFile = path.join(appRoot, 'src', 'integrations', 'context-menu', 'index.js');
         const hasConsumer = fs.existsSync(consumerFile);
-        ctx.expect(ctx.manager.contextMenu.hasCustomDefinition()).toBe(hasConsumer);
+        ctx.expect(ctx.omega.contextMenu.hasCustomDefinition()).toBe(hasConsumer);
       },
     },
     {
       name: 'default fn: editable params produce cut/copy/paste',
       run: (ctx) => {
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -55,7 +55,7 @@ module.exports = defineCases({
     {
       name: 'default fn: text selection produces copy only',
       run: (ctx) => {
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: false,
           selectionText: 'hello world',
         });
@@ -68,7 +68,7 @@ module.exports = defineCases({
     {
       name: 'default fn: link adds Open / Copy Address items',
       run: (ctx) => {
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           linkURL: 'https://example.com',
         });
         const labels = items.filter((i) => i.label).map((i) => i.label);
@@ -80,27 +80,27 @@ module.exports = defineCases({
       name: 'default fn: empty params → only the always-on items (reload)',
       run: (ctx) => {
         // Force isDevelopment false so dev-only items don't appear.
-        const orig = ctx.manager.isDevelopment;
-        ctx.manager.isDevelopment = () => false;
+        const orig = ctx.omega.isDevelopment;
+        ctx.omega.isDevelopment = () => false;
         try {
-          const items = ctx.manager.contextMenu.buildItems({});
+          const items = ctx.omega.contextMenu.buildItems({});
           // With no editFlags, no selection, no link → only `reload` is always-on.
           const ids = items.filter((i) => i.id).map((i) => i.id);
           ctx.expect(ids).toEqual(['reload']);
         } finally {
-          ctx.manager.isDevelopment = orig;
+          ctx.omega.isDevelopment = orig;
         }
       },
     },
     {
       name: 'define() replaces the fn',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu, params }) => {
+        ctx.omega.contextMenu.define(({ menu, params }) => {
           menu.item({ label: `Selected: ${params.selectionText}` });
         });
-        ctx.expect(ctx.manager.contextMenu.hasCustomDefinition()).toBe(true);
+        ctx.expect(ctx.omega.contextMenu.hasCustomDefinition()).toBe(true);
 
-        const items = ctx.manager.contextMenu.buildItems({ selectionText: 'foo' });
+        const items = ctx.omega.contextMenu.buildItems({ selectionText: 'foo' });
         ctx.expect(items.length).toBe(1);
         ctx.expect(items[0].label).toBe('Selected: foo');
       },
@@ -108,18 +108,18 @@ module.exports = defineCases({
     {
       name: 'define() throws on non-function input',
       run: (ctx) => {
-        ctx.expect(() => ctx.manager.contextMenu.define(null)).toThrow(/must be a function/);
+        ctx.expect(() => ctx.omega.contextMenu.define(null)).toThrow(/must be a function/);
       },
     },
     {
       name: 'menu.separator() pushes a separator descriptor',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.item({ label: 'A' });
           menu.separator();
           menu.item({ label: 'B' });
         });
-        const items = ctx.manager.contextMenu.buildItems({});
+        const items = ctx.omega.contextMenu.buildItems({});
         ctx.expect(items.length).toBe(3);
         ctx.expect(items[1].type).toBe('separator');
       },
@@ -127,24 +127,25 @@ module.exports = defineCases({
     {
       name: 'menu.submenu() builds a nested submenu',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.submenu('More', [{ label: 'X' }, { label: 'Y' }]);
         });
-        const items = ctx.manager.contextMenu.buildItems({});
+        const items = ctx.omega.contextMenu.buildItems({});
         ctx.expect(items[0].label).toBe('More');
         ctx.expect(items[0].submenu.length).toBe(2);
       },
     },
     {
-      name: 'definition fn receives manager, params, webContents',
+      name: 'definition fn receives omega, params, webContents (no manager key)',
       run: (ctx) => {
         let received;
-        ctx.manager.contextMenu.define((arg) => {
+        ctx.omega.contextMenu.define((arg) => {
           received = arg;
           arg.menu.item({ label: 'probe' });
         });
-        ctx.manager.contextMenu.buildItems({ x: 100, y: 200 }, { id: 'fake-wc' });
-        ctx.expect(received.manager).toBe(ctx.manager);
+        ctx.omega.contextMenu.buildItems({ x: 100, y: 200 }, { id: 'fake-wc' });
+        ctx.expect(received.omega).toBe(ctx.omega);
+        ctx.expect(received.manager).toBeUndefined();
         ctx.expect(received.params).toEqual({ x: 100, y: 200 });
         ctx.expect(received.webContents).toEqual({ id: 'fake-wc' });
         ctx.expect(typeof received.menu.item).toBe('function');
@@ -156,12 +157,12 @@ module.exports = defineCases({
       name: '_resolveItem evaluates dynamic labels',
       run: (ctx) => {
         let n = 0;
-        const resolved = ctx.manager.contextMenu._resolveItem({
+        const resolved = ctx.omega.contextMenu._resolveItem({
           label: () => `Items: ${n}`,
         });
         ctx.expect(resolved.label).toBe('Items: 0');
         n = 4;
-        const resolved2 = ctx.manager.contextMenu._resolveItem({ label: () => `Items: ${n}` });
+        const resolved2 = ctx.omega.contextMenu._resolveItem({ label: () => `Items: ${n}` });
         ctx.expect(resolved2.label).toBe('Items: 4');
       },
     },
@@ -169,7 +170,7 @@ module.exports = defineCases({
       name: '_resolveItem wraps click handlers to swallow errors',
       run: (ctx) => {
         let called = false;
-        const resolved = ctx.manager.contextMenu._resolveItem({
+        const resolved = ctx.omega.contextMenu._resolveItem({
           label: 'X',
           click: () => { called = true; throw new Error('nope'); },
         });
@@ -185,8 +186,8 @@ module.exports = defineCases({
         const mockWC = {
           on: (evt, fn) => { calls.push({ evt, fn }); },
         };
-        ctx.manager.contextMenu.attach(mockWC);
-        ctx.manager.contextMenu.attach(mockWC); // second call should be a no-op
+        ctx.omega.contextMenu.attach(mockWC);
+        ctx.omega.contextMenu.attach(mockWC); // second call should be a no-op
         ctx.expect(calls.length).toBe(1);
         ctx.expect(calls[0].evt).toBe('context-menu');
       },
@@ -194,8 +195,8 @@ module.exports = defineCases({
     {
       name: 'menu.useDefaults() ships id-tagged items (cut, copy, paste, ...)',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => { menu.useDefaults(); });
-        const items = ctx.manager.contextMenu.buildItems({
+        ctx.omega.contextMenu.define(({ menu }) => { menu.useDefaults(); });
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -208,11 +209,11 @@ module.exports = defineCases({
     {
       name: 'menu.remove() drops an item by id within the event',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           menu.remove('paste');
         });
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -225,11 +226,11 @@ module.exports = defineCases({
     {
       name: 'menu.insertAfter splices a new item by id',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           menu.insertAfter('copy', { id: 'search', label: 'Search...' });
         });
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: false,
           selectionText: 'foo',
         });
@@ -243,11 +244,11 @@ module.exports = defineCases({
     {
       name: 'menu.update() patches a default item before popup',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           menu.update('copy', { label: 'CUSTOM COPY' });
         });
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: false,
           selectionText: 'foo',
         });
@@ -259,7 +260,7 @@ module.exports = defineCases({
     {
       name: 'defaults: undo/redo appear when canUndo/canRedo flags set',
       run: (ctx) => {
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canUndo: true, canRedo: true, canCut: true, canCopy: true, canPaste: true },
         });
@@ -271,7 +272,7 @@ module.exports = defineCases({
     {
       name: 'defaults: paste-and-match-style appears in editable contexts',
       run: (ctx) => {
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -282,14 +283,14 @@ module.exports = defineCases({
     {
       name: 'defaults: reload always present',
       run: (ctx) => {
-        const orig = ctx.manager.isDevelopment;
-        ctx.manager.isDevelopment = () => false;
+        const orig = ctx.omega.isDevelopment;
+        ctx.omega.isDevelopment = () => false;
         try {
-          const items = ctx.manager.contextMenu.buildItems({ selectionText: 'hi' });
+          const items = ctx.omega.contextMenu.buildItems({ selectionText: 'hi' });
           const ids = items.filter((i) => i.id).map((i) => i.id);
           ctx.expect(ids).toContain('reload');
         } finally {
-          ctx.manager.isDevelopment = orig;
+          ctx.omega.isDevelopment = orig;
         }
       },
     },
@@ -297,13 +298,13 @@ module.exports = defineCases({
       name: 'menu.find / menu.has work within event builder',
       run: (ctx) => {
         let foundCopy, hasCut, hasNope;
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           foundCopy = menu.find('copy');
           hasCut    = menu.has('cut');
           hasNope   = menu.has('does-not-exist');
         });
-        ctx.manager.contextMenu.buildItems({
+        ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -315,11 +316,11 @@ module.exports = defineCases({
     {
       name: 'menu.insertBefore splices a new item by id',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           menu.insertBefore('copy', { id: 'pre-copy', label: 'BEFORE COPY' });
         });
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: false,
           selectionText: 'foo',
         });
@@ -332,12 +333,12 @@ module.exports = defineCases({
     {
       name: 'menu.hide / menu.enable / menu.show within event',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           menu.useDefaults();
           menu.hide('copy');
           menu.enable('paste', false);
         });
-        const items = ctx.manager.contextMenu.buildItems({
+        const items = ctx.omega.contextMenu.buildItems({
           isEditable: true,
           editFlags: { canCut: true, canCopy: true, canPaste: true },
         });
@@ -350,12 +351,12 @@ module.exports = defineCases({
     {
       name: 'menu.appendTo pushes into a submenu created via menu.submenu(...)',
       run: (ctx) => {
-        ctx.manager.contextMenu.define(({ menu }) => {
+        ctx.omega.contextMenu.define(({ menu }) => {
           // Build a parent submenu with an id.
           menu.item({ id: 'more', label: 'More', submenu: [] });
           menu.appendTo('more', { id: 'extra', label: 'Extra' });
         });
-        const items = ctx.manager.contextMenu.buildItems({});
+        const items = ctx.omega.contextMenu.buildItems({});
         const more = items.find((i) => i.id === 'more');
         ctx.expect(more).toBeTruthy();
         ctx.expect(more.submenu[0].id).toBe('extra');

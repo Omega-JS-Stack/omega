@@ -3,10 +3,10 @@
 const path = require('path');
 const fs = require('fs');
 
-const Manager = require('../../../build.js');
+const build = require('../../../build.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
-const pkg = Manager.getPackage('main');
-const root = Manager.getRootPath('main');
+const pkg = build.getPackage('main');
+const root = build.getRootPath('main');
 
 module.exports = defineCases({
   type: 'group',
@@ -28,13 +28,14 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'main / renderer / preload / build all loadable',
+      // main and preload load anywhere and export their instance; the renderer
+      // needs its preload's window.desktop, so omega.test.js loads it with one
+      name: 'main / preload / build all loadable',
       run: (ctx) => {
         const fromDist = (subpath) => path.join(root, 'dist', subpath);
-        ctx.expect(typeof require(fromDist('main.js'))).toBe('function');
-        ctx.expect(typeof require(fromDist('renderer.js'))).toBe('function');
-        ctx.expect(typeof require(fromDist('preload.js'))).toBe('function');
-        ctx.expect(typeof require(fromDist('build.js'))).toBe('function');
+        ctx.expect(typeof require(fromDist('main.js'))).toBe('object');
+        ctx.expect(typeof require(fromDist('preload.js'))).toBe('object');
+        ctx.expect(typeof require(fromDist('build.js'))).toBe('object');
       },
     },
     {

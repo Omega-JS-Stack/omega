@@ -1,21 +1,23 @@
 /**
- * Test: helpers/user
- * Unit tests for Manager.User() schema-driven normalization
+ * Test: the backend's User (services/user.js installs its generators)
+ * Unit tests for User schema-driven normalization
  *
  * Tests the declarative schema resolver: defaults, passthrough, templates, type coercion
  */
-const User = require('../../dist/manager/helpers/user.js');
+const { User } = require('../../dist/omega/helpers/account.js');
+const { bootOmega } = require('./_boot-omega.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// Mock Manager with minimal Utilities
-const Manager = {
-  Utilities: () => ({
-    randomId: ({ size }) => 'test123',
-  }),
-};
+// A real boot installs the backend's generators on User, once
+let booted = false;
 
 function createUser(settings) {
-  return new User(Manager, settings).properties;
+  if (!booted) {
+    bootOmega();
+    booted = true;
+  }
+
+  return new User(settings).toJSON();
 }
 
 module.exports = defineCases({
@@ -95,7 +97,7 @@ module.exports = defineCases({
     {
       name: 'undefined-settings-gets-all-defaults',
       async run({ assert }) {
-        const user = new User(Manager).properties;
+        const user = createUser(undefined);
 
         assert.equal(user.auth.uid, null, 'auth.uid should be null');
         assert.equal(user.subscription.product.id, 'basic', 'subscription.product.id should be basic');

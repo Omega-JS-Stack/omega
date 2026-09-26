@@ -18,7 +18,7 @@ const testAccounts = require('./test-accounts.js');
  *
  * @param {string} frameworkTestsDir - @omega.js/backend's own test/ directory
  * @param {string} [projectTestsDir] - Consumer project's test/ directory
- * @param {object} [ctx] - Context passed to _init.js functions ({ config, Manager })
+ * @param {object} [ctx] - Context passed to _init.js functions ({ config, omega })
  * @returns {{ accounts: object, setups: Function[], failed: boolean }}
  */
 function loadInitHooks(frameworkTestsDir, projectTestsDir, ctx) {
@@ -76,15 +76,15 @@ const seedAccountsCache = new Map();
  * @param {object} options
  * @param {string} options.projectDir - Firebase project directory (holds test/)
  * @param {object} [options.config] - Resolved brand config, passed to the hooks
- * @param {object} [options.Manager] - Backend Manager instance, passed to the hooks
+ * @param {object} [options.omega] - @omega.js/backend instance, passed to the hooks
  * @returns {object} Accounts keyed by id (empty when the project declares none)
  */
-function loadSeedAccounts({ projectDir, config, Manager }) {
+function loadSeedAccounts({ projectDir, config, omega }) {
   if (!seedAccountsCache.has(projectDir)) {
     const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(projectDir, 'test');
 
-    const hooks = loadInitHooks(frameworkTestsDir, projectTestsDir, { config, Manager });
+    const hooks = loadInitHooks(frameworkTestsDir, projectTestsDir, { config, omega });
 
     if (hooks.failed) {
       return {};
@@ -153,19 +153,19 @@ function failedInit(initPath) {
  * @param {string} options.domain      - Brand domain (for email templates)
  * @param {object} options.config      - Resolved brand config
  * @param {string} options.projectDir  - Firebase project directory (for _init.js discovery)
- * @param {object} [options.Manager]   - Backend Manager instance (passed to _init hooks)
+ * @param {object} [options.omega]   - @omega.js/backend instance (passed to _init hooks)
  * @param {object} [options.ctx] - Backend ctx instance (passed to _init hooks)
  * @param {boolean} [options.quiet]    - Suppress progress output
  * @returns {Promise<{ accounts: object, created: number }>}
  */
-async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) {
+async function seed({ admin, domain, config, projectDir, omega, ctx, quiet }) {
   const log = quiet ? () => {} : (msg) => process.stdout.write(msg);
   const logLn = quiet ? () => {} : (msg) => console.log(msg);
 
   const frameworkTestsDir = path.resolve(__dirname, '../../test');
   const projectTestsDir = path.join(projectDir, 'test');
 
-  const initHooks = loadInitHooks(frameworkTestsDir, projectTestsDir, { config, Manager });
+  const initHooks = loadInitHooks(frameworkTestsDir, projectTestsDir, { config, omega });
 
   // 1. Wipe emulator + delete auth users
   log(chalk.gray('  Wiping emulator + deleting test users... '));
@@ -228,7 +228,7 @@ async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) 
   for (const setup of initHooks.setups) {
     log(chalk.gray('  Running test/_init.js setup... '));
     try {
-      await setup({ admin, config, accounts, Manager, ctx });
+      await setup({ admin, config, accounts, omega, ctx });
       logLn(chalk.green('✓'));
     } catch (e) {
       logLn(chalk.red(`✗ (${e.message})`));

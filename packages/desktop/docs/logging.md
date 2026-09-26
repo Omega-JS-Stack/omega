@@ -20,25 +20,23 @@
 
 ## How to write logs
 
-In **main process** (uses the same `manager.logger` you've always had):
+In **main process**:
 
 ```js
-const Manager = require('@omega.js/desktop/main');
-const manager = new Manager();
-await manager.initialize();
+const omega = require('@omega.js/desktop/main');
+await omega.initialize();
 
-manager.logger.log('booted');
-manager.logger.warn('connection slow');
-manager.logger.error(new Error('boom'));
+omega.logger.log('booted');
+omega.logger.warn('connection slow');
+omega.logger.error(new Error('boom'));
 ```
 
 In **preload**:
 
 ```js
-const Manager = require('@omega.js/desktop/preload');
-const manager = new Manager();
-await manager.initialize();
-manager.logger.log('preload ready');
+const omega = require('@omega.js/desktop/preload');
+await omega.initialize();
+omega.logger.log('preload ready');
 ```
 
 In **renderer** (use the contextBridge surface, which forwards to main → file):
@@ -52,7 +50,7 @@ window.desktop.logger.error(new Error('ui blew up'));
 All three end up in the same `runtime.log`, prefixed with their scope (`main`, `preload`, `renderer`):
 
 ```
-[2026-05-05 14:32:11.045] [info] main manager.initialize
+[2026-05-05 14:32:11.045] [info] main omega.initialize
 [2026-05-05 14:32:11.122] [info] main ipc ready
 [2026-05-05 14:32:11.187] [info] preload contextBridge exposed
 [2026-05-05 14:32:11.401] [info] renderer auth.listen attached
@@ -108,7 +106,7 @@ Useful for:
 
 Beyond what you write yourself, @omega.js/desktop emits a fixed set of high-signal lifecycle lines so post-mortem debugging works without redeploying:
 
-**At boot (`manager.initialize()`):**
+**At boot (`omega.initialize()`):**
 
 ```
 (main)     Initializing @omega.js/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--omega-launched-at-login"]
@@ -118,7 +116,7 @@ Beyond what you write yourself, @omega.js/desktop emits a fixed set of high-sign
 (startup)    process.arch:            arm64
 (startup)    app.isPackaged:          true
 (startup)    app.getLoginItemSettings(): {"status":"enabled","openAtLogin":true,"openAsHidden":false,"restoreState":false,"wasOpenedAtLogin":false,"wasOpenedAsHidden":false}
-(startup)    EM_/electron/node env:   {}
+(startup)    boot env:                {}
 (startup)  startup boot summary — RESOLVED values:
 (startup)    config.startup.mode:     normal
 (startup)    config.startup.openAtLogin: {enabled:true, mode:hidden}

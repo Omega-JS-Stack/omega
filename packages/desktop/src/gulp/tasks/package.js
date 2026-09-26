@@ -10,9 +10,9 @@
 
 const path    = require('path');
 const jetpack = require('fs-jetpack');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 
-const logger = Manager.logger('package');
+const logger = build.logger('package');
 
 module.exports = function packageApp(done) {
   const projectRoot = process.cwd();
@@ -25,7 +25,7 @@ module.exports = function packageApp(done) {
   // Resolve electron-builder from the consumer's node_modules first, then @omega.js/desktop's bundled one.
   let builder;
   try {
-    builder = Manager.require('electron-builder');
+    builder = require('electron-builder');
   } catch (e) {
     return done(new Error(`Could not resolve electron-builder: ${e.message}. Run \`npm i -D electron-builder\` in the consumer.`));
   }

@@ -1,8 +1,8 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('defaults');
-const watcherLogger = Manager.logger('defaults:watcher');
-const workflowLogger = Manager.logger('defaults:workflows');
+const build = require('../../build.js');
+const logger = build.logger('defaults');
+const watcherLogger = build.logger('defaults:watcher');
+const workflowLogger = build.logger('defaults:workflows');
 const { watch, series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
@@ -12,9 +12,9 @@ const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 
 // Load package
-const package = Manager.getPackage('main');
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
+const package = build.getPackage('main');
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
 
 // Get clean versions — the pinned consumer Node (omega.nodeRuntime), NOT
 // engines.node: engines is the honest dev floor (>=22), templates need a
@@ -261,7 +261,7 @@ async function defaults(complete, changedFile) {
     // scaffoldDefaults, and only one of the two can win at load time.
     const { ensureTarget } = require('../../commands/lib/ensure-target.js');
     await ensureTarget({
-      projectDir: Manager.getRootPath('project'),
+      projectDir: build.getRootPath('project'),
       log: (line) => logger.log(line),
       warn: (line) => logger.warn(line),
     });
@@ -276,7 +276,7 @@ async function defaults(complete, changedFile) {
 
 function defaultsWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }

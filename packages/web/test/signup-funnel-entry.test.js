@@ -71,7 +71,7 @@ function bundleOnce() {
             `,
           };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -138,8 +138,8 @@ async function wireForm(initializer) {
   globalThis.__omegaFormElement = $form;
   globalThis.__omegaClient = {
     isDevelopment: () => false,
-    storage: () => ({ get: (key, fallback) => fallback, set: () => {} }),
-    utilities: () => ({ showNotification: () => {} }),
+    storage: { get: (key, fallback) => fallback, set: () => {} },
+    utilities: { showNotification: () => {} },
   };
   globalThis.document = {
     getElementById: () => null,

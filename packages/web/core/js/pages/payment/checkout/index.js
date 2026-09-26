@@ -6,7 +6,7 @@ import { state, buildBindingsState, resolveProvider, resolveFrequency, TRIAL_ELI
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
@@ -38,7 +38,7 @@ let orderPainted = false;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
     await initializeCheckout();
     return resolve();
   });
@@ -56,7 +56,7 @@ function updateUI() {
     return;
   }
 
-  omega.bindings().update(buildBindingsState());
+  omega.bindings.update(buildBindingsState());
 }
 
 // Everything the build config already knows — the product, the plan tiles and
@@ -65,7 +65,7 @@ function updateUI() {
 function paintStatic() {
   const { checkout } = buildBindingsState();
 
-  omega.bindings().update({ checkout });
+  omega.bindings.update({ checkout });
 }
 
 // The half only the server can answer: the trial spot and the money line. Its
@@ -75,7 +75,7 @@ function paintOrder() {
   const { order, auth } = buildBindingsState();
 
   orderPainted = true;
-  omega.bindings().update({ order, auth });
+  omega.bindings.update({ order, auth });
 }
 
 // Show fatal error and hide checkout content
@@ -86,8 +86,8 @@ function showError(message) {
 
 // Create/reset abandoned cart tracker in Firestore (fire-and-forget)
 function trackAbandonedCart(product, state) {
-  const user = omega.auth().getUser();
-  if (!user) {
+  const user = omega.auth.user;
+  if (!user.authenticated) {
     return;
   }
 
@@ -96,7 +96,7 @@ function trackAbandonedCart(product, state) {
   const nowISO = new Date().toISOString();
   const FIRST_REMINDER_DELAY = 900; // 15 minutes
 
-  omega.firestore().doc(`payments-carts/${uid}`).set({
+  omega.firestore.doc(`payments-carts/${uid}`).set({
     id: uid,
     owner: uid,
     status: 'pending',
@@ -236,7 +236,7 @@ async function noTrialToAsk() {
 // Auth settle, as a promise. Two things want the signed-in user: the
 // eligibility route, and the load-time tracking. Neither waits on the other.
 function authSettled() {
-  return new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
+  return new Promise((resolve) => omega.auth.listen({ once: true }, resolve));
 }
 
 // Ask the server whether this visitor may trial, bounded by ELIGIBILITY_TIMEOUT_MS
@@ -306,7 +306,7 @@ async function askTrialEligibility(urlParams) {
 
 // Setup FormManager and event listeners
 function setupForm() {
-  formManager = new FormManager('#checkout-form', {
+  formManager = new FormManager(omega, '#checkout-form', {
     autoReady: false,
     allowResubmit: false,
     submittingText: 'Processing...',

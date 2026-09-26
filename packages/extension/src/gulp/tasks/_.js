@@ -1,12 +1,12 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('XXX');
+const build = require('../../build.js');
+const logger = build.logger('XXX');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Task
 module.exports = function XXX(complete) {

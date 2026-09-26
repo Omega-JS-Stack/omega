@@ -32,7 +32,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           content: 'Test content',
         });
 
@@ -47,7 +47,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
         });
 
@@ -63,7 +63,7 @@ module.exports = defineCases({
 
       async run({ http, assert, state }) {
         const uniqueContent = `@omega.js/backend Test - ${new Date().toISOString()}`;
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-write-test.txt',
           content: uniqueContent,
         });
@@ -85,7 +85,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert, state }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/type-test.txt',
           content: 'Test content with default type',
         });
@@ -107,7 +107,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/custom-repo-test.txt',
           content: 'Test content',
         });
@@ -123,7 +123,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
           content: 'Test content',
         });
@@ -138,7 +138,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/repo/content', {
+        const response = await http.post('omega/admin/repo/content', {
           path: '_test/backend-test-file.txt',
           content: 'Test content',
         });

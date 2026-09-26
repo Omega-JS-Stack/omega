@@ -13,7 +13,7 @@ module.exports = defineCases({
     {
       name: 'rejects-unauthenticated',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/portal', {
+        const response = await http.as('none').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
@@ -24,7 +24,7 @@ module.exports = defineCases({
     {
       name: 'rejects-basic-user',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/portal', {
+        const response = await http.as('basic').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
@@ -36,7 +36,7 @@ module.exports = defineCases({
       name: 'rejects-no-provider',
       async run({ http, assert }) {
         // portal-no-provider starts with payment.provider=null
-        const response = await http.as('portal-no-provider').post('backend-manager/payments/portal', {
+        const response = await http.as('portal-no-provider').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
@@ -48,7 +48,7 @@ module.exports = defineCases({
       name: 'rejects-unknown-provider',
       async run({ http, assert }) {
         // portal-unknown-provider starts with provider='unknown-provider'
-        const response = await http.as('portal-unknown-provider').post('backend-manager/payments/portal', {
+        const response = await http.as('portal-unknown-provider').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 
@@ -66,7 +66,7 @@ module.exports = defineCases({
         }
 
         // Set up a paid subscription with the test provider
-        const intentResponse = await http.as('journey-payments-portal-route').post('backend-manager/payments/intent', {
+        const intentResponse = await http.as('journey-payments-portal-route').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: 'monthly',
@@ -82,7 +82,7 @@ module.exports = defineCases({
         }, 15000, 500);
 
         // Call the portal endpoint
-        const portalResponse = await http.as('journey-payments-portal-route').post('backend-manager/payments/portal', {
+        const portalResponse = await http.as('journey-payments-portal-route').post('omega/payments/portal', {
           returnUrl: 'https://example.com/account',
         });
 

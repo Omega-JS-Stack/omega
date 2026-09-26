@@ -16,8 +16,8 @@
  *
  * There is no dual-read anywhere in OMEGA, so a retired key is a setting the
  * brand still believes in and nothing reads — the validator says so loudly on
- * every load. The UJM→omega converter drops them on its way through
- * (@omega.js/web's `omega migrate`), but a brand ALREADY on omega.json5 had
+ * every load. @omega.js/web's `omega migrate` drops them on its way through,
+ * but a brand ALREADY on omega.json5 had
  * only that error and an edit by hand. Editing an AUTHORED omega.json5 is the
  * manager's lane (#612), so the rule lives here.
  *

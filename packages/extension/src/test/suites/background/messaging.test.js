@@ -1,7 +1,7 @@
 // Background-layer test for chrome.runtime.onMessage / sendMessage. The harness
 // SW (src/test/harness/extension/background.js) ships a ping handler that
 // returns { pong: true, ts }. This test verifies the round-trip works inside
-// the SW context, which is the same primitive BXM consumers use for
+// the SW context, which is the same primitive extension consumers use for
 // popup ↔ background messaging.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');

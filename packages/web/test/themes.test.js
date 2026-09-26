@@ -416,6 +416,45 @@ test('tier 2: a shadowing theme with no _theme.js inherits the packaged skin\'s,
   }
 });
 
+test('every packaged theme is a module: _theme.js default-exports a function taking { omega }, and imports no host (#945)', () => {
+  // The host (web's main.js, the extension's page contexts, the desktop
+  // renderer) calls the theme with ITS instance, so theme JS is host-neutral:
+  // a theme importing a host's instance module breaks every other host (the
+  // extension vendors this tree and its vendor guard refuses @omega.js/web).
+  // Only a lib with no entry would import a runtime, and themes ship none.
+  const themesDir = path.join(PKG, 'themes');
+  const themes = fs.readdirSync(themesDir).filter((id) => fs.existsSync(path.join(themesDir, id, '_theme.js')));
+  assert.ok(themes.includes('classy') && themes.includes('base'), `the theme list read wrong: ${themes.join(', ')}`);
+
+  const walk = (dir, out = []) => {
+    if (!fs.existsSync(dir)) return out;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(file, out);
+      else if (entry.name.endsWith('.js')) out.push(file);
+    }
+    return out;
+  };
+
+  for (const id of themes) {
+    const entry = path.join(themesDir, id, '_theme.js');
+    assert.match(
+      fs.readFileSync(entry, 'utf8'),
+      /^export default async function\s*\w*\s*\(\{\s*omega\b/m,
+      `${id}/_theme.js does not default-export a function taking { omega }`,
+    );
+
+    // Every JS file the theme ships, sections included: the extension and
+    // desktop vendor the whole tree, and a section init receives { omega } too
+    for (const file of walk(path.join(themesDir, id))) {
+      assert.ok(
+        !/['"]@omega\.js\/(web|desktop|extension)(\/[^'"]*)?['"]/.test(fs.readFileSync(file, 'utf8')),
+        `${path.relative(themesDir, file)} imports a host package; take omega from its entry's { omega } argument`,
+      );
+    }
+  }
+});
+
 test('tier 2: a shadowing theme inherits the packaged theme\'s font FILES, not just its faces (#773)', async () => {
   // `@forward 'omega:theme'` hands a consumer theme the packaged skin's
   // @font-face rules — whose urls point into the very dir the consumer theme

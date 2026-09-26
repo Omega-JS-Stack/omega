@@ -318,16 +318,17 @@ test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chun
   assert.ok(signinEntry.length < 2000, `page entry is a thin stub (${signinEntry.length} bytes)`);
   assert.ok(/chunks\/chunk-/.test(signinEntry), 'stub imports shared chunks');
 
-  // The client (`_authReady` is its constructor marker) appears in exactly one
-  // file across ALL bundles — the shared chunk both main and pages import.
-  const withClient = walkJs(path.join(OUT, 'assets', 'js')).filter((f) => fs.readFileSync(f, 'utf8').includes('_authReady'));
+  // The client (`_stateGeneration` is its auth module's constructor marker)
+  // appears in exactly one file across ALL bundles: the shared chunk both
+  // main and pages import, where the web runtime instance lives.
+  const withClient = walkJs(path.join(OUT, 'assets', 'js')).filter((f) => fs.readFileSync(f, 'utf8').includes('_stateGeneration'));
   assert.strictEqual(withClient.length, 1, `client code in exactly one file (found ${withClient.length})`);
   assert.ok(withClient[0].includes(`${path.sep}chunks${path.sep}`), 'client lives in a shared chunk');
 
-  // The page's own code is still in its graph (via the @omega.js/client alias)
+  // The page's own code is still in its graph (via the @omega.js/web/runtime alias)
   const graph = readGraph(manifest.js.pages['signin/index'][0]);
   assert.ok(graph.includes('Email is required'), 'real UJM auth page module code present');
-  assert.ok(graph.includes('_authReady'), 'client reachable from the page graph');
+  assert.ok(graph.includes('_stateGeneration'), 'client reachable from the page graph');
 });
 
 test('layered sass: main css compiles per theme through omega:theme', async () => {

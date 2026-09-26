@@ -21,7 +21,7 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/refund-details
  */
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 
 const FIXTURE_CAPTURE_REFUNDED = require('../../../fixtures/paypal/capture-refunded.json');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');

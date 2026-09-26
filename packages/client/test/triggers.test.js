@@ -3,9 +3,10 @@
  * class rule, delegated dispatch through closest(), replacement-on-re-register,
  * and a click on unregistered markup costing nothing.
  *
- * The registry attaches its listener to `document` on first registration, so
- * the suite captures that handler by swapping `document.addEventListener`
- * BEFORE importing the module — the same seam notifications.test.js uses. The
+ * The registry (`omega.triggers`, a Triggers instance) attaches its listener
+ * to `document` on first registration, so the suite captures that handler by
+ * swapping `document.addEventListener` BEFORE the first register() call, the
+ * same seam notifications.test.js uses. The
  * DOM is the hand-rolled minimum the module touches (the shared setup.js
  * convention: Node has no DOM and the package pulls in no jsdom), and the
  * closest() here is a real parent-chain walk, not a stub of a match.
@@ -63,7 +64,7 @@ function makeClick(target) {
 }
 
 describe('triggers', () => {
-  let registerTrigger;
+  let triggers;
   let click;
   let listenerCount;
   let originalAddEventListener;
@@ -80,7 +81,8 @@ describe('triggers', () => {
       }
     };
 
-    ({ registerTrigger } = await import('../src/modules/triggers.js'));
+    const Triggers = (await import('../src/modules/triggers.js')).default;
+    triggers = new Triggers();
   });
 
   after(() => {
@@ -94,12 +96,12 @@ describe('triggers', () => {
   });
 
   it('registers a handler and arms exactly one document listener', () => {
-    registerTrigger('demo', () => {});
+    triggers.register('demo', () => {});
 
     assert.strictEqual(typeof click, 'function', 'the delegated click handler is attached');
     assert.strictEqual(listenerCount, 1);
 
-    registerTrigger('other', () => {});
+    triggers.register('other', () => {});
     assert.strictEqual(listenerCount, 1, 'a second registration reuses the ONE listener');
 
     console.warn = originalWarn;
@@ -107,7 +109,7 @@ describe('triggers', () => {
 
   it('dispatches to the handler for a click INSIDE the trigger element (closest)', () => {
     const calls = [];
-    registerTrigger('signout', (event, element) => calls.push([event, element]));
+    triggers.register('signout', (event, element) => calls.push([event, element]));
 
     const button = makeElement(['btn', 'omega-signout']);
     const icon = makeElement(['fa-solid', 'fa-right-from-bracket'], button);
@@ -126,7 +128,7 @@ describe('triggers', () => {
 
   it('answers `omega-<name>` only — an unregistered class is ignored', () => {
     let ran = 0;
-    registerTrigger('password-toggle', () => { ran++; });
+    triggers.register('password-toggle', () => { ran++; });
 
     // The legacy name, and a bare name without the prefix: neither is a trigger.
     for (const classNames of [['uj-password-toggle'], ['password-toggle'], ['btn']]) {
@@ -146,10 +148,10 @@ describe('triggers', () => {
 
   it('re-registering a name REPLACES the handler and warns (never stacks)', () => {
     const ran = [];
-    registerTrigger('replaceme', () => ran.push('first'));
+    triggers.register('replaceme', () => ran.push('first'));
     assert.deepStrictEqual(warnings, [], 'a fresh name warns about nothing');
 
-    registerTrigger('replaceme', () => ran.push('second'));
+    triggers.register('replaceme', () => ran.push('second'));
     assert.strictEqual(warnings.length, 1, 'the replacement warns');
     assert.match(warnings[0], /Trigger "replaceme" re-registered/);
 
@@ -160,7 +162,7 @@ describe('triggers', () => {
   });
 
   it('rejects a non-function handler', () => {
-    assert.throws(() => registerTrigger('bogus', 'nope'), /needs a handler function/);
+    assert.throws(() => triggers.register('bogus', 'nope'), /needs a handler function/);
 
     console.warn = originalWarn;
   });
@@ -171,8 +173,8 @@ describe('triggers', () => {
     console.error = (...args) => errors.push(args.join(' '));
 
     let sibling = 0;
-    registerTrigger('boom', () => { throw new Error('handler exploded'); });
-    registerTrigger('fine', () => { sibling++; });
+    triggers.register('boom', () => { throw new Error('handler exploded'); });
+    triggers.register('fine', () => { sibling++; });
 
     click(makeClick(makeElement(['omega-boom', 'omega-fine'])));
 

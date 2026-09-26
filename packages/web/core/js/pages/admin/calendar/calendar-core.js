@@ -7,7 +7,7 @@
  * IMPORTANT: All dates/times in this module are UTC.
  * No local time APIs (getHours, getDate, etc.) are used anywhere.
  */
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // View modes
 export const VIEW_MODES = ['day', 'week', 'month', 'year', 'list'];

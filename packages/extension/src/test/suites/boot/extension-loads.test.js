@@ -1,9 +1,9 @@
-// Boot-layer test — verifies Chromium can load BXM's fixture consumer
+// Boot-layer test: verifies Chromium can load the framework's fixture consumer
 // extension as unpacked, the manifest validates, the SW comes up, and the
 // popup renders end-to-end. This is the integration equivalent to "did the
 // real consumer extension start without throwing".
 //
-// In BXM's own test run, OMEGA_TEST_BOOT_PROJECT points at the fixture under
+// In the framework's own test run, OMEGA_TEST_BOOT_PROJECT points at the fixture under
 // src/test/fixtures/consumer-extension. In a real consumer's `npx omega test`
 // run, the env var is unset and boot tests target the consumer's own
 // `<cwd>/dist/`.
@@ -20,7 +20,7 @@ module.exports = defineCases({
       inspect: async ({ extension, expect }) => {
         expect(extension.id).toMatch(/^[a-z]{32}$/);
         expect(extension.manifest.manifest_version).toBe(3);
-        expect(extension.manifest.name).toBe('BXM Fixture Consumer');
+        expect(extension.manifest.name).toBe('OMEGA Fixture Consumer');
       },
     },
     {

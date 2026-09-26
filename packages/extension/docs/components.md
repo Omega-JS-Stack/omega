@@ -40,9 +40,9 @@ The build pipeline wires these together — `views/<component>/index.html` autom
 | `offscreen` | created programmatically — requires the `offscreen` permission (see [offscreen.md](offscreen.md)) |
 | `pages` | none — opened via `extension.tabs.create({ url: extension.runtime.getURL('views/pages/index.html') })` |
 
-## Manager-per-context
+## One `omega` per context
 
-Each component context gets its own Manager class with a one-line bootstrap. See [managers.md](managers.md) for the full list and import paths.
+Each component context's module exports ONE ready-made instance, `omega`, with a one-line bootstrap (`import omega from '@omega.js/extension/<context>'; await omega.initialize();`). See [contexts.md](contexts.md) for the full list and import paths.
 
 ## Boot order across contexts
 
@@ -66,7 +66,7 @@ If you DO need to add a new top-level component type:
    - `src/defaults/src/assets/css/components/<component>/index.scss`
    - `src/defaults/src/assets/js/components/<component>/index.js`
    - `src/defaults/src/views/<component>/index.html`
-3. **Manager class** if the new context needs its own bootstrap surface — `src/<component>.js` (mirror `src/popup.js` shape).
+3. **Context module** if the new context needs its own bootstrap surface: `src/<component>.js` exporting ONE instance (mirror `src/popup.js` for a page context, `src/offscreen.js` for a light one).
 4. **Export in package.json**:
    ```json
    {
@@ -75,11 +75,11 @@ If you DO need to add a new top-level component type:
      }
    }
    ```
-5. **Mix in cross-context helpers** at the bottom of the new Manager file — see [environment-detection.md](environment-detection.md).
+5. **Cross-context helpers** come with the class it extends (`src/omega.js` or `src/page-context.js`), nothing to mix in; see [environment-detection.md](environment-detection.md).
 
 ## See also
 
-- [managers.md](managers.md) — Manager classes, one-line bootstrap per context
+- [contexts.md](contexts.md): the one instance per context, one-line bootstrap per context
 - [build-system.md](build-system.md) — how components compile through esbuild/sass/html
 - [defaults.md](defaults.md) — the `src/defaults/` template system
 - [css.md](css.md) — SCSS load paths for component styles

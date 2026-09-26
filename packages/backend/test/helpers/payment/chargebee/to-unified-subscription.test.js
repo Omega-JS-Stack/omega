@@ -4,7 +4,7 @@
  *
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  */
-const Chargebee = require('../../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../../dist/omega/libraries/payment/providers/chargebee.js');
 
 // Chargebee fixtures
 const FIXTURE_ACTIVE = require('../../../fixtures/chargebee/subscription-active.json');

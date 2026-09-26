@@ -93,7 +93,7 @@ module.exports = defineCases({
   // CI). Set TEST_EXTENDED_MODE=1 to switch to the full AI pipeline that fetches
   // real sources, calls the structure + SVG providers, and writes a preview.
   // Other modes (FIXTURE, THEME_ONLY, RELEASE, PEEK) are also opt-in via env.
-  async run({ assert, config, Manager, ctx, skip }) {
+  async run({ assert, config, omega, ctx, skip }) {
     const env = process.env;
 
     // --- Apply env overrides into newsletterConfig ---
@@ -173,8 +173,8 @@ module.exports = defineCases({
         newsletterConfig.template = requestedFixture;
       }
 
-      const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
-      const { renderMarkdown } = require('../../dist/manager/libraries/email/generators/lib/markdown-renderer.js');
+      const { renderNewsletter } = require('../../dist/omega/libraries/email/generators/lib/mjml-template.js');
+      const { renderMarkdown } = require('../../dist/omega/libraries/email/generators/lib/markdown-renderer.js');
 
       const renderStart = Date.now();
       const { html, mjml, template: templateName } = await renderNewsletter({
@@ -261,8 +261,8 @@ module.exports = defineCases({
         }
       }
 
-      const { renderNewsletter } = require('../../dist/manager/libraries/email/generators/lib/mjml-template.js');
-      const { renderMarkdown } = require('../../dist/manager/libraries/email/generators/lib/markdown-renderer.js');
+      const { renderNewsletter } = require('../../dist/omega/libraries/email/generators/lib/mjml-template.js');
+      const { renderMarkdown } = require('../../dist/omega/libraries/email/generators/lib/markdown-renderer.js');
 
       const renderStart = Date.now();
       const { html, mjml, template: templateName } = await renderNewsletter({
@@ -328,7 +328,7 @@ module.exports = defineCases({
     // --- AI pipeline path (TEST_EXTENDED_MODE) ---
     // Everything below this point talks to the real parent server and the AI
     // providers. The parent URL is required for any of it.
-    // Use Manager.getParentApiUrl() — same helper the production newsletter
+    // Use omega.getParentApiUrl() — same helper the production newsletter
     // generator uses. The resolved `company.url` is the parent's brand URL
     // WITHOUT the `api.` subdomain (e.g. 'https://itwcreativeworks.com', #677);
     // the helper inserts `api.` at call time. PARENT_API_URL env override is
@@ -338,7 +338,7 @@ module.exports = defineCases({
     let sources = [];
 
     if (!env.NEWSLETTER_SOURCE) {
-      const parentUrl = env.PARENT_API_URL || Manager.getParentApiUrl();
+      const parentUrl = env.PARENT_API_URL || omega.getParentApiUrl();
       assert.ok(parentUrl, 'PARENT_API_URL (env) or a resolved company.url must be set for the AI pipeline. Set TEST_EXTENDED_MODE=1 to run it, or omit TEST_EXTENDED_MODE for the fast fixture preview.');
 
       // --- Peek mode (early return) ---
@@ -387,22 +387,22 @@ module.exports = defineCases({
     }
 
     // Force `newsletter.enabled: true` and inject the per-run newsletter config
-    // overrides onto Manager.config. The iteration test IS the explicit trigger
+    // overrides onto omega.config. The iteration test IS the explicit trigger
     // — we're not checking whether newsletter is configured for prod use, we're
-    // driving the generator directly. Mutating Manager.config is fine here
+    // driving the generator directly. Mutating omega.config is fine here
     // because this is a `type: 'standalone'` test (one test per process — no
     // cross-test config leakage).
-    Manager.config.marketing = {
-      ...(Manager.config.marketing || {}),
+    omega.config.marketing = {
+      ...(omega.config.marketing || {}),
       newsletter: {
-        ...(Manager.config.marketing?.newsletter || {}),
+        ...(omega.config.marketing?.newsletter || {}),
         enabled: true,
         content: newsletterConfig,
       },
     };
 
     // --- Run the production generator with the local-persist image hook ---
-    const generator = require('../../dist/manager/libraries/email/generators/newsletter.js');
+    const generator = require('../../dist/omega/libraries/email/generators/newsletter.js');
 
     // EXTENDED mode mirrors the production cron's newsletter side effects:
     // GH upload always happens (PNGs + newsletter.html), Beehiiv draft upload
@@ -447,11 +447,11 @@ module.exports = defineCases({
 
     if (useResolverSources) {
       newsletterConfig.sources = [env.NEWSLETTER_SOURCE];
-      Manager.config.marketing.newsletter.content = newsletterConfig;
+      omega.config.marketing.newsletter.content = newsletterConfig;
     }
 
     const result = await generator.generate(
-      Manager,
+      omega,
       ctx,
       { name: `${config.brand?.name || 'Brand'} Newsletter — Iteration ${stamp}` },
       {
@@ -568,7 +568,7 @@ module.exports = defineCases({
 
 /**
  * Upload the rendered HTML to Beehiiv as a draft post (never sends). Uses the
- * v2 Posts API directly so it works against the test's stub Manager.
+ * v2 Posts API directly so it works against the test's stub omega.
  *
  * Writes the Beehiiv response to {runDir}/beehiiv-upload.json for inspection.
  *

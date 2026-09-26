@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -104,7 +104,7 @@ export async function init() {
 
 // Load billing data
 export async function loadData(account, sharedPaymentConfig) {
-  if (!account) {
+  if (!account.authenticated) {
     return;
   }
 
@@ -129,7 +129,7 @@ export function onShow() {
 function updateUI(account) {
   const state = buildBillingState(account);
 
-  omega.bindings().update(state);
+  omega.bindings.update(state);
   syncCancelTriggerToggle(dialogOwed(state));
   updateUsageInfo(account);
 }
@@ -152,8 +152,7 @@ function dialogOwed(state) {
 }
 
 function buildBillingState(account) {
-  const subscription = account?.subscription || {};
-  const resolved = omega.auth().resolveSubscription(account);
+  const subscription = account.subscription;
   const rawStatus = subscription.status;
   const isPaid = subscription.product?.id !== 'basic' && !!subscription.product?.id;
   const displayName = getDisplayName(subscription);
@@ -163,7 +162,7 @@ function buildBillingState(account) {
   if (isPaid) {
     if (rawStatus === 'suspended') configKey = 'suspended';
     else if (rawStatus === 'cancelled') configKey = 'cancelled';
-    else if (resolved.active) configKey = 'active';
+    else if (account.active) configKey = 'active';
   }
   const config = STATUS_CONFIG[configKey] || STATUS_CONFIG.free;
 
@@ -207,13 +206,13 @@ function buildBillingState(account) {
 
   // One home for "is cancelling on the table at all" — the button and the trial
   // warning that gates it both read it (#267)
-  const canCancel = isPaid && rawStatus !== 'cancelled' && !resolved.cancelling;
+  const canCancel = isPaid && rawStatus !== 'cancelled' && !account.cancelling;
 
   // And one home for "this cancel would end a TRIAL", read by the warning dialog
   // AND by the questionnaire copy behind it (#267). Two rules would eventually
   // disagree, and a form contradicting the dialog that opened it is the bug the
   // dialog exists to fix.
-  const trialCancel = canCancel && resolved.trialing;
+  const trialCancel = canCancel && account.trialing;
 
   // The save offer (#268): pitched to a PAID cancel, before the questionnaire.
   // A trial is never offered a discount on a cycle it has not paid for — its
@@ -279,14 +278,14 @@ function buildBillingState(account) {
       },
       description: {
         free: !isPaid,
-        active: resolved.active,
+        active: account.active,
         suspended: rawStatus === 'suspended',
         cancelled: rawStatus === 'cancelled',
       },
       alerts: {
         suspended: rawStatus === 'suspended',
-        cancelling: resolved.cancelling,
-        trialing: resolved.trialing,
+        cancelling: account.cancelling,
+        trialing: account.trialing,
         cancelDate: cancelDate,
         trialEndDate: trialEndDate,
         trialHasEndDate: !!trialEndDate,
@@ -343,7 +342,7 @@ function buildBillingState(account) {
         change: canChangePlan(account),
         manage: isPaid && rawStatus !== 'cancelled',
         cancel: canCancel,
-        // Undo reads the SAME raw flag Change does, not `resolved.cancelling`
+        // Undo reads the SAME raw flag Change does, not `account.cancelling`
         // (which is `pending && !trialing`): a TRIALING subscription with a
         // scheduled cancellation is reachable — the provider's own billing
         // portal schedules one — and reading the derived flag left that account
@@ -365,8 +364,8 @@ function buildBillingState(account) {
 // two can never disagree.
 function canChangePlan(account) {
   return planSwitchSupported
-    && omega.auth().resolveSubscription(account).active
-    && account?.subscription?.cancellation?.pending !== true;
+    && account.active
+    && account.subscription.cancellation.pending !== true;
 }
 
 // ─── Action Buttons ──────────────────────────────────────────
@@ -426,7 +425,7 @@ async function openBillingPortal() {
     }
   } catch (error) {
     console.error('Failed to open billing portal:', error);
-    omega.utilities().showNotification(error.message || 'Failed to open billing portal. Please try again later.', 'danger');
+    omega.utilities.showNotification(error.message || 'Failed to open billing portal. Please try again later.', 'danger');
   } finally {
     if ($manageBtn) $manageBtn.disabled = false;
     if ($btnText) $btnText.textContent = originalText;
@@ -477,7 +476,7 @@ async function uncancelSubscription($confirmBtn) {
 
     collapseUncancelConfirm();
 
-    omega.utilities().showNotification('Your subscription will continue as normal. You were not charged today.', 'success');
+    omega.utilities.showNotification('Your subscription will continue as normal. You were not charged today.', 'success');
   } catch (error) {
     logger.error('Failed to withdraw cancellation:', error);
 
@@ -489,9 +488,9 @@ async function uncancelSubscription($confirmBtn) {
       uncancelSupported = false;
       updateUI(currentAccount);
       collapseUncancelConfirm();
-      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+      omega.utilities.showNotification(error.message, { type: 'warning', timeout: 8000 });
     } else {
-      omega.utilities().showNotification(error.message || 'Failed to resume your subscription. Please try again later.', 'danger');
+      omega.utilities.showNotification(error.message || 'Failed to resume your subscription. Please try again later.', 'danger');
     }
   } finally {
     $confirmBtn.disabled = false;
@@ -692,7 +691,7 @@ function renderCadenceToggle($container) {
       : '';
 
     return `
-      <input type="radio" class="btn-check" name="change_plan_cadence" id="${id}" value="${omega.utilities().escapeHTML(frequency)}" autocomplete="off"${frequency === switcherFrequency ? ' checked' : ''}>
+      <input type="radio" class="btn-check" name="change_plan_cadence" id="${id}" value="${omega.utilities.escapeHTML(frequency)}" autocomplete="off"${frequency === switcherFrequency ? ' checked' : ''}>
       <label class="btn" for="${id}">${CADENCE_LABELS[frequency] || frequency}${save}</label>
     `;
   }).join('');
@@ -775,12 +774,12 @@ function populatePlanOptions($container) {
 
     return `
     <div class="omega-plan-option">
-      <input class="btn-check" type="radio" name="change_plan_option" id="${id}" value="${omega.utilities().escapeHTML(product.id)}" data-frequency="${omega.utilities().escapeHTML(frequency)}" autocomplete="off"${current ? ' disabled' : ''}${features ? ` aria-describedby="${featuresId}"` : ''}>
+      <input class="btn-check" type="radio" name="change_plan_option" id="${id}" value="${omega.utilities.escapeHTML(product.id)}" data-frequency="${omega.utilities.escapeHTML(frequency)}" autocomplete="off"${current ? ' disabled' : ''}${features ? ` aria-describedby="${featuresId}"` : ''}>
       <div class="omega-plan-card${current ? ' omega-plan-card--current' : ''}">
         <label class="omega-plan-card__head" for="${id}">
-          <span class="omega-plan-card__name">${omega.utilities().escapeHTML(product.name || product.id)}</span>
+          <span class="omega-plan-card__name">${omega.utilities.escapeHTML(product.name || product.id)}</span>
           ${current ? '<span class="omega-chip omega-plan-card__badge">Current plan</span>' : ''}
-          <span class="omega-plan-card__price">${omega.utilities().escapeHTML(formatCurrency(resolvePlanPrice(product, frequency), currency))}<span class="omega-plan-card__per"> / ${FREQUENCY_LABELS[frequency] || frequency}</span></span>
+          <span class="omega-plan-card__price">${omega.utilities.escapeHTML(formatCurrency(resolvePlanPrice(product, frequency), currency))}<span class="omega-plan-card__per"> / ${FREQUENCY_LABELS[frequency] || frequency}</span></span>
         </label>
         ${features}
       </div>
@@ -861,12 +860,12 @@ function renderPlanFeatures(product, id) {
       prefix = `${value} `;
     }
 
-    const name = omega.utilities().escapeHTML(feature.name);
+    const name = omega.utilities.escapeHTML(feature.name);
     const explained = definition
-      ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${omega.utilities().escapeHTML(definition)}">${name}</span><span class="visually-hidden"> &mdash; ${omega.utilities().escapeHTML(definition)}</span>`
+      ? `<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="${omega.utilities.escapeHTML(definition)}">${name}</span><span class="visually-hidden"> &mdash; ${omega.utilities.escapeHTML(definition)}</span>`
       : name;
 
-    return `<li><span class="omega-feature-check text-success"><i class="fa-solid fa-check fa-sm"></i></span><span>${omega.utilities().escapeHTML(prefix)}${explained}</span></li>`;
+    return `<li><span class="omega-feature-check text-success"><i class="fa-solid fa-check fa-sm"></i></span><span>${omega.utilities.escapeHTML(prefix)}${explained}</span></li>`;
   });
 
   return `<ul class="omega-plan-card__features list-unstyled mb-0" id="${id}">${items.join('')}</ul>`;
@@ -936,7 +935,7 @@ async function changePlan($confirmBtn, $modal) {
 
     hidePlanSwitcher($modal);
 
-    omega.utilities().showNotification(`You're now on the ${product?.name || selection.productId} plan. Your next invoice reflects the change.`, 'success');
+    omega.utilities.showNotification(`You're now on the ${product?.name || selection.productId} plan. Your next invoice reflects the change.`, 'success');
   } catch (error) {
     logger.error('Failed to change plan:', error);
 
@@ -947,9 +946,9 @@ async function changePlan($confirmBtn, $modal) {
       planSwitchSupported = false;
       updateUI(currentAccount);
       hidePlanSwitcher($modal);
-      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+      omega.utilities.showNotification(error.message, { type: 'warning', timeout: 8000 });
     } else {
-      omega.utilities().showNotification(error.message || 'Failed to change your plan. Please try again later.', 'danger');
+      omega.utilities.showNotification(error.message || 'Failed to change your plan. Please try again later.', 'danger');
     }
   } finally {
     $confirmBtn.disabled = false;
@@ -1161,7 +1160,7 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
 
     trackBilling('winback_offer_accepted');
 
-    omega.utilities().showNotification('Your discount is applied to your next bill. Nothing else changes, and you can still cancel any time.', 'success');
+    omega.utilities.showNotification('Your discount is applied to your next bill. Nothing else changes, and you can still cancel any time.', 'success');
   } catch (error) {
     logger.error('Failed to apply the winback offer:', error);
 
@@ -1202,11 +1201,11 @@ async function acceptWinbackOffer($acceptBtn, $modal, $accordion) {
         bootstrap.Collapse.getOrCreateInstance($accordion, { toggle: false }).show();
       }
 
-      omega.utilities().showNotification(error.message, { type: 'warning', timeout: 8000 });
+      omega.utilities.showNotification(error.message, { type: 'warning', timeout: 8000 });
     } else {
       // A failure is not a decline: the dialog stays up so the same button can
       // be pressed again.
-      omega.utilities().showNotification(error.message || 'We could not apply your discount right now. Please try again later.', 'danger');
+      omega.utilities.showNotification(error.message || 'We could not apply your discount right now. Please try again later.', 'danger');
     }
   } finally {
     $acceptBtn.disabled = false;
@@ -1355,7 +1354,7 @@ function setupCancellationForm() {
   // Populate randomized reasons
   populateCancelReasons();
 
-  cancelFormManager = new FormManager('#cancel-subscription-form', {
+  cancelFormManager = new FormManager(omega, '#cancel-subscription-form', {
     allowResubmit: false,
     warnOnUnsavedChanges: false,
     submittingText: 'Cancelling...',
@@ -1369,10 +1368,10 @@ function setupCancellationForm() {
 
     // Capture state BEFORE the API call — the auth listener may update currentAccount
     // with Firestore data (cancellation.pending=true) before we reach the post-cancel code
-    const resolvedBeforeCancel = omega.auth().resolveSubscription(currentAccount);
-    const isTrialCancel = resolvedBeforeCancel.trialing;
+    const planBeforeCancel = currentAccount.plan;
+    const isTrialCancel = currentAccount.trialing;
 
-    logger.log('Cancelling:', { plan: resolvedBeforeCancel.plan, isTrialCancel });
+    logger.log('Cancelling:', { plan: planBeforeCancel, isTrialCancel });
 
     trackBilling('cancel_submit');
 
@@ -1453,8 +1452,8 @@ function populateCancelReasons() {
 
   $container.innerHTML = shuffled.map((reason, i) => `
     <div class="form-check mb-2">
-      <input class="form-check-input" type="radio" name="cancel_reason" id="cancel-reason-${i}" value="${omega.utilities().escapeHTML(reason)}">
-      <label class="form-check-label" for="cancel-reason-${i}">${omega.utilities().escapeHTML(reason)}</label>
+      <input class="form-check-input" type="radio" name="cancel_reason" id="cancel-reason-${i}" value="${omega.utilities.escapeHTML(reason)}">
+      <label class="form-check-label" for="cancel-reason-${i}">${omega.utilities.escapeHTML(reason)}</label>
     </div>
   `).join('');
 }
@@ -1479,8 +1478,7 @@ function updateUsageInfo(account) {
   }
 
   // The EFFECTIVE plan (basic if cancelled/suspended) is the one whose numbers apply
-  const resolved = omega.auth().resolveSubscription(account);
-  const product = paymentConfig?.products?.find(p => p.id === resolved.plan);
+  const product = paymentConfig?.products?.find(p => p.id === account.plan);
   const catalog = featureCatalog();
 
   const features = resolveFeatures({ catalog, product: product || {}, account })
@@ -1502,7 +1500,7 @@ function updateUsageInfo(account) {
 // One feature's block: its name (with the catalog's definition on hover), the
 // day bar when the feature is paced, and the month bar always.
 function renderUsageFeature(feature) {
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
   // The catalog's `icon` IS the class string (#929), emitted verbatim.
   const icon = feature.icon
     ? `<i class="${escape(feature.icon)} fa-sm me-1 text-muted"></i>`
@@ -1541,7 +1539,7 @@ function renderUsageFeature(feature) {
 // One bar. `limit` of -1 is unlimited: no percentage can be honest about a
 // number with no ceiling, so the bar stays empty and the label says so.
 function renderUsageBar(feature, limit, used, left, period) {
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
   const isUnlimited = limit < 0;
   const usagePercent = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
 

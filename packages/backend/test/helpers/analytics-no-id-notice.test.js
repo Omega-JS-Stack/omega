@@ -7,14 +7,15 @@
  * on a normal run, one `OMEGA_DEBUG=1` away when you are hunting a missing id. The
  * SKIP itself is untouched — every construction still returns un-initialized.
  *
- * The only stand-in here is `console` (the sink the logger writes to); the Manager
+ * The only stand-in here is `console` (the sink the logger writes to); the Omega instance
  * and ctx are the real booted ones, and the module under test is the real one.
  *
  * Run: npx omega test framework:helpers/analytics-no-id-notice
  */
 
-const Analytics = require('../../dist/manager/helpers/analytics.js');
+const Analytics = require('../../dist/omega/services/analytics.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 // Record every console call the thunk makes, restoring console afterward.
 function withConsoleRecorder(fn) {
@@ -58,8 +59,8 @@ function withDebug(value, fn) {
 
 // Run the thunk with the brand's GA4 id off — the real config object, restored
 // after, the same way the logging suite swaps the real environment.
-function withoutAnalyticsId(Manager, fn) {
-  const google = Manager.config?.analytics?.providers?.google;
+function withoutAnalyticsId(omega, fn) {
+  const google = omega.config?.analytics?.providers?.google;
   const saved = google?.id;
 
   if (google) {
@@ -84,14 +85,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'the-notice-is-silent-on-a-normal-run',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'analytics-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         const calls = withConsoleRecorder(() => {
           withDebug(undefined, () => {
-            withoutAnalyticsId(Manager, () => {
-              new Analytics(Manager, { ctx: ctx });
-              new Analytics(Manager, { ctx: ctx });
+            withoutAnalyticsId(omega, () => {
+              new Analytics(ctx);
+              new Analytics(ctx);
             });
           });
         });
@@ -104,14 +105,14 @@ module.exports = defineCases({
 
     {
       name: 'the-notice-is-there-with-omega-debug',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'analytics-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         const calls = withConsoleRecorder(() => {
           withDebug('1', () => {
-            withoutAnalyticsId(Manager, () => {
-              new Analytics(Manager, { ctx: ctx });
-              new Analytics(Manager, { ctx: ctx });
+            withoutAnalyticsId(omega, () => {
+              new Analytics(ctx);
+              new Analytics(ctx);
             });
           });
         });
@@ -126,15 +127,15 @@ module.exports = defineCases({
 
     {
       name: 'the-quiet-construction-still-skips-analytics',
-      run: async ({ assert, Manager }) => {
-        const ctx = Manager.RouteContext({}, { functionName: 'analytics-gate' });
+      run: async ({ assert, omega }) => {
+        const ctx = new Context(omega, {}, { functionName: 'analytics-gate' });
 
         let analytics;
 
         withConsoleRecorder(() => {
           withDebug(undefined, () => {
-            withoutAnalyticsId(Manager, () => {
-              analytics = new Analytics(Manager, { ctx: ctx });
+            withoutAnalyticsId(omega, () => {
+              analytics = new Analytics(ctx);
             });
           });
         });

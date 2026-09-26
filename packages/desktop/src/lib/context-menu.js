@@ -4,7 +4,7 @@
 // context-menu event with a builder API plus the event's `params`:
 //
 //   // src/integrations/context-menu/index.js
-//   module.exports = ({ manager, menu, params, webContents }) => {
+//   module.exports = ({ omega, menu, params, webContents }) => {
 //     // Start from @omega.js/desktop's default template (undo/redo, cut/copy/paste, link items,
 //     // reload, dev-only inspect):
 //     menu.useDefaults();
@@ -44,10 +44,10 @@
 // Building no items (calling no menu.* methods) suppresses the popup entirely.
 //
 // @omega.js/desktop auto-attaches the handler to every BrowserWindow's webContents that
-// goes through `manager.windows.createNamed()`. To attach manually:
-//   manager.contextMenu.attach(webContents)
+// goes through `omega.windows.createNamed()`. To attach manually:
+//   omega.contextMenu.attach(webContents)
 //
-// Disabling at runtime: call `manager.contextMenu.disable()`. Idempotent. After
+// Disabling at runtime: call `omega.contextMenu.disable()`. Idempotent. After
 // disable() the lib stops responding to context-menu events on already-attached
 // webContents — no new menus are shown. No config flag.
 
@@ -61,20 +61,20 @@ const logger = new LoggerLite('context-menu');
 
 const contextMenu = {
   _initialized:  false,
-  _manager:      null,
+  _omega:        null,
   _electron:     null,
   _definitionFn: null,
   _attached:     new WeakSet(), // webContents that already have the listener
 
-  initialize(manager) {
+  initialize(omega) {
     if (contextMenu._initialized) {
       return;
     }
 
-    contextMenu._manager = manager;
+    contextMenu._omega = omega;
 
     if (contextMenu._disabled) {
-      logger.log('initialize — disabled via manager.contextMenu.disable() called pre-init');
+      logger.log('initialize — disabled via omega.contextMenu.disable() called pre-init');
       contextMenu._initialized = true;
       return;
     }
@@ -89,7 +89,7 @@ const contextMenu = {
 
     if (fs.existsSync(absPath)) {
       const loadConsumerFile = require('../utils/load-consumer-file.js');
-      const loaded = loadConsumerFile(absPath, logger);
+      const loaded = loadConsumerFile(absPath);
       if (typeof loaded === 'function') {
         contextMenu._definitionFn = loaded;
       } else if (loaded != null) {
@@ -156,7 +156,7 @@ const contextMenu = {
 
     const fn = contextMenu._definitionFn || contextMenu._defaultFn;
     try {
-      fn({ manager: contextMenu._manager, menu: builder, params, webContents });
+      fn({ omega: contextMenu._omega, menu: builder, params, webContents });
     } catch (e) {
       logger.error('context-menu definition fn threw:', e);
       return [];
@@ -170,7 +170,7 @@ const contextMenu = {
   // Item set + visibility gates mirror the legacy @omega.js/desktop context-menu behavior:
   // undo/redo gated on canUndo/canRedo, edit ops gated on params.isEditable, etc.
   _populateDefaults(items, params) {
-    const m = contextMenu._manager;
+    const omega = contextMenu._omega;
     const flags = params.editFlags || {};
 
     // Undo / redo — only when applicable. Hidden when canUndo/canRedo is false (matches legacy).
@@ -219,7 +219,7 @@ const contextMenu = {
     if (items.length > 0) items.push({ type: 'separator' });
     items.push({ id: 'reload', role: 'reload' });
 
-    if (m.isDevelopment()) {
+    if (omega.isDevelopment()) {
       items.push({ type: 'separator' });
       items.push({ id: 'inspect',         role: 'inspectElement' });
       items.push({ id: 'toggle-devtools', role: 'toggleDevTools' });
@@ -286,7 +286,7 @@ const contextMenu = {
 
   // Disable the context menu entirely. Idempotent. Safe pre- or post-init.
   // After this, _popup() short-circuits — already-attached webContents stop
-  // showing menus on right-click. No way to re-enable; call manager.contextMenu.define()
+  // showing menus on right-click. No way to re-enable; call omega.contextMenu.define()
   // and clear _disabled if you really need to.
   disable() {
     contextMenu._disabled = true;

@@ -27,7 +27,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // Try to sign up with a non-existent affiliate code
         // Use dedicated account so it doesn't affect other tests
-        const signupResponse = await http.as('signup-referred-invalid').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred-invalid').post('omega/user/signup', {
           attribution: {
             affiliate: { code: 'INVALID_CODE_12345' },
           },
@@ -79,7 +79,7 @@ module.exports = defineCases({
         // Call POST /user/signup as the referred user with the new attribution format
         // This triggers the referral tracking logic
         // Use .as('signup-referred') to authenticate as that specific user via privateKey
-        const signupResponse = await http.as('signup-referred').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred').post('omega/user/signup', {
           attribution: {
             affiliate: {
               code: state.referrerAffiliateCode,
@@ -135,7 +135,7 @@ module.exports = defineCases({
       async run({ http, assert, state }) {
         // Try to call POST /user/signup again for the same user
         // This should be blocked since signup has already been processed
-        const signupResponse = await http.as('signup-referred').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred').post('omega/user/signup', {
           attribution: {
             affiliate: { code: state.referrerAffiliateCode },
           },
@@ -229,7 +229,7 @@ module.exports = defineCases({
         // Sign up a disposable email account with the referrer's affiliate code
         // The signup itself should succeed (account was created via Admin SDK, bypassing beforeCreate)
         // But the referral credit should be SKIPPED because the email is disposable
-        const signupResponse = await http.as('signup-referred-disposable').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-referred-disposable').post('omega/user/signup', {
           attribution: {
             affiliate: { code: state.referrerAffiliateCode },
           },
@@ -265,7 +265,7 @@ module.exports = defineCases({
         };
 
         // Use absurdly-old client timestamp to prove server time wins (defense vs clock skew)
-        const signupResponse = await http.as('consent-granted').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('consent-granted').post('omega/user/signup', {
           consent: {
             legal: { granted: true, text: consentText.legal, timestamp: '2000-01-01T00:00:00.000Z' },
             marketing: { granted: true, text: consentText.marketing, timestamp: '2000-01-01T00:00:00.000Z' },
@@ -312,7 +312,7 @@ module.exports = defineCases({
       async run({ http, firestore, assert, accounts }) {
         const legalText = 'I agree to the Terms of Service and Privacy Policy.';
 
-        const signupResponse = await http.as('consent-declined').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('consent-declined').post('omega/user/signup', {
           consent: {
             legal: { granted: true, text: legalText },
             marketing: { granted: false, text: 'Send me updates.' },
@@ -348,7 +348,7 @@ module.exports = defineCases({
       async run({ http, firestore, assert, accounts }) {
         // Client sends NO consent field at all (legacy or malformed payload).
         // Expected: both legal + marketing default to revoked. No crash, no marketing sync.
-        const signupResponse = await http.as('consent-missing').post('backend-manager/user/signup', {});
+        const signupResponse = await http.as('consent-missing').post('omega/user/signup', {});
 
         assert.isSuccess(signupResponse, `Signup should succeed even with no consent: ${JSON.stringify(signupResponse, null, 2)}`);
 
@@ -399,7 +399,7 @@ module.exports = defineCases({
         }, { merge: true });
 
         // Re-fire signup with NO consent payload (the legacy page-load case).
-        const signupResponse = await http.as('consent-preserve').post('backend-manager/user/signup', {});
+        const signupResponse = await http.as('consent-preserve').post('omega/user/signup', {});
         assert.isSuccess(signupResponse, `Signup should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
 
         const userDoc = await firestore.get(`users/${uid}`);
@@ -439,7 +439,7 @@ module.exports = defineCases({
           flags: { signupProcessed: false },
         }, { merge: true });
 
-        const signupResponse = await http.as('consent-preserve').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('consent-preserve').post('omega/user/signup', {
           consent: {
             legal: { granted: true, text: 'Legal grant on re-fire' },
             marketing: { granted: false, text: 'Declining marketing' },
@@ -487,7 +487,7 @@ module.exports = defineCases({
           myCustomIntegration: { slackWebhook: 'https://hooks.slack.com/services/XXX' },
         }, { merge: true });
 
-        const signupResponse = await http.as('signup-merge').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('signup-merge').post('omega/user/signup', {
           consent: { legal: { granted: true, text: 'I agree.' }, marketing: { granted: true, text: 'Updates please.' } },
           attribution: {
             first: { tags: { utm_source: 'newsletter' }, referrer: 'https://news.ycombinator.com/', page: '/' },
@@ -566,7 +566,7 @@ module.exports = defineCases({
       name: 'unauthenticated-rejected',
       async run({ http, assert }) {
         // Try to call POST /user/signup without authentication
-        const signupResponse = await http.as('none').post('backend-manager/user/signup', {
+        const signupResponse = await http.as('none').post('omega/user/signup', {
           attribution: {
             affiliate: { code: REFERRER_AFFILIATE_CODE },
           },

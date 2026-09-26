@@ -16,7 +16,7 @@
  * Firestore — the call is allowed to reject at that seam and the assertions read the
  * captured ctx output.
  */
-const post = require('../../../dist/manager/routes/user/signup/post.js');
+const post = require('../../../dist/omega/routes/user/signup/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const { keyNames } = post;
@@ -49,7 +49,7 @@ async function captureStartingLine() {
   // No Firestore here — the route rejects at the first poll, long after the line under
   // test was written. The assertions are on the log, not the result.
   const ctx = {
-    Manager: { libraries: { admin: {} } },
+    omega: { firebase: { admin: {} } },
     log: record,
     warn: record,
     error: record,
@@ -57,7 +57,7 @@ async function captureStartingLine() {
   };
   const user = { authenticated: true, auth: { uid: SETTINGS.uid, email: 'recipient@test.dev' }, roles: {} };
 
-  await post({ ctx, user, settings: SETTINGS, libraries: { admin: {} } }).catch(() => {});
+  await post({ ctx, omega: ctx.omega, user, data: SETTINGS }).catch(() => {});
 
   return captured.find((line) => line.includes('signup(): Starting'));
 }

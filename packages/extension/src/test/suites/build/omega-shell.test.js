@@ -40,8 +40,10 @@ module.exports = defineCases({
         ctx.expect(module.includes('data-shell-toggle')).toBe(true);
         ctx.expect(module.includes('data-shell-dismiss')).toBe(true);
         ctx.expect(module.includes("'shell.collapsed'")).toBe(true);
-        // client is a runtime dependency, so the specifier survives vendoring.
-        ctx.expect(module.includes("from '@omega.js/client'")).toBe(true);
+        // The shell is built FROM the runtime instance it is handed, so the
+        // vendored copy imports no runtime of its own.
+        ctx.expect(module.includes('export function createShell(omega)')).toBe(true);
+        ctx.expect(module.includes('@omega.js/client')).toBe(false);
       },
     },
     {

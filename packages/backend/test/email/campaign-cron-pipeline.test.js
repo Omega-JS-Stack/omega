@@ -28,11 +28,11 @@
 const {
   getNextOccurrence,
   getNextFutureOccurrence,
-} = require('../../dist/manager/libraries/email/constants.js');
+} = require('../../dist/omega/libraries/email/constants.js');
 const {
   PROCESSING_LEASE_SECONDS,
   GENERATOR_MAX_ATTEMPTS,
-} = require('../../dist/manager/events/cron/frequent/marketing-campaigns.js');
+} = require('../../dist/omega/events/cron/frequent/marketing-campaigns.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const WEEK = 7 * 86400;

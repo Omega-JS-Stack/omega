@@ -22,7 +22,7 @@
 //
 // The task module reads its project (package.json / config / dist) from cwd at
 // REQUIRE time, so each test stages a temp project, chdirs into it, and requires
-// the task fresh — the same model as manager.test.js's inDir().
+// the task fresh — the same model as build-module.test.js's inDir().
 
 const path = require('path');
 const fs   = require('fs');
@@ -111,7 +111,7 @@ module.exports = async (ctx) => {
     keys: Object.keys(ctx || {}).sort(),
     projectRoot: ctx && ctx.projectRoot,
     mode: ctx && ctx.mode,
-    hasManager: Boolean(ctx && ctx.manager && typeof ctx.manager.getConfig === 'function'),
+    hasBuild: Boolean(ctx && ctx.build && typeof ctx.build.getConfig === 'function'),
   }));
 };
 `;
@@ -870,7 +870,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'a build hook receives the ONE OMEGA ctx shape — { manager, projectRoot, mode } (#591)',
+      name: 'a build hook receives the ONE OMEGA ctx shape: { build, projectRoot, mode } (#591)',
       run: async (ctx) => {
         const tmp = stageProject({
           files: { 'hooks/build/pre.js': HOOK('nested') },
@@ -880,10 +880,10 @@ module.exports = defineCases({
             await task.hook('build:pre');
 
             const ran = JSON.parse(fs.readFileSync(path.join(tmp, 'hook-ran.json'), 'utf8'));
-            ctx.expect(ran.keys).toEqual(['manager', 'mode', 'projectRoot']);
+            ctx.expect(ran.keys).toEqual(['build', 'mode', 'projectRoot']);
             ctx.expect(ran.projectRoot).toBe(fs.realpathSync(tmp));
             ctx.expect(ran.mode).toBe('development');
-            ctx.expect(ran.hasManager).toBe(true);
+            ctx.expect(ran.hasBuild).toBe(true);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });

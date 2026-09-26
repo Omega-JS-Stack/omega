@@ -22,15 +22,15 @@
 const Stripe = require('stripe');
 const { buildUser, callHandler, withEnvironment } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
-const isAlreadyGone = require('../../../dist/manager/libraries/payment/provider-errors.js');
+const handler = require('../../../dist/omega/routes/payments/cancel/post.js');
+const isAlreadyGone = require('../../../dist/omega/libraries/payment/provider-errors.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A subscriber on a real provider, old enough to clear the age guard.
-function subscriber(Manager, { uid, status, provider }) {
+function subscriber(omega, { uid, status, provider }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
 
-  return buildUser(Manager, {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: {},
     subscription: {
@@ -48,13 +48,13 @@ function subscriber(Manager, { uid, status, provider }) {
 
 // Cancel with Stripe unconfigured — StripeLib.init() throws, the transient failure
 // closest to a real outage that can be produced offline.
-function cancelWithoutStripeKey(Manager, user) {
+function cancelWithoutStripeKey(omega, user) {
   return withEnvironment({ STRIPE_SECRET_KEY: null }, () => callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-cancel',
     user,
-    settings: { confirmed: true, skipGuards: false, reason: null, feedback: null },
+    data: { confirmed: true, skipGuards: false, reason: null, feedback: null },
   }));
 }
 
@@ -69,13 +69,13 @@ module.exports = defineCases({
     {
       name: 'a-transient-failure-on-a-suspended-subscription-writes-nothing',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const uid = '_test-cancel-transient-suspended';
-        const user = subscriber(Manager, { uid, status: 'suspended', provider: 'stripe' });
+        const user = subscriber(omega, { uid, status: 'suspended', provider: 'stripe' });
 
         assert.equal(await firestore.exists(`users/${uid}`), false, 'the case starts with no user doc to overwrite');
 
-        const sent = await cancelWithoutStripeKey(Manager, user);
+        const sent = await cancelWithoutStripeKey(omega, user);
 
         assert.equal(sent.code, 500, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.equal(await firestore.exists(`users/${uid}`), false, 'A transient failure must never write a cancelled subscription');
@@ -85,11 +85,11 @@ module.exports = defineCases({
     {
       name: 'a-transient-failure-on-an-active-subscription-writes-nothing',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const uid = '_test-cancel-transient-active';
-        const user = subscriber(Manager, { uid, status: 'active', provider: 'stripe' });
+        const user = subscriber(omega, { uid, status: 'active', provider: 'stripe' });
 
-        const sent = await cancelWithoutStripeKey(Manager, user);
+        const sent = await cancelWithoutStripeKey(omega, user);
 
         assert.equal(sent.code, 500, `A transient failure must reach the caller, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.equal(await firestore.exists(`users/${uid}`), false, 'A transient failure must never write a cancelled subscription');
@@ -99,10 +99,10 @@ module.exports = defineCases({
     {
       name: 'the-failure-response-carries-no-sdk-detail',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = subscriber(Manager, { uid: '_test-cancel-neutral-message', status: 'active', provider: 'stripe' });
+      async run({ assert, omega }) {
+        const user = subscriber(omega, { uid: '_test-cancel-neutral-message', status: 'active', provider: 'stripe' });
 
-        const sent = await cancelWithoutStripeKey(Manager, user);
+        const sent = await cancelWithoutStripeKey(omega, user);
 
         assert.equal(sent.code, 500, `Expected the provider failure, got ${sent.code}`);
         assert.ok(!/STRIPE_SECRET_KEY/.test(`${sent.body}`), `The SDK detail must stay in the logs, got: ${sent.body}`);

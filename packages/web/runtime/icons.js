@@ -5,10 +5,11 @@
  * The build inlines every icon the RENDERED page names (src/inline-icons.js),
  * so a static page pays nothing here. This is what covers the rest: an `<i>`
  * a page module builds after the fact, or an icon whose classes JS changes
- * mid-flight. @omega.js/client's icon-renderer is the shared watcher (one
- * MutationObserver, insertions AND class changes, the same module desktop and
- * extension pages run); web supplies only the transport — the site's OWN
- * emitted icon set, one file per icon actually asked for.
+ * mid-flight. The instance's `omega.icons` is the shared watcher (one
+ * MutationObserver, insertions AND class changes, the same one desktop and
+ * extension pages run); web supplies only the transport, the site's OWN
+ * emitted icon set, one file per icon actually asked for. runtime/boot.js
+ * starts it: `omega.icons.start({ resolve: createIconResolver(…) }, document)`.
  *
  * Zero cost until requested: no icon transfers until an element that needs it
  * appears, and each one transfers once per page.
@@ -17,7 +18,6 @@
  * EVERY page, main bundle or not, and its imports must resolve identically in
  * the monorepo and in a published install — hence the relative paths.
  */
-import { createIconRenderer } from '@omega.js/client/modules/icon-renderer.js';
 import { ICONS_DIR, candidateRelPaths } from '@omega.js/client/modules/icon-core.js';
 import { siteUrl } from '../core/js/libs/path-prefix.js';
 import { createLogger } from '../core/js/libs/logger.js';
@@ -63,15 +63,4 @@ export function createIconResolver({ development } = {}) {
     }
     return null;
   };
-}
-
-/**
- * The watcher, bound to this site's transport.
- *
- * @param {object} [options]
- * @param {boolean} [options.development] - whether misses are reported
- * @returns {{ start: function, stop: function, scan: function }}
- */
-export function createIconWatcher({ development } = {}) {
-  return createIconRenderer({ resolve: createIconResolver({ development }) });
 }

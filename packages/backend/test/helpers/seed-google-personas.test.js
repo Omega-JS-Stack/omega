@@ -36,14 +36,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-second-seed-of-an-existing-persona-succeeds',
-      async run({ assert, Manager, config, skip }) {
+      async run({ assert, omega, config, skip }) {
         const domain = seedDomain(config);
 
         if (!domain) {
           skip('No brand.contact.email configured — persona emails have no domain');
         }
 
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
 
         for (const account of Object.values(GOOGLE_ACCOUNTS)) {
           const email = account.email.replace('{domain}', domain);
@@ -63,14 +63,14 @@ module.exports = defineCases({
 
     {
       name: 'the-re-seeded-persona-still-carries-its-google-provider',
-      async run({ assert, Manager, config, skip }) {
+      async run({ assert, omega, config, skip }) {
         const domain = seedDomain(config);
 
         if (!domain) {
           skip('No brand.contact.email configured — persona emails have no domain');
         }
 
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
 
         for (const account of Object.values(GOOGLE_ACCOUNTS)) {
           const email = account.email.replace('{domain}', domain);
@@ -89,7 +89,7 @@ module.exports = defineCases({
 
     {
       name: 'a-persona-absent-from-the-emulator-still-imports',
-      async run({ assert, Manager, config, skip }) {
+      async run({ assert, omega, config, skip }) {
         // The cold path must keep working — idempotency cannot depend on the
         // record already being there.
         const domain = seedDomain(config);
@@ -98,7 +98,7 @@ module.exports = defineCases({
           skip('No brand.contact.email configured — persona emails have no domain');
         }
 
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
         const account = Object.values(GOOGLE_ACCOUNTS)[0];
         const email = account.email.replace('{domain}', domain);
 

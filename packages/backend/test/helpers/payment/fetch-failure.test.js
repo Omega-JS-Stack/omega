@@ -16,10 +16,10 @@
  * Run: npx omega test backend:helpers/payment/fetch-failure
  */
 const assert = require('node:assert');
-const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
-const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
+const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
+const Coinbase = require('../../../dist/omega/libraries/payment/providers/coinbase.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const RESOURCE_ID = '_test-res-lookup';

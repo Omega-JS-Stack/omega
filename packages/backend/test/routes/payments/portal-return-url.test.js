@@ -15,14 +15,14 @@
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/portal/post.js');
+const handler = require('../../../dist/omega/routes/payments/portal/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // Where the route sends a caller whose returnUrl it refused.
-const DEFAULT_RETURN = (Manager) => new URL('/dashboard/account#billing', Manager.project.websiteUrl).toString();
+const DEFAULT_RETURN = (omega) => new URL('/dashboard/account#billing', omega.project.websiteUrl).toString();
 
-function subscriber(Manager) {
-  return buildUser(Manager, {
+function subscriber(omega) {
+  return buildUser({
     auth: { uid: '_test-portal-return-url', email: '_test.portal-return-url@example.com' },
     roles: {},
     subscription: {
@@ -33,13 +33,13 @@ function subscriber(Manager) {
   });
 }
 
-function openPortal(Manager, returnUrl) {
+function openPortal(omega, returnUrl) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-portal',
-    user: subscriber(Manager),
-    settings: { returnUrl: returnUrl },
+    user: subscriber(omega),
+    data: { returnUrl: returnUrl },
   });
 }
 
@@ -52,53 +52,53 @@ module.exports = defineCases({
     {
       name: 'an-off-brand-return-url-falls-back',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const sent = await openPortal(Manager, 'https://evil.example/steal');
+      async run({ assert, omega }) {
+        const sent = await openPortal(omega, 'https://evil.example/steal');
 
         assert.equal(sent.code, 200, `The portal should still open, got ${sent.code}: ${JSON.stringify(sent.body)}`);
-        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'An off-brand host must never reach the provider');
+        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'An off-brand host must never reach the provider');
       },
     },
 
     {
       name: 'a-look-alike-host-falls-back',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // The classic near-miss: the brand's origin as a prefix of somebody else's host
-        const origin = new URL(Manager.project.websiteUrl).origin;
-        const sent = await openPortal(Manager, `${origin}.evil.example/dashboard/account`);
+        const origin = new URL(omega.project.websiteUrl).origin;
+        const sent = await openPortal(omega, `${origin}.evil.example/dashboard/account`);
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'A host that merely starts with the brand origin must not pass');
+        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'A host that merely starts with the brand origin must not pass');
       },
     },
 
     {
       name: 'an-unparseable-return-url-falls-back',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const sent = await openPortal(Manager, 'not a url at all');
+      async run({ assert, omega }) {
+        const sent = await openPortal(omega, 'not a url at all');
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'An unparseable value must fall back, never be forwarded');
+        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'An unparseable value must fall back, never be forwarded');
       },
     },
 
     {
       name: 'a-missing-return-url-falls-back',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const sent = await openPortal(Manager, null);
+      async run({ assert, omega }) {
+        const sent = await openPortal(omega, null);
 
-        assert.equal(sent.body.url, DEFAULT_RETURN(Manager), 'No returnUrl should still return to the brand');
+        assert.equal(sent.body.url, DEFAULT_RETURN(omega), 'No returnUrl should still return to the brand');
       },
     },
 
     {
       name: 'the-brands-own-return-url-passes-through',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const returnUrl = new URL('/dashboard/account?tab=invoices', Manager.project.websiteUrl).toString();
+      async run({ assert, omega }) {
+        const returnUrl = new URL('/dashboard/account?tab=invoices', omega.project.websiteUrl).toString();
 
-        const sent = await openPortal(Manager, returnUrl);
+        const sent = await openPortal(omega, returnUrl);
 
         assert.equal(sent.body.url, returnUrl, "The brand's own URL should be honored exactly as asked");
       },

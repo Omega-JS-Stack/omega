@@ -309,7 +309,7 @@ function buildConfig(eleventyConfig, options) {
   });
 
   // ---- Jekyll site-data emulation.
-  // site.data._includes.<path> mirrors UJM's json-in-_includes data system
+  // site.data._includes.<path> is the json-in-_includes data system
   // (admin sidebar/topbar read site.data._includes.admin.sections.sidebar):
   // every .json under a layered include root lands at its path, higher
   // layers win.
@@ -354,7 +354,7 @@ function buildConfig(eleventyConfig, options) {
   // data cascade at data-init (before collections compute), so replacing the
   // array (or lazy getters) after that is invisible to templates.
   //
-  // A BRAND's own collection (#207) publishes the same way (#593): a UJM
+  // A BRAND's own collection (#207) publishes the same way (#593): a
   // consumer's `{% for product in site.products %}` is how a declared
   // collection is read, and reaching templates only as `collections.products`
   // (frontmatter under `.data`) rendered that loop empty on a green build —
@@ -662,8 +662,8 @@ function buildConfig(eleventyConfig, options) {
     const inputPath = data.page.inputPath;
     const ownSource = readOwnSource(inputPath) || '';
 
-    // The OTHER dead read the census owns (#595): UJM's per-render `random_id`
-    // global, which OMEGA does not have — the read renders empty and every id
+    // The OTHER dead read the census owns (#595): a bare `random_id`, a
+    // global OMEGA does not have — the read renders empty and every id
     // it scopes collides. A WARNING, not a throw, unlike the config reads
     // above: `random_id` is an ordinary variable name, so a layout or an
     // include may legitimately assign it for this page, and a read guard's
@@ -672,7 +672,7 @@ function buildConfig(eleventyConfig, options) {
       const leftover = randomIdReads(ownSource);
       if (leftover.length) {
         logger.warn(
-          `${inputPath}:${leftover[0].line}: reads a bare \`random_id\` — UJM's per-render global is gone, so it renders `
+          `${inputPath}:${leftover[0].line}: reads a bare \`random_id\` — there is no per-render global, so it renders `
           + `EMPTY and every id built from it collides. Assign it first: \`${RANDOM_ID_ASSIGN_IDIOM}\`. `
           + 'Run `omega migrate` to write it (docs/web/index.md).',
         );
@@ -1045,7 +1045,7 @@ function buildConfig(eleventyConfig, options) {
     },
   });
 
-  // page.url parity with Jekyll (legacy UJM): the flat `about.html` output
+  // page.url parity with Jekyll: the flat `about.html` output
   // still reads as '/about' everywhere templates look (canonical, hreflang,
   // data-page-path, nav active-detection, collection doc.url). index.html
   // outputs are collapsed to directory URLs by Eleventy before transforms run.
@@ -1126,9 +1126,8 @@ function buildConfig(eleventyConfig, options) {
   // of them takes just that URL over.
   // ---- Target shortlinks (#561): the same lane again, for the download
   // platform/artifact URLs (/download/mac, /download/linux/snap) and the
-  // extension store URLs (/extension/chrome) legacy UJM shipped as hand-made
-  // default pages. The declaration is the SAME map /download and /extension
-  // already render from.
+  // extension store URLs (/extension/chrome). The declaration is the SAME
+  // map /download and /extension already render from.
   const shortlinkPages = [
     ...socialPages(readSocials(config.socials)),
     ...targetShortlinkPages(readTargetShortlinks(site)),
@@ -1190,7 +1189,7 @@ function buildConfig(eleventyConfig, options) {
   // the foot both read it, and with nothing setting it both shipped EMPTY on
   // every post. `site.omega.date.iso` is the same instant by construction.
   site.time = buildTime.toISOString();
-  // site.omega carries UJM-runtime site values the core includes read
+  // site.omega carries the runtime site values the core includes read
   // (cache_breaker in the @omega.js/client bake, date.year in the
   // copyright meta, date.iso as the sitemap/feed build stamp,
   // placeholder.src in lazy-loaded imgs).
@@ -1365,7 +1364,7 @@ function buildConfig(eleventyConfig, options) {
     });
   }
 
-  // ---- Production HTML minification (the UJM minifyHtml successor). Only
+  // ---- Production HTML minification. Only
   // .html outputs — the meta-files (sitemap.xml, feeds, robots.txt, …) ship
   // exactly as their templates render them.
   if (environment === 'production') {
@@ -1424,7 +1423,7 @@ function jekyllDoc(item) {
 function jekyllPermalink(data, collections) {
   const inputPath = data.page.inputPath;
   let permalink = data.permalink;
-  // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
+  // Collection URLs mirror Jekyll's defaults (permalink: "/<coll>/
   // :title", with Eleventy's fileSlug stripping the dated-filename part) —
   // but an EXPLICIT permalink in the doc's frontmatter wins, like Jekyll.
   // '' counts as absent: Eleventy's computed dependency pass probes with
@@ -1433,7 +1432,7 @@ function jekyllPermalink(data, collections) {
     const collection = collections.find((entry) => inputPath.includes(`/${entry.dir}/`));
     if (collection) permalink = `${collection.base}/${data.page.fileSlug}`;
   }
-  // Jekyll flat URLs (legacy UJM parity): `/about` writes `about.html`,
+  // Jekyll flat URLs: `/about` writes `about.html`,
   // NOT `about/index.html` — site URLs carry no trailing slash. page.url
   // stays extensionless ('/about') via configureOmega's .html-stripping
   // urlTransform, exactly like Jekyll's page.url for extensionless permalinks.

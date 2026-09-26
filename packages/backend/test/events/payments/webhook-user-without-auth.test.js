@@ -119,7 +119,7 @@ module.exports = defineCases({
       name: 'with no DSN configured the refusal still lands, reporting nothing',
 
       async run() {
-        // `libraries.sentry` is null whenever no DSN is set — the capture must be a
+        // `omega.sentry` is null whenever no DSN is set — the capture must be a
         // clean no-op, never a second failure on top of the refusal
         const { store, captures } = await runSubscriptionCreated({ authUids: [], reporting: false });
 

@@ -7,18 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#945](../../issues/945) - `User` from `@omega.js/account` is one class on the backend and in the browser: the stored account as own fields, `authenticated`, `plan`, `active`, `trialing`, `cancelling` and `everPaid` as getters, `profile` from the sign-in. `ctx.user` and every `omega.auth.user` is one, never null.
+- [#945](../../issues/945) - `omega.auth.reload()` re-reads the account and lands a new `{ user, denied }` state. `omega.ready` is the promise `initialize()` settles, so a module that did not boot the instance can await it.
 - [#709](../../issues/709) - Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value - an explicit `data-omega-copy-value`/property, a selector, else the sibling input - copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) - `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
 - [#212](../../issues/212) - A test dispute provider, so a chargeback is provable end to end: an alert matches by amount and card against the emulator's records, then issues the cancel as the `customer.subscription.deleted` event Stripe's own cancel produces. Refuses in production.
 - [#212](../../issues/212) - `POST /payments/intent` takes `simulate: 'abandon'` - the session is created and no webhook is fired, which is what an abandoned checkout IS. Test-provider only, never persisted.
 
 ### Changed
+- [#945](../../issues/945) - Every package is consumed one way: the default export is the ready-made instance `omega`, `initialize()` returns it, and modules are properties (`omega.auth.user`, `omega.utilities.escapeHTML()`). Migration steps: `docs/shared/breaking-changes.md`.
+- [#945](../../issues/945) - Every runtime entry is two lines, the instance and then `omega.initialize()`: browser entries (web, extension, the desktop renderer) `import omega from '...'`, and Node entries (backend, desktop main and preload) `require` it. A backend ends with `module.exports = omega.functions`.
+- [#945](../../issues/945) - Routes receive `({ ctx, omega, user, data, usage, analytics })`, events `({ ctx, omega, user, context, change, snapshot })`, cron jobs `({ ctx, omega, context })`. Bindings read one root, `auth.user` (`auth.user.plan`, `auth.user.authenticated`), and `auth.listen` delivers `{ user, denied }`.
+- [#945](../../issues/945) - The desktop and extension build modules are plain (`const build = require('@omega.js/desktop/build'); build.getConfig()`), and every hook receives `{ build, projectRoot, mode }`.
+- [#945](../../issues/945) - The extension background and desktop main both carry `omega.request()` and `omega.auth.getIdToken()`. The desktop renderer carries the `.omega-signin` and `.omega-account` triggers, and its `.omega-signout` signs the whole app out through main.
+- [#945](../../issues/945) - Consumer routes leave `omega_api` and `/omega/*`: each gets its own function, hosting rewrite and path (`/notes`). `omega.routes.run(name, { req, res }, options)` and `omega.events.run(name, payload)` replace `omega.run` and `omega.runEvent`. An MCP tool's `path` is the path as served.
+- [#823](../../issues/823) - One request-schema system: a schema file returns a plain field declaration (`{ type: 'string', required: true }`) from `({ user, body, query, path, method, headers, geolocation })`, and one zod adapter validates it. `pattern`, `path`, `of` and `fields` join the vocabulary.
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
+### Removed
+- [#945](../../issues/945) - Backend: the `_legacy` functions and `setupFunctionsLegacy`, `ApiManager`, `Roles`, `install()`, `debug()`, `self.interface`, `libraries.localDatabase`, `fetchStats`, `server-manager.js`, and the `/backend-manager/*` URL alias, which answers 404 now.
+- [#945](../../issues/945) - Frontends: `omega.library()`, the client's `getUser()`, `isAuthenticated()` and `resolveSubscription()`, the `auth.account.*` and `auth.resolved.*` bindings, the extension's root export, `openAuthPage()` and `attachTo` mixins, desktop's `manager.omega`, `./lib/logger` and `__EM_TEST__`, and `@omega.js/config`'s `attachTo`.
+- [#823](../../issues/823) - The hand-rolled schema engine and the zod builder layer (`f.object`, `f.string` and the rest): `helpers/schema.js` is the one adapter.
+
 ### Fixed
+- [#950](../../issues/950) - The admin users page calls the snapshot's `exists()`, so viewing a user with no Firestore document says so instead of showing an empty `{ id }` record.
+- [#951](../../issues/951) - The backend setup check for the staged functions manifest compares against the target manifest instead of reading an undefined `app`.
 - [#769](../../issues/769) - Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#212](../../issues/212) - The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) - The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.
+- [#961](../../issues/961) - A consumer handler MCP tool now receives the request `Context` as `ctx` and the resolved caller as `user`, instead of the logger and `null`. The MCP endpoint resolves its caller once, through `Context.authenticate()`.
+- [#953](../../issues/953) - A page with no translation (cold under `--cached-only`, or a provider failure) ships its source copy at the language path, unadvertised, so built sites and deploys carry no dead language links. `omega translate` fills them.
 
 ## [0.52.0] 2026-09-24
 

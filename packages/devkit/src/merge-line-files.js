@@ -1,7 +1,6 @@
 // Merge line-based files (.env, .gitignore, AGENTS.md) during framework setup —
-// the OMEGA marker-section protocol. Canonical version is EM's (it added .env
-// double-quote normalization and order-safe key substitution over the older
-// BXM/UJM inline copies) plus @omega.js/backend's custom-key promotion (a key the framework
+// the OMEGA marker-section protocol: .env double-quote normalization,
+// order-safe key substitution, and custom-key promotion (a key the framework
 // newly adopts into its Default section is promoted UP from the user's Custom
 // section with their value, instead of appearing empty in Default and set in
 // Custom).

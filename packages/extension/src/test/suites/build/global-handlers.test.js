@@ -1,5 +1,5 @@
 // Build-layer pin for setupGlobalHandlers(): it is called BARE at top level
-// (before any Manager exists) so that MV3 registers the SW listeners before any
+// (before the instance exists) so that MV3 registers the SW listeners before any
 // async work. In an ES module `this` is undefined there, so every `this.<x>`
 // inside that function is a TypeError the moment its listener fires — which is
 // exactly what broke the fresh-install welcome tab ([#90]): the install logger
@@ -37,10 +37,12 @@ module.exports = defineCases({
   description: 'background.js setupGlobalHandlers — no `this` in a bare-called function (#90)',
   tests: [
     {
-      name: 'it is called bare at top level, before the Manager class',
+      name: 'it is called bare at top level, before the Omega class and its instance',
       run: (ctx) => {
         ctx.expect(SOURCE).toMatch(/^setupGlobalHandlers\(\);$/m);
-        ctx.expect(SOURCE.indexOf('setupGlobalHandlers();')).toBeLessThan(SOURCE.indexOf('class Manager'));
+        ctx.expect(SOURCE.indexOf('class Omega extends BaseOmega')).toBeGreaterThan(-1);
+        ctx.expect(SOURCE.indexOf('setupGlobalHandlers();')).toBeLessThan(SOURCE.indexOf('class Omega extends BaseOmega'));
+        ctx.expect(SOURCE.indexOf('setupGlobalHandlers();')).toBeLessThan(SOURCE.indexOf('const omega = new Omega();'));
       },
     },
     {

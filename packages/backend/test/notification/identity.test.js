@@ -11,7 +11,7 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { buildPayload } = require('../../dist/manager/libraries/notification.js');
+const { buildPayload } = require('../../dist/omega/libraries/notification.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The identity the framework used to hardcode. Nothing may ever emit these again.

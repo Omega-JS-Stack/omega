@@ -23,7 +23,7 @@
  * never a crash, and never a wrong-style fallback.
  */
 
-const { parseIconClasses, isValidIconName, isValidStyle, injectSvgAttributes } = require('./icon-core.js');
+import { parseIconClasses, isValidIconName, isValidStyle, injectSvgAttributes } from './icon-core.js';
 
 // Both namespaces the class parser understands (#619): Font Awesome's fa-*
 // and the country flags' omega-flag-*.
@@ -146,4 +146,4 @@ function createIconRenderer(options) {
   return { start, stop, scan };
 }
 
-module.exports = { createIconRenderer };
+export { createIconRenderer };

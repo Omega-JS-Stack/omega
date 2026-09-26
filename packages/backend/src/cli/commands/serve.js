@@ -102,8 +102,8 @@ class ServeCommand extends BaseCommand {
 
     // demo-* projects are emulator-only by convention: `firebase serve`'s
     // hosting upstream fetches LIVE site config and 403s (there is no live
-    // project to reach — BEM 1.4b residue; the serve mechanics themselves
-    // are fine, cp90). Functions still serve, so warn-and-continue and point
+    // project to reach; the serve mechanics themselves are fine).
+    // Functions still serve, so warn-and-continue and point
     // at the hosting EMULATOR for the full surface.
     const { resolveProjectId } = require('./firebase-init');
     const serveProjectId = resolveProjectId(projectDir);

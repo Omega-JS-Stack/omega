@@ -4,13 +4,13 @@ File-based context menu. Unlike tray and application menu (called once at boot),
 
 ## Config
 
-No config block. Path is conventional: `src/integrations/context-menu/index.js`. To opt out, call `manager.contextMenu.disable()` from your main entry — after that, right-click events are silently swallowed.
+No config block. Path is conventional: `src/integrations/context-menu/index.js`. To opt out, call `omega.contextMenu.disable()` from your main entry: after that, right-click events are silently swallowed.
 
 ## Definition file
 
 ```js
 // src/integrations/context-menu/index.js
-module.exports = ({ manager, menu, params, webContents }) => {
+module.exports = ({ omega, menu, params, webContents }) => {
   // Easiest: start from @omega.js/desktop's defaults, then customize per event.
   menu.useDefaults();
 
@@ -61,7 +61,7 @@ Same shape across menu / tray / context-menu. Available **inside the definition 
 
 Context-menu ids are **flat** — no `context/` prefix needed (the lib namespace is implicit). Submenus you build with `menu.submenu(...)` are addressable as `parent/child` paths via the resolver.
 
-(Runtime-on-`manager.contextMenu` mutators don't apply here — items are rebuilt every event. Mutate inside the definition fn instead.)
+(Runtime-on-`omega.contextMenu` mutators don't apply here: items are rebuilt every event. Mutate inside the definition fn instead.)
 
 ## Default template ids
 
@@ -74,33 +74,33 @@ Context-menu ids are **flat** — no `context/` prefix needed (the lib namespace
 | `copy` | `params.selectionText` (read-only) |
 | `open-link`, `copy-link` | `params.linkURL` |
 | `reload` | always |
-| `inspect`, `toggle-devtools` | `manager.isDevelopment()` only |
+| `inspect`, `toggle-devtools` | `omega.isDevelopment()` only |
 
 ## Definition fn arguments
 
 | Arg | Description |
 |---|---|
-| `manager` | The running @omega.js/desktop Manager |
+| `omega` | The running @omega.js/desktop main-process instance |
 | `menu` | Per-event builder + id-path API |
 | `params` | Electron's [`ContextMenuParams`](https://www.electronjs.org/docs/latest/api/web-contents#event-context-menu) — `selectionText`, `isEditable`, `linkURL`, `srcURL`, `mediaType`, `editFlags`, `x`, `y`, etc. |
 | `webContents` | The `webContents` that fired the event |
 
 ## Auto-attach
 
-Every window created via `manager.windows.createNamed()` is automatically wired up with the context-menu listener. Idempotent per `webContents` (uses a `WeakSet`). For windows you create directly with `new BrowserWindow()`, call:
+Every window created via `omega.windows.createNamed()` is automatically wired up with the context-menu listener. Idempotent per `webContents` (uses a `WeakSet`). For windows you create directly with `new BrowserWindow()`, call:
 
 ```js
-manager.contextMenu.attach(win.webContents);
+omega.contextMenu.attach(win.webContents);
 ```
 
-## Runtime API on `manager.contextMenu`
+## Runtime API on `omega.contextMenu`
 
 ```js
-manager.contextMenu.define(fn)              // replace the definition at runtime
-manager.contextMenu.disable()               // ignore future right-click events (idempotent)
-manager.contextMenu.attach(webContents)     // manual attach
-manager.contextMenu.buildItems(params, wc)  // run the definition without popping a menu (useful for tests)
-manager.contextMenu.hasCustomDefinition()   // false → using the built-in default fn
+omega.contextMenu.define(fn)              // replace the definition at runtime
+omega.contextMenu.disable()               // ignore future right-click events (idempotent)
+omega.contextMenu.attach(webContents)     // manual attach
+omega.contextMenu.buildItems(params, wc)  // run the definition without popping a menu (useful for tests)
+omega.contextMenu.hasCustomDefinition()   // false → using the built-in default fn
 ```
 
 ## Default fn

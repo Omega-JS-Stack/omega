@@ -20,7 +20,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /**
  * Jekyll slugify (default mode): downcase, non-alphanumeric runs => '-'.
  *
- * An apostrophe is DELETED, not separated on (#597) — legacy UJM dropped it,
+ * An apostrophe is DELETED, not separated on (#597),
  * so "Beginner's Guides" is `beginners-guides` and every migrating brand's
  * apostrophe category keeps its live URL. Both spellings, straight and
  * typographic: the markdown typographer smartens the straight one at build

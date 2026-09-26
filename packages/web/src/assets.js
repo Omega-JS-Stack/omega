@@ -31,8 +31,9 @@
  * layer that ships one wins, and it extends the layers below it by importing
  * the same name (`import coreMain from 'omega:main'`, `@use 'omega:main'`).
  *
- * Special import specifiers (UJM conventions, resolved by esbuild plugin):
+ * Special import specifiers (resolved by esbuild plugin):
  *   @omega.js/client             → the @omega.js/client entry (options.clientEntry)
+ *   @omega.js/web/runtime        → the web runtime instance (runtime/omega.js)
  *   omega:<name>            → the same name from the layers strictly BELOW the
  *                             importing file's OWN layer (the JS twin of sass's
  *                             `omega:` importer, which stays skip-self)
@@ -43,13 +44,13 @@
  *                             so consumer code imports @tanstack/charts & friends bare
  *
  * Every js entry is wrapped in a boot stub around the runtime handshake
- * (runtime/boot.js): the main bundle calls bootMain(mod) — @omega.js/client
- * initialize + global module — page bundles call bootPage(mod), which
+ * (runtime/boot.js): the main bundle calls bootMain(mod) (the web runtime's
+ * initialize + global module), page bundles call bootPage(mod), which
  * awaits the main boot before running the page module with
- * ({ manager, options }), and layout bundles call bootLayout(mod) with the
- * module's namespace, whose default export is optional. Bundles are ESM with code splitting: @omega.js/client
- * and the boot runtime land in a shared chunk that evaluates once per page,
- * so every bundle sees the SAME initialized singleton (webpack's single
+ * ({ omega, options }), and layout bundles call bootLayout(mod) with the
+ * module's namespace, whose default export is optional. Bundles are ESM with code splitting: the web runtime
+ * instance and the boot runtime land in a shared chunk that evaluates once per page,
+ * so every bundle sees the SAME initialized instance (webpack's single
  * module graph, reproduced with `<script type="module">` semantics).
  */
 const crypto = require('node:crypto');
@@ -258,7 +259,7 @@ async function buildAssets(options) {
 
     // The first-paint entry (#585): layered like main.js, but deliberately NOT
     // wrapped in the boot stub — the stub's runtime import is what pulls
-    // @omega.js/client into the shared chunk, and this script exists precisely
+    // the web runtime into the shared chunk, and this script exists precisely
     // to run without it. Plain entry, its own tiny bundle, loaded from the head
     // ahead of the main bundle.
     const firstPaintJs = collectLayered(jsDirs, /^first-paint\.js$/).get('first-paint.js');
@@ -274,8 +275,8 @@ async function buildAssets(options) {
       setup(build) {
         // Boot stubs: main → bootMain (initialize + global module), page
         // modules → bootPage (awaits the main boot), layout modules →
-        // bootLayout. The runtime import is what pulls @omega.js/client into
-        // the shared chunk.
+        // bootLayout. The runtime import is what pulls the web runtime
+        // instance into the shared chunk.
         //
         // A LAYOUT module is handed to the runtime as its NAMESPACE, so
         // shipping no default export is legal there: layout chrome that must
@@ -348,7 +349,7 @@ async function buildAssets(options) {
           return null;
         });
 
-        // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (base fallback)
+        // Asset aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (base fallback)
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           const rest = args.path.slice('__main_assets__/'.length);
           const target = rest.startsWith('themes/')
@@ -383,16 +384,21 @@ async function buildAssets(options) {
       frameworkRoot: FRAMEWORK_ROOT,
       entries: entryPoints,
       dev: Boolean(options.dev),
-      // ESM + splitting is load-bearing: shared modules (@omega.js/client, the boot
-      // runtime) go into one chunk the browser evaluates once — the singleton
-      // survives across the main and page bundles.
+      // ESM + splitting is load-bearing: shared modules (the web runtime
+      // instance, the boot runtime) go into one chunk the browser evaluates
+      // once, so the instance survives across the main and page bundles.
       format: 'esm',
       splitting: true,
       outdir: path.join(options.outDir, 'assets', 'js'),
       entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
       chunkNames: 'chunks/[name]-[hash]',
-      // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js)
-      alias: { '@omega.js/client': path.dirname(options.clientEntry) },
+      // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js).
+      // `@omega.js/web/runtime` is this package's own file, pinned here so it
+      // resolves the same in the monorepo and in a published install.
+      alias: {
+        '@omega.js/client': path.dirname(options.clientEntry),
+        '@omega.js/web/runtime': path.join(FRAMEWORK_ROOT, 'runtime', 'omega.js'),
+      },
       plugins: [bootPlugin],
       define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
     });
@@ -410,8 +416,8 @@ async function buildAssets(options) {
 
     // ---- Orphaned page modules (#469): a consumer `js/pages/` file that is
     // neither an ENTRY nor an INPUT of one is dead code — the build stays green
-    // and the page it was written for ships with no JS. The legacy UJM shape
-    // (js/pages/dashboard/agents/edit.js, 4 segments) lands here every time.
+    // and the page it was written for ships with no JS. A page file one level
+    // too deep (js/pages/dashboard/agents/edit.js, 4 segments) lands here every time.
     // The bundle graph is the judge, not the path: deep helpers are legitimate
     // (payment/checkout/modules/, dashboard/account/sections/) and stay silent
     // because their page entry imports them. Framework layers are out of scope
@@ -1292,8 +1298,7 @@ async function extractCriticalCss(options) {
  * css/ wins). `omega:theme` → the active theme's _theme.scss. A candidate
  * that IS the requesting file is skipped, so a consumer main.scss can
  * `@use 'omega:main' with (…)` to configure and extend the main bundle from
- * the layers below it (the migrated form of UJM's
- * `@use 'ultimate-jekyll-manager' with (…)` theme customization).
+ * the layers below it.
  * @param {string[]} layers - layer roots
  * @returns {object}
  */

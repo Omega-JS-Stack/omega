@@ -5,7 +5,7 @@
  * Tests the pure function directly — no emulator, no Firestore, no HTTP
  * Mirrors stripe/to-unified-one-time.js for consistent coverage
  */
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 
 // Real PayPal sandbox fixtures
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');

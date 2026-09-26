@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 let formManager = null;
 
@@ -20,7 +20,7 @@ function setupDeleteAccountForm() {
     return;
   }
 
-  formManager = new FormManager('#delete-account-form', {
+  formManager = new FormManager(omega, '#delete-account-form', {
     allowResubmit: false,
     warnOnUnsavedChanges: false,
     submittingText: 'Deleting account...',
@@ -60,7 +60,7 @@ function setupDeleteAccountForm() {
     formManager.showSuccess('Your account has been successfully deleted. You will now be signed out.');
 
     // Sign out the user
-    await omega.auth().signOut();
+    await omega.auth.signOut();
 
     // Redirect to home page
     setTimeout(() => {

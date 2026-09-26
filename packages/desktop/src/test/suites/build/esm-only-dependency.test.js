@@ -4,8 +4,8 @@
 // Both Node bundles are CommonJS (`format: 'cjs'`, `platform: 'node'`), and
 // esbuild rewrites `import.meta` to `{}` in that output: a dependency doing
 // `createRequire(import.meta.url)` was handed `undefined` and threw
-// ERR_INVALID_ARG_VALUE the moment a packaged app booted (found porting an
-// electron-manager app that depends on yargs 18). @omega.js/devkit's `bundle()`
+// ERR_INVALID_ARG_VALUE the moment a packaged app booted (an app that depends
+// on yargs 18 does exactly that). @omega.js/devkit's `bundle()`
 // composes the answer for every cjs+node build, so nothing here wires it.
 //
 // The proof is a RUN, not a read of the bundle text: the fixture package

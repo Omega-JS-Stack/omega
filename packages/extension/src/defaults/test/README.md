@@ -23,13 +23,13 @@ Tests that hit REAL external services (Firebase, push, network) are skipped by d
 
 ```js
 // test/build/my-feature.test.js
-const Manager = require('@omega.js/extension/build');
+const build = require('@omega.js/extension/build');
 
 module.exports = {
   layer: 'build',
   description: 'the project config carries a brand id',
   run: (ctx) => {
-    ctx.expect(Manager.getConfig().brand.id).toBeTruthy();
+    ctx.expect(build.getConfig().brand.id).toBeTruthy();
   },
 };
 ```

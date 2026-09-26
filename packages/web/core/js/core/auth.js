@@ -1,4 +1,3 @@
-import omega from '@omega.js/client';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { identify, readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
 import { retryOrphanCleanup } from '__main_assets__/js/libs/auth/orphan.js';
@@ -7,7 +6,7 @@ import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 const logger = createLogger('auth');
 
 // Auth Module
-export default function () {
+export default function ({ omega }) {
   // Get auth policy
   const config = omega.config.auth.config;
   const policy = config.policy;
@@ -37,7 +36,7 @@ export default function () {
 
   // Setup Auth listener
   try {
-    omega.auth().listen({}, async (state) => {
+    omega.auth.listen({}, async (state) => {
       const user = state.user;
       const url = new URL(window.location.href);
       const authReturnUrlRaw = url.searchParams.get('authReturnUrl');
@@ -69,7 +68,7 @@ export default function () {
       identify(user);
 
       // Check if we're in the process of signing out
-      if (authSignout === 'true' && user) {
+      if (authSignout === 'true' && user.authenticated) {
         // Mark that we're about to sign out
         justSignedOut = true;
         return; // Let pages.js handle the signout
@@ -81,7 +80,7 @@ export default function () {
       // the policy: 'unauthenticated' branch below sees a user and redirects off the
       // page (#196). The flag survives the strip, so it decides instead.
       if (window.__OMEGA_SIGNOUT_IN_PROGRESS) {
-        if (user) {
+        if (user.authenticated) {
           // Stale signed-in event, signout still propagating — same deal as above.
           logger.warn('Skipping state-change processing — signout in progress');
           justSignedOut = true;
@@ -94,7 +93,7 @@ export default function () {
       }
 
       // Handle authentication state changes and page policies
-      if (user) {
+      if (user.authenticated) {
         // User is authenticated
 
         // Rules refused the account read: a REAL failure, and nothing on this
@@ -103,10 +102,10 @@ export default function () {
         // else — the deleted consent guard's defect was collapsing "the doc is
         // not written yet" (the normal state for the seconds after a signup)
         // into this one ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)).
-        if (state.accountDenied) {
+        if (state.denied) {
           logger.warn('Signing out user whose account read was denied');
-          await omega.auth().signOut();
-          omega.utilities().showNotification(
+          await omega.auth.signOut();
+          omega.utilities.showNotification(
             `Couldn't load your account. Please sign in again.`,
             { type: 'danger', timeout: 8000 }
           );
@@ -131,10 +130,10 @@ export default function () {
         // ([#700](https://github.com/Omega-JS-Stack/omega/issues/700)). It never
         // throws — it catches internally — and its in-flight marker is the
         // failure path: a post that never landed retries on the next page load.
-        sendUserSignupMetadata(state.account);
+        sendUserSignupMetadata(omega, user);
 
         // Prompt for push notification subscription (fire-and-forget)
-        omega.notifications().subscribe().catch((e) => {
+        omega.notifications.subscribe().catch((e) => {
           logger.warn('Notification subscribe failed:', e.message);
         });
 
@@ -152,7 +151,7 @@ export default function () {
         }
 
         // Check if page requires specific roles (e.g., admin: true)
-        if (requiredRoles && !hasRequiredRoles(state.account, requiredRoles)) {
+        if (requiredRoles && !hasRequiredRoles(user, requiredRoles)) {
           logger.warn('User missing required roles:', requiredRoles);
           redirect(authenticated);
           return;
@@ -182,12 +181,10 @@ export default function () {
   }
 }
 
-// Check if account has all required roles
-function hasRequiredRoles(account, requiredRoles) {
-  const accountRoles = account?.roles || {};
-
+// Check if the user has all required roles
+function hasRequiredRoles(user, requiredRoles) {
   return Object.keys(requiredRoles).every((role) => {
-    return accountRoles[role] === requiredRoles[role];
+    return user.roles[role] === requiredRoles[role];
   });
 }
 
@@ -267,26 +264,25 @@ const SIGNUP_METADATA_MARKER = 'temporary.signupMetadata';
 const SIGNUP_MARKER_TTL_MS = 10 * 60 * 1000;
 
 // The marker is per uid — a shared browser must not let one account's in-flight post
-// silence the next account's. No uid (an account doc read that produced no auth.uid,
-// and no signed-in user to ask) means no marker, which is the behaviour that shipped
-// before this gate existed.
-function signupMetadataMarkerKey(account) {
-  const uid = account?.auth?.uid || omega.auth?.().getUser?.()?.uid;
+// silence the next account's. No uid (a signed-out User) means no marker, which is
+// the behaviour that shipped before this gate existed.
+function signupMetadataMarkerKey(user) {
+  const uid = user.uid;
 
   return uid ? `${SIGNUP_METADATA_MARKER}.${uid}` : null;
 }
 
 // A marker gates only while it is FRESH: an expired one is dropped on read and
 // reads as absent, so the post it was holding back goes out.
-function readSignupMetadataMarker(key) {
-  const marked = omega.storage().get(key, 0);
+function readSignupMetadataMarker(omega, key) {
+  const marked = omega.storage.get(key, 0);
 
   if (!marked) {
     return false;
   }
 
   if (Date.now() - marked > SIGNUP_MARKER_TTL_MS) {
-    omega.storage().remove(key);
+    omega.storage.remove(key);
 
     return false;
   }
@@ -306,10 +302,11 @@ function readSignupMetadataMarker(key) {
  *
  * Exported for testing — the payload is a contract with `routes/user/signup`.
  *
- * @param {object} account - The signed-in account doc (its `flags.signupProcessed` gates the post).
+ * @param {object} omega - The web runtime instance.
+ * @param {User} user - The signed-in User (its `flags.signupProcessed` gates the post).
  * @returns {Promise<void>}
  */
-export async function sendUserSignupMetadata(account) {
+export async function sendUserSignupMetadata(omega, user) {
   // Declared out here so the catch below can clear it: a post that never landed
   // must not leave the gate closed behind it.
   let markerKey = null;
@@ -327,8 +324,8 @@ export async function sendUserSignupMetadata(account) {
     // account doc on every page load, so gate on it directly — no account-age window, no
     // client-only localStorage flag. Fire whenever the doc shows signup is unprocessed; the
     // server is idempotent and rejects if it was already processed.
-    const signupProcessed = account?.flags?.signupProcessed === true;
-    markerKey = signupMetadataMarkerKey(account);
+    const signupProcessed = user.flags.signupProcessed === true;
+    markerKey = signupMetadataMarkerKey(user);
 
     /* @dev-only:start */
     logger.log('signupProcessed:', signupProcessed);
@@ -339,7 +336,7 @@ export async function sendUserSignupMetadata(account) {
     // place it is cleared is a failed post, in the catch below).
     if (signupProcessed) {
       if (markerKey) {
-        omega.storage().remove(markerKey);
+        omega.storage.remove(markerKey);
       }
 
       return;
@@ -348,7 +345,7 @@ export async function sendUserSignupMetadata(account) {
     // A post for this uid is already in flight (or landed and the doc has not caught
     // up yet). Every page load in that window used to re-post and collect a
     // "Signup has already been processed" 400.
-    if (markerKey && readSignupMetadataMarker(markerKey)) {
+    if (markerKey && readSignupMetadataMarker(omega, markerKey)) {
       logger.log('Skipping user metadata — a signup post is already in flight for this account');
 
       return;
@@ -359,22 +356,22 @@ export async function sendUserSignupMetadata(account) {
     // uses and never persisted — a stale `_fbc` would match the wrong click —
     // and carried under `attribution.cookies`, the shape the intent already
     // sends and `match-data.js` already reads.
-    const storedAttribution = omega.storage().get('attribution', {});
+    const storedAttribution = omega.storage.get('attribution', {});
     const cookies = readPlatformCookies();
     const attribution = Object.keys(cookies).length
       ? { ...storedAttribution, cookies }
       : storedAttribution;
-    const consent = omega.storage().get('consent', {});
+    const consent = omega.storage.get('consent', {});
     // The tracking-consent snapshot: its own key and its own payload field, stored
     // verbatim beside attribution. Distinct from `consent` above, which is the
     // legal/marketing decision the signup form captures and the route interprets.
-    const trackingConsent = omega.storage().get('trackingConsent', null);
+    const trackingConsent = omega.storage.get('trackingConsent', null);
 
     // Build the payload
     const payload = {
       // New structure
       attribution: attribution,
-      context: omega.utilities().getContext(),
+      context: omega.utilities.getContext(),
       consent: consent,
       trackingConsent: trackingConsent,
     };
@@ -385,7 +382,7 @@ export async function sendUserSignupMetadata(account) {
     // Mark the post in flight BEFORE it goes out: the doc's flag lands seconds
     // later, and a navigation in between is exactly what re-fired this request.
     if (markerKey) {
-      omega.storage().set(markerKey, Date.now());
+      omega.storage.set(markerKey, Date.now());
     }
 
     // Make API call to send signup metadata (route resolves via getApiUrl;
@@ -409,11 +406,11 @@ export async function sendUserSignupMetadata(account) {
     // the next page load retries ([#633](https://github.com/Omega-JS-Stack/omega/issues/633)).
     const alreadyProcessed = error?.code === 400 && `${error.message}`.includes('already been processed');
     if (markerKey && !alreadyProcessed) {
-      omega.storage().remove(markerKey);
+      omega.storage.remove(markerKey);
     }
 
     /* @dev-only:start */
-    omega.utilities().showNotification(
+    omega.utilities.showNotification(
       alreadyProcessed
         ? `[DEV] Signup metadata was already processed. The marker holds until flags.signupProcessed lands.`
         : `[DEV] Failed to send signup metadata. The in-flight marker was cleared — the next page load retries.`,
@@ -423,9 +420,9 @@ export async function sendUserSignupMetadata(account) {
   }
 }
 
-// LEGACY: Translate desktop app auth params to UJM format
+// LEGACY: Translate older desktop app auth params to this page's format
 // Legacy apps send: ?destination=appscheme://page&source=app&signout=true&cb=timestamp
-// UJM expects: ?authReturnUrl=...&authSignout=true
+// This page reads: ?authReturnUrl=...&authSignout=true
 // TODO: Remove this function AND its call above when legacy desktop app support is no longer needed
 function _legacyTranslateAppAuth() {
   const url = new URL(window.location.href);

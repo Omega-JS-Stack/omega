@@ -1,5 +1,5 @@
-// Main-process tests for lib/auth-persistence.js (pluggable session vault) and the
-// bridge's desktop:auth:account-resolved intake (renderer → main plan resolution cache).
+// Main-process tests for lib/auth-persistence.js (pluggable session vault) and
+// lib/auth.js's desktop:auth:account-resolved intake (renderer → main account).
 // The safeStorage strategy runs REAL (OS keychain + real file under userData) when
 // encryption is available in the test environment; adapter logic is covered against
 // a real in-memory strategy either way.
@@ -27,27 +27,27 @@ module.exports = defineCases({
     {
       name: 'resolve(): a test run is none, whatever the config says',
       run: async (ctx) => {
-        const m = ctx.manager;
-        ctx.expect(m.isTesting()).toBe(true);
-        m.config.omega = m.config.omega || {};
-        const orig = m.config.omega.authPersistence;
+        const omega = ctx.omega;
+        ctx.expect(omega.isTesting()).toBe(true);
+        omega.config.omega = omega.config.omega || {};
+        const orig = omega.config.omega.authPersistence;
         try {
           // Unset, and explicitly asking for the vault, both land on none: the harness
           // never signs a real user in, so it never asks the OS keychain
           // ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
-          delete m.config.omega.authPersistence;
-          ctx.expect(await authPersistence.resolve(m)).toBeNull();
+          delete omega.config.omega.authPersistence;
+          ctx.expect(await authPersistence.resolve(omega)).toBeNull();
           ctx.expect(authPersistence.getActive()).toBeNull();
 
-          m.config.omega.authPersistence = 'safeStorage';
-          ctx.expect(await authPersistence.resolve(m)).toBeNull();
+          omega.config.omega.authPersistence = 'safeStorage';
+          ctx.expect(await authPersistence.resolve(omega)).toBeNull();
 
-          m.config.omega.authPersistence = 'none';
-          ctx.expect(await authPersistence.resolve(m)).toBeNull();
+          omega.config.omega.authPersistence = 'none';
+          ctx.expect(await authPersistence.resolve(omega)).toBeNull();
         } finally {
-          if (orig !== undefined) m.config.omega.authPersistence = orig;
-          else delete m.config.omega.authPersistence;
-          await authPersistence.resolve(m); // restore the active strategy for later suites
+          if (orig !== undefined) omega.config.omega.authPersistence = orig;
+          else delete omega.config.omega.authPersistence;
+          await authPersistence.resolve(omega); // restore the active strategy for later suites
         }
       },
     },
@@ -58,7 +58,7 @@ module.exports = defineCases({
 
         authPersistence.register('desktop-test-custom', fakeStrategy());
         try {
-          // Selection by config is proven at the build layer, on a production manager:
+          // Selection by config is proven at the build layer, on a production omega instance:
           // under test mode resolve() answers none before it reads a thing.
           ctx.expect(authPersistence._strategies['desktop-test-custom'].name).toBe('desktop-test-custom');
           ctx.expect(await authPersistence._strategies['desktop-test-custom'].available()).toBe(true);
@@ -116,47 +116,58 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'bridge account-resolved intake: uid-guarded, cached, broadcast once per change, cleared on sign-out',
+      name: 'auth account-resolved intake: uid-guarded, lands a User, broadcasts { document } once per change, dropped on sign-out',
       run: async (ctx) => {
-        const m = ctx.manager;
-        const bridge = m.omega;
-        const origAuth = bridge._firebaseAuth;
-        const origBroadcast = m.ipc.broadcast;
+        const omega = ctx.omega;
+        const auth = omega.auth;
+        const origAuth = auth._firebaseAuth;
+        const origBroadcast = omega.ipc.broadcast;
         const broadcasts = [];
-        m.ipc.broadcast = (ch, payload) => { if (ch === 'desktop:auth:plan-changed') broadcasts.push(payload); };
-        try {
-          // Main signed out → any push is rejected.
-          bridge._firebaseAuth = { currentUser: null };
-          let res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true } });
-          ctx.expect(res.accepted).toBe(false);
-          ctx.expect(bridge.getResolvedPlan()).toBeNull();
+        omega.ipc.broadcast = (ch, payload) => { if (ch === 'desktop:auth:plan-changed') broadcasts.push(payload); };
 
-          // Matching uid → cached + broadcast.
-          bridge._firebaseAuth = { currentUser: { uid: 'u1', email: 'x@y.z' } };
-          res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
+        // What a signed-in renderer pushes: its User's stored document (resolved,
+        // metadata stamped) and its identity
+        const { User } = require('@omega.js/account');
+        const IDENTITY = { uid: 'u1', email: 'x@y.z', displayName: 'X', photoURL: null, emailVerified: true };
+        const DOCUMENT = new User({ subscription: { product: { id: 'premium' }, status: 'active' }, roles: { betaTester: true } }, IDENTITY).toJSON();
+
+        try {
+          // Main signed out → any push is rejected, `user` stays signed out.
+          auth._firebaseAuth = { currentUser: null };
+          let res = await omega.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', document: DOCUMENT, identity: IDENTITY });
+          ctx.expect(res.accepted).toBe(false);
+          ctx.expect(auth.user.authenticated).toBe(false);
+          ctx.expect(auth.user.plan).toBe('basic');
+
+          // Matching uid → main builds its User from the WHOLE document + broadcasts it.
+          auth._firebaseAuth = { currentUser: { uid: 'u1', email: 'x@y.z' } };
+          res = await omega.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', document: DOCUMENT, identity: IDENTITY });
           ctx.expect(res.accepted).toBe(true);
-          ctx.expect(bridge.getResolvedPlan()).toEqual({ plan: 'pro', active: true });
-          ctx.expect(bridge.getResolvedRoles()).toEqual({ betaTester: true });
+          ctx.expect(auth.user.uid).toBe('u1');
+          ctx.expect(auth.user.plan).toBe('premium');
+          ctx.expect(auth.user.roles.betaTester).toBe(true);
+          ctx.expect(auth.user.profile.displayName).toBe('X');
           ctx.expect(broadcasts.length).toBe(1);
+          ctx.expect(broadcasts[0]).toEqual({ document: auth.user.toJSON() });
 
           // Identical push → accepted but NO second broadcast.
-          await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
+          await omega.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', document: DOCUMENT, identity: IDENTITY });
           ctx.expect(broadcasts.length).toBe(1);
 
-          // Mismatched uid (stale renderer) → dropped, cache intact.
-          res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'other', resolved: { plan: 'max', active: true } });
+          // Mismatched uid (stale renderer) → dropped, account intact.
+          res = await omega.ipc.invoke('desktop:auth:account-resolved', { uid: 'other', document: { subscription: { product: { id: 'max' }, status: 'active' } } });
           ctx.expect(res.accepted).toBe(false);
-          ctx.expect(bridge.getResolvedPlan()).toEqual({ plan: 'pro', active: true });
+          ctx.expect(auth.user.plan).toBe('premium');
 
-          // Sign-out clears the cache.
-          bridge._handleAuthStateChange(null);
-          ctx.expect(bridge.getResolvedPlan()).toBeNull();
-          ctx.expect(bridge.getResolvedRoles()).toBeNull();
+          // Sign-out drops the account.
+          auth._handleAuthStateChange(null);
+          ctx.expect(auth.user.authenticated).toBe(false);
+          ctx.expect(auth.user.plan).toBe('basic');
         } finally {
-          bridge._firebaseAuth = origAuth;
-          m.ipc.broadcast = origBroadcast;
-          bridge._resolvedPlan = null;
-          bridge._resolvedRoles = null;
+          // A case that failed midway still leaves main signed out for the suites after it
+          if (auth.user.authenticated) auth._handleAuthStateChange(null);
+          auth._firebaseAuth = origAuth;
+          omega.ipc.broadcast = origBroadcast;
         }
       },
     },

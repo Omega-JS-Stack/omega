@@ -17,8 +17,8 @@ The NESTED path above is authoritative: it is what `src/defaults/hooks/build/` s
 
 ```js
 // hooks/build/pre.js
-module.exports = async function ({ manager, projectRoot, mode }) {
-  console.log('Pre-build hook running for', manager.getConfig().brand.name);
+module.exports = async function ({ build, projectRoot, mode }) {
+  console.log('Pre-build hook running for', build.getConfig().brand.name);
 
   // Mutate files, generate assets, validate, anything you want.
   // Return a Promise (or use async fn) to make the build wait.
@@ -27,23 +27,21 @@ module.exports = async function ({ manager, projectRoot, mode }) {
 
 ## The `ctx` argument
 
-Hooks take the ONE hook-argument shape every OMEGA framework passes — the same `ctx` @omega.js/desktop hands its lifecycle hooks:
+Hooks take the ONE hook-argument shape every OMEGA framework passes, `{ build, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks:
 
-- `ctx.manager` — the build `Manager` instance (`@omega.js/extension/build`)
-- `ctx.projectRoot` — the consumer project root, absolute
+- `ctx.build`: the build module (`require('@omega.js/extension/build')`, one plain object of functions)
+- `ctx.projectRoot`: the consumer project root, absolute
 - `ctx.mode`: `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`. The deploy hook (`hooks/deploy/pre.js`, run by `omega deploy`) always reads `'production'`: the verb runs outside a build, and what it is about to publish is a release
 
-Everything else a build hook needs comes off `ctx.manager`:
+Everything else a build hook needs comes off `ctx.build`:
 
 | What you want | Where it is |
 |---|---|
-| Parsed `package.json` | `manager.getPackage('project')` |
-| Parsed `src/manifest.json` (JSON5) | `manager.getManifest()` |
-| Resolved `config/omega.json5` (targets.extension overlaid onto the top level) | `manager.getConfig()` |
-| The brand block | `manager.getConfig().brand` |
-| The project / framework roots | `manager.getRootPath('project')` / `manager.getRootPath('main')` |
-
-Until [#591](https://github.com/Omega-JS-Stack/omega/issues/591) this page described an `index` build-info object nothing ever built — the task passed its internal watch counter, so a hook written from these docs read `undefined` at its first property.
+| Parsed `package.json` | `build.getPackage('project')` |
+| Parsed `src/manifest.json` (JSON5) | `build.getManifest()` |
+| Resolved `config/omega.json5` (targets.extension overlaid onto the top level) | `build.getConfig()` |
+| The brand block | `build.getConfig().brand` |
+| The project / framework roots | `build.getRootPath('project')` / `build.getRootPath('main')` |
 
 ## Common uses
 
@@ -54,8 +52,8 @@ Until [#591](https://github.com/Omega-JS-Stack/omega/issues/591) this page descr
 const fs = require('fs');
 const path = require('path');
 
-module.exports = async function ({ manager, projectRoot }) {
-  const manifest = manager.getManifest();
+module.exports = async function ({ build, projectRoot }) {
+  const manifest = build.getManifest();
   const changelog = fs.readFileSync(path.join(projectRoot, 'CHANGELOG.md'), 'utf8');
   const latestVersion = changelog.match(/## \[([\d.]+)\]/)?.[1];
   if (latestVersion && latestVersion !== manifest.version) {
@@ -84,11 +82,11 @@ module.exports = async function ({ projectRoot }) {
 
 ```js
 // hooks/build/post.js
-module.exports = async function ({ manager }) {
+module.exports = async function ({ build }) {
   if (process.env.OMEGA_IS_PUBLISH !== 'true') return;   // only after real publish
   await fetch('https://api.myservice.com/extension-released', {
     method: 'POST',
-    body: JSON.stringify({ version: manager.getManifest().version }),
+    body: JSON.stringify({ version: build.getManifest().version }),
   });
 };
 ```

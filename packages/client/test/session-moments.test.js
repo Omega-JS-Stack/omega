@@ -1,13 +1,13 @@
 const { describe, it, before, beforeEach } = require('node:test');
 const { registerHooks } = require('node:module');
-const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
+const { getOmega, TEST_CONFIG, assert } = require('./helpers.js');
 
 // #798: the probe is only worth having if something ASKS it. The boot wires the
 // two free moments of doubt (the tab coming back into view, and the network
 // coming back) beside the auth state listener, so web, desktop and extension
 // get them from the one place. The third moment, a 401, is the request layer's
 // onUnauthorized dep (request.test.js).
-describe('Manager: the session probe\'s moments of doubt (#798)', () => {
+describe('Omega: the session probe\'s moments of doubt (#798)', () => {
 
   const USER = { uid: 'user-1', email: 'user@test.com', emailVerified: true, metadata: {}, providerData: [] };
 
@@ -67,7 +67,7 @@ describe('Manager: the session probe\'s moments of doubt (#798)', () => {
 
   before(async () => {
     // Registered here, not at load: hooks route every later require through the
-    // ESM loader, and the helpers' Manager import pulls in CJS that will not
+    // ESM loader, and the helpers' Omega import pulls in CJS that will not
     // survive the trip.
     stubFirebaseModules();
 
@@ -87,7 +87,7 @@ describe('Manager: the session probe\'s moments of doubt (#798)', () => {
     };
 
     // A config the SDK can actually boot: apiKey is what gates _initializeFirebase
-    await getManager().initialize({
+    await getOmega().initialize({
       ...TEST_CONFIG,
       firebase: { app: { enabled: true, config: { apiKey: 'test-api-key', projectId: 'test-project' } } },
     });
@@ -100,7 +100,7 @@ describe('Manager: the session probe\'s moments of doubt (#798)', () => {
   });
 
   it('should register visibilitychange on the document and online on the window', () => {
-    assert.strictEqual(listeners('document', 'visibilitychange').length, 1, 'ONE registration per manager instance');
+    assert.strictEqual(listeners('document', 'visibilitychange').length, 1, 'ONE registration per Omega instance');
     assert.ok(listeners('window', 'online').length >= 1, 'the network coming back is the second moment');
   });
 

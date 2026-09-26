@@ -1,6 +1,6 @@
 # Lib Modules
 
-`src/lib/*.js` — every Electron concern is its own module. Each exports a singleton with `initialize(manager)`; the main-process Manager wires them in a fixed order at boot (see [boot-sequence.md](boot-sequence.md)). Each module's deep reference lives at `docs/<lib-name>.md`; the module list is in the framework guide's Architecture section ([docs/desktop/index.md](../../../docs/desktop/index.md)).
+`src/lib/*.js`: every Electron concern is its own module. Each exports one object with `initialize(omega)`; the main-process instance hangs each on itself by name and initializes them in a fixed order at boot (see [boot-sequence.md](boot-sequence.md)). Each module's deep reference lives at `docs/<lib-name>.md`; the module list is in the framework guide's Architecture section ([docs/desktop/index.md](../../../docs/desktop/index.md)).
 
 ## Lib initialization contract
 
@@ -9,10 +9,10 @@ Each lib exposes the same skeleton:
 ```js
 const myLib = {
   _initialized: false,
-  _manager: null,
+  _omega: null,
 
-  initialize(manager) {
-    myLib._manager = manager;
+  initialize(omega) {
+    myLib._omega = omega;
     // wire IPC handlers, app event listeners, etc.
     myLib._initialized = true;
   },
@@ -33,9 +33,9 @@ Don't use `EventEmitter` unless the lib genuinely emits multiple event types. Fo
 
 ## Adding a new lib
 
-1. Create `src/lib/<name>.js` exporting a singleton object with `initialize(manager)`.
-2. Wire it into the boot order in `src/main.js` (or the renderer/preload Manager if it's a per-context lib) — check [boot-sequence.md](boot-sequence.md) for where it belongs and what it may depend on.
-3. Attach it to `Manager.prototype` as `manager.<camelCaseName>` so consumers can access it at runtime.
+1. Create `src/lib/<name>.js` exporting one object with `initialize(omega)`.
+2. Wire it into the boot order in `src/main.js` (or the renderer/preload class if it's a per-context lib): check [boot-sequence.md](boot-sequence.md) for where it belongs and what it may depend on.
+3. Set it on the instance in the `Omega` constructor as `this.<camelCaseName>`, so consumers reach it at runtime as `omega.<camelCaseName>`.
 4. Write tests at every layer the lib has a surface in (see [test-framework.md](test-framework.md)) — at minimum `src/test/suites/main/<name>.test.js`.
 5. Add a `docs/<name>.md` deep reference, add the module's row to the Lib modules table in the framework guide (`docs/desktop/index.md`), and link it from the Documentation index.
 
@@ -48,6 +48,6 @@ Don't use `EventEmitter` unless the lib genuinely emits multiple event types. Fo
 
 ## See also
 
-- [boot-sequence.md](boot-sequence.md) — the fixed `manager.initialize()` order + rationale
-- [environment-detection.md](environment-detection.md) — cross-context helpers shared by all four Managers via `attachTo(Manager)`
+- [boot-sequence.md](boot-sequence.md): the fixed `omega.initialize()` order + rationale
+- [environment-detection.md](environment-detection.md): cross-context helpers shared by the three processes and the build module
 - [test-framework.md](test-framework.md) — the four-layer harness new libs must ship tests in

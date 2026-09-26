@@ -14,7 +14,7 @@
  *
  * Run: npx omega test backend:helpers/web-target
  */
-const { resolveWebTarget, cmsContext } = require('../../dist/manager/helpers/web-target.js');
+const { resolveWebTarget, cmsContext } = require('../../dist/omega/helpers/web-target.js');
 const { brandConfig } = require('./_cms-target-harness.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 

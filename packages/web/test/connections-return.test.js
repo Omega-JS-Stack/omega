@@ -59,7 +59,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -149,9 +149,9 @@ async function bootCallback({ answer, rejection, search = '?code=auth-code-784&s
 
   globalThis.__omegaClient = {
     getApiUrl: () => 'https://api.test',
-    dom: () => ({ ready: async () => {} }),
+    dom: { ready: async () => {} },
     // The page does its whole job inside this callback
-    auth: () => ({ listen: (options, handler) => handler() }),
+    auth: { listen: (options, handler) => handler() },
     request: async (url, options = {}) => {
       if (options.wakeup) {
         return {};

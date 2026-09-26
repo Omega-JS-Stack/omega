@@ -1,0 +1,21 @@
+// Surface: a consumer section's contract (args, defaults, showcase demo)
+// Doc: node_modules/@omega.js/web/docs/sections.md
+{
+  description: 'The notes band: a composer form, the signed-in user\'s notes, and two bindings (the display name and the notes written so far). Its behavior lives in the page module, js/pages/notes.js.',
+
+  args: {
+    placeholder: 'string',
+    submit_label: 'string',
+    empty_text: 'string',
+  },
+
+  defaults: {
+    placeholder: 'Write a note (up to 280 characters)',
+    submit_label: 'Add note',
+    empty_text: 'No notes yet. Write the first one above.',
+  },
+
+  demo: [
+    { label: 'Default' },
+  ],
+}

@@ -20,8 +20,8 @@ Caller (route/transition/cron)
 
 | Context | API | Delivers via |
 |---|---|---|
-| Transactional (individual) | `Manager.Email(ctx).send(settings)` | SendGrid Mail Send |
-| Marketing (campaign) | `Manager.Email(ctx).sendCampaign(settings)` | SendGrid Single Send + Beehiiv |
+| Transactional (individual) | `ctx.email.send(options)` (or `omega.email.send(options)` outside a request) | SendGrid Mail Send |
+| Marketing (campaign) | `ctx.email.sendCampaign(options)` | SendGrid Single Send + Beehiiv |
 | Newsletter (generated) | `generators/newsletter.js` → `renderNewsletter()` | Same as marketing |
 
 ### Shared Preparation (`prepare.js`)
@@ -30,8 +30,8 @@ Both transactional and marketing paths share the same preparation layer:
 
 | Function | Purpose |
 |---|---|
-| `resolveBrand(Manager)` | Clones brand config, sanitizes images (SVG→PNG via CDN naming) |
-| `resolveSender({ sender, from, group }, brand, brandDomain, Manager)` | Resolves sender from/display-name by category key, and the ASM group id from config (`marketing.campaigns.providers.sendgrid.groups.<key>`) — see [Unsubscribe groups](#unsubscribe-groups) |
+| `resolveBrand(omega)` | Clones brand config, sanitizes images (SVG→PNG via CDN naming) |
+| `resolveSender({ sender, from, group }, brand, brandDomain, omega)` | Resolves sender from/display-name by category key, and the ASM group id from config (`marketing.campaigns.providers.sendgrid.groups.<key>`); see [Unsubscribe groups](#unsubscribe-groups) |
 | `renderContent({ content, html, trusted }, utmOptions)` | Markdown→HTML via markdown-it, applies UTM link tagging. Raw HTML in `content` is DISABLED unless `trusted` is set — see [Content trust](#content-trust) |
 | `resolvePerson(brand)` | The `brand.contact.person` identity for personal email. Throws 400 when unconfigured — see [Identity is config, or it is an error](#identity-is-config-or-it-is-an-error) |
 | `resolveSignoff(signoff, brand)` | Fills personal signoff details (name, headshot, URL) from `brand.contact.person` when `type: 'personal'` |
@@ -152,7 +152,7 @@ The vendor list is a committed **seed** plus a gitignored **refresh cache**, own
 
 | | Path | Written by |
 |---|---|---|
-| Seed (committed) | `src/manager/libraries/email/data/disposable-domains.json` | `node scripts/promote-disposable-domains.js` — nothing else, ever |
+| Seed (committed) | `src/omega/libraries/email/data/disposable-domains.json` | `node scripts/promote-disposable-domains.js`, nothing else, ever |
 | Cache (gitignored) | `.cache/email/disposable-domains.json` | `node scripts/update-disposable-domains.js` (also the `npm prepare` before-hook) |
 
 `load()` reads the cache when it is present and parseable, else the seed — so an offline clone, a CI box with no network, and a deployed function (which ships the seed and no cache) all resolve the same committed baseline.
@@ -385,21 +385,21 @@ Outside extended mode, `Transactional.send()` **records** the email instead of d
 
 **The gate is the mailer's, not the caller's.** `ctx.isTesting() && !TEST_EXTENDED_MODE` is asked in exactly one place (`isCapturing()`), the way the marketing library gates `add`/`sync`/`remove` at the SSOT level. Do not add an `isTesting()` check around a new `send()` call — the seam already covers it. What the seam does NOT cover: a send scheduled past `SEND_AT_LIMIT` is queued to `emails-queue` before the seam is reached (assert it there), and extended mode still sends real mail.
 
-**The store is a file:** `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `Manager.cwd`). A file rather than a `_test/emails` Firestore collection because a test drives the mailer from three places and only a file serves all three — the emulator's function worker (another process from the test runner, so an in-memory array is impossible), the test-runner process itself, and a plain-node case with no emulator and therefore no Firestore to read. It also needs no rules, no index and no cleanup lane, and `.temp/` is already gitignored. Cross-process appends stay atomic by keeping every record under `PIPE_BUF` (the summary absorbs the trim).
+**The store is a file:** `<projectDir>/.temp/test-emails.jsonl`, one JSON record per line, beside `test-mode.json` and resolved the same way (the parent of `omega.cwd`). A file rather than a `_test/emails` Firestore collection because a test drives the mailer from three places and only a file serves all three: the emulator's function worker (another process from the test runner, so an in-memory array is impossible), the test-runner process itself, and a plain-node case with no emulator and therefore no Firestore to read. It also needs no rules, no index and no cleanup lane, and `.temp/` is already gitignored. Cross-process appends stay atomic by keeping every record under `PIPE_BUF` (the summary absorbs the trim).
 
 **The helpers are test-only** (`src/test/utils/email-capture.js`, never a framework export, exactly like `test-mode-file.js`):
 
 ```javascript
 const capture = require('../../dist/test/utils/email-capture.js');
 
-capture.clearCaptured(Manager);              // before the act
-await http.as('signup-emails').post('backend-manager/user/signup', {});
-capture.readCaptured(Manager);               // [{ to, template, subject, summary, sendAt }]
+capture.clearCaptured(omega);                // before the act
+await http.as('signup-emails').post('omega/user/signup', {});
+capture.readCaptured(omega);                 // [{ to, template, subject, summary, sendAt }]
 ```
 
 The record's `summary` is the rendered body reduced to visible text — where a test finds the product name a receipt exists to state. Field table and the fire-and-forget caveat: [test-framework.md](test-framework.md#testing-mode-email-capture--how-a-test-reads-what-was-sent).
 
-All email tests live under `test/email/`, mirroring the source at `src/manager/libraries/email/`:
+All email tests live under `test/email/`, mirroring the source at `src/omega/libraries/email/`:
 
 | Test file | What it tests | Extended? |
 |---|---|---|
@@ -433,27 +433,27 @@ All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_te
 
 | Purpose | File |
 |---|---|
-| Shared preparation | `src/manager/libraries/email/prepare.js` |
-| Transactional pipeline | `src/manager/libraries/email/transactional/index.js` |
-| Marketing pipeline | `src/manager/libraries/email/marketing/index.js` |
-| MJML compiler (both email + newsletter) | `src/manager/libraries/email/generators/lib/mjml-template.js` |
-| Template registry | `src/manager/libraries/email/generators/lib/templates/index.js` |
-| Base blocks | `src/manager/libraries/email/generators/lib/templates/base.js` |
-| Card template | `src/manager/libraries/email/generators/lib/templates/card.js` |
-| Plain template | `src/manager/libraries/email/generators/lib/templates/plain.js` |
-| Order template (9 events) | `src/manager/libraries/email/generators/lib/templates/order.js` |
-| Feedback template | `src/manager/libraries/email/generators/lib/templates/feedback.js` |
-| UTM link tagging | `src/manager/libraries/email/utm.js` |
-| Constants (senders, groups, fields, segments) | `src/manager/libraries/email/constants.js` |
-| Email validation | `src/manager/libraries/email/validation.js` |
-| Typo domain prefixes | `src/manager/libraries/email/data/typo-domains.js` |
-| Custom disposable domains | `src/manager/libraries/email/data/custom-disposable-domains.json` |
-| Disposable-domain seed/cache contract | `src/manager/libraries/email/disposable-domains.js` |
-| NeverBounce provider | `src/manager/libraries/email/validation-provider-neverbounce.js` |
+| Shared preparation | `src/omega/libraries/email/prepare.js` |
+| Transactional pipeline | `src/omega/libraries/email/transactional/index.js` |
+| Marketing pipeline | `src/omega/libraries/email/marketing/index.js` |
+| MJML compiler (both email + newsletter) | `src/omega/libraries/email/generators/lib/mjml-template.js` |
+| Template registry | `src/omega/libraries/email/generators/lib/templates/index.js` |
+| Base blocks | `src/omega/libraries/email/generators/lib/templates/base.js` |
+| Card template | `src/omega/libraries/email/generators/lib/templates/card.js` |
+| Plain template | `src/omega/libraries/email/generators/lib/templates/plain.js` |
+| Order template (9 events) | `src/omega/libraries/email/generators/lib/templates/order.js` |
+| Feedback template | `src/omega/libraries/email/generators/lib/templates/feedback.js` |
+| UTM link tagging | `src/omega/libraries/email/utm.js` |
+| Constants (senders, groups, fields, segments) | `src/omega/libraries/email/constants.js` |
+| Email validation | `src/omega/libraries/email/validation.js` |
+| Typo domain prefixes | `src/omega/libraries/email/data/typo-domains.js` |
+| Custom disposable domains | `src/omega/libraries/email/data/custom-disposable-domains.json` |
+| Disposable-domain seed/cache contract | `src/omega/libraries/email/disposable-domains.js` |
+| NeverBounce provider | `src/omega/libraries/email/validation-provider-neverbounce.js` |
 | Testing-mode capture (the SendGrid stand-in) | `src/test/utils/email-capture.js` |
-| ZeroBounce provider | `src/manager/libraries/email/validation-provider-zerobounce.js` |
+| ZeroBounce provider | `src/omega/libraries/email/validation-provider-zerobounce.js` |
 | Validation tests | `test/email/validation.test.js`, `test/email/validation-cases.test.js` |
 | Content-trust test (render lanes + escaping) | `test/email/render-content.test.js` |
 | Identity test (config-driven + loud failures) | `test/email/identity.test.js` |
 | Seed campaigns | `src/cli/commands/setup-tests/helpers/seed-campaigns.js` |
-| Transition email dispatcher | `src/manager/events/firestore/payments-webhooks/transitions/send-email.js` |
+| Transition email dispatcher | `src/omega/events/firestore/payments-webhooks/transitions/send-email.js` |

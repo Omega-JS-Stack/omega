@@ -12,7 +12,7 @@
  * Plain-node unit test (no emulator, no network): build() is a pure string.
  */
 const assert = require('node:assert');
-const order = require('../../dist/manager/libraries/email/generators/lib/templates/order.js');
+const order = require('../../dist/omega/libraries/email/generators/lib/templates/order.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const BRAND = { name: 'Test Brand', url: 'https://test.dev' };

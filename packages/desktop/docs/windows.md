@@ -1,6 +1,6 @@
 # Windows
 
-**Lazy named-window registry.** @omega.js/desktop does NOT auto-create any window. Your `main.js` calls `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(() => { ... })`. Always create `main` — its presence in the registry is what lets @omega.js/desktop's `app.on('activate')` (macOS dock click) and `app.on('second-instance')` (win/linux re-launch) handlers surface UI when the user double-clicks the running app. In hidden launches, pass `show: false` to keep the window invisible until something explicitly calls `windows.show('main')`. Use the registry for the common case (named, persistent, integrated windows). For one-off windows (a toast, a print preview), use `new BrowserWindow()` directly — `window-manager` doesn't get in the way.
+**Lazy named-window registry.** @omega.js/desktop does NOT auto-create any window. Your `main.js` calls `omega.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `omega.initialize().then(() => { ... })`. Always create `main`: its presence in the registry is what lets @omega.js/desktop's `app.on('activate')` (macOS dock click) and `app.on('second-instance')` (win/linux re-launch) handlers surface UI when the user double-clicks the running app. In hidden launches, pass `show: false` to keep the window invisible until something explicitly calls `windows.show('main')`. Use the registry for the common case (named, persistent, integrated windows). For one-off windows (a toast, a print preview), use `new BrowserWindow()` directly, `window-manager` doesn't get in the way.
 
 ## Re-surface on user re-launch
 
@@ -14,20 +14,20 @@ Both handlers are no-ops if `main` isn't in the registry. So consumers who genui
 ## API
 
 ```js
-await manager.windows.create('main', overrides?)        // canonical entry point
-await manager.windows.createNamed('main', mgr, opts?)   // identical; .create() is sugar
-manager.windows.get('main')                              // BrowserWindow | null
-manager.windows.show('main')                             // show + focus + auto app.dock.show()
-manager.windows.hide('main')
-manager.windows.close('main')                            // force-close (bypasses hideOnClose)
-manager.windows.list()                                   // string[] of currently-open names
+await omega.windows.create('main', overrides?)        // canonical entry point
+await omega.windows.createNamed('main', mgr, opts?)   // identical; .create() is sugar
+omega.windows.get('main')                              // BrowserWindow | null
+omega.windows.show('main')                             // show + focus + auto app.dock.show()
+omega.windows.hide('main')
+omega.windows.close('main')                            // force-close (bypasses hideOnClose)
+omega.windows.list()                                   // string[] of currently-open names
 ```
 
 `create()` is single-instance: a second call with the same name returns the existing window and focuses it (no double-create).
 
 ## Defaults
 
-No JSON config required. @omega.js/desktop bakes in sensible defaults so `manager.windows.create('main')` "just works":
+No JSON config required. @omega.js/desktop bakes in sensible defaults so `omega.windows.create('main')` "just works":
 
 | Window | Defaults |
 |---|---|
@@ -37,8 +37,8 @@ No JSON config required. @omega.js/desktop bakes in sensible defaults so `manage
 Override at the call site:
 
 ```js
-manager.windows.create('main',     { width: 1280, height: 800 });
-manager.windows.create('settings', { width: 600,  height: 480 });
+omega.windows.create('main',     { width: 1280, height: 800 });
+omega.windows.create('settings', { width: 600,  height: 480 });
 ```
 
 ## Config (optional)
@@ -60,7 +60,7 @@ Per-window keys:
 | `view` | `main` | `<name>` | Folder under `src/views/`. Loads `dist/views/<view>/index.html`. |
 | `width` / `height` | 1024 / 720 | 800 / 600 | Initial size (overridden by saved bounds if `persistBounds: true`). |
 | `minWidth` / `minHeight` | 400 / 300 | 400 / 300 | |
-| `show` | `true` | `true` | Auto-show on `ready-to-show`. `false` keeps the window hidden until `manager.windows.show()`. |
+| `show` | `true` | `true` | Auto-show on `ready-to-show`. `false` keeps the window hidden until `omega.windows.show()`. |
 | `hideOnClose` | `true` | `false` | Discord-style: X click hides instead of closes. See "Hide-on-close" below. |
 | `title` | `app.productName` | `app.productName` | Window title. |
 | `backgroundColor` | `#ffffff` | `#ffffff` | Background color before the page loads. |
@@ -96,15 +96,15 @@ The `main` window's X button **hides instead of closes** by default. Real quit o
 - Menu Quit (`main/quit` on mac, `file/quit` on win/linux)
 - Tray Quit (`quit` item)
 - Auto-updater install (`autoUpdater.installNow()`)
-- Programmatic `manager.quit({ force: true })`
+- Programmatic `omega.quit({ force: true })`
 
 The window-manager close handler checks three flags before deciding to swallow vs let through:
 
 | Flag | Set by | Means |
 |---|---|---|
-| `manager._allowQuit` | `manager.quit({ force: true })`, `autoUpdater.installNow()` | Programmatic force — let the close go through. |
-| `manager._isQuitting` | `app.on('before-quit')` (every quit path Electron knows about) | App is quitting — let close events flow naturally. |
-| `win._emForceClose` | `manager.windows.close(name)` | Per-window override. |
+| `omega._allowQuit` | `omega.quit({ force: true })`, `autoUpdater.installNow()` | Programmatic force: let the close go through. |
+| `omega._isQuitting` | `app.on('before-quit')` (every quit path Electron knows about) | App is quitting: let close events flow naturally. |
+| `win._emForceClose` | `omega.windows.close(name)` | Per-window override. |
 
 Other named windows default to `hideOnClose: false` (X actually closes). Override per window via config or call-site overrides.
 
@@ -121,27 +121,27 @@ Every named window's position and size persist to storage on resize / move / max
 
 ## macOS dock auto-show
 
-When `LSUIElement: true` is baked at build time (`startup.mode: 'hidden'`), the app launches with **no dock icon, no Cmd+Tab, no taskbar**. The first time `manager.windows.create()` or `manager.windows.show()` runs, @omega.js/desktop calls `app.dock.show()` automatically — the dock icon appears alongside the window.
+When `LSUIElement: true` is baked at build time (`startup.mode: 'hidden'`), the app launches with **no dock icon, no Cmd+Tab, no taskbar**. The first time `omega.windows.create()` or `omega.windows.show()` runs, @omega.js/desktop calls `app.dock.show()` automatically: the dock icon appears alongside the window.
 
-**And the inverse**: for `startup.mode: 'hidden'` apps, when the LAST visible named window hides (hide-on-close X, `windows.hide()`, any consumer `win.hide()`), @omega.js/desktop calls `app.dock.hide()` again — the app returns to its fully-invisible posture, dock and UI appearing and vanishing together. Normal-mode apps keep their dock icon for life; quit paths are untouched (`manager._isQuitting` guard).
+**And the inverse**: for `startup.mode: 'hidden'` apps, when the LAST visible named window hides (hide-on-close X, `windows.hide()`, any consumer `win.hide()`), @omega.js/desktop calls `app.dock.hide()` again: the app returns to its fully-invisible posture, dock and UI appearing and vanishing together. Normal-mode apps keep their dock icon for life; quit paths are untouched (`omega._isQuitting` guard).
 
 This means agent / menubar apps can stay completely invisible until the user explicitly asks for UI:
 
 ```js
-manager.initialize().then(() => {
+omega.initialize().then(() => {
   // Don't call windows.create() here — app stays invisible.
   // Surface UI later when something warrants it:
-  manager.tray.update('open', { click: () => manager.windows.create('main') });
+  omega.tray.update('open', { click: () => omega.windows.create('main') });
 });
 ```
 
 ## Auto-attach context-menu
 
-Every window created via `manager.windows.create()` is automatically wired up with the consumer's `src/integrations/context-menu/index.js` (see [context-menu.md](context-menu.md)). Idempotent per webContents (uses a WeakSet). For windows you create directly with `new BrowserWindow()`, call `manager.contextMenu.attach(win.webContents)` manually.
+Every window created via `omega.windows.create()` is automatically wired up with the consumer's `src/integrations/context-menu/index.js` (see [context-menu.md](context-menu.md)). Idempotent per webContents (uses a WeakSet). For windows you create directly with `new BrowserWindow()`, call `omega.contextMenu.attach(win.webContents)` manually.
 
 ## Testing mode: stealth surfacing
 
-When `manager.isTesting()` (i.e. under `npx omega test`), every surfacing path in this lib — `ready-to-show`, `windows.show()`, the create-dedup focus — goes **stealth** instead of `win.show()`: `_surface()` applies the shared recipe from `src/utils/stealth-window.js` and surfaces via `showInactive()`, with no `win.focus()`/dock surfacing. **The full stealth story lives in [test-framework.md](test-framework.md) (SSOT)** — the recipe and why it's not `hide()`/`minimize()`, the raw-window `browser-window-created` hook, `webContents.focus()` suppression, macOS app-level activation suppression, and the **`OMEGA_TEST_SHOW=1`** opt-out. Covered by `suites/main/stealth-window.test.js`.
+When `omega.isTesting()` (i.e. under `npx omega test`), every surfacing path in this lib (`ready-to-show`, `windows.show()`, the create-dedup focus) goes **stealth** instead of `win.show()`: `_surface()` applies the shared recipe from `src/utils/stealth-window.js` and surfaces via `showInactive()`, with no `win.focus()`/dock surfacing. **The full stealth story lives in [test-framework.md](test-framework.md) (SSOT)**: the recipe and why it's not `hide()`/`minimize()`, the raw-window `browser-window-created` hook, `webContents.focus()` suppression, macOS app-level activation suppression, and the **`OMEGA_TEST_SHOW=1`** opt-out. Covered by `suites/main/stealth-window.test.js`.
 
 ## Platform behavior
 

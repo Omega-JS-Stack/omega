@@ -29,9 +29,9 @@
 // take the same options and each bundle is one self-contained file.
 
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('bundle');
-const watcherLogger = Manager.logger('bundle:watcher');
+const build = require('../../build.js');
+const logger = build.logger('bundle');
+const watcherLogger = build.logger('bundle:watcher');
 const { watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const path = require('path');
@@ -48,11 +48,11 @@ const { resolveLicenseStamp } = require('@omega.js/devkit/license');
 const buildJsonKit = require('@omega.js/devkit/build-json');
 
 // Load package
-const project = Manager.getPackage('project');
-const manifest = Manager.getManifest();
-const config = Manager.getConfig();
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const project = build.getPackage('project');
+const manifest = build.getManifest();
+const config = build.getConfig();
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Themes are per-framework (#261) — a shared theme.id naming a WEB theme falls
 // back to the extension's default instead of aliasing a directory that isn't there.
@@ -76,7 +76,7 @@ const FIREFOX_MV3_FLOOR = 91;
  * this pair and leaves everything newer alone; it never polyfills a runtime
  * API, which is the one thing preset-env's core-js path could have done and
  * this build never asked it to.
- * @param {object} manifest - the project's manifest (`Manager.getManifest()`)
+ * @param {object} manifest - the project's manifest (`build.getManifest()`)
  * @returns {string[]} esbuild targets, `['chrome<n>', 'firefox<n>']`
  */
 function resolveSyntaxTarget(manifest) {
@@ -154,7 +154,7 @@ const watchInput = [
   // All project assets js - watch for changes but don't compile as entry points
   'src/assets/js/**/*.js',
 
-  // All BXM package src files - watch for changes (includes background.js, popup.js, etc.)
+  // All @omega.js/extension src files - watch for changes (includes background.js, popup.js, etc.)
   `${rootPathPackage}/src/**/*.js`,
 
   // So we can watch for changes while we're developing @omega.js/client
@@ -196,7 +196,7 @@ async function runBundle() {
     // content script, or an MV3 service worker registered as a classic script.
     format: 'iife',
     target: SYNTAX_TARGET,
-    dev: !Manager.actLikeProduction(),
+    dev: !build.actLikeProduction(),
     alias: {
       // For importing assets
       '__main_assets__': path.resolve(rootPathPackage, 'dist/assets'),
@@ -260,10 +260,10 @@ function substituteTemplates(files, replacements) {
 // (clientConfig, off the schema's own `client` flag), and the wrapper around it
 // is @omega.js/devkit's ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
 function buildFacts() {
-  const environment = Manager.getEnvironment();
+  const environment = build.getEnvironment();
 
   // The live sibling website's published origin, or null when none is up (#262)
-  const devWebsiteOrigin = Manager.getDevWebsiteOrigin();
+  const devWebsiteOrigin = build.getDevWebsiteOrigin();
 
   // The local stack's resolved facts (N7): the sibling backend's published map
   // plus anything a parent injected on the env channel, the sibling WEBSITE's
@@ -287,7 +287,7 @@ function buildFacts() {
     // A local-stack number like every other one here, so it rides the local
     // stack's own map and never a second legacy fact beside it
     // ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)).
-    liveReloadPort: config.liveReloadPort || Manager.getLiveReloadPort(),
+    liveReloadPort: config.liveReloadPort || build.getLiveReloadPort(),
   };
 
   return {
@@ -333,15 +333,15 @@ async function composeBuildJson() {
   // Resolved ONCE per build: a PRODUCTION build asks the license server (a key
   // that cannot be answered THROWS, which is what gates a bad-key publish), and
   // a dev build is keyless by definition and never phones home.
-  const license = await resolveLicenseStamp({ config, production: Manager.getEnvironment() === 'production' });
+  const license = await resolveLicenseStamp({ config, production: build.getEnvironment() === 'production' });
 
   // The verdict a run built under, said ONCE — web/backend/desktop all print theirs.
-  logger.log(`bundling — environment=${Manager.getEnvironment()}, license=${license.status}`);
+  logger.log(`bundling — environment=${build.getEnvironment()}, license=${license.status}`);
 
   const buildJson = buildJsonKit.composeBuildJson({
     config,
     pkg: project,
-    mode: Manager.getMode(),
+    mode: build.getMode(),
     license,
     facts: buildFacts(),
   });
@@ -362,7 +362,7 @@ function bundleDefines() {
     // webpack derived this from its `mode`; esbuild has no modes, so the
     // switch every bundled library reads is stated here instead. Dropping it
     // would ship every library's DEVELOPMENT branch to a store.
-    'process.env.NODE_ENV': Manager.actLikeProduction() ? '"production"' : '"development"',
+    'process.env.NODE_ENV': build.actLikeProduction() ? '"production"' : '"development"',
     // Libraries like lodash/@firebase/util reference the Node-ism `global`;
     // a browser bundle leaves it undefined, so it is rewritten textually.
     global: 'globalThis',
@@ -393,13 +393,13 @@ const BAKED_KEYS = bakeKeys('extension');
  * @param {object} config - The target's resolved omega.json5 config.
  * @param {object} env - The build env.
  * @param {object} [options]
- * @param {boolean} [options.build] - Build/publish mode (default: the Manager's).
+ * @param {boolean} [options.build] - Build/publish mode (default: the build module's).
  * @param {object} [options.logger] - Logger with `warn` (default: this task's).
  * @throws {Error} in build mode, naming every brand-level key and the config path that requires it.
  */
 function assertBakeRules(config, env, options) {
   options = options || {};
-  const build = options.build === undefined ? Manager.isBuildMode() : options.build;
+  const buildMode = options.build === undefined ? build.isBuildMode() : options.build;
   const warn = (options.logger || logger).warn.bind(options.logger || logger);
 
   const violations = checkEnvRules(config, env, { target: 'extension' })
@@ -413,7 +413,7 @@ function assertBakeRules(config, env, options) {
   const message = `${violations.length} env ${violations.length === 1 ? 'key this brand\'s config requires is' : 'keys this brand\'s config requires are'} missing from the build env: ${named}. `
     + 'Set it in the brand .env (and as a repo Actions secret for a CI publish — `omega deploy` pushes them), then build again.';
 
-  if (build) {
+  if (buildMode) {
     throw new Error(message);
   }
 
@@ -440,8 +440,8 @@ function readBakedEnv(env, options) {
 function bundleTask(complete) {
   // Log
   logger.log('Starting...');
-  Manager.logMemory(logger, 'Start');
-  logger.log(`Mode: ${Manager.actLikeProduction() ? 'production' : 'development'}`);
+  build.logMemory(logger, 'Start');
+  logger.log(`Mode: ${build.actLikeProduction() ? 'production' : 'development'}`);
   logger.log(`Target: ${SYNTAX_TARGET.join(', ')}`);
 
   runBundle()
@@ -450,20 +450,20 @@ function bundleTask(complete) {
       logger.log('Finished!');
 
       // Trigger rebuild
-      Manager.triggerRebuild(compiled);
+      build.triggerRebuild(compiled, logger);
 
       // Complete successfully
       return complete();
     })
     // esbuild rejects with every error already formatted, so a failed build
     // surfaces through the same reporter webpack's did.
-    .catch((e) => Manager.reportBuildError(Object.assign(e, { plugin: 'Bundle' }), complete));
+    .catch((e) => build.reportBuildError(Object.assign(e, { plugin: 'Bundle' }), complete));
 }
 
 // Watcher task
 function bundleWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }
@@ -554,11 +554,11 @@ function getTemplateReplaceOptions() {
     ...config,
 
     // Additional
-    environment: Manager.getEnvironment(),
+    environment: build.getEnvironment(),
 
     // Specific
     firebaseVersion: version.clean(require('@omega.js/client/package.json').dependencies.firebase),
-    liveReloadPort: Manager.getLiveReloadPort(),
+    liveReloadPort: build.getLiveReloadPort(),
   }
 
   // Return

@@ -10,14 +10,14 @@
 // Fetch timeout:  60s
 //
 // The file is plain JavaScript fetched as text. It runs as an async function
-// body with `manager` and `require` in scope — full main-process access.
+// body with `omega` and `require` in scope: full main-process access.
 // Dedup is automatic: the script's content hash is stored in electron-store and
 // the same script won't re-execute until the content changes.
 //
 // API:
-//   manager.remoteScripts.refreshNow()    → force-fetch + execute if changed
-//   manager.remoteScripts.getLastRun()    → { hash, timestamp } or null
-//   manager.remoteScripts.clearExecuted() → wipe stored hash (forces re-run next poll)
+//   omega.remoteScripts.refreshNow()    → force-fetch + execute if changed
+//   omega.remoteScripts.getLastRun()    → { hash, timestamp } or null
+//   omega.remoteScripts.clearExecuted() → wipe stored hash (forces re-run next poll)
 
 const LoggerLite           = require('./logger-lite.js');
 const fetch                = require('wonderful-fetch');
@@ -31,17 +31,17 @@ const FETCH_TIMEOUT_MS = 60 * 1000;
 
 const remoteScripts = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _url:         null,
   _enabled:     false,
   _intervalId:  null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (remoteScripts._initialized) return;
     remoteScripts._initialized = true;
-    remoteScripts._manager = manager;
+    remoteScripts._omega = omega;
 
-    const cfg = manager.config.remoteScripts || {};
+    const cfg = omega.config.remoteScripts || {};
     remoteScripts._enabled = cfg.enabled === true;
 
     if (!remoteScripts._enabled) {
@@ -51,8 +51,8 @@ const remoteScripts = {
 
     if (cfg.url) {
       remoteScripts._url = cfg.url;
-    } else if (manager.config.brand.url) {
-      const base = String(manager.config.brand.url).replace(/\/$/, '');
+    } else if (omega.config.brand.url) {
+      const base = String(omega.config.brand.url).replace(/\/$/, '');
       remoteScripts._url = `${base}/data/scripts/main.js`;
     }
 
@@ -72,9 +72,9 @@ const remoteScripts = {
     remoteScripts.refreshNow()
       .catch((e) => logger.warn(`initial fetch failed: ${formatFetchError(e)}`));
 
-    const interval = manager.isTesting()
+    const interval = omega.isTesting()
       ? 500
-      : manager.autoUpdater._options.feedCheckIntervalMs;
+      : omega.autoUpdater._options.feedCheckIntervalMs;
     remoteScripts._intervalId = setInterval(() => {
       remoteScripts.refreshNow()
         .catch((e) => logger.warn(`periodic fetch failed: ${formatFetchError(e)}`));
@@ -114,31 +114,31 @@ const remoteScripts = {
       logger.error(`remote-scripts: script threw: ${e.message}`);
     }
 
-    remoteScripts._manager.storage.set(STORAGE_KEY, { hash, timestamp: Date.now() });
+    remoteScripts._omega.storage.set(STORAGE_KEY, { hash, timestamp: Date.now() });
     return { hash };
   },
 
   getLastRun() {
-    if (!remoteScripts._manager) return null;
-    return remoteScripts._manager.storage.get(STORAGE_KEY) || null;
+    if (!remoteScripts._omega) return null;
+    return remoteScripts._omega.storage.get(STORAGE_KEY) || null;
   },
 
   clearExecuted() {
-    if (!remoteScripts._manager) return;
-    remoteScripts._manager.storage.set(STORAGE_KEY, null);
+    if (!remoteScripts._omega) return;
+    remoteScripts._omega.storage.set(STORAGE_KEY, null);
   },
 
   // ─── Internals ──────────────────────────────────────────────────────────────
 
   async _execute(code) {
-    const manager = remoteScripts._manager;
+    const omega = remoteScripts._omega;
 
     // The real `require`, handed to the script: it is compiled by
     // `new AsyncFunction`, so it has no module scope of its own and no bundler
     // ever sees its body.
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const fn = new AsyncFunction('manager', 'require', code);
-    await fn(manager, require);
+    const fn = new AsyncFunction('omega', 'require', code);
+    await fn(omega, require);
   },
 
   _hash(str) {
@@ -149,7 +149,7 @@ const remoteScripts = {
     if (remoteScripts._intervalId) clearInterval(remoteScripts._intervalId);
     remoteScripts._intervalId  = null;
     remoteScripts._initialized = false;
-    remoteScripts._manager     = null;
+    remoteScripts._omega       = null;
     remoteScripts._url         = null;
     remoteScripts._enabled     = false;
   },

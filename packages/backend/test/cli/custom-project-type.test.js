@@ -10,7 +10,7 @@
  *
  * What these tests hold it to:
  *   - the project type comes from the brand's omega.json5, not from a flag a
- *     brand has to remember to pass to `Manager.init()`;
+ *     brand has to remember to pass to `omega.initialize()`;
  *   - a custom boot loads no `firebase-functions`, and every helper the
  *     framework exposes — the auth middleware included — is there in both modes;
  *   - the Firebase-only verbs REFUSE, loudly and with the lane that replaces
@@ -23,7 +23,7 @@
  *   - `omega build` is unchanged: a custom backend stages src/ → dist/ like
  *     any other.
  *
- * Real config files on real temp dirs, the real Manager, the real command
+ * Real config files on real temp dirs, the real omega, the real command
  * classes. The one seam is `powertools.execute` — stubbed to a recorder, so a
  * deploy that DID reach the shell would be visible instead of running.
  *
@@ -48,7 +48,8 @@ const TestCommand = require('../../dist/cli/commands/test.js');
 const { getTests } = require('../../dist/cli/commands/setup-tests/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MANAGER_PATH = require.resolve('../../dist/manager/index.js');
+const OMEGA_PATH = require.resolve('../../dist/omega/index.js');
+const Context = require('../../dist/omega/context.js');
 
 /**
  * A backend target on disk: package.json, an authored src/, and a brand
@@ -130,32 +131,34 @@ function setupCheckNames(dir) {
 }
 
 /**
- * Boot a REAL Manager against a fixture target, with every required env key
+ * Boot a REAL Omega instance against a fixture target, with every required env key
  * present so the #581 boot guard passes, and restore the process env after.
  */
-function bootManager(dir, options = {}) {
+function bootOmega(dir, options = {}) {
   const saved = {};
   for (const name of requiredEnvKeys('backend')) {
     saved[name] = process.env[name];
     process.env[name] = process.env[name] || 'fixture-value';
   }
 
-  delete require.cache[MANAGER_PATH];
-  const FreshManager = require(MANAGER_PATH);
+  delete require.cache[OMEGA_PATH];
+  const { Omega } = require(OMEGA_PATH);
 
   try {
-    return new FreshManager().init(null, { cwd: dir, log: false, ...options });
+    return new Omega().initialize({ cwd: dir, ...options });
   } finally {
     for (const [name, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
-    delete require.cache[MANAGER_PATH];
+    delete require.cache[OMEGA_PATH];
   }
 }
 
-// Every helper a consumer's routes reach for through the Manager handle.
-const HELPERS = ['RouteContext', 'User', 'Analytics', 'ApiManager', 'Roles', 'Usage', 'Middleware', 'BackendRouter', 'EventMiddleware', 'Settings', 'Metadata', 'Email', 'AI', 'Utilities'];
+// The process services a consumer's routes reach for on the instance, and the
+// request services every Context carries.
+const PROCESS_SERVICES = ['utilities', 'email', 'ai'];
+const REQUEST_SERVICES = ['user', 'usage', 'analytics', 'email', 'ai'];
 
 module.exports = defineCases({
   description: "Backend custom-server mode (#584): the config switch, the boot, and the Firebase-only verbs' refusal",
@@ -188,27 +191,34 @@ module.exports = defineCases({
     },
 
     {
-      name: 'a custom boot loads no firebase-functions, and every helper still answers',
+      name: 'a custom boot loads no firebase-functions, and every service still answers',
 
       run() {
         const custom = targetDir({ projectType: 'custom' });
         const firebase = targetDir({});
 
         try {
-          const customManager = bootManager(custom);
-          assert.strictEqual(customManager.options.projectType, 'custom', 'the config is the switch — no init flag needed');
-          assert.strictEqual(customManager.libraries.functions, null, 'custom mode must not load firebase-functions');
+          const customOmega = bootOmega(custom);
+          assert.strictEqual(customOmega.options.projectType, 'custom', 'the config is the switch — no init flag needed');
+          assert.strictEqual(customOmega.firebase.functions, null, 'custom mode must not load firebase-functions');
 
-          const firebaseManager = bootManager(firebase);
-          assert.strictEqual(firebaseManager.options.projectType, 'firebase');
-          assert.ok(firebaseManager.libraries.functions, 'firebase mode still loads firebase-functions');
+          const firebaseOmega = bootOmega(firebase);
+          assert.strictEqual(firebaseOmega.options.projectType, 'firebase');
+          assert.ok(firebaseOmega.firebase.functions, 'firebase mode still loads firebase-functions');
 
           // The whole point of the mode: the SAME backend, minus the artifact.
-          for (const helper of HELPERS) {
-            assert.strictEqual(typeof customManager[helper], 'function', `${helper}() must work in custom mode`);
-            assert.strictEqual(typeof firebaseManager[helper], 'function', `${helper}() must work in firebase mode`);
+          for (const [mode, instance] of [['custom', customOmega], ['firebase', firebaseOmega]]) {
+            for (const service of PROCESS_SERVICES) {
+              assert.strictEqual(typeof instance[service], 'object', `omega.${service} must work in ${mode} mode`);
+            }
+            assert.strictEqual(typeof instance.storage, 'function', `omega.storage() must work in ${mode} mode`);
+
+            const ctx = new Context(instance);
+            for (const service of REQUEST_SERVICES) {
+              assert.strictEqual(typeof ctx[service], 'object', `ctx.${service} must work in ${mode} mode`);
+            }
           }
-          assert.ok(customManager.config.brand.id, 'the config still resolves in custom mode');
+          assert.ok(customOmega.config.brand.id, 'the config still resolves in custom mode');
         } finally {
           for (const dir of [custom, firebase]) fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -216,15 +226,15 @@ module.exports = defineCases({
     },
 
     {
-      name: 'an explicit init option still wins over the config',
+      name: 'an explicit initialize option still wins over the config',
 
       run() {
         const custom = targetDir({ projectType: 'custom' });
 
         try {
-          const manager = bootManager(custom, { projectType: 'firebase' });
-          assert.strictEqual(manager.options.projectType, 'firebase', 'an explicit option is the caller saying so');
-          assert.ok(manager.libraries.functions);
+          const instance = bootOmega(custom, { projectType: 'firebase' });
+          assert.strictEqual(instance.options.projectType, 'firebase', 'an explicit option is the caller saying so');
+          assert.ok(instance.firebase.functions);
         } finally {
           fs.rmSync(custom, { recursive: true, force: true });
         }

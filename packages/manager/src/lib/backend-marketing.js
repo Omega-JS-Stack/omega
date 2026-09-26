@@ -12,17 +12,17 @@
  * only writer is the legacy-contact import script, which hasn't ported —
  * the field rides that port.
  */
-const { FIELDS, SEGMENTS, GROUP_KEYS, fieldsForProvider } = require('@omega.js/backend/dist/manager/libraries/email/constants.js');
+const { FIELDS, SEGMENTS, GROUP_KEYS, fieldsForProvider } = require('@omega.js/backend/dist/omega/libraries/email/constants.js');
 
 // Array shapes for handlers that iterate
-const BEM_FIELDS = Object.entries(FIELDS).map(([name, field]) => ({
+const BACKEND_FIELDS = Object.entries(FIELDS).map(([name, field]) => ({
   name,
   display: field.display,
   type: field.type,
   skip: field.skip || [],
 }));
 
-const BEM_SEGMENTS = Object.entries(SEGMENTS).map(([name, segment]) => ({
+const BACKEND_SEGMENTS = Object.entries(SEGMENTS).map(([name, segment]) => ({
   name,
   display: segment.display,
   conditions: segment.conditions,
@@ -30,7 +30,7 @@ const BEM_SEGMENTS = Object.entries(SEGMENTS).map(([name, segment]) => ({
   skip: segment.skip || [],
 }));
 
-const BEM_FIELDS_BY_NAME = Object.fromEntries(BEM_FIELDS.map((field) => [field.name, field]));
+const BACKEND_FIELDS_BY_NAME = Object.fromEntries(BACKEND_FIELDS.map((field) => [field.name, field]));
 
 /**
  * Fields a given provider should provision — @omega.js/backend's OWN view of its
@@ -38,12 +38,12 @@ const BEM_FIELDS_BY_NAME = Object.fromEntries(BEM_FIELDS.map((field) => [field.n
  * writes can never be two different lists.
  */
 function fieldsFor(provider) {
-  return fieldsForProvider(provider).map((name) => BEM_FIELDS_BY_NAME[name]);
+  return fieldsForProvider(provider).map((name) => BACKEND_FIELDS_BY_NAME[name]);
 }
 
 /** Segments a given provider should provision (honors each segment's skip list). */
 function segmentsFor(provider) {
-  return BEM_SEGMENTS.filter((segment) => !segment.skip.includes(provider));
+  return BACKEND_SEGMENTS.filter((segment) => !segment.skip.includes(provider));
 }
 
-module.exports = { BACKEND_FIELDS_MAP: FIELDS, BEM_FIELDS, BEM_SEGMENTS, BEM_GROUP_KEYS: GROUP_KEYS, fieldsFor, segmentsFor };
+module.exports = { BACKEND_FIELDS_MAP: FIELDS, BACKEND_FIELDS, BACKEND_SEGMENTS, BACKEND_GROUP_KEYS: GROUP_KEYS, fieldsFor, segmentsFor };

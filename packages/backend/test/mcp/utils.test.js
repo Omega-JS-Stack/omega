@@ -4,6 +4,9 @@
  *
  * Run: npx omega test backend:mcp/utils
  */
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -16,7 +19,7 @@ module.exports = defineCases({
 
     {
       name: 'resolveAuthInfo: admin key returns admin role',
-      async run({ assert }) {
+      async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const saved = process.env.OMEGA_ADMIN_KEY;
 
@@ -35,7 +38,7 @@ module.exports = defineCases({
 
     {
       name: 'resolveAuthInfo: non-admin token returns user role',
-      async run({ assert }) {
+      async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('some-user-api-key');
 
@@ -46,7 +49,7 @@ module.exports = defineCases({
 
     {
       name: 'resolveAuthInfo: empty token returns public role',
-      async run({ assert }) {
+      async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const result = resolveAuthInfo('');
 
@@ -58,7 +61,7 @@ module.exports = defineCases({
 
     {
       name: 'resolveAuthInfo: null/undefined token returns public role',
-      async run({ assert }) {
+      async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
 
         assert.equal(resolveAuthInfo(null).role, 'public', 'null should be public');
@@ -68,7 +71,7 @@ module.exports = defineCases({
 
     {
       name: 'resolveAuthInfo: returns public when OMEGA_ADMIN_KEY is not set',
-      async run({ assert }) {
+      async run() {
         const { resolveAuthInfo } = require('../../dist/mcp/utils.js');
         const saved = process.env.OMEGA_ADMIN_KEY;
 
@@ -87,7 +90,7 @@ module.exports = defineCases({
 
     {
       name: 'filterToolsByRole: admin sees all roles',
-      async run({ assert }) {
+      async run() {
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
@@ -102,7 +105,7 @@ module.exports = defineCases({
 
     {
       name: 'filterToolsByRole: user sees user + public only',
-      async run({ assert }) {
+      async run() {
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
@@ -120,7 +123,7 @@ module.exports = defineCases({
 
     {
       name: 'filterToolsByRole: public sees public only',
-      async run({ assert }) {
+      async run() {
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
@@ -136,7 +139,7 @@ module.exports = defineCases({
 
     {
       name: 'filterToolsByRole: tools without role default to admin',
-      async run({ assert }) {
+      async run() {
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [{ name: 'no-role' }];
 
@@ -148,7 +151,7 @@ module.exports = defineCases({
 
     {
       name: 'filterToolsByRole: unknown role treated as public',
-      async run({ assert }) {
+      async run() {
         const { filterToolsByRole } = require('../../dist/mcp/utils.js');
         const tools = [
           { name: 'a', role: 'admin' },
@@ -165,7 +168,7 @@ module.exports = defineCases({
 
     {
       name: 'loadConsumerTools: returns empty array when no cwd',
-      async run({ assert }) {
+      async run() {
         const { loadConsumerTools } = require('../../dist/mcp/utils.js');
 
         assert.equal(loadConsumerTools(null).length, 0, 'null cwd');
@@ -176,7 +179,7 @@ module.exports = defineCases({
 
     {
       name: 'loadConsumerTools: returns empty array for non-existent directory',
-      async run({ assert }) {
+      async run() {
         const { loadConsumerTools } = require('../../dist/mcp/utils.js');
         const result = loadConsumerTools('/tmp/does-not-exist-12345');
 
@@ -184,11 +187,29 @@ module.exports = defineCases({
       },
     },
 
+    {
+      name: 'loadConsumerTools: a route tool path without the leading slash is refused by name',
+      async run() {
+        const { loadConsumerTools } = require('../../dist/mcp/utils.js');
+        const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-backend-mcp-'));
+
+        fs.writeFileSync(path.join(cwd, 'mcp.js'), `module.exports = [
+          { name: 'list_notes', description: 'List notes', method: 'GET', path: 'notes' },
+        ];`);
+
+        assert.throws(
+          () => loadConsumerTools(cwd),
+          /Consumer tool "list_notes" path "notes" must be the HTTP path as served, starting with "\/"/,
+          'the path is taken as served, so a relative one is a load-time error',
+        );
+      },
+    },
+
     // --- buildToolMap ---
 
     {
       name: 'buildToolMap: consumer tools override built-ins with same name',
-      async run({ assert }) {
+      async run() {
         const { buildToolMap } = require('../../dist/mcp/utils.js');
         const builtin = [{ name: 'tool_a', description: 'original' }];
         const consumer = [{ name: 'tool_a', description: 'override', _consumer: true }];
@@ -201,7 +222,7 @@ module.exports = defineCases({
 
     {
       name: 'buildToolMap: merges non-overlapping tools',
-      async run({ assert }) {
+      async run() {
         const { buildToolMap } = require('../../dist/mcp/utils.js');
         const builtin = [{ name: 'a' }, { name: 'b' }];
         const consumer = [{ name: 'c' }];
@@ -218,7 +239,7 @@ module.exports = defineCases({
 
     {
       name: 'every built-in tool has a role assigned',
-      async run({ assert }) {
+      async run() {
         const tools = require('../../dist/mcp/tools.js');
 
         const missing = tools.filter((t) => !t.role);
@@ -227,8 +248,18 @@ module.exports = defineCases({
     },
 
     {
+      name: 'every built-in route tool path is the path as served, under /omega/',
+      async run() {
+        const tools = require('../../dist/mcp/tools.js');
+
+        const stray = tools.filter((t) => !t.path.startsWith('/omega/'));
+        assert.equal(stray.length, 0, `Every built-in path is /omega/<route>, stray: ${stray.map((t) => `${t.name}=${t.path}`).join(', ')}`);
+      },
+    },
+
+    {
       name: 'role distribution matches expected counts',
-      async run({ assert }) {
+      async run() {
         const tools = require('../../dist/mcp/tools.js');
 
         const admin = tools.filter((t) => t.role === 'admin');

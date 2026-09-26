@@ -1,6 +1,6 @@
 // Background-layer test for chrome.storage.local round-trip. This exercises
 // the storage-permission grant (which has to be declared in the harness
-// manifest) and the actual SW-side storage API that BXM consumers use.
+// manifest) and the actual SW-side storage API that extension consumers use.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 

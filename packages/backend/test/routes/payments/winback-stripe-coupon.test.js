@@ -17,21 +17,21 @@
  *
  * Run: npx omega test framework:routes/payments/winback-stripe-coupon
  */
-const StripeLib = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const stripeWinback = require('../../../dist/manager/routes/payments/winback/providers/stripe.js');
-const winback = require('../../../dist/manager/libraries/payment/winback.js');
+const StripeLib = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const stripeWinback = require('../../../dist/omega/routes/payments/winback/providers/stripe.js');
+const winback = require('../../../dist/omega/libraries/payment/winback.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-winback-coupon-uid';
 const RESOURCE_ID = 'sub_test_winback_coupon';
 
 /**
- * The ctx a provider receives. `Manager` is the runner's REAL one — the coupon
+ * The ctx a provider receives. `omega` is the runner's REAL one — the coupon
  * builder reads the brand's currency off its resolved config.
  */
-function buildCtx(Manager) {
+function buildCtx(omega) {
   return {
-    Manager,
+    omega,
     log: () => {},
   };
 }
@@ -79,7 +79,7 @@ function sdkCapturing(captured) {
   };
 }
 
-async function applyOffer(Manager, discount) {
+async function applyOffer(omega, discount) {
   const captured = {};
 
   await withStripeSdk(sdkCapturing(captured), () => stripeWinback.applyOffer({
@@ -87,7 +87,7 @@ async function applyOffer(Manager, discount) {
     uid: UID,
     subscription: { product: { id: 'premium' }, payment: { provider: 'stripe', resourceId: RESOURCE_ID } },
     discount: discount,
-    ctx: buildCtx(Manager),
+    ctx: buildCtx(omega),
   }));
 
   return captured;
@@ -102,12 +102,12 @@ module.exports = defineCases({
     {
       name: 'stripe-attaches-the-default-offers-coupon-to-the-live-subscription',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // The framework default — 50% off the next cycle — is the offer a brand
         // that configures nothing makes, and its coupon id is derived from it,
         // never invented here.
         const discount = winback.toDiscount(winback.resolveOffer());
-        const captured = await applyOffer(Manager, discount);
+        const captured = await applyOffer(omega, discount);
 
         assert.equal(captured.retrieved, 'BEM_WINBACK50_50OFF_ONCE', 'The offer resolves to the checkout plumbing\'s deterministic coupon id');
         assert.equal(captured.created.percent_off, 50, 'A percent offer builds a percent_off coupon');

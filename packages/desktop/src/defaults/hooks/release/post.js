@@ -5,5 +5,5 @@
 // changelog page on your marketing site, sending notification emails.
 
 module.exports = async (ctx) => {
-  // ctx = { manager, projectRoot, artifacts }   // artifacts: array of release/ paths
+  // ctx = { build, projectRoot, artifacts }   // artifacts: array of release/ paths
 };

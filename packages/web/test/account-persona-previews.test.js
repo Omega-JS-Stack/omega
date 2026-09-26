@@ -23,6 +23,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
+
+// A seeded persona as the page receives it: the stored document built into a User
+const persona = (document) => new User(document, { uid: 'u1' });
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const SECTIONS_DIR = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections');
@@ -54,7 +58,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -186,11 +190,11 @@ async function renderPanels(render, { sessions } = {}) {
     isDevelopment: () => true,
     getApiUrl: () => 'https://example.com/api',
     request: async () => sessionsPayload,
-    auth: () => ({ getUser: () => null }),
-    utilities: () => ({
+    auth: { user: new User() },
+    utilities: {
       escapeHTML: (value) => String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`),
       showNotification: () => {},
-    }),
+    },
   };
 
   const bundle = require(BUNDLE);
@@ -220,7 +224,7 @@ test('#343: the referrals panel renders the referrals a persona carries', async 
   ];
 
   const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData({ affiliate: { code: 'TESTREF', referrals } });
+    bundle.referrals.loadData(persona({ affiliate: { code: 'TESTREF', referrals } }));
   });
 
   const list = elements.get('referrals-list').innerHTML;
@@ -247,12 +251,12 @@ test('#343: the referrals panel counts this month from the same timestamps', asy
   const withinThisMonth = Math.min(Date.now() - startOfMonth, 12 * HOUR);
 
   const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData({
+    bundle.referrals.loadData(persona({
       affiliate: {
         code: 'TESTREF',
         referrals: [referral('_test-basic', withinThisMonth), referral('_test-refunded', 120 * DAY)],
       },
-    });
+    }));
   });
 
   assert.equal(elements.get('total-referrals').textContent, '2', 'both referrals are counted in the total');
@@ -261,7 +265,7 @@ test('#343: the referrals panel counts this month from the same timestamps', asy
 
 test('#343: an account that referred nobody still renders its empty state', async () => {
   const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData({ affiliate: { code: 'FRESH', referrals: [] } });
+    bundle.referrals.loadData(persona({ affiliate: { code: 'FRESH', referrals: [] } }));
   });
 
   assert.equal(elements.get('total-referrals').textContent, '0', 'nothing is counted');
@@ -272,10 +276,10 @@ test('#401: an account that arrived through a referral is told who referred it',
   // The REFERRED persona: its own affiliate code is unused (nobody signed up
   // through it), and the one state it carries is the inbound linkage.
   const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData({
+    bundle.referrals.loadData(persona({
       affiliate: { code: 'OWNCODE', referrals: [] },
       attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
-    });
+    }));
   });
 
   assert.equal(elements.get('referred-by-code').textContent, 'TESTREF', 'the code the signup came in on');
@@ -284,17 +288,17 @@ test('#401: an account that arrived through a referral is told who referred it',
 });
 
 test('#401: the inbound line goes away again when the next account carries none', async () => {
-  // `omega.auth().listen` fires per auth state, so ONE page can render a second
+  // `omega.auth.listen` fires per auth state, so ONE page can render a second
   // account: Referred, then anyone else. Hiding is therefore an ACTIVE branch,
   // not the markup's default — without it the second account keeps reading
   // "Referred by TESTREF", a referral it never had.
   let shownForReferred = null;
 
   const elements = await renderPanels(async (bundle) => {
-    bundle.referrals.loadData({
+    bundle.referrals.loadData(persona({
       affiliate: { code: 'OWNCODE', referrals: [] },
       attribution: { affiliate: inboundReferral('TESTREF', 2 * DAY) },
-    });
+    }));
 
     // Read off the document the panel just wrote to, before the second account
     // lands on the same elements.
@@ -302,10 +306,10 @@ test('#401: the inbound line goes away again when the next account carries none'
 
     // The next account, carrying the schema's nulled block rather than no block
     // at all — the shape every doc a backend wrote actually has.
-    bundle.referrals.loadData({
+    bundle.referrals.loadData(persona({
       affiliate: { code: 'FRESH', referrals: [] },
       attribution: { affiliate: noInboundReferral() },
-    });
+    }));
   });
 
   assert.ok(shownForReferred, 'the referred account shows the line');
@@ -331,13 +335,13 @@ test('#343: the sessions panel renders the devices a persona is signed in on', a
   };
 
   const elements = await renderPanels(async (bundle) => {
-    bundle.security.loadData({
+    bundle.security.loadData(persona({
       activity: {
         client: { platform: 'windows', mobile: false, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 Safari/537.36' },
         geolocation: { ip: '198.51.100.12', city: 'Manchester', region: 'England', country: 'GB' },
         created: { timestamp: new Date(Date.now() - (2 * HOUR)).toISOString(), timestampUNIX: Math.floor((Date.now() - (2 * HOUR)) / 1000) },
       },
-    });
+    }));
     await settle();
   }, { sessions });
 
@@ -354,13 +358,13 @@ test('#343: the sessions panel renders the devices a persona is signed in on', a
 
 test('#343: a persona signed in nowhere else still shows its current session', async () => {
   const elements = await renderPanels(async (bundle) => {
-    bundle.security.loadData({
+    bundle.security.loadData(persona({
       activity: {
         client: { platform: 'mac', mobile: false, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0.0.0 Safari/537.36' },
         geolocation: { ip: '192.0.2.44', city: 'San Diego', region: 'California', country: 'US' },
         created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
       },
-    });
+    }));
     await settle();
   }, { sessions: {} });
 

@@ -6,13 +6,13 @@
  * - loadTemplate: email-template-id confinement (colon-joined ids → nested folders)
  */
 const path = require('path');
-const safeCompare = require('../../dist/manager/helpers/safe-compare.js');
-const loadProvider = require('../../dist/manager/libraries/load-provider.js');
+const safeCompare = require('../../dist/omega/helpers/safe-compare.js');
+const loadProvider = require('../../dist/omega/libraries/load-provider.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 const { loadTemplate } = loadProvider;
 
-const PROVIDERS_DIR = path.join(__dirname, '../../dist/manager/routes/payments/webhook/providers');
-const TEMPLATES_DIR = path.join(__dirname, '../../dist/manager/routes/general/email/templates');
+const PROVIDERS_DIR = path.join(__dirname, '../../dist/omega/routes/payments/webhook/providers');
+const TEMPLATES_DIR = path.join(__dirname, '../../dist/omega/routes/general/email/templates');
 
 module.exports = defineCases({
   description: 'safeCompare + loadProvider security primitives',

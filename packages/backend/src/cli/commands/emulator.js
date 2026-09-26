@@ -1024,7 +1024,7 @@ class EmulatorCommand extends BaseCommand {
       OMEGA_TEST_MODE: 'true',
     };
 
-    // Internal calls (Manager.getApiUrl) loop through the HTTPS proxy under the
+    // Internal calls (omega.getApiUrl) loop through the HTTPS proxy under the
     // local mkcert certificate. The child TRUSTS that root (#795) instead of
     // switching verification off wholesale — same handoff as `omega serve` and
     // `omega dev`'s legs, and Node prints no warning for it. A shell-set value
@@ -1811,7 +1811,7 @@ class EmulatorCommand extends BaseCommand {
   }
 }
 
-// Static, alongside Middleware's precedent — the ownership decision is pure,
+// Static, alongside the pipeline's precedent — the ownership decision is pure,
 // so tests exercise it directly with real `ps` rows instead of live processes.
 EmulatorCommand.resolveReadyTimeout = resolveReadyTimeout;
 EmulatorCommand.heldPorts = heldPorts;

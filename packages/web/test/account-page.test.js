@@ -20,6 +20,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const SECTIONS_DIR = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections');
@@ -49,7 +50,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -121,16 +122,16 @@ test('#663: the saved address is loaded back into the form', async () => {
     querySelectorAll: () => [],
     addEventListener: () => {},
   };
-  globalThis.__omegaClient = globalThis.__omegaClient || {};
+  // The join date reads the Firebase session's own metadata; none here
+  globalThis.__omegaClient = { firebaseAuth: { currentUser: null } };
 
   delete require.cache[require.resolve(BUNDLE)];
   const { profile } = require(BUNDLE);
 
   profile.init();
-  profile.loadData({
-    auth: { uid: 'uid-1', email: 'buyer@example.com' },
+  profile.loadData(new User({
     personal: { location: { country: 'US', region: 'California', city: 'San Diego', postalCode: '90210', street: '123 Main Street' } },
-  }, { uid: 'uid-1', email: 'buyer@example.com' });
+  }, { uid: 'uid-1', email: 'buyer@example.com' }));
 
   const location = globalThis.__profileForm.data.personal.location;
 

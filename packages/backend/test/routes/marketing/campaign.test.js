@@ -21,7 +21,7 @@ module.exports = defineCases({
         : false,
 
       async run({ http, assert, state }) {
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: '@omega.js/backend Test Campaign',
           subject: 'Test Marketing Email',
           template: 'card',
@@ -79,7 +79,7 @@ module.exports = defineCases({
         // Future sendAt → campaign is saved as 'pending' for cron pickup, not sent immediately
         const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: 'Future Campaign',
           subject: 'Future Subject',
           content: 'Future content',
@@ -107,7 +107,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // The raw-HTML passthrough is internal-caller only — an admin (or the MCP
         // create_campaign tool it fronts) must not bypass the escaped lane (#90).
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: 'Raw HTML Campaign',
           subject: 'Should fail',
           test: true,
@@ -131,7 +131,7 @@ module.exports = defineCases({
         // internalOnlyFieldFault() rejects data.content.html outright.
         const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: 'Raw HTML Persistence Probe',
           subject: 'Probe',
           contentHtml: '<img src=x onerror=alert(1)>',
@@ -155,7 +155,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: 'Unauthorized Campaign',
           subject: 'Should fail',
           content: 'Should fail',
@@ -171,7 +171,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/marketing/campaign', {
+        const response = await http.post('omega/marketing/campaign', {
           name: 'Unauthenticated Campaign',
           subject: 'Should fail',
           content: 'Should fail',

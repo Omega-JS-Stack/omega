@@ -19,15 +19,20 @@ class BEMClient {
   /**
    * Call a @omega.js/backend route
    * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
-   * @param {string} path - Route path (e.g. "admin/firestore")
+   * @param {string} path - The HTTP path as served (e.g. "/omega/admin/firestore", "/notes")
    * @param {object} params - Request parameters
    * @returns {object} - Parsed response
    */
   async call(method, path, params) {
+    // The path is taken as served, so a relative one would silently glue onto the host
+    if (typeof path !== 'string' || !path.startsWith('/')) {
+      throw new Error(`[@omega.js/backend:mcp] client.call(): path "${path}" must be the HTTP path as served, starting with "/"`);
+    }
+
     params = params || {};
     method = method.toUpperCase();
 
-    const url = new URL(`${this.baseUrl}/omega/${path}`);
+    const url = new URL(`${this.baseUrl}${path}`);
 
     const fetchOptions = {
       method: method,

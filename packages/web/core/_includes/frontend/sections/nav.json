@@ -46,7 +46,7 @@
       class: 'btn-adaptive omega-btn-ring',
       icon: 'fa-solid fa-user-plus',
       attributes: [
-        ['data-omega-bind', '@show !auth.user']
+        ['data-omega-bind', '@hide auth.user.authenticated']
       ]
     },
     // {
@@ -55,14 +55,14 @@
     //   class: 'btn-adaptive',
     //   icon: 'fa-solid fa-crown',
     //   attributes: [
-    //     ['data-omega-bind', '@show auth.account.subscription.product.id === basic'],
+    //     ['data-omega-bind', '@show auth.user.plan === basic'],
     //     ['hidden', '']
     //   ]
     // },
     {
       type: 'account',
       attributes: [
-        ['data-omega-bind', '@show auth.user'],
+        ['data-omega-bind', '@show auth.user.authenticated'],
         ['hidden', '']
       ],
     }

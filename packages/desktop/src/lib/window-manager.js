@@ -1,8 +1,8 @@
 // Window manager — named-window registry over BrowserWindow.
 //
 // **Lazy creation.** @omega.js/desktop does NOT auto-create any windows. Consumers call
-// `manager.windows.create('main', opts?)` from their main.js when they want UI
-// to surface — typically right after `manager.initialize()` resolves, but may
+// `omega.windows.create('main', opts?)` from their main.js when they want UI
+// to surface — typically right after `omega.initialize()` resolves, but may
 // be deferred (e.g. agent apps that only show UI when the user clicks the tray).
 //
 // Defaults baked in (no JSON config required):
@@ -10,8 +10,8 @@
 //   any other → { width: 800,  height: 600, hideOnClose: false, view: name   }
 //
 // Override at the call site:
-//   manager.windows.create('main',     { width: 1280, height: 800 });
-//   manager.windows.create('settings', { width: 600,  height: 480 });
+//   omega.windows.create('main',     { width: 1280, height: 800 });
+//   omega.windows.create('settings', { width: 600,  height: 480 });
 //
 // `view` resolves to `<projectRoot>/dist/views/<view>/index.html`.
 //
@@ -37,13 +37,13 @@ const SAVE_DEBOUNCE_MS = 250;
 
 const windowManager = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _windows:     {}, // name -> BrowserWindow
   _saveTimers:  {}, // name -> debounce timer
   _electron:    null,
 
-  initialize(manager) {
-    windowManager._manager = manager;
+  initialize(omega) {
+    windowManager._omega = omega;
     windowManager._initialized = true;
 
     windowManager._electron = require('electron');
@@ -83,15 +83,15 @@ const windowManager = {
   // can configure entirely from main.js without touching JSON. Falls through to
   // createNamed which does the heavy lifting.
   async create(name, overrides) {
-    return windowManager.createNamed(name, windowManager._manager, overrides);
+    return windowManager.createNamed(name, windowManager._omega, overrides);
   },
 
   // Create or focus a named window. Args:
   //   name      — registry key + default view name + storage key for bounds.
-  //   manager   — Manager instance (defaults to the one passed to initialize()).
+  //   omega     : the omega instance (defaults to the one passed to initialize()).
   //   overrides — optional opts that take precedence over config.windows.<name>.
-  async createNamed(name, manager, overrides) {
-    manager = manager || windowManager._manager;
+  async createNamed(name, omega, overrides) {
+    omega = omega || windowManager._omega;
     overrides = overrides || {};
 
     // Single-instance dedup
@@ -119,7 +119,7 @@ const windowManager = {
     const defaults = isMain
       ? { width: 1024, height: 720, view: 'main', hideOnClose: true }
       : { width: 800,  height: 600, view: name,   hideOnClose: false };
-    const jsonConfig = manager.config.windows?.[name] || {};
+    const jsonConfig = omega.config.windows?.[name] || {};
     const config = { ...defaults, ...jsonConfig, ...overrides };
 
     logger.log(`createNamed: building "${name}" (show=${config.show !== false}, hideOnClose=${config.hideOnClose})`);
@@ -141,7 +141,7 @@ const windowManager = {
     };
     if (typeof config.x === 'number') defaultBounds.x = config.x;
     if (typeof config.y === 'number') defaultBounds.y = config.y;
-    const savedBounds = persistBounds ? windowManager._loadBounds(name, manager) : null;
+    const savedBounds = persistBounds ? windowManager._loadBounds(name, omega) : null;
     const bounds = savedBounds
       ? windowManager._clampToDisplays(savedBounds)
       : defaultBounds;
@@ -190,7 +190,7 @@ const windowManager = {
       show: false, // flicker prevention — show on ready-to-show
       // Tray-only apps suppress all taskbar/dock representation for their windows.
       skipTaskbar,
-      title: config.title || manager.config.app?.productName || name,
+      title: config.title || omega.config.app?.productName || name,
       backgroundColor: config.backgroundColor || '#ffffff',
       ...titleBarOpts,
       webPreferences: {
@@ -218,7 +218,7 @@ const windowManager = {
     }
 
     // Attach the context-menu listener so right-click works in this window.
-    manager.contextMenu.attach(win.webContents);
+    omega.contextMenu.attach(win.webContents);
 
     // ALL event listeners must attach BEFORE `await loadFile()` below — otherwise the
     // window can be in the registry but missing close/resize/etc. listeners during the
@@ -265,9 +265,9 @@ const windowManager = {
     // Consumers override per-window via config.windows.<name>.hideOnClose.
     //
     // Three escape hatches let a close-event ACTUALLY close:
-    //   1. `manager._allowQuit` — set by manager.quit({ force: true }) and by the
+    //   1. `omega._allowQuit` — set by omega.quit({ force: true }) and by the
     //      auto-updater before installNow().
-    //   2. `manager._isQuitting` — set by app.on('before-quit'), so any quit path
+    //   2. `omega._isQuitting` — set by app.on('before-quit'), so any quit path
     //      Electron knows about (Cmd+Q, role:'quit' menu, app.quit() programmatic,
     //      OS shutdown) flows through naturally.
     //   3. `win._emForceClose` — per-window override for one-off "close this for
@@ -275,8 +275,8 @@ const windowManager = {
     const hideOnClose = config.hideOnClose === true;
 
     win.on('close', (event) => {
-      const allowQuit  = manager._allowQuit  === true;
-      const isQuitting = manager._isQuitting === true;
+      const allowQuit  = omega._allowQuit  === true;
+      const isQuitting = omega._isQuitting === true;
       const force      = win._emForceClose === true;
 
       if (hideOnClose && !allowQuit && !isQuitting && !force) {
@@ -332,7 +332,7 @@ const windowManager = {
     const win = windowManager._windows[name];
     if (!win || win.isDestroyed()) return;
 
-    const storage = windowManager._manager.storage;
+    const storage = windowManager._omega.storage;
 
     // Use getNormalBounds when maximized/fullscreen so we restore to the underlying size on next launch.
     const isMaximized  = win.isMaximized();
@@ -353,8 +353,8 @@ const windowManager = {
     storage.set(`windows.${name}.bounds`, bounds);
   },
 
-  _loadBounds(name, manager) {
-    const storage = (manager || windowManager._manager).storage;
+  _loadBounds(name, omega) {
+    const storage = (omega || windowManager._omega).storage;
 
     const saved = storage.get(`windows.${name}.bounds`);
     if (!saved || typeof saved !== 'object') return null;
@@ -431,7 +431,7 @@ const windowManager = {
   // focus app-wide) is suppressed separately — main.js flips the app to the
   // accessory activation policy under the same predicate.
   _isStealth() {
-    return require('../utils/test-stealth.js')(windowManager._manager);
+    return require('../utils/test-stealth.js')(windowManager._omega);
   },
 
   // Surface a window: normal show (+ dock) — or stealth-show in Testing mode.
@@ -470,9 +470,9 @@ const windowManager = {
   // alone. No-op off macOS. Wired to every named window's 'hide' event.
   _maybeRehideDock() {
     if (process.platform !== 'darwin') return;
-    const manager = windowManager._manager;
-    if (manager.startup.getMode() !== 'hidden') return;
-    if (manager._isQuitting === true) return;
+    const omega = windowManager._omega;
+    if (omega.startup.getMode() !== 'hidden') return;
+    if (omega._isQuitting === true) return;
 
     const anyVisible = Object.values(windowManager._windows)
       .some((win) => !win.isDestroyed() && win.isVisible());

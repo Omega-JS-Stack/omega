@@ -3,7 +3,8 @@
  * count-up parser/formatter round-trip and the factory's environment safety
  * (no document → inert, like icon-renderer). The DOM behaviors (reveals,
  * rotators, marquees) are exercised end-to-end by @omega.js/web's build
- * and the browser proof. Pure CJS — required straight from dist.
+ * and the browser proof. ESM like its siblings, required straight from dist
+ * (require(esm)).
  */
 const { describe, it, before } = require('node:test');
 const assert = require('assert');

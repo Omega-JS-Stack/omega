@@ -1,25 +1,29 @@
-// ============================================
-// Offscreen Component
-// ============================================
-// Persistent offscreen document for background operations
-// (WebSocket connections, long-running tasks, etc.)
+/**
+ * Surface: the offscreen document (a light context background opens on demand)
+ * Doc: node_modules/@omega.js/extension/docs/offscreen.md
+ *
+ * One handler, notes:parse: the plain text of an HTML string, through the
+ * DOMParser a service worker does not have. Background calls it before every
+ * notes:create.
+ */
+import omega from '@omega.js/extension/offscreen';
 
-// Import OMEGA Extension
-import Manager from '@omega.js/extension/offscreen';
+// Registered before initialize() settles: background sends the first
+// notes:parse the moment createDocument resolves
+omega.messenger.onMessage((message, _sender, sendResponse) => {
+  if (message.command !== 'notes:parse') {
+    return false;
+  }
 
-// Create instance
-const manager = new Manager();
+  const html = message.payload?.html || '';
+  const text = new DOMParser().parseFromString(html, 'text/html').body.textContent.trim();
 
-// Initialize
-manager.initialize()
-.then(() => {
-  // Shortcuts
-  const { extension, logger } = manager;
+  sendResponse({ text });
 
-  // Add your project-specific offscreen logic here
-  // This document is invisible and persists in the background
-  // ...
-
-  // Log the initialization
-  logger.log('Offscreen initialized!');
+  return false;
 });
+
+omega.initialize()
+  .then(() => {
+    omega.logger.log('Offscreen initialized!');
+  });

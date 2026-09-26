@@ -22,10 +22,10 @@
  * extended-mode marketing-lifecycle suite.
  */
 const assert = require('node:assert');
-const cron = require('../../../dist/manager/events/cron/daily/marketing-prune.js');
-const Manager = require('../../../dist/manager/index.js');
-const sendgridProvider = require('../../../dist/manager/libraries/email/providers/sendgrid.js');
-const beehiivProvider = require('../../../dist/manager/libraries/email/providers/beehiiv.js');
+const cron = require('../../../dist/omega/events/cron/daily/marketing-prune.js');
+const omega = require('../../../dist/omega/index.js');
+const sendgridProvider = require('../../../dist/omega/libraries/email/providers/sendgrid.js');
+const beehiivProvider = require('../../../dist/omega/libraries/email/providers/beehiiv.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const {
@@ -90,17 +90,24 @@ function buildAssistant() {
 }
 
 /**
- * A Manager stub. The cron ENTRY runs stage 1, which sends the re-engagement
- * campaign through Manager.Email(ctx) — stages 2 and 3 never touch the mailer,
+ * An Omega instance stub. The cron ENTRY runs stage 1, which sends the re-engagement
+ * campaign through ctx.email — stages 2 and 3 never touch the mailer,
  * so the recorder stays optional.
  */
-function buildManager(marketing, sentCampaigns = []) {
+function buildOmega(marketing, admin = null) {
   return {
     config: { brand: BRAND, marketing },
-    Email: () => ({
-      sendCampaign: async (campaign) => { sentCampaigns.push(campaign); return { success: true }; },
-    }),
+    firebase: { admin },
   };
+}
+
+/** The ctx with its email door recording every campaign the re-engage stage sends. */
+function withEmail(ctx, sentCampaigns) {
+  ctx.email = {
+    sendCampaign: async (campaign) => { sentCampaigns.push(campaign); return { success: true }; },
+  };
+
+  return ctx;
 }
 
 /**
@@ -180,19 +187,19 @@ async function withProviders({ sendgrid = {}, beehiiv = {}, env = {} }, run) {
 
 /**
  * Run with a Beehiiv publication configured. getPublicationId() reads the
- * static config off the Manager constructor, so the tests that exercise the
+ * static config off the Omega instance constructor, so the tests that exercise the
  * real listSubscriptions have to put one there, and always put back what they
  * found.
  */
 async function withPublication(run) {
-  const original = Manager.config;
+  const original = omega.config;
 
-  Manager.config = { marketing: { newsletter: { providers: { beehiiv: { publicationId: 'pub_test' } } } } };
+  omega.config = { marketing: { newsletter: { providers: { beehiiv: { publicationId: 'pub_test' } } } } };
 
   try {
     return await run();
   } finally {
-    Manager.config = original;
+    omega.config = original;
   }
 }
 
@@ -240,7 +247,7 @@ const PRUNE_ENABLED = { ...NEWSLETTER_ENABLED, prune: { enabled: true } };
 // The per-brand off switch: the ONE value that stops the monthly run.
 const PRUNE_DISABLED = { ...NEWSLETTER_ENABLED, prune: { enabled: false } };
 
-// Paid-ness is whatever resolveSubscription() calls active — the subscription_paid
+// Paid-ness is whatever the User calls active — the subscription_paid
 // segment's two conditions (plan not basic AND status active), not a local rule.
 const PAYING_USER = {
   auth: { email: 'payer@gmail.com' },
@@ -312,7 +319,7 @@ module.exports = defineCases({
             removeContact: async (email) => { beehiivRemovals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => stagePrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stagePrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(
           beehiivRemovals,
@@ -384,7 +391,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(removals, ['cold@gmail.com'], `Only the Beehiiv-inactive subscriber is deleted, got ${JSON.stringify(removals)}`);
         assert.deepStrictEqual(
@@ -422,7 +429,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true }; },
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(removals, [], `Dormancy is the guard working, got ${JSON.stringify(removals)}`);
         assert.strictEqual(writes.length, 0, 'Nothing deleted means nothing logged');
@@ -444,7 +451,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true }; },
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(removals, [], `A partial or failed read must never drive deletes, got ${JSON.stringify(removals)}`);
         assert.strictEqual(calls.errors.length, 1, `The failed listing is logged loudly, got ${JSON.stringify(calls.errors)}`);
@@ -475,7 +482,7 @@ module.exports = defineCases({
               : { success: true, deleted: true }),
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(
           writes[0]?.data.emails,
@@ -513,7 +520,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(
           removals,
@@ -546,7 +553,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
-        }, () => stageNewsletterPrune(buildManager(NEWSLETTER_ENABLED), ctx, { admin }));
+        }, () => stageNewsletterPrune(buildOmega(NEWSLETTER_ENABLED, admin), ctx));
 
         assert.deepStrictEqual(removals, [], `Nothing left to prune means no deletes, got ${JSON.stringify(removals)}`);
         assert.strictEqual(writes.length, 0, 'Nothing deleted means nothing logged');
@@ -568,9 +575,8 @@ module.exports = defineCases({
           },
           env: { BEEHIIV_API_KEY: 'test-key' },
         }, () => stageNewsletterPrune(
-          buildManager({ campaigns: { enabled: true }, newsletter: { enabled: false } }),
+          buildOmega({ campaigns: { enabled: true }, newsletter: { enabled: false } }, admin),
           ctx,
-          { admin },
         ));
 
         assert.strictEqual(listed, false, 'A disabled newsletter never reaches the provider');
@@ -658,7 +664,7 @@ module.exports = defineCases({
     // `marketing.prune.enabled` carries the schema default `true` (Ian
     // 2026-08-22), and the entry read it `!== true` — the opt-in polarity of
     // [#422](https://github.com/Omega-JS-Stack/omega/issues/422), left behind
-    // when the default flipped. Any Manager.config assembled outside
+    // when the default flipped. Any omega.config assembled outside
     // loadConfig()'s materialization then silently skipped the monthly run
     // ([#551](https://github.com/Omega-JS-Stack/omega/issues/551)).
     {
@@ -681,7 +687,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => cron({ Manager: buildManager(NEWSLETTER_ENABLED, sent), ctx, libraries: { admin } })));
+        }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(NEWSLETTER_ENABLED, admin) })));
 
         assert.deepStrictEqual(deleted, ['sg_1'], `An unmentioned prune is ON, so the SendGrid lane deletes, got ${JSON.stringify(deleted)}`);
         assert.deepStrictEqual(removals, ['cold@gmail.com'], `An unmentioned prune is ON, so the Beehiiv lane deletes, got ${JSON.stringify(removals)}`);
@@ -710,7 +716,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => cron({ Manager: buildManager(PRUNE_DISABLED, sent), ctx, libraries: { admin } })));
+        }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(PRUNE_DISABLED, admin) })));
 
         assert.deepStrictEqual(deleted, [], `A brand that opted out deletes no SendGrid contact, got ${JSON.stringify(deleted)}`);
         assert.deepStrictEqual(removals, [], `A brand that opted out deletes no Beehiiv subscriber, got ${JSON.stringify(removals)}`);
@@ -743,7 +749,7 @@ module.exports = defineCases({
             removeContact: async (email) => { removals.push(email); return { success: true, deleted: true }; },
           },
           env: { SENDGRID_API_KEY: 'test-key', BEEHIIV_API_KEY: 'test-key' },
-        }, () => cron({ Manager: buildManager(PRUNE_ENABLED, sent), ctx, libraries: { admin } })));
+        }, () => cron({ ctx: withEmail(ctx, sent), omega: buildOmega(PRUNE_ENABLED, admin) })));
 
         assert.deepStrictEqual(deleted, ['sg_1'], `The SendGrid lane still deletes, got ${JSON.stringify(deleted)}`);
         assert.deepStrictEqual(removals, ['cold@gmail.com'], `The Beehiiv lane still deletes, got ${JSON.stringify(removals)}`);

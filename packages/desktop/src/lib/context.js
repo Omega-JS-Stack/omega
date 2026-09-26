@@ -1,14 +1,14 @@
 // Runtime context — what we know about the user's machine + their network +
 // the current session. Modeled after @omega.js/backend's `assistant.request.{geolocation,client}`
-// shape so @omega.js/desktop apps + sister projects (@omega.js/backend, UJM, @omega.js/client) all reference the
+// shape so @omega.js/desktop apps + sister projects (@omega.js/backend, @omega.js/client) all reference the
 // same property paths when reading user info.
 //
-// Populated asynchronously during manager.initialize():
+// Populated asynchronously during omega.initialize():
 //
-//   manager.context.geolocation = { ip, country, region, city }      // ipify-fetched
-//   manager.context.client      = { userAgent, locale, platform, arch, mobile }
-//   manager.context.session     = { id, startTime, deviceId }        // desktop-specific
-//   manager.context.app         = { version, environment, isPackaged }
+//   omega.context.geolocation = { ip, country, region, city }      // ipify-fetched
+//   omega.context.client      = { userAgent, locale, platform, arch, mobile }
+//   omega.context.session     = { id, startTime, deviceId }        // desktop-specific
+//   omega.context.app         = { version, environment, isPackaged }
 //
 // Geolocation is fetched from https://api.ipify.org (IP only) and persisted to
 // storage so a subsequent boot offline still reports the last-known IP. The
@@ -37,7 +37,7 @@ const IP_FETCH_TIMEOUT_MS = 5000;
 
 const context = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
 
   // Public shape — populated during initialize(). Exported as plain JSON so renderer
   // tests + IPC consumers can read it via structured-clone.
@@ -46,10 +46,10 @@ const context = {
   session:     { id: null, startTime: null, deviceId: null },
   app:         { version: null, environment: null, isPackaged: null },
 
-  async initialize(manager) {
+  async initialize(omega) {
     if (context._initialized) return;
     context._initialized = true;
-    context._manager = manager;
+    context._omega = omega;
 
     // ─── session ──────────────────────────────────────────────────────────────
     context.session.id        = crypto.randomUUID();
@@ -67,14 +67,14 @@ const context = {
     context.app.isPackaged   = app.isPackaged;
 
     // ─── app ──────────────────────────────────────────────────────────────────
-    context.app.version     = manager.getVersion();
-    context.app.environment = manager.getEnvironment();
+    context.app.version     = omega.getVersion();
+    context.app.environment = omega.getEnvironment();
 
     // ─── geolocation ──────────────────────────────────────────────────────────
     // Restore last-known from storage immediately so we always have SOMETHING to
     // work with (offline boot, ipify down, slow network, etc.). Then fire the
     // network fetch in the background — when it lands it overwrites + persists.
-    const cached = manager.storage.get(STORAGE_KEY) || null;
+    const cached = omega.storage.get(STORAGE_KEY) || null;
     if (cached?.geolocation) {
       Object.assign(context.geolocation, cached.geolocation);
     }
@@ -82,8 +82,8 @@ const context = {
     context._fetchGeolocation().catch((e) => logger.warn(`geolocation fetch failed: ${e.message}`));
 
     // IPC: renderer can read the full context block.
-    manager.ipc.unhandle('desktop:context:get');
-    manager.ipc.handle('desktop:context:get', () => context.toJSON());
+    omega.ipc.unhandle('desktop:context:get');
+    omega.ipc.handle('desktop:context:get', () => context.toJSON());
 
     logger.log(`context initialized — session=${context.session.id} deviceId=${context.session.deviceId} platform=${context.client.platform}`);
   },
@@ -97,11 +97,11 @@ const context = {
   //      id it had before its storage was wiped.
   //   3. A generated UUID (the shared derivation's floor), persisted for next boot.
   async _resolveDeviceId() {
-    const m = context._manager;
+    const omega = context._omega;
 
     return core.deriveDeviceId({
-      get:  () => m.storage.get(`${STORAGE_KEY}.deviceId`),
-      set:  (id) => m.storage.set(`${STORAGE_KEY}.deviceId`, id),
+      get:  () => omega.storage.get(`${STORAGE_KEY}.deviceId`),
+      set:  (id) => omega.storage.set(`${STORAGE_KEY}.deviceId`, id),
       seed: () => context._readFirstMac(),
     });
   },
@@ -138,14 +138,14 @@ const context = {
 
     context.geolocation.ip = ip;
     // Persist for next launch so an offline boot still has a usable IP.
-    context._manager.storage.set(`${STORAGE_KEY}.geolocation`, { ...context.geolocation });
+    context._omega.storage.set(`${STORAGE_KEY}.geolocation`, { ...context.geolocation });
   },
 
   // Test/teardown helper. Re-initialize is idempotent guarded; call this first
   // if a test wants to re-run with mutated state.
   shutdown() {
     context._initialized = false;
-    context._manager     = null;
+    context._omega       = null;
   },
 
   // Plain-JSON snapshot — what gets sent over IPC to the renderer.

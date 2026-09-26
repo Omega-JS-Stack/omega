@@ -1,4 +1,4 @@
-// Build-layer tests for Manager.getConfig() — omega.json5 resolution + derived defaults.
+// Build-layer tests for build.getConfig() — omega.json5 resolution + derived defaults.
 // Stages a temp consumer dir with a config/omega.json5, sets process.cwd()
 // at it, and asserts the resolution + derivation rules.
 
@@ -43,8 +43,8 @@ function loadConfigInDir(dir) {
   }
   try {
     process.chdir(dir);
-    const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-    return Manager.getConfig();
+    const build = require(path.join(__dirname, '..', '..', '..', 'build.js'));
+    return build.getConfig();
   } finally {
     process.chdir(oldCwd);
   }
@@ -53,7 +53,7 @@ function loadConfigInDir(dir) {
 module.exports = defineCases({
   type: 'suite',
   layer: 'build',
-  description: 'Manager.getConfig — omega.json5 resolution + derived defaults',
+  description: 'build.getConfig — omega.json5 resolution + derived defaults',
   tests: [
     {
       name: 'derives appId from the BRAND: reverse-domain of brand.url, else app.<brand.id> (friction #18)',

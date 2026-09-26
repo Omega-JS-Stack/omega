@@ -1,8 +1,7 @@
 /**
  * Appearance Module
- * Handles theme appearance switching (dark, light, system)
+ * Handles theme appearance switching (dark, light, system): `omega.appearance`.
  */
-import omega from '@omega.js/client';
 
 // Constants
 const STORAGE_KEY = 'appearance.preference';
@@ -11,16 +10,19 @@ const VALID_VALUES = ['dark', 'light', 'system'];
 // Module state
 let mediaQuery = null;
 
-// Module
-export default () => {
-
+/**
+ * Build the appearance API for `omega.appearance` and wire its page controls.
+ * @param {object} omega - the web runtime instance (its storage holds the preference).
+ * @returns {object} the appearance API: get, getResolved, set, toggle, cycle, clear.
+ */
+export function createAppearance(omega) {
   // Create appearance API
   const appearanceAPI = {
     /**
      * Get the current saved preference
      * @returns {string|null} 'dark', 'light', 'system', or null if not set
      */
-    get: () => omega.storage().get(STORAGE_KEY) || null,
+    get: () => omega.storage.get(STORAGE_KEY) || null,
 
     /**
      * Get the resolved (actual) theme being displayed
@@ -40,7 +42,7 @@ export default () => {
       }
 
       // Save preference
-      omega.storage().set(STORAGE_KEY, value);
+      omega.storage.set(STORAGE_KEY, value);
 
       // Apply theme
       applyTheme(value);
@@ -76,17 +78,14 @@ export default () => {
      * Clear saved preference (revert to site default)
      */
     clear: () => {
-      omega.storage().remove(STORAGE_KEY);
+      omega.storage.remove(STORAGE_KEY);
       updateUI(null);
       setupSystemListener(false);
     }
   };
 
-  // Register on the omega library
-  omega._library.appearance = appearanceAPI;
-
   // Initialize UI event listeners
-  initializeUI();
+  initializeUI(appearanceAPI);
 
   // Setup system listener if current preference is 'system'
   const currentPreference = appearanceAPI.get();
@@ -98,7 +97,9 @@ export default () => {
   updateUI(currentPreference);
 
   console.log('Appearance module loaded');
-};
+
+  return appearanceAPI;
+}
 
 /**
  * Apply theme to the document
@@ -146,8 +147,9 @@ const handleSystemChange = (event) => {
 
 /**
  * Initialize UI event listeners
+ * @param {object} appearanceAPI - The appearance API the controls drive
  */
-const initializeUI = () => {
+const initializeUI = (appearanceAPI) => {
   // Use event delegation for appearance controls
   document.addEventListener('click', (event) => {
     const $target = event.target.closest('[data-appearance-set]');
@@ -159,7 +161,7 @@ const initializeUI = () => {
     event.preventDefault();
 
     const value = $target.getAttribute('data-appearance-set');
-    omega.library().appearance.set(value);
+    appearanceAPI.set(value);
   });
 };
 

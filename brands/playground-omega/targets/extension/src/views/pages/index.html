@@ -1,10 +1,29 @@
+<!--
+  Surface: a custom extension page (the notes dashboard, opened from the popup)
+  Doc: node_modules/@omega.js/extension/docs/components.md
+-->
 <div class="page-container p-4">
   <header class="page-header mb-4">
-    <h1 class="h2">Welcome</h1>
-    <p class="lead text-muted">Your extension page is ready.</p>
+    <h1 class="h2">{{ brand.name }} notes</h1>
+    <p class="lead text-muted mb-0" data-omega-bind="@show auth.user.authenticated" hidden>
+      Signed in as <strong data-omega-bind="@text auth.user.profile.displayName"></strong>
+    </p>
   </header>
 
   <main class="page-content">
-    <p>Add your page content here.</p>
+    <div data-omega-bind="@show !auth.user.authenticated" hidden>
+      <p class="text-muted">Sign in to see your notes.</p>
+      <button type="button" class="btn btn-primary omega-signin">Sign in</button>
+    </div>
+
+    <form id="notes-form" class="d-flex gap-2 mb-4" novalidate>
+      <input type="text" name="text" id="note-text" class="form-control" maxlength="280" required placeholder="Write a note" aria-label="Write a note">
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+
+    <div data-omega-bind="@show auth.user.authenticated" hidden>
+      <ul id="notes-list" class="list-unstyled mb-0" aria-live="polite"></ul>
+      <p id="notes-empty" class="text-muted mb-0" hidden>No notes yet.</p>
+    </div>
   </main>
 </div>

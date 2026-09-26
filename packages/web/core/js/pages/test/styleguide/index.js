@@ -4,13 +4,13 @@
 // `omega-password-toggle` click trigger (#16), armed by the global module.
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     const bootstrap = window.bootstrap;
     if (bootstrap) {

@@ -88,7 +88,7 @@ function pickPaths(section, paths) {
 
 /**
  * The subset of a resolved config a browser may see.
- * @param {object} [resolved] - a resolved config (Manager.getConfig() output),
+ * @param {object} [resolved] - a resolved config (build.getConfig() output),
  *   with this build's facts composed onto it.
  * @returns {object} the blob every browser surface bakes as OMEGA_BUILD_JSON.config.
  * @throws {Error} when a section that is about to ship carries a secret-shaped key.

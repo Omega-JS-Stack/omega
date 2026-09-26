@@ -3,7 +3,7 @@
 //
 // The managers are plain objects and `available()` is stubbed, so the production
 // default is provable with no Electron and, above all, with no call into this box's
-// OS keychain. The real-manager half lives in the main suite, which now runs under
+// OS keychain. The real-instance half lives in the main suite, which now runs under
 // the forced test-mode strategy itself.
 
 const path = require('path');
@@ -41,7 +41,7 @@ module.exports = defineCases({
   description: 'auth-persistence resolve(): the production default, and the test-mode override',
   tests: [
     {
-      name: 'a production manager with no config still picks safeStorage; an unknown name warns to null',
+      name: 'a production omega instance with no config still picks safeStorage; an unknown name warns to null',
       run: async (ctx) => {
         const vault = stubSafeStorage();
         const lines = [];
@@ -63,7 +63,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'a testing manager gets none before any config read, and the vault is never asked',
+      name: 'a testing omega instance gets none before any config read, and the vault is never asked',
       run: async (ctx) => {
         const vault = stubSafeStorage();
         const lines = [];
@@ -97,13 +97,13 @@ module.exports = defineCases({
           // explicit one alone ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)),
           // and so the real isTesting() answers the lane, not the bake.
           process.env[ENVIRONMENT_VAR] = 'testing';
-          const manager = {
+          const omega = {
             config:    { environment: 'production', omega: { authPersistence: 'safeStorage' } },
             isTesting,
           };
-          ctx.expect(manager.isTesting()).toBe(true);
+          ctx.expect(omega.isTesting()).toBe(true);
 
-          const active = await capture(lines, () => authPersistence.resolve(manager));
+          const active = await capture(lines, () => authPersistence.resolve(omega));
           ctx.expect(active).toBeNull();
           ctx.expect(vault.calls.available).toBe(0);
           ctx.expect(lines.join('\n')).toMatch(/auth persistence: none \(test mode\)/);

@@ -1,6 +1,6 @@
 // Analytics — GA4 via Measurement Protocol. Mirrors @omega.js/backend's
-// `Manager.config.analytics.providers.google.id` shape so the same person can be
-// tracked across desktop (@omega.js/desktop) + web (UJM/@omega.js/client) + backend (@omega.js/backend) by
+// `omega.config.analytics.providers.google.id` shape so the same person can be
+// tracked across desktop (@omega.js/desktop) + web (@omega.js/client) + backend (@omega.js/backend) by
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
@@ -18,16 +18,16 @@
 // namespace via uuidv5.URL of the projectId string. Same projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop
 // → the same uid hashes to the same user_id everywhere → unified analytics.
 //
-// Anonymous (client-bridge hasn't reported auth yet) → user_id stays null.
+// Anonymous (auth holds no signed-in account yet) → user_id stays null.
 // Authed (auth event fires) → user_id is set + a `login` event is dispatched. On
 // logout → user_id clears + `logout` event fires.
 //
 // API surface:
-//   manager.analytics.event(name, params?)         // generic event
-//   manager.analytics.pageview(path?)              // convenience wrapper
-//   manager.analytics.screenview(name?)            // convenience wrapper
-//   manager.analytics.setUserId(uid)               // manual override; auto-wired to omega
-//   manager.analytics.setUserProperties(props)     // merge into user_properties block
+//   omega.analytics.event(name, params?)         // generic event
+//   omega.analytics.pageview(path?)              // convenience wrapper
+//   omega.analytics.screenview(name?)            // convenience wrapper
+//   omega.analytics.setUserId(uid)               // manual override; auto-wired to auth
+//   omega.analytics.setUserProperties(props)     // merge into user_properties block
 //
 // Events fired during normal operation are queued until init completes (we need
 // context.session + measurement_id + secret). Once initialized, the queue
@@ -67,7 +67,7 @@ const MAX_QUEUE = 200;
 
 const analytics = {
   _initialized:  false,
-  _manager:      null,
+  _omega:        null,
   _enabled:      false,
   _measurementId: null,
   _apiSecret:    null,
@@ -78,12 +78,12 @@ const analytics = {
   _queue:        [],
   _authUnsub:    null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (analytics._initialized) return;
     analytics._initialized = true;
-    analytics._manager = manager;
+    analytics._omega = omega;
 
-    const cfg = manager.config.analytics || {};
+    const cfg = omega.config.analytics || {};
 
     // Presence-driven: providers.google.id presence enables analytics. No separate
     // `enabled` flag (matches @omega.js/backend convention — credentials are the enable signal).
@@ -109,8 +109,8 @@ const analytics = {
     // projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
-    const projectId = manager.config.cloud?.config?.projectId
-      || manager.config.brand.id;
+    const projectId = omega.config.cloud?.config?.projectId
+      || omega.config.brand.id;
     analytics._namespace = core.deriveNamespace(projectId);
 
     // Apply a uid stored by a pre-init setUserId() call — the auth
@@ -125,7 +125,7 @@ const analytics = {
     // so an empty one is a broken boot order, never a runtime condition — and a
     // fresh id minted here would persist nowhere, making every launch a new GA
     // client (#396). It raises instead.
-    const deviceId = manager.context.session.deviceId;
+    const deviceId = omega.context.session.deviceId;
 
     if (!deviceId) {
       throw new Error('analytics.initialize() ran before context.initialize() resolved session.deviceId — the boot sequence must init context first');
@@ -142,16 +142,14 @@ const analytics = {
     analytics_.configure({
       transport: { send: (descriptor) => analytics._send(descriptor) },
       context: { runtime: 'electron' },
-      environment: manager.isDevelopment?.() ? 'development' : 'production',
+      environment: omega.isDevelopment?.() ? 'development' : 'production',
     });
 
-    // Wire auth subscription so user_id flips automatically on login/logout.
-    analytics._authUnsub = manager.omega.onAuthChange((snap) => {
-      analytics._handleAuthChange(snap);
+    // Listen to auth so user_id flips automatically on login/logout. The listen
+    // catch-up delivers the state auth already holds, so nothing is pulled here.
+    analytics._authUnsub = omega.auth.listen(({ user }) => {
+      analytics._handleAuthChange(user);
     });
-    // Pull current state immediately in case auth already resolved.
-    const current = manager.omega.getCurrentUser();
-    if (current?.uid) analytics._handleAuthChange(current);
 
     // Compute initial user_properties from context + usage.
     analytics._userProperties = analytics._buildUserProperties();
@@ -176,11 +174,11 @@ const analytics = {
 
     // IPC: renderer → main analytics calls. Forward fires-and-forgets via send;
     // status query via invoke.
-    manager.ipc.unhandle('desktop:analytics:status');
-    manager.ipc.handle('desktop:analytics:status', () => analytics.toJSON());
+    omega.ipc.unhandle('desktop:analytics:status');
+    omega.ipc.handle('desktop:analytics:status', () => analytics.toJSON());
     // Use Set-deduped listener; named handler so re-init collapses duplicates.
-    manager.ipc.on('desktop:analytics:event',               analytics._onIpcEvent);
-    manager.ipc.on('desktop:analytics:set-user-properties', analytics._onIpcSetProps);
+    omega.ipc.on('desktop:analytics:event',               analytics._onIpcEvent);
+    omega.ipc.on('desktop:analytics:set-user-properties', analytics._onIpcSetProps);
   },
 
   _onIpcEvent({ name, params } = {}) {
@@ -248,7 +246,7 @@ const analytics = {
     analytics.event('screen_view', name ? { screen_name: name } : {});
   },
 
-  // Manual user-id override. Normally client-bridge wires this automatically.
+  // Manual user-id override. Normally auth.listen wires this automatically.
   setUserId(uid) {
     if (!analytics._namespace) {
       // Init hasn't run yet — store and apply at init.
@@ -273,24 +271,24 @@ const analytics = {
   // GA4 param contract: each event needs engagement_time_msec (else session bounces),
   // and we add session_id + page_location so reports group properly.
   _enrichParams(params) {
-    const m = analytics._manager;
-    const ctx = m.context;
+    const omega = analytics._omega;
+    const ctx = omega.context;
     const sessionStart = ctx.session.startTime ? new Date(ctx.session.startTime).getTime() : Date.now();
     const engagement   = Math.max(1, Date.now() - sessionStart);
     return {
       session_id:           ctx.session.id || 'unknown',
       engagement_time_msec: engagement,
-      page_location:        params.page_location || `app://${m.config.brand.id}`,
-      page_title:           params.page_title || m.config.app?.productName || m.config.brand.name,
+      page_location:        params.page_location || `app://${omega.config.brand.id}`,
+      page_title:           params.page_title || omega.config.app?.productName || omega.config.brand.name,
       ...params,
     };
   },
 
   // Compute user-properties from current context + usage. Re-run on auth change.
   _buildUserProperties() {
-    const m = analytics._manager;
-    const ctx = m.context;
-    const usage = m.usage;
+    const omega = analytics._omega;
+    const ctx = omega.context;
+    const usage = omega.usage;
     const wrap = (v) => ({ value: v });
     const out = {
       app_version:      wrap(ctx.app.version || 'unknown'),
@@ -343,7 +341,7 @@ const analytics = {
       analytics._authUnsub();
     }
     analytics._initialized   = false;
-    analytics._manager       = null;
+    analytics._omega         = null;
     analytics._enabled       = false;
     analytics._measurementId = null;
     analytics._apiSecret     = null;

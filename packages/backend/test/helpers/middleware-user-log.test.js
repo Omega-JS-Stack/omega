@@ -1,5 +1,5 @@
 /**
- * Test: the user projection Middleware.process() logs
+ * Test: the user projection the request pipeline logs
  * ([#275](https://github.com/Omega-JS-Stack/omega/issues/275)).
  *
  * The middleware used to hand its "User (...)" line the ENTIRE user document,
@@ -15,17 +15,17 @@
  * beyond the document itself. The wiring half is proven by the emulator: every
  * authenticated route suite still round-trips green through this same line.
  */
-const Middleware = require('../../dist/manager/helpers/middleware.js');
+const redaction = require('../../dist/omega/helpers/log-redaction.js');
 const { USER_SCHEMA } = require('../../dist/vendor/account/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const { projectUserForLog } = Middleware;
+const { projectUserForLog } = redaction;
 
 // The secret the leak was about, plus its sibling under api/.
 const PRIVATE_KEY = 'sk_live_275_private_key_value';
 const CLIENT_ID = 'e3f1c0de-0000-4000-8000-000000000275';
 
-// A user doc in the shape the middleware reads off ctx.getUser() — the fields
+// A user doc in the shape the middleware reads off ctx.user — the fields
 // the projection keeps, the credential it must drop, and enough neighbors to
 // prove the allow-list is not just an `api` blocklist.
 function userDoc(overrides) {
@@ -50,7 +50,7 @@ function serialize(value) {
 }
 
 module.exports = defineCases({
-  description: 'Middleware user log projection — no credential reaches a log line',
+  description: 'Pipeline user log projection — no credential reaches a log line',
   type: 'group',
 
   tests: [

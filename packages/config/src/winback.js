@@ -9,7 +9,7 @@
  * nothing at all still makes one: 50% off the next cycle, one cycle only.
  *
  * That default lives HERE and nowhere else. The backend's apply route resolves
- * `Manager.config.payment` through this function, and the web build bakes the
+ * `omega.config.payment` through this function, and the web build bakes the
  * SAME call into the client blob it emits — so the dialog the customer reads and
  * the coupon the provider creates can never disagree about the number.
  *

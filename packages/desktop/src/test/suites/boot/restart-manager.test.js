@@ -16,8 +16,8 @@ module.exports = defineCases({
   tests: [
     {
       description: 'restartManager wired, bailed as testing, nothing scheduled',
-      inspect: async ({ manager, expect }) => {
-        const rm = manager.restartManager;
+      inspect: async ({ omega, expect }) => {
+        const rm = omega.restartManager;
         expect(Boolean(rm)).toBe(true);
         for (const fn of ['register', 'unregister', 'ensureInstalled', 'ensureRunning', 'getStatus', 'shutdown']) {
           expect(typeof rm[fn]).toBe('function');

@@ -40,19 +40,19 @@ module.exports = defineCases({
 
     {
       description: 'storage is a REAL store through the bundle (not the no-op fallback)',
-      inspect: async ({ manager, expect }) => {
+      inspect: async ({ omega, expect }) => {
         const fs = require('fs');
 
         // The no-op fallback leaves _store null → getPath() null and get() always default.
-        manager.storage.set('desktop:boot:storageProof', 'bundled');
-        expect(manager.storage.get('desktop:boot:storageProof')).toBe('bundled');
+        omega.storage.set('desktop:boot:storageProof', 'bundled');
+        expect(omega.storage.get('desktop:boot:storageProof')).toBe('bundled');
 
-        const storePath = manager.storage.getPath();
+        const storePath = omega.storage.getPath();
         expect(Boolean(storePath)).toBe(true);
         expect(storePath.endsWith('omega-storage.json')).toBe(true);
         expect(fs.existsSync(storePath)).toBe(true);
 
-        manager.storage.delete('desktop:boot:storageProof');
+        omega.storage.delete('desktop:boot:storageProof');
       },
     },
   ],

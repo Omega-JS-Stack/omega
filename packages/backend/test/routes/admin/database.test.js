@@ -27,7 +27,7 @@ module.exports = defineCases({
           },
         };
 
-        const writeResponse = await http.post('backend-manager/admin/database', {
+        const writeResponse = await http.post('omega/admin/database', {
           path: TEST_PATH,
           document: testData,
         });
@@ -43,7 +43,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const readResponse = await http.get('backend-manager/admin/database', {
+        const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 
@@ -70,7 +70,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const readResponse = await http.get('backend-manager/admin/database', {
+        const readResponse = await http.get('omega/admin/database', {
           path: '_test/nonexistent-path-12345',
         });
 
@@ -93,7 +93,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const readResponse = await http.get('backend-manager/admin/database', {});
+        const readResponse = await http.get('omega/admin/database', {});
 
         assert.isError(readResponse, 400, 'Missing path should return 400');
       },
@@ -106,7 +106,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const readResponse = await http.get('backend-manager/admin/database', {
+        const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 
@@ -121,7 +121,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const readResponse = await http.get('backend-manager/admin/database', {
+        const readResponse = await http.get('omega/admin/database', {
           path: TEST_PATH,
         });
 

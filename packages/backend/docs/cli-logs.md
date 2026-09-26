@@ -45,7 +45,7 @@ The `--fn` flag uses the **deployed Cloud Function name**, not the route path.
 
 | Function name | Type | Description |
 |---------------|------|-------------|
-| `omega_api` | HTTPS | Main API router — all consumer routes (GET/POST/PUT/DELETE) go through this |
+| `omega_api` | HTTPS | Main API router: the framework's routes (GET/POST/PUT/DELETE) and the MCP endpoint; a consumer route rides its own function |
 | `omega_authBeforeCreate` | Auth blocking | Before user creation: disposable email blocking, IP rate limiting, consumer hooks |
 | `omega_authBeforeSignIn` | Auth blocking | Before sign-in: consumer hooks |
 | `omega_authOnCreate` | Auth event | After user creation: user doc setup |

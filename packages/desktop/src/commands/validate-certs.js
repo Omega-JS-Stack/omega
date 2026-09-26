@@ -38,8 +38,8 @@ const { certificateExpiry, EXPIRY_WARN_DAYS } = require('@omega.js/devkit/certs'
 const { signingPathCandidates } = require('@omega.js/devkit/signing-env');
 const { requiredWhenHolds } = require('@omega.js/config/env-rules');
 
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('validate-certs');
+const build = require('../build.js');
+const logger = build.logger('validate-certs');
 
 module.exports = async function (options) {
   options = options || {};
@@ -48,8 +48,8 @@ module.exports = async function (options) {
   logger.log('Validating signing prerequisites...');
 
   const platform = process.platform;
-  const config = Manager.getConfig();
-  const winStrategy = Manager.getWindowsSignStrategy();
+  const config = build.getConfig();
+  const winStrategy = build.getWindowsSignStrategy();
 
   const issues = [];
 

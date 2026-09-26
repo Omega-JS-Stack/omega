@@ -85,14 +85,14 @@ module.exports = defineCases({
   description: 'restart-manager (main)',
   cleanup: async (ctx) => {
     if (ctx.state.rm) ctx.state.rm.server.close();
-    ctx.manager.restartManager.shutdown();
-    ctx.manager.restartManager.initialize(ctx.manager);
+    ctx.omega.restartManager.shutdown();
+    ctx.omega.restartManager.initialize(ctx.omega);
   },
   tests: [
     {
-      name: 'wired on manager with the full v2 API surface',
+      name: 'wired on omega with the full v2 API surface',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         ctx.expect(rm).toBeDefined();
         for (const fn of ['register', 'unregister', 'ensureInstalled', 'ensureRunning', 'getStatus', 'shutdown']) {
           ctx.expect(typeof rm[fn]).toBe('function');
@@ -102,7 +102,7 @@ module.exports = defineCases({
     {
       name: 'testing bail: bailed with reason, no timer, no before-quit hook',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         const status = rm.getStatus();
         ctx.expect(status.bailed).toBe(true);
         ctx.expect(status.bailReason).toBe('testing');
@@ -114,7 +114,7 @@ module.exports = defineCases({
       name: 'testing-root isolation: _root lives under the (Testing) userData, never appData',
       run: (ctx) => {
         const { app } = require('electron');
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         ctx.expect(rm._root.startsWith(app.getPath('userData'))).toBe(true);
         ctx.expect(rm._root).not.toBe(protocol.resolveSharedRoot(app.getPath('appData'), {}));
       },
@@ -122,38 +122,38 @@ module.exports = defineCases({
     {
       name: 'enabled=false bail (reason disabled, no timer)',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         rm.shutdown();
-        const orig = ctx.manager.config.restartManager;
-        ctx.manager.config.restartManager = { enabled: false };
+        const orig = ctx.omega.config.restartManager;
+        ctx.omega.config.restartManager = { enabled: false };
         try {
-          rm.initialize(ctx.manager);
+          rm.initialize(ctx.omega);
           // Testing bail fires first in the harness, so force-evaluate the
           // config path: _enabled captured false proves the knob was read.
           ctx.expect(rm._enabled).toBe(false);
           ctx.expect(rm._registerTimer).toBe(null);
         } finally {
           rm.shutdown();
-          ctx.manager.config.restartManager = orig;
-          rm.initialize(ctx.manager);
+          ctx.omega.config.restartManager = orig;
+          rm.initialize(ctx.omega);
         }
       },
     },
     {
       name: 'brand.id === "restart-manager" bail (RM does not manage itself)',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         rm.shutdown();
-        const origBrand = ctx.manager.config.brand;
-        ctx.manager.config.brand = { ...origBrand, id: 'restart-manager' };
+        const origBrand = ctx.omega.config.brand;
+        ctx.omega.config.brand = { ...origBrand, id: 'restart-manager' };
         try {
-          rm.initialize(ctx.manager);
+          rm.initialize(ctx.omega);
           ctx.expect(rm._registerTimer).toBe(null);
           ctx.expect(rm.getStatus().bailed).toBe(true);
         } finally {
           rm.shutdown();
-          ctx.manager.config.brand = origBrand;
-          rm.initialize(ctx.manager);
+          ctx.omega.config.brand = origBrand;
+          rm.initialize(ctx.omega);
         }
       },
     },
@@ -161,14 +161,14 @@ module.exports = defineCases({
       name: 'non-production without OMEGA_RESTART_MANAGER_DEV: nothing scheduled',
       run: (ctx) => {
         ctx.expect(process.env.OMEGA_RESTART_MANAGER_DEV).not.toBe('1');
-        ctx.expect(ctx.manager.isProduction()).toBe(false);
-        ctx.expect(ctx.manager.restartManager._registerTimer).toBe(null);
+        ctx.expect(ctx.omega.isProduction()).toBe(false);
+        ctx.expect(ctx.omega.restartManager._registerTimer).toBe(null);
       },
     },
     {
       name: '_readRuntime: valid file parses; wrong version / malformed / missing → null',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         const runtimePath = protocol.getRuntimePath(rm._root);
 
         writeRuntime(rm._root, 4000);
@@ -189,7 +189,7 @@ module.exports = defineCases({
     {
       name: '_pidAlive: own pid alive, absurd pid dead',
       run: (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         ctx.expect(rm._pidAlive(process.pid)).toBe(true);
         ctx.expect(rm._pidAlive(999999)).toBe(false);
       },
@@ -197,14 +197,14 @@ module.exports = defineCases({
     {
       name: 'register round-trip: contract-valid payload lands, pid is ours, status flips',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         ctx.state.rm = await startContractServer();
         writeRuntime(rm._root, ctx.state.rm.port);
 
         const ok = await rm.register();
         ctx.expect(ok).toBe(true);
 
-        const appId = ctx.manager.config.brand.id;
+        const appId = ctx.omega.config.brand.id;
         const stored = ctx.state.rm.apps.get(appId);
         ctx.expect(stored).toBeDefined();
         ctx.expect(stored.pid).toBe(process.pid);
@@ -219,7 +219,7 @@ module.exports = defineCases({
     {
       name: 'heartbeat: idempotent upsert (1 app, request count climbs), timestamp advances',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         const before = ctx.state.rm.counts.register;
 
         await rm._heartbeatTick();
@@ -233,7 +233,7 @@ module.exports = defineCases({
     {
       name: 'quit flush: capped deregister lands under the 1s budget',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         const started = Date.now();
         await rm._quitFlush();
         ctx.expect(Date.now() - started).toBeLessThan(1000 + 250);
@@ -245,9 +245,9 @@ module.exports = defineCases({
       name: '_handleBeforeQuit: not-registered path returns without touching the event',
       run: (ctx) => {
         // Only the safe branch is drivable in the harness (the flush branch ends
-        // in manager.quit which would kill the test Electron). _quitFlush itself
+        // in omega.quit which would kill the test Electron). _quitFlush itself
         // is proven above.
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         rm._registered = false;
         rm._quitFlushed = false;
         let prevented = false;
@@ -258,7 +258,7 @@ module.exports = defineCases({
     {
       name: 'deregister round-trip: fixture saw { id, pid }',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         await rm.register();
         ctx.expect(ctx.state.rm.apps.size).toBe(1);
 
@@ -271,7 +271,7 @@ module.exports = defineCases({
     {
       name: 'dead server: register resolves false, lastError set, no spawn in testing',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         // Grab a port that WAS listening and now is not.
         const throwaway = await startContractServer();
         const deadPort = throwaway.port;
@@ -286,7 +286,7 @@ module.exports = defineCases({
     {
       name: 'smart existence: installed app on disk short-circuits before any network',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         const appPath = protocol.getInstalledAppPath(rm._root, process.platform);
         fs.mkdirSync(appPath, { recursive: true });
         try {
@@ -301,7 +301,7 @@ module.exports = defineCases({
     {
       name: 'not installed in testing: ensureInstalled refuses network and returns false',
       run: async (ctx) => {
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         if (process.env.TEST_EXTENDED_MODE) return ctx.skip('extended mode allows the real download');
         const ok = await rm.ensureInstalled();
         ctx.expect(ok).toBe(false);
@@ -312,7 +312,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         if (!process.env.TEST_EXTENDED_MODE) return ctx.skip('requires TEST_EXTENDED_MODE (live GitHub)');
         const install = require('../../../lib/restart-manager/install.js');
-        const rm = ctx.manager.restartManager;
+        const rm = ctx.omega.restartManager;
         try {
           const feed = await install.fetchFeed(rm._feed, process.platform);
           const artifact = install.pickArtifact(feed, process.platform, process.arch);

@@ -44,7 +44,7 @@ module.exports = defineCases({
     {
       name: 'create-one-time-intent',
       async run({ http, assert, state }) {
-        const response = await http.as('journey-payments-one-time').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-one-time').post('omega/payments/intent', {
           provider: 'test',
           productId: state.productId,
         });
@@ -128,7 +128,7 @@ module.exports = defineCases({
         // first webhook already wrote, matched on its resourceId.
         state.bareEventId = `_test-evt-one-time-bare-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.bareEventId,
           type: 'checkout.session.completed',
           data: {

@@ -10,6 +10,9 @@ import ServiceWorker from './modules/service-worker.js';
 import Sentry from './modules/sentry.js';
 import Device from './modules/device.js';
 import Verts from './modules/verts.js';
+import Triggers from './modules/triggers.js';
+import Icons from './modules/icons.js';
+import { createMotion } from './modules/motion.js';
 import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
 import { createLogger } from './modules/logger.js';
 import { pathPrefix } from './modules/path-prefix.js';
@@ -46,7 +49,16 @@ function _devFactMissing(what) {
   return devFactMissing(what, DEV_FACT_WRITER);
 }
 
-class Manager {
+/**
+ * The OMEGA browser runtime: the BASE CLASS every browser framework (web, the
+ * extension, the desktop renderer) subclasses and exports ONE instance of. This
+ * package exports the class and no instance; a consumer never writes `new`.
+ *
+ * Every module is a plain property built here (`omega.auth`, `omega.storage`,
+ * `omega.triggers`), and each one that needs the instance receives it in its
+ * constructor, so nothing imports a singleton.
+ */
+class Omega {
   constructor() {
     // Configuration from init()
     this.config = {};
@@ -56,41 +68,55 @@ class Manager {
       serviceWorker: null
     };
 
-    // Auth settler: resolves when Firebase auth first determines user state
-    this._firebaseAuthInitialized = false;
-    this._authReadyResolve = null;
-    this._authReady = new Promise((resolve) => {
-      this._authReadyResolve = resolve;
-    });
-
     // The session probe's moments are registered ONCE per instance (#798)
     this._sessionProbeMomentsWired = false;
 
-    // Initialize modules
-    this._storage = new Storage();
-    this._utilities = new Utilities(this);
-    this._analytics = new Analytics(this);
-    this._auth = new Auth(this);
-    this._bindings = new Bindings(this);
-    this._firestore = new Firestore(this);
-    this._notifications = new Notifications(this);
-    this._serviceWorker = new ServiceWorker(this);
-    this._sentry = new Sentry(this);
-    this._device = new Device(this);
-    this._verts = new Verts(this);
+    // Settled by initialize(): resolves with the instance, rejects with the
+    // error initialize() rethrows. A module that did not call initialize() can
+    // still await it.
+    this._readyResolve = null;
+    this._readyReject = null;
+    this.ready = new Promise((resolve, reject) => {
+      this._readyResolve = resolve;
+      this._readyReject = reject;
+    });
+
+    // A rejected boot nobody awaited must not surface as an unhandled
+    // rejection; a consumer awaiting `ready` still sees the error, because this
+    // catch hangs off a separate branch of the same promise.
+    this.ready.catch(() => {});
+
+    // Modules
+    this.storage = new Storage();
+    this.utilities = new Utilities(this);
+    this.analytics = new Analytics(this);
+    this.auth = new Auth(this);
+    this.bindings = new Bindings(this);
+    this.firestore = new Firestore(this);
+    this.notifications = new Notifications(this);
+    this.serviceWorker = new ServiceWorker(this);
+    this.sentry = new Sentry(this);
+    this.device = new Device(this);
+    this.verts = new Verts(this);
+    this.dom = domUtils;
+
+    // The standalone service modules the framework builds once
+    this.triggers = new Triggers();
+    this.icons = new Icons();
+    this.motion = createMotion();
 
     // Harmonized API fetch (omega.request) — fresh Bearer token when signed in,
     // omega-properties processed on every response (server usage → bindings)
     this._request = createRequest({
       getApiUrl: () => this.getApiUrl(),
       getIdToken: (force) => this._firebaseAuth?.currentUser
-        ? this._auth.getIdToken(force)
+        ? this.auth.getIdToken(force)
         : null,
-      onProperties: (properties) => mergeUsageIntoBindings(this._bindings, properties),
+      onProperties: (properties) => mergeUsageIntoBindings(this.bindings, properties),
       // A 401 is the third moment of doubt (#798): the backend refused this
       // token, so the client asks the Auth server whether the session is still
       // there at all. Fire-and-forget: the caller's error is unchanged.
-      onUnauthorized: () => this._auth.probeSession(),
+      onUnauthorized: () => this.auth.probeSession(),
     });
   }
 
@@ -102,57 +128,11 @@ class Manager {
     return this._request(url, options);
   }
 
-  // Module getters
-  storage() {
-    return this._storage;
-  }
-
-  auth() {
-    return this._auth;
-  }
-
-  bindings() {
-    return this._bindings;
-  }
-
-  firestore() {
-    return this._firestore;
-  }
-
-  notifications() {
-    return this._notifications;
-  }
-
-  serviceWorker() {
-    return this._serviceWorker;
-  }
-
-  sentry() {
-    return this._sentry;
-  }
-
-  device() {
-    return this._device;
-  }
-
-  analytics() {
-    return this._analytics;
-  }
-
-  verts() {
-    return this._verts;
-  }
-
-  // DOM utilities
-  dom() {
-    return domUtils;
-  }
-
-  utilities() {
-    return this._utilities;
-  }
-
-  // Initialize the manager
+  /**
+   * Boot the instance from a surface's resolved config, and settle `ready`.
+   * @param {object} configuration - the browser subset of the brand's omega.json5.
+   * @returns {Promise<Omega>} the instance.
+   */
   async initialize(configuration) {
     try {
       // Store configuration as-is
@@ -176,7 +156,7 @@ class Manager {
 
       // Initialize Sentry if enabled
       if (this.config.sentry?.enabled) {
-        await this._sentry.init(this.config.sentry.config);
+        await this.sentry.init(this.config.sentry.config);
       }
 
       // Initialize Analytics when the google provider is configured
@@ -192,10 +172,10 @@ class Manager {
       // and the real engagement time — so a bridged renderer initializes with
       // no id and no secret of its own.
       const googleAnalytics = this.config.analytics?.providers?.google;
-      const isWebRuntime = this._utilities.getRuntime() === 'web';
+      const isWebRuntime = this.utilities.getRuntime() === 'web';
       const analyticsBridge = this._resolveAnalyticsBridge();
       if (isWebRuntime || analyticsBridge || (googleAnalytics?.id && googleAnalytics?.secret)) {
-        this._analytics.init({
+        this.analytics.init({
           id: googleAnalytics?.id || null,
           secret: googleAnalytics?.secret,
           projectId: this._resolveFirebaseConfig()?.projectId || this.config.brand?.id || null,
@@ -219,11 +199,11 @@ class Manager {
 
       if (originProtocol === 'http:' || originProtocol === 'https:') {
         if (this.config.serviceWorker?.enabled) {
-          this._serviceWorker.register({
+          this.serviceWorker.register({
             path: this.config.serviceWorker?.config?.path
           });
         } else {
-          this._serviceWorker.unregisterAll();
+          this.serviceWorker.unregisterAll();
         }
       }
 
@@ -233,11 +213,11 @@ class Manager {
       }
 
       // Set up auth event listeners (uses event delegation, no need to wait for DOM)
-      this._auth.setupEventListeners();
+      this.auth.setupEventListeners();
 
       // Set up push notifications
       if (this.config.pushNotifications?.enabled) {
-        this._notifications.initialize(this.config.pushNotifications.config);
+        this.notifications.initialize(this.config.pushNotifications.config);
       }
 
       // Initialize Chatsy chat widget if enabled
@@ -250,19 +230,22 @@ class Manager {
       // await this._loadPolyfillsIfNeeded();
 
       // Initialize local device-stats tracking (installed/session/version)
-      await this._device.initialize();
+      await this.device.initialize();
 
       // Update bindings with config and device data. `device` is the LOCAL
       // stats key — the `usage` key belongs to SERVER usage (seeded on auth
       // settle, refreshed from omega-properties by omega.request()).
-      this.bindings().update({
+      this.bindings.update({
         config: this.config,
-        device: this._device.getBindingData(),
+        device: this.device.getBindingData(),
       });
+
+      this._readyResolve(this);
 
       return this;
     } catch (error) {
-      console.error('Manager initialization error:', error);
+      console.error('Omega initialization error:', error);
+      this._readyReject(error);
       throw error;
     }
   }
@@ -334,7 +317,7 @@ class Manager {
           }
         }
       },
-      // ONE home (#23): the manager provisions the agent and writes agentId
+      // ONE home (#23): @omega.js/manager provisions the agent and writes agentId
       // here, and the widget's presentation settings sit beside it — there is
       // no second `chatsy` blob to keep in sync.
       inbound: {
@@ -526,16 +509,16 @@ class Manager {
     const $html = document.documentElement;
 
     // Set platform (OS) - windows, mac, linux, ios, android, chromeos, unknown
-    $html.dataset.platform = this._utilities.getPlatform();
+    $html.dataset.platform = this.utilities.getPlatform();
 
     // Set browser - chrome, firefox, safari, edge, opera, brave
-    $html.dataset.browser = this._utilities.getBrowser();
+    $html.dataset.browser = this.utilities.getBrowser();
 
     // Set runtime - web, browser-extension, electron, node
-    $html.dataset.runtime = this._utilities.getRuntime();
+    $html.dataset.runtime = this.utilities.getRuntime();
 
     // Set device - mobile, tablet, desktop
-    $html.dataset.device = this._utilities.getDevice();
+    $html.dataset.device = this.utilities.getDevice();
   }
 
   // Resolve the desktop renderer's analytics bridge — the ONE seam that turns
@@ -569,7 +552,7 @@ class Manager {
   // omega.json5 role shape — desktop passes its resolved config through), then nested
   // `firebase.app.config` (the web/extension bridge contract shape).
   // A blob only counts when at least one value is non-empty — framework config merges
-  // (e.g. UJM's Jekyll chain) inject all-empty-string blobs into Firebase-less sites,
+  // can inject all-empty-string blobs into Firebase-less sites,
   // and those must resolve to null (no init, no URL derivation).
   _resolveFirebaseConfig() {
     const hasValues = (blob) => !!blob
@@ -625,7 +608,7 @@ class Manager {
     // from it (#834): the `dev.ports` chrome, then `window.__OMEGA_DEV_PORTS__`
     // for the keys it omits. A key nobody resolved throws by name.
     // Both connects live HERE, immediately after the instances are created: the auth
-    // module reads accounts via `manager.firebaseFirestore` directly, so connecting
+    // module reads accounts via the instance's `firebaseFirestore` directly, so connecting
     // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
     // Auth warnings banner disabled: it injects a DOM overlay that interferes with
     // page content in automated flows.
@@ -664,24 +647,22 @@ class Manager {
 
     // Setup auth state listener
     onAuthStateChanged(this._firebaseAuth, (user) => {
-      // Mark auth as initialized and resolve the settler promise on first callback
-      if (!this._firebaseAuthInitialized) {
-        this._firebaseAuthInitialized = true;
-        this._authReadyResolve();
-      }
-
-      // Let auth module handle everything including DOM updates
-      this._auth._handleAuthStateChange(user);
+      // The auth module builds the one state for this change and lands it on
+      // every consumer. Not awaited: its account fetch must never block
+      // Firebase's callback, and the Chatsy/analytics calls below need none of it.
+      this.auth._handleAuthStateChange(user);
 
       // Analytics follows auth: the identity on every runtime (user_id =
       // uuidv5(uid, namespace)), plus the login/logout events on the runtimes
       // that own them — web's auth pages fire their own (#328 gap 8)
-      this._analytics.handleAuthChange(user);
+      this.analytics.handleAuthChange(user);
 
       // Update Chatsy with current user
+      // (the identity, not `this.auth.user`: the User for this change lands
+      // only after its account fetch, and Chatsy needs no account fields)
       if (this._chatsy) {
-        const resolved = this._auth.getUser();
-        this._chatsy.setUser(resolved ? { id: resolved.uid, email: resolved.email, firstName: resolved.displayName, photoURL: resolved.photoURL } : null);
+        const identity = this.auth._identity(user);
+        this._chatsy.setUser(identity ? { id: identity.uid, email: identity.email, firstName: identity.displayName, photoURL: identity.photoURL } : null);
       }
     });
 
@@ -705,14 +686,14 @@ class Manager {
       if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
-            this._auth.probeSession().catch(() => {});
+            this.auth.probeSession().catch(() => {});
           }
         });
       }
 
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener('online', () => {
-          this._auth.probeSession().catch(() => {});
+          this.auth.probeSession().catch(() => {});
         });
       }
     }
@@ -910,7 +891,7 @@ class Manager {
         : new URL(decoded);
 
       // Loopback returns (RFC 8252 §7.3) are valid while the SITE runs in development:
-      // native apps (Electron Manager) can't OS-register their custom scheme in dev, so
+      // native apps (Electron desktop) can't OS-register their custom scheme in dev, so
       // their sign-in flow returns to an ephemeral 127.0.0.1 listener instead. Any port —
       // the app binds it at flow start. Production sites never match this branch.
       if (this.isDevelopment() && ['127.0.0.1', '[::1]', 'localhost'].includes(returnUrlObject.hostname)) {
@@ -1069,10 +1050,7 @@ const safeEvaluate = (str) => {
   }
 };
 
-// Create singleton instance
-const manager = new Manager();
-
-// Export for different environments
-export default manager;
-export { Manager };
+// The class only: each browser framework subclasses it and exports its one instance
+export default Omega;
+export { Omega };
 

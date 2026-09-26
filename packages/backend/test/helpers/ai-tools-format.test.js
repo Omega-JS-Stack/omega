@@ -11,9 +11,9 @@
  *
  * All pure helpers — no network, no ctx.
  */
-const format = require('../../dist/manager/libraries/ai/providers/anthropic-format.js');
-const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
-const AI = require('../../dist/manager/libraries/ai/index.js');
+const format = require('../../dist/omega/libraries/ai/providers/anthropic-format.js');
+const OpenAI = require('../../dist/omega/libraries/ai/providers/openai.js');
+const AI = require('../../dist/omega/libraries/ai/index.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const { formatMessages, normalizeToolEntry, normalizeToolChoice } = OpenAI._internals;

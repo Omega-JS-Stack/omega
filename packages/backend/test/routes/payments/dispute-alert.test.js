@@ -14,7 +14,7 @@ module.exports = defineCases({
       name: 'rejects-missing-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/dispute-alert', {});
+        const response = await http.as('none').post('omega/payments/dispute-alert', {});
 
         assert.isError(response, 401, 'Should reject missing key');
       },
@@ -24,7 +24,7 @@ module.exports = defineCases({
       name: 'rejects-invalid-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/dispute-alert?key=wrong-key', {});
+        const response = await http.as('none').post('omega/payments/dispute-alert?key=wrong-key', {});
 
         assert.isError(response, 401, 'Should reject invalid key');
       },
@@ -34,7 +34,7 @@ module.exports = defineCases({
       name: 'rejects-unknown-provider',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?provider=unknown&key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-unknown-provider',
           card: '4242',
           amount: 9.99,
@@ -49,7 +49,7 @@ module.exports = defineCases({
       name: 'rejects-missing-id',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           card: '4242',
           amount: 9.99,
           transactionDate: '2026-01-15',
@@ -63,7 +63,7 @@ module.exports = defineCases({
       name: 'rejects-missing-card',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-card',
           amount: 9.99,
           transactionDate: '2026-01-15',
@@ -77,7 +77,7 @@ module.exports = defineCases({
       name: 'rejects-missing-amount',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-amount',
           card: '4242',
           transactionDate: '2026-01-15',
@@ -91,7 +91,7 @@ module.exports = defineCases({
       name: 'rejects-missing-transaction-date',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: '_test-dispute-no-date',
           card: '4242',
           amount: 9.99,
@@ -107,7 +107,7 @@ module.exports = defineCases({
       async run({ http, assert, firestore }) {
         const alertId = '_test-dispute-valid';
 
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '4242424242424242',
           cardBrand: 'Visa',
@@ -168,7 +168,7 @@ module.exports = defineCases({
         const alertId = '_test-dispute-alertid-field';
 
         // Chargeblast alert.created events use alertId instead of id
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           alertId: alertId,
           card: '546616******5805',
           cardBrand: 'Mastercard',
@@ -193,7 +193,7 @@ module.exports = defineCases({
         const alertId = '_test-dispute-minimal';
 
         // Send minimal alert (alert.created shape — no externalOrder, metadata, etc.)
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '9124',
           amount: 10,
@@ -222,7 +222,7 @@ module.exports = defineCases({
       async run({ http, assert, firestore }) {
         const alertId = '_test-dispute-last4';
 
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '1234',
           amount: 9.99,
@@ -255,7 +255,7 @@ module.exports = defineCases({
         });
 
         // A subsequent identical alert must be reported as a duplicate (not reprocessed).
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '4242',
           amount: 29.99,
@@ -281,7 +281,7 @@ module.exports = defineCases({
         });
 
         // Send alert with same ID — should retry since previous status was 'failed'
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '4242',
           amount: 29.99,
@@ -307,7 +307,7 @@ module.exports = defineCases({
         const alertId = '_test-dispute-default-provider';
 
         // Send without provider query param
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${process.env.OMEGA_WEBHOOK_KEY}`, {
           id: alertId,
           card: '4242',
           amount: 9.99,

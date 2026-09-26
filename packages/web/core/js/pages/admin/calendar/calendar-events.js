@@ -5,7 +5,7 @@
  */
 
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { DISPLAY_TYPES, formatDateUTC, formatTimeUTC, todayUTC } from './calendar-core.js';
 import { renderEmailPreview, renderPushPreview } from './campaign-preview.js';
 
@@ -79,7 +79,7 @@ export default class CalendarEvents {
   }
 
   _initForm() {
-    this.formManager = new FormManager('#campaign-editor-form', {
+    this.formManager = new FormManager(omega, '#campaign-editor-form', {
       autoReady: true,
       allowResubmit: true,
     });
@@ -201,7 +201,7 @@ export default class CalendarEvents {
         $container.innerHTML = renderPushPreview(data);
       }
     } catch (error) {
-      $container.innerHTML = `<div class="text-danger small">Preview failed: ${omega.utilities().escapeHTML(error.message)}</div>`;
+      $container.innerHTML = `<div class="text-danger small">Preview failed: ${omega.utilities.escapeHTML(error.message)}</div>`;
     }
   }
 
@@ -773,38 +773,38 @@ export default class CalendarEvents {
     html += `<span class="badge bg-${campaign.type === 'email' ? 'primary' : 'success'}">${campaign.type === 'email' ? 'Email' : 'Push'}</span>`;
     html += `</div>`;
     html += `<table class="table table-sm table-borderless mb-0">`;
-    html += `<tr><td class="text-muted" style="width:120px">ID</td><td><code>${omega.utilities().escapeHTML(campaign.id)}</code></td></tr>`;
-    html += `<tr><td class="text-muted">Name</td><td>${omega.utilities().escapeHTML(settings.name || '')}</td></tr>`;
-    html += `<tr><td class="text-muted">Subject</td><td>${omega.utilities().escapeHTML(settings.subject || '')}</td></tr>`;
+    html += `<tr><td class="text-muted" style="width:120px">ID</td><td><code>${omega.utilities.escapeHTML(campaign.id)}</code></td></tr>`;
+    html += `<tr><td class="text-muted">Name</td><td>${omega.utilities.escapeHTML(settings.name || '')}</td></tr>`;
+    html += `<tr><td class="text-muted">Subject</td><td>${omega.utilities.escapeHTML(settings.subject || '')}</td></tr>`;
     html += `<tr><td class="text-muted">Test</td><td>${settings.test ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td></tr>`;
     const localStr = d.toLocaleString('en', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
     html += `<tr><td class="text-muted">Sent At</td><td>${formatDateUTC(d)} ${formatTimeUTC(d)} UTC <span class="text-muted">(${localStr})</span></td></tr>`;
 
     if (campaign.type === 'email') {
       if (settings.preheader) {
-        html += `<tr><td class="text-muted">Preheader</td><td>${omega.utilities().escapeHTML(settings.preheader)}</td></tr>`;
+        html += `<tr><td class="text-muted">Preheader</td><td>${omega.utilities.escapeHTML(settings.preheader)}</td></tr>`;
       }
       if (settings.sender) {
-        html += `<tr><td class="text-muted">Sender</td><td>${omega.utilities().escapeHTML(settings.sender)}</td></tr>`;
+        html += `<tr><td class="text-muted">Sender</td><td>${omega.utilities.escapeHTML(settings.sender)}</td></tr>`;
       }
       if (settings.template) {
-        html += `<tr><td class="text-muted">Template</td><td>${omega.utilities().escapeHTML(settings.template)}</td></tr>`;
+        html += `<tr><td class="text-muted">Template</td><td>${omega.utilities.escapeHTML(settings.template)}</td></tr>`;
       }
     }
 
     if (campaign.type === 'push') {
       if (settings.icon) {
-        const iconUrl = /^https?:\/\//i.test(settings.icon) ? omega.utilities().escapeHTML(settings.icon) : '#';
-        html += `<tr><td class="text-muted">Icon</td><td><a href="${iconUrl}" target="_blank" rel="noopener">${omega.utilities().escapeHTML(settings.icon)}</a></td></tr>`;
+        const iconUrl = /^https?:\/\//i.test(settings.icon) ? omega.utilities.escapeHTML(settings.icon) : '#';
+        html += `<tr><td class="text-muted">Icon</td><td><a href="${iconUrl}" target="_blank" rel="noopener">${omega.utilities.escapeHTML(settings.icon)}</a></td></tr>`;
       }
       if (settings.clickAction) {
-        const clickUrl = /^https?:\/\//i.test(settings.clickAction) ? omega.utilities().escapeHTML(settings.clickAction) : '#';
-        html += `<tr><td class="text-muted">Click URL</td><td><a href="${clickUrl}" target="_blank" rel="noopener">${omega.utilities().escapeHTML(settings.clickAction)}</a></td></tr>`;
+        const clickUrl = /^https?:\/\//i.test(settings.clickAction) ? omega.utilities.escapeHTML(settings.clickAction) : '#';
+        html += `<tr><td class="text-muted">Click URL</td><td><a href="${clickUrl}" target="_blank" rel="noopener">${omega.utilities.escapeHTML(settings.clickAction)}</a></td></tr>`;
       }
     }
 
     if (campaign.recurringId) {
-      html += `<tr><td class="text-muted">Recurring</td><td>${omega.utilities().escapeHTML(campaign.recurringId)}</td></tr>`;
+      html += `<tr><td class="text-muted">Recurring</td><td>${omega.utilities.escapeHTML(campaign.recurringId)}</td></tr>`;
     }
 
     html += `</table>`;
@@ -815,7 +815,7 @@ export default class CalendarEvents {
     if (campaign.type === 'email' && resultContent) {
       html += '<div class="mb-4">';
       html += '<h6>Content</h6>';
-      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:200px;overflow-y:auto">${omega.utilities().escapeHTML(resultContent)}</pre>`;
+      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:200px;overflow-y:auto">${omega.utilities.escapeHTML(resultContent)}</pre>`;
       html += '</div>';
     }
 
@@ -823,7 +823,7 @@ export default class CalendarEvents {
     if (Object.keys(results).length > 0) {
       html += '<div class="mb-3">';
       html += '<h6>Results</h6>';
-      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto">${omega.utilities().escapeHTML(JSON.stringify(results, null, 2))}</pre>`;
+      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto">${omega.utilities.escapeHTML(JSON.stringify(results, null, 2))}</pre>`;
       html += '</div>';
     }
 

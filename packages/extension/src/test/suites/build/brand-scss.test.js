@@ -32,7 +32,7 @@ function stageConsumer(color) {
 /**
  * Run the sass compile with the fixture as the project root. The task resolves
  * that root (and the config) at REQUIRE time, so each run gets a fresh copy of
- * it and of the build Manager.
+ * it and of the build module.
  */
 async function runSassIn(dir) {
   const oldCwd = process.cwd();

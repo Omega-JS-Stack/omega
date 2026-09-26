@@ -1,6 +1,5 @@
 /**
- * `omega audit` — Lighthouse over a production build (the UJM audit port's
- * Lighthouse half). The site builds FULL through the same `omega build`
+ * `omega audit` — Lighthouse over a production build. The site builds FULL through the same `omega build`
  * plumbing a deploy runs, dist/ is served on an ephemeral loopback port, and
  * Lighthouse scores the home page plus every page path passed as an argument.
  *
@@ -8,7 +7,7 @@
  * (Lighthouse's default preset is mobile emulation on Slow 4G, the same shape
  * PageSpeed Insights reports for mobile).
  *
- * Report-only by default (legacy UJM parity: the scores print, the command
+ * Report-only by default (the scores print, the command
  * exits 0). A `--min-<category>` flag ARMS the gate for that category, and
  * `--max-lcp=<ms>` arms the perceived-usability bar (#467) — any page under a
  * stated minimum, or over the stated LCP, fails loudly and exits non-zero.
@@ -132,7 +131,7 @@ module.exports = async function (options) {
 /**
  * The armed thresholds: `--min-<category>` for each Lighthouse category, in
  * both the dashed and the camelized form the parse mints. An absent flag leaves its
- * category ungated (report-only is the default, legacy UJM parity).
+ * category ungated (report-only is the default).
  * @param {object} options - the parsed CLI options
  * @returns {Object<string, number>} category id → minimum score
  */

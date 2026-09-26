@@ -11,8 +11,8 @@
  * Plain-node unit test (no emulator, no network).
  */
 const assert = require('node:assert');
-const { renderContent } = require('../../dist/manager/libraries/email/prepare.js');
-const { escapeHtml } = require('../../dist/manager/libraries/email/constants.js');
+const { renderContent } = require('../../dist/omega/libraries/email/prepare.js');
+const { escapeHtml } = require('../../dist/omega/libraries/email/constants.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The integration checks below prove the trust decision actually reaches the rendered
@@ -21,18 +21,17 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 function transactionalBuild(settings) {
   process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || 'test-key';
 
-  const Transactional = require('../../dist/manager/libraries/email/transactional/index.js');
-  const Manager = {
+  const Transactional = require('../../dist/omega/libraries/email/transactional/index.js');
+  const omega = {
     config: {
       brand: { id: 'testbrand', name: 'Test Brand', url: 'https://test.dev', contact: { email: 'hello@test.dev' }, images: {} },
       // The account's unsubscribe group ids (#649) — every send resolves one from config
       marketing: { campaigns: { providers: { sendgrid: { groups: { orders: 900001, hello: 900002, account: 900003, marketing: 900004, security: 900005, newsletter: 900006, internal: 900007 } } } } },
     },
     project: { websiteUrl: 'https://test.dev' },
-    libraries: { admin: {} },
-    User: () => ({ properties: {} }),
+    firebase: { admin: {} },
   };
-  const ctx = { Manager, log: () => {}, error: () => {} };
+  const ctx = { omega, log: () => {}, error: () => {} };
 
   return new Transactional(ctx).build({
     to: 'user@test.dev',

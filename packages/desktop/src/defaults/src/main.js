@@ -1,11 +1,9 @@
 // Main-process entry. Config is auto-loaded from config/omega.json5 (resolved for the desktop target).
-const Manager = require('@omega.js/desktop/main');
+const omega = require('@omega.js/desktop/main');
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, omega, appState, sentry, startup } = manager;
+    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, auth, appState, sentry, startup } = omega;
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 1. Create the main window

@@ -35,7 +35,7 @@
 // (`events/firestore/payments-webhooks/analytics.js` resolveEventId keys the two
 // browser-twinned events, `purchase` and `trial_start`, on the order — the only
 // id a browser can compute).
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { FREQUENCIES, ONE_TIME_FREQUENCY } from '../../checkout/modules/state.js';
 
@@ -119,7 +119,7 @@ export function trackPurchaseIfNeeded(state) {
   window.history.replaceState({}, document.title, newUrl);
 
   // Backup: store orderId in storage
-  const trackedOrders = omega.storage().get('trackedPurchases', []);
+  const trackedOrders = omega.storage.get('trackedPurchases', []);
   if (!trackedOrders.includes(state.orderId)) {
     trackedOrders.push(state.orderId);
 
@@ -128,6 +128,6 @@ export function trackPurchaseIfNeeded(state) {
       trackedOrders.shift();
     }
 
-    omega.storage().set('trackedPurchases', trackedOrders);
+    omega.storage.set('trackedPurchases', trackedOrders);
   }
 }

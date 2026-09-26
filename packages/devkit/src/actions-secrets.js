@@ -5,7 +5,7 @@
  * repo secrets: hand it a repo (`owner/name`) and a key → value map, it sets
  * each one. The transport is the `gh` CLI (`gh secret set KEY --repo o/n`,
  * which encrypts locally with the repo's public key before sending) — there is
- * NO libsodium/REST fallback here (UJM's path): without a usable `gh` this
+ * NO libsodium/REST fallback here: without a usable `gh` this
  * FAILS LOUDLY with install/auth instructions rather than growing a crypto
  * dependency to do what the CLI already does.
  *

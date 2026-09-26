@@ -109,9 +109,9 @@ Affiliatizer.get = function () {
   return map;
 };
 
-Affiliatizer.initialize = async function (Manager) {
+Affiliatizer.initialize = async function (omega) {
   // Shortcuts
-  const { extension, logger } = Manager;
+  const { extension, logger } = omega;
   const storage = extension.storage.local;
 
   // Parse the URL

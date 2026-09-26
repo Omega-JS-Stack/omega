@@ -19,7 +19,7 @@
 - [Features](#-features)
 - [Configuration](#-configuration)
 - [API Reference](#-api-reference)
-  - [Manager Instance](#manager-instance)
+  - [The omega Instance](#the-omega-instance)
   - [Storage API](#storage-api)
   - [Authentication](#authentication)
   - [Data Binding System](#data-binding-system)
@@ -48,11 +48,13 @@ npm install @omega.js/client
 
 ## Quick Start
 
-```javascript
-import Manager from '@omega.js/client';
+`@omega.js/client` exports the base class `Omega` and no instance. @omega.js/web, @omega.js/extension and @omega.js/desktop each subclass it and export the one ready-made instance, `omega`, and they initialize it for you: a web page module receives it (`export default async ({ omega, options }) => { }`), an extension context imports `@omega.js/extension/<context>`, a desktop view imports `@omega.js/desktop/renderer`. A consumer never writes `new`.
 
-// Initialize with your configuration
-await Manager.initialize({
+The host initializes the instance with the brand's browser config; `initialize()` returns the instance, and `omega.ready` is the same promise:
+
+```javascript
+// Inside a host framework: `omega` is its instance
+await omega.initialize({
   environment: 'production',
   buildTime: Date.now(),
   brand: {
@@ -77,9 +79,18 @@ await Manager.initialize({
 console.log('OMEGA Client initialized!');
 ```
 
+Anywhere after that:
+
+```javascript
+omega.auth.listen({ once: true }, ({ user }) => {
+  if (user.authenticated) console.log(user.email, user.plan);
+});
+omega.utilities.escapeHTML(untrustedText);
+```
+
 ## Supported Environments
 
-Web Manager is designed to work in multiple environments:
+OMEGA Client is designed to work in multiple environments:
 
 | Environment | Support | Notes |
 |-------------|---------|-------|
@@ -111,7 +122,7 @@ Web Manager is designed to work in multiple environments:
 ### Full Configuration Reference
 
 ```javascript
-await Manager.initialize({
+await omega.initialize({
   // Environment: 'development' or 'production'
   environment: 'production',
 
@@ -224,40 +235,46 @@ await Manager.initialize({
 
 ## API Reference
 
-### Manager Instance
+### The omega Instance
 
-The Manager is a singleton that provides access to all modules:
+The host framework's instance extends the `Omega` base class; every module is a plain property:
 
 ```javascript
-import Manager from '@omega.js/client';
-
-// Module getters
-Manager.storage();        // Storage API
-Manager.auth();           // Firebase Auth wrapper
-Manager.bindings();       // Data binding system
-Manager.firestore();      // Firestore wrapper
-Manager.notifications();  // Push notifications
-Manager.serviceWorker();  // Service worker management
-Manager.sentry();         // Error tracking
-Manager.dom();            // DOM utilities
-Manager.utilities();      // Utility functions
-Manager.verts();          // Verts (provider ladder + in-house fallback units)
+// Modules
+omega.storage;        // Storage API
+omega.auth;           // Firebase Auth wrapper (omega.auth.user is the current User)
+omega.bindings;       // Data binding system
+omega.firestore;      // Firestore wrapper
+omega.notifications;  // Push notifications
+omega.serviceWorker;  // Service worker management
+omega.sentry;         // Error tracking
+omega.dom;            // DOM utilities
+omega.utilities;      // Utility functions
+omega.verts;          // Verts (provider ladder + in-house fallback units)
+omega.device;         // Local device stats
+omega.analytics;      // Runtime event tracking
+omega.triggers;       // Click-trigger registry (omega.triggers.register('name', handler))
+omega.icons;          // Font Awesome auto-render
+omega.motion;         // Motion engine behind the data-omega-* attributes
 
 // Helper methods
-Manager.isDevelopment();                        // Check if in development mode
-Manager.getFunctionsUrl();                      // Get Firebase Functions URL
-Manager.getFunctionsUrl('development');         // Force development URL
-Manager.getApiUrl();                            // Get API URL (api.<brand.url host>)
-Manager.isValidRedirectUrl('https://...');      // Validate redirect URL
+omega.request('/omega/user/token', { method: 'POST' }); // API fetch with a fresh Bearer token
+omega.getEnvironment();                         // 'development' | 'testing' | 'production'
+omega.isDevelopment();                          // Also isProduction(), isTesting()
+omega.getFunctionsUrl();                        // Get Firebase Functions URL
+omega.getFunctionsUrl('development');           // Force development URL
+omega.getApiUrl();                              // Get API URL (api.<brand.url host>)
+omega.isValidRedirectUrl('https://...');        // Validate redirect URL
 
 // Firebase instances (after initialization)
-Manager.firebaseApp;       // Firebase App instance
-Manager.firebaseAuth;      // Firebase Auth instance
-Manager.firebaseFirestore; // Firestore instance
-Manager.firebaseMessaging; // FCM instance
+omega.firebaseApp;       // Firebase App instance
+omega.firebaseAuth;      // Firebase Auth instance
+omega.firebaseFirestore; // Firestore instance
+omega.firebaseMessaging; // FCM instance
 
 // Configuration
-Manager.config;            // Access full configuration
+omega.config;            // Access full configuration
+omega.ready;             // The promise initialize() settles
 ```
 
 ### Storage API
@@ -265,7 +282,7 @@ Manager.config;            // Access full configuration
 Enhanced localStorage and sessionStorage with path-based access:
 
 ```javascript
-const storage = Manager.storage();
+const storage = omega.storage;
 
 // LocalStorage (persists across browser sessions)
 storage.set('user.name', 'John');
@@ -294,31 +311,32 @@ storage.session.clear();
 
 ### Authentication
 
-Firebase Authentication wrapper with a promise-based auth settler:
+Firebase Authentication with one `User` per auth state change:
 
 ```javascript
-const auth = Manager.auth();
+const auth = omega.auth;
 
-// Listen once — waits for auth to settle, fires exactly once
-auth.listen({ once: true }, (state) => {
-  if (state.user) {
-    console.log('Logged in:', state.user.email);
-    console.log('Account:', state.account);
+// Listen once: waits for auth to settle, fires exactly once
+auth.listen({ once: true }, ({ user, denied }) => {
+  if (user.authenticated) {
+    console.log('Logged in:', user.email, 'on plan', user.plan);
   } else {
     console.log('Not logged in');
   }
 });
 
-// Persistent listener — fires on initial settle + every future auth change
-const unsubscribe = auth.listen({}, (state) => {
-  console.log('Auth changed:', state.user?.email || 'signed out');
+// Persistent listener: fires on every auth state change
+const unsubscribe = auth.listen(({ user }) => {
+  console.log('Auth changed:', user.email || 'signed out');
 });
 
-// Check authentication status
-if (auth.isAuthenticated()) {
-  const user = auth.getUser();
-  console.log('Logged in as:', user.email);
+// The current user, any time (a signed-out User until auth settles)
+if (auth.user.authenticated) {
+  console.log('Logged in as:', auth.user.profile.displayName);
 }
+
+// Re-read the account (after a purchase, say) and land a new state
+const { user } = await auth.reload();
 
 // Sign in
 await auth.signInWithEmailAndPassword('user@example.com', 'password');
@@ -337,82 +355,79 @@ await auth.signOut();
 unsubscribe();
 ```
 
-**Auth Settler Design**:
+**Auth State Design**:
 
-On page load, Firebase Auth takes time to restore the user session. The auth settler (`Manager._authReady`) is a promise that resolves once Firebase determines the auth state (user or null). All `listen()` callbacks wait for this settler before firing — consumers never see an intermediate/unknown state.
+On page load, Firebase Auth takes time to restore the user session. Each auth state change builds ONE state (`{ user, denied }`, one account fetch, one `User`) before anything reads it, and every listener, `auth.user` and the bindings hold that same `User`. `auth.settled` resolves the first time a state lands, so consumers never see an intermediate/unknown state.
 
-- `{ once: true }` — Waits for the settler promise, calls the callback once, done. No cleanup needed.
-- `{}` (persistent) — Gets the initial settled state via `_handleAuthStateChange`, then fires again on every future sign-in/sign-out.
+- `{ once: true }`: Waits for `auth.settled`, calls the callback once with the newest landed state, done. No cleanup needed.
+- `{}` (persistent): Fires on every landed state; registered after a state already landed, it catches up with that state once, asynchronously.
+- `denied` is true only when Firestore rules refused the account read. An account document not written yet (right after signup) is a normal, empty account.
 
-**getUser() returns enhanced user object**:
+**`auth.user` is a `User`** (from `@omega.js/account`, the same class the backend builds as `ctx.user`), never null:
+
 ```javascript
 {
+  // The stored account document, as own fields
+  auth: { uid: 'abc123', email: 'user@example.com' },
+  subscription: { product: { id: 'premium' }, status: 'active', /* ... */ },
+  roles: { admin: false, betaTester: false },
+  // ...every other schema field
+
+  // Getters, computed on every read
+  authenticated: true,   // a non-empty uid
   uid: 'abc123',
   email: 'user@example.com',
-  displayName: 'John Doe',        // Falls back to email or 'User'
-  photoURL: 'https://...',        // Falls back to ui-avatars.com
-  emailVerified: true
+  plan: 'premium',       // effective plan right now ('basic' if cancelled/suspended)
+  active: true,          // active, trialing, or cancelling
+  trialing: false,       // an unexpired trial on an active paid plan
+  cancelling: false,     // a cancellation pending on an active paid plan
+  everPaid: true,        // a payment start date exists
+
+  // From the sign-in, not the stored document
+  profile: {
+    displayName: 'John Doe',   // Falls back to the email prefix or 'User'
+    photoURL: 'https://...',   // Falls back to ui-avatars.com
+    emailVerified: true,
+  },
 }
 ```
+
+`user.toJSON()` returns the stored document alone, so storing or sending a `User` carries one shape.
 
 **HTML Auth Classes**:
 - `.omega-signout` - Sign out button (shows confirmation dialog)
 
-**Resolve Subscription State**:
-
-Derives calculated subscription fields from raw account data. Returns only fields that require logic — raw data is on `account.subscription` directly.
-
-```javascript
-const resolved = auth.resolveSubscription(account);
-// Or without an argument (falls back to stored auth state):
-const resolved = auth.resolveSubscription();
-```
-
-When called without an argument, reads the account from `localStorage` (the last auth state saved by `listen()`). Pass an explicit account when you have one to avoid stale data.
-
-Returns:
-```javascript
-{
-  plan: 'basic',       // Effective plan ID right now ('basic' if cancelled/suspended)
-  active: true,        // Has active access (active, trialing, or cancelling)
-  trialing: false,     // In an active trial (status 'active' + unexpired trial)
-  cancelling: false,   // Cancellation pending (status 'active' + cancellation.pending)
-}
-```
-
 Usage:
 ```javascript
-auth.listen({ once: true }, (state) => {
-  const resolved = auth.resolveSubscription(state.account);
-
-  if (!resolved.active) {
+auth.listen({ once: true }, ({ user }) => {
+  if (!user.active) {
     // User is on free plan or subscription ended
   }
 
-  if (resolved.trialing) {
+  if (user.trialing) {
     // Show trial banner
   }
 
-  if (resolved.cancelling) {
+  if (user.cancelling) {
     // Show "your plan will cancel at end of period" notice
   }
 
-  // Use resolved.plan for effective plan ID
-  const product = products.find(p => p.id === resolved.plan);
+  // user.plan is the effective plan ID
+  const product = products.find(p => p.id === user.plan);
 });
 ```
 
 **⚠️ Auth State Timing**:
 
-Methods like `auth.isAuthenticated()`, `auth.getUser()`, and `auth.getIdToken()` read the current state directly — they may return `null` before auth settles.
+`auth.user` and `auth.getIdToken()` read the current state directly: before auth settles, `auth.user` is the signed-out `User` and `getIdToken()` throws, since there is no Firebase user yet.
 
 ```javascript
 // ❌ May fail on page load - auth state not yet determined
 const token = await auth.getIdToken();
 
 // ✅ Wait for auth to settle first
-auth.listen({ once: true }, async (state) => {
-  if (state.user) {
+auth.listen({ once: true }, async ({ user }) => {
+  if (user.authenticated) {
     const token = await auth.getIdToken(); // Safe
   }
 });
@@ -426,7 +441,7 @@ Reactive DOM updates with `data-omega-bind` attributes:
 ```html
 <!-- Display text content (default action) -->
 <span data-omega-bind="auth.user.email"></span>
-<span data-omega-bind="@text auth.user.displayName"></span>
+<span data-omega-bind="@text auth.user.profile.displayName"></span>
 ```
 
 #### Input/Textarea Value Binding
@@ -438,22 +453,22 @@ Reactive DOM updates with `data-omega-bind` attributes:
 #### Conditional Visibility
 ```html
 <!-- Show when truthy -->
-<div data-omega-bind="@show auth.user">Welcome back!</div>
+<div data-omega-bind="@show auth.user.authenticated">Welcome back!</div>
 
 <!-- Hide when truthy -->
-<div data-omega-bind="@hide auth.user">Please log in</div>
+<div data-omega-bind="@hide auth.user.authenticated">Please log in</div>
 
 <!-- Negation -->
-<div data-omega-bind="@show !auth.user">Not logged in</div>
+<div data-omega-bind="@show !auth.user.authenticated">Not logged in</div>
 
 <!-- Comparisons -->
-<div data-omega-bind="@show auth.account.plan === 'premium'">Premium content</div>
+<div data-omega-bind="@show auth.user.plan === 'premium'">Premium content</div>
 <div data-omega-bind="@hide settings.notifications === false">Notifications on</div>
 ```
 
 #### Attribute Binding
 ```html
-<img data-omega-bind="@attr src auth.user.photoURL" />
+<img data-omega-bind="@attr src auth.user.profile.photoURL" />
 <a data-omega-bind="@attr href settings.profileUrl">Profile</a>
 <input data-omega-bind="@attr disabled auth.loading" />
 ```
@@ -470,12 +485,12 @@ Reactive DOM updates with `data-omega-bind` attributes:
 #### Multiple Actions
 Combine actions with commas:
 ```html
-<img data-omega-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName" />
+<img data-omega-bind="@show auth.user.authenticated, @attr src auth.user.profile.photoURL, @attr alt auth.user.profile.displayName" />
 ```
 
 #### JavaScript API
 ```javascript
-const bindings = Manager.bindings();
+const bindings = omega.bindings;
 
 // Update context data
 bindings.update({
@@ -493,7 +508,7 @@ bindings.clear();
 #### Skeleton Loaders
 ```html
 <!-- Shows shimmer animation until bound -->
-<span data-omega-bind="auth.user.name" class="omega-binding-skeleton"></span>
+<span data-omega-bind="auth.user.profile.displayName" class="omega-binding-skeleton"></span>
 ```
 
 The skeleton automatically:
@@ -518,7 +533,7 @@ The skeleton automatically:
 Simplified Firestore wrapper with chainable queries:
 
 ```javascript
-const db = Manager.firestore();
+const db = omega.firestore;
 
 // Document operations - two syntax options
 await db.doc('users/user123').set({ name: 'John', age: 30 });
@@ -563,7 +578,7 @@ const page2 = await db.collection('users')
 Firebase Cloud Messaging integration:
 
 ```javascript
-const notifications = Manager.notifications();
+const notifications = omega.notifications;
 
 // Check support
 if (notifications.isSupported()) {
@@ -611,7 +626,7 @@ await notifications.syncSubscription();
 Service worker registration and messaging:
 
 ```javascript
-const sw = Manager.serviceWorker();
+const sw = omega.serviceWorker;
 
 // Check support
 if (sw.isSupported()) {
@@ -655,7 +670,7 @@ const state = sw.getState(); // 'none', 'installing', 'waiting', 'active', 'unkn
 Automatic error tracking with Sentry:
 
 ```javascript
-const sentry = Manager.sentry();
+const sentry = omega.sentry;
 
 // Capture an exception
 try {
@@ -680,7 +695,7 @@ try {
 
 ```javascript
 import { loadScript, ready } from '@omega.js/client/modules/dom';
-// Or: const { loadScript, ready } = Manager.dom();
+// Or: const { loadScript, ready } = omega.dom;
 
 // Wait for DOM ready
 await ready();
@@ -732,7 +747,7 @@ import {
   getDevice,
   getContext
 } from '@omega.js/client/modules/utilities';
-// Or: const utils = Manager.utilities();
+// Or: const utils = omega.utilities;
 
 // Copy to clipboard (rejects when the clipboard refuses — catch it)
 await clipboardCopy('Text to copy');
@@ -786,7 +801,7 @@ getContext();
 
 ## HTML Data Attributes
 
-Web Manager automatically sets these attributes on the `<html>` element during initialization:
+OMEGA Client sets these attributes on the `<html>` element during initialization:
 
 ```html
 <html data-platform="mac" data-browser="chrome" data-runtime="web" data-device="desktop">
@@ -829,24 +844,24 @@ import { clipboardCopy, escapeHTML } from '@omega.js/client/modules/utilities';
 // DOM utilities only
 import { loadScript, ready } from '@omega.js/client/modules/dom';
 
-// Full manager (default)
-import Manager from '@omega.js/client';
+// The base class a host framework extends
+import { Omega } from '@omega.js/client';
 ```
 
 **Available Modules**:
 - `@omega.js/client/modules/storage` - Storage class
 - `@omega.js/client/modules/utilities` - Utility functions
 - `@omega.js/client/modules/dom` - DOM utilities
-- `@omega.js/client/modules/auth` - Auth class (requires Manager)
-- `@omega.js/client/modules/bindings` - Bindings class (requires Manager)
-- `@omega.js/client/modules/firestore` - Firestore class (requires Manager)
-- `@omega.js/client/modules/notifications` - Notifications class (requires Manager)
-- `@omega.js/client/modules/service-worker` - ServiceWorker class (requires Manager)
-- `@omega.js/client/modules/sentry` - Sentry class (requires Manager)
+- `@omega.js/client/modules/auth` - Auth class (constructed with the instance)
+- `@omega.js/client/modules/bindings` - Bindings class (constructed with the instance)
+- `@omega.js/client/modules/firestore` - Firestore class (constructed with the instance)
+- `@omega.js/client/modules/notifications` - Notifications class (constructed with the instance)
+- `@omega.js/client/modules/service-worker` - ServiceWorker class (constructed with the instance)
+- `@omega.js/client/modules/sentry` - Sentry class (constructed with the instance)
 
 ## Browser Support
 
-Web Manager is transpiled to ES5 for broad browser support:
+OMEGA Client is transpiled to ES5 for broad browser support:
 
 | Browser | Version | Support |
 |---------|---------|---------|
@@ -869,12 +884,12 @@ Web Manager is transpiled to ES5 for broad browser support:
 - [SoundGrail Music App](https://app.soundgrail.com/): A resource for producers, musicians, and DJs
 - [Hammock Report](https://hammockreport.com/): An API for exploring and listing backyard products
 
-*Want your project listed? [Open an issue](https://github.com/itw-creative-works/web-manager/issues)!*
+*Want your project listed? [Open an issue](https://github.com/Omega-JS-Stack/omega/issues)!*
 
 ## Support
 
 If you're having issues or have questions:
-- [Open an issue](https://github.com/itw-creative-works/web-manager/issues) on GitHub
+- [Open an issue](https://github.com/Omega-JS-Stack/omega/issues) on GitHub
 - Include code samples and relevant files to help us help you faster
 
 ## License

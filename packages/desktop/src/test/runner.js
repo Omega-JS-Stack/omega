@@ -9,7 +9,7 @@
 //   - 'build'    runs in plain Node (runner core).
 //   - 'main'     spawns Electron via runners/electron.js, runs in the main process.
 //   - 'renderer' runs in a hidden BrowserWindow in the same spawned Electron process.
-//   - 'boot'     spawns the consumer's actual built bundle and inspects the live manager.
+//   - 'boot'     spawns the consumer's actual built bundle and inspects the live omega instance.
 //
 // Electron / boot runners are lazy-loaded so a missing electron doesn't prevent build-layer
 // tests from running. The layer callbacks below require() them only when those layers exist.
@@ -68,7 +68,7 @@ const runner = createRunner({
   ],
 
   boot: {
-    // Spawn the consumer's actual built bundle and inspect the live manager (the core
+    // Spawn the consumer's actual built bundle and inspect the live omega instance (the core
     // aggregates boot tests into the flat `tests` list). `suites` are the boot-bound
     // renderer suites (`view: '<name>'`), which run in a real window of that same app.
     run: async ({ tests, suites, results, projectRoot }) => {

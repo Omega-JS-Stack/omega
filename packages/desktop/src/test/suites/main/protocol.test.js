@@ -8,24 +8,24 @@ module.exports = defineCases({
   description: 'protocol (main)',
   tests: [
     {
-      name: 'protocol module is loaded on the manager',
+      name: 'protocol module is loaded on the omega instance',
       run: (ctx) => {
-        ctx.expect(ctx.manager.protocol).toBeDefined();
-        ctx.expect(ctx.manager.protocol._initialized).toBe(true);
+        ctx.expect(ctx.omega.protocol).toBeDefined();
+        ctx.expect(ctx.omega.protocol._initialized).toBe(true);
       },
     },
     {
       name: 'hasSingleInstanceLock returns true (test process owns the lock)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.protocol.hasSingleInstanceLock()).toBe(true);
+        ctx.expect(ctx.omega.protocol.hasSingleInstanceLock()).toBe(true);
       },
     },
     {
       name: 'getSchemes returns brand.id when configured',
       run: (ctx) => {
-        const schemes = ctx.manager.protocol.getSchemes();
+        const schemes = ctx.omega.protocol.getSchemes();
         ctx.expect(Array.isArray(schemes)).toBe(true);
-        const brandId = ctx.manager.config?.brand?.id;
+        const brandId = ctx.omega.config?.brand?.id;
         if (brandId) {
           ctx.expect(schemes).toContain(brandId);
         }
@@ -34,8 +34,8 @@ module.exports = defineCases({
     {
       name: 'getSchemes returns a fresh copy each call (mutation safe)',
       run: (ctx) => {
-        const a = ctx.manager.protocol.getSchemes();
-        const b = ctx.manager.protocol.getSchemes();
+        const a = ctx.omega.protocol.getSchemes();
+        const b = ctx.omega.protocol.getSchemes();
         ctx.expect(a).not.toBe(b);   // different array instances
         ctx.expect(a).toEqual(b);    // same contents
       },
@@ -43,33 +43,33 @@ module.exports = defineCases({
     {
       name: 'isOurScheme matches registered scheme',
       run: (ctx) => {
-        const brandId = ctx.manager.config?.brand?.id;
+        const brandId = ctx.omega.config?.brand?.id;
         if (!brandId) return ctx.skip('no brand.id configured');
-        ctx.expect(ctx.manager.protocol.isOurScheme(`${brandId}://auth/token?t=abc`)).toBe(true);
+        ctx.expect(ctx.omega.protocol.isOurScheme(`${brandId}://auth/token?t=abc`)).toBe(true);
       },
     },
     {
       name: 'isOurScheme rejects unregistered schemes',
       run: (ctx) => {
-        ctx.expect(ctx.manager.protocol.isOurScheme('https://example.com')).toBe(false);
-        ctx.expect(ctx.manager.protocol.isOurScheme('imaginary-scheme://x')).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme('https://example.com')).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme('imaginary-scheme://x')).toBe(false);
       },
     },
     {
       name: 'isOurScheme: non-string input returns false (no throw)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.protocol.isOurScheme(null)).toBe(false);
-        ctx.expect(ctx.manager.protocol.isOurScheme(undefined)).toBe(false);
-        ctx.expect(ctx.manager.protocol.isOurScheme(42)).toBe(false);
-        ctx.expect(ctx.manager.protocol.isOurScheme({})).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme(null)).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme(undefined)).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme(42)).toBe(false);
+        ctx.expect(ctx.omega.protocol.isOurScheme({})).toBe(false);
       },
     },
     {
       name: 'initialize is idempotent — re-calling does not change schemes',
       run: async (ctx) => {
-        const before = ctx.manager.protocol.getSchemes();
-        await ctx.manager.protocol.initialize(ctx.manager);
-        const after = ctx.manager.protocol.getSchemes();
+        const before = ctx.omega.protocol.getSchemes();
+        await ctx.omega.protocol.initialize(ctx.omega);
+        const after = ctx.omega.protocol.getSchemes();
         ctx.expect(after).toEqual(before);
       },
     },

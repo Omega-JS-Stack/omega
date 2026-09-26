@@ -1,6 +1,6 @@
 /**
- * The boot runtime initializes @omega.js/client from the page's ONE build
- * snapshot ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
+ * The boot runtime initializes the web runtime instance from the page's ONE
+ * build snapshot ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)).
  *
  * `runtime/boot.js` used to read `window.Configuration`, the legacy UJM name
  * web alone carried. It reads `window.OMEGA_BUILD_JSON.config` now, the same
@@ -9,7 +9,7 @@
  * config-rekey.test.js).
  *
  * Same convention as the wakeup-ping suite: the REAL module through esbuild
- * behind its bundler aliases, with the client stubbed at its boundary.
+ * behind its bundler aliases, with the instance stubbed at its boundary.
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
@@ -23,8 +23,8 @@ const BUNDLE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-boot-build-json-
 
 let bundled = null;
 
-// The boot runtime, bundled once: the client is the stub every assertion reads,
-// and the icon watcher is a DOM walker with nothing to say here.
+// The boot runtime, bundled once: the instance is the stub every assertion
+// reads, and the icon transport is a fetcher with nothing to say here.
 function bundleOnce() {
   if (!bundled) {
     const outfile = path.join(BUNDLE_DIR, 'boot.cjs');
@@ -38,9 +38,9 @@ function bundleOnce() {
       plugins: [{
         name: 'harness-aliases',
         setup(build) {
-          build.onResolve({ filter: /^@omega\.js\/client$/ }, () => ({ path: 'client', namespace: 'omega-client-stub' }));
-          build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => ({
-            contents: 'export default globalThis.__omegaClient;',
+          build.onResolve({ filter: /^\.\/omega\.js$/ }, () => ({ path: 'omega', namespace: 'omega-instance-stub' }));
+          build.onLoad({ filter: /.*/, namespace: 'omega-instance-stub' }, () => ({
+            contents: 'export default globalThis.__omegaInstance;',
           }));
           // The dev palette is a development-only dynamic import; a run with no
           // bake reads as development, so it is answered rather than left to
@@ -51,7 +51,7 @@ function bundleOnce() {
           }));
           build.onResolve({ filter: /\/icons\.js$/ }, () => ({ path: 'icons', namespace: 'omega-icons-stub' }));
           build.onLoad({ filter: /.*/, namespace: 'omega-icons-stub' }, () => ({
-            contents: 'export const createIconWatcher = () => ({ start: () => {} });',
+            contents: 'export const createIconResolver = () => () => null;',
           }));
         },
       }],
@@ -64,7 +64,7 @@ function bundleOnce() {
 /**
  * Boot the real runtime against a page that baked `buildJson`.
  * @param {object|undefined} buildJson - what the page assigned to the global
- * @returns {Promise<object>} the calls the client stub recorded
+ * @returns {Promise<object>} the calls the instance stub recorded
  */
 async function boot(buildJson) {
   const bundle = await bundleOnce();
@@ -80,9 +80,10 @@ async function boot(buildJson) {
     addEventListener: () => {},
     querySelectorAll: () => [],
   };
-  globalThis.__omegaClient = {
+  globalThis.__omegaInstance = {
     initialize: async (configuration) => { initialized.push(configuration); },
     isDevelopment: () => false,
+    icons: { start: () => {} },
   };
 
   delete require.cache[require.resolve(bundle)];
@@ -92,7 +93,7 @@ async function boot(buildJson) {
   return { initialized };
 }
 
-test('#894: bootMain hands @omega.js/client the page\'s OMEGA_BUILD_JSON.config', async () => {
+test('#894: bootMain hands the web runtime the page\'s OMEGA_BUILD_JSON.config', async () => {
   const config = {
     runtime: 'web',
     environment: 'production',
@@ -101,7 +102,7 @@ test('#894: bootMain hands @omega.js/client the page\'s OMEGA_BUILD_JSON.config'
   };
   const { initialized } = await boot({ config, package: { name: 'boot', version: '1.0.0' }, mode: { environment: 'production' } });
 
-  assert.strictEqual(initialized.length, 1, 'the singleton is initialized exactly once');
+  assert.strictEqual(initialized.length, 1, 'the instance is initialized exactly once');
   // The `config` blob and nothing around it: the wrapper's own facts (package,
   // mode, license, builtAt) are never part of the client contract.
   assert.deepStrictEqual(initialized[0], config);

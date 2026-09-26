@@ -5,7 +5,7 @@
  * Verifies that parseWebhook() correctly determines category, resourceType, resourceId,
  * and uid for each supported event type. Uses real Stripe CLI fixtures where available.
  */
-const stripeProvider = require('../../../../dist/manager/routes/payments/webhook/providers/stripe.js');
+const stripeProvider = require('../../../../dist/omega/routes/payments/webhook/providers/stripe.js');
 
 // Real Stripe CLI fixtures
 const FIXTURE_INVOICE_MANUAL = require('../../../fixtures/stripe/invoice-payment-failed.json');

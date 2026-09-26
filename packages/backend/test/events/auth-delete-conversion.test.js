@@ -2,7 +2,7 @@
  * Test: auth:on-delete fires `user_delete` as a CANONICAL conversion
  * ([#328](https://github.com/Omega-JS-Stack/omega/issues/328)).
  *
- * The handler used to reach `Manager.Analytics(...).event('user_delete')`
+ * The handler used to reach `Analytics(...).event('user_delete')`
  * directly — the right NAME, but past the consent gate and past the catalog's
  * per-provider walk. It now goes through `deliverConversion`, which is what
  * makes it the same kind of event as every other server conversion.
@@ -15,14 +15,15 @@
  * ABSENT snapshot GRANTS (the standing rule) — a legacy account predating the
  * consent system is still counted.
  *
- * Real handler, real Manager, real ctx, real Firestore delete. The doc is
+ * Real handler, real omega, real ctx, real Firestore delete. The doc is
  * seeded directly and the UserRecord is a plain object, so no Auth user exists
  * and the emulator's own trigger never races this one.
  *
  * Run: npx omega test framework:events/auth-delete-conversion
  */
-const onDelete = require('../../dist/manager/events/auth/on-delete.js');
+const onDelete = require('../../dist/omega/events/auth/on-delete.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../dist/omega/context.js');
 
 const EVENT_CONTEXT = {
   eventType: 'providers/firebase.auth/eventTypes/user.delete',
@@ -53,19 +54,18 @@ async function withConsoleRecorder(fn) {
 }
 
 /** Seed a user doc, run the real handler against it, hand back the delivery lines. */
-async function runHandler({ Manager, uid, doc }) {
-  const ctx = Manager.RouteContext({}, { functionName: 'omega_authOnDelete' });
-  const admin = Manager.libraries.admin;
+async function runHandler({ omega, uid, doc }) {
+  const ctx = new Context(omega, {}, { functionName: 'omega_authOnDelete' });
+  const admin = omega.firebase.admin;
 
   await admin.firestore().doc(`users/${uid}`).set(doc);
 
   const calls = await withConsoleRecorder(async () => {
     await onDelete({
-      Manager: Manager,
+      omega: omega,
       ctx: ctx,
       user: { uid: uid, email: `${uid}@test.invalid` },
       context: EVENT_CONTEXT,
-      libraries: { admin: admin },
     });
   });
 
@@ -84,12 +84,12 @@ module.exports = defineCases({
   tests: [
     {
       name: 'a-deleted-account-fires-user-delete-with-the-uid-derived-dedupe-id',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const uid = testUid();
 
         try {
           const { delivery } = await runHandler({
-            Manager: Manager,
+            omega: omega,
             uid: uid,
             doc: { auth: { uid: uid, email: `${uid}@test.invalid` } },
           });
@@ -114,12 +114,12 @@ module.exports = defineCases({
 
     {
       name: 'a-declined-snapshot-read-before-the-delete-blocks-the-fire',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const uid = testUid();
 
         try {
           const { delivery } = await runHandler({
-            Manager: Manager,
+            omega: omega,
             uid: uid,
             doc: {
               auth: { uid: uid, email: `${uid}@test.invalid` },

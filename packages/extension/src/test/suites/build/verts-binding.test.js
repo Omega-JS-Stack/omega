@@ -1,6 +1,6 @@
-// Build-layer pin for the verts auto-bind (ads-system phase 4): every page
-// surface (popup/options/sidepanel/page) wires lib/verts.js after
-// omega.initialize(), the binder pins the house lane (extension surfaces
+// Build-layer pin for the verts auto-bind (ads-system phase 4): the page
+// contexts (popup/options/sidepanel/page, ONE class in page-context.js) wire
+// lib/verts.js after the client boots, the binder pins the house lane (extension surfaces
 // never run AdSense: store policy + MV3 CSP), the client subset carries
 // advertising/company through to the client, and content/background/
 // offscreen deliberately do NOT bind. Surface files are browser-context ES
@@ -17,6 +17,7 @@ const ROOT = path.join(__dirname, '..', '..', '..');
 const read = (...segments) => fs.readFileSync(path.join(ROOT, ...segments), 'utf8');
 
 const SURFACES = ['popup.js', 'options.js', 'sidepanel.js', 'page.js'];
+const PAGE_CONTEXT = read('page-context.js');
 const NON_SURFACES = ['content.js', 'background.js', 'offscreen.js'];
 const VERTS_LIB = read('lib', 'verts.js');
 // What the baked snapshot may carry is @omega.js/config's declaration since
@@ -30,14 +31,14 @@ module.exports = defineCases({
   description: 'verts auto-bind — surface wiring + house-lane pin + build-JSON plumbing',
   tests: [
     {
-      name: 'every page surface imports and calls wireAds after omega.initialize()',
+      name: 'every page surface is the page class, which calls wireAds(this) after the client boots',
       run: (ctx) => {
         for (const surface of SURFACES) {
-          const source = read(surface);
-          ctx.expect(source).toMatch(/import \{ wireAds \} from '\.\/lib\/verts\.js';/);
-          // The call sits inside initialize(), after the client boot
-          ctx.expect(/await this\.omega\.initialize\(configuration\);[\s\S]*wireAds\(\);/.test(source)).toBe(true);
+          ctx.expect(read(surface)).toMatch(/import \{ Omega \} from '\.\/page-context\.js';/);
         }
+        ctx.expect(PAGE_CONTEXT).toMatch(/import \{ wireAds \} from '\.\/lib\/verts\.js';/);
+        // The call sits inside initialize(), after the client boot
+        ctx.expect(/await super\.initialize\(window\.OMEGA_BUILD_JSON\?\.config\);[\s\S]*wireAds\(this\);/.test(PAGE_CONTEXT)).toBe(true);
       },
     },
     {
@@ -45,13 +46,16 @@ module.exports = defineCases({
       run: (ctx) => {
         for (const context of NON_SURFACES) {
           ctx.expect(read(context).includes('wireAds')).toBe(false);
+          ctx.expect(read(context).includes('page-context.js')).toBe(false);
         }
       },
     },
     {
       name: 'the binder pins the house lane — mount() type override, no AdSense path',
       run: (ctx) => {
-        ctx.expect(VERTS_LIB).toMatch(/omega\.verts\(\)\.mount\(\$el, \{ type: 'house' \}\);/);
+        ctx.expect(VERTS_LIB).toMatch(/omega\.verts\.mount\(\$el, \{ type: 'house' \}\);/);
+        // The instance arrives as the argument: no singleton import
+        ctx.expect(VERTS_LIB.includes("from '@omega.js/client'")).toBe(false);
         // The wiring marks bound hosts for observability (tests + debugging)
         ctx.expect(VERTS_LIB).toMatch(/data-omega-vert-bound/);
         // Live binding: new [data-omega-vert] elements mount on arrival

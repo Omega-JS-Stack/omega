@@ -49,7 +49,7 @@ function bundleModule(entryPoint, outfile) {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -118,14 +118,14 @@ async function makeBrowser(seedAttribution) {
     globalThis.document = { referrer };
 
     globalThis.__omegaClient = {
-      dom: () => ({ ready: () => Promise.resolve() }),
-      storage: () => storage,
+      dom: { ready: () => Promise.resolve() },
+      storage: storage,
     };
 
     // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and
     // macOS's tmpdir is a symlink (/var → /private/var).
     delete require.cache[require.resolve(BUNDLE)];
-    require(BUNDLE).default();
+    require(BUNDLE).default({ omega: globalThis.__omegaClient });
 
     // The module runs behind dom().ready() — let the microtask land.
     await new Promise((resolve) => setImmediate(resolve));

@@ -19,7 +19,7 @@ const { isBoxVerbArgv } = require('@omega.js/devkit/omega-bin');
 // reading of it, covering the bare verb and its `--` flag spelling alike.
 if (!isBoxVerbArgv(process.argv.slice(2))) {
   require('./utils/load-env.js').loadDesktopEnv(process.cwd(), {
-    logger: new (require('./lib/logger.js'))('env'),
+    logger: new (require('@omega.js/devkit/logger'))('env'),
   });
 }
 

@@ -6,7 +6,7 @@ const { v5: uuidv5 } = require('uuid');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 async function reinit(ctx, env, configOverrides) {
-  ctx.manager.analytics.shutdown();
+  ctx.omega.analytics.shutdown();
   const saved = {
     GOOGLE_ANALYTICS_SECRET: process.env.GOOGLE_ANALYTICS_SECRET,
   };
@@ -14,19 +14,19 @@ async function reinit(ctx, env, configOverrides) {
     if (v == null) delete process.env[k];
     else process.env[k] = v;
   }
-  const cfgOrig = ctx.manager.config.analytics;
+  const cfgOrig = ctx.omega.config.analytics;
   if (configOverrides !== undefined) {
-    ctx.manager.config.analytics = configOverrides;
+    ctx.omega.config.analytics = configOverrides;
   }
-  ctx.manager.analytics.initialize(ctx.manager);
+  ctx.omega.analytics.initialize(ctx.omega);
   return () => {
-    ctx.manager.analytics.shutdown();
+    ctx.omega.analytics.shutdown();
     for (const [k, v] of Object.entries(saved)) {
       if (v == null) delete process.env[k];
       else process.env[k] = v;
     }
-    ctx.manager.config.analytics = cfgOrig;
-    ctx.manager.analytics.initialize(ctx.manager);
+    ctx.omega.config.analytics = cfgOrig;
+    ctx.omega.analytics.initialize(ctx.omega);
   };
 }
 
@@ -35,15 +35,15 @@ module.exports = defineCases({
   layer: 'main',
   description: 'analytics (main)',
   cleanup: async (ctx) => {
-    ctx.manager.analytics.shutdown();
+    ctx.omega.analytics.shutdown();
     delete process.env.GOOGLE_ANALYTICS_SECRET;
-    ctx.manager.analytics.initialize(ctx.manager);
+    ctx.omega.analytics.initialize(ctx.omega);
   },
   tests: [
     {
-      name: 'analytics module wired on manager',
+      name: 'analytics module wired on omega',
       run: (ctx) => {
-        ctx.expect(ctx.manager.analytics).toBeDefined();
+        ctx.expect(ctx.omega.analytics).toBeDefined();
       },
     },
     {
@@ -51,8 +51,8 @@ module.exports = defineCases({
       run: async (ctx) => {
         const restore = await reinit(ctx, {}, { enabled: false });
         try {
-          ctx.expect(ctx.manager.analytics._enabled).toBe(false);
-          ctx.expect(ctx.manager.analytics._clientId).toBe(null);
+          ctx.expect(ctx.omega.analytics._enabled).toBe(false);
+          ctx.expect(ctx.omega.analytics._clientId).toBe(null);
         } finally { await restore(); }
       },
     },
@@ -64,7 +64,7 @@ module.exports = defineCases({
           providers: { google: { id: '' } },
         });
         try {
-          ctx.expect(ctx.manager.analytics._enabled).toBe(false);
+          ctx.expect(ctx.omega.analytics._enabled).toBe(false);
         } finally { await restore(); }
       },
     },
@@ -76,7 +76,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          ctx.expect(ctx.manager.analytics._enabled).toBe(false);
+          ctx.expect(ctx.omega.analytics._enabled).toBe(false);
         } finally { await restore(); }
       },
     },
@@ -88,14 +88,14 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          ctx.expect(ctx.manager.analytics._enabled).toBe(true);
-          ctx.expect(typeof ctx.manager.analytics._clientId).toBe('string');
-          ctx.expect(ctx.manager.analytics._clientId.length).toBe(36);
+          ctx.expect(ctx.omega.analytics._enabled).toBe(true);
+          ctx.expect(typeof ctx.omega.analytics._clientId).toBe('string');
+          ctx.expect(ctx.omega.analytics._clientId.length).toBe(36);
           // Confirm it's a stable derivation: same deviceId + same namespace should
           // produce the same uuidv5 every time.
-          const ns = ctx.manager.analytics._namespace;
-          const deviceId = ctx.manager.context.session.deviceId;
-          ctx.expect(ctx.manager.analytics._clientId).toBe(uuidv5(deviceId, ns));
+          const ns = ctx.omega.analytics._namespace;
+          const deviceId = ctx.omega.context.session.deviceId;
+          ctx.expect(ctx.omega.analytics._clientId).toBe(uuidv5(deviceId, ns));
         } finally { await restore(); }
       },
     },
@@ -105,24 +105,24 @@ module.exports = defineCases({
       // launch a new GA client, so initialize raises instead of limping.
       name: 'no context.session.deviceId: initialize raises (the boot-order invariant)',
       run: async (ctx) => {
-        const savedDeviceId = ctx.manager.context.session.deviceId;
+        const savedDeviceId = ctx.omega.context.session.deviceId;
         const savedSecret   = process.env.GOOGLE_ANALYTICS_SECRET;
-        const savedConfig   = ctx.manager.config.analytics;
+        const savedConfig   = ctx.omega.config.analytics;
 
-        ctx.manager.analytics.shutdown();
-        ctx.manager.context.session.deviceId = null;
+        ctx.omega.analytics.shutdown();
+        ctx.omega.context.session.deviceId = null;
         process.env.GOOGLE_ANALYTICS_SECRET  = 'fake-secret';
-        ctx.manager.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
+        ctx.omega.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
 
         try {
-          await ctx.expect(() => ctx.manager.analytics.initialize(ctx.manager)).toThrow(/boot sequence/);
+          await ctx.expect(() => ctx.omega.analytics.initialize(ctx.omega)).toThrow(/boot sequence/);
         } finally {
-          ctx.manager.context.session.deviceId = savedDeviceId;
-          ctx.manager.config.analytics = savedConfig;
+          ctx.omega.context.session.deviceId = savedDeviceId;
+          ctx.omega.config.analytics = savedConfig;
           if (savedSecret == null) delete process.env.GOOGLE_ANALYTICS_SECRET;
           else process.env.GOOGLE_ANALYTICS_SECRET = savedSecret;
-          ctx.manager.analytics.shutdown();
-          ctx.manager.analytics.initialize(ctx.manager);
+          ctx.omega.analytics.shutdown();
+          ctx.omega.analytics.initialize(ctx.omega);
         }
       },
     },
@@ -136,7 +136,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          const a = ctx.manager.analytics;
+          const a = ctx.omega.analytics;
           const ns = a._namespace;
           a.setUserId('firebase-uid-abc-123');
           const expected = uuidv5('firebase-uid-abc-123', ns);
@@ -153,7 +153,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         // Hand-rolled (not reinit()): the helper's leading shutdown() would
         // wipe the very _pendingUid this test plants.
-        const a = ctx.manager.analytics;
+        const a = ctx.omega.analytics;
         a.shutdown(); // _namespace null — the pre-init state
 
         a.setUserId('early-uid-before-boot');
@@ -161,18 +161,18 @@ module.exports = defineCases({
 
         const savedSecret = process.env.GOOGLE_ANALYTICS_SECRET;
         process.env.GOOGLE_ANALYTICS_SECRET = 'fake-secret';
-        const cfgOrig = ctx.manager.config.analytics;
-        ctx.manager.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
+        const cfgOrig = ctx.omega.config.analytics;
+        ctx.omega.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
         try {
-          a.initialize(ctx.manager);
+          a.initialize(ctx.omega);
           ctx.expect(a._pendingUid).toBe(null);
           ctx.expect(a._userId).toBe(uuidv5('early-uid-before-boot', a._namespace));
         } finally {
           a.shutdown();
           if (savedSecret == null) delete process.env.GOOGLE_ANALYTICS_SECRET;
           else process.env.GOOGLE_ANALYTICS_SECRET = savedSecret;
-          ctx.manager.config.analytics = cfgOrig;
-          a.initialize(ctx.manager);
+          ctx.omega.config.analytics = cfgOrig;
+          a.initialize(ctx.omega);
         }
       },
     },
@@ -184,10 +184,10 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          ctx.manager.analytics.setUserId('some-uid');
-          ctx.expect(ctx.manager.analytics._userId).not.toBe(null);
-          ctx.manager.analytics.setUserId(null);
-          ctx.expect(ctx.manager.analytics._userId).toBe(null);
+          ctx.omega.analytics.setUserId('some-uid');
+          ctx.expect(ctx.omega.analytics._userId).not.toBe(null);
+          ctx.omega.analytics.setUserId(null);
+          ctx.expect(ctx.omega.analytics._userId).toBe(null);
         } finally { await restore(); }
       },
     },
@@ -203,7 +203,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
 
-        const a = ctx.manager.analytics;
+        const a = ctx.omega.analytics;
         const origSend = a._send;
         const sent = [];
         a._send = (descriptor) => { sent.push(descriptor); return true; };
@@ -230,7 +230,7 @@ module.exports = defineCases({
     {
       name: '_enrichParams adds session_id + engagement_time_msec',
       run: (ctx) => {
-        const params = ctx.manager.analytics._enrichParams({ custom: 'value' });
+        const params = ctx.omega.analytics._enrichParams({ custom: 'value' });
         ctx.expect(params.custom).toBe('value');
         ctx.expect(typeof params.session_id).toBe('string');
         ctx.expect(typeof params.engagement_time_msec).toBe('number');
@@ -245,7 +245,7 @@ module.exports = defineCases({
         const restore = await reinit(ctx, {}, { enabled: false });
         try {
           // Should not throw.
-          ctx.manager.analytics.event('app_launch', { x: 1 });
+          ctx.omega.analytics.event('app_launch', { x: 1 });
           ctx.expect(true).toBe(true);
         } finally { await restore(); }
       },
@@ -253,28 +253,28 @@ module.exports = defineCases({
     {
       name: 'event() before init queues, queue is bounded',
       run: (ctx) => {
-        const a = ctx.manager.analytics;
+        const a = ctx.omega.analytics;
         a.shutdown();   // back to uninitialized state
         a.event('queued_one');
         a.event('queued_two');
         ctx.expect(a._queue.length).toBe(2);
-        ctx.manager.analytics.initialize(ctx.manager);   // restore for downstream tests
+        ctx.omega.analytics.initialize(ctx.omega);   // restore for downstream tests
       },
     },
     {
       name: 'queue flushes on init',
       run: async (ctx) => {
         // Force a "before init" state with a couple of queued items.
-        ctx.manager.analytics.shutdown();
-        ctx.manager.analytics._queue.push({ name: 'x', params: {} });
-        ctx.manager.analytics._queue.push({ name: 'y', params: {} });
+        ctx.omega.analytics.shutdown();
+        ctx.omega.analytics._queue.push({ name: 'x', params: {} });
+        ctx.omega.analytics._queue.push({ name: 'y', params: {} });
         const restore = await reinit(ctx, { GOOGLE_ANALYTICS_SECRET: 'fake-secret' }, {
           enabled: true,
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
           // After init, queue should be drained.
-          ctx.expect(ctx.manager.analytics._queue.length).toBe(0);
+          ctx.expect(ctx.omega.analytics._queue.length).toBe(0);
         } finally { await restore(); }
       },
     },
@@ -286,7 +286,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          const a = ctx.manager.analytics;
+          const a = ctx.omega.analytics;
           // Simulate auth bridge firing.
           a._handleAuthChange({ uid: 'user-123' });
           ctx.expect(a._userId).not.toBe(null);
@@ -304,9 +304,9 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          ctx.manager.analytics.setUserProperties({ plan: 'premium', custom_flag: true });
-          ctx.expect(ctx.manager.analytics._userProperties.plan).toEqual({ value: 'premium' });
-          ctx.expect(ctx.manager.analytics._userProperties.custom_flag).toEqual({ value: true });
+          ctx.omega.analytics.setUserProperties({ plan: 'premium', custom_flag: true });
+          ctx.expect(ctx.omega.analytics._userProperties.plan).toEqual({ value: 'premium' });
+          ctx.expect(ctx.omega.analytics._userProperties.custom_flag).toEqual({ value: true });
         } finally { await restore(); }
       },
     },
@@ -318,7 +318,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          const snap = await ctx.manager.ipc.invoke('desktop:analytics:status');
+          const snap = await ctx.omega.ipc.invoke('desktop:analytics:status');
           ctx.expect(snap.enabled).toBe(true);
           ctx.expect(snap.measurementId).toBe('G-TESTID12');
         } finally { await restore(); }
@@ -327,13 +327,13 @@ module.exports = defineCases({
     {
       name: 'IPC listener desktop:analytics:event routes to analytics.event',
       run: async (ctx) => {
-        const a = ctx.manager.analytics;
+        const a = ctx.omega.analytics;
         const origEvent = a.event;
         let captured = null;
         a.event = (name, params) => { captured = { name, params }; };
         try {
           // Simulate an inbound IPC call (renderer would do ipcRenderer.send).
-          const listeners = ctx.manager.ipc._listeners?.['desktop:analytics:event'];
+          const listeners = ctx.omega.ipc._listeners?.['desktop:analytics:event'];
           ctx.expect(listeners).toBeDefined();
           listeners.forEach((fn) => fn({ name: 'rendererEvent', params: { x: 1 } }));
           ctx.expect(captured).toEqual({ name: 'rendererEvent', params: { x: 1 } });
@@ -348,7 +348,7 @@ module.exports = defineCases({
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          const j = ctx.manager.analytics.toJSON();
+          const j = ctx.omega.analytics.toJSON();
           ctx.expect(j.enabled).toBe(true);
           ctx.expect(j.measurementId).toBe('G-TESTID12');
           ctx.expect(typeof j.clientId).toBe('string');

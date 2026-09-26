@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
@@ -51,7 +51,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -99,15 +99,14 @@ function makeElement() {
 }
 
 function paidAccount(usage) {
-  return {
-    auth: { uid: 'user-647' },
+  return new User({
     subscription: {
       product: { id: 'premium' },
       status: 'active',
       expires: { timestampUNIX: Math.floor(Date.now() / 1000) + 86400 },
     },
     usage: usage,
-  };
+  }, { uid: 'user-647' });
 }
 
 /** Render the usage section for an account and hand back the HTML it wrote. */
@@ -133,9 +132,8 @@ async function renderUsage(account, config) {
   globalThis.__omegaClient = {
     config: { features: FEATURE_CATALOG },
     library: () => ({ motion: { scan: () => {} } }),
-    auth: () => ({ resolveSubscription: (a) => resolveSubscription(a) }),
-    bindings: () => ({ update: () => {} }),
-    utilities: () => ({ showNotification: () => {}, escapeHTML: (value) => `${value}` }),
+    bindings: { update: () => {} },
+    utilities: { showNotification: () => {}, escapeHTML: (value) => `${value}` },
     request: async () => ({}),
   };
 
@@ -221,11 +219,20 @@ test('usage bars: unlimited says so instead of drawing a percentage of nothing',
 });
 
 test('usage bars: a plan that meters nothing says so', async () => {
-  const html = await renderUsage({
-    auth: { uid: 'user-647' },
+  const html = await renderUsage(new User({
     subscription: { product: { id: 'basic' }, status: 'active' },
     usage: {},
-  }, { currency: 'USD', products: [{ id: 'basic', name: 'Basic', type: 'subscription', prices: {}, features: { support: true } }] });
+  }, { uid: 'user-647' }), { currency: 'USD', products: [{ id: 'basic', name: 'Basic', type: 'subscription', prices: {}, features: { support: true } }] });
 
   assert.ok(html.includes('Usage tracking not available for this plan.'), html);
+});
+
+test('#945: the bars read the plan off the User: a cancelled paid plan draws the basic limits', async () => {
+  const html = await renderUsage(new User({
+    subscription: { product: { id: 'premium' }, status: 'cancelled' },
+    usage: { saves: { monthly: 40, daily: 5 } },
+  }, { uid: 'user-647' }));
+
+  assert.ok(html.includes('60 of 100 left this month'), `the basic plan's number, not premium's: ${html}`);
+  assert.ok(!html.includes('Exports'), 'and none of the premium-only meters');
 });

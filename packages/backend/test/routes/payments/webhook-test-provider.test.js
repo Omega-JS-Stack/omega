@@ -8,7 +8,7 @@
  * `intent/providers/test.js`. The webhook providers receive only the raw req
  * (no ctx), so the guard lives at the route's dispatch layer.
  *
- * The handler is called directly with a real ctx built by Manager.RouteContext();
+ * The handler is called directly with a real ctx a real Context;
  * only `res` is a stand-in (the external sink), per the no-mock doctrine.
  *
  * Run: npx omega test backend:routes/payments/webhook-test-provider
@@ -19,6 +19,7 @@
 // over everything else, so it has to come off too.
 
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../../dist/omega/context.js');
 function withProductionEnvironment(fn) {
   const original = {
     OMEGA_ENVIRONMENT: process.env.OMEGA_ENVIRONMENT,
@@ -75,7 +76,7 @@ function recordingResponse() {
 }
 
 // Build a real ctx for a webhook request, then run the handler against it.
-async function callWebhook({ Manager, query, body }) {
+async function callWebhook({ omega, query, body }) {
   const res = recordingResponse();
   const req = {
     method: 'POST',
@@ -83,10 +84,10 @@ async function callWebhook({ Manager, query, body }) {
     query: query,
     body: body,
   };
-  const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-webhook' });
-  const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
+  const ctx = new Context(omega, { req, res }, { functionName: 'payments-webhook' });
+  const handler = require('../../../dist/omega/routes/payments/webhook/post.js');
 
-  await handler({ ctx, Manager, libraries: Manager.libraries });
+  await handler({ ctx, omega });
 
   return res.sent;
 }
@@ -100,9 +101,9 @@ module.exports = defineCases({
   tests: [
     {
       name: 'test-provider-is-blocked-in-production',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
-          Manager,
+          omega,
           query: { provider: 'test', key: VALID_KEY() },
           body: { id: '_test-evt-prod-guard', type: 'customer.subscription.updated', data: { object: { id: 'sub_guard' } } },
         }));
@@ -113,9 +114,9 @@ module.exports = defineCases({
 
     {
       name: 'real-providers-are-untouched-in-production',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
-          Manager,
+          omega,
           query: { provider: 'stripe', key: VALID_KEY() },
           // An unsupported event type — the handler ignores it before any Firestore write.
           body: { id: '_test-evt-prod-stripe', type: 'ping.unsupported', data: { object: {} } },
@@ -128,11 +129,11 @@ module.exports = defineCases({
 
     {
       name: 'test-provider-is-allowed-outside-production',
-      async run({ assert, Manager, ctx }) {
+      async run({ assert, omega, ctx }) {
         assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
 
         const sent = await callWebhook({
-          Manager,
+          omega,
           query: { provider: 'test', key: VALID_KEY() },
           // An unsupported event type — proves dispatch got past the guard without a write.
           body: { id: '_test-evt-nonprod-guard', type: 'ping.unsupported', data: { object: {} } },
@@ -145,9 +146,9 @@ module.exports = defineCases({
 
     {
       name: 'the-key-still-gates-before-the-provider-guard',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const sent = await withProductionEnvironment(() => callWebhook({
-          Manager,
+          omega,
           query: { provider: 'test', key: 'wrong-key' },
           body: { id: '_test-evt-prod-badkey', type: 'customer.subscription.updated', data: { object: { id: 'sub_guard' } } },
         }));

@@ -21,7 +21,7 @@
  * Run: npx omega test framework:analytics/signup-conversion
  */
 const crypto = require('crypto');
-const signup = require('../../dist/manager/libraries/analytics/signup.js');
+const signup = require('../../dist/omega/libraries/analytics/signup.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-signup-conversion-uid';

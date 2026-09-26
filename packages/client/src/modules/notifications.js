@@ -4,8 +4,8 @@ const logger = createLogger('push');
 const syncLogger = createLogger('push:sync');
 
 class Notifications {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this._requestInProgress = false;
   }
 
@@ -14,11 +14,11 @@ class Notifications {
     // design — VAPID public keys ship to every browser). The nested
     // firebase.messaging shape is the web/extension bridge contract,
     // mirroring _resolveFirebaseConfig's cloud-first order.
-    this._vapidKey = this.manager.config?.cloud?.messaging?.vapidKey
-      || this.manager.config?.firebase?.messaging?.config?.vapidKey
+    this._vapidKey = this.omega.config?.cloud?.messaging?.vapidKey
+      || this.omega.config?.firebase?.messaging?.config?.vapidKey
       || null;
 
-    const storage = this.manager.storage();
+    const storage = this.omega.storage;
     const stored = storage.get('notifications');
     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
@@ -39,7 +39,7 @@ class Notifications {
 
     // Listen for foreground messages (tab is focused)
     if (permission === 'granted') {
-      logger.log('Setting up foreground listener...', { supported: this.isSupported(), hasMessaging: !!this.manager.firebaseMessaging });
+      logger.log('Setting up foreground listener...', { supported: this.isSupported(), hasMessaging: !!this.omega.firebaseMessaging });
       this.onMessage((payload) => {
         logger.log('Foreground message received:', payload);
       }).then(unsub => {
@@ -71,7 +71,7 @@ class Notifications {
   isSupported() {
     return 'Notification' in window &&
            'serviceWorker' in navigator &&
-           !!this.manager.firebaseMessaging;
+           !!this.omega.firebaseMessaging;
   }
 
   // Check if user is subscribed to notifications
@@ -102,13 +102,13 @@ class Notifications {
       this._requestInProgress = true;
 
       // Get Firebase messaging
-      const messaging = this.manager.firebaseMessaging;
+      const messaging = this.omega.firebaseMessaging;
       if (!messaging) {
         throw new Error('Firebase Messaging not initialized');
       }
 
       // Get service worker registration
-      const swRegistration = this.manager.state.serviceWorker;
+      const swRegistration = this.omega.state.serviceWorker;
       if (!swRegistration) {
         throw new Error('Service Worker not registered');
       }
@@ -137,12 +137,12 @@ class Notifications {
       await this._saveSubscription(token);
 
       // Track in local storage
-      const storage = this.manager.storage();
+      const storage = this.omega.storage;
       storage.set('notifications', {
         subscribed: true,
         token: token,
         timestamp: new Date().toISOString(),
-        uid: this.manager.auth().getUser()?.uid || null
+        uid: this.omega.auth.user.uid
       });
 
       this._requestInProgress = false;
@@ -163,14 +163,14 @@ class Notifications {
       }
 
       const { deleteToken } = await import('firebase/messaging');
-      const messaging = this.manager.firebaseMessaging;
+      const messaging = this.omega.firebaseMessaging;
 
       if (messaging) {
         await deleteToken(messaging);
       }
 
       // Clear local storage
-      const storage = this.manager.storage();
+      const storage = this.omega.storage;
       storage.remove('notifications');
 
       return true;
@@ -209,7 +209,7 @@ class Notifications {
    */
   async _askPermission() {
     const prompted = Notification.permission === 'default';
-    const analytics = this.manager.analytics();
+    const analytics = this.omega.analytics;
 
     if (prompted) {
       analytics.event('notification_permission_request');
@@ -233,13 +233,13 @@ class Notifications {
         return null;
       }
 
-      const messaging = this.manager.firebaseMessaging;
+      const messaging = this.omega.firebaseMessaging;
       if (!messaging) {
         return null;
       }
 
       const { getToken } = await import('firebase/messaging');
-      const swRegistration = this.manager.state.serviceWorker;
+      const swRegistration = this.omega.state.serviceWorker;
 
       const tokenOptions = { serviceWorkerRegistration: swRegistration };
       if (this._vapidKey) { tokenOptions.vapidKey = this._vapidKey; }
@@ -258,7 +258,7 @@ class Notifications {
       }
 
       const { onMessage } = await import('firebase/messaging');
-      const messaging = this.manager.firebaseMessaging;
+      const messaging = this.omega.firebaseMessaging;
 
       if (!messaging) {
         return () => {};
@@ -321,7 +321,7 @@ class Notifications {
   // and updates localStorage. Clears the subscribed state if the token is gone.
   async syncSubscription() {
     try {
-      const storage = this.manager.storage();
+      const storage = this.omega.storage;
       const storedNotification = storage.get('notifications');
 
       const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
@@ -351,11 +351,10 @@ class Notifications {
 
       await this._saveSubscription(currentToken);
 
-      const user = this.manager.auth().getUser();
       storage.set('notifications', {
         subscribed: true,
         token: currentToken,
-        uid: user?.uid || null,
+        uid: this.omega.auth.user.uid,
         timestamp: new Date().toISOString(),
       });
 
@@ -370,9 +369,9 @@ class Notifications {
   // Save subscription to Firestore
   async _saveSubscription(token) {
     try {
-      const firestore = this.manager.firestore();
-      const user = this.manager.auth().getUser();
-      const storage = this.manager.storage();
+      const firestore = this.omega.firestore;
+      const user = this.omega.auth.user;
+      const storage = this.omega.storage;
 
       if (!token) {
         return;
@@ -383,7 +382,7 @@ class Notifications {
       const timestampUNIX = Math.floor(now.getTime() / 1000);
 
       // Get context for client information
-      const context = this.manager.utilities().getContext();
+      const context = this.omega.utilities.getContext();
       const clientData = context.client;
 
       // Reference to the notification document (ID is the token)
@@ -394,7 +393,7 @@ class Notifications {
       const existingData = existingDoc.exists() ? existingDoc.data() : null;
 
       // Determine if we need to update
-      const currentUid = user?.uid || null;
+      const currentUid = user.uid;
       const existingOwner = existingData?.owner || null;
       const needsUpdate = existingOwner !== currentUid;
 

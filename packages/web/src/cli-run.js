@@ -4,8 +4,8 @@
  */
 // The value-LESS flags, the only list a CLI owes the parse: every other flag
 // takes the next token as its value, so an undeclared `--extended some/target`
-// would become extended='some/target' with NO target. Mirrors the UJM and
-// @omega.js/backend CLI fix.
+// would become extended='some/target' with NO target. @omega.js/backend's CLI
+// declares the same.
 const BOOLEAN_FLAGS = [
   'extended', 'check', 'dry-run', 'local', 'direct', 'secrets', 'list', 'a',
   'apply', 'major', 'force-fresh', 'https',

@@ -1,5 +1,5 @@
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Global variables
 let launchTimeout;
@@ -16,7 +16,7 @@ export default () => {
   return new Promise(async function (resolve) {
     // Set omega
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupPage();
 

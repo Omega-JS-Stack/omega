@@ -20,7 +20,7 @@
 //   3. the sibling input in the same `.input-group` — the bare
 //      `<input><button data-omega-copy>` row, which needs no value at all.
 
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 const CONTROL_SELECTOR = '[data-omega-copy]';
 const GROUP_SELECTOR = '.input-group';
@@ -41,19 +41,19 @@ export function setupCopy() {
     // An empty field is the account page's "still loading" case, not a
     // failure — and never a silently emptied clipboard.
     if (!value) {
-      omega.utilities().showNotification('Nothing to copy', 'warning');
+      omega.utilities.showNotification('Nothing to copy', 'warning');
       return;
     }
 
     try {
-      await omega.utilities().clipboardCopy(value);
-      omega.utilities().showNotification('Copied!', 'success');
+      await omega.utilities.clipboardCopy(value);
+      omega.utilities.showNotification('Copied!', 'success');
     } catch (e) {
       // Reachable since #726 — `clipboardCopy` rejects on a real refusal, so
       // this notification stopped being dead code and the reason belongs in
       // the console, not only in a toast.
       console.error('Failed to copy to clipboard:', e);
-      omega.utilities().showNotification('Failed to copy', 'danger');
+      omega.utilities.showNotification('Failed to copy', 'danger');
     }
   });
 }

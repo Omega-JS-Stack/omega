@@ -5,7 +5,7 @@
  * What lives here is what only the client can know: when to load the SDK, which
  * release tag this page is (`brand.id@version`), where the signed-in user
  * comes from (the auth storage keys), and the public surface every consumer
- * calls — `omega.sentry().captureException(err)`.
+ * calls — `omega.sentry.captureException(err)`.
  *
  * Everything else — the send gate, the @omega.js-bundle filter, the PII scrub,
  * the integrations — is the package's, shared with the backend and the desktop
@@ -18,9 +18,9 @@ import { createLogger } from './logger.js';
 
 const logger = createLogger('sentry');
 
-class mod {
-  constructor(manager) {
-    this.manager = manager;
+class Sentry {
+  constructor(omega) {
+    this.omega = omega;
     this.initialized = false;
     this.Sentry = null;
     this.config = null;
@@ -50,23 +50,25 @@ class mod {
           Sentry: sdk,
           config,
           release: monitoringCore.releaseTag({
-            id: this.manager.config.brand?.id,
+            id: this.omega.config.brand?.id,
             // The host blob's app version when it carries one (@omega.js/extension
             // bakes it, and it is the same key device stats read) — the build stamp
             // is the fallback for a surface that ships no version yet.
-            version: this.manager.config.version || this.manager.config.buildTime,
+            version: this.omega.config.version || this.omega.config.buildTime,
           }),
           // The ONE environment surface (#817), never the raw baked fact: the
-          // Manager's getEnvironment() is the same module every other OMEGA
+          // instance's getEnvironment() is the same module every other OMEGA
           // target answers from, so an artifact that baked no environment
           // throws by name here instead of tagging every event `undefined`.
-          environment: this.manager.getEnvironment(),
-          isDevelopment: () => this.manager.isDevelopment(),
+          environment: this.omega.getEnvironment(),
+          isDevelopment: () => this.omega.isDevelopment(),
           getUser: () => {
-            const storage = this.manager.storage();
+            // The stored auth state holds the User as its stored document
+            // (User.toJSON), so identity sits under the document's `auth` branch
+            const storage = this.omega.storage;
             return {
-              uid: storage.get('auth.user.uid', ''),
-              email: storage.get('auth.user.email', ''),
+              uid: storage.get('auth.user.auth.uid', ''),
+              email: storage.get('auth.user.auth.email', ''),
             };
           },
         });
@@ -109,4 +111,4 @@ class mod {
   }
 }
 
-export default mod;
+export default Sentry;

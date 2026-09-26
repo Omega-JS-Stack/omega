@@ -3,7 +3,7 @@ const chalk = require('chalk').default;
 /**
  * Shared CLI styling helpers — the SSOT for @omega.js/backend's console output look.
  *
- * Mirrors the OMEGA Manager (omega-manager) styling conventions so every @omega.js/backend
+ * Mirrors the OMEGAn Omega instance (omega-manager) styling conventions so every @omega.js/backend
  * command renders with the same dividers, indentation, timestamps, colors, and
  * status symbols. Pull these helpers into any command (setup/serve/deploy/test/
  * emulator/...) instead of hand-rolling chalk + console.log.

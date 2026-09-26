@@ -11,7 +11,16 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { createIconResolver, createIconWatcher, ICON_BASE } = require('../runtime/icons.js');
+const { createIconResolver, ICON_BASE } = require('../runtime/icons.js');
+const { createIconRenderer } = require('@omega.js/client/modules/icon-renderer.js');
+
+/**
+ * The watcher runtime/boot.js starts (`omega.icons.start`): @omega.js/client's
+ * renderer bound to this site's transport.
+ */
+function createIconWatcher({ development }) {
+  return createIconRenderer({ resolve: createIconResolver({ development }) });
+}
 
 /** The minimum <i> the watcher reads and fills. */
 function makeIcon(className) {

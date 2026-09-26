@@ -2,7 +2,7 @@
 //
 // Note: createNamed requires src/views/<view>/index.html to exist on disk in the test cwd.
 // The harness uses @omega.js/desktop's defaults config but runs from @omega.js/desktop's repo root, where there are no built views.
-// So we test the API surface and dedup behavior using the manager's electron handle but skip
+// So we test the API surface and dedup behavior using the omega instance's electron handle but skip
 // actual file-loading in createNamed (it logs an error and returns the BrowserWindow anyway,
 // which is enough to verify the registry behavior).
 
@@ -16,21 +16,21 @@ module.exports = defineCases({
     {
       name: 'initialize was called during boot',
       run: (ctx) => {
-        ctx.expect(ctx.manager.windows._initialized).toBe(true);
+        ctx.expect(ctx.omega.windows._initialized).toBe(true);
       },
     },
     {
       name: 'list returns empty array when no windows are open',
       run: (ctx) => {
         // skipWindowCreation: true means no window was auto-created.
-        ctx.expect(Array.isArray(ctx.manager.windows.list())).toBe(true);
-        ctx.expect(ctx.manager.windows.list().length).toBe(0);
+        ctx.expect(Array.isArray(ctx.omega.windows.list())).toBe(true);
+        ctx.expect(ctx.omega.windows.list().length).toBe(0);
       },
     },
     {
       name: 'get returns null for unknown name',
       run: (ctx) => {
-        ctx.expect(ctx.manager.windows.get('nonexistent')).toBeNull();
+        ctx.expect(ctx.omega.windows.get('nonexistent')).toBeNull();
       },
     },
     {
@@ -39,25 +39,25 @@ module.exports = defineCases({
         // We need a view file. Use @omega.js/desktop's own defaults dir as the cwd-equivalent by setting a custom html path.
         // For simplicity, just verify createNamed creates a BrowserWindow even when the html file is missing
         // (loadFile catches the error; the window object still exists in the registry).
-        const win = await ctx.manager.windows.createNamed('about');
+        const win = await ctx.omega.windows.createNamed('about');
         ctx.state.win = win;
         ctx.expect(win).toBeTruthy();
-        ctx.expect(ctx.manager.windows.get('about')).toBe(win);
-        ctx.expect(ctx.manager.windows.list()).toContain('about');
+        ctx.expect(ctx.omega.windows.get('about')).toBe(win);
+        ctx.expect(ctx.omega.windows.list()).toContain('about');
       },
     },
     {
       name: 'createNamed dedups — second call returns the same window',
       run: async (ctx) => {
-        const again = await ctx.manager.windows.createNamed('about');
+        const again = await ctx.omega.windows.createNamed('about');
         ctx.expect(again).toBe(ctx.state.win);
       },
     },
     {
       name: 'hide / show do not throw',
       run: (ctx) => {
-        ctx.manager.windows.hide('about');
-        ctx.manager.windows.show('about');
+        ctx.omega.windows.hide('about');
+        ctx.omega.windows.show('about');
         // No assertion beyond "didn't throw" — visibility is OS-side state we can't reliably read.
       },
     },
@@ -66,13 +66,13 @@ module.exports = defineCases({
       // without a startup block (schema: optional) threw inside the hide handler.
       name: '_maybeRehideDock survives a config without a startup block',
       run: (ctx) => {
-        const orig = ctx.manager.config.startup;
-        delete ctx.manager.config.startup;
+        const orig = ctx.omega.config.startup;
+        delete ctx.omega.config.startup;
         try {
-          ctx.manager.windows._maybeRehideDock(); // must not throw
-          ctx.expect(ctx.manager.startup.getMode()).toBe('normal');
+          ctx.omega.windows._maybeRehideDock(); // must not throw
+          ctx.expect(ctx.omega.startup.getMode()).toBe('normal');
         } finally {
-          if (orig !== undefined) ctx.manager.config.startup = orig;
+          if (orig !== undefined) ctx.omega.config.startup = orig;
         }
       },
     },
@@ -84,7 +84,7 @@ module.exports = defineCases({
         if (process.platform !== 'darwin') {
           return ctx.skip('macOS-only — accessory activation policy / dock');
         }
-        // Both the harness entry (at require time) and Manager.initialize (step 1a)
+        // Both the harness entry (at require time) and omega.initialize() (step 1a)
         // hide the dock under the stealth predicate, so the launched test app never
         // activates and never steals keyboard focus.
         const { app } = require('electron');
@@ -96,10 +96,10 @@ module.exports = defineCases({
       run: (ctx) => {
         const { BrowserWindow } = require('electron');
 
-        ctx.expect(ctx.manager.windows._isStealth()).toBe(true);
+        ctx.expect(ctx.omega.windows._isStealth()).toBe(true);
 
         const win = new BrowserWindow({ show: false, width: 120, height: 80 });
-        ctx.manager.windows._surface(win, 'stealth-probe');
+        ctx.omega.windows._surface(win, 'stealth-probe');
 
         // Shown (rendering/timers run like a visible window — NOT hide/minimize,
         // which would occlusion-throttle) but fully transparent and inactive.
@@ -117,7 +117,7 @@ module.exports = defineCases({
 
         process.env.OMEGA_TEST_SHOW = '1';
         try {
-          ctx.expect(ctx.manager.windows._isStealth()).toBe(false);
+          ctx.expect(ctx.omega.windows._isStealth()).toBe(false);
 
           // This probe exercises the real non-stealth _surface branch WITHOUT
           // stealing the developer's keyboard focus mid-run. Two activation
@@ -133,7 +133,7 @@ module.exports = defineCases({
             require('electron').app.setActivationPolicy('regular');
           }
           const win = new BrowserWindow({ show: false, width: 120, height: 80, x: 0, y: 0, focusable: false });
-          ctx.manager.windows._surface(win, 'visible-probe');
+          ctx.omega.windows._surface(win, 'visible-probe');
 
           ctx.expect(win.isVisible()).toBe(true);
           ctx.expect(win.getOpacity()).toBe(1);
@@ -148,7 +148,7 @@ module.exports = defineCases({
         }
 
         // Flag removed → stealth is back on for the rest of the run.
-        ctx.expect(ctx.manager.windows._isStealth()).toBe(true);
+        ctx.expect(ctx.omega.windows._isStealth()).toBe(true);
       },
     },
     {
@@ -158,7 +158,7 @@ module.exports = defineCases({
           return; // trafficLightPosition is a macOS-only BrowserWindow option
         }
 
-        const win = await ctx.manager.windows.create('tlp-probe', { trafficLightPosition: { x: 26, y: 24 } });
+        const win = await ctx.omega.windows.create('tlp-probe', { trafficLightPosition: { x: 26, y: 24 } });
         ctx.expect(win).toBeTruthy();
 
         const pos = win.getWindowButtonPosition();
@@ -170,7 +170,7 @@ module.exports = defineCases({
     {
       name: 'close removes the window from the registry',
       run: async (ctx) => {
-        const win = ctx.manager.windows.get('about');
+        const win = ctx.omega.windows.get('about');
         ctx.expect(win).toBeTruthy();
 
         // close fires asynchronously — wait for the 'closed' event rather than guessing a timeout.
@@ -179,18 +179,18 @@ module.exports = defineCases({
           win.once('closed', resolve);
         });
 
-        ctx.manager.windows.close('about');
+        ctx.omega.windows.close('about');
         await closedPromise;
 
-        ctx.expect(ctx.manager.windows.get('about')).toBeNull();
+        ctx.expect(ctx.omega.windows.get('about')).toBeNull();
       },
     },
     {
-      name: 'manager.quit + manager.relaunch exposed and set _allowQuit',
+      name: 'omega.quit + omega.relaunch exposed and set _allowQuit',
       run: (ctx) => {
-        ctx.expect(typeof ctx.manager.quit).toBe('function');
-        ctx.expect(typeof ctx.manager.relaunch).toBe('function');
-        ctx.manager._allowQuit = false;
+        ctx.expect(typeof ctx.omega.quit).toBe('function');
+        ctx.expect(typeof ctx.omega.relaunch).toBe('function');
+        ctx.omega._allowQuit = false;
 
         // Calling quit({force:true}) should set _allowQuit BEFORE invoking app.quit().
         // We can't actually let app.quit() run mid-test (it'd kill the harness), so we
@@ -199,33 +199,33 @@ module.exports = defineCases({
         const origQuit = electron.app.quit;
         electron.app.quit = () => {};
         try {
-          ctx.manager.quit({ force: true });
-          ctx.expect(ctx.manager._allowQuit).toBe(true);
+          ctx.omega.quit({ force: true });
+          ctx.expect(ctx.omega._allowQuit).toBe(true);
         } finally {
           electron.app.quit = origQuit;
-          ctx.manager._allowQuit = false;
+          ctx.omega._allowQuit = false;
         }
       },
     },
     {
-      name: 'auto-updater installNow flips manager._allowQuit',
+      name: 'auto-updater installNow flips omega._allowQuit',
       run: (ctx) => {
-        ctx.manager._allowQuit = false;
+        ctx.omega._allowQuit = false;
 
         // Force the autoUpdater state to "downloaded" + stub the underlying library
         // so installNow doesn't actually quit the harness.
-        const prevState = ctx.manager.autoUpdater._state;
-        const prevLib   = ctx.manager.autoUpdater._library;
-        ctx.manager.autoUpdater._state = { code: 'downloaded', version: '9.9.9' };
-        ctx.manager.autoUpdater._library = { quitAndInstall: () => {} };
+        const prevState = ctx.omega.autoUpdater._state;
+        const prevLib   = ctx.omega.autoUpdater._library;
+        ctx.omega.autoUpdater._state = { code: 'downloaded', version: '9.9.9' };
+        ctx.omega.autoUpdater._library = { quitAndInstall: () => {} };
 
         try {
-          ctx.manager.autoUpdater.installNow();
-          ctx.expect(ctx.manager._allowQuit).toBe(true);
+          ctx.omega.autoUpdater.installNow();
+          ctx.expect(ctx.omega._allowQuit).toBe(true);
         } finally {
-          ctx.manager.autoUpdater._state   = prevState;
-          ctx.manager.autoUpdater._library = prevLib;
-          ctx.manager._allowQuit = false;
+          ctx.omega.autoUpdater._state   = prevState;
+          ctx.omega.autoUpdater._library = prevLib;
+          ctx.omega._allowQuit = false;
         }
       },
     },

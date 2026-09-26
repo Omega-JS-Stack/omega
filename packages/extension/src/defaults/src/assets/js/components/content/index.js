@@ -3,16 +3,13 @@
 // ============================================
 
 // Import OMEGA Extension
-import Manager from '@omega.js/extension/content';
-
-// Create instance
-const manager = new Manager();
+import omega from '@omega.js/extension/content';
 
 // Initialize
-manager.initialize()
+omega.initialize()
 .then(() => {
   // Shortcuts
-  const { extension, messenger, logger } = manager;
+  const { extension, messenger, logger } = omega;
 
   // Add your project-specific content script logic here
   // ...

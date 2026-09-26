@@ -1,96 +1,71 @@
+// The build-time module: one plain object of functions every gulp task, verb
+// and consumer hook reads (`const build = require('@omega.js/desktop/build')`).
+// No class and no `new`, the shape @omega.js/web's and @omega.js/extension's
+// build modules share.
+
 // Libraries
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { setEnvironment, buildLaneEnvironment } = require('@omega.js/config/environment');
 const fs = require('fs');
 const JSON5 = require('json5');
-const { force, execute } = require('node-powertools');
+const { force } = require('node-powertools');
 const { parseArgv } = require('@omega.js/devkit/argv');
+const { getEnvironment, isDevelopment, isProduction, isTesting, getVersion } = require('./utils/mode-helpers.js');
 
-// Class
-function Manager() {
-  const self = this;
-
-  // Properties
-  self._logger = null;
-
-  // Return
-  return self;
+// Logger: a named build logger
+function logger(name) {
+  return new (require('@omega.js/devkit/logger'))(name);
 }
-
-// Initialize (build-time hook)
-Manager.prototype.initialize = function () {
-  console.log('initialize:');
-};
-
-// Logger
-Manager.prototype.logger = function (name) {
-  // Static-style call
-  if (!(this instanceof Manager)) {
-    return new (require('./lib/logger'))(name);
-  }
-
-  // Cache one logger per Manager instance
-  if (!this._logger) {
-    this._logger = new (require('./lib/logger'))(name);
-  }
-
-  return this._logger;
-};
 
 // argv: the gulp lane's own parse. It is spawned with the TASK NAME alone
 // (`npm run gulp -- build`), so `debug` is the one flag it declares.
-Manager.getArguments = function () {
+function getArguments() {
   const options = parseArgv(process.argv.slice(2), { booleans: ['debug'] });
 
   options.debug = force(options.debug === undefined ? false : options.debug, 'boolean');
 
   return options;
-};
-Manager.prototype.getArguments = Manager.getArguments;
+}
 
-// Report build errors with notification (parity with BXM)
-Manager.reportBuildError = function (error, callback) {
-  const logger = new (require('./lib/logger'))('build-error');
+// Report build errors with notification (parity with @omega.js/extension)
+function reportBuildError(error, callback) {
+  const log = logger('build-error');
   const errorMessage = error.message || error.toString() || 'Unknown error';
   const errorPlugin = error.plugin || 'Build';
 
-  logger.error(`[${errorPlugin}] ${errorMessage}`);
+  log.error(`[${errorPlugin}] ${errorMessage}`);
 
   if (callback) {
     return callback(error);
   }
 
   return (cb) => cb ? cb(error) : error;
-};
-Manager.prototype.reportBuildError = Manager.reportBuildError;
+}
 
 // Mode flags
-Manager.isBuildMode = function () {
+function isBuildMode() {
   return process.env.OMEGA_BUILD_MODE === 'true';
-};
-Manager.prototype.isBuildMode = Manager.isBuildMode;
+}
 
-Manager.isPublishMode = function () {
+function isPublishMode() {
   return process.env.OMEGA_IS_PUBLISH === 'true';
-};
-Manager.prototype.isPublishMode = Manager.isPublishMode;
+}
 
-Manager.isServerMode = function () {
+function isServerMode() {
   return process.env.OMEGA_IS_SERVER === 'true';
-};
-Manager.prototype.isServerMode = Manager.isServerMode;
+}
 
-Manager.actLikeProduction = function () {
-  return Boolean(Manager.isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
-};
-Manager.prototype.actLikeProduction = Manager.actLikeProduction;
+function actLikeProduction() {
+  return Boolean(isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
+}
 
 // The environment is the ONE module's (@omega.js/config's environment.js,
 // [#817](https://github.com/Omega-JS-Stack/omega/issues/817)), reachable from
-// all four @omega.js/desktop Manager entry points (main / renderer / preload /
-// build) through the mode-helpers attachTo() call at the bottom of each, so
-// every context resolves it identically. It reads ONE input and never guesses.
+// all four @omega.js/desktop entry points (the main / renderer / preload `Omega`
+// classes and this build module) through the same plain functions in
+// utils/mode-helpers.js, so every context resolves it identically. It reads ONE
+// input and never guesses.
 //
 // THIS FILE IS THE NODE LANE'S ONE SETTER, and it runs at load, before any
 // gulp task, verb or getConfig() asks. Two rules, no sniffing:
@@ -108,19 +83,18 @@ Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 // The electron app this lane spawns inherits the variable; a PACKAGED app has
 // no parent env, so main.js sets it from the baked config instead (the same
 // word, written into the artifact by the bundle task).
-setEnvironment(buildLaneEnvironment(Manager.isBuildMode()));
+setEnvironment(buildLaneEnvironment(isBuildMode()));
 
-Manager.getMode = function () {
+function getMode() {
   return {
-    build:   Manager.isBuildMode(),
-    publish: Manager.isPublishMode(),
-    server:  Manager.isServerMode(),
-    environment: Manager.getEnvironment(),
+    build:   isBuildMode(),
+    publish: isPublishMode(),
+    server:  isServerMode(),
+    environment: getEnvironment(),
   };
-};
-Manager.prototype.getMode = Manager.getMode;
+}
 
-// Config — the consumer's config/omega.json5 resolved for the desktop target via
+// Config: the consumer's config/omega.json5 resolved for the desktop target via
 // @omega.js/config: shared sections (brand, cloud, analytics, payment, monitoring,
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
@@ -136,7 +110,7 @@ Manager.prototype.getMode = Manager.getMode;
 //   app.productName ← brand.name if not set
 // These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo',
 // url: 'https://foo.com' }` is enough; appId/productName flow through automatically.
-Manager.getConfig = function () {
+function getConfig() {
   const { hasOmegaConfig, loadConfig, composeBundleId, deriveBundleIdPrefix } = require('@omega.js/config');
 
   // WHICH environment overlay composes
@@ -147,7 +121,7 @@ Manager.getConfig = function () {
   // every other read in the process answers from, so the overlay that composes
   // and the environment the artifact records can never be two different words.
   // Same rule, same shape, in @omega.js/extension's getConfig.
-  const environment = Manager.getEnvironment();
+  const environment = getEnvironment();
 
   // No config at all (fresh dir, non-consumer cwd) → seeded empty shape below; the
   // schema validation in audit/boot reports what's actually missing.
@@ -184,11 +158,10 @@ Manager.getConfig = function () {
   if (!config.app.productName && config.brand.name) config.app.productName = config.brand.name;
 
   return config;
-};
-Manager.prototype.getConfig = Manager.getConfig;
+}
 
 // package.json
-Manager.getPackage = function (type) {
+function getPackage(type) {
   const basePath = type === 'project'
     ? process.cwd()
     : path.resolve(__dirname, '..');
@@ -201,35 +174,31 @@ Manager.getPackage = function (type) {
   }
 
   return JSON5.parse(raw);
-};
-Manager.prototype.getPackage = Manager.getPackage;
+}
 
 // Root path
-Manager.getRootPath = function (type) {
+function getRootPath(type) {
   return type === 'project'
     ? process.cwd()
     : path.resolve(__dirname, '..');
-};
-Manager.prototype.getRootPath = Manager.getRootPath;
+}
 
 // Live reload port
-Manager.getLiveReloadPort = function () {
+function getLiveReloadPort() {
   process.env.OMEGA_LIVERELOAD_PORT = process.env.OMEGA_LIVERELOAD_PORT || 35729;
   return parseInt(process.env.OMEGA_LIVERELOAD_PORT, 10);
-};
-Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
+}
 
 // Windows signing strategy. Config-only: `platforms.windows.signing.strategy`
 // (targets.desktop.platforms.windows in the raw omega.json5). Default 'self-hosted'.
-Manager.getWindowsSignStrategy = function () {
-  const config = Manager.getConfig();
+function getWindowsSignStrategy() {
+  const config = getConfig();
   return config?.platforms?.windows?.signing?.strategy || 'self-hosted';
-};
-Manager.prototype.getWindowsSignStrategy = Manager.getWindowsSignStrategy;
+}
 
 // Touch files to trigger a rebuild watcher
-Manager.triggerRebuild = function (files, logger) {
-  logger = this?._logger || logger || console;
+function triggerRebuild(files, log) {
+  log = log || console;
 
   if (typeof files === 'string') {
     files = [files];
@@ -238,7 +207,7 @@ Manager.triggerRebuild = function (files, logger) {
   } else if (typeof files === 'object' && files !== null) {
     files = Object.keys(files);
   } else {
-    logger.error('Invalid files for triggerRebuild()');
+    log.error('Invalid files for triggerRebuild()');
     return;
   }
 
@@ -247,24 +216,15 @@ Manager.triggerRebuild = function (files, logger) {
   files.forEach((file) => {
     try {
       fs.utimesSync(file, now, now);
-      logger.log(`Triggered build: ${file}`);
+      log.log(`Triggered build: ${file}`);
     } catch (e) {
-      logger.error(`Failed to trigger build ${file}`, e);
+      log.error(`Failed to trigger build ${file}`, e);
     }
   });
-};
-Manager.prototype.triggerRebuild = Manager.triggerRebuild;
-
-// Generic require passthrough (lets gulp tasks dynamically load lib modules).
-// Only ever called from gulp tasks (release / package / bundle), which run
-// un-bundled — so plain require is fine.
-Manager.require = function (p) {
-  return require(p);
-};
-Manager.prototype.require = Manager.require;
+}
 
 // Memory usage
-Manager.getMemoryUsage = function () {
+function getMemoryUsage() {
   const used = process.memoryUsage();
   return {
     rss:       Math.round(used.rss / 1024 / 1024),
@@ -272,19 +232,35 @@ Manager.getMemoryUsage = function () {
     heapUsed:  Math.round(used.heapUsed / 1024 / 1024),
     external:  Math.round(used.external / 1024 / 1024),
   };
+}
+
+function logMemory(log, label) {
+  const mem = getMemoryUsage();
+  log.log(`[Memory ${label}] RSS: ${mem.rss}MB | Heap Used: ${mem.heapUsed}MB / ${mem.heapTotal}MB | External: ${mem.external}MB`);
+}
+
+// Export: the environment four + getVersion() come from the same plain
+// functions the runtime `Omega` classes call
+module.exports = {
+  logger,
+  getArguments,
+  reportBuildError,
+  isBuildMode,
+  isPublishMode,
+  isServerMode,
+  actLikeProduction,
+  getMode,
+  getConfig,
+  getPackage,
+  getRootPath,
+  getLiveReloadPort,
+  getWindowsSignStrategy,
+  triggerRebuild,
+  getMemoryUsage,
+  logMemory,
+  getEnvironment,
+  isDevelopment,
+  isProduction,
+  isTesting,
+  getVersion,
 };
-Manager.prototype.getMemoryUsage = Manager.getMemoryUsage;
-
-Manager.logMemory = function (logger, label) {
-  const mem = Manager.getMemoryUsage();
-  logger.log(`[Memory ${label}] RSS: ${mem.rss}MB | Heap Used: ${mem.heapUsed}MB / ${mem.heapTotal}MB | External: ${mem.external}MB`);
-};
-Manager.prototype.logMemory = Manager.logMemory;
-
-// Mix in shared cross-context helpers — same code path used in main, renderer, preload.
-// All four contexts share the exact same implementation.
-require('./utils/mode-helpers.js').attachTo(Manager);
-require('./utils/url-helpers.js').attachTo(Manager);
-
-// Export
-module.exports = Manager;

@@ -21,7 +21,7 @@ targets/<brand>/targets/backend/
   .env                      # local-layer secrets (D15 cascade)
   .nvmrc                    # Node version pin
   src/
-    index.js                # Manager.init entry
+    index.js                # initialize() entry; exports omega.functions
     routes/** schemas/** hooks/** mcp.js
     public/                 # OPTIONAL: overrides for the hosting boilerplate
   config/omega.json5        # STANDALONE escape hatch only — brand targets carry none
@@ -42,13 +42,13 @@ targets/<brand>/targets/backend/
 - `service-account.json` → from the target root (standalone) or the brand's `.omega/secrets/` (brand targets — the firebase manage service mints it there)
 - `firestore.rules` → **compiled** into `dist/firestore.rules`: the target root's file is the brand's source half, the framework half ships in `@omega.js/backend/templates/firestore.framework.rules`, and `firebase.json` points the emulator and `firebase deploy` at the artifact ([#255](https://github.com/Omega-JS-Stack/omega/issues/255)). Every stage recompiles, so a brand-rules edit reaches a running emulator through the stage watch. The brand's own file is never written by the build — setup owns that.
 
-> **Credentials at runtime.** The staged key is for LOCAL scripts that talk to the real project. On any managed runtime — deployed Cloud Functions / Cloud Run (`K_SERVICE`/`FUNCTION_TARGET`), the emulator, or an explicit `GOOGLE_APPLICATION_CREDENTIALS` — `Manager.init` calls `admin.initializeApp()` with NO arguments and authenticates as the runtime's own service identity. When it does fall back to the staged cert, a `project_id` that doesn't match the resolved Firebase `projectId` **throws at boot** rather than warning: a mismatched key authenticates every Firestore call as the wrong identity and surfaces far away as gRPC `UNAUTHENTICATED (16)` on the first read.
+> **Credentials at runtime.** The staged key is for LOCAL scripts that talk to the real project. On any managed runtime (deployed Cloud Functions / Cloud Run (`K_SERVICE`/`FUNCTION_TARGET`), the emulator, or an explicit `GOOGLE_APPLICATION_CREDENTIALS`), `initialize()` calls `admin.initializeApp()` with NO arguments and authenticates as the runtime's own service identity. When it does fall back to the staged cert, a `project_id` that doesn't match the resolved Firebase `projectId` **throws at boot** rather than warning: a mismatched key authenticates every Firestore call as the wrong identity and surfaces far away as gRPC `UNAUTHENTICATED (16)` on the first read.
 - `node_modules/` preserved across stages (runtime artifacts, never authored)
 - `*.log` preserved (co-located with firebase-tools logs)
 
 ## prepare-package (framework-side)
 
-The @omega.js/backend library itself has one build step: `npm run prepare` copies `src/` → `dist/` via prepare-package (`npm run prepare:watch` for watch mode). Consumers always require from `dist/`. This mirrors the framework-side prepare step in EM/BXM/UJM.
+The @omega.js/backend library itself has one build step: `npm run prepare` copies `src/` → `dist/` via prepare-package (`npm run prepare:watch` for watch mode). Consumers always require from `dist/`. This mirrors the framework-side prepare step in desktop, extension and web.
 
 **The framework package is never a stage target.** Its root looks like a target root to the stage (a `package.json` beside a `src/`), so an `omega` verb run from inside the framework itself — no target context, so the dispatcher runs the host CLI — used to re-stage the framework's OWN `dist/`: prepare-package's output wiped, then a hard stop on the missing `omega.json5`, leaving the CLI unbootable until the next `npm run prepare` ([#308](https://github.com/Omega-JS-Stack/omega/issues/308)). `stageFunctions` now refuses by name BEFORE the wipe (`Refusing to stage <dir>: that is the @omega.js/backend framework package itself…`). The framework self-test is unaffected: `npx omega test` here retargets to the bundled fixture project before anything stages ([test-boot-layer.md](test-boot-layer.md)).
 
@@ -60,6 +60,6 @@ CLI commands tee output to `dist/*.log` (`dev.log`, `emulator.log`, `test.log`, 
 
 ## See also
 
-- [architecture.md](architecture.md) — Manager class, dual-mode support (`firebase` / `custom`)
+- [architecture.md](architecture.md): the `Omega` instance, dual-mode support (`firebase` / `custom`)
 - [directory-structure.md](directory-structure.md) — @omega.js/backend library + consumer project layout
 - [test-framework.md](test-framework.md) — the emulator-based test harness

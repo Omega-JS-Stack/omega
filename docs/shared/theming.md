@@ -466,7 +466,7 @@ Resilience rules (load-bearing):
   that must beat the big bundle belongs there (brand custom hero animations,
   [#441](https://github.com/Omega-JS-Stack/omega/issues/441), ride the same
   engine and get the same early start) — weighed against that budget. It must
-  never import `@omega.js/client`: the singleton drags the whole runtime into
+  never import `@omega.js/client`: the runtime import drags the whole client into
   the bundle and rebuilds the very problem it exists to solve. The motion
   module's subpath is standalone by design, and `core/js/core/motion.js` adopts
   the running instance rather than starting a second one.

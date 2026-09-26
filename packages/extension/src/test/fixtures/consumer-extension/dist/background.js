@@ -1,6 +1,6 @@
 importScripts('/build.js');
 
-// BXM fixture consumer — pretends to be a real BXM-based extension's background.
+// fixture consumer: pretends to be a real @omega.js/extension-based extension's background.
 // Boot tests verify this SW comes up cleanly and exposes a couple of probe hooks.
 //
 // Line 1 above is what a real service worker's first line is

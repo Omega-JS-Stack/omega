@@ -2,7 +2,7 @@
 // ?authPrivateKey=…, and authReturnUrl propagation into the page's auth links.
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { trackLogin } from '__main_assets__/js/libs/auth/tracking.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
@@ -34,11 +34,11 @@ export async function handleAuthSignout() {
     // would ever clear the flag — and the next signed-in state change on this
     // page load (checkout's switch-account link, the legacy reset redirects)
     // would be swallowed, stranding the user on /signin.
-    if (omega.auth().isAuthenticated()) {
+    if (omega.auth.user.authenticated) {
       window.__OMEGA_SIGNOUT_IN_PROGRESS = true;
     }
 
-    await omega.auth().signOut();
+    await omega.auth.signOut();
 
     // Remove the authSignout parameter from URL to prevent sign-out loop
     url.searchParams.delete('authSignout');
@@ -93,14 +93,14 @@ export async function handleCustomTokenSignin() {
     // Failed sign-in: hand navigation control back to the core listener
     window.__OMEGA_CUSTOM_TOKEN_SIGNIN = false;
 
-    omega.sentry().captureException(new Error('Custom token sign-in error', { cause: error }));
+    omega.sentry.captureException(new Error('Custom token sign-in error', { cause: error }));
     logger.error('Custom token sign-in failed:', error);
 
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('authCustomToken');
     window.history.replaceState({}, document.title, cleanUrl.toString());
 
-    omega.utilities().showNotification(
+    omega.utilities.showNotification(
       `Custom token sign-in failed: ${error.message || 'Invalid or expired token'}`,
       { type: 'danger', timeout: 8000 }
     );
@@ -175,10 +175,10 @@ export async function handlePrivateKeySignin() {
     // Failed sign-in: hand navigation control back to the core listener
     window.__OMEGA_CUSTOM_TOKEN_SIGNIN = false;
 
-    omega.sentry().captureException(new Error('Private key sign-in error', { cause: error }));
+    omega.sentry.captureException(new Error('Private key sign-in error', { cause: error }));
     logger.error('Private key sign-in failed:', error);
 
-    omega.utilities().showNotification(
+    omega.utilities.showNotification(
       `Private key sign-in failed: ${error.message || 'Invalid or expired key'}`,
       { type: 'danger', timeout: 8000 }
     );

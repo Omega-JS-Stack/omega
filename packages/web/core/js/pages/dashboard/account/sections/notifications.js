@@ -11,7 +11,7 @@
  * left it — they can try Save again without re-flipping.
  */
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('account:push');
@@ -29,7 +29,7 @@ export function init() {
     return;
   }
 
-  formManager = new FormManager(`#${FORM_ID}`, {
+  formManager = new FormManager(omega, `#${FORM_ID}`, {
     autoReady: false,          // Wait for loadData() to populate the toggle
     allowResubmit: true,       // Save → flip again → Save again is normal flow
     warnOnUnsavedChanges: false, // Toggle changes are explicit-Save, not draft
@@ -68,7 +68,7 @@ export function init() {
 }
 
 export function loadData(account) {
-  if (!account || !formManager) {
+  if (!account.authenticated || !formManager) {
     return;
   }
 
@@ -104,8 +104,8 @@ function updatePushUI() {
     return;
   }
 
-  const notifications = omega.notifications();
-  const stored = omega.storage().get('notifications', {});
+  const notifications = omega.notifications;
+  const stored = omega.storage.get('notifications', {});
   const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
   let state;
@@ -140,7 +140,7 @@ async function initPushNotifications() {
     return;
   }
 
-  const notifications = omega.notifications();
+  const notifications = omega.notifications;
 
   // Full sync: validates permission + token + Firestore, then updates localStorage
   await notifications.syncSubscription();
@@ -149,7 +149,7 @@ async function initPushNotifications() {
   if (notifications.isSupported() && $form) {
     $form.style.display = '';
 
-    pushFormManager = new FormManager('#push-subscribe-form', {
+    pushFormManager = new FormManager(omega, '#push-subscribe-form', {
       autoReady: false,
       allowResubmit: true,
     });

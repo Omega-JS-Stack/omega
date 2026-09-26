@@ -27,7 +27,7 @@ test('blog [slug].js rides the modern verts lane — config-gated, module-delega
   assert.ok(!slug.includes('vert.bundle'), 'no legacy vert bundle reference');
   assert.ok(slug.includes('omega.config?.advertising'), 'advertising key presence gates insertion');
   assert.ok(slug.includes('data-omega-vert'), 'inserted hosts speak the modern vocabulary');
-  assert.ok(slug.includes('omega.verts().mount'), 'delegates the lifecycle to the shared client verts module');
+  assert.ok(slug.includes('omega.verts.mount'), 'delegates the lifecycle to the shared client verts module');
   assert.ok(slug.includes('[data-omega-verts="false"]'), 'the per-post opt-out stops the mid-article lane too');
 });
 
@@ -37,7 +37,7 @@ test('the verts test page carries a per-slot reload that tears the unit down fir
   assert.ok(page.includes('.omega-vert-unit'), 'every demo slot gets the control');
   assert.ok(page.includes('unit.destroy()'), 'the live unit is destroyed, not just orphaned');
   assert.ok(page.includes('__omegaVertMounted = false'), 'the mount latch clears so the element re-mounts');
-  assert.ok(page.includes('omega.verts().mount'), 're-init runs through the public verts API');
+  assert.ok(page.includes('omega.verts.mount'), 're-init runs through the public verts API');
 });
 
 test('packaged content speaks advertising.providers.* only', () => {

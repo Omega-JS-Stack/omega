@@ -18,7 +18,7 @@ const preload = {
   _enabled: false,
 
   /**
-   * @param {object} host - the desktop Manager: { config }
+   * @param {object} host - the desktop Omega instance: { config }
    */
   initialize(host) {
     const { shouldEnable, reason } = resolveConfig(host && host.config && host.config.monitoring, readGates(host));

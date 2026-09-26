@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('publish');
+const build = require('../build.js');
+const logger = build.logger('publish');
 const { runPipeline } = require('../utils/build-pipeline.js');
 
 // `npx omega publish` publishes from an already-built tree (the CI lane calls it

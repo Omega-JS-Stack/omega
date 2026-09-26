@@ -14,10 +14,10 @@
  * technique test/helpers/dev-only-routes.test.js uses, because no emulator
  * runs in a production environment.
  */
-const Middleware = require('../../dist/manager/helpers/middleware.js');
+const pipeline = require('../../dist/omega/pipeline.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const { isDevOnlyRouteBlocked } = Middleware;
+const { isDevOnlyRouteBlocked } = pipeline;
 
 // Everything the probe reports, and nothing else — the payload is a fixed set,
 // which is also what makes it echo-proof

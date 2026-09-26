@@ -33,9 +33,10 @@
  * Run: npx omega test framework:analytics/match-normalization
  */
 const crypto = require('crypto');
-const matchData = require('../../dist/manager/libraries/analytics/match-data.js');
-const conversions = require('../../dist/manager/libraries/analytics/conversions.js');
+const matchData = require('../../dist/omega/libraries/analytics/match-data.js');
+const conversions = require('../../dist/omega/libraries/analytics/conversions.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { User } = require('../../dist/omega/helpers/account.js');
 
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -123,14 +124,14 @@ module.exports = defineCases({
       name: 'the-schema-default-birthday-is-not-a-birthday',
       auth: 'none',
 
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // `personal.birthday` is a `$timestamp` branch, and its default is the
         // EPOCH — the same shape of trap `personal.telephone`'s `0` default is
         // (#388): hashing it would hand every account with no birthday on file
         // the digest of `19700101`, one junk match key shared by all of them.
         // The user comes from the production resolver, so the default is the
         // real one and not a hand-written stand-in.
-        const user = Manager.User({ auth: { uid: '_test-match-uid', email: 'buyer@example.com' } }).properties;
+        const user = new User({ auth: { uid: '_test-match-uid', email: 'buyer@example.com' } }).toJSON();
 
         assert.equal(user.personal.birthday.timestampUNIX, 0, 'precondition: the schema default is the epoch');
 
@@ -158,11 +159,11 @@ module.exports = defineCases({
       name: 'the-postal-code-and-street-come-off-the-account-schema',
       auth: 'none',
 
-      async run({ assert, Manager }) {
-        const user = Manager.User({
+      async run({ assert, omega }) {
+        const user = new User({
           auth: { uid: '_test-match-uid', email: 'buyer@example.com' },
           personal: { location: { postalCode: '90210', street: '123 Main Street' } },
-        }).properties;
+        }).toJSON();
 
         assert.equal(user.personal.location.postalCode, '90210', 'precondition: the resolver keeps the schema field');
 
@@ -205,7 +206,7 @@ module.exports = defineCases({
       name: 'tiktok-carries-no-parameter-its-events-api-does-not-accept',
       auth: 'none',
 
-      async run({ assert, ctx, Manager }) {
+      async run({ assert, ctx, omega }) {
         // TikTok's Events API 2.0 `user` object documents email, phone,
         // external_id, ttclid, ttp, ip and user_agent — and nothing else. A
         // name or address key there is not rejected: it is read by nobody.
@@ -217,7 +218,7 @@ module.exports = defineCases({
           providers: ['tiktok'],
           eventId: 'sign_up._test-match',
           ctx: ctx,
-          Manager: Manager,
+          omega: omega,
         });
 
         const user = conversions.buildTikTokBody({

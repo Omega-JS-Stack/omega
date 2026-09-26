@@ -1,12 +1,12 @@
 /**
- * Animation Studio — UJM default admin page
+ * Animation Studio — default admin page
  *
  * Uses FormManager for sidebar controls. Canvas content is designed at a
  * base resolution (960×540) and CSS-scaled to match the selected resolution,
  * so clips look identical at any size.
  */
 
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
@@ -25,10 +25,10 @@ let formManager = null;
 
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, (auth) => {
-      if (!auth.user) {
+    omega.auth.listen({ once: true }, (auth) => {
+      if (!auth.user.authenticated) {
         return;
       }
 
@@ -93,7 +93,7 @@ function buildNav(clipIds) {
 // FormManager for sidebar controls
 // ============================================
 function setupForm() {
-  formManager = new FormManager('#studio-controls-form', {
+  formManager = new FormManager(omega, '#studio-controls-form', {
     autoReady: true,
     allowResubmit: true,
   });

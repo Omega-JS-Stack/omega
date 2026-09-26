@@ -10,8 +10,8 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/switch-plan
  */
-const provider = require('../../../../dist/manager/routes/payments/plan/providers/paypal.js');
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const provider = require('../../../../dist/omega/routes/payments/plan/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const TRIAL_PRODUCT = { id: 'premium', name: 'Premium', type: 'subscription', trial: { days: 7 }, prices: { monthly: 20 }, paypal: { productId: 'PROD-PREMIUM' } };

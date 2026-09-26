@@ -11,7 +11,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { siteUrl } from '__main_assets__/js/libs/path-prefix.js';
 
 // State
@@ -40,10 +40,10 @@ const PROVIDER_LABELS = {
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await omega.dom().ready();
+    await omega.dom.ready();
 
-    omega.auth().listen({ once: true }, async (state) => {
-      if (!state.user) {
+    omega.auth.listen({ once: true }, async (state) => {
+      if (!state.user.authenticated) {
         return;
       }
 
@@ -59,7 +59,7 @@ export default () => {
 
 // Initialize FormManager for search
 function initForm() {
-  formManager = new FormManager('#user-search-form', {
+  formManager = new FormManager(omega, '#user-search-form', {
     allowResubmit: true,
     submittingText: 'Searching...',
   });
@@ -188,7 +188,7 @@ function renderUsers() {
 
 // Build one directory row
 function renderRow(row) {
-  const escape = omega.utilities().escapeHTML;
+  const escape = omega.utilities.escapeHTML;
   const email = row.email || 'Unknown';
   const uid = row.uid;
   const plan = row.plan || 'basic';
@@ -332,10 +332,10 @@ function renderRow(row) {
 // ============================================
 
 // Fetch the full Firestore doc on demand (the directory rows are lean)
-async function fetchFullUser(uid) {
-  const doc = await omega.firestore().doc(`users/${uid}`).get();
+export async function fetchFullUser(uid) {
+  const doc = await omega.firestore.doc(`users/${uid}`).get();
 
-  return doc.exists ? { id: uid, ...doc.data() } : null;
+  return doc.exists() ? { id: uid, ...doc.data() } : null;
 }
 
 async function viewUser(uid, email) {
@@ -577,7 +577,7 @@ async function editUser(uid, email) {
 }
 
 function initEditForm() {
-  editFormManager = new FormManager('#user-edit-form', {
+  editFormManager = new FormManager(omega, '#user-edit-form', {
     allowResubmit: true,
     submittingText: 'Saving...',
   });
@@ -587,7 +587,7 @@ function initEditForm() {
       return;
     }
 
-    const firestore = omega.firestore();
+    const firestore = omega.firestore;
 
     // Build the update document
     const update = {

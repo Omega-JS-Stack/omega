@@ -6,10 +6,10 @@
  * It reads configuration from OMEGA_TEST_CONFIG environment variable and runs the test suite
  */
 
-// Mark this process as the test runner BEFORE loading any @omega.js/backend code. Manager.init()
-// auto-detects this and skips Firebase Functions / server / Sentry wiring (which
-// can't run outside a real Functions runtime). This is what lets tests receive a
-// fully-wired Manager + ctx in their context — no per-test stub.
+// Mark this process as the test runner BEFORE loading any @omega.js/backend code.
+// omega.initialize() reads it and skips the Firebase init, the Functions and
+// server wiring and Sentry (none can run outside a real Functions runtime). This
+// is what lets tests receive a fully-wired omega + ctx in their context.
 process.env.OMEGA_TEST_RUNNER = '1';
 
 const path = require('path');
@@ -41,34 +41,30 @@ async function main() {
     console.error('Warning: Could not initialize Firebase Admin:', error.message);
   }
 
-  // Boot a real Manager. With OMEGA_TEST_RUNNER set, init() loads libraries +
-  // resolves project config but skips the parts that need a Functions runtime
-  // (handler wiring, server boot, Sentry, admin.initializeApp re-init).
-  // The resulting Manager + ctx are passed into every test context, so
-  // tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
-  // like production code does — no hand-rolled stubs.
-  let Manager = null;
+  // Boot the real instance. With OMEGA_TEST_RUNNER set, initialize() loads config
+  // and the services but skips what needs a Functions runtime (the Firebase
+  // init, the function wiring, the custom server, Sentry). The instance and a
+  // Context ride into every test context, so a test reads omega.email, ctx.ai
+  // and new User() exactly like production code does: no per-test stub.
+  let omega = null;
   let ctx = null;
   try {
     const projectDir = testConfig.projectDir || process.cwd();
-    const BackendManager = require('../manager/index.js');
-    Manager = new BackendManager();
-    Manager.init(null, {
-      // The staged output tree (src/dist pillar) — same cwd the emulator's
-      // function workers boot with, so config/SA resolve identically
-      cwd: path.join(projectDir, 'dist'),
-      log: false,
-    });
-    ctx = Manager.RouteContext({}, { functionName: 'backend-test-runner', accept: 'json' });
+    const Context = require('../omega/context.js');
+
+    // The staged output tree (src/dist pillar): the same cwd the emulator's
+    // function workers boot with, so config/SA resolve identically
+    omega = require('../omega/index.js').initialize({ cwd: path.join(projectDir, 'dist') });
+    ctx = new Context(omega, {}, { functionName: 'backend-test-runner', accept: 'json' });
   } catch (error) {
-    console.error('Warning: Could not initialize @omega.js/backend Manager for tests:', error.message);
+    console.error('Warning: Could not initialize @omega.js/backend for tests:', error.message);
   }
 
   // Create and run the test runner
   const runner = new TestRunner({
     ...testConfig,
     admin,
-    Manager,
+    omega,
     ctx,
   });
 

@@ -28,13 +28,13 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const version = require('wonderful-version');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 const { listingId, deriveFirefoxId, listingConfigPath } = require('../../lib/listings.js');
 
-const logger = Manager.logger('ensure-target');
-const package = Manager.getPackage('main');
+const logger = build.logger('ensure-target');
+const package = build.getPackage('main');
 
 /**
  * Sync the consumer manifest: the omega verb scripts, the npm-private latch
@@ -43,7 +43,7 @@ const package = Manager.getPackage('main');
  * (#572) — it matters more since #675, because this runs on EVERY verb.
  */
 function setupScripts(projectDir, result) {
-  projectDir = projectDir || Manager.getRootPath('project');
+  projectDir = projectDir || build.getRootPath('project');
   result = result || { changed: [] };
 
   const project = readProject(projectDir);
@@ -105,14 +105,14 @@ function pinFirefoxListingId(projectDir, result, log) {
   }
 
   // Addressed at the TARGET, not the cwd, because the brand-root fan-out calls
-  // this in-process from the brand root: same reader Manager.getConfig() is.
+  // this in-process from the brand root: same reader build.getConfig() is.
   // The ambient environment is the right layer here, unlike a deploy-time read
   // that pins production (#856): the scaffold runs before EVERY verb, and the
   // add-on id is one value across environments, judged and written in the BASE
   // layer so every environment reads the same id.
   // An overlay that declares a different id is a config error; catching that is
   // the validator's job, not this read's.
-  const { config } = loadConfig(projectDir, 'extension', { environment: Manager.getEnvironment() });
+  const { config } = loadConfig(projectDir, 'extension', { environment: build.getEnvironment() });
 
   // A declared id is the brand's word, and nothing here second-guesses it.
   if (listingId(config, 'firefox')) {
@@ -185,7 +185,7 @@ function checkLocality(projectDir) {
  */
 async function ensureTarget(options) {
   options = options || {};
-  const projectDir = options.projectDir || Manager.getRootPath('project');
+  const projectDir = options.projectDir || build.getRootPath('project');
   const log = options.log || (() => {});
   const warn = options.warn || (() => {});
   const result = { written: [], merged: [], changed: [] };

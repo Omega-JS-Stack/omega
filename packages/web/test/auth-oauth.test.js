@@ -44,7 +44,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -70,8 +70,8 @@ function makeClient({ development = false } = {}) {
   return {
     captured,
     isDevelopment: () => development,
-    sentry: () => ({ captureException: (e) => captured.push(e.message) }),
-    utilities: () => ({ showNotification: () => {} }),
+    sentry: { captureException: (e) => captured.push(e.message) },
+    utilities: { showNotification: () => {} },
     isValidRedirectUrl: () => true,
   };
 }

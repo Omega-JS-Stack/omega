@@ -4,7 +4,7 @@
 // (Google auto-creates accounts during signin attempts).
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { extractBlockingFunctionMessage, isUserError } from '__main_assets__/js/libs/auth/errors.js';
 import { markOrphanedAccount } from '__main_assets__/js/libs/auth/orphan.js';
 import { trackLogin, trackSignup } from '__main_assets__/js/libs/auth/tracking.js';
@@ -90,7 +90,7 @@ export async function reverseAccidentalSignup(ctx, newUser) {
     // that fails too ([#703](https://github.com/Omega-JS-Stack/omega/issues/703)).
     logger.error('Failed to delete accidental account:', e);
     markOrphanedAccount(newUser.uid);
-    omega.sentry().captureException(new Error('Failed to reverse accidental signup', { cause: e }));
+    omega.sentry.captureException(new Error('Failed to reverse accidental signup', { cause: e }));
   }
 
   try {
@@ -190,7 +190,7 @@ export async function handleRedirectResult(ctx) {
     if (!result || !result.user) {
       if (hadPendingRedirect) {
         logger.error('Returned from an OAuth redirect with no result');
-        omega.sentry().captureException(new Error('OAuth redirect returned no result'));
+        omega.sentry.captureException(new Error('OAuth redirect returned no result'));
         ctx.formManager.showError('Sign-in did not complete. Please try again.');
       }
 
@@ -242,7 +242,7 @@ export async function handleRedirectResult(ctx) {
   } catch (error) {
     // Only capture unexpected errors to Sentry
     if (!isUserError(error.code)) {
-      omega.sentry().captureException(new Error('Error handling redirect result', { cause: error }));
+      omega.sentry.captureException(new Error('Error handling redirect result', { cause: error }));
     }
 
     // Handle specific OAuth errors. Check blocking-function rejections FIRST —
@@ -370,7 +370,7 @@ export async function signInWithProvider(ctx, providerName, action = 'signin') {
 
     // Only capture unexpected errors to Sentry
     if (!isUserError(error.code)) {
-      omega.sentry().captureException(new Error('OAuth provider sign-in error', { cause: error }));
+      omega.sentry.captureException(new Error('OAuth provider sign-in error', { cause: error }));
     }
 
     // Handle specific errors. Blocking-function rejections from @omega.js/backend

@@ -2,19 +2,18 @@
 //
 // Every framework bin parses argv (src/argv.js) and hands the result to a Main class
 // whose process() resolves a command name and runs commands/<name>.js from the
-// framework's dist. That router was copy-pasted per framework (UJM/BXM/EM,
-// drift-identical); this is the single implementation. @omega.js/backend's CLI is a different
+// framework's dist; this is the single implementation. @omega.js/backend's CLI is a different
 // design (colon-style utility commands dispatching stateful command classes)
 // and does not use this.
 //
-// Resolution order (unchanged from the framework copies):
+// Resolution order:
 //   1. Positional command (`mgr build`) — matched against command names and
 //      their aliases; unknown names pass through as-is (missing file = error).
 //   2. Flag-style alias (`mgr --build`, `mgr -b`) — first alias-table hit wins.
 //   3. The default command (OMEGA convention: help — `setup` is retired,
 //      #675, and every verb runs its own local scaffold).
 //
-// dotenv loading and any process-env fixups (e.g. EM's ELECTRON_RUN_AS_NODE
+// dotenv loading and any process-env fixups (e.g. desktop's ELECTRON_RUN_AS_NODE
 // strip) stay in the framework's cli.js/bin — they're framework concerns, not
 // dispatch.
 

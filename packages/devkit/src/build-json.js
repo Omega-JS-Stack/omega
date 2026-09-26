@@ -23,7 +23,7 @@ const { clientConfig } = require('@omega.js/config');
 // ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)): the build's
 // verdict (`environment`), whether it was a BUILD rather than a dev/watch run,
 // and whether it publishes. A surface's own extra verdicts (desktop's
-// `server`) stay inside that surface's Manager and never reach the artifact.
+// `server`) stay inside that surface's Omega instance and never reach the artifact.
 const MODE_KEYS = ['environment', 'build', 'publish'];
 
 /**

@@ -12,10 +12,10 @@
  * Run: npx omega test backend:helpers/recaptcha
  */
 const path = require('path');
-const { verify } = require('../../dist/manager/libraries/recaptcha.js');
+const { verify } = require('../../dist/omega/libraries/recaptcha.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const MODULE_PATH = require.resolve('../../dist/manager/libraries/recaptcha.js');
+const MODULE_PATH = require.resolve('../../dist/omega/libraries/recaptcha.js');
 
 /**
  * Run verify() against a STUBBED siteverify, with console.warn recorded.

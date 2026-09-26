@@ -49,7 +49,7 @@ There is deliberately no quit endpoint — RM updates itself (below); nothing ex
 
 1. **Boot** (step 12e): after `whenReady` + 15s (3s dev), `register()` runs the full flow — probe (`runtime.json` → pid alive via `process.kill(pid, 0)` (EPERM = alive) → `GET /v1/health` with protocolVersion match) → if RM isn't serving: `ensureInstalled()` + `ensureRunning()` (spawn detached, poll up to 15s) → `POST /v1/register` with **this process's pid**. Attempt budget: 3 per invocation. Never throws; failures land in `getStatus().lastError`.
 2. **Heartbeat**: re-POST register every 60s (idempotent upsert on RM's side). Doubles as the keep-alive — a failed tick runs the full `register()` flow, which respawns (or reinstalls, cooldown-gated) RM.
-3. **Graceful quit**: the first `before-quit` is prevented once, deregister flushes with a hard 1s cap, then `manager.quit({ force: true })` re-quits (all framework before-quit listeners are double-fire safe — main.js `_isQuitting`, appState sentinel, usage stamp). Exception: when the auto-updater has a staged install (`_allowQuit` + status `downloaded`) we never intercept `quitAndInstall` — deregister goes fire-and-forget and RM's grace window covers the race. RM-side safety net: a crash only counts after 2 consecutive dead ticks (~20s), so a slightly-late deregister always wins.
+3. **Graceful quit**: the first `before-quit` is prevented once, deregister flushes with a hard 1s cap, then `omega.quit({ force: true })` re-quits (all framework before-quit listeners are double-fire safe: main.js `_isQuitting`, appState sentinel, usage stamp). Exception: when the auto-updater has a staged install (`_allowQuit` + status `downloaded`) we never intercept `quitAndInstall`, deregister goes fire-and-forget and RM's grace window covers the race. RM-side safety net: a crash only counts after 2 consecutive dead ticks (~20s), so a slightly-late deregister always wins.
 4. **Crash**: the pid dies with the registration still present → RM relaunches the app from its registered exe path (mac: `open` on the derived bundle). Never in dev — RM refuses to relaunch `environment !== 'production'` registrations (a dev exe path is the bare electron binary). Crash loops back off (3 relaunches / 10 min → RM gives up, visible in its dashboard).
 
 ## Silent install (smart existence first)
@@ -76,8 +76,8 @@ The update relaunch is safe by construction: RM's registrations are **storage-pe
 
 ## Bail conditions
 
-- **`manager.isTesting()`** — nothing fires on its own: no timers, no before-quit hook (a preventDefault would wedge the harness quit), and the root is isolated under the testing userData. Tests drive `register()`/`ensureInstalled()` explicitly against fixture servers; the network and spawn paths stay dead (`ensureInstalled` refuses network without `TEST_EXTENDED_MODE`, `ensureRunning` never spawns in testing).
-- `manager.config.brand.id === 'restart-manager'` — RM doesn't manage itself.
+- **`omega.isTesting()`**: nothing fires on its own: no timers, no before-quit hook (a preventDefault would wedge the harness quit), and the root is isolated under the testing userData. Tests drive `register()`/`ensureInstalled()` explicitly against fixture servers; the network and spawn paths stay dead (`ensureInstalled` refuses network without `TEST_EXTENDED_MODE`, `ensureRunning` never spawns in testing).
+- `omega.config.brand.id === 'restart-manager'`: RM doesn't manage itself.
 - `config.restartManager.enabled === false` — explicit opt-out.
 - Non-production without `OMEGA_RESTART_MANAGER_DEV=1` — dev noise guard.
 
@@ -96,11 +96,11 @@ Existing consumers with the old `{ enabled: true }` shape need zero changes.
 ## API
 
 ```js
-manager.restartManager.register()          // full ensure-installed→ensure-running→POST flow; never throws
-manager.restartManager.unregister()        // best-effort deregister (stops the heartbeat)
-manager.restartManager.ensureInstalled()   // smart-existence install; true when present
-manager.restartManager.ensureRunning()     // probe → spawn → poll; true when serving
-manager.restartManager.getStatus()         // { enabled, bailed, bailReason, root, installed,
+omega.restartManager.register()          // full ensure-installed→ensure-running→POST flow; never throws
+omega.restartManager.unregister()        // best-effort deregister (stops the heartbeat)
+omega.restartManager.ensureInstalled()   // smart-existence install; true when present
+omega.restartManager.ensureRunning()     // probe → spawn → poll; true when serving
+omega.restartManager.getStatus()         // { enabled, bailed, bailReason, root, installed,
                                            //   installedVersion, running, registered, port,
                                            //   pid, lastHeartbeatAt, lastError }
 ```

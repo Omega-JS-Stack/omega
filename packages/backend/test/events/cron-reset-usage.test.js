@@ -19,7 +19,7 @@
  */
 const assert = require('node:assert');
 
-const resetUsage = require('../../dist/manager/events/cron/daily/reset-usage.js');
+const resetUsage = require('../../dist/omega/events/cron/daily/reset-usage.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const CATALOG = {
@@ -48,20 +48,19 @@ async function runCron() {
     data: () => ({ usage: usage }),
   };
 
-  const Manager = {
+  const omega = {
     config: { features: CATALOG },
+    firebase: { admin: { firestore: () => ({ recursiveDelete: async () => {}, collection: () => ({}) }) } },
     storage: () => ({ setState: () => ({ write: () => {} }) }),
-    Utilities: () => ({
+    utilities: {
       // Every query answers with the one user — the cron dedupes by doc id, so
       // a user found by several field paths is still written once
       iterateCollection: async (handler) => handler({ docs: [doc] }),
-    }),
+    },
   };
 
   const ctx = { log: () => {}, warn: () => {}, error: () => {}, report: () => {} };
-  const libraries = { admin: { firestore: () => ({ recursiveDelete: async () => {}, collection: () => ({}) }) } };
-
-  await resetUsage({ Manager, ctx, context: {}, libraries });
+  await resetUsage({ ctx, omega, context: {} });
 
   return { writes, usage };
 }

@@ -11,7 +11,7 @@ import * as dataRequestSection from './sections/data-request.js';
 import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
 import * as ordersSection from './sections/orders.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
@@ -28,12 +28,12 @@ export default () => {
     omega.request(WAKEUP_ROUTE, { wakeup: true });
 
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     try {
       await initializeAccount();
     } catch (error) {
-      omega.sentry().captureException(new Error('Failed to initialize account page', { cause: error }));
+      omega.sentry.captureException(new Error('Failed to initialize account page', { cause: error }));
     }
 
     // Resolve after initialization
@@ -100,7 +100,7 @@ async function initializeAccount() {
   // control of its own (#343): the referrals and the sessions a persona shows
   // are the ones the backend seeded onto it, so the palette's persona
   // dropdown is the whole affordance.
-  omega.auth().listen({}, async (state) => {
+  omega.auth.listen({}, async (state) => {
     console.log('Auth state with account data:', state);
 
     loadAllSectionData(state);
@@ -113,13 +113,14 @@ async function initializeAccount() {
   });
 }
 
-// Load data for all sections
+// Load data for all sections. The User IS the account: every section reads
+// its stored fields and its getters off the one object.
 function loadAllSectionData(authState) {
-  const { user, account } = authState;
+  const account = authState.user;
 
   // Load data for each section (passing brand data where needed)
   if (sectionModules.profile.loadData) {
-    sectionModules.profile.loadData(account, user);
+    sectionModules.profile.loadData(account);
   }
 
   if (sectionModules.notifications.loadData) {
@@ -222,7 +223,7 @@ function handleHashChange() {
     } else {
       // Section doesn't exist, default to profile
       console.warn(`Section "${hash}" not found, defaulting to profile`);
-      omega.sentry().captureException(new Error(`Invalid account section hash: ${hash}`));
+      omega.sentry.captureException(new Error(`Invalid account section hash: ${hash}`));
       window.location.hash = '#profile';
       showSection('profile');
     }

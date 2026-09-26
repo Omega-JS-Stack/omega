@@ -19,7 +19,7 @@ module.exports = defineCases({
       name: 'requires-auth',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/test/reset-account');
+        const response = await http.as('none').post('omega/test/reset-account');
 
         assert.isError(response, 401, 'An unauthenticated caller must be refused');
       },
@@ -60,7 +60,7 @@ module.exports = defineCases({
         });
         await firestore.delete(`payments-orders/${seededOrderId}`);
 
-        const response = await http.as('journey-flows-cancel').post('backend-manager/test/reset-account');
+        const response = await http.as('journey-flows-cancel').post('omega/test/reset-account');
 
         assert.isSuccess(response, 'A seeded persona should be resettable');
         assert.equal(response.data.persona, 'journey-flows-cancel', 'The route should name the persona it reset');
@@ -96,8 +96,8 @@ module.exports = defineCases({
     {
       name: 'non-seeded-account-rejected',
       auth: 'none',
-      async run({ http, assert, accounts, firestore, Manager, waitFor }) {
-        const admin = Manager.libraries.admin;
+      async run({ http, assert, accounts, firestore, omega, waitFor }) {
+        const admin = omega.firebase.admin;
         const domain = accounts.basic.email.split('@')[1];
         const uid = '_test-reset-outsider';
         const email = `_test.reset-outsider@${domain}`;
@@ -115,7 +115,7 @@ module.exports = defineCases({
           return doc?.api?.privateKey;
         }, 20000, 250);
 
-        const response = await http.withPrivateKey(privateKey).post('backend-manager/test/reset-account');
+        const response = await http.withPrivateKey(privateKey).post('omega/test/reset-account');
 
         assert.isError(response, 403, 'An account with no seed definition must not be resettable');
 

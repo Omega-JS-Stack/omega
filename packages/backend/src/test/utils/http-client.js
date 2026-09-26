@@ -11,8 +11,8 @@ class HttpClient {
     options = options || {};
 
     // Use API URL (port 5002, the hosting emulator) for all requests, not the
-    // functions URL (port 5001). All requests go through /omega which
-    // rewrites to the omega_api function.
+    // functions URL (port 5001), so firebase.json's rewrites apply: /omega/*
+    // reaches omega_api, and a consumer route (`notes`) its own function.
     this.baseUrl = options.apiUrl || '';
     this.defaultHeaders = {};
     this.defaultAuthParams = {};

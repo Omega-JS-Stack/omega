@@ -8,7 +8,7 @@
  *
  * Run: npx omega test backend:routes/verts/cache
  */
-const { getInventory, resetInventoryCache } = require('../../../dist/manager/routes/verts/utils.js');
+const { getInventory, resetInventoryCache } = require('../../../dist/omega/routes/verts/utils.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const TTL = 10 * 60 * 1000; // long enough to never expire mid-suite
@@ -19,14 +19,14 @@ module.exports = defineCases({
   tests: [
     {
       name: 'fresh-fetch-reads-enabled-verts-only',
-      async run({ assert, firestore, Manager }) {
+      async run({ assert, firestore, omega }) {
         await firestore.set('verts/cache-a', { id: 'cache-a', enabled: true, title: 'A', link: 'https://a.example', weight: 1 });
         await firestore.set('verts/cache-b', { id: 'cache-b', enabled: true, title: 'B', link: 'https://b.example', weight: 1 });
         await firestore.set('verts/cache-disabled', { id: 'cache-disabled', enabled: false, title: 'D', link: 'https://d.example', weight: 1 });
 
         resetInventoryCache();
 
-        const verts = await getInventory(Manager, { ttl: TTL });
+        const verts = await getInventory(omega, { ttl: TTL });
         const ids = verts.map((vert) => vert.id);
 
         assert.contains(ids, 'cache-a', 'Enabled vert a should be in the inventory');
@@ -37,10 +37,10 @@ module.exports = defineCases({
 
     {
       name: 'within-ttl-serves-stale-cache',
-      async run({ assert, firestore, Manager }) {
+      async run({ assert, firestore, omega }) {
         await firestore.set('verts/cache-late', { id: 'cache-late', enabled: true, title: 'Late', link: 'https://late.example', weight: 1 });
 
-        const verts = await getInventory(Manager, { ttl: TTL });
+        const verts = await getInventory(omega, { ttl: TTL });
         const ids = verts.map((vert) => vert.id);
 
         assert.ok(!ids.includes('cache-late'), 'A doc written after the fetch should NOT appear within the TTL (one read per interval)');
@@ -49,9 +49,9 @@ module.exports = defineCases({
 
     {
       name: 'expired-ttl-refetches',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // ttl 0 → the cached fetch is always expired → fresh read
-        const verts = await getInventory(Manager, { ttl: 0 });
+        const verts = await getInventory(omega, { ttl: 0 });
         const ids = verts.map((vert) => vert.id);
 
         assert.contains(ids, 'cache-late', 'An expired TTL should refetch and see the new doc');
@@ -60,17 +60,17 @@ module.exports = defineCases({
 
     {
       name: 'reset-busts-the-cache',
-      async run({ assert, firestore, Manager }) {
+      async run({ assert, firestore, omega }) {
         // Re-prime the cache, write, reset, and confirm the reset busts it
-        await getInventory(Manager, { ttl: TTL });
+        await getInventory(omega, { ttl: TTL });
         await firestore.set('verts/cache-reset', { id: 'cache-reset', enabled: true, title: 'Reset', link: 'https://reset.example', weight: 1 });
 
-        const stale = await getInventory(Manager, { ttl: TTL });
+        const stale = await getInventory(omega, { ttl: TTL });
         assert.ok(!stale.map((vert) => vert.id).includes('cache-reset'), 'Cache should still be stale before the reset');
 
         resetInventoryCache();
 
-        const fresh = await getInventory(Manager, { ttl: TTL });
+        const fresh = await getInventory(omega, { ttl: TTL });
         assert.contains(fresh.map((vert) => vert.id), 'cache-reset', 'resetInventoryCache() should force a fresh read');
       },
     },

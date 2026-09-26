@@ -6,14 +6,13 @@
  * a handler even if a client still sends them — a blogger-role account must not
  * be able to redirect a commit at another repo the shared token can write.
  *
- * Schemas are pure functions with no I/O, so they are asserted directly.
+ * Schemas are pure functions with no I/O, so they are asserted directly: a
+ * declaration's keys are the fields it accepts.
  */
-const { buildSchemaMap } = require('../../dist/manager/helpers/schema-zod.js');
-
 const SCHEMAS = {
-  'admin/post (create)': require('../../dist/manager/schemas/admin/post/post.js'),
-  'admin/post (edit)': require('../../dist/manager/schemas/admin/post/put.js'),
-  'admin/repo/content': require('../../dist/manager/schemas/admin/repo/content/post.js'),
+  'admin/post (create)': require('../../dist/omega/schemas/admin/post/post.js'),
+  'admin/post (edit)': require('../../dist/omega/schemas/admin/post/put.js'),
+  'admin/repo/content': require('../../dist/omega/schemas/admin/repo/content/post.js'),
 };
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -29,7 +28,7 @@ module.exports = defineCases({
 
       async run({ assert }) {
         for (const [name, factory] of Object.entries(SCHEMAS)) {
-          const keys = Object.keys(buildSchemaMap(factory()));
+          const keys = Object.keys(factory());
 
           if (keys.includes('githubUser') || keys.includes('githubRepo')) {
             assert.fail(`${name} still accepts a caller-supplied repo target (keys: ${keys.join(',')})`);
@@ -49,13 +48,13 @@ module.exports = defineCases({
         // unique URL is never-created, so both calls fetch-404 before any push.
         const url = `https://example.com/blog/never-created-${Date.now()}`;
 
-        const withKeys = await http.put('backend-manager/admin/post', {
+        const withKeys = await http.put('omega/admin/post', {
           url,
           body: 'Test content',
           githubUser: 'nonexistent-user-12345',
           githubRepo: 'nonexistent-repo-12345',
         });
-        const withoutKeys = await http.put('backend-manager/admin/post', {
+        const withoutKeys = await http.put('omega/admin/post', {
           url,
           body: 'Test content',
         });

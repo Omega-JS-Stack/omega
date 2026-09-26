@@ -28,7 +28,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         const m = chrome.runtime.getManifest();
         ctx.expect(m.manifest_version).toBe(3);
-        ctx.expect(m.name).toBe('BXM Test Harness');
+        ctx.expect(m.name).toBe('OMEGA Test Harness');
       },
     },
     {

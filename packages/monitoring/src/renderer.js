@@ -21,7 +21,7 @@ const renderer = {
   _Sentry:      null,
 
   /**
-   * @param {object} host - the desktop Manager: { config, getVersion() }
+   * @param {object} host - the desktop Omega instance: { config, getVersion() }
    */
   initialize(host) {
     renderer._initialized = true;

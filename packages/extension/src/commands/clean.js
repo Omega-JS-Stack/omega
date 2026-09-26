@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('clean');
+const build = require('../build.js');
+const logger = build.logger('clean');
 const { cleanDirs } = require('@omega.js/devkit/clean-dirs');
 const { ensureTarget } = require('./lib/ensure-target.js');
 

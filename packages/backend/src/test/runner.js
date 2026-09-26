@@ -298,7 +298,7 @@ class TestRunner {
       domain: this.options.domain,
       config: this.config,
       projectDir: this.options.projectDir,
-      Manager: this.config.Manager,
+      omega: this.config.omega,
       ctx: this.config.ctx,
     });
 
@@ -347,14 +347,14 @@ class TestRunner {
 
     for (const item of items) {
       // Skip _-prefixed files and directories (fixtures, helpers, internal data).
-      // Matches EM/BXM/UJM convention — `test/_fixtures/`, `test/_helpers/`, etc.
+      // The family convention: `test/_fixtures/`, `test/_helpers/`, etc.
       if (item.startsWith('_')) {
         continue;
       }
 
       // Skip the boot/ smoke layer except during framework self-test. It targets
       // the bundled fixture project and would be redundant noise in a real
-      // consumer's run (mirrors EM/BXM/UJM excluding boot/** for consumers).
+      // consumer's run (every framework excludes boot/** for consumers).
       if (item === 'boot' && !this.options.isFrameworkSelfTest) {
         continue;
       }
@@ -805,10 +805,10 @@ class TestRunner {
       pubsub,
       skip,
       admin: this.config.admin,
-      // Real @omega.js/backend Manager + ctx, booted by run-tests.js with OMEGA_TEST_RUNNER=1.
-      // Tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
-      // like production code — no stubs.
-      Manager: this.config.Manager,
+      // The real @omega.js/backend instance + a Context, booted by run-tests.js with
+      // OMEGA_TEST_RUNNER=1: tests read omega.email, ctx.ai, new User() exactly
+      // like production code, no stubs.
+      omega: this.config.omega,
       ctx: this.config.ctx,
       rules: this.rulesContext,
       config: this.config,

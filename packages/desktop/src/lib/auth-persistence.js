@@ -1,6 +1,6 @@
 // Auth Persistence — pluggable MAIN-process storage for the Firebase auth session.
 //
-// Every browser context (renderers here, popup/options/background in BXM) gets Firebase
+// Every browser context (renderers here, popup/options/background in an extension) gets Firebase
 // session persistence for free via IndexedDB. Main is the one Node context — Firebase
 // defaults to in-memory there, so sign-in died with the process and the bridge's
 // authority rule signed every renderer out on the next boot.
@@ -30,7 +30,7 @@
 // signal isTestRun() reads below ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
 //
 // Select via config `omega.authPersistence` ('safeStorage' | 'none' | a custom
-// registered name). Register custom strategies BEFORE manager.initialize():
+// registered name). Register custom strategies BEFORE omega.initialize():
 //   require('@omega.js/desktop/lib/auth-persistence').register('keytar', {...})
 //
 // The firebase adapter mirrors firebase's own getReactNativePersistence(): a class
@@ -114,18 +114,18 @@ const noneStrategy = {
   async removeItem() {},
 };
 
-// Is this process a TEST RUN, in either lane that reaches this lib? The manager
+// Is this process a TEST RUN, in either lane that reaches this lib? The omega instance
 // answers it, in both: each lane spawns its child with `OMEGA_ENVIRONMENT=testing`
 // and the baked word never writes over it
 // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so a booted
 // production artifact reports the lane it is running in too.
-function isTestRun(manager) {
-  return !!manager?.isTesting?.();
+function isTestRun(omega) {
+  return !!omega?.isTesting?.();
 }
 
 const authPersistence = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _strategies: {
     safeStorage: safeStorageStrategy,
     none:        noneStrategy,
@@ -134,15 +134,15 @@ const authPersistence = {
 
   // Lib-shape conformance — the real work happens in resolve(), called by the
   // @omega.js/client bridge at auth boot (it needs the async availability check).
-  initialize(manager) {
+  initialize(omega) {
     if (authPersistence._initialized) {
       return;
     }
-    authPersistence._manager = manager;
+    authPersistence._omega = omega;
     authPersistence._initialized = true;
   },
 
-  // Consumers add custom strategies before manager.initialize().
+  // Consumers add custom strategies before omega.initialize().
   register(name, strategy) {
     if (!name || typeof strategy?.getItem !== 'function') {
       throw new Error('auth-persistence.register: strategy must implement getItem/setItem/removeItem/available');
@@ -152,20 +152,20 @@ const authPersistence = {
 
   // Pick + availability-check the configured strategy. Returns the active strategy
   // or null (→ caller falls back to firebase's in-memory default).
-  async resolve(manager) {
+  async resolve(omega) {
     // A TEST RUN is `none`, before any config is read: the test lanes never sign a
     // real user in, so the OS keychain is never asked. This overrides an explicit
     // consumer value too, because the boot layer boots the brand's REAL config through
     // the staged test app, and an unsigned Electron binary asking macOS for a keychain
     // item parks the whole run behind a SecurityAgent prompt
     // ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)).
-    if (isTestRun(manager)) {
+    if (isTestRun(omega)) {
       logger.log('auth persistence: none (test mode)');
       authPersistence._active = null;
       return null;
     }
 
-    const wanted = manager.config?.omega?.authPersistence || 'safeStorage';
+    const wanted = omega.config?.omega?.authPersistence || 'safeStorage';
     const strategy = authPersistence._strategies[wanted];
 
     if (!strategy) {

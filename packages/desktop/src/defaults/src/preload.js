@@ -1,11 +1,9 @@
 // Preload entry. Exposes window.desktop to the renderer via contextBridge.
-const Manager = require('@omega.js/desktop/preload');
+const omega = require('@omega.js/desktop/preload');
 
-const manager = new Manager();
-
-manager.initialize()
+omega.initialize()
   .then(() => {
-    const { logger } = manager;
+    const { logger } = omega;
 
     // Add any extra contextBridge-exposed APIs here. Be careful — anything you expose runs
     // in the renderer's context, so don't pass through privileged Node APIs without care.

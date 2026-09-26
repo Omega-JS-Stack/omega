@@ -16,7 +16,7 @@
  *
  * Run: npx omega test backend:routes/payments/refund-paypal-proration
  */
-const paypalRefund = require('../../../dist/manager/routes/payments/refund/providers/paypal.js');
+const paypalRefund = require('../../../dist/omega/routes/payments/refund/providers/paypal.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A stand-in for the PayPal HTTP client — the external boundary. It answers plan

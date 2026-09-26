@@ -24,6 +24,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const { bootCheckout } = require('./lib/checkout-boot.js');
 
@@ -57,7 +58,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -77,7 +78,7 @@ async function bindingsFor(product, { frequency = 'annually' } = {}) {
   globalThis.window = { location: { search: '' } };
   globalThis.__omegaClient = {
     isDevelopment: () => false,
-    auth: () => ({ getUser: () => null }),
+    auth: { user: new User() },
   };
 
   // require.resolve, not BUNDLE: the cache is keyed by the REAL path, and

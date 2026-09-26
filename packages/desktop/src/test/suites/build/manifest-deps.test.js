@@ -24,7 +24,7 @@ const SOURCE_DIRS = ['lib', 'gulp'];
 // The two specifiers that are ALLOWED to be undeclared, each one required inside a
 // try/catch whose catch is the documented behaviour, not a crash:
 //   firebase        @omega.js/client's own dependency; the client bridge falls back
-//                   to no-op mode when it is not there (lib/client-bridge.js)
+//                   to no-op mode when it is not there (lib/auth.js)
 //   app-builder-bin electron-builder's own dependency; blockmap generation is
 //                   best-effort and warns-and-skips (lib/sign-helpers/update-info.js)
 const GUARDED = new Set(['firebase', 'app-builder-bin']);

@@ -15,7 +15,7 @@
  *
  * Run: npx omega test backend:routes/user/orders
  */
-const handler = require('../../../dist/manager/routes/user/orders/get.js');
+const handler = require('../../../dist/omega/routes/user/orders/get.js');
 const { buildAdmin } = require('../../events/payments/_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -59,7 +59,7 @@ function caller(uid, { admin: isAdmin = false, authenticated = true } = {}) {
  * @param {object} options
  * @param {object} options.seed - payments-orders documents by path
  * @param {object} options.user - The resolved caller
- * @param {object} options.settings - The resolved request settings
+* @param {object} options.settings - The resolved request input
  * @returns {Promise<{ code: number|null, body: any, logs: string[] }>}
  */
 async function callRoute({ seed, user, settings }) {
@@ -78,7 +78,7 @@ async function callRoute({ seed, user, settings }) {
     },
   };
 
-  await handler({ ctx, user, settings, libraries: { admin } });
+  await handler({ ctx, omega: { firebase: { admin } }, user, data: settings });
 
   return { ...sent, logs };
 }

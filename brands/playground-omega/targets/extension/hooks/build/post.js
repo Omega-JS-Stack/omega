@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('@omega.js/extension/build'));
-const logger = Manager.logger('build:post');
+const build = require('@omega.js/extension/build');
+const logger = build.logger('build:post');
 
 // Hook
 module.exports = async ({ projectRoot, mode }) => {

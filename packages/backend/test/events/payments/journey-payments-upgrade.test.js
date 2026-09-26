@@ -41,7 +41,7 @@ module.exports = defineCases({
     {
       name: 'create-test-intent',
       async run({ http, assert, state }) {
-        const response = await http.as('journey-payments-upgrade').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-upgrade').post('omega/payments/intent', {
           provider: 'test',
           productId: state.paidProductId,
           frequency: state.product.frequency,

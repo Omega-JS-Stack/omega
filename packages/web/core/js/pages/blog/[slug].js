@@ -1,5 +1,5 @@
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const logger = createLogger('blog-post');
@@ -8,7 +8,7 @@ const logger = createLogger('blog-post');
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     insertBlogPostAds();
     setupReadingProgress();
@@ -123,10 +123,10 @@ function insertBlogPostAds() {
     const $host = document.createElement('div');
     $host.classList.add('omega-vert-unit', 'my-4');
     $host.setAttribute('data-omega-vert', 'in-article');
-    $host.setAttribute('data-omega-bind', '@hide auth.resolved.active');
+    $host.setAttribute('data-omega-bind', '@hide auth.user.active');
 
     // Insert after the target paragraph, then hand it to the verts module
     targetParagraph.parentNode.insertBefore($host, targetParagraph.nextSibling);
-    omega.verts().mount($host);
+    omega.verts.mount($host);
   });
 }

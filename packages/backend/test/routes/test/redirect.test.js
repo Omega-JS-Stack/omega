@@ -16,7 +16,7 @@ module.exports = defineCases({
       async run({ http, assert }) {
         // /omega/health is a GET route on this same backend, so following
         // the redirect lands on its payload — proof the redirect really fired.
-        const response = await http.as('none').get('backend-manager/test/redirect', {
+        const response = await http.as('none').get('omega/test/redirect', {
           url: '/omega/health',
         });
 
@@ -29,7 +29,7 @@ module.exports = defineCases({
       name: 'absolute-url-refused',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/test/redirect', {
+        const response = await http.as('none').get('omega/test/redirect', {
           url: 'https://evil.example.com',
         });
 
@@ -44,7 +44,7 @@ module.exports = defineCases({
         // `//host` and `/\host` are absolute to a browser even though they
         // start with a slash.
         for (const url of ['//evil.example.com', '/\\evil.example.com']) {
-          const response = await http.as('none').get('backend-manager/test/redirect', { url });
+          const response = await http.as('none').get('omega/test/redirect', { url });
 
           assert.isError(response, 400, `${url} must be refused, not followed`);
         }
@@ -55,7 +55,7 @@ module.exports = defineCases({
       name: 'scheme-refused',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.as('none').get('backend-manager/test/redirect', {
+        const response = await http.as('none').get('omega/test/redirect', {
           url: 'javascript:alert(1)',
         });
 

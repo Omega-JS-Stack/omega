@@ -14,11 +14,11 @@
  * lookup ([#506](https://github.com/Omega-JS-Stack/omega/issues/506)).
  */
 const assert = require('node:assert');
-const Stripe = require('../../../dist/manager/libraries/payment/providers/stripe.js');
-const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
-const Chargebee = require('../../../dist/manager/libraries/payment/providers/chargebee.js');
-const Coinbase = require('../../../dist/manager/libraries/payment/providers/coinbase.js');
-const Test = require('../../../dist/manager/libraries/payment/providers/test.js');
+const Stripe = require('../../../dist/omega/libraries/payment/providers/stripe.js');
+const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
+const Chargebee = require('../../../dist/omega/libraries/payment/providers/chargebee.js');
+const Coinbase = require('../../../dist/omega/libraries/payment/providers/coinbase.js');
+const Test = require('../../../dist/omega/libraries/payment/providers/test.js');
 
 const chargebeeSubscriptionCreated = require('../../fixtures/chargebee/webhook-subscription-created.json');
 const chargebeeInvoiceOneTime = require('../../fixtures/chargebee/invoice-one-time.json');

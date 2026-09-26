@@ -25,11 +25,11 @@
  * provider, not paid churn, and a degraded payload carrying no term at all is not
  * a trial when the subscription is on record as already having had one.
  */
-const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
-const paypalProvider = require('../../../dist/manager/routes/payments/webhook/providers/paypal.js');
-const chargebeeProvider = require('../../../dist/manager/routes/payments/webhook/providers/chargebee.js');
-const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
-const testProvider = require('../../../dist/manager/routes/payments/webhook/providers/test.js');
+const analytics = require('../../../dist/omega/events/firestore/payments-webhooks/analytics.js');
+const paypalProvider = require('../../../dist/omega/routes/payments/webhook/providers/paypal.js');
+const chargebeeProvider = require('../../../dist/omega/routes/payments/webhook/providers/chargebee.js');
+const stripeProvider = require('../../../dist/omega/routes/payments/webhook/providers/stripe.js');
+const testProvider = require('../../../dist/omega/routes/payments/webhook/providers/test.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A renewed paid subscription — no transition, money moved

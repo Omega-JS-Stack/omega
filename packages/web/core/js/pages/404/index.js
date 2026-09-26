@@ -1,5 +1,5 @@
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
@@ -7,7 +7,7 @@ export default () => {
   return new Promise(async function (resolve) {
     // Set omega
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupPage();
 
@@ -53,5 +53,5 @@ function setupPage() {
   }
 
   // Report to Sentry
-  omega.sentry().captureException(new Error(`404 at ${window.location.href}`));
+  omega.sentry.captureException(new Error(`404 at ${window.location.href}`));
 }

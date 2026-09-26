@@ -1,14 +1,11 @@
-// Default export — re-exports per-process Managers + version.
-// Most consumers should use the per-process subpath imports instead:
+// Default export: the build-time entry (version + the build module). Each Electron
+// process imports its own ready-made instance from its subpath instead:
 //   require('@omega.js/desktop/main')
-//   require('@omega.js/desktop/renderer')
+//   import omega from '@omega.js/desktop/renderer'
 //   require('@omega.js/desktop/preload')
 const package = require('../package.json');
 
 module.exports = {
-  version:  package.version,
-  Main:     require('./main.js'),
-  Renderer: require('./renderer.js'),
-  Preload:  require('./preload.js'),
-  Build:    require('./build.js'),
+  version: package.version,
+  build:   require('./build.js'),
 };

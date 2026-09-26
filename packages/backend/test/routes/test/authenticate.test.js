@@ -13,10 +13,10 @@ module.exports = defineCases({
       name: 'no-auth',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/test/authenticate');
+        const response = await http.get('omega/test/authenticate');
 
         assert.isSuccess(response, 'Should succeed without auth');
-        assert.equal(response.data.user.authenticated, false, 'User should not be authenticated');
+        assert.equal(response.data.authenticated, false, 'User should not be authenticated');
       },
     },
 
@@ -25,10 +25,10 @@ module.exports = defineCases({
       name: 'private-key',
       auth: 'basic',
       async run({ http, assert, accounts }) {
-        const response = await http.as('basic').get('backend-manager/test/authenticate');
+        const response = await http.as('basic').get('omega/test/authenticate');
 
         assert.isSuccess(response, 'Should succeed with privateKey');
-        assert.equal(response.data.user.authenticated, true, 'User should be authenticated');
+        assert.equal(response.data.authenticated, true, 'User should be authenticated');
         assert.equal(response.data.user.auth.uid, accounts.basic.uid, 'UID should match');
       },
     },
@@ -38,10 +38,10 @@ module.exports = defineCases({
       name: 'invalid-private-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.withPrivateKey('invalid-key-12345').get('backend-manager/test/authenticate');
+        const response = await http.withPrivateKey('invalid-key-12345').get('omega/test/authenticate');
 
         assert.isSuccess(response, 'Should succeed but not authenticate');
-        assert.equal(response.data.user.authenticated, false, 'Invalid key should not authenticate');
+        assert.equal(response.data.authenticated, false, 'Invalid key should not authenticate');
       },
     },
 
@@ -50,10 +50,10 @@ module.exports = defineCases({
       name: 'admin-key-header',
       auth: 'admin',
       async run({ http, assert }) {
-        const response = await http.as('admin').get('backend-manager/test/authenticate');
+        const response = await http.as('admin').get('omega/test/authenticate');
 
         assert.isSuccess(response, 'Should succeed with admin key');
-        assert.equal(response.data.user.authenticated, true, 'User should be authenticated');
+        assert.equal(response.data.authenticated, true, 'User should be authenticated');
         assert.equal(response.data.user.roles?.admin, true, 'Should have admin role');
       },
     },
@@ -66,12 +66,12 @@ module.exports = defineCases({
       name: 'legacy-key-field-dead',
       auth: 'none',
       async run({ http, assert, config }) {
-        const viaQuery = await http.as('none').get('backend-manager/test/authenticate', {
+        const viaQuery = await http.as('none').get('omega/test/authenticate', {
           backendManagerKey: config.adminKey,
         });
 
         assert.isSuccess(viaQuery, 'Request itself should succeed');
-        assert.equal(viaQuery.data.user.authenticated, false, 'Legacy backendManagerKey param must NOT authenticate');
+        assert.equal(viaQuery.data.authenticated, false, 'Legacy backendManagerKey param must NOT authenticate');
         assert.equal(viaQuery.data.user.roles?.admin ?? false, false, 'Legacy backendManagerKey param must NOT grant admin');
       },
     },

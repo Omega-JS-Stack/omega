@@ -1,8 +1,7 @@
 /**
- * Social shortlink pages (#429) — legacy UJM generated a redirect page per
+ * Social shortlink pages (#429) — a redirect page per
  * social (`/spotify`, `/youtube`, `/discord`, …) from the brand's socials
- * block, and the omega footer links some of them site-wide, so every migrated
- * brand 404'd its own links until this lane existed. A brand never hand-writes
+ * block, which the omega footer links site-wide. A brand never hand-writes
  * these pages: the `socials` config block IS the declaration.
  *
  *   socials: {

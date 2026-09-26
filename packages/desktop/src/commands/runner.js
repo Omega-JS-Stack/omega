@@ -24,7 +24,7 @@
 //   stop                 Kill every Runner.Listener.exe under RUNNER_HOME.
 //   status               Registered orgs, Startup shortcuts, live listeners.
 //   uninstall            Remove everything — legacy services and tasks, and the
-//                        electron-manager era's em-runner install, included.
+//                        legacy em-runner install, included.
 //   monitor              Tail the JSONL signing event log, pretty-printed.
 //
 // Every subcommand except `monitor` refuses on non-Windows
@@ -35,8 +35,8 @@ const fs       = require('fs');
 const os       = require('os');
 const jetpack  = require('fs-jetpack');
 
-const Manager  = new (require('../build.js'));
-const logger   = Manager.logger('runner');
+const build  = require('../build.js');
+const logger   = build.logger('runner');
 
 const RUNNER_LABELS = ['self-hosted', 'windows', 'ev-token'];
 
@@ -63,7 +63,7 @@ const attachLogFile = require('../utils/attach-log-file.js');
 const RUNNER_HOME = process.env.OMEGA_RUNNER_HOME || defaultRunnerHome();
 loadRunnerEnv({ home: RUNNER_HOME });
 
-// The electron-manager era of this command (`em runner`) laid the same design
+// The legacy generation of this command (`em runner`) laid the same design
 // down under other names: the home was %LOCALAPPDATA%\em-runner (C:\actions-runners
 // before that), and the Startup shortcuts and the GitHub-side runners were
 // `em-runner-<host>-<org>`. An upgraded box still has all of it — live, and
@@ -207,7 +207,7 @@ async function install(options) {
   // the calling terminal at normal user privilege.
 
   // Idempotent by replacement: always tear down any prior install before starting —
-  // the omega one, or the electron-manager one an upgraded box still runs.
+  // the omega one, or the legacy em-runner one an upgraded box still runs.
   if (jetpack.exists(home) || listLegacyRunnerHomes({ home }).length > 0 || listLegacyRunnerStartupShortcuts().length > 0) {
     logger.log(`Existing runner installation detected — uninstalling first for a clean re-install...`);
     try {
@@ -369,8 +369,8 @@ async function registerOrg(options) {
   // THIS host. Without this, re-running install accumulates orphaned runners (one per
   // failed/aborted install, one per host rename, etc.) which causes actions/runner to
   // auto-suffix the new runner's name (e.g. `-2872`) and breaks our ability to predict
-  // service names. Match prefix is `omega-runner-<host>-<org>` — and the electron-manager
-  // era's `em-runner-<host>-<org>`, the same box's older registration — so we never touch
+  // service names. Match prefix is `omega-runner-<host>-<org>` — and the legacy
+  // `em-runner-<host>-<org>`, the same box's older registration — so we never touch
   // user-created runners or runners from other hosts.
   //
   // We do this BEFORE fetching the registration token because the token is one-shot
@@ -900,7 +900,7 @@ async function statusServices(options) {
     }
   }
 
-  // The electron-manager era's install (`em runner`): its home, its Startup
+  // The legacy install (`em runner`): its home, its Startup
   // shortcuts, and any listener still running out of it. None of it answers to
   // the omega names above, so it is named here and torn down by `uninstall`.
   const legacyHomes     = listLegacyRunnerHomes({ home });
@@ -989,7 +989,7 @@ async function uninstall(options) {
   // handles asynchronously after stop).
   await removeRunnerHomeWithRetry(new Set(failed.map((f) => f.dir)), home);
 
-  // The electron-manager era's install, when this box still has one: the same
+  // The legacy em-runner install, when this box still has one: the same
   // teardown, org by org, so its GitHub-side registrations come off too.
   const legacy = await uninstallLegacyRunnerInstalls(home);
   const stillRegistered = [...failed, ...legacy.failed];
@@ -1002,7 +1002,7 @@ async function uninstall(options) {
   logger.warn(`  Their directories were kept — re-run 'npx omega runner uninstall' to retry, or delete them under each org's Settings → Actions → Runners.`);
 }
 
-// Tear down the electron-manager era's runner install: its `em-runner-*`
+// Tear down the legacy runner install: its `em-runner-*`
 // Startup shortcuts, then each legacy home — deregister every org dir through
 // its own config.cmd, kill what runs out of it, remove it. A registration that
 // did not come off keeps its directory, exactly as the omega home's does.
@@ -1657,7 +1657,7 @@ function listRunnerStartupShortcuts(startupDir) {
   return listStartupShortcuts('omega-runner-', startupDir);
 }
 
-// The electron-manager era's: `em-runner-<host>-<org>`, which `status` names
+// The legacy shortcuts: `em-runner-<host>-<org>`, which `status` names
 // and `uninstall` removes — never anything `start` would launch.
 function listLegacyRunnerStartupShortcuts(startupDir) {
   return listStartupShortcuts(LEGACY_RUNNER_PREFIX, startupDir);

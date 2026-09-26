@@ -22,8 +22,6 @@
  * cannot unload a script that is already running — there is no such thing — so
  * it takes effect on the next page load, while Consent Mode updates now.
  */
-import omega from '@omega.js/client';
-
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { getTrackingConsent, onTrackingConsentChange } from '__main_assets__/js/libs/tracking-consent.js';
@@ -47,7 +45,7 @@ const TIKTOK_METHODS = [
   'ready', 'alias', 'group', 'enableCookie', 'disableCookie',
 ];
 
-export default function () {
+export default function ({ omega }) {
   const providers = (omega.config.analytics && omega.config.analytics.providers) || {};
   const ids = {
     google: idOf(providers.google),
@@ -71,7 +69,7 @@ export default function () {
       }
 
       loaded[provider] = true;
-      LOADERS[provider](ids[provider]);
+      LOADERS[provider](omega, ids[provider]);
     });
   };
 
@@ -163,7 +161,7 @@ function installMetaQueue() {
  * The TikTok pixel's queue (vendor snippet), without its script injection —
  * `ttq.load` in the vendor blob both registers the instance AND appends the
  * script tag; only the registration survives here, so every provider script on
- * the page goes through the ONE seam (omega.dom().loadScript).
+ * the page goes through the ONE seam (omega.dom.loadScript).
  */
 function installTikTokQueue() {
   if (window.ttq && window.ttq.methods) {
@@ -224,30 +222,30 @@ function countPageView(provider) {
 }
 
 /** Inject one provider script; a blocked or failed load is never fatal. */
-function inject(provider, src) {
-  omega.dom().loadScript({ src: src })
+function inject(omega, provider, src) {
+  omega.dom.loadScript({ src: src })
     .catch((error) => logger.log(`${provider} did not load (blocked or offline):`, error.message));
 }
 
 const LOADERS = {
-  google: (id) => {
+  google: (omega, id) => {
     // `config` is queued, not called on a loaded library: dataLayer holds it
     // until gtag.js drains the queue, exactly as the inline snippet did.
     window.gtag('config', id);
-    inject('google', `${GTAG_SRC}?id=${encodeURIComponent(id)}`);
+    inject(omega, 'google', `${GTAG_SRC}?id=${encodeURIComponent(id)}`);
   },
 
-  meta: (id) => {
+  meta: (omega, id) => {
     installMetaQueue();
     window.fbq('init', id);
     countPageView('meta');
-    inject('meta', META_SRC);
+    inject(omega, 'meta', META_SRC);
   },
 
-  tiktok: (id) => {
+  tiktok: (omega, id) => {
     installTikTokQueue();
     window.ttq.load(id);
     countPageView('tiktok');
-    inject('tiktok', `${TIKTOK_SRC}?sdkid=${encodeURIComponent(id)}&lib=ttq`);
+    inject(omega, 'tiktok', `${TIKTOK_SRC}?sdkid=${encodeURIComponent(id)}&lib=ttq`);
   },
 };

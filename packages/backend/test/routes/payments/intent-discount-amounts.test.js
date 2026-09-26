@@ -19,12 +19,12 @@
  * Run: npx omega test framework:routes/payments/intent-discount-amounts
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
-const discountCodes = require('../../../dist/manager/libraries/payment/discount-codes.js');
-const analytics = require('../../../dist/manager/events/firestore/payments-webhooks/analytics.js');
+const discountCodes = require('../../../dist/omega/libraries/payment/discount-codes.js');
+const analytics = require('../../../dist/omega/events/firestore/payments-webhooks/analytics.js');
 
-const PayPal = require('../../../dist/manager/libraries/payment/providers/paypal.js');
+const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 
-const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/omega/routes/payments/intent/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // What each code is worth, pinned against the discount-codes SSOT below so a
@@ -45,7 +45,7 @@ const AMOUNT_OFF = 10;
  * `intent-discount-<case>`, never minted mid-test. The caller is built from the
  * seeded DOC, so it is the record the route reads, not a shape invented here.
  */
-async function purchaser(accounts, firestore, Manager, name) {
+async function purchaser(accounts, firestore, omega, name) {
   const account = accounts[`intent-discount-${name}`];
 
   if (!account) {
@@ -58,7 +58,7 @@ async function purchaser(accounts, firestore, Manager, name) {
     throw new Error(`The seeded persona for '${name}' has no user doc — the checkout guard would refuse it`);
   }
 
-  return { uid: account.uid, user: buildUser(Manager, doc) };
+  return { uid: account.uid, user: buildUser(doc) };
 }
 
 /**
@@ -139,16 +139,16 @@ module.exports = defineCases({
 
     {
       name: 'a-percent-discount-lands-in-the-confirmation-url',
-      async run({ accounts, assert, firestore, Manager, state }) {
-        const { user } = await purchaser(accounts, firestore, Manager, 'percent-url');
+      async run({ accounts, assert, firestore, omega, state }) {
+        const { user } = await purchaser(accounts, firestore, omega, 'percent-url');
         const expected = parseFloat((state.price * 0.85).toFixed(2));
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -195,15 +195,15 @@ module.exports = defineCases({
 
     {
       name: 'a-percent-discount-lands-on-the-webhook-subscription',
-      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
-        const { user } = await purchaser(accounts, firestore, Manager, 'percent-payload');
+      async run({ accounts, assert, firestore, omega, state, waitFor }) {
+        const { user } = await purchaser(accounts, firestore, omega, 'percent-payload');
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -223,19 +223,19 @@ module.exports = defineCases({
 
     {
       name: 'a-declined-first-invoice-bills-the-discounted-amount',
-      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
+      async run({ accounts, assert, firestore, omega, state, waitFor }) {
         // The subscription event carries the coupon; the INVOICE is where Stripe
         // reports the money — and the declined checkout is the one path that fires
         // one, so it is where the discounted first charge is provable end to end
-        const { user } = await purchaser(accounts, firestore, Manager, 'percent-invoice');
+        const { user } = await purchaser(accounts, firestore, omega, 'percent-invoice');
         const expectedCents = Math.round(parseFloat((state.price * 0.85).toFixed(2)) * 100);
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE, simulate: 'decline' }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, discount: PERCENT_CODE, simulate: 'decline' }),
         });
 
         assert.equal(sent.code, 200, `A declined checkout still starts, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -248,17 +248,17 @@ module.exports = defineCases({
 
     {
       name: 'a-one-time-purchase-is-discounted-in-the-url-and-the-session',
-      async run({ accounts, assert, firestore, Manager, state, waitFor, skip }) {
+      async run({ accounts, assert, firestore, omega, state, waitFor, skip }) {
         if (!state.oneTimeProduct) {
           skip('No one-time product configured in this brand');
         }
 
-        const { user } = await purchaser(accounts, firestore, Manager, 'one-time');
+        const { user } = await purchaser(accounts, firestore, omega, 'one-time');
         const price = state.oneTimeProduct.prices.once;
         const expected = parseFloat((price * 0.8).toFixed(2));
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
@@ -266,7 +266,7 @@ module.exports = defineCases({
           // the shape the live checkout really sent
           // ([#668](https://github.com/Omega-JS-Stack/omega/issues/668)). The
           // route is what decides a one-time buy bills on `once`.
-          settings: checkoutSettings({ productId: state.oneTimeProduct.id, frequency: 'annually', discount: ONE_TIME_CODE }),
+          data: checkoutSettings({ productId: state.oneTimeProduct.id, frequency: 'annually', discount: ONE_TIME_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -290,15 +290,15 @@ module.exports = defineCases({
 
     {
       name: 'no-discount-leaves-the-amounts-alone',
-      async run({ accounts, assert, firestore, Manager, state, waitFor }) {
-        const { user } = await purchaser(accounts, firestore, Manager, 'none');
+      async run({ accounts, assert, firestore, omega, state, waitFor }) {
+        const { user } = await purchaser(accounts, firestore, omega, 'none');
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.frequency }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.frequency }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -312,19 +312,19 @@ module.exports = defineCases({
 
     {
       name: 'a-trial-with-a-discount-still-charges-nothing-now',
-      async run({ accounts, assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, omega, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
 
-        const { user } = await purchaser(accounts, firestore, Manager, 'trial');
+        const { user } = await purchaser(accounts, firestore, omega, 'trial');
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.frequency, trial: true, discount: PERCENT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.frequency, trial: true, discount: PERCENT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -334,20 +334,20 @@ module.exports = defineCases({
 
     {
       name: 'an-amount-discount-lands-in-the-confirmation-url',
-      async run({ accounts, assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, omega, state, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
 
-        const { user } = await purchaser(accounts, firestore, Manager, 'amount-url');
+        const { user } = await purchaser(accounts, firestore, omega, 'amount-url');
         const expected = parseFloat((state.amountPrice - AMOUNT_OFF).toFixed(2));
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -357,19 +357,19 @@ module.exports = defineCases({
 
     {
       name: 'an-amount-discount-lands-on-the-webhook-subscription-in-cents',
-      async run({ accounts, assert, firestore, Manager, state, waitFor, skip }) {
+      async run({ accounts, assert, firestore, omega, state, waitFor, skip }) {
         if (!state.amountFrequency) {
           skip(`No configured price is bigger than the $${AMOUNT_OFF} code`);
         }
 
-        const { user } = await purchaser(accounts, firestore, Manager, 'amount-payload');
+        const { user } = await purchaser(accounts, firestore, omega, 'amount-payload');
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency, discount: AMOUNT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -390,19 +390,19 @@ module.exports = defineCases({
 
     {
       name: 'a-trial-with-an-amount-discount-still-charges-nothing-now',
-      async run({ accounts, assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, omega, state, skip }) {
         if (!state.product.trial?.days) {
           skip('The paid product configures no trial');
         }
 
-        const { user } = await purchaser(accounts, firestore, Manager, 'amount-trial');
+        const { user } = await purchaser(accounts, firestore, omega, 'amount-trial');
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-intent',
           user,
-          settings: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency || state.frequency, trial: true, discount: AMOUNT_CODE }),
+          data: checkoutSettings({ productId: state.product.id, frequency: state.amountFrequency || state.frequency, trial: true, discount: AMOUNT_CODE }),
         });
 
         assert.equal(sent.code, 200, `Checkout should succeed, got ${sent.code}: ${JSON.stringify(sent.body)}`);
@@ -490,7 +490,7 @@ module.exports = defineCases({
 
     {
       name: 'a-code-that-covers-the-whole-price-answers-400-and-never-calls-paypal',
-      async run({ accounts, assert, firestore, Manager, state, skip }) {
+      async run({ accounts, assert, firestore, omega, state, skip }) {
         if (!state.fullCoverFrequency) {
           skip(`No configured price is small enough for the $${AMOUNT_OFF} code to cover whole`);
         }
@@ -501,7 +501,7 @@ module.exports = defineCases({
         // error it repeats instead of hiding behind its neutral 500 sentence.
         // Everything else about this checkout is real; only PayPal's HTTP door
         // is watched, and it must never open.
-        const { user } = await purchaser(accounts, firestore, Manager, 'zero-total');
+        const { user } = await purchaser(accounts, firestore, omega, 'zero-total');
         const calls = [];
         const realRequest = PayPal.request;
 
@@ -514,11 +514,11 @@ module.exports = defineCases({
 
         try {
           sent = await callHandler({
-            Manager,
+            omega,
             handler,
             functionName: 'payments-intent',
             user,
-            settings: checkoutSettings({ provider: 'paypal', productId: state.product.id, frequency: state.fullCoverFrequency, discount: AMOUNT_CODE }),
+            data: checkoutSettings({ provider: 'paypal', productId: state.product.id, frequency: state.fullCoverFrequency, discount: AMOUNT_CODE }),
           });
         } finally {
           PayPal.request = realRequest;

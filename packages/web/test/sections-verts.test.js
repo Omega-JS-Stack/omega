@@ -43,7 +43,7 @@ test('verts/unit: args flow to the data-omega-vert vocabulary on the mount host'
   assert.ok(html.includes('data-omega-vert-tags="dev,news"'), 'tags array joins');
   assert.ok(html.includes('class="my-4"'), 'section_class knob');
   assert.ok(html.includes('class="omega-vert-unit"'), 'inner mount host');
-  assert.ok(html.includes('data-omega-bind="@hide auth.resolved.active"'), 'paying users hide via the standard binding');
+  assert.ok(html.includes('data-omega-bind="@hide auth.user.active"'), 'paying users hide via the standard binding');
   assert.deepEqual(warnings, []);
 });
 
@@ -80,8 +80,9 @@ test('verts/unit: resolves through the library under BOTH themes — newsflash f
 
 test('verts/unit: section.js delegates WHOLLY to the shared client verts module (one implementation)', () => {
   const js = fs.readFileSync(path.join(BASE, '_sections', 'verts', 'unit', 'section.js'), 'utf8');
-  assert.ok(js.includes("from '@omega.js/client'"), 'imports the shared singleton');
-  assert.ok(js.includes('omega.verts().mount'), 'delegates lazy-arm + ladder to the client verts module');
+  assert.ok(js.includes('export default (el, { omega })'), 'takes the host instance from the section init argument');
+  assert.ok(!js.includes('@omega.js/web'), 'imports no host instance module');
+  assert.ok(js.includes('omega.verts.mount'), 'delegates lazy-arm + ladder to the client verts module');
   assert.ok(!js.includes('IntersectionObserver'), 'no private lazy fork — the module owns the observer');
   assert.ok(!js.includes('createElement'), 'no DOM construction in the section — the module owns the iframe');
 });

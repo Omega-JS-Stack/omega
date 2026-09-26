@@ -4,16 +4,16 @@ Built-in test framework for both @omega.js/desktop itself and consumer projects.
 
 ## 🚫 NEVER mock — test against the real harness (HARD RULE)
 
-**Do NOT hand-roll fake/stub/mock objects** — no `mockManager`, fake `ipc`/`storage`/`window`/`tray`, stubbed `app`/`BrowserWindow`, or fake IPC channels. Every test gets the **real** framework context:
+**Do NOT hand-roll fake/stub/mock objects**: no mock `omega`, fake `ipc`/`storage`/`window`/`tray`, stubbed `app`/`BrowserWindow`, or fake IPC channels. Every test gets the **real** framework context:
 
 - `build` runs real @omega.js/desktop helper code in plain Node.
-- `main` / `renderer` / `boot` run inside a **real spawned Electron process**, where `ctx.manager` (and boot's `inspect({ manager })`) is the **real booted Manager** — real `manager.storage`, `manager.ipc`, `manager.tray`, `manager.windows`, etc. Use them; exercise the code the way production does.
+- `main` / `renderer` / `boot` run inside a **real spawned Electron process**, where `ctx.omega` (and boot's `inspect({ omega })`) is the **real booted main-process instance**: real `omega.storage`, `omega.ipc`, `omega.tray`, `omega.windows`, etc. Use them; exercise the code the way production does.
 
 **Pure functions are the ONLY exception.** A function with zero I/O (config-defaults merge, icon-path resolver, schema validator, CLI alias resolver, a string/number transform) can be `require()`d and called directly with plain inputs — that's not mocking, there's nothing to mock. The moment a function touches `app.*` / `BrowserWindow` / `ipcMain` / `Tray` / the real bundle / an external service, it MUST run against the real harness in the appropriate layer (`main` / `renderer` / `boot`), not a stub.
 
 **Real external APIs are gated behind extended mode (`TEST_EXTENDED_MODE`), NOT mocked** (see [Extended vs normal mode](#extended-vs-normal-mode) below). Normal mode skips them *in the source*; extended mode runs them for real. The test never fakes them. **Anything an extended test creates in a real external system MUST be cleaned up** by the test (via the suite's `cleanup(ctx)` hook) — external systems are not reset between runs.
 
-If you find yourself writing `const mockX = {...}` to satisfy code under test, STOP — pass the real `ctx.manager` (or its real sub-object), or, if the function is genuinely pure, call it directly with plain data.
+If you find yourself writing `const mockX = {...}` to satisfy code under test, STOP: pass the real `ctx.omega` (or its real sub-object), or, if the function is genuinely pure, call it directly with plain data.
 
 ### The ONLY two exceptions where a narrow stub is allowed
 
@@ -30,7 +30,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 | Coverage | Layer | Proves |
 |---|---|---|
-| **Logic** | `build` / `main` | The feature's functions do the right thing when called directly (real Manager, real storage, real IPC) |
+| **Logic** | `build` / `main` | The feature's functions do the right thing when called directly (the real booted `omega`, real storage, real IPC) |
 | **UI** | `renderer` | The feature's interface is WIRED — a real event on the real DOM triggers the behavior and the visible result appears |
 | **End-to-end** | `boot` | The feature survives in the consumer's actual built bundle (extend the boot suite's `inspect` assertions) |
 
@@ -85,7 +85,7 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 
 The target matches against the test file path. The source prefix scopes selection to framework-only or project-only tests — a prefixed target excludes the other source entirely:
 
-- `mgr:` — the **universal cross-framework alias** for "the manager's own tests" (framework-only). Works identically in @omega.js/desktop, BXM, UJM, and @omega.js/backend.
+- `mgr:`: the **universal cross-framework alias** for "the framework's own tests" (framework-only). Works identically in @omega.js/desktop, @omega.js/extension, @omega.js/web, and @omega.js/backend.
 - `desktop:` / `framework:` — desktop-specific aliases for framework-only tests, equivalent to `mgr:`.
 - `project:` — consumer project tests only.
 
@@ -111,20 +111,20 @@ Anything an extended suite creates externally must be torn down in its `cleanup(
 
 ### `OMEGA_ENVIRONMENT=testing`, the one input a test run names
 
-Both @omega.js/desktop test runners (`runners/electron.js`, `runners/boot.js`) spawn their child with `OMEGA_ENVIRONMENT=testing`, the ONE environment input ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and nothing writes over an explicit one: the word a build baked into the artifact is the fallback for a packaged app, never an override ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). That powers `manager.isTesting()` (and the `Manager.isTesting()` static), the cross-context helper everything in @omega.js/desktop checks when it needs to behave differently in tests:
+Both @omega.js/desktop test runners (`runners/electron.js`, `runners/boot.js`) spawn their child with `OMEGA_ENVIRONMENT=testing`, the ONE environment input ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)), and nothing writes over an explicit one: the word a build baked into the artifact is the fallback for a packaged app, never an override ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). That powers `omega.isTesting()` (and the build module's `isTesting()`), the cross-context helper everything in @omega.js/desktop checks when it needs to behave differently in tests:
 
 - `auto-updater` flips its idle threshold from 15min → 3s and its periodic tick from 60s → 500ms, AND short-circuits the native install-prompt dialog (so tests don't pop modal windows).
 - **Every BrowserWindow surfaces stealth** — named windows via `window-manager._surface()` AND raw `new BrowserWindow()` ones (e.g. a consumer's automation popup) via a global `browser-window-created` hook registered in `main.js` step 1a-ii. The shared recipe lives in `src/utils/stealth-window.js`: shown INACTIVE (keyboard focus never leaves your editor), opacity 0, click-through (`setIgnoreMouseEvents`), and raw windows get `show()` rerouted to `showInactive()` + `focus()` no-op'd — a test run never interrupts you, and a stray real click physically can't land in the app, while synthetic test input (`executeJavaScript`, `sendInputEvent`, CDP) is unaffected. **`webContents.focus()` is suppressed separately** (a global `web-contents-created` hook in the same main.js block): it bypasses the window-level patches — it's a different object whose `focus()` reaches the native window directly and makes the invisible window KEY, grabbing the keyboard mid-typing even under the accessory policy (which only prevents *launch* activation, not key-window steals). Consumers call it legitimately (e.g. address-bar focus on tab select), so it's no-op'd per-contents under the same predicate. Set **`OMEGA_TEST_SHOW=1`** to surface windows normally and watch a run live (the predicate is evaluated per window, so flipping it mid-run works). Deliberately NOT `hide()`/`minimize()`: occluded windows get throttled by Chromium (`requestAnimationFrame` pauses, `document.visibilityState` flips to `hidden`) — tests would exercise a DIFFERENT runtime, whereas an opacity-0 shown-inactive window renders and behaves identically to a visible one. See [windows.md](windows.md).
 - **App-level activation is suppressed too (macOS).** Launching a regular-policy app activates it — the menu bar and keyboard focus switch to the test process at launch even though every window surfaces inactive. Under the same stealth predicate (`src/utils/test-stealth.js` — Testing mode + `OMEGA_TEST_SHOW` unset), `main.js` (step 1a, before app ready) and the spawned test harness flip the app to the **accessory activation policy** (`app.dock.hide()` — the same switch `LSUIElement` bakes for packaged hidden-mode apps): the process never activates, never shows a dock icon, and never steals focus, while windows still render identically. `OMEGA_TEST_SHOW=1` restores normal activation along with visible windows. Verified by frontmost-app sampling across a full run: zero focus changes (previously four steals per run).
 - `main.js#initialize` isolates userData per environment: testing runs get `<userData> (Testing)` — **wiped at boot**, so every test run starts from a clean slate (post-run state stays on disk for inspection until the next run; set `OMEGA_TEST_KEEP_USERDATA=1` to skip the wipe). Dev runs get ` (Development)`; production is untouched. See [boot-sequence.md](boot-sequence.md).
 - **The main-layer harness exposes a CDP endpoint.** `test/harness/main-entry.js` appends `--remote-debugging-port=0` at require time (loopback-only, OS-assigned port) and publishes the resolved port as **`process.env.OMEGA_CDP_PORT`** before suites run (read from Chromium's `DevToolsActivePort` file; any value inherited from your shell is overwritten — that one points at your dev app, not the harness). Consumer suites can drive real browser automation against the harness Electron itself, e.g. `playwright-core`'s `connectOverCDP('http://127.0.0.1:' + process.env.OMEGA_CDP_PORT)`. Covered by `suites/main/harness-cdp.test.js`.
-- Other lib code can branch on `manager.isTesting()` to suppress dock bounce, login-item changes, OS protocol-handler registration, etc.
+- Other lib code can branch on `omega.isTesting()` to suppress dock bounce, login-item changes, OS protocol-handler registration, etc.
 
 Consumers writing their own tests name the same input in their own runner, for example in `package.json`:
 ```json
 "test": "OMEGA_ENVIRONMENT=testing vitest"
 ```
-Then in your code, gate test-only behavior on `manager.isTesting()` instead of inventing yet another env var.
+Then in your code, gate test-only behavior on `omega.isTesting()` instead of inventing yet another env var.
 
 ## Test discovery
 
@@ -170,14 +170,14 @@ module.exports = {
   layer: 'main',                    // 'build' | 'main' | 'renderer'
   description: 'storage (main)',
   cleanup: async (ctx) => {         // runs after the last test
-    ctx.manager.storage.clear();
+    ctx.omega.storage.clear();
   },
   tests: [
     {
       name: 'set + get round-trip',
       run: (ctx) => {
-        ctx.manager.storage.set('hello', 'world');
-        ctx.expect(ctx.manager.storage.get('hello')).toBe('world');
+        ctx.omega.storage.set('hello', 'world');
+        ctx.expect(ctx.omega.storage.get('hello')).toBe('world');
       },
     },
     {
@@ -232,7 +232,7 @@ module.exports = [
 | Layer | Where it runs | Use for |
 |---|---|---|
 | `build` | Plain Node | CLI, package.json, config schema, gulp tasks |
-| `main` | Spawned Electron main process | Manager init, lib modules, IPC, windows |
+| `main` | Spawned Electron main process | `omega.initialize()`, lib modules, IPC, windows |
 | `renderer` | Hidden BrowserWindow: the framework's harness page by default, one of the project's own `src/views/` when the suite declares `view: '<name>'` | `window.desktop.*`, preload bridge, UI logic, your own views |
 
 The runner partitions test files by layer at discovery time. The build layer runs inline; the main layer spawns Electron once with all main suites and parses JSON-line stdout.
@@ -246,7 +246,7 @@ ctx.expect(actual)          // Jest-compatible expect()
 ctx.state                   // shared object across tests in a suite/group
 ctx.layer                   // 'build' | 'main' | 'renderer'
 ctx.skip(reason)            // skip from inside the test
-ctx.manager                 // (main layer only) the booted @omega.js/desktop Manager
+ctx.omega                 // (main layer only) the booted @omega.js/desktop main-process instance
 ```
 
 ## expect() matchers
@@ -290,15 +290,15 @@ All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, t
 ## Test harness internals (main layer)
 
 - `runners/electron.js` spawns Electron with `harness/main-entry.js` as the app.
-- `harness/main-entry.js` boots Manager with `skipWindowCreation: true`, runs the suites, emits results via `__EM_TEST__{json}\n` lines on stdout.
+- `harness/main-entry.js` boots `omega` with `skipWindowCreation: true`, runs the suites, emits results via `__OMEGA_TEST__{json}\n` lines on stdout (`TEST_EVENT_PREFIX`, [src/utils/test-events.js](../src/utils/test-events.js), the one prefix every harness writes and every runner reads).
 - The runner parses those lines and renders @omega.js/backend-style output.
 - stderr is always drained (otherwise the pipe fills and the harness blocks); printed only when `OMEGA_TEST_DEBUG=1`.
 - `ELECTRON_RUN_AS_NODE` is stripped from the spawn env (would otherwise make Electron behave as Node and break the harness).
-- **Consumer-scheme containment.** The consumer's `main.js` — where the real `protocol.handle('<brand.id>', …)` lives — never runs in this harness, so `brand://` URLs loaded by main-layer suites would be UNHANDLED. Chromium treats a load on an unhandled scheme as an *external protocol* and hands it to the OS — and if an installed copy of the app owns the scheme (e.g. `/Applications/Brand.app` on macOS, registered via its `Info.plist`), Launch Services launches the installed production app mid-test-run. The harness contains this two ways after Manager boots: (1) it registers a stub handler for the consumer's brand scheme (read from `<cwd>/config/omega.json5`) on the default session, so `brand://` loads commit in-process as a blank page; (2) it denies the `openExternal` permission on the default session and every session created after it (partitions included), so no navigation can hand ANY scheme to the OS during a test run. Suites that need real page content for `brand://` URLs belong in the boot layer, where the real app (and its real protocol handler) runs. A main-layer suite that genuinely needs its OWN handler for the brand scheme must call `protocol.unhandle(brand.id)` first — the harness stub holds the scheme on the default session.
+- **Consumer-scheme containment.** The consumer's `main.js` (where the real `protocol.handle('<brand.id>', …)` lives) never runs in this harness, so `brand://` URLs loaded by main-layer suites would be UNHANDLED. Chromium treats a load on an unhandled scheme as an *external protocol* and hands it to the OS: and if an installed copy of the app owns the scheme (e.g. `/Applications/Brand.app` on macOS, registered via its `Info.plist`), Launch Services launches the installed production app mid-test-run. The harness contains this two ways after `omega` boots: (1) it registers a stub handler for the consumer's brand scheme (read from `<cwd>/config/omega.json5`) on the default session, so `brand://` loads commit in-process as a blank page; (2) it denies the `openExternal` permission on the default session and every session created after it (partitions included), so no navigation can hand ANY scheme to the OS during a test run. Suites that need real page content for `brand://` URLs belong in the boot layer, where the real app (and its real protocol handler) runs. A main-layer suite that genuinely needs its OWN handler for the brand scheme must call `protocol.unhandle(brand.id)` first: the harness stub holds the scheme on the default session.
 
 ## A test run never touches the OS keychain, and a blocked boot reports
 
-The harness resolves auth persistence to the **`none`** strategy on every layer, main and boot alike, before any config is read: a brand that declares `omega.authPersistence: 'safeStorage'` still runs its tests with Firebase auth in memory, because the lanes never sign a real user in. That is a hard rule, not a nicety. The boot lane spawns the raw, unsigned `Electron` binary, which carries no keychain ACL, so one `safeStorage` read parks the entire run behind a macOS SecurityAgent prompt ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)). ONE signal answers "is this a test run" on both layers, `manager.isTesting()`: the boot lane boots the consumer's PRODUCTION artifact, and the word baked into it no longer writes over the `OMEGA_ENVIRONMENT=testing` the runner spawned it with ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so the booted app reports the lane it is running in. And since a boot can block long before `main.js` requires the harness (where the per-test timeout lives), the boot runner carries its own budget, measured as SILENCE: every harness line rearms it, so a suite that legitimately runs longer keeps going, and a boot that produces no harness output for 60s (`OMEGA_TEST_BOOT_TIMEOUT_MS` overrides) counts its tests failed, prints `✗ boot: no harness output after 60s; last runtime.log line: "<line>"` from the booted app's `logs/runtime.log`, and ends the child instead of hanging `npx omega test`.
+The harness resolves auth persistence to the **`none`** strategy on every layer, main and boot alike, before any config is read: a brand that declares `omega.authPersistence: 'safeStorage'` still runs its tests with Firebase auth in memory, because the lanes never sign a real user in. That is a hard rule, not a nicety. The boot lane spawns the raw, unsigned `Electron` binary, which carries no keychain ACL, so one `safeStorage` read parks the entire run behind a macOS SecurityAgent prompt ([#907](https://github.com/Omega-JS-Stack/omega/issues/907)). ONE signal answers "is this a test run" on both layers, `omega.isTesting()`: the boot lane boots the consumer's PRODUCTION artifact, and the word baked into it no longer writes over the `OMEGA_ENVIRONMENT=testing` the runner spawned it with ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)), so the booted app reports the lane it is running in. And since a boot can block long before `main.js` requires the harness (where the per-test timeout lives), the boot runner carries its own budget, measured as SILENCE: every harness line rearms it, so a suite that legitimately runs longer keeps going, and a boot that produces no harness output for 60s (`OMEGA_TEST_BOOT_TIMEOUT_MS` overrides) counts its tests failed, prints `✗ boot: no harness output after 60s; last runtime.log line: "<line>"` from the booted app's `logs/runtime.log`, and ends the child instead of hanging `npx omega test`.
 
 ## Writing consumer tests
 
@@ -314,7 +314,7 @@ module.exports = {
     {
       name: 'storage starts empty',
       run: (ctx) => {
-        ctx.expect(ctx.manager.storage.get('user')).toBeUndefined();
+        ctx.expect(ctx.omega.storage.get('user')).toBeUndefined();
       },
     },
   ],

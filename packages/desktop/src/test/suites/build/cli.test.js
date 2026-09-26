@@ -3,9 +3,9 @@
 const path = require('path');
 const fs = require('fs');
 
-const Manager = require('../../../build.js');
+const build = require('../../../build.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
-const root = Manager.getRootPath('main');
+const root = build.getRootPath('main');
 
 module.exports = defineCases({
   type: 'group',

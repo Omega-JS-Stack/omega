@@ -28,13 +28,15 @@
  * Run: npx omega test framework:routes/payments/winback
  */
 const { buildUser, recordingResponse } = require('./_route-harness.js');
-const winback = require('../../../dist/manager/libraries/payment/winback.js');
+const winback = require('../../../dist/omega/libraries/payment/winback.js');
 
-const handler = require('../../../dist/manager/routes/payments/winback/post.js');
+const handler = require('../../../dist/omega/routes/payments/winback/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const { User } = require('../../../dist/omega/helpers/account.js');
+const Context = require('../../../dist/omega/context.js');
 
 function providerModule(name) {
-  return require(`../../../dist/manager/routes/payments/winback/providers/${name}.js`);
+  return require(`../../../dist/omega/routes/payments/winback/providers/${name}.js`);
 }
 
 const YEAR = 365 * 24 * 60 * 60;
@@ -42,14 +44,14 @@ const YEAR = 365 * 24 * 60 * 60;
 /**
  * A paying subscriber the offer can be made to.
  *
- * @param {object} Manager - The @omega.js/backend Manager
+ * @param {object} omega - The Omega instance
  * @param {object} options - uid, product, provider, resourceId, and the state overrides
  */
-function subscriber(Manager, { uid, product, provider, resourceId, orderId, pending, trial, status }) {
+function subscriber(omega, { uid, product, provider, resourceId, orderId, pending, trial, status }) {
   const lastYearUNIX = Math.floor(Date.now() / 1000) - YEAR;
   const nextMonthUNIX = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
-  return buildUser(Manager, {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: {},
     subscription: {
@@ -80,7 +82,7 @@ function subscriber(Manager, { uid, product, provider, resourceId, orderId, pend
  *
  * @returns {Promise<{ sent: object, properties: object|null }>}
  */
-async function acceptOfferReadingProperties(Manager, user, settings) {
+async function acceptOfferReadingProperties(omega, user, settings) {
   const res = recordingResponse();
   const headers = {};
 
@@ -91,16 +93,9 @@ async function acceptOfferReadingProperties(Manager, user, settings) {
   res.get = (key) => headers[key];
 
   const req = { method: 'POST', headers: { 'content-type': 'application/json' }, query: {}, body: {} };
-  const ctx = Manager.RouteContext({ req, res }, { functionName: 'payments-winback' });
+  const ctx = new Context(omega, { req, res }, { functionName: 'payments-winback' });
 
-  // The REAL analytics library, attached the way the middleware attaches it —
-  // every refusal returns before the route's accept event, but the success path
-  // records one, and a ctx built without it would fail on a line the wire never
-  // reaches this way. Not a stand-in: in a test environment the library itself
-  // skips the send.
-  ctx.analytics = Manager.Analytics({ ctx: ctx, uuid: user.auth.uid });
-
-  await handler({ ctx, Manager, user, settings: { confirmed: true, ...(settings || {}) }, libraries: Manager.libraries });
+  await handler({ ctx, omega, user, data: { confirmed: true, ...(settings || {}) } });
 
   return {
     sent: res.sent,
@@ -109,8 +104,8 @@ async function acceptOfferReadingProperties(Manager, user, settings) {
 }
 
 /** Run the thunk with the brand's save offer replaced, restoring it after. */
-async function withOffer(Manager, winbackConfig, fn) {
-  const payment = Manager.config.payment;
+async function withOffer(omega, winbackConfig, fn) {
+  const payment = omega.config.payment;
   const original = payment.winback;
 
   if (winbackConfig === null) delete payment.winback;
@@ -146,7 +141,7 @@ module.exports = defineCases({
     {
       name: 'rejects-unauthenticated',
       async run({ http, assert }) {
-        const response = await http.as('none').post('backend-manager/payments/winback', {
+        const response = await http.as('none').post('omega/payments/winback', {
           confirmed: true,
         });
 
@@ -157,7 +152,7 @@ module.exports = defineCases({
     {
       name: 'rejects-missing-confirmed',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/winback', {});
+        const response = await http.as('basic').post('omega/payments/winback', {});
 
         assert.isError(response, 400, 'Should reject a request that confirms nothing');
       },
@@ -166,7 +161,7 @@ module.exports = defineCases({
     {
       name: 'rejects-basic-user',
       async run({ http, assert }) {
-        const response = await http.as('basic').post('backend-manager/payments/winback', {
+        const response = await http.as('basic').post('omega/payments/winback', {
           confirmed: true,
         });
 
@@ -178,11 +173,11 @@ module.exports = defineCases({
 
     {
       name: 'resolves-the-brand-offer-with-the-framework-default',
-      async run({ Manager, assert }) {
+      async run({ omega, assert }) {
         // The 50% default has ONE home (@omega.js/config). A brand that
         // configures nothing still has an offer, and it is that one.
-        await withOffer(Manager, null, async () => {
-          const offer = winback.resolveOffer(Manager.config);
+        await withOffer(omega, null, async () => {
+          const offer = winback.resolveOffer(omega.config);
 
           assert.equal(offer.enabled, true, 'the offer is on by default');
           assert.equal(offer.percent, 50, 'and it is 50% off');
@@ -199,12 +194,12 @@ module.exports = defineCases({
 
     {
       name: 'refuses-when-the-brand-disabled-the-offer',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
 
-        await withOffer(Manager, { enabled: false }, async () => {
-          const user = subscriber(Manager, { uid: '_test-winback-disabled', product });
-          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+        await withOffer(omega, { enabled: false }, async () => {
+          const user = subscriber(omega, { uid: '_test-winback-disabled', product });
+          const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 400, 'Should refuse an offer the brand turned off');
           assert.equal(
@@ -218,10 +213,10 @@ module.exports = defineCases({
 
     {
       name: 'refuses-an-unconfirmed-request',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-unconfirmed', product });
-        const { sent, properties } = await acceptOfferReadingProperties(Manager, user, { confirmed: false });
+        const user = subscriber(omega, { uid: '_test-winback-unconfirmed', product });
+        const { sent, properties } = await acceptOfferReadingProperties(omega, user, { confirmed: false });
 
         assert.equal(sent.code, 400, 'Should refuse a request that confirms nothing');
         assert.equal(
@@ -236,14 +231,14 @@ module.exports = defineCases({
 
     {
       name: 'refuses-a-trial',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         // A trial cancel ends access immediately (#267) and nothing has been
         // paid, so there is no next cycle to discount. The billing card gates
         // the same way, off the same rule.
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-trial', product, trial: true });
+        const user = subscriber(omega, { uid: '_test-winback-trial', product, trial: true });
 
-        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
         assert.equal(sent.code, 400, 'Should refuse a subscription still inside its free trial');
         assert.equal(
@@ -256,11 +251,11 @@ module.exports = defineCases({
 
     {
       name: 'refuses-a-scheduled-cancellation',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-pending', product, pending: true });
+        const user = subscriber(omega, { uid: '_test-winback-pending', product, pending: true });
 
-        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
         assert.equal(sent.code, 400, 'Should refuse when the cancellation is already scheduled');
         assert.equal(
@@ -273,11 +268,11 @@ module.exports = defineCases({
 
     {
       name: 'refuses-a-suspended-subscription',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-suspended', product, status: 'suspended' });
+        const user = subscriber(omega, { uid: '_test-winback-suspended', product, status: 'suspended' });
 
-        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
         assert.equal(sent.code, 400, 'Should refuse a subscription that is not active');
         assert.equal(
@@ -290,7 +285,7 @@ module.exports = defineCases({
 
     {
       name: 'refuses-missing-payment-details',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         // An ADMIN-GRANTED or imported subscription is paid and active with no
         // provider details on it at all, and the client pitches what it can
         // read — so this refusal needs a code as much as the capability gate
@@ -305,8 +300,8 @@ module.exports = defineCases({
         ];
 
         for (const { what, provider, resourceId } of halves) {
-          const user = subscriber(Manager, { uid: `_test-winback-no-${what}`, product, provider, resourceId });
-          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+          const user = subscriber(omega, { uid: `_test-winback-no-${what}`, product, provider, resourceId });
+          const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 400, `missing ${what}: Should refuse a subscription the route cannot reach a provider with`);
           assert.equal(
@@ -320,11 +315,11 @@ module.exports = defineCases({
 
     {
       name: 'refuses-an-unknown-provider',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-unknown', product, provider: 'not-a-provider' });
+        const user = subscriber(omega, { uid: '_test-winback-unknown', product, provider: 'not-a-provider' });
 
-        const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+        const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
         assert.equal(sent.code, 400, 'Should refuse a provider that does not exist');
         assert.equal(
@@ -337,14 +332,14 @@ module.exports = defineCases({
 
     {
       name: 'refuses-when-the-claim-has-nowhere-to-be-recorded',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         // "Claimed once" is only true while there is a document to record the
         // claim on. A subscription carrying no orderId (dashboard-created,
         // imported, a metadata backfill that never landed) has none, so the
         // offer is refused BEFORE dispatch rather than becoming takeable on
         // every cancel dialog — each accept re-couponing the subscription.
         const product = paidProduct(config, skip);
-        const user = subscriber(Manager, { uid: '_test-winback-no-order', product });
+        const user = subscriber(omega, { uid: '_test-winback-no-order', product });
         const provider = providerModule('test');
         const applied = [];
         const realApplyOffer = provider.applyOffer;
@@ -352,7 +347,7 @@ module.exports = defineCases({
         provider.applyOffer = async (options) => applied.push(options);
 
         try {
-          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+          const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 400, 'Should refuse an offer whose claim cannot be recorded');
           assert.equal(
@@ -369,7 +364,7 @@ module.exports = defineCases({
 
     {
       name: 'refuses-a-second-claim-with-a-branchable-code',
-      async run({ Manager, assert, config, firestore, skip }) {
+      async run({ omega, assert, config, firestore, skip }) {
         // The offer is claimed ONCE, and a past claimant who opens the cancel
         // dialog again is pitched it anyway — the client reads the account, not
         // the order doc. So the refusal carries a code the billing card can
@@ -377,7 +372,7 @@ module.exports = defineCases({
         // leaves the dialog armed for a retry that can never succeed.
         const product = paidProduct(config, skip);
         const orderId = '_test-winback-claimed-order';
-        const user = subscriber(Manager, { uid: '_test-winback-claimed', product, orderId });
+        const user = subscriber(omega, { uid: '_test-winback-claimed', product, orderId });
         const provider = providerModule('test');
         const applied = [];
         const realApplyOffer = provider.applyOffer;
@@ -386,7 +381,7 @@ module.exports = defineCases({
         await firestore.set(`payments-orders/${orderId}`, {
           requests: {
             winback: {
-              discount: winback.toDiscount(winback.resolveOffer(Manager.config)),
+              discount: winback.toDiscount(winback.resolveOffer(omega.config)),
               date: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
             },
           },
@@ -395,7 +390,7 @@ module.exports = defineCases({
         provider.applyOffer = async (options) => applied.push(options);
 
         try {
-          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+          const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 400, 'Should refuse an offer this subscription already took');
           assert.equal(
@@ -415,7 +410,7 @@ module.exports = defineCases({
 
     {
       name: 'records-the-applied-discount-on-the-account',
-      async run({ Manager, assert, config, firestore, skip }) {
+      async run({ omega, assert, config, firestore, skip }) {
         // The order doc is the offer's MEMORY — what a second claim is refused
         // against — but the billing card reads the ACCOUNT, and a saving that
         // vanishes on reload was never announced at all ([#325]). So the claim
@@ -425,7 +420,7 @@ module.exports = defineCases({
         const product = paidProduct(config, skip);
         const uid = '_test-winback-account';
         const orderId = '_test-winback-account-order';
-        const user = subscriber(Manager, { uid, product, orderId });
+        const user = subscriber(omega, { uid, product, orderId });
         const provider = providerModule('test');
         const realApplyOffer = provider.applyOffer;
         const applied = [];
@@ -433,7 +428,7 @@ module.exports = defineCases({
         provider.applyOffer = async (options) => applied.push(options);
 
         try {
-          const { sent } = await acceptOfferReadingProperties(Manager, user);
+          const { sent } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 200, 'Should apply the save offer');
           assert.equal(applied.length, 1, 'and the provider discounted the live subscription once');
@@ -468,7 +463,7 @@ module.exports = defineCases({
           );
 
           // Through the resolver, exactly as the client reads it
-          const resolved = Manager.User(userDoc).properties.subscription.discount;
+          const resolved = new User(userDoc).toJSON().subscription.discount;
 
           assert.equal(resolved.valid, true, 'The discount survives account resolution');
           assert.equal(resolved.source, 'winback', 'source and all');
@@ -480,7 +475,7 @@ module.exports = defineCases({
 
           // A second accept changes NOTHING: it is refused before dispatch, and
           // the account's discount is not doubled, re-stamped or cleared.
-          const { sent: second, properties } = await acceptOfferReadingProperties(Manager, user);
+          const { sent: second, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(second.code, 400, 'Should refuse a second claim');
           assert.equal(properties?.additional?.code, 'offer-already-claimed', 'with the branchable code');
@@ -516,12 +511,12 @@ module.exports = defineCases({
 
     {
       name: 'refuses-a-provider-that-cannot-discount-with-a-branchable-code',
-      async run({ Manager, assert, config, skip }) {
+      async run({ omega, assert, config, skip }) {
         const product = paidProduct(config, skip);
 
         for (const provider of ['paypal', 'chargebee']) {
-          const user = subscriber(Manager, { uid: `_test-winback-${provider}`, product, provider, resourceId: `sub_${provider}_winback` });
-          const { sent, properties } = await acceptOfferReadingProperties(Manager, user);
+          const user = subscriber(omega, { uid: `_test-winback-${provider}`, product, provider, resourceId: `sub_${provider}_winback` });
+          const { sent, properties } = await acceptOfferReadingProperties(omega, user);
 
           assert.equal(sent.code, 400, `${provider}: Should refuse before dispatch`);
           assert.equal(
@@ -542,7 +537,7 @@ module.exports = defineCases({
         const product = paidProduct(config, skip);
 
         // Step 1: a real paid subscription on the test provider
-        const intentResponse = await http.as('route-winback-success').post('backend-manager/payments/intent', {
+        const intentResponse = await http.as('route-winback-success').post('omega/payments/intent', {
           provider: 'test',
           productId: product.id,
           frequency: 'monthly',
@@ -559,7 +554,7 @@ module.exports = defineCases({
         }, 15000, 500);
 
         // Step 3: the customer starts cancelling and takes the offer instead
-        const response = await http.as('route-winback-success').post('backend-manager/payments/winback', {
+        const response = await http.as('route-winback-success').post('omega/payments/winback', {
           confirmed: true,
         });
 
@@ -586,7 +581,7 @@ module.exports = defineCases({
 
         // Step 6: it is claimed ONCE — an offer takeable on every cancel dialog
         // is a permanent discount nobody agreed to
-        const second = await http.as('route-winback-success').post('backend-manager/payments/winback', {
+        const second = await http.as('route-winback-success').post('omega/payments/winback', {
           confirmed: true,
         });
 

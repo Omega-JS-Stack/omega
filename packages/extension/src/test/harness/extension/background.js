@@ -1,4 +1,4 @@
-// BXM test-harness background service worker.
+// The test-harness background service worker.
 //
 // This SW does ONE job: stay alive long enough for the chromium runner to attach
 // a CDP session and inject test code via Runtime.evaluate. The runner discovers
@@ -6,8 +6,8 @@
 // directly from the parent Node process — this file is intentionally minimal.
 //
 // We set a couple of globals the injected test code can rely on:
-//   globalThis.OMEGA_TEST_MODE — picked up by Manager.isTesting()
-//   globalThis.__bxmTestEmit — defined by the runner before each test;
+//   globalThis.OMEGA_TEST_MODE: picked up by omega.isTesting()
+//   globalThis.__omegaTestEmit — defined by the runner before each test;
 //                              used by injected code to report results
 //
 // We also publish a `chrome.runtime.onMessage` ping handler so view-layer tests

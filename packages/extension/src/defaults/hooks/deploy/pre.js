@@ -6,5 +6,5 @@
 // that must happen before the publish reaches the stores or the release repo.
 
 module.exports = async (ctx) => {
-  // ctx = { manager, projectRoot, mode }
+  // ctx = { build, projectRoot, mode }
 };

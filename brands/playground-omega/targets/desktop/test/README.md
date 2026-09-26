@@ -15,6 +15,12 @@ Match the framework's four layers — OMEGA Desktop's test runner discovers file
 
 A renderer suite that declares `view: '<name>'` runs against that view of YOUR app instead of the framework's harness page: the framework builds the app first, so the page carries your real preload, IPC handlers and config. It rides the boot lane, so `--layer=boot` (or the default `all`) runs it and `--layer=renderer` does not.
 
+## This project's suites
+
+- `main/notes-ipc.test.js`: main's half of the notes feature (`src/lib/notes.js`) on the harness's real IPC, app store and auth.
+- `boot/notes.test.js`: the notes channels, tray item, menu item, context-menu item, deep link and settings window in the real bundle.
+- `renderer/notes-view.test.js` (`view: 'main'`): the main view's notes panel, driven by real submits and app-store writes.
+
 ## Coverage
 
 Every feature ships with tests at every layer it has a surface in — logic (`build`/`main`), UI (`renderer`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.

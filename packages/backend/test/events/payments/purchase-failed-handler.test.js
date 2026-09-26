@@ -16,7 +16,7 @@
  *
  * Run: npx omega test backend:events/payments/purchase-failed-handler
  */
-const handler = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-failed.js');
+const handler = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/one-time/purchase-failed.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ORDER_ID = '5544-3322-1100';
@@ -31,9 +31,9 @@ function context(logs, sent) {
     ctx: {
       log: (line) => logs.push(line),
       error: (line) => logs.push(line),
-      Manager: {
+      email: { send: async (payload) => { sent.push(payload); return { status: 'sent' }; } },
+      omega: {
         config: { brand: { name: 'Test Brand' } },
-        Email: () => ({ send: async (payload) => { sent.push(payload); return { status: 'sent' }; } }),
       },
     },
   };

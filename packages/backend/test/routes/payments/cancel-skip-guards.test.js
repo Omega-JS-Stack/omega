@@ -22,14 +22,14 @@
  */
 const { buildUser, callHandler, withEnvironment, PRODUCTION_ENVIRONMENT } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/cancel/post.js');
+const handler = require('../../../dist/omega/routes/payments/cancel/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // A paid subscriber whose subscription is minutes old — the shape the age guard exists for.
-function youngSubscriber(Manager, { uid, admin }) {
+function youngSubscriber(omega, { uid, admin }) {
   const nowUNIX = Math.floor(Date.now() / 1000);
 
-  return buildUser(Manager, {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: { admin: !!admin },
     subscription: {
@@ -46,13 +46,13 @@ function youngSubscriber(Manager, { uid, admin }) {
   });
 }
 
-function cancel(Manager, user) {
+function cancel(omega, user) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-cancel',
     user,
-    settings: { confirmed: true, skipGuards: true, reason: null, feedback: null },
+    data: { confirmed: true, skipGuards: true, reason: null, feedback: null },
   });
 }
 
@@ -65,10 +65,10 @@ module.exports = defineCases({
     {
       name: 'skip-guards-is-ignored-for-an-ordinary-caller',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = youngSubscriber(Manager, { uid: '_test-skip-guards-plain', admin: false });
+      async run({ assert, omega }) {
+        const user = youngSubscriber(omega, { uid: '_test-skip-guards-plain', admin: false });
 
-        const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(Manager, user));
+        const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(omega, user));
 
         assert.equal(sent.code, 400, `An ordinary caller's skipGuards must not waive the age guard, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /still being set up/i, 'The age guard should be the rejection');
@@ -78,10 +78,10 @@ module.exports = defineCases({
     {
       name: 'skip-guards-is-honored-for-an-admin',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = youngSubscriber(Manager, { uid: '_test-skip-guards-admin', admin: true });
+      async run({ assert, omega }) {
+        const user = youngSubscriber(omega, { uid: '_test-skip-guards-admin', admin: true });
 
-        const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(Manager, user));
+        const sent = await withEnvironment(PRODUCTION_ENVIRONMENT, () => cancel(omega, user));
 
         assert.equal(sent.code, 400, `An admin should reach the provider lookup, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /Unknown provider/i, 'An admin should get PAST the age guard');
@@ -91,12 +91,12 @@ module.exports = defineCases({
     {
       name: 'skip-guards-is-honored-outside-production',
       auth: 'none',
-      async run({ assert, Manager, ctx }) {
+      async run({ assert, omega, ctx }) {
         assert.equal(ctx.isProduction(), false, 'the suite must run outside production for this test');
 
-        const user = youngSubscriber(Manager, { uid: '_test-skip-guards-nonprod', admin: false });
+        const user = youngSubscriber(omega, { uid: '_test-skip-guards-nonprod', admin: false });
 
-        const sent = await cancel(Manager, user);
+        const sent = await cancel(omega, user);
 
         assert.equal(sent.code, 400, `A non-production run should reach the provider lookup, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /Unknown provider/i, 'A non-production run should get PAST the age guard');
@@ -106,16 +106,16 @@ module.exports = defineCases({
     {
       name: 'the-age-guard-still-runs-without-skip-guards',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const user = youngSubscriber(Manager, { uid: '_test-skip-guards-absent', admin: true });
+      async run({ assert, omega }) {
+        const user = youngSubscriber(omega, { uid: '_test-skip-guards-absent', admin: true });
 
         // An admin who never asked to bypass gets the guard like anybody else
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-cancel',
           user,
-          settings: { confirmed: true, skipGuards: false, reason: null, feedback: null },
+          data: { confirmed: true, skipGuards: false, reason: null, feedback: null },
         });
 
         assert.equal(sent.code, 400, `The age guard should reject, got ${sent.code}: ${sent.body}`);

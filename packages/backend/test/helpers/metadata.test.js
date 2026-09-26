@@ -1,5 +1,5 @@
 /**
- * Test: helpers/metadata.js — the document metadata stamp
+ * Test: services/metadata.js — the document metadata stamp
  *
  * Run: npx omega test backend:helpers/metadata
  *
@@ -11,11 +11,11 @@
  *     idempotency handle events dedupe on.
  *   - timestamp and timestampUNIX describe the SAME instant.
  */
-const Metadata = require('../../dist/manager/helpers/metadata.js');
+const Metadata = require('../../dist/omega/services/metadata.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// The helper only reaches Manager.ctx.log().
-const Manager = { ctx: { log: () => {} } };
+// The service only reaches ctx.log().
+const ctx = { log: () => {} };
 
 module.exports = defineCases({
   description: 'Metadata.set() document stamping',
@@ -28,7 +28,7 @@ module.exports = defineCases({
       name: 'stamps-updated-and-tag-on-a-bare-document',
       async run({ assert }) {
         const doc = {};
-        const metadata = new Metadata(Manager, doc).set({});
+        const metadata = new Metadata(ctx).set({}, doc);
 
         assert.equal(typeof metadata.updated.timestamp, 'string');
         assert.equal(typeof metadata.updated.timestampUNIX, 'number');
@@ -40,7 +40,7 @@ module.exports = defineCases({
     {
       name: 'timestamp-and-timestampUNIX-describe-the-same-instant',
       async run({ assert }) {
-        const metadata = new Metadata(Manager, {}).set({});
+        const metadata = new Metadata(ctx).set({}, {});
         const iso = metadata.updated.timestamp;
 
         assert.equal(iso.endsWith('Z'), true, 'ISO-8601 in UTC');
@@ -53,7 +53,7 @@ module.exports = defineCases({
     {
       name: 'a-supplied-tag-is-used-verbatim',
       async run({ assert }) {
-        const metadata = new Metadata(Manager, {}).set({ tag: 'evt_abc123' });
+        const metadata = new Metadata(ctx).set({ tag: 'evt_abc123' }, {});
 
         assert.equal(metadata.tag, 'evt_abc123');
       },
@@ -62,8 +62,8 @@ module.exports = defineCases({
     {
       name: 'an-absent-tag-becomes-a-fresh-uuid-every-time',
       async run({ assert }) {
-        const first = new Metadata(Manager, {}).set({});
-        const second = new Metadata(Manager, {}).set({});
+        const first = new Metadata(ctx).set({}, {});
+        const second = new Metadata(ctx).set({}, {});
 
         assert.equal(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(first.tag), true);
         assert.equal(first.tag === second.tag, false, 'two stamps never share a tag');
@@ -84,7 +84,7 @@ module.exports = defineCases({
           },
         };
 
-        const metadata = new Metadata(Manager, doc).set({ tag: 'new-tag' });
+        const metadata = new Metadata(ctx).set({ tag: 'new-tag' }, doc);
 
         assert.deepEqual(metadata.created, { timestamp: '2020-01-01T00:00:00.000Z', timestampUNIX: 1577836800 });
         assert.equal(metadata.updated.timestamp === '2020-01-01T00:00:00.000Z', false, 'updated moved');
@@ -99,7 +99,7 @@ module.exports = defineCases({
       async run({ assert }) {
         const doc = { metadata: { created: { timestamp: '2020-01-01T00:00:00.000Z' } } };
 
-        const metadata = new Metadata(Manager, doc).set({});
+        const metadata = new Metadata(ctx).set({}, doc);
 
         assert.equal(metadata.created.timestamp, '2020-01-01T00:00:00.000Z');
         assert.equal(typeof metadata.updated.timestampUNIX, 'number');
@@ -111,11 +111,10 @@ module.exports = defineCases({
     {
       name: 'an-absent-document-stamps-onto-a-fresh-one',
       async run({ assert }) {
-        const instance = new Metadata(Manager);
-        const metadata = instance.set({});
+        const metadata = new Metadata(ctx).set({});
 
         assert.equal(typeof metadata.updated.timestamp, 'string');
-        assert.equal(instance.document.metadata, metadata);
+        assert.equal(typeof metadata.tag, 'string');
       },
     },
   ],

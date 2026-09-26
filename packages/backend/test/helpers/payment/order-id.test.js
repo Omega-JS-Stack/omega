@@ -18,7 +18,7 @@
  *
  * Run: npx omega test framework:helpers/payment/order-id
  */
-const OrderId = require('../../../dist/manager/libraries/payment/order-id.js');
+const OrderId = require('../../../dist/omega/libraries/payment/order-id.js');
 const { buildAdmin } = require('../../events/payments/_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 

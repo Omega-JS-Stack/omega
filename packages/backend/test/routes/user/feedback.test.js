@@ -17,7 +17,7 @@ module.exports = defineCases({
       timeout: 30000, // Longer timeout due to external API call
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/feedback', {
+        const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Great app! Works well.',
           dislike: '',
@@ -36,7 +36,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/feedback', {
+        const response = await http.post('omega/user/feedback', {
           rating: 'love',
           like: 'Absolutely love this app! Best thing ever! Highly recommend!',
           dislike: '',
@@ -58,7 +58,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/feedback', {
+        const response = await http.post('omega/user/feedback', {
           rating: 'dislike',
           like: '',
           dislike: 'Could use some improvements in the UI',
@@ -76,7 +76,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/feedback', {
+        const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Premium features are great!',
           dislike: '',
@@ -93,7 +93,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/user/feedback', {
+        const response = await http.post('omega/user/feedback', {
           rating: 'like',
           like: 'Test',
           dislike: '',

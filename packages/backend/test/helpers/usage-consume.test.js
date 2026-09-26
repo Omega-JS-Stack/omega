@@ -14,8 +14,8 @@
  *    features counted at once cannot overwrite each other;
  *  - mirrors come from the CATALOG and the account's owned docs, never a
  *    call-site API;
- *  - init is LAZY: attaching reads nothing, and an unused counter never
- *    resolves an account;
+ *  - init is LAZY: building the counter reads nothing, and an unused counter
+ *    never resolves an account;
  *  - a key is EXPLICIT: forKey() is a separate counter, so a signed-in user's
  *    own counters can never be moved into the anonymous store;
  *  - a feature the catalog does not define, or a perk, is a 500 — a limit
@@ -28,7 +28,8 @@
  */
 const assert = require('node:assert');
 
-const Usage = require('../../dist/manager/helpers/usage.js');
+const Usage = require('../../dist/omega/services/usage.js');
+const { User } = require('../../dist/omega/helpers/account.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A 31-day month, so ceil(100 / 31) = 4 is a number the assertions can name.
@@ -50,7 +51,7 @@ const PRODUCTS = [
   { id: 'premium', name: 'Premium', features: { saves: -1, exports: 500, support: true } },
 ];
 
-function makeManager(options) {
+function makeOmega(options) {
   options = options || {};
 
   return {
@@ -59,12 +60,13 @@ function makeManager(options) {
       payment: { products: PRODUCTS },
     },
     storage: () => ({ get: () => ({ value: () => ({}) }), set: () => ({ write: () => {} }) }),
-    libraries: {},
+    firebase: {},
   };
 }
 
-// A ctx that answers exactly what the counter asks it: who the caller is, and
-// where to put a log line. `report` returns the decorated Error ctx.report does.
+// A ctx that answers exactly what the counter asks it: who the caller is (a
+// User, as authenticate() resolves one), and where to put a log line. `report`
+// returns the decorated Error ctx.report does.
 function makeCtx(account, options) {
   options = options || {};
 
@@ -72,6 +74,7 @@ function makeCtx(account, options) {
   const record = (...args) => state.lines.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
 
   return {
+    omega: makeOmega(options),
     state: state,
     log: record,
     warn: record,
@@ -86,7 +89,7 @@ function makeCtx(account, options) {
     },
     authenticate: async () => {
       state.authenticated++;
-      return JSON.parse(JSON.stringify(account || {}));
+      return new User(JSON.parse(JSON.stringify(account || {})));
     },
     request: { data: {}, geolocation: { ip: options.ip || '203.0.113.7' } },
   };
@@ -97,9 +100,7 @@ function attach(account, options) {
   options = options || {};
 
   const ctx = makeCtx(account, options);
-  const usage = new Usage(makeManager(options));
-
-  usage.attach(ctx, { log: false, today: options.today || IN_MARCH });
+  const usage = new Usage(ctx).configure({ log: false, today: options.today || IN_MARCH });
 
   const writes = [];
   usage.write = async function (feature) {
@@ -125,12 +126,12 @@ module.exports = defineCases({
 
   tests: [
     {
-      name: 'attach reads nothing — the account resolves on the FIRST consume',
+      name: 'building the counter reads nothing — the account resolves on the FIRST consume',
 
       async run() {
         const { usage, ctx } = attach(account());
 
-        assert.equal(ctx.state.authenticated, 0, 'attaching must cost no read');
+        assert.equal(ctx.state.authenticated, 0, 'building the counter must cost no read');
         assert.equal(usage.resolved, false);
 
         await usage.consume('saves');
@@ -141,20 +142,17 @@ module.exports = defineCases({
     },
 
     {
-      name: 'a request the middleware already authenticated is never authenticated twice',
+      name: 'the counter counts on the account authenticate() resolved, read once',
 
       async run() {
-        const { usage, ctx } = attach(account());
-
-        // What the middleware leaves behind: the caller resolved, and the flag
-        // that says so
-        ctx.resolvedUser = true;
-        ctx.request.user = account({ usage: { saves: { monthly: 7, daily: 0 } } });
+        const { usage, ctx } = attach(account({ usage: { saves: { monthly: 7, daily: 0 } } }));
 
         const state = await usage.read('saves');
 
-        assert.equal(ctx.state.authenticated, 0, 'no second token verification, no second user-doc read');
-        assert.equal(state.used, 7, 'and the counter reads the account the middleware resolved');
+        await usage.read('saves');
+
+        assert.equal(ctx.state.authenticated, 1, 'no second token verification, no second user-doc read');
+        assert.equal(state.used, 7, 'and the counter reads the account authenticate() resolved');
       },
     },
 
@@ -162,14 +160,10 @@ module.exports = defineCases({
       name: 'a signed-OUT caller is refused loudly, never routed to the anonymous store',
 
       async run() {
-        // What ctx.authenticate() leaves behind for a caller with no credential:
-        // a full account SHAPE whose uid is null, and resolvedUser set all the
-        // same. Writing that would land on `users/null` — one document every
-        // anonymous caller on earth shares.
-        const { usage, ctx } = attach(null);
-
-        ctx.resolvedUser = true;
-        ctx.request.user = { ...account(), auth: { uid: null, email: null }, authenticated: false };
+        // What ctx.authenticate() resolves for a caller with no credential: a
+        // full account SHAPE whose uid is null. Writing that would land on
+        // `users/null`, one document every anonymous caller on earth shares.
+        const { usage } = attach(null);
 
         const consumed = await usage.consume('saves').catch((e) => e);
         const read = await usage.read('saves').catch((e) => e);

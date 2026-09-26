@@ -16,13 +16,8 @@ meta:
       <h1 class="h2 mb-4">Error test page</h1>
       <p class="lead mb-5">This page demonstrates different error handling scenarios.</p>
 
-      <!-- Trigger auth signin error -->
+      <!-- Trigger auth signin error (wired by the page module, core/js/pages/test/libraries/error) -->
       <button id="trigger-error" class="btn btn-danger">Trigger auth signin error</button>
-      <script>
-        document.getElementById('trigger-error').addEventListener('click', function() {
-          Manager.omega.auth().signInWithEmailAndPassword('invalid@example.com', 'wrongpassword')
-        });
-      </script>
 
     </div>
   </div>

@@ -1,0 +1,516 @@
+/**
+ * POST /admin/post - Create blog post
+ * Admin/blogger endpoint to create blog posts via GitHub
+ * Uses Git Trees API to commit all files (images + post) in a single commit
+ */
+const moment = require('moment');
+const jetpack = require('fs-jetpack');
+const powertools = require('node-powertools');
+const uuidv4 = require('uuid').v4;
+const path = require('path');
+const { Octokit } = require('@octokit/rest');
+const { get, set } = require('lodash');
+
+const deduplicateImageAlts = require('./deduplicate-image-alts');
+const dispatchDeploy = require('./dispatch-deploy');
+const { commitTreeToDeployBranch } = require('../lib/deploy-branch.js');
+const { cmsContext } = require('../../../helpers/web-target.js');
+const env = require('../../../libraries/env.js');
+
+const POST_TEMPLATE = jetpack.read(`${__dirname}/templates/post.html`);
+// SITE-relative, like every path here: the web target's folder is prefixed at
+// composition time (#887)
+const IMAGE_PATH_SRC = `src/assets/images/blog/post-{id}/`;
+const IMAGE_REGEX = /(?:!\[(.*?)\]\((.*?)\))/img;
+
+// Max dimension (px) for downloaded post images on the long edge, and JPEG
+// re-encode quality. Sources above the max cause downstream Jekyll/imagemin
+// pipelines to stall on huge decodes (e.g. a 16384×10576 source decodes to
+// ~520MB raw), so resize at ingest time.
+const IMAGE_MAX_DIMENSION = 2048;
+const IMAGE_JPEG_QUALITY = 80;
+
+// Non-JPG raster sources are converted to JPEG at ingest rather than rejected
+// — stock CDNs beyond Unsplash (Pexels, Pixabay) commonly serve png/webp.
+// Anything not in this list (and not already .jpg) is still rejected.
+const CONVERTIBLE_IMAGE_EXTS = ['.png', '.webp'];
+
+module.exports = async ({ ctx, omega, user, data, analytics }) => {
+
+  // Require authentication
+  if (!user.authenticated) {
+    return ctx.respond('Authentication required', { code: 401 });
+  }
+
+  // Require admin or blogger
+  if (!user.roles.admin && !user.roles.blogger) {
+    return ctx.respond('Admin required.', { code: 403 });
+  }
+
+  // Check for GitHub configuration
+  if (!env.has('GH_TOKEN')) {
+    return ctx.respond('GitHub API key not configured.', { code: 500 });
+  }
+
+  // The SOURCE repo this commits to, and WHICH website inside it (#887): the
+  // brand's one web target by default, the named one when it runs several
+  let source;
+  let target;
+  try {
+    ({ source, target } = cmsContext(omega.config, data.target));
+  } catch (e) {
+    return ctx.respond(e.message, { code: e.code });
+  }
+
+  ctx.log('main(): settings', data);
+
+  const now = ctx.meta.startTime.timestamp;
+  const bemRepo = { user: source.owner, name: source.name };
+
+  // Setup Octokit
+  const octokit = new Octokit({
+    auth: env.get('GH_TOKEN'),
+  });
+
+  // Check for required values
+  if (!data.title) {
+    return ctx.respond('Missing required parameter: title', { code: 400 });
+  }
+  if (!data.url) {
+    return ctx.respond('Missing required parameter: url', { code: 400 });
+  }
+  if (!data.description) {
+    return ctx.respond('Missing required parameter: description', { code: 400 });
+  }
+  if (!data.headerImageURL) {
+    return ctx.respond('Missing required parameter: headerImageURL', { code: 400 });
+  }
+  if (!data.body) {
+    return ctx.respond('Missing required parameter: body', { code: 400 });
+  }
+
+  // Fix URL — strip blog/ prefix then slugify (slugify handles slashes/special chars)
+  data.url = omega.utilities.slugify(data.url.replace(/blog\//ig, ''));
+
+  // Fix body
+  data.body = data.body
+    .replace(powertools.regexify(`/# ${data.title}/i`), '')
+    .replace(/\n\n\n+/g, '\n\n')
+    .trim();
+
+  // Fix other values
+  data.author = data.author || powertools.random(['alex-raeburn', 'rare-ivy', 'christina-hill']);
+  data.affiliate = data.affiliate;
+  data.tags = data.tags;
+  data.categories = data.categories;
+  data.layout = data.layout;
+  data.source = data.source || null;
+  data.date = moment(data.date || now).subtract(1, 'days').format('YYYY-MM-DD');
+  data.id = data.id || Math.round(new Date(now).getTime() / 1000);
+  data.target = target.name;
+  data.directory = `${target.path}/src/_posts/${moment(now).format('YYYY')}/${data.postPath}`;
+  // Always the brand's own repo — caller-supplied values would let a blogger-role
+  // user point the shared GH_TOKEN at any repo it can write
+  data.githubUser = bemRepo.user;
+  data.githubRepo = bemRepo.name;
+
+  ctx.log('main(): Creating post...', data);
+
+  // Download all images and collect file data
+  const imageFiles = await downloadImages(ctx, data, target).catch(e => e);
+  if (imageFiles instanceof Error) {
+    return ctx.respond(imageFiles.message, { code: 400 });
+  }
+
+  // Rewrite body to use @post/ prefix for extracted images
+  for (const file of imageFiles) {
+    if (file.originalUrl) {
+      data.body = data.body.split(file.originalUrl).join(`@post/${file.filename}`);
+    }
+  }
+
+  // Generate post content from template
+  const formattedContent = powertools.template(
+    POST_TEMPLATE,
+    formatClone(data),
+  );
+
+  // Build post file entry
+  data.path = `${data.directory}/${data.date}-${data.url}.md`;
+  const allFiles = [
+    ...imageFiles.map(img => ({
+      path: img.githubPath,
+      content: img.base64,
+      encoding: 'base64',
+    })),
+    {
+      path: data.path,
+      content: Buffer.from(formattedContent).toString('base64'),
+      encoding: 'base64',
+    },
+  ];
+
+  // Commit all files in a single commit
+  const commitResult = await commitAll(ctx, octokit, data, allFiles).catch(e => e);
+  if (commitResult instanceof Error) {
+    return ctx.respond(commitResult.message, { code: 500 });
+  }
+
+  ctx.log('main(): commitAll', commitResult);
+
+  // D13: content-publish implies deploy (deploy: false opts out)
+  await dispatchDeploy(ctx, octokit, data);
+
+  // Track analytics
+  analytics.event('admin/post', { action: 'create' });
+
+  return ctx.respond(data);
+};
+
+// Helper: Download all images and return file data (no GitHub uploads)
+async function downloadImages(ctx, data, target) {
+  const files = [];
+  const assetsPath = `${target.path}/${powertools.template(IMAGE_PATH_SRC, data)}`;
+
+  const matches = data.body.matchAll(IMAGE_REGEX);
+  const images = Array.from(matches).map(match => ({
+    src: match[2] || '',
+    alt: match[1] || uuidv4(),
+    header: false,
+  }));
+
+  // Add heading image to beginning
+  images.unshift({
+    src: data.headerImageURL,
+    alt: data.url,
+    header: true,
+  });
+
+  // Deduplicate alt-text across different image URLs (mutates images in place,
+  // returns rewritten body). See deduplicate-image-alts.js for full rationale.
+  const dedup = deduplicateImageAlts(images, data.body);
+  data.body = dedup.body;
+
+  ctx.log('downloadImages(): images', images);
+
+  if (!images.length) {
+    return files;
+  }
+
+  for (let index = 0; index < images.length; index++) {
+    const image = images[index];
+
+    // Download image
+    const download = await downloadImage(ctx, image.src, image.alt).catch(e => e);
+
+    ctx.log('downloadImages(): download', download);
+
+    if (download instanceof Error) {
+      if (image.header) {
+        throw download;
+      } else {
+        ctx.warn('downloadImages(): Skipping NON-HEADER image download due to error', download);
+        continue;
+      }
+    }
+
+    // Read file content as base64
+    const base64 = jetpack.read(download.path, 'buffer').toString('base64');
+
+    files.push({
+      githubPath: `${assetsPath}${download.filename}`,
+      filename: download.filename,
+      base64: base64,
+      originalUrl: image.header ? null : image.src,
+    });
+  }
+
+  return files;
+}
+
+// Apply CDN-side resize params so the server delivers a pre-scaled image.
+// Unsplash (images.unsplash.com) supports Imgix-style params: w, q, fm.
+// Other CDNs can be added here as needed.
+function applyImageCDNParams(src) {
+  try {
+    const url = new URL(src);
+
+    if (url.hostname === 'images.unsplash.com') {
+      if (!url.searchParams.has('w')) {
+        url.searchParams.set('w', String(IMAGE_MAX_DIMENSION));
+      }
+      if (!url.searchParams.has('q')) {
+        url.searchParams.set('q', String(IMAGE_JPEG_QUALITY));
+      }
+    }
+
+    if (url.hostname === 'images.pexels.com') {
+      if (!url.searchParams.has('w')) {
+        url.searchParams.set('w', String(IMAGE_MAX_DIMENSION));
+      }
+      if (!url.searchParams.has('auto')) {
+        url.searchParams.set('auto', 'compress');
+      }
+    }
+
+    return url.toString();
+  } catch (e) {
+    return src;
+  }
+}
+
+// Helper: Build a readable message for a failed image download. Fetch errors
+// can carry raw HTML bodies as the message (CDN 404 pages) — strip tags and
+// truncate so callers surface "Could not download image (<url>): 404" instead
+// of markup that downstream HTML rendering swallows.
+function formatImageDownloadError(src, e) {
+  const reason = (e && typeof e.message === 'string' ? e.message : `${e}`)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const truncated = reason.length > 200 ? `${reason.slice(0, 197)}...` : reason;
+
+  return `Could not download image (${src}): ${truncated || 'unknown error'}`;
+}
+
+// Helper: Download image
+async function downloadImage(ctx, src, alt) {
+  const fetch = ctx.omega.require('wonderful-fetch');
+  const hyphenated = ctx.omega.utilities.slugify(alt);
+
+  // Request a server-side resize from supported CDNs so we never download
+  // a massive original (e.g. 5184×3456 → ~71MB decoded). This keeps peak
+  // memory well within Cloud Functions limits even at 256MB.
+  const url = applyImageCDNParams(src);
+
+  ctx.log(`downloadImage(): src=${src}, url=${url}, alt=${alt}, hyphenated=${hyphenated}`);
+
+  const result = await fetch(url, {
+    method: 'get',
+    download: `${ctx.tmpdir}/${hyphenated}`,
+  }).catch(e => {
+    throw new Error(formatImageDownloadError(src, e));
+  });
+
+  result.filename = path.basename(result.path);
+  result.ext = path.extname(result.path);
+
+  ctx.log('downloadImage(): Result', result.path);
+
+  // Convert supported non-JPG formats in place (mutates result.path/filename/ext)
+  if (CONVERTIBLE_IMAGE_EXTS.includes(result.ext)) {
+    await convertToJpeg(ctx, result);
+  }
+
+  if (result.ext !== '.jpg') {
+    throw new Error(`Images must be .jpg, .png, or .webp (got ${result.ext}): ${src}`);
+  }
+
+  // Resize in place if the long edge exceeds IMAGE_MAX_DIMENSION
+  await resizeImage(ctx, result.path);
+
+  return result;
+}
+
+// Helper: Convert a downloaded png/webp to progressive JPEG in place. Alpha is
+// flattened onto white (JPEG has no transparency; default flatten is black).
+// Mutates result.path/filename/ext to the new .jpg file and removes the
+// original so the rest of the pipeline (resize, base64, GitHub path) only ever
+// sees JPGs.
+async function convertToJpeg(ctx, result) {
+  const sharp = ctx.omega.require('sharp');
+  sharp.cache(false);
+
+  const newPath = result.path.replace(/\.[^.]+$/, '.jpg');
+  const buffer = await sharp(result.path)
+    .flatten({ background: '#ffffff' })
+    .jpeg({ quality: IMAGE_JPEG_QUALITY, progressive: true })
+    .toBuffer();
+
+  jetpack.write(newPath, buffer);
+
+  if (newPath !== result.path) {
+    jetpack.remove(result.path);
+  }
+
+  result.path = newPath;
+  result.filename = path.basename(newPath);
+  result.ext = '.jpg';
+
+  ctx.log(`convertToJpeg(): Converted to ${newPath}`);
+
+  return result;
+}
+
+// Helper: Resize image in place if the long edge exceeds IMAGE_MAX_DIMENSION.
+// Re-encodes as progressive JPEG at IMAGE_JPEG_QUALITY. Short-circuits when the
+// source is already within the limit.
+//
+// Disables sharp's pixel cache so decoded buffers are freed immediately —
+// without this, processing several large images serially can OOM a 256MB
+// Cloud Function even though only one image is "active" at a time.
+async function resizeImage(ctx, filepath) {
+  const sharp = ctx.omega.require('sharp');
+  sharp.cache(false);
+
+  const meta = await sharp(filepath).metadata();
+  const longEdge = Math.max(meta.width, meta.height);
+
+  if (longEdge <= IMAGE_MAX_DIMENSION) {
+    ctx.log(`resizeImage(): No resize needed (${meta.width}x${meta.height})`);
+    return { resized: false, width: meta.width, height: meta.height };
+  }
+
+  // Resize to a buffer (cannot read+write the same path in one sharp pipeline)
+  const buffer = await sharp(filepath)
+    .resize({
+      width: IMAGE_MAX_DIMENSION,
+      height: IMAGE_MAX_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: IMAGE_JPEG_QUALITY, progressive: true })
+    .toBuffer();
+
+  // Overwrite the file on disk
+  jetpack.write(filepath, buffer);
+
+  // Read the resized dimensions back for the log
+  const resizedMeta = await sharp(filepath).metadata();
+  ctx.log(`resizeImage(): Resized ${meta.width}x${meta.height} -> ${resizedMeta.width}x${resizedMeta.height} (max ${IMAGE_MAX_DIMENSION}px, q${IMAGE_JPEG_QUALITY})`);
+
+  return { resized: true, width: resizedMeta.width, height: resizedMeta.height };
+}
+
+// Helper: Commit all files (images + post) in a single commit using Git Trees API
+async function commitAll(ctx, octokit, data, files) {
+  const owner = data.githubUser;
+  const repo = data.githubRepo;
+
+  ctx.log('commitAll(): Committing', files.length, 'files');
+
+  // Get the latest commit SHA on the default branch
+  const refResult = await octokit.rest.git.getRef({
+    owner: owner,
+    repo: repo,
+    ref: 'heads/master',
+  }).catch(() => {
+    // Try 'main' if 'master' fails
+    return octokit.rest.git.getRef({
+      owner: owner,
+      repo: repo,
+      ref: 'heads/main',
+    });
+  });
+
+  const latestCommitSha = refResult.data.object.sha;
+  const branch = refResult.data.ref;
+
+  ctx.log('commitAll(): Latest commit', latestCommitSha, 'on', branch);
+
+  // Get the tree SHA of the latest commit
+  const commitResult = await octokit.rest.git.getCommit({
+    owner: owner,
+    repo: repo,
+    commit_sha: latestCommitSha,
+  });
+
+  const baseTreeSha = commitResult.data.tree.sha;
+
+  // Create blobs for each file
+  const treeItems = [];
+
+  for (const file of files) {
+    const blob = await octokit.rest.git.createBlob({
+      owner: owner,
+      repo: repo,
+      content: file.content,
+      encoding: file.encoding,
+    });
+
+    ctx.log('commitAll(): Created blob for', file.path, blob.data.sha);
+
+    treeItems.push({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blob.data.sha,
+    });
+  }
+
+  // Create a new tree with all files
+  const newTree = await octokit.rest.git.createTree({
+    owner: owner,
+    repo: repo,
+    base_tree: baseTreeSha,
+    tree: treeItems,
+  });
+
+  ctx.log('commitAll(): Created tree', newTree.data.sha);
+
+  // Create the commit
+  const postPath = files[files.length - 1].path;
+  const message = `📦 admin/post:create ${postPath}`;
+  const newCommit = await octokit.rest.git.createCommit({
+    owner: owner,
+    repo: repo,
+    message: message,
+    tree: newTree.data.sha,
+    parents: [latestCommitSha],
+  });
+
+  ctx.log('commitAll(): Created commit', newCommit.data.sha);
+
+  // Update the branch ref to point to the new commit
+  const updateResult = await octokit.rest.git.updateRef({
+    owner: owner,
+    repo: repo,
+    ref: branch.replace('refs/', ''),
+    sha: newCommit.data.sha,
+  });
+
+  ctx.log('commitAll(): Updated ref', updateResult.data.object.sha);
+
+  // The same files, on the branch CI builds (#919). The blobs above are
+  // repo-level objects, so the tree items are reused as they are and nothing
+  // uploads twice; only the tree, the commit and the ref differ, because the
+  // two branches hold different history. A brand with no deploy branch yet
+  // keeps the commit above and is told so.
+  const deployed = await commitTreeToDeployBranch({
+    ctx,
+    octokit,
+    owner: owner,
+    repo: repo,
+    tree: treeItems,
+    message: message,
+    what: postPath,
+  });
+
+  data.deployBranch = deployed.deployBranch;
+
+  return updateResult;
+}
+
+// Helper: Format clone for templating
+function formatClone(payload) {
+  powertools.getKeys(payload).forEach((item) => {
+    const value = get(payload, item);
+    const isArray = Array.isArray(value);
+
+    if (isArray) {
+      set(payload, item, JSON.stringify(value));
+    }
+  });
+
+  return payload;
+}
+
+// Expose helpers + constants for tests
+module.exports.commitAll = commitAll;
+module.exports.resizeImage = resizeImage;
+module.exports.convertToJpeg = convertToJpeg;
+module.exports.formatImageDownloadError = formatImageDownloadError;
+module.exports.applyImageCDNParams = applyImageCDNParams;
+module.exports.IMAGE_MAX_DIMENSION = IMAGE_MAX_DIMENSION;
+module.exports.IMAGE_JPEG_QUALITY = IMAGE_JPEG_QUALITY;
+

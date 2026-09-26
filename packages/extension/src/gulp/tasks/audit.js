@@ -1,16 +1,16 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('audit');
+const build = require('../../build.js');
+const logger = build.logger('audit');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { series } = require('gulp');
 const chalk = require('chalk').default;
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Audit results tracker
 const auditResults = {
@@ -118,7 +118,7 @@ async function auditFn(complete) {
   logger.log('Starting audit...');
 
   // Skip if not in build mode
-  if (!Manager.isBuildMode()) {
+  if (!build.isBuildMode()) {
     logger.log('Skipping audit (not in build mode)');
     return complete();
   }

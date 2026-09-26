@@ -1,6 +1,6 @@
 // Libraries
 import authPages from '__main_assets__/js/libs/auth/index.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 
 // Module

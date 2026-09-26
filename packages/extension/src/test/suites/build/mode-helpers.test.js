@@ -38,9 +38,10 @@ module.exports = defineCases({
   description: 'utils/mode-helpers — cross-context isDevelopment/isTesting/getVersion',
   tests: [
     {
-      name: 'exports { attachTo, getEnvironment, isDevelopment, isProduction, isTesting, getVersion }',
+      name: 'exports the plain functions { getEnvironment, isDevelopment, isProduction, isTesting, getVersion }, no mixin',
       run: (ctx) => {
-        ctx.expect(typeof helpers.attachTo).toBe('function');
+        // The mixin is retired: the context classes call these as methods
+        ctx.expect(helpers.attachTo).toBeUndefined();
         ctx.expect(typeof helpers.getEnvironment).toBe('function');
         ctx.expect(typeof helpers.isDevelopment).toBe('function');
         ctx.expect(typeof helpers.isProduction).toBe('function');
@@ -95,20 +96,6 @@ module.exports = defineCases({
         withEnv({ OMEGA_ENVIRONMENT: 'staging' }, () => {
           ctx.expect(() => helpers.getEnvironment()).toThrow(/OMEGA_ENVIRONMENT/);
         });
-      },
-    },
-    {
-      name: 'attachTo() mixes helpers into a constructor + its prototype',
-      run: (ctx) => {
-        function FakeManager() {}
-        helpers.attachTo(FakeManager);
-        ctx.expect(typeof FakeManager.getEnvironment).toBe('function');
-        ctx.expect(typeof FakeManager.prototype.getEnvironment).toBe('function');
-        ctx.expect(typeof FakeManager.isDevelopment).toBe('function');
-        ctx.expect(typeof FakeManager.prototype.isDevelopment).toBe('function');
-        ctx.expect(typeof FakeManager.isTesting).toBe('function');
-        ctx.expect(typeof FakeManager.prototype.isTesting).toBe('function');
-        ctx.expect(typeof FakeManager.getVersion).toBe('function');
       },
     },
     {

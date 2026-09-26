@@ -13,7 +13,7 @@
  *     the second reuses the first's (possibly already-suffixed) alt — no change.
  *   - Images with distinct alts are untouched.
  */
-const deduplicateImageAlts = require('../../../dist/manager/routes/admin/post/deduplicate-image-alts');
+const deduplicateImageAlts = require('../../../dist/omega/routes/admin/post/deduplicate-image-alts');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({

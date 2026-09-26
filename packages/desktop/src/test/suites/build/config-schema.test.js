@@ -10,9 +10,9 @@ const fs = require('fs');
 const JSON5 = require('json5');
 const { loadConfig } = require('@omega.js/config');
 
-const Manager = require('../../../build.js');
+const build = require('../../../build.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
-const root = Manager.getRootPath('main');
+const root = build.getRootPath('main');
 const defaultsDir = path.join(root, 'dist', 'defaults');
 const defaultConfigPath = path.join(defaultsDir, 'config', 'omega.json5');
 
@@ -76,7 +76,7 @@ module.exports = defineCases({
       name: 'resolved: has app block (appId + productName may be null — derived from brand)',
       run: (ctx) => {
         // appId and productName are derived from brand.id / brand.name at config-load
-        // time (Manager.getConfig). The raw scaffold leaves them null on purpose so the
+        // time (build.getConfig). The raw scaffold leaves them null on purpose so the
         // user only sets brand.{id,name} once. The `app` block itself must exist for
         // copyright + any future explicit overrides.
         ctx.expect(ctx.state.cfg.app).toBeTruthy();
@@ -96,7 +96,7 @@ module.exports = defineCases({
       run: (ctx) => {
         // Tray, menu, and context-menu use fixed conventional paths
         // (src/integrations/{tray,menu,context-menu}/index.js). Disabling is a runtime
-        // call (manager.tray.disable() etc.), not a config flag. Config carries no entry
+        // call (omega.tray.disable() etc.), not a config flag. Config carries no entry
         // for these in v1 — guard against re-introducing one accidentally.
         ctx.expect(ctx.state.cfg.tray).toBeUndefined();
         ctx.expect(ctx.state.cfg.menu).toBeUndefined();
@@ -125,7 +125,7 @@ module.exports = defineCases({
       name: 'has NO deepLinks config block (scheme = brand.id, routes are runtime)',
       run: (ctx) => {
         // deep-link scheme is auto-derived from brand.id; routes register at runtime via
-        // manager.deepLink.on(). Guard against re-introducing a config block.
+        // omega.deepLink.on(). Guard against re-introducing a config block.
         ctx.expect(ctx.state.cfg.deepLinks).toBeUndefined();
       },
     },

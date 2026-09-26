@@ -18,7 +18,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.get('backend-manager/user', {});
+        const response = await http.get('omega/user', {});
 
         assert.isError(response, 401, 'Resolve should fail without authentication');
       },
@@ -31,7 +31,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert, accounts }) {
-        const response = await http.get('backend-manager/user', {});
+        const response = await http.get('omega/user', {});
 
         assert.isSuccess(response, 'Resolve should succeed for basic user');
 
@@ -40,7 +40,8 @@ module.exports = defineCases({
         // Verify auth properties
         assert.equal(user.auth.uid, accounts.basic.uid, 'UID should match test account');
         assert.equal(user.auth.email, accounts.basic.email, 'Email should match test account');
-        assert.equal(user.authenticated, true, 'User should be authenticated');
+        // The 200 IS the verdict: the route answers 401 to a signed-out caller, and
+        // the user rides the wire as its stored document (no computed getters)
 
         // Verify subscription properties - basic user should have basic subscription
         assert.equal(user.subscription.product.id, 'basic', 'Subscription ID should be basic');
@@ -63,7 +64,7 @@ module.exports = defineCases({
 
       async run({ http, assert, accounts }) {
         // Authenticate with the real admin test account's privateKey
-        const response = await http.withPrivateKey(accounts.admin.privateKey).get('backend-manager/user', {});
+        const response = await http.withPrivateKey(accounts.admin.privateKey).get('omega/user', {});
 
         assert.isSuccess(response, 'Resolve should succeed for admin account');
 
@@ -72,7 +73,6 @@ module.exports = defineCases({
         // Verify auth properties - should match the real admin account
         assert.equal(user.auth.uid, accounts.admin.uid, 'UID should match admin test account');
         assert.equal(user.auth.email, accounts.admin.email, 'Email should match admin test account');
-        assert.equal(user.authenticated, true, 'Should be authenticated');
 
         // Verify roles - admin account has roles.admin = true in Firestore
         assert.equal(user.roles.admin, true, 'Admin account should have admin role');
@@ -84,12 +84,12 @@ module.exports = defineCases({
 
     // Test 4: admin key only - shell account with admin role, no real user
     {
-      name: 'backend-manager-key-shell-account',
+      name: 'admin-key-shell-account',
       auth: 'admin',
       timeout: 15000,
 
       async run({ http, assert, accounts }) {
-        const response = await http.get('backend-manager/user', {});
+        const response = await http.get('omega/user', {});
 
         assert.isSuccess(response, 'Resolve should succeed with admin key');
 
@@ -97,7 +97,6 @@ module.exports = defineCases({
 
         // Verify roles - admin key grants admin role
         assert.equal(user.roles.admin, true, 'admin key should grant admin role');
-        assert.equal(user.authenticated, true, 'Should be authenticated');
 
         // Should NOT have the real admin account's UID (it's a shell account)
         assert.notEqual(user.auth.uid, accounts.admin.uid, 'Should not be the real admin account');
@@ -112,7 +111,7 @@ module.exports = defineCases({
 
       async run({ http, assert, accounts, config }) {
         const paidProduct = getFirstPaidProduct(config);
-        const response = await http.get('backend-manager/user', {});
+        const response = await http.get('omega/user', {});
 
         assert.isSuccess(response, 'Resolve should succeed for premium user');
 
@@ -140,7 +139,7 @@ module.exports = defineCases({
 
       async run({ http, assert, accounts, config }) {
         const paidProduct = getFirstPaidProduct(config);
-        const response = await http.get('backend-manager/user', {});
+        const response = await http.get('omega/user', {});
 
         assert.isSuccess(response, 'Resolve should succeed for expired premium user');
 

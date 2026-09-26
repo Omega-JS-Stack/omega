@@ -1,6 +1,6 @@
 // Main-process tests for the global raw-BrowserWindow test stealth:
 // utils/stealth-window.js applied by main.js's `browser-window-created` hook
-// (registered during Manager.initialize step 1a-ii — this harness IS Testing
+// (registered during omega.initialize() step 1a-ii — this harness IS Testing
 // mode, so the hook is live).
 //
 // Named windows created through lib/window-manager have their own stealth path

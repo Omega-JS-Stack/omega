@@ -19,7 +19,7 @@ const jetpack = require('fs-jetpack');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const SOURCE_DIRS = [
-  path.join(__dirname, '../../dist/manager'),
+  path.join(__dirname, '../../dist/omega'),
   path.join(__dirname, '../../dist/mcp'),
 ];
 
@@ -27,7 +27,7 @@ const SOURCE_DIRS = [
 const LOG_FLAG = /\blog\s*:\s*true\b/g;
 
 // A key that carries a credential: the middleware's CREDENTIAL_HEADERS set
-// (authorization, omega-admin-key, cookie — src/manager/helpers/middleware.js),
+// (authorization, omega-admin-key, cookie — src/omega/pipeline.js),
 // an api key, or any dash/underscore `*-key` / `*-token` / `*-secret` key (the
 // snake_case form covers body fields like `client_secret` — `log: true` dumps
 // the whole config, body included). Requires the trailing `:` so a VALUE like

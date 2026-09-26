@@ -1,5 +1,5 @@
 const { TEST_ACCOUNTS, getAccountDefinitions, getFirstPaidProduct, buildOrderFixture, buildSessionFixtures } = require('../../dist/test/test-accounts.js');
-const isTrialing = require('../../dist/manager/routes/payments/cancel/_is-trialing.js');
+const isTrialing = require('../../dist/omega/routes/payments/cancel/_is-trialing.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /**

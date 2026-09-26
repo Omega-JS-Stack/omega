@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
@@ -51,7 +51,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -86,7 +86,7 @@ const MONTH_FROM_NOW = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
 
 /** A live trial: the subscription runs exactly as far as the trial does. */
 function trialingAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -95,12 +95,12 @@ function trialingAccount(subscription) {
       trial: { claimed: true, expires: { timestampUNIX: WEEK_FROM_NOW } },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /** A paid subscription — the half of the ruling that must not change. */
 function paidAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       status: 'active',
@@ -108,7 +108,7 @@ function paidAccount(subscription) {
       expires: { timestampUNIX: MONTH_FROM_NOW },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 async function billingStateFor(account) {
@@ -127,12 +127,11 @@ async function billingStateFor(account) {
     history: { replaceState: () => {} },
   };
   globalThis.__omegaClient = {
-    auth: () => ({ resolveSubscription: (a) => resolveSubscription(a) }),
-    bindings: () => ({ update: (state) => updates.push(state) }),
-    utilities: () => ({
+    bindings: { update: (state) => updates.push(state) },
+    utilities: {
       showNotification: () => {},
       escapeHTML: (value) => value,
-    }),
+    },
     request: async () => ({}),
   };
 
@@ -265,9 +264,8 @@ async function wireCancelFlow(account, { analyticsBlocked = false } = {}) {
     },
   };
   globalThis.__omegaClient = {
-    auth: () => ({ resolveSubscription: (a) => resolveSubscription(a) }),
-    bindings: () => ({ update: () => {} }),
-    utilities: () => ({ showNotification: () => {}, escapeHTML: (v) => v }),
+    bindings: { update: () => {} },
+    utilities: { showNotification: () => {}, escapeHTML: (v) => v },
     request: async () => ({}),
   };
 
@@ -562,7 +560,7 @@ test('#267: a state that cannot cancel is never gated', async () => {
   // button there is nothing to gate, and a stray warning flag would be a dialog
   // that can never be dismissed by completing the flow.
   const cases = [
-    { what: 'a free account', account: { subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } } },
+    { what: 'a free account', account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }) },
     { what: 'an already-ended subscription', account: paidAccount({ status: 'cancelled', cancellation: { pending: false } }) },
     { what: 'a paid subscription already scheduled to end', account: paidAccount({ cancellation: { pending: true, date: { timestampUNIX: MONTH_FROM_NOW } } }) },
   ];
@@ -577,7 +575,7 @@ test('#267: a state that cannot cancel is never gated', async () => {
 
 test('#267: the gate never disagrees with the button it guards', async () => {
   // A TRIALING subscription carrying a scheduled cancellation still offers the
-  // cancel button — `resolved.cancelling` is `pending && !trialing`, and the
+  // cancel button: the `cancelling` getter is `pending && !trialing`, and the
   // provider's own portal can schedule one (#226). Cancelling from there still
   // ends the trial immediately, so the warning has to ride along with it.
   const account = trialingAccount({ cancellation: { pending: true, date: { timestampUNIX: WEEK_FROM_NOW } } });

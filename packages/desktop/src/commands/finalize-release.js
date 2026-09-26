@@ -27,9 +27,9 @@ const jetpack = require('fs-jetpack');
 
 const { getOctokit } = require('../utils/github.js');
 const { releasesRepo } = require('@omega.js/config');
-const Manager = new (require('../build.js'));
+const build = require('../build.js');
 
-const logger = Manager.logger('finalize-release');
+const logger = build.logger('finalize-release');
 
 module.exports = async function finalizeRelease(options = {}) {
   const argv = options._ || [];
@@ -42,8 +42,8 @@ module.exports = async function finalizeRelease(options = {}) {
   }
 
   const projectRoot = process.cwd();
-  const config      = Manager.getConfig() || {};
-  const pkgVersion  = (Manager.getPackage('project') || {}).version;
+  const config      = build.getConfig() || {};
+  const pkgVersion  = (build.getPackage('project') || {}).version;
 
   if (!pkgVersion) {
     throw new Error('finalize-release: package.json version not found');

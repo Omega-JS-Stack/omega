@@ -5,8 +5,8 @@
  * When translation.languages is set, the built site is then translated into
  * /{lang}/ copies — cache-first (committed per-string cache), and cold
  * strings translate LIVE by default so a build always ships the complete
- * translated site (Ian's #24 final call). `omega build --cached-only` skips
- * cold pages instead (with a warning list) for LLM-free builds.
+ * translated site (Ian's #24 final call). `omega build --cached-only` ships
+ * cold pages untranslated instead (with a warning list) for LLM-free builds.
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -132,7 +132,7 @@ module.exports = async function (options) {
       brandRoot,
       assetsDir: paths.assets,
     }),
-    // Responsive image matrix (the UJM imagemin successor) — on unless the
+    // Responsive image matrix — on unless the
     // brand opts out via `web.imagemin.enabled: false`. The cache is
     // machine-owned at the brand's .omega (never committed); CI restores it
     // via actions/cache in the scaffolded build workflow.
@@ -159,7 +159,7 @@ module.exports = async function (options) {
 
   // GH Pages custom domain: every production build carries dist/CNAME so
   // BOTH deploy lanes publish it: a push without the file clears the Pages
-  // domain (UJM auto-created it; omega parity). The derivation is the config's
+  // domain. The derivation is the config's
   // ONE `pagesHost`, the same one the manage walk sets the domain from (#883).
   const cname = pagesHost(siteData, targetNameFromDir(paths.root) || 'web');
   if (cname) {
@@ -181,10 +181,11 @@ module.exports = async function (options) {
   // Post-build translation (site.* IS the resolved config shape).
   // Default: translate EVERYTHING — warm strings from the committed cache
   // (instant), cold strings live through the provider, so a build always
-  // ships the complete translated site. --cached-only skips cold pages
-  // instead (warning lists them) for provider-free builds.
+  // ships the complete translated site. --cached-only ships cold pages
+  // untranslated and unadvertised instead (warning lists them) for
+  // provider-free builds, so no language link ever dangles (#953).
   if (options.cachedOnly) {
-    logger.log('--cached-only: cold pages will be skipped, not translated');
+    logger.log('--cached-only: cold pages will ship untranslated, not be translated');
   }
 
   const translation = await translateSite({
@@ -198,13 +199,13 @@ module.exports = async function (options) {
 
   if (!translation.skipped) {
     logger.log(`Translated ${translation.pages} pages → ${translation.languages.join(', ')} (${translation.newStrings} new, ${translation.cachedStrings} cached strings)`);
-    translation.failures.forEach((failure) => logger.warn(`translation: ${failure} — page skipped whole, no copy shipped`));
+    translation.failures.forEach((failure) => logger.warn(`translation: ${failure}; the copy shipped untranslated`));
 
     if (translation.skippedCold.length) {
       const preview = translation.skippedCold.slice(0, 10).join(', ');
       const more = translation.skippedCold.length > 10 ? ` (+${translation.skippedCold.length - 10} more)` : '';
-      logger.warn(`translation: ${translation.skippedCold.length} page-language pair(s) skipped — cold cache: ${preview}${more}`);
-      logger.warn('translation: run `omega translate` (or build without --cached-only) to translate them');
+      logger.warn(`translation: ${translation.skippedCold.length} page-language pair(s) shipped untranslated (cold cache): ${preview}${more}`);
+      logger.warn('translation: run `omega translate` (or build without --cached-only) to fill them');
     }
   }
 

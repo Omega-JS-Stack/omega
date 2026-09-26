@@ -3,13 +3,13 @@
 // @omega.js/desktop looks for the consumer's `src/integrations/menu/index.js` and calls it with a builder API:
 //
 //   // src/integrations/menu/index.js
-//   module.exports = ({ manager, menu, defaults }) => {
+//   module.exports = ({ omega, menu, defaults }) => {
 //     // Use the platform-aware default template as a starting point...
 //     menu.useDefaults();
 //
 //     // ...or build from scratch:
 //     menu.menu('File', [
-//       { id: 'file/new', label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => manager.windows.show('main') },
+//       { id: 'file/new', label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => omega.windows.show('main') },
 //       { type: 'separator' },
 //       { role: 'quit' },
 //     ]);
@@ -28,7 +28,7 @@
 //   menu.clear()              // start over
 //   menu.append(item)         // append a top-level descriptor (rare; prefer menu())
 //
-// Id-path API (during definition AND at runtime via `manager.menu.*`):
+// Id-path API (during definition AND at runtime via `omega.menu.*`):
 //   .find(idPath) / .has(idPath)
 //   .update(idPath, patch)        — Object.assign + re-render
 //   .remove(idPath)               — splice + re-render
@@ -59,7 +59,7 @@
 //     development/open-user-data, development/open-logs, development/open-app-config,
 //     development/test-error
 //
-// Disabling at runtime: call `manager.menu.disable()` from anywhere in main —
+// Disabling at runtime: call `omega.menu.disable()` from anywhere in main,
 // idempotent, calls Menu.setApplicationMenu(null) (or null on Windows/Linux to hide
 // the menu bar). No config flag.
 
@@ -73,21 +73,21 @@ const logger = new LoggerLite('menu');
 
 const menu = {
   _initialized: false,
-  _manager:     null,
+  _omega:       null,
   _menu:        null,    // electron Menu instance (after _render)
   _items:       [],      // top-level descriptors
   _electron:    null,
   _definitionFn: null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (menu._initialized) {
       return;
     }
 
-    menu._manager = manager;
+    menu._omega = omega;
 
     if (menu._disabled) {
-      logger.log('initialize — disabled via manager.menu.disable() called pre-init');
+      logger.log('initialize — disabled via omega.menu.disable() called pre-init');
       menu._initialized = true;
       return;
     }
@@ -102,7 +102,7 @@ const menu = {
 
     if (fs.existsSync(absPath)) {
       const loadConsumerFile = require('../utils/load-consumer-file.js');
-      const loaded = loadConsumerFile(absPath, logger);
+      const loaded = loadConsumerFile(absPath);
       if (typeof loaded === 'function') {
         menu._definitionFn = loaded;
       } else if (loaded != null) {
@@ -117,7 +117,7 @@ const menu = {
 
     if (menu._definitionFn) {
       try {
-        menu._definitionFn({ manager, menu: builder, defaults: menu._defaultTemplate() });
+        menu._definitionFn({ omega, menu: builder, defaults: menu._defaultTemplate() });
       } catch (e) {
         logger.error('menu definition fn threw:', e);
       }
@@ -131,8 +131,8 @@ const menu = {
     // Reflect current auto-updater state into the menu item now that the menu exists.
     // (The auto-updater initializes before menu in the boot sequence, so its initial state
     // wasn't reflected in the menu yet.)
-    if (manager.autoUpdater._updateMenuItem) {
-      manager.autoUpdater._updateMenuItem();
+    if (omega.autoUpdater._updateMenuItem) {
+      omega.autoUpdater._updateMenuItem();
     }
 
     logger.log(`initialize — top-level menus=${menu._items.length}`);
@@ -168,12 +168,12 @@ const menu = {
   // is informed by the legacy @omega.js/desktop template (preferences, relaunch,
   // dev tools nested under view/developer, top-level development menu).
   _defaultTemplate() {
-    const m = menu._manager;
+    const omega = menu._omega;
     const isMac        = process.platform === 'darwin';
-    const productName  = m.config.app?.productName || m.config.brand.name;
-    const brandUrl     = m.config.brand.url || null;
-    const brandName    = m.config.brand.name;
-    const isDev        = m.isDevelopment();
+    const productName  = omega.config.app?.productName || omega.config.brand.name;
+    const brandUrl     = omega.config.brand.url || null;
+    const brandName    = omega.config.brand.name;
+    const isDev        = omega.isDevelopment();
 
     // @omega.js/desktop's built-in "Check for Updates..." item. Click defaults to invoking auto-updater
     // check; auto-updater hook updates label/enabled dynamically based on status.
@@ -183,9 +183,9 @@ const menu = {
       id: idPath,
       label: 'Check for Updates...',
       click: () => {
-        const status = m.autoUpdater.getStatus();
-        if (status.code === 'downloaded') m.autoUpdater.installNow();
-        else m.autoUpdater.checkNow({ userInitiated: true });
+        const status = omega.autoUpdater.getStatus();
+        if (status.code === 'downloaded') omega.autoUpdater.installNow();
+        else omega.autoUpdater.checkNow({ userInitiated: true });
       },
     });
 
@@ -197,7 +197,7 @@ const menu = {
       id: `view/developer/simulate-update/${scenario}`,
       label,
       click: () => {
-        m.autoUpdater.simulate(scenario)
+        omega.autoUpdater.simulate(scenario)
           .then((status) => logger.log(`simulate(${scenario}) → ${status.code}`))
           .catch((e) => logger.warn(`simulate(${scenario}) failed: ${e.message}`));
       },
@@ -211,7 +211,7 @@ const menu = {
       accelerator: 'CommandOrControl+,',
       visible: false,
       click: () => {
-        m.windows.show('settings');
+        omega.windows.show('settings');
       },
     };
 
@@ -351,7 +351,7 @@ const menu = {
           const { shell } = require('electron');
           // Route through getWebsiteUrl() so dev runs open localhost:4000 instead
           // of punching out to the live brand site.
-          const safe = sanitizeURL(m.getWebsiteUrl());
+          const safe = sanitizeURL(omega.getWebsiteUrl());
           if (safe) shell.openExternal(safe);
         },
       });
@@ -477,7 +477,7 @@ const menu = {
       throw new Error('menu.define: fn must be a function');
     }
     menu._items = [];
-    fn({ manager: menu._manager, menu: menu._buildBuilder(), defaults: menu._defaultTemplate() });
+    fn({ omega: menu._omega, menu: menu._buildBuilder(), defaults: menu._defaultTemplate() });
     menu._render();
   },
 
@@ -511,7 +511,7 @@ const menu = {
   isDisabled() { return Boolean(menu._disabled); },
 };
 
-// Mix the id-path API directly onto the singleton so `manager.menu.update(...)` works at runtime.
+// Mix the id-path API directly onto the singleton so `omega.menu.update(...)` works at runtime.
 Object.assign(menu, buildIdApi({
   getItems: () => menu._items,
   render:   () => menu._render(),

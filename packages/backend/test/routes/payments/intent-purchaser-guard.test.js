@@ -17,25 +17,25 @@
 const { buildUser, callHandler } = require('./_route-harness.js');
 const { TEST_ACCOUNT_PASSWORD } = require('../../../dist/test/test-accounts.js');
 
-const handler = require('../../../dist/manager/routes/payments/intent/post.js');
+const handler = require('../../../dist/omega/routes/payments/intent/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const NO_AUTH_UID = '_test-intent-no-auth-user';
 const NO_DOC_UID = '_test-intent-no-user-doc';
 
 /** A checkout request for a paid product, as a signed-in caller sends it */
-function checkout(Manager, uid, { productId }) {
+function checkout(omega, uid, { productId }) {
   const doc = uid === null
     // The omega-admin-key lane: authenticated, carrying no user at all
     ? { roles: { admin: true } }
     : { auth: { uid: uid, email: `${uid}@example.com` } };
 
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-intent',
-    user: buildUser(Manager, doc),
-    settings: {
+    user: buildUser(doc),
+    data: {
       provider: 'test',
       productId: productId,
       frequency: 'monthly',
@@ -64,8 +64,8 @@ module.exports = defineCases({
       name: 'refuses a purchaser with no auth user',
       auth: 'none',
 
-      async run({ assert, Manager, config, firestore, skip }) {
-        const sent = await checkout(Manager, NO_AUTH_UID, { productId: paidProductId(config, skip) });
+      async run({ assert, omega, config, firestore, skip }) {
+        const sent = await checkout(omega, NO_AUTH_UID, { productId: paidProductId(config, skip) });
 
         assert.equal(sent.code, 403, `A uid this project has no auth user for must be refused, got ${sent.code}: ${sent.body}`);
         assert.equal(await firestore.exists(`users/${NO_AUTH_UID}`), false, 'The refusal writes nothing — no user doc is created by a checkout');
@@ -76,11 +76,11 @@ module.exports = defineCases({
       name: 'refuses an authenticated caller carrying no uid at all',
       auth: 'none',
 
-      async run({ assert, Manager, config, skip }) {
+      async run({ assert, omega, config, skip }) {
         // The admin-key lane authenticates without a user token, so the uid the
         // guard looks up is empty — a lookup that THROWS, and a 500 is not a
         // refusal. It has to come back as the same loud 403.
-        const sent = await checkout(Manager, null, { productId: paidProductId(config, skip) });
+        const sent = await checkout(omega, null, { productId: paidProductId(config, skip) });
 
         assert.equal(sent.code, 403, `A caller with no uid must be refused, got ${sent.code}: ${sent.body}`);
       },
@@ -90,9 +90,9 @@ module.exports = defineCases({
       name: 'refuses a purchaser whose user doc is missing',
       auth: 'none',
 
-      async run({ assert, Manager, config, firestore, waitFor, skip }) {
+      async run({ assert, omega, config, firestore, waitFor, skip }) {
         const productId = paidProductId(config, skip);
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
 
         await admin.auth().deleteUser(NO_DOC_UID).catch(() => null);
         // Seeding's own createUser shape, password included ON PURPOSE: a
@@ -111,7 +111,7 @@ module.exports = defineCases({
           await waitFor(() => firestore.exists(`users/${NO_DOC_UID}`), 20000, 250);
           await firestore.delete(`users/${NO_DOC_UID}`);
 
-          const sent = await checkout(Manager, NO_DOC_UID, { productId: productId });
+          const sent = await checkout(omega, NO_DOC_UID, { productId: productId });
 
           assert.equal(sent.code, 403, `An auth user with no user doc must be refused, got ${sent.code}: ${sent.body}`);
           assert.equal(await firestore.exists(`users/${NO_DOC_UID}`), false, 'The refusal writes nothing — the doc a signup owns is not created here');
@@ -126,10 +126,10 @@ module.exports = defineCases({
       name: 'a real account gets past the guard',
       auth: 'none',
 
-      async run({ assert, Manager, accounts }) {
+      async run({ assert, omega, accounts }) {
         // A product the brand does not sell: the 400 it earns proves the request
         // reached the route's own validation, and no provider is ever called
-        const sent = await checkout(Manager, accounts['basic'].uid, { productId: '_test-nonexistent-product' });
+        const sent = await checkout(omega, accounts['basic'].uid, { productId: '_test-nonexistent-product' });
 
         assert.equal(sent.code, 400, `A seeded persona has both halves and must get past the guard, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /not found/i, 'The rejection should be the product lookup, not the purchaser guard');

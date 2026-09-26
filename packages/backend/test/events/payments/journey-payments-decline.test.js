@@ -13,7 +13,7 @@
  *
  * Product-agnostic: resolves the first paid subscription product from config.
  */
-const User = require('../../../dist/manager/helpers/user.js');
+const { User } = require('../../../dist/omega/helpers/account.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 module.exports = defineCases({
@@ -38,7 +38,7 @@ module.exports = defineCases({
         state.paidProductId = paidProduct.id;
         state.product = payments.products[paidProduct.id];
 
-        const response = await http.as('journey-payments-decline').post('backend-manager/payments/intent', {
+        const response = await http.as('journey-payments-decline').post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
@@ -67,7 +67,7 @@ module.exports = defineCases({
       name: 'suspended-grants-no-access',
       async run({ firestore, assert, state }) {
         const userDoc = await firestore.get(`users/${state.uid}`);
-        const resolved = User.resolveSubscription(userDoc);
+        const resolved = new User(userDoc);
 
         assert.equal(resolved.active, false, 'Suspended should grant no access');
         assert.equal(resolved.plan, 'basic', 'Effective plan should fall back to basic');
@@ -176,7 +176,7 @@ module.exports = defineCases({
 
         state.recoveryEventId = `_test-evt-journey-decline-recover-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=test&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=test&key=${config.webhookKey}`, {
           id: state.recoveryEventId,
           type: 'customer.subscription.updated',
           data: {
@@ -216,7 +216,7 @@ module.exports = defineCases({
         assert.equal(userDoc.subscription.status, 'active', 'Status should be active after recovery');
         assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should still be ${state.paidProductId}`);
 
-        const resolved = User.resolveSubscription(userDoc);
+        const resolved = new User(userDoc);
         assert.equal(resolved.active, true, 'Recovered subscription should grant access');
         assert.equal(resolved.plan, state.paidProductId, 'Effective plan should be the paid product');
       },

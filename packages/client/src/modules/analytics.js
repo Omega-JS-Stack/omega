@@ -3,7 +3,7 @@
  * second implementation of it ([#328](https://github.com/Omega-JS-Stack/omega/issues/328),
  * stage E).
  *
- * `manager.analytics().event('<canonical>', params)` resolves through the shared
+ * `omega.analytics.event('<canonical>', params)` resolves through the shared
  * catalog and adapters, exactly like a web page's call sites and the backend's
  * webhook. What differs per runtime is the TRANSPORT, and this module is where
  * each one is injected:
@@ -43,8 +43,8 @@ const SESSION_KEY = '_ga_session_id';
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 
 class Analytics {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
     this.initialized = false;
     this.devMode = false;
     this.runtime = null;
@@ -104,7 +104,7 @@ class Analytics {
     this.config = config;
 
     // Get runtime
-    this.runtime = this.manager.utilities().getRuntime();
+    this.runtime = this.omega.utilities.getRuntime();
 
     if (!this._isSupported()) {
       logger.log(`Runtime "${this.runtime}" not supported yet, skipping`);
@@ -120,7 +120,7 @@ class Analytics {
     // Check for development mode — dev NEVER posts to a real property
     // (consumers' dev traffic must not land in anyone's GA4; the baked-in
     // fallback credentials are gone by design — C4 cp106a de-ITW).
-    this.devMode = this.manager.isDevelopment();
+    this.devMode = this.omega.isDevelopment();
 
     // The host's seam for a runtime whose events belong to another process
     // (#411) — the desktop renderer's IPC bridge, null everywhere else.
@@ -499,7 +499,7 @@ class Analytics {
     // it here would set a value nothing in this process ever reads, so the
     // call raises where it was made instead of quietly doing nothing (#480).
     if (this._isBridged()) {
-      throw new Error('setUserId() is not a bridged renderer\'s to call — the main process owns identity (its auth bridge sets user_id off the same Firebase user). Call manager.analytics.setUserId(uid) in MAIN to set one by hand');
+      throw new Error('setUserId() is not a bridged renderer\'s to call — the main process owns identity (its auth bridge sets user_id off the same Firebase user). Call omega.analytics.setUserId(uid) in MAIN to set one by hand');
     }
 
     this.userId = core.deriveUserId(userId, this.namespace);

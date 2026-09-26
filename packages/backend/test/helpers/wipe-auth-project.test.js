@@ -87,8 +87,8 @@ module.exports = defineCases({
 
     {
       name: 'the-wiped-store-is-the-one-holding-the-personas',
-      async run({ assert, Manager, config }) {
-        const admin = Manager.libraries.admin;
+      async run({ assert, omega, config }) {
+        const admin = omega.firebase.admin;
         const projectId = resolveWipeProjectId(admin);
 
         assert.equal(projectId, config.cloud.config.projectId);
@@ -115,8 +115,8 @@ module.exports = defineCases({
 
     {
       name: 'a-project-id-disagreement-throws-instead-of-clearing-a-stranger',
-      async run({ assert, Manager, config }) {
-        const admin = Manager.libraries.admin;
+      async run({ assert, omega, config }) {
+        const admin = omega.firebase.admin;
 
         // A stale GCLOUD_PROJECT from another brand's shell would send the wipe
         // at a store this process never reads or writes — success there is the

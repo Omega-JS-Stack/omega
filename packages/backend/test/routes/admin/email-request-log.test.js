@@ -7,11 +7,11 @@
  * rejection line beside it, which logs field names only.
  *
  * The handler runs for real; the only stand-ins are the ctx it is handed (a recorder)
- * and `Manager.Email`, whose `send()` would hit SendGrid.
+ * and `ctx.email`, whose `send()` would hit SendGrid.
  *
  * Run: npx omega test backend:routes/admin/email-request-log
  */
-const handler = require('../../../dist/manager/routes/admin/email/post.js');
+const handler = require('../../../dist/omega/routes/admin/email/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ADMIN = { authenticated: true, roles: { admin: true } };
@@ -22,7 +22,7 @@ async function logLinesFor(settings) {
   const ctx = {
     log: (...args) => lines.push(args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')),
     respond: (body) => body,
-    Manager: { Email: () => ({ send: async () => ({ status: 'sent' }) }) },
+    email: { send: async () => ({ status: 'sent' }) },
   };
 
   const previousKey = process.env.SENDGRID_API_KEY;
@@ -30,7 +30,7 @@ async function logLinesFor(settings) {
   process.env.SENDGRID_API_KEY = 'test-key';
 
   try {
-    await handler({ ctx, user: ADMIN, settings });
+    await handler({ ctx, user: ADMIN, data: settings });
   } finally {
     if (previousKey === undefined) {
       delete process.env.SENDGRID_API_KEY;

@@ -18,8 +18,8 @@ module.exports = defineCases({
   tests: [
     {
       name: 'baseline-create-and-verify',
-      async run({ Manager, assert }) {
-        const admin = Manager.libraries.admin;
+      async run({ omega, assert }) {
+        const admin = omega.firebase.admin;
         const testUid = '_test-race-baseline';
         const testEmail = '_test.race-baseline@test.com';
         const userRef = admin.firestore().doc(`users/${testUid}`);
@@ -48,8 +48,8 @@ module.exports = defineCases({
 
     {
       name: 'no-wait-gets-clobbered',
-      async run({ Manager, assert, skip }) {
-        const admin = Manager.libraries.admin;
+      async run({ omega, assert, skip }) {
+        const admin = omega.firebase.admin;
         const testUid = '_test-race-no-wait';
         const testEmail = '_test.race-no-wait@test.com';
         const userRef = admin.firestore().doc(`users/${testUid}`);
@@ -95,8 +95,8 @@ module.exports = defineCases({
 
     {
       name: 'wait-for-gone-survives',
-      async run({ Manager, assert }) {
-        const admin = Manager.libraries.admin;
+      async run({ omega, assert }) {
+        const admin = omega.firebase.admin;
         const testUid = '_test-race-wait-gone';
         const testEmail = '_test.race-wait-gone@test.com';
         const userRef = admin.firestore().doc(`users/${testUid}`);
@@ -133,8 +133,8 @@ module.exports = defineCases({
 
     {
       name: 'force-delete-doc-survives',
-      async run({ Manager, assert }) {
-        const admin = Manager.libraries.admin;
+      async run({ omega, assert }) {
+        const admin = omega.firebase.admin;
         const testUid = '_test-race-force-del';
         const testEmail = '_test.race-force-del@test.com';
         const userRef = admin.firestore().doc(`users/${testUid}`);

@@ -1,13 +1,13 @@
-// Chromium-runner — launches Puppeteer with the BXM harness extension loaded,
+// Chromium-runner: launches Puppeteer with the harness extension loaded,
 // runs background-layer suites in the SW context via CDP Runtime.evaluate, then
 // runs view-layer suites in tabs pointed at popup/options/sidepanel pages.
 //
 // Communication channel: each injected test wraps its events as
-//   console.log('__BXM_TEST__' + JSON.stringify(evt))
+//   console.log(TEST_EVENT_PREFIX + JSON.stringify(evt))
 // from inside the SW / tab. The runner subscribes to `Runtime.consoleAPICalled`
 // (for SW) and Puppeteer's `page.on('console')` (for tabs) and parses those
-// lines exactly like EM's electron runner parses stdout. Same JSON-line
-// protocol — different transport.
+// lines exactly like @omega.js/desktop's electron runner parses stdout. Same
+// JSON-line protocol, the same prefix, a different transport.
 //
 // Test source is shipped as a string. Each test's `run` function body is
 // extracted at load-time and wrapped as `(async (ctx) => { <body> })(ctx)`
@@ -25,6 +25,10 @@ const { waitForTarget } = require('./helpers.js');
 // devkit (NOT ../assert.js, which is now a CommonJS re-export shim — its source would
 // leave a bare `module.exports = require(...)` in the browser context).
 const ASSERT_SRC = fs.readFileSync(require.resolve('@omega.js/devkit/test/assert'), 'utf8');
+
+// The ONE prefix every harness event line carries, written inside the SW / tab
+// and read back here (the same word @omega.js/desktop's harness writes)
+const TEST_EVENT_PREFIX = '__OMEGA_TEST__';
 
 async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, frameworkDistRoot }) {
   let puppeteer;
@@ -114,12 +118,12 @@ async function runBackgroundSuites({ browser, swTarget, suiteFiles, filter }) {
     return { passed: 0, failed: suiteFiles.length, skipped: 0 };
   }
 
-  // Subscribe to console output from the SW. Each '__BXM_TEST__...' line is a
+  // Subscribe to console output from the SW. Each TEST_EVENT_PREFIX line is a
   // structured test event. Anything else is incidental SW logging — surface it
   // in OMEGA_TEST_DEBUG mode.
   const consoleHandler = (msg) => {
     const text = msg.text();
-    if (text.startsWith('__BXM_TEST__')) {
+    if (text.startsWith(TEST_EVENT_PREFIX)) {
       handleConsoleLine(text, counts);
     } else if (process.env.OMEGA_TEST_DEBUG) {
       process.stdout.write(chalk.gray(`      [sw:${msg.type()}] ${text}\n`));
@@ -158,7 +162,7 @@ async function runBackgroundSuites({ browser, swTarget, suiteFiles, filter }) {
 
       // Build a single payload that runs every test in the suite sequentially
       // inside the SW. Shared `state` lives inside the SW for the lifetime of
-      // the suite. The runner emits one __BXM_TEST__ event per test.
+      // the suite. The runner emits one TEST_EVENT_PREFIX event per test.
       const payload = buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: mod.timeout });
       try {
         await worker.evaluate(payload);
@@ -215,7 +219,7 @@ async function runViewSuites({ browser, extId, suiteFiles, filter }) {
     const page = await browser.newPage();
     const consoleHandler = (msg) => {
       const text = msg.text();
-      if (text.startsWith('__BXM_TEST__')) {
+      if (text.startsWith(TEST_EVENT_PREFIX)) {
         handleConsoleLine(text, counts);
       } else if (process.env.OMEGA_TEST_DEBUG) {
         process.stdout.write(chalk.gray(`      [tab:${msg.type()}] ${text}\n`));
@@ -242,7 +246,7 @@ async function runViewSuites({ browser, extId, suiteFiles, filter }) {
 // ─── Suite payload builder ────────────────────────────────────────────────────
 
 // Build a single string of JavaScript that, when evaluated inside the SW or a tab,
-// runs all `tests` sequentially and emits __BXM_TEST__ events per result.
+// runs all `tests` sequentially and emits TEST_EVENT_PREFIX events per result.
 //
 // Why string-payload vs function-passing? Puppeteer can pass functions, but
 // `worker.evaluate(fn, ...args)` serializes args via JSON (no functions). So
@@ -280,7 +284,7 @@ function buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: s
   ${ASSERT_SRC.replace(/module\.exports\s*=\s*expect;?/, '')}
 
   function emit(evt) {
-    console.log('__BXM_TEST__' + JSON.stringify(evt));
+    console.log(${JSON.stringify(TEST_EVENT_PREFIX)} + JSON.stringify(evt));
   }
 
   class SkipError extends Error { constructor(reason) { super(reason); this.name = 'SkipError'; } }
@@ -347,7 +351,7 @@ ${inlinedTests}
 
 function handleConsoleLine(text, counts) {
   let evt;
-  try { evt = JSON.parse(text.slice('__BXM_TEST__'.length)); } catch (_) { return; }
+  try { evt = JSON.parse(text.slice(TEST_EVENT_PREFIX.length)); } catch (_) { return; }
   if (evt.event === 'result') {
     if (evt.passed) {
       console.log(chalk.green(`      ✓ ${evt.name}`) + chalk.gray(` (${evt.duration}ms)`));

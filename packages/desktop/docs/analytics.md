@@ -51,11 +51,11 @@ The `bundle` task's esbuild `define` bakes `process.env.GOOGLE_ANALYTICS_SECRET`
 ## API
 
 ```js
-manager.analytics.event('button_click', { button_id: 'cta' });
-manager.analytics.pageview('/settings');
-manager.analytics.screenview('SettingsScreen');
-manager.analytics.setUserProperties({ plan: 'premium', trial: false });
-manager.analytics.setUserId('firebase-uid-abc');   // usually wired automatically
+omega.analytics.event('button_click', { button_id: 'cta' });
+omega.analytics.pageview('/settings');
+omega.analytics.screenview('SettingsScreen');
+omega.analytics.setUserProperties({ plan: 'premium', trial: false });
+omega.analytics.setUserId('firebase-uid-abc');   // usually wired automatically
 ```
 
 Same surface in renderer:
@@ -71,10 +71,10 @@ The renderer surface is fire-and-forget IPC (`ipcRenderer.send`) for events; onl
 
 ## The renderer NEVER sends — it forwards ([#411](https://github.com/Omega-JS-Stack/omega/issues/411))
 
-A renderer's own `omega.analytics().event(...)` — the embedded @omega.js/client, the surface a vert click or a permission prompt fires through — routes to the bridge above and is delivered by the MAIN process's sender. There is exactly one sender per install:
+A renderer's own `omega.analytics.event(...)` (the embedded @omega.js/client, the surface a vert click or a permission prompt fires through) routes to the bridge above and is delivered by the MAIN process's sender. There is exactly one sender per install:
 
 ```
-renderer: omega.analytics().event('vert_click', { … })
+renderer: omega.analytics.event('vert_click', { … })
   → @omega.js/client reads config.analyticsBridge (src/renderer.js injects the
     preload's window.desktop.analytics when it boots the client)
   → ipcRenderer.send('desktop:analytics:event', { name, params })
@@ -136,5 +136,5 @@ free-typed string here.
 ## Tests
 
 - `src/test/suites/main/analytics.test.js` — disabled paths, uuidv5 stability, the catalog contract (canonical name in, GA4 descriptor out; unknown names never post), queueing, auth-bridge wiring, IPC handlers, secret-not-leaked guard.
-- `src/test/suites/renderer/analytics-bridge.test.js` — renderer-side surface shape, `getStatus` round-trip, and the #411 pin: a renderer-originated `omega.analytics().event(...)` reaches main's sender exactly once, and the payload GA would receive carries main's `client_id` and main's session id, while the bridged client holds no secret and no device id of its own (the harness hands it credentials on purpose). The harness taps main's transport (`harness/main-entry.js`) so a renderer suite can read back what the sender was handed — a test run never reaches a real GA property. Harness fidelity, stated plainly: it drives the real client and the real IPC channel into the real main-process sender, but the client runs in the preload world holding the bridge object directly, not the contextBridge proxy a page bundle gets — the proxy hop is the one link this pin does not exercise.
+- `src/test/suites/renderer/analytics-bridge.test.js`: renderer-side surface shape, `getStatus` round-trip, and the #411 pin: a renderer-originated `omega.analytics.event(...)` reaches main's sender exactly once, and the payload GA would receive carries main's `client_id` and main's session id, while the bridged client holds no secret and no device id of its own (the harness hands it credentials on purpose). The harness taps main's transport (`harness/main-entry.js`) so a renderer suite can read back what the sender was handed: a test run never reaches a real GA property. Harness fidelity, stated plainly: it drives the real client and the real IPC channel into the real main-process sender, but the client runs in the preload world holding the bridge object directly, not the contextBridge proxy a page bundle gets, the proxy hop is the one link this pin does not exercise.
 - `packages/client/test/analytics.test.js` — the client half: the bridge is the injected config value alone (a planted `window.desktop` bridges nothing), a bridged client drops credentials and mints no device id, an uncatalogued name never leaves the renderer, and a forward that throws never reaches the caller.

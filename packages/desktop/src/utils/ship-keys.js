@@ -21,8 +21,8 @@
 
 const { shipPlan, missingShipKeys, shipKeyRefusal } = require('@omega.js/devkit/ship-plan');
 
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('ship-keys');
+const build = require('../build.js');
+const logger = build.logger('ship-keys');
 
 /**
  * Refuse a publish whose declared formats have no credential to ship with.
@@ -36,7 +36,7 @@ const logger = Manager.logger('ship-keys');
 function assertShipKeys(options) {
   options = options || {};
 
-  const config = options.config || Manager.getConfig();
+  const config = options.config || build.getConfig();
   const plan = shipPlan(config, 'desktop');
   const missing = missingShipKeys(plan, options.env || process.env);
 

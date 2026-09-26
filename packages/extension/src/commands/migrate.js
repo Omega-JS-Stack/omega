@@ -13,11 +13,11 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const version = require('wonderful-version');
-const Manager = new (require('../build.js'));
+const build = require('../build.js');
 const { readProject } = require('./lib/dependencies.js');
 
-const logger = Manager.logger('migrate');
-const package = Manager.getPackage('main');
+const logger = build.logger('migrate');
+const package = build.getPackage('main');
 
 // Old hook file name → its new nested path
 const HOOK_MIGRATIONS = [
@@ -58,7 +58,7 @@ function migrateHooksToNestedStructure(projectDir) {
 module.exports = async function (options) {
   options = options || {};
 
-  const projectDir = options.projectDir || Manager.getRootPath('project');
+  const projectDir = options.projectDir || build.getRootPath('project');
   const project = readProject(projectDir);
   const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name] || '0.0.0';
 

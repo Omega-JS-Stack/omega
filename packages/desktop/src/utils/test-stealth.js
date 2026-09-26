@@ -8,23 +8,23 @@
 //   - main.js — app-level activation suppression on macOS (accessory policy via
 //     app.dock.hide(), so a launching test app never steals keyboard focus)
 //   - test/harness/main-entry.js — same suppression for the spawned harness app,
-//     which initializes its Manager only after app ready (too late to prevent
+//     which initializes its omega instance only after app ready (too late to prevent
 //     the launch activation)
 //
-// Pass the Manager when you have one: its isTesting() reads the environment the
-// Manager's own config was baked with. Without one (the harness, pre-Manager
+// Pass the omega instance when you have one: its isTesting() reads the environment
+// its own config was baked with. Without one (the harness, pre-initialize
 // code) the standalone check reads the process's OMEGA_ENVIRONMENT, the one
 // input every lane sets ([#817](https://github.com/Omega-JS-Stack/omega/issues/817));
 // the test runners spawn their children naming `testing`.
 //
 // Usage:
 //   const isTestStealth = require('./utils/test-stealth.js');
-//   if (isTestStealth(manager)) { ... }
+//   if (isTestStealth(omega)) { ... }
 
 const { isTesting } = require('./mode-helpers.js');
 
-function isTestStealth(manager) {
-  const testing = manager ? manager.isTesting() : isTesting();
+function isTestStealth(omega) {
+  const testing = omega ? omega.isTesting() : isTesting();
   return testing && process.env.OMEGA_TEST_SHOW !== '1';
 }
 

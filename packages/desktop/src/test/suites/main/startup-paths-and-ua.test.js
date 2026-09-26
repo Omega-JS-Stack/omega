@@ -3,7 +3,7 @@
 //     harness, " (Development)" in dev, untouched in production
 //   - app.userAgentFallback is set to a branded template via node-powertools.template
 //
-// These are observable side-effects of `manager.initialize()` so we just inspect
+// These are observable side-effects of `omega.initialize()` so we just inspect
 // the live electron `app` after the harness boot.
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
@@ -34,7 +34,7 @@ module.exports = defineCases({
         const userData = app.getPath('userData');
         // The wipe ran before storage.initialize(); only files written by THIS
         // boot may exist. A marker from a previous run must never survive.
-        const marker = path.join(userData, '__em-wipe-marker');
+        const marker = path.join(userData, '__omega-wipe-marker');
         ctx.expect(fs.existsSync(marker)).toBe(false);
         // Leave a marker so the NEXT run proves the wipe (self-perpetuating check).
         fs.mkdirSync(userData, { recursive: true });
@@ -63,8 +63,8 @@ module.exports = defineCases({
       name: 'userAgentFallback contains the brand name from config',
       run: (ctx) => {
         const { app } = require('electron');
-        const brand = ctx.manager.config?.brand?.name
-          || ctx.manager.config?.app?.productName
+        const brand = ctx.omega.config?.brand?.name
+          || ctx.omega.config?.app?.productName
           || 'App';
         ctx.expect(app.userAgentFallback).toContain(brand);
       },

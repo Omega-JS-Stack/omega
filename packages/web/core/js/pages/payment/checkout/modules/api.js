@@ -2,7 +2,7 @@
 import fetch from 'wonderful-fetch';
 import { getRecaptchaToken } from '../../../../libs/recaptcha.js';
 import { readPlatformCookies } from '__main_assets__/js/libs/analytics.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { TRIAL_ELIGIBILITY_UNKNOWN } from './state.js';
 
 // Check trial eligibility via backend endpoint. Three answers, never two: a
@@ -66,7 +66,7 @@ export async function createPaymentIntent({ state, provider, formData }) {
 
   // The stored attribution plus the platform cookies as they stand right now.
   // Spread, never mutated: the stored object is the client storage module's own.
-  const storedAttribution = omega.storage().get('attribution', {});
+  const storedAttribution = omega.storage.get('attribution', {});
   const cookies = readPlatformCookies();
   const attribution = Object.keys(cookies).length
     ? { ...storedAttribution, cookies }
@@ -83,7 +83,7 @@ export async function createPaymentIntent({ state, provider, formData }) {
     // beside attribution and the order fold copies it, so a conversion knows what
     // the user agreed to. Its own key, distinct from the legal/marketing consent
     // the signup form captures; read as a key, never interpreted here.
-    trackingConsent: omega.storage().get('trackingConsent', null),
+    trackingConsent: omega.storage.get('trackingConsent', null),
     verification: {
       'g-recaptcha-response': recaptchaToken || '',
     },

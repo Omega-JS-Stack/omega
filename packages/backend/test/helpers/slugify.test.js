@@ -1,5 +1,5 @@
 /**
- * Test: helpers/utilities.slugify()
+ * Test: services/utilities.slugify()
  * Unit tests for the canonical URL slug builder.
  *
  * Run: npx omega test helpers/slugify
@@ -15,11 +15,11 @@
  *   - Lowercase the result
  *   - Non-string input → empty string
  */
-const Utilities = require('../../dist/manager/helpers/utilities.js');
+const Utilities = require('../../dist/omega/services/utilities.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-const Manager = { libraries: {} };
-const utilities = new Utilities(Manager);
+const omega = { firebase: {} };
+const utilities = new Utilities(omega);
 
 module.exports = defineCases({
   description: 'Utilities.slugify()',

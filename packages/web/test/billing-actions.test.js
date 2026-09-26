@@ -18,8 +18,8 @@
  * the convention auth-policy.test.js and dev-palette.test.js set — over a
  * document that answers nothing (the section wires its controls by id at
  * init(); this suite only calls loadData). Subscription resolution is NOT
- * stubbed: the stub client delegates to @omega.js/account, the same resolver
- * the real client calls, so "cancelling" here means what it means in
+ * stubbed: every account is a real `User` from @omega.js/account, the same
+ * class the real client builds, so "cancelling" here means what it means in
  * production. The assertion is the buttons object.
  */
 const assert = require('node:assert');
@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { resolveSubscription } = require('@omega.js/account');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const BILLING_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'billing.js');
@@ -51,7 +51,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -88,14 +88,14 @@ const HOUR_FROM_NOW = Math.floor(Date.now() / 1000) + 3600;
 
 /** A paid subscription in whatever state the case needs. */
 function paidAccount(subscription) {
-  return {
+  return new User({
     subscription: {
       product: { id: 'premium', name: 'Premium' },
       payment: { frequency: 'monthly', price: 10, provider: 'stripe' },
       expires: { timestampUNIX: HOUR_FROM_NOW },
       ...subscription,
     },
-  };
+  }, { uid: 'u1' });
 }
 
 /** The minimum client the section reaches for, plus the captured calls. */
@@ -106,12 +106,11 @@ function makeClient() {
   const client = {
     updates,
     notifications,
-    auth: () => ({ resolveSubscription: (account) => resolveSubscription(account) }),
-    bindings: () => ({ update: (state) => updates.push(state) }),
-    utilities: () => ({
+    bindings: { update: (state) => updates.push(state) },
+    utilities: {
       showNotification: (message, type) => notifications.push({ message, type }),
       escapeHTML: (value) => value,
-    }),
+    },
     request: async () => ({}),
   };
 
@@ -166,7 +165,7 @@ test('billing buttons: only a live subscription scheduled to end offers undo', a
     },
     {
       what: 'a free account',
-      account: { subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } },
+      account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }),
       buttons: { upgrade: true, change: false, manage: false, cancel: false, uncancel: false },
     },
     {
@@ -181,7 +180,7 @@ test('billing buttons: only a live subscription scheduled to end offers undo', a
     },
     {
       // BOTH gates read the raw cancellation.pending flag, not
-      // resolveSubscription().cancelling (which is `pending && !trialing`).
+      // the User's `cancelling` getter (which is `pending && !trialing`).
       // A trialing subscription CAN carry a scheduled cancellation — the
       // provider's own billing portal schedules one — and reading the derived
       // flag offered this account neither Change nor Undo: a dead end.
@@ -283,7 +282,7 @@ test('billing details: every paid state shows all three slots — price, cadence
       // Free accounts are unchanged: the whole row stays hidden, so what the
       // slots would have said never reaches a screen.
       what: 'a free account has no billing details at all',
-      account: { subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } },
+      account: new User({ subscription: { status: 'active', product: { id: 'basic', name: 'Basic' } } }, { uid: 'u1' }),
       details: { ...row({ dateLabel: 'Next billing', date: '', amount: '', cadence: '' }), visible: false },
     },
   ];

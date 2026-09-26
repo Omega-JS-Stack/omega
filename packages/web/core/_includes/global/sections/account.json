@@ -8,7 +8,7 @@
     {
       divider: true,
       attributes: [
-        ['data-omega-bind', '@show auth.account.roles.admin']
+        ['data-omega-bind', '@show auth.user.roles.admin']
       ]
     },
     {
@@ -16,7 +16,7 @@
       href: '/admin',
       icon: 'fa-solid fa-shield-halved',
       attributes: [
-        ['data-omega-bind', '@show auth.account.roles.admin']
+        ['data-omega-bind', '@show auth.user.roles.admin']
       ]
     },
     {

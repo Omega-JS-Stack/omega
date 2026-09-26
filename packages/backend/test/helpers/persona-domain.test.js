@@ -33,7 +33,7 @@ const SPLIT_BRAND = {
 const SEEDING_LANES = [
   'dist/cli/commands/emulator.js',
   'dist/cli/commands/test.js',
-  'dist/manager/routes/test/reset-account/post.js',
+  'dist/omega/routes/test/reset-account/post.js',
 ];
 
 module.exports = defineCases({

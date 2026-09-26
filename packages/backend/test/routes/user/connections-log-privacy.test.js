@@ -18,7 +18,7 @@
  *
  * The seam is the one [#632] established: the assertions read the captured `ctx`
  * output. The call is allowed to REJECT after the line under test is written (the
- * hand-rolled Manager has no Firestore behind it), exactly as
+ * hand-rolled omega has no Firestore behind it), exactly as
  * `signup-log-privacy.test.js` does.
  *
  * The one stand-in is `wonderful-fetch`, replaced in the require cache and restored
@@ -46,11 +46,11 @@ require.cache[originalFetchPath] = {
   exports: async () => ({ ...IDENTITY, data: [{ ...IDENTITY }] }),
 };
 
-const google = require('../../../dist/manager/routes/user/connections/providers/google.js');
-const discord = require('../../../dist/manager/routes/user/connections/providers/discord.js');
-const spotify = require('../../../dist/manager/routes/user/connections/providers/spotify.js');
-const twitch = require('../../../dist/manager/routes/user/connections/providers/twitch.js');
-const kick = require('../../../dist/manager/routes/user/connections/providers/kick.js');
+const google = require('../../../dist/omega/routes/user/connections/providers/google.js');
+const discord = require('../../../dist/omega/routes/user/connections/providers/discord.js');
+const spotify = require('../../../dist/omega/routes/user/connections/providers/spotify.js');
+const twitch = require('../../../dist/omega/routes/user/connections/providers/twitch.js');
+const kick = require('../../../dist/omega/routes/user/connections/providers/kick.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 function restoreFetch() {

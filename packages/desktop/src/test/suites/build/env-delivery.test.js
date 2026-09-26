@@ -19,13 +19,13 @@ const { publishSecretKeys, bakeKeys, renderSecretsBlock, WORKFLOW_OWNED_KEYS } =
 const { composeTargetEnv } = require('@omega.js/config');
 
 const SRC = path.join(__dirname, '..', '..', '..');
-const Manager = require(path.join(SRC, 'build.js'));
+const build = require(path.join(SRC, 'build.js'));
 const { ensureTarget } = require(path.join(SRC, 'commands', 'lib', 'ensure-target.js'));
 const bundleTask = require(path.join(SRC, 'gulp', 'tasks', 'bundle.js'));
 const { collectTargetSecrets } = require('@omega.js/devkit/target-secrets');
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 /** A consumer whose peer deps are already satisfied — the steady state. */
 function stageConsumer() {

@@ -19,6 +19,7 @@ const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const BEMClient = require('./client.js');
+const { callTool } = require('./call-tool.js');
 const builtinTools = require('./tools.js');
 const { resolveAuthInfo, filterToolsByRole, loadConsumerTools, buildToolMap } = require('./utils.js');
 const packageJSON = require('../../package.json');
@@ -111,26 +112,9 @@ async function startServer(options) {
       };
     }
 
-    try {
-      const response = await client.call(tool.method, tool.path, args || {});
-
-      const text = typeof response === 'string'
-        ? response
-        : JSON.stringify(response, null, 2);
-
-      return {
-        content: [{ type: 'text', text }],
-      };
-    } catch (error) {
-      const message = error.response
-        ? JSON.stringify(error.response, null, 2)
-        : error.message;
-
-      return {
-        content: [{ type: 'text', text: `Error calling ${tool.path}: ${message}` }],
-        isError: true,
-      };
-    }
+    // A route tool over stdio: no request Context exists, and the handler
+    // branch was refused above, so only the client is handed over
+    return callTool({ tool, client, args });
   });
 
   // Connect via stdio transport

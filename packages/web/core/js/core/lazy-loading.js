@@ -1,8 +1,7 @@
-import omega from '@omega.js/client';
 import { mapSrcset } from '__main_assets__/js/libs/srcset.js';
 
 // Lazy Loading Module
-export default function () {
+export default function ({ omega }) {
   // Constants
   const TRANSPARENT_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
@@ -40,7 +39,7 @@ export default function () {
   }
 
   // Wait for DOM to be ready
-  omega.dom().ready().then(() => {
+  omega.dom.ready().then(() => {
     initLazyLoading();
   });
 
@@ -344,7 +343,7 @@ export default function () {
         parent: element,
       };
 
-      omega.dom().loadScript(scriptOptions)
+      omega.dom.loadScript(scriptOptions)
         .then(() => {
           markAsLoaded(element);
         })

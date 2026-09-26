@@ -25,13 +25,13 @@ Name every test file `<concern>.test.js` — the suffix is how the runner finds 
 
 | Directory | Use for |
 |---|---|
-| `test/routes/` | Custom HTTP route handlers (`functions/routes/<verb>/<path>.js`) |
+| `test/routes/` | Custom HTTP route handlers (`src/routes/<path>/<method>.js`) |
 | `test/events/` | Pub/Sub / Firestore-trigger handlers |
 | `test/helpers/` | Shared test utilities for your project |
 | `test/fixtures/` | Static test data (JSON, sample docs) |
 | `test/_init/` | Per-suite setup (Firestore seed data, user accounts) |
 
-Tests run inside the Firebase emulator. Use the @omega.js/backend helpers (`ctx`, admin SDK, fixture loaders) instead of mocking — `npx omega emulator` boots the same environment the tests run against.
+Tests run inside the Firebase emulator. Use what every test's `run()` receives (the real `omega` instance, a real `ctx`, `firestore`, `http`, `accounts`) instead of mocking: `npx omega emulator` boots the same environment the tests run against.
 
 ## Extended mode (real external APIs)
 
@@ -42,7 +42,7 @@ npx omega test --extended            # opt into real external APIs
 TEST_EXTENDED_MODE=true npx omega test   # identical — the env-var form
 ```
 
-`--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM. @omega.js/backend propagates it to BOTH the test runner and the running emulator, so a single flag on the test command flips everything — no need to restart the emulator. Anything an extended test creates in an external system MUST be cleaned up by the test (the runner only wipes local Firestore/Auth).
+`--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across all four OMEGA frameworks. @omega.js/backend propagates it to BOTH the test runner and the running emulator, so a single flag on the test command flips everything, no need to restart the emulator. Anything an extended test creates in an external system MUST be cleaned up by the test (the runner only wipes local Firestore/Auth).
 
 ## Coverage
 
@@ -53,10 +53,18 @@ Every feature ships with tests at every surface it exposes — logic (handler su
 ```js
 // test/routes/hello.test.js
 module.exports = {
-  'GET /hello returns ok': async ({ http }) => {
-    const res = await http.get('hello');
-    if (res.status !== 200) throw new Error('expected 200');
-  },
+  description: 'GET /hello',
+  type: 'group',
+  tests: [
+    {
+      name: 'answers-ok',
+      auth: 'none',
+      async run({ http, assert }) {
+        const response = await http.get('omega/hello');
+        assert.isSuccess(response);
+      },
+    },
+  ],
 };
 ```
 

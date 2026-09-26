@@ -5,15 +5,15 @@ Typed channel bus for main ↔ renderer communication. All @omega.js/desktop fea
 ## Main-process API
 
 ```js
-manager.ipc.handle(channel, async (payload, evt) => result)   // request/response
-manager.ipc.unhandle(channel)
-manager.ipc.invoke(channel, payload)                          // call locally (also what renderer triggers)
-manager.ipc.on(channel, (payload, evt) => void)               // one-way subscribe (renderer → main)
-manager.ipc.off(channel, fn)
-manager.ipc.broadcast(channel, payload)                       // → all BrowserWindows
-manager.ipc.send(webContents, channel, payload)               // → one renderer
-manager.ipc.hasHandler(channel)
-manager.ipc.listenerCount(channel)
+omega.ipc.handle(channel, async (payload, evt) => result)   // request/response
+omega.ipc.unhandle(channel)
+omega.ipc.invoke(channel, payload)                          // call locally (also what renderer triggers)
+omega.ipc.on(channel, (payload, evt) => void)               // one-way subscribe (renderer → main)
+omega.ipc.off(channel, fn)
+omega.ipc.broadcast(channel, payload)                       // → all BrowserWindows
+omega.ipc.send(webContents, channel, payload)               // → one renderer
+omega.ipc.hasHandler(channel)
+omega.ipc.listenerCount(channel)
 ```
 
 ## Renderer-process API (via preload contextBridge)
@@ -51,7 +51,7 @@ Registration is validated for you (above) — payload CONTENT is not. Treat ever
 
 ```js
 // main
-manager.ipc.handle('user:get-token', async (payload) => {
+omega.ipc.handle('user:get-token', async (payload) => {
   const token = await fetchToken(payload.userId);
   return { token };
 });

@@ -1,7 +1,7 @@
 // Shared test-runner core for the OMEGA frameworks — discovery, suite/group/standalone
-// execution, filtering, skip semantics, init hooks, and reporting. Extracted from UJM's
-// runner (the canonical 3-layer build/page/boot model); BXM/EM/UJM differ only in title,
-// package name, CLI target alias, and their special layers — all injected via config.
+// execution, filtering, skip semantics, init hooks, and reporting, on the 3-layer
+// build/page/boot model. The frameworks differ only in title, package name, CLI
+// target alias, and their special layers — all injected via config.
 //
 // Test-definition forms supported (see each framework's test/index.js for docs):
 //   - Standalone:  module.exports = { layer, description, run, cleanup, timeout, skip };
@@ -12,7 +12,7 @@
 // Suites stop on first failure (sequential, share state). Groups run all tests regardless.
 //
 // createRunner(config) config surface:
-//   title              — heading printed at the top of a run ('Browser Extension Manager Tests')
+//   title              — heading printed at the top of a run ('OMEGA Extension Tests')
 //   packageName        — framework npm name; cwd package === this ⇒ framework self-test mode
 //                        (framework boot/ suites only run in self-test mode — they assert on
 //                        the framework's own fixture consumer)
@@ -28,7 +28,7 @@
 //                           options, results, projectRoot }) => void }]
 //                        The callback owns runner loading, skip messaging, and results
 //                        mutation — framework glue stays framework-side.
-//   bootDefaultTimeout — per-test default for boot-layer inspect() (UJM/BXM 20000, EM 15000)
+//   bootDefaultTimeout — per-test default for boot-layer inspect() (each framework's runner sets its own)
 //   boot:              { run: async ({ tests, suites, options, results, projectRoot }) => void }
 //                        Called with the aggregated flat boot test list plus the boot-BOUND
 //                        suites (at least one of the two is non-empty).
@@ -37,7 +37,7 @@
 //                        partitions that FILE into the boot layer whatever its `layer` says,
 //                        and hands it to boot.run WHOLE (`suites: [{ file, mod }]`) instead
 //                        of flattening it into the inspect list: for suites that need the
-//                        boot lane's built app but run their own way (EM's `view:` renderer
+//                        boot lane's built app but run their own way (desktop's `view:` renderer
 //                        suites). Default: () => false. An array-form file is never bound.
 
 const path = require('path');

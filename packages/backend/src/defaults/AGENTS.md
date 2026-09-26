@@ -10,10 +10,12 @@
 ## Framework
 
 This project consumes **OMEGA Backend** (@omega.js/backend), a comprehensive framework for building
-modern Firebase Cloud Functions backends. A single `Manager.init(exports, {...})` bootstrap wires:
+modern Firebase Cloud Functions backends. Its main export is ONE ready-made instance, `omega`, and
+`omega.initialize({...})` wires:
 
-- built-in functions (`omega_api`, auth events, cron jobs)
-- helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata)
+- built-in functions (`omega_api`, auth events, cron jobs) into `omega.functions`
+- the request pipeline, and the `Context` (`ctx`) every route, event and cron job receives
+- the services (User, Usage, Analytics, Settings, Utilities, Metadata, Storage, Email, AI)
 - payment provider integrations (Stripe / PayPal) and Firestore-trigger pipelines
 - a deploy/emulator/watch tooling pipeline
 
@@ -48,10 +50,11 @@ npx omega install live      # restore the published @omega.js/backend from npm
 ## Where things live
 
 - `package.json`: THE target manifest, carrying scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
-- `src/index.js`: entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
-- `src/routes/<verb>/<path>.js`: custom routes mounted at runtime (e.g. `src/routes/get/hello.js` → `GET /hello`).
-- `src/schemas/<name>.js`: schema definitions for `Manager.Settings()` validation.
-- `src/hooks/<area>/<event>.js`: auth/cron hooks.
+- `src/index.js`: entry point. Requires the `omega` instance from `@omega.js/backend`, calls `omega.initialize({ ... })` and exports `omega.functions` (the built-in functions plus any you add).
+- `src/routes/<path>/<method>.js`: custom routes (e.g. `src/routes/hello/get.js` → `GET /hello` through your own `hello` function, `omega.routes.run('hello', { req, res })` in `src/index.js`, and its own hosting rewrite; `omega_api` and `/omega/*` serve only the framework's routes). `index.js` serves every method.
+- `src/schemas/<path>/<method>.js`: the route's schema, a function of the request returning a plain field declaration (validated into the route's `data`).
+- `src/hooks/auth/<event>.js`, `src/hooks/cron/<schedule>/<job>.js`: auth and cron hooks.
+- `src/events/<name>.js`: OPTIONAL handlers your own triggers run through `omega.events.run('<name>', payload)`.
 - `src/public/`: OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
 - `config/omega.json5`: STANDALONE projects only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this target's settings) and this target carries NO config file.
 - `.env`: OPTIONAL per-key overrides you write by hand. The brand root's `.env` is the one file to edit; every verb composes `dist/.env` from the cascade (company ← brand ← this file), filtered to the keys the env schema names for `backend`. Gitignored; no machine writes this file.
@@ -67,38 +70,57 @@ npx omega install live      # restore the published @omega.js/backend from npm
 ## Per-context imports
 
 ```js
-// src/index.js: the entire backend bootstrap
-const Manager = require('@omega.js/backend');
-Manager.init(exports, {
+// src/index.js: the entire backend bootstrap (synchronous; never `new`)
+const omega = require('@omega.js/backend');
+
+omega.initialize({
   // ...your options. How this backend RUNS is config, not an option here:
   // targets.backend.projectType in config/omega.json5 ('firebase' | 'custom').
 });
 
-// In a custom route (src/routes/get/hello.js):
-module.exports = async function(Manager, ctx) {
-  // ctx.req, ctx.res, ctx.user, etc.
+module.exports = omega.functions;
+
+// A route (src/routes/hello/get.js): ONE object, destructured
+module.exports = async ({ ctx, omega, user, data, usage, analytics }) => {
+  return ctx.respond({ hello: user.authenticated ? user.email : 'world' });
 };
+
+// A schema (src/schemas/hello/get.js): a function of the request, returning a declaration
+module.exports = ({ user, body, query, path, method, headers, geolocation }) => ({
+  limit: { type: 'number', default: 10, min: 1, max: user.plan === 'basic' ? 100 : 1000 },
+});
+
+// An auth hook (src/hooks/auth/on-create.js) and a cron job (src/hooks/cron/daily/<job>.js)
+module.exports = async ({ ctx, omega, user, context }) => { };
+module.exports = async ({ ctx, omega, context }) => { };
 ```
 
 ## Available APIs at runtime
 
-After `Manager.init()`, the Manager instance exposes factory methods:
-- `Manager.RouteContext({ req, res })`: request handler with user + analytics + utility access
-- `Manager.User(data)`: user property structure + schema
-- `Manager.Analytics({ ctx })`: GA4 event tracking
-- `Manager.Usage()`: rate-limiting
-- `Manager.Middleware(req, res)`: request pipeline
-- `Manager.Settings()`: schema validation against `src/schemas/*`
-- `Manager.Utilities()`: batch operations + helpers
-- `Manager.Metadata(doc)`: timestamps + tag helpers
-- `Manager.storage({ name })`: local JSON storage (lowdb)
+On the instance (`omega`), after `initialize()`:
+- `omega.config`, `omega.env`, `omega.logger`, `omega.cwd`, `omega.project`: config, the env reader, the logger, the functions dir, the Firebase project
+- `omega.firebase.admin`, `omega.firebase.functions`: the Firebase Admin and Functions SDKs; `omega.functions` is the exported map
+- `omega.utilities`: batch operations + helpers (`randomId()`, `sanitize()`, `iterateCollection()`)
+- `omega.email`, `omega.ai`: transactional/marketing email and OpenAI/Anthropic
+- `omega.storage({ name })`: local JSON storage (lowdb)
+- `omega.routes.run(name, { req, res }, options)`: run a request through the pipeline as the named route, from your own function
+- `omega.events.run(name, payload)`: run an event handler through the framework
+- `omega.getEnvironment()`, `omega.isDevelopment()`, `omega.isTesting()`, `omega.isProduction()`, `omega.getApiUrl()`
+
+On the request's `ctx` (every key of a route's argument is also here):
+- `ctx.user`: the caller, a `User` (`authenticated`, `uid`, `email`, `plan`, `active`, `roles`, the stored fields); never null
+- `ctx.data`: the input validated against the route's schema; `ctx.request` is the raw request
+- `ctx.usage`, `ctx.analytics`, `ctx.email`, `ctx.ai`, `ctx.metadata(metadata, doc)`: the request services, built on first read
+- `ctx.respond()`, `ctx.redirect()`, `ctx.report()`, `ctx.log()` / `.warn()` / `.error()`
+
+A route never constructs a service: it reads it off `ctx` or `omega`.
 
 Auth events, payment-webhook transitions, and cron jobs are wired automatically; hook into them by exporting from `src/hooks/<area>/<event>.js`.
 
 ## Dependency resolution
 
-- **`Manager.require(name)`** resolves from @omega.js/backend's module context. Consumer code (routes, schemas) can use it to access @omega.js/backend's bundled dependencies without installing them directly.
-- **@omega.js/client owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different).
+- **`omega.require(name)`** resolves from @omega.js/backend's module context. Consumer code (routes, schemas) can use it to access @omega.js/backend's bundled dependencies without installing them directly.
+- **@omega.js/client owns Firebase on the client side.** Frontend consumer code (web pages, extension contexts, desktop renderers) NEVER imports Firebase directly. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different).
 
 ## Testing
 

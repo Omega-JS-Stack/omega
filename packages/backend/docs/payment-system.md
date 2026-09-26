@@ -108,7 +108,7 @@ The webhook is **completed**, not failed: the event reached a terminal decision,
 A user doc is born at **signup**, behind a real Firebase auth user. A payment event can update one and can never mint one, at either seam ([#399](https://github.com/Omega-JS-Stack/omega/issues/399)):
 
 - **The webhook pipeline** looks the uid up in Auth when `users/{uid}` does not exist. With no auth user it refuses: nothing is written — no user doc, no order, no intent — and the event completes with `refusal` = `{ reason: 'user-without-auth' }` plus a loud `USER WITHOUT AUTH` warning naming the uid and the event. Completed, not failed, so the provider stops redelivering an event nothing here will ever act on. A uid whose doc already exists takes no lookup at all: updates and deletes behave exactly as before.
-  - The refusal also **reports**, at `warning` level, through the backend's one capture handle (`Manager.libraries.sentry`, null and therefore a no-op when no DSN is configured — [monitoring.md](../../../docs/shared/monitoring.md)). It carries the uid, the event id and type, the provider and the reason; no email is assembled, so there is nothing for the PII scrub to take out. The doc stamp is the record a human reconciles from; this is the alarm that tells them to look, since the whole problem is that nobody knows to (Ian, 2026-08-20).
+  - The refusal also **reports**, at `warning` level, through the backend's one capture handle (`omega.sentry`, null and therefore a no-op when no DSN is configured; [monitoring.md](../../../docs/shared/monitoring.md)). It carries the uid, the event id and type, the provider and the reason; no email is assembled, so there is nothing for the PII scrub to take out. The doc stamp is the record a human reconciles from; this is the alarm that tells them to look, since the whole problem is that nobody knows to (Ian, 2026-08-20).
 - **The checkout route** verifies BOTH halves before it starts — missing either answers `403` with a warn line, so there is no provider session, no intent doc, and no half-written account.
 
 The seam is real, not theoretical: a QA checkout run locally against the emulator with real test-mode keys has its webhooks delivered to the **deployed** backend (the emulator has no webhook path), and `customer.subscription.created` for an emulator-only uid used to mint a LIVE `users/{uid}` holding nothing but a subscription block. Residue that predates the guards is cleaned up by the users migration, which flags exactly this shape as an orphan.
@@ -205,36 +205,36 @@ user.subscription.cancellation.pending === true
 user.subscription.status === 'suspended'
 ```
 
-## resolveSubscription(account)
+## The subscription getters on `User`
 
-`User.resolveSubscription(account)` is a static method on the User helper that derives calculated subscription fields from raw account data. It returns only fields that require derivation logic — raw data (product.id, status, trial, cancellation) lives on the account object directly.
+A `User` (`@omega.js/account`, the same class on the backend and in the browser) derives the calculated subscription facts as getters, computed on every read. The raw data (`subscription.product.id`, `status`, `trial`, `cancellation`) stays on the document's own fields.
 
 ```javascript
-const User = require('@omega.js/backend/dist/manager/helpers/user');
-
-const resolved = User.resolveSubscription(account);
-// Returns: { plan, active, trialing, cancelling }
+module.exports = async ({ ctx, user }) => {
+  user.plan;       // 'basic' when cancelled or suspended
+  user.active;     // true for an active, trialing or cancelling paid plan
+};
 ```
 
-| Field | Type | Description |
+A route reads the caller as `user`, already a `User`. Framework code that holds a raw account document builds one through `src/omega/helpers/account.js` (`new User(document)`).
+
+| Getter | Type | Description |
 |-------|------|-------------|
 | `plan` | `string` | Effective plan ID the user has access to RIGHT NOW (`'basic'` if cancelled/suspended) |
 | `active` | `boolean` | User has active access (active, trialing, or cancelling) |
 | `trialing` | `boolean` | In an active trial (status `'active'` + `trial.claimed` + unexpired `trial.expires`) |
 | `cancelling` | `boolean` | Cancellation pending (status `'active'` + `cancellation.pending` + NOT trialing) |
+| `everPaid` | `boolean` | The user has ever paid (a payment start date exists) |
 
-Accepts either a raw Firestore account object or a resolved `User` instance (checks both `account.subscription` and `account.properties.subscription`).
+The getters never reach `toJSON()`, so a Firestore write or an API response carries the stored document alone. The browser's `omega.auth.user` is the same class, so both sides read the same answer.
 
-**Unified with @omega.js/client**: The same function exists as `auth.resolveSubscription(account)` in @omega.js/client (`modules/auth.js`) with identical logic and return shape.
-
-**Use this instead of manual access checks** — it centralizes all the derivation logic in one place:
+**Use the getters instead of manual access checks.** They centralize all the derivation logic in one place:
 
 ```javascript
-// ✅ PREFERRED — use resolveSubscription
-const resolved = User.resolveSubscription(user);
-if (resolved.active) { /* has access */ }
+// ✅ PREFERRED: the getter
+if (user.active) { /* has access */ }
 
-// ❌ AVOID — manual checks that duplicate logic
+// ❌ AVOID: manual checks that duplicate logic
 if (user.subscription.status === 'active' && user.subscription.product.id !== 'basic') { /* ... */ }
 ```
 
@@ -324,15 +324,16 @@ Note: Trials are NOT a separate transition. The `new-subscription` handler check
 
 ### Handler Interface
 
-All handlers are in `src/manager/events/firestore/payments-webhooks/transitions/` and export a single async function:
+All handlers are in `src/omega/events/firestore/payments-webhooks/transitions/` and export a single async function:
 
 ```javascript
-module.exports = async function ({ before, after, uid, userDoc, admin, ctx, Manager, eventType, eventId }) {
+module.exports = async function ({ ctx, before, after, order, uid, userDoc, refundDetails }) {
+  // ctx: the webhook event's Context (ctx.omega is the instance)
   // before: previous subscription state (null for new/one-time)
   // after: new unified state (subscription or one-time)
+  // order: the order document
   // userDoc: full user document data
-  // eventType: original webhook event type (e.g., 'customer.subscription.updated')
-  // eventId: webhook event ID
+  // refundDetails: the refund's details, on a refund
 };
 ```
 
@@ -340,7 +341,7 @@ module.exports = async function ({ before, after, uid, userDoc, admin, ctx, Mana
 
 1. Add detection logic in `transitions/index.js` (in priority order)
 2. Create handler file in `transitions/{category}/{name}.js`
-3. Handler receives full context — use `ctx.log()` for logging, `Manager.getApiUrl()` for API calls
+3. Handler receives full context: use `ctx.log()` for logging, `omega.getApiUrl()` for API calls
 
 ## Subscription Management Routes
 
@@ -472,7 +473,7 @@ A provider implements as much of this as its API HAS. Coinbase Commerce sells on
 
 ```javascript
 module.exports = {
-  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, Manager, ctx }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, ctx }) {
     return { id, url, raw };
   },
 };

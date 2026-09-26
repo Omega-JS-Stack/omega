@@ -10,9 +10,10 @@
  * processing and Firestore tracking tests run against the real emulator.
  */
 const path = require('path');
-const resolverPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/source-resolver.js');
+const resolverPath = path.resolve(__dirname, '../../../dist/omega/libraries/content/source-resolver.js');
 const { contentSourceHash, isURL } = require(resolverPath);
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const Context = require('../../../dist/omega/context.js');
 
 module.exports = defineCases({
   description: 'content/blog-auto-publisher',
@@ -316,9 +317,9 @@ module.exports = defineCases({
     // ============================
     {
       name: 'resolveSources-brand-pick-resolves-seed',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { resolveSources } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
         const resolved = await resolveSources({
           sources: ['$brand'],
@@ -334,9 +335,9 @@ module.exports = defineCases({
 
     {
       name: 'resolveSources-text-pick-resolves-content',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { resolveSources } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
         const resolved = await resolveSources({
           sources: ['Write about blockchain technology'],
@@ -354,9 +355,9 @@ module.exports = defineCases({
     {
       name: 'resolvePick-feed-failure-never-falls-back-to-brand',
       timeout: 30000,
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
         // $brand IS listed in the pool — the fallback chain must STILL never
         // land on it. Feed fails (nonexistent domain), no $parent listed → null.
@@ -373,11 +374,11 @@ module.exports = defineCases({
     {
       name: 'resolvePick-feed-falls-back-to-other-feeds-then-parent',
       timeout: 30000,
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
-        // Both feeds dead, $parent listed but no Manager → parent unreachable → null.
+        // Both feeds dead, $parent listed but no omega → parent unreachable → null.
         // Exercises the full chain (same feed → other feeds → parent) without throwing.
         const state = createResolverState({
           sources: [
@@ -398,11 +399,11 @@ module.exports = defineCases({
 
     {
       name: 'resolvePick-parent-only-falls-back-to-parent',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
-        // Parent unreachable (no Manager). Feeds ARE listed — but $parent must
+        // Parent unreachable (no omega). Feeds ARE listed — but $parent must
         // NOT fall back to them.
         const state = createResolverState({
           sources: ['$parent', '$feed:https://nonexistent.invalid/feed.xml', '$brand'],
@@ -417,9 +418,9 @@ module.exports = defineCases({
 
     {
       name: 'resolveSources-empty-pool-returns-empty',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { resolveSources } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
         const resolved = await resolveSources({ sources: [], count: 3, ctx });
         assert.equal(resolved.length, 0, 'empty pool resolves nothing');
@@ -429,9 +430,9 @@ module.exports = defineCases({
     {
       name: 'resolveSources-dead-feed-only-pool-returns-empty',
       timeout: 30000,
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         const { resolveSources } = require(resolverPath);
-        const ctx = Manager.RouteContext();
+        const ctx = new Context(omega);
 
         const resolved = await resolveSources({
           sources: ['$feed:https://nonexistent.invalid/feed.xml'],

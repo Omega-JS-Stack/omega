@@ -565,7 +565,7 @@ module.exports = defineCases({
         const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'), 'utf8');
         ctx.expect(src).toContain('Existing runner installation detected');
         ctx.expect(src).toContain('uninstalling first for a clean re-install');
-        // ...and the electron-manager era's install counts as an existing one.
+        // ...and the legacy em-runner install counts as an existing one.
         ctx.expect(src).toMatch(/jetpack\.exists\(home\)\s*\|\|\s*listLegacyRunnerHomes\(\{ home \}\)\.length > 0/);
       },
     },
@@ -1013,7 +1013,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'the electron-manager era homes are found from the environment, never the current home',
+      name: 'the legacy em-runner homes are found from the environment, never the current home',
       run: (ctx) => {
         // An upgraded box still runs `em runner`'s install out of
         // %LOCALAPPDATA%\em-runner (C:\actions-runners before that). Those are

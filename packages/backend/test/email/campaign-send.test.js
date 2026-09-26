@@ -12,7 +12,7 @@ module.exports = defineCases({
   timeout: 60000,
 
   async run({ http, assert }) {
-    const response = await http.post('backend-manager/marketing/campaign', {
+    const response = await http.post('omega/marketing/campaign', {
       name: '[TEST] Summer Sale — Free Users',
       subject: 'Summer Sale — {discount.percent}% Off Your First Month!',
       preheader: 'Limited time offer — upgrade to Premium today',

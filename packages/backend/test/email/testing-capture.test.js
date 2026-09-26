@@ -12,7 +12,7 @@
  *
  * This suite proves the sink itself — the gate, the store, the summary, the
  * append bound — and then the seam, by sending a real email through the runner's
- * own Manager and reading it back out of the store.
+ * own omega and reading it back out of the store.
  *
  * Plain-node (no emulator, no network): the store is a file and the capture path
  * touches no Firestore, which is the whole reason a file was chosen over a
@@ -34,7 +34,7 @@ const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 // A stand-in project root for the store tests, so they never disturb the real
 // project's `.temp/` (which the mailer case below uses for real).
 const SCRATCH_DIR = path.join(os.tmpdir(), '_test-omega-email-capture');
-const scratchManager = () => ({ cwd: path.join(SCRATCH_DIR, 'dist') });
+const scratchOmega = () => ({ cwd: path.join(SCRATCH_DIR, 'dist') });
 
 /** A testing ctx, and its extended twin */
 const testingCtx = { isTesting: () => true };
@@ -83,12 +83,12 @@ module.exports = defineCases({
       name: 'the store sits beside the test-mode file, one project up from the staged tree',
 
       run() {
-        const Manager = scratchManager();
+        const omega = scratchOmega();
 
         // The emulator's workers and the test runner are different processes with
         // different staged trees; the parent of each is the same project root,
         // which is exactly how the test-mode watcher finds the file it shares.
-        assert.equal(capture.resolveProjectDir(Manager), SCRATCH_DIR, 'the project root is the parent of Manager.cwd');
+        assert.equal(capture.resolveProjectDir(omega), SCRATCH_DIR, 'the project root is the parent of omega.cwd');
         assert.equal(
           capture.getCaptureFilePath(SCRATCH_DIR),
           path.join(SCRATCH_DIR, TEMP_DIR_NAME, capture.CAPTURE_FILENAME),
@@ -97,8 +97,8 @@ module.exports = defineCases({
 
         assert.throws(
           () => capture.resolveProjectDir({}),
-          /Manager\.cwd is unset/,
-          'a Manager that never booted fails loudly rather than writing to some other directory',
+          /omega\.cwd is unset/,
+          'a omega that never booted fails loudly rather than writing to some other directory',
         );
       },
     },
@@ -107,18 +107,18 @@ module.exports = defineCases({
       name: 'records round-trip through the store, in send order, and clear empties it',
 
       run() {
-        const Manager = scratchManager();
+        const omega = scratchOmega();
 
-        capture.clearCaptured(Manager);
-        assert.deepEqual(capture.readCaptured(Manager), [], 'a missing store reads as no emails, never as an error');
+        capture.clearCaptured(omega);
+        assert.deepEqual(capture.readCaptured(omega), [], 'a missing store reads as no emails, never as an error');
 
-        capture.recordCaptured(Manager, {
+        capture.recordCaptured(omega, {
           to: [{ email: 'first@test.dev', name: 'First' }],
           template: 'card',
           subject: 'Welcome aboard',
           html: '<p>Hello <strong>First</strong></p>',
         });
-        capture.recordCaptured(Manager, {
+        capture.recordCaptured(omega, {
           to: [{ email: 'second@test.dev' }, { email: 'cc@test.dev' }],
           template: 'order',
           subject: 'Your order',
@@ -126,7 +126,7 @@ module.exports = defineCases({
           sendAt: 1900000000,
         });
 
-        const records = capture.readCaptured(Manager);
+        const records = capture.readCaptured(omega);
 
         assert.equal(records.length, 2, 'both sends are recorded');
         assert.deepEqual(records[0].to, ['first@test.dev'], 'the record names the recipient by address');
@@ -137,8 +137,8 @@ module.exports = defineCases({
         assert.deepEqual(records[1].to, ['second@test.dev', 'cc@test.dev'], 'every recipient of a send lands in one record');
         assert.equal(records[1].sendAt, 1900000000, 'a scheduled send records the second it is due');
 
-        capture.clearCaptured(Manager);
-        assert.deepEqual(capture.readCaptured(Manager), [], 'clear empties the store, so a test reads only its own act');
+        capture.clearCaptured(omega);
+        assert.deepEqual(capture.readCaptured(omega), [], 'clear empties the store, so a test reads only its own act');
       },
     },
 
@@ -169,10 +169,10 @@ module.exports = defineCases({
       name: 'a record stays inside the atomic-append bound, so two processes never tear a line',
 
       run() {
-        const Manager = scratchManager();
+        const omega = scratchOmega();
 
-        capture.clearCaptured(Manager);
-        capture.recordCaptured(Manager, {
+        capture.clearCaptured(omega);
+        capture.recordCaptured(omega, {
           to: [{ email: 'huge@test.dev' }],
           template: 'card',
           subject: 'A very long email',
@@ -188,9 +188,9 @@ module.exports = defineCases({
           lines[0].length <= capture.LINE_LIMIT,
           `a record must fit the PIPE_BUF bound the appends rely on, got ${lines[0].length}`,
         );
-        assert.equal(capture.readCaptured(Manager).length, 1, 'and it still parses');
+        assert.equal(capture.readCaptured(omega).length, 1, 'and it still parses');
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
         jetpack.remove(SCRATCH_DIR);
       },
     },
@@ -199,9 +199,9 @@ module.exports = defineCases({
       name: 'a record that cannot be trimmed under the bound throws instead of tearing the store',
 
       run() {
-        const Manager = scratchManager();
+        const omega = scratchOmega();
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
 
         // The bound lives on the ENVELOPE too: a recipient list this long fills the
         // line on its own, so there is nothing left for the summary to give back.
@@ -209,11 +209,11 @@ module.exports = defineCases({
         const bulk = Array.from({ length: 200 }, (unused, index) => ({ email: `_test-bulk-${index}@a-fairly-long-domain.example.com` }));
 
         assert.throws(
-          () => capture.recordCaptured(Manager, { to: bulk, template: 'card', subject: 'Bulk', html: '<p>hi</p>' }),
+          () => capture.recordCaptured(omega, { to: bulk, template: 'card', subject: 'Bulk', html: '<p>hi</p>' }),
           /nothing left to trim/,
           'an unrecordable send fails loudly rather than corrupting the store',
         );
-        assert.deepEqual(capture.readCaptured(Manager), [], 'and nothing was written');
+        assert.deepEqual(capture.readCaptured(omega), [], 'and nothing was written');
 
         jetpack.remove(SCRATCH_DIR);
       },
@@ -222,12 +222,12 @@ module.exports = defineCases({
     {
       name: 'the mailer records instead of sending, past a real render',
 
-      async run({ Manager, ctx }) {
+      async run({ omega, ctx }) {
         // The REAL mailer, the REAL brand, the REAL MJML render — only the delivery
         // is replaced. A template that throws (the #640 signoff crash) fails here.
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
 
-        const result = await Manager.Email(ctx).send({
+        const result = await ctx.email.send({
           sender: 'account',
           to: '_test.capture-seam@test.dev',
           subject: 'The seam records this one',
@@ -245,7 +245,7 @@ module.exports = defineCases({
         assert.equal(result.status, 'captured', 'a testing send reports what happened to it');
         assert.ok(result.options.content[0].value.includes('<html'), 'and it went through the full render on the way');
 
-        const records = capture.readCaptured(Manager);
+        const records = capture.readCaptured(omega);
 
         assert.equal(records.length, 1, `exactly one email was recorded, got ${records.length}`);
         assert.deepEqual(records[0].to, ['_test.capture-seam@test.dev']);
@@ -253,7 +253,7 @@ module.exports = defineCases({
         assert.equal(records[0].subject, 'The seam records this one');
         assert.match(records[0].summary, /This email was never handed to SendGrid\./, 'the summary carries the rendered body text');
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
       },
     },
   ],

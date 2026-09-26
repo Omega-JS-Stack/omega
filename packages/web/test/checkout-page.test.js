@@ -82,11 +82,15 @@ test('contract: every binding path the page reads is one the state module builds
 
   assert.ok(bound.size >= 25, `the page still drives its UI from bindings (${bound.size} paths)`);
 
+  // `auth.user.*` resolves on the live User the state module hands through,
+  // never on a key it builds
+  assert.match(state, /user: omega\.auth\.user,/, 'the bindings carry the live User under auth.user');
+
   // Every leaf key must exist in buildBindingsState() — a renamed or dropped
   // key would render a permanently blank/hidden element.
   for (const path_ of bound) {
     const leaf = path_.split('.').pop();
-    if (['checkout', 'auth'].includes(leaf)) {
+    if (['checkout', 'auth'].includes(leaf) || path_.startsWith('auth.user.')) {
       continue;
     }
     // `key: value` or the shorthand `key,` — both are how the state object

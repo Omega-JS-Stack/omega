@@ -39,8 +39,40 @@ module.exports = defineCases({
         ctx.expect(module.includes('data-shell-toggle')).toBe(true);
         ctx.expect(module.includes('data-shell-dismiss')).toBe(true);
         ctx.expect(module.includes("'shell.collapsed'")).toBe(true);
-        // client is a runtime dependency, so the specifier survives vendoring.
-        ctx.expect(module.includes("from '@omega.js/client'")).toBe(true);
+        // The shell is built FROM the runtime instance it is handed, so the
+        // vendored copy imports no runtime of its own.
+        ctx.expect(module.includes('export function createShell(omega)')).toBe(true);
+        ctx.expect(module.includes('@omega.js/client')).toBe(false);
+      },
+    },
+    {
+      // The renderer builds `omega.shell` from ITSELF, exactly as web's runtime
+      // does (`this.shell = createShell(this)`), off the vendored module
+      name: 'the renderer builds omega.shell with createShell(omega)',
+      run: (ctx) => {
+        const renderer = fs.readFileSync(path.join(PACKAGE_ROOT, 'dist', 'renderer.js'), 'utf8');
+        ctx.expect(renderer.includes("const { createShell } = require('./assets/js/core/app-shell.js');")).toBe(true);
+        ctx.expect(renderer.includes('this.shell = createShell(this);')).toBe(true);
+      },
+    },
+    {
+      // The same function object the renderer calls, and it builds the shell API
+      // off the instance's storage (an inert API when the page carries no shell)
+      name: 'createShell(omega) returns the shell API off the instance it is handed',
+      run: (ctx) => {
+        const { createShell } = require(path.join(PACKAGE_ROOT, 'dist', 'assets', 'js', 'core', 'app-shell.js'));
+        const savedDocument = globalThis.document;
+        globalThis.document = { querySelector: () => null };
+        try {
+          const shell = createShell({ storage: { get: () => null, set: () => {} } });
+          for (const name of ['isCollapsed', 'isOpen', 'setCollapsed', 'setOpen', 'toggleCollapsed', 'toggleOpen']) {
+            ctx.expect(typeof shell[name]).toBe('function');
+          }
+          ctx.expect(shell.isCollapsed()).toBe(false);
+        } finally {
+          if (savedDocument === undefined) delete globalThis.document;
+          else globalThis.document = savedDocument;
+        }
       },
     },
     {

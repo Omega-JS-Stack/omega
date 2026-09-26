@@ -10,10 +10,10 @@
  *
  * Run: npx omega test backend:routes/content/post-target-scope
  */
-const readPost = require('../../../dist/manager/routes/content/post/get.js');
+const readPost = require('../../../dist/omega/routes/content/post/get.js');
 const {
   brandConfig,
-  fakeManager,
+  fakeOmega,
   recordingCtx,
   githubDouble,
   withGithub,
@@ -45,10 +45,10 @@ function hit(filePath) {
 
 /** Run the read route, returning what it sent and what GitHub saw. */
 async function readAgainst(config, settings, github) {
-  const Manager = fakeManager(config);
-  const ctx = recordingCtx(Manager);
+  const omega = fakeOmega(config);
+  const ctx = recordingCtx(omega);
 
-  await withGithub(github, () => readPost({ ctx, Manager, settings, analytics: { event() {} } }));
+  await withGithub(github, () => readPost({ ctx, omega, data: settings, analytics: { event() {} } }));
 
   return { sent: ctx.sent, calls: github.calls };
 }

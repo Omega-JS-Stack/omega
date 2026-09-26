@@ -19,8 +19,9 @@ This project consumes **OMEGA Desktop** (@omega.js/desktop), a comprehensive fra
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process.**
+**@omega.js/desktop's renderer instance extends `@omega.js/client`'s base class.**
 - It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
+- `omega.auth.user` is always a `User`: `authenticated`, `plan`, `active`, `profile.displayName`; `omega.auth.listen()` delivers `{ user, denied }`.
 - Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
@@ -70,28 +71,36 @@ npx omega install live # restore the published @omega.js/desktop from npm
 
 ## Per-context imports
 
+Each entry exports ONE ready-made instance, `omega`; a consumer never writes `new`.
+
 ```js
 // src/main.js
-new (require('@omega.js/desktop/main'))().initialize();   // auto-loads JSON5 config
+const omega = require('@omega.js/desktop/main');
+omega.initialize().then(() => { const { logger, windows } = omega; });   // auto-loads JSON5 config
 
 // src/preload.js
-new (require('@omega.js/desktop/preload'))().initialize();
+const omega = require('@omega.js/desktop/preload');
+omega.initialize();
 
 // src/assets/js/components/main/index.js
-new (require('@omega.js/desktop/renderer'))().initialize();
+import omega from '@omega.js/desktop/renderer';
+omega.initialize().then(() => { const { logger, desktop } = omega; });
 ```
 
 ## Available APIs at runtime
 
-In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
+In main, each a property of `omega`: `windows`, `tray`, `menu`, `contextMenu`, `ipc`, `storage`, `deepLink`, `autoUpdater`, `appState`, `startup`, `protocol`, `authFlow`, `theme`, `fontawesome`, `context`, `usage`, `remoteConfig`, `remoteScripts`, `restartManager`, `analytics`, `sentry`, `logger`.
+- `omega.auth` is the signed-in account in main: `.user` (a `User`), `.listen()`, `.signOut()`, `.getIdToken()`, `.handleToken()`.
 
-In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `window.OMEGA_BUILD_JSON.config` (the one `build.js` the view's shell loads).
+In renderer: the @omega.js/client base (`omega.auth`, `omega.firestore`, `omega.bindings`, and `omega.storage`, the page store) plus `omega.desktop`, the preload's bridge to main.
+- `omega.desktop.{ipc,storage,theme,fontawesome,autoUpdater,analytics,context,usage,remoteConfig}`; `omega.desktop.storage` is the app store, async over IPC.
+- Config: `window.OMEGA_BUILD_JSON.config` (the one `build.js` the view's shell loads).
 
 ## Dependency resolution
 
 - **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `@omega.js/client`, etc.). @omega.js/desktop's bundler resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omega.js/desktop's bundle task, not your `package.json`.
-- **@omega.js/client owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge).
-- **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime for unbundled code (gulp tasks, test fixtures).
+- **@omega.js/client owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. In renderers use `omega.auth` and `omega.firestore` on the renderer instance. In the main process, use `omega.auth` (the @omega.js/desktop bridge).
+- **`omega.require(name)`** resolves from @omega.js/desktop's module context at runtime for unbundled code (gulp tasks, test fixtures).
 
 ## Testing
 

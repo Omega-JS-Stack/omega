@@ -11,17 +11,17 @@ module.exports = defineCases({
   description: 'fontawesome (main)',
   tests: [
     {
-      name: 'manager.fontawesome is initialized with the full API surface',
+      name: 'omega.fontawesome is initialized with the full API surface',
       run: (ctx) => {
-        ctx.expect(ctx.manager.fontawesome._initialized).toBe(true);
-        ctx.expect(typeof ctx.manager.fontawesome.get).toBe('function');
-        ctx.expect(typeof ctx.manager.fontawesome.has).toBe('function');
+        ctx.expect(ctx.omega.fontawesome._initialized).toBe(true);
+        ctx.expect(typeof ctx.omega.fontawesome.get).toBe('function');
+        ctx.expect(typeof ctx.omega.fontawesome.has).toBe('function');
       },
     },
     {
       name: 'get() resolves a solid icon to an inline SVG sized 1em/currentColor',
       run: (ctx) => {
-        const svg = ctx.manager.fontawesome.get('play');
+        const svg = ctx.omega.fontawesome.get('play');
         ctx.expect(typeof svg).toBe('string');
         ctx.expect(svg.startsWith('<svg ')).toBe(true);
         ctx.expect(svg.includes('width="1em"')).toBe(true);
@@ -36,7 +36,7 @@ module.exports = defineCases({
         // fa-lock's shackle peaks at y=-32 in a 0 0 384 512 viewBox; the SVG
         // root default (overflow: hidden) clips it — FA's own kit renders
         // with overflow visible, so the serve path must too.
-        const svg = ctx.manager.fontawesome.get('lock');
+        const svg = ctx.omega.fontawesome.get('lock');
         ctx.expect(typeof svg).toBe('string');
         ctx.expect(svg.includes('overflow="visible"')).toBe(true);
       },
@@ -44,8 +44,8 @@ module.exports = defineCases({
     {
       name: 'solid is the default style; brands resolve when named',
       run: (ctx) => {
-        ctx.expect(ctx.manager.fontawesome.get('rocket')).toBe(ctx.manager.fontawesome.get('rocket', 'solid'));
-        const brand = ctx.manager.fontawesome.get('github', 'brands');
+        ctx.expect(ctx.omega.fontawesome.get('rocket')).toBe(ctx.omega.fontawesome.get('rocket', 'solid'));
+        const brand = ctx.omega.fontawesome.get('github', 'brands');
         ctx.expect(typeof brand).toBe('string');
         ctx.expect(brand.startsWith('<svg ')).toBe(true);
       },
@@ -54,20 +54,20 @@ module.exports = defineCases({
       name: 'FA aliases resolve (via the fontawesome-free metadata map)',
       run: (ctx) => {
         // 'search' is the classic alias of 'magnifying-glass'.
-        ctx.expect(ctx.manager.fontawesome.has('search')).toBe(true);
-        ctx.expect(ctx.manager.fontawesome.has('magnifying-glass')).toBe(true);
+        ctx.expect(ctx.omega.fontawesome.has('search')).toBe(true);
+        ctx.expect(ctx.omega.fontawesome.has('magnifying-glass')).toBe(true);
       },
     },
     {
       name: 'unknown names and unknown styles return null (never throw)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.fontawesome.get('definitely-not-an-icon-xyz')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('definitely-not-an-icon-xyz')).toBe(null);
         // 'no-such-style' is shape-valid but exists in NO Font Awesome set —
         // stays null even after a brand supplies Pro (whose styles, like
         // duotone, are legitimate lookups now).
-        ctx.expect(ctx.manager.fontawesome.get('play', 'no-such-style')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('play', '../solid')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.has('definitely-not-an-icon-xyz')).toBe(false);
+        ctx.expect(ctx.omega.fontawesome.get('play', 'no-such-style')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('play', '../solid')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.has('definitely-not-an-icon-xyz')).toBe(false);
       },
     },
     {
@@ -76,7 +76,7 @@ module.exports = defineCases({
         const os = require('os');
         const path = require('path');
         const jetpack = require('fs-jetpack');
-        const fa = ctx.manager.fontawesome;
+        const fa = ctx.omega.fontawesome;
 
         const brandRoot = path.join(os.tmpdir(), `omega-fa-test-${process.pid}`);
         jetpack.write(
@@ -112,34 +112,34 @@ module.exports = defineCases({
     {
       name: 'non-slug names are rejected — no path traversal, no crashes',
       run: (ctx) => {
-        ctx.expect(ctx.manager.fontawesome.get('../../package')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('..')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('play.svg/../../secrets')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get(null)).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get(42)).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('Play')).toBe(null); // uppercase is not a slug
+        ctx.expect(ctx.omega.fontawesome.get('../../package')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('..')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('play.svg/../../secrets')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('')).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get(null)).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get(42)).toBe(null);
+        ctx.expect(ctx.omega.fontawesome.get('Play')).toBe(null); // uppercase is not a slug
       },
     },
     {
       name: 'lookups are cached — same string instance on repeat calls',
       run: (ctx) => {
-        const first = ctx.manager.fontawesome.get('play');
-        const second = ctx.manager.fontawesome.get('play');
+        const first = ctx.omega.fontawesome.get('play');
+        const second = ctx.omega.fontawesome.get('play');
         ctx.expect(first === second).toBe(true);
       },
     },
     {
       name: 'desktop:fontawesome:get IPC handler round-trips (and nulls bad input)',
       run: async (ctx) => {
-        const ok = await ctx.manager.ipc.invoke('desktop:fontawesome:get', { name: 'play', style: 'solid' });
+        const ok = await ctx.omega.ipc.invoke('desktop:fontawesome:get', { name: 'play', style: 'solid' });
         ctx.expect(typeof ok.svg).toBe('string');
         ctx.expect(ok.svg.startsWith('<svg ')).toBe(true);
 
-        const bad = await ctx.manager.ipc.invoke('desktop:fontawesome:get', { name: '../../etc/passwd' });
+        const bad = await ctx.omega.ipc.invoke('desktop:fontawesome:get', { name: '../../etc/passwd' });
         ctx.expect(bad.svg).toBe(null);
 
-        const empty = await ctx.manager.ipc.invoke('desktop:fontawesome:get', {});
+        const empty = await ctx.omega.ipc.invoke('desktop:fontawesome:get', {});
         ctx.expect(empty.svg).toBe(null);
       },
     },

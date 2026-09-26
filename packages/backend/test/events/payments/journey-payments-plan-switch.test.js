@@ -18,7 +18,7 @@
  */
 const { buildUser, callHandler } = require('../../routes/payments/_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/plan/post.js');
+const handler = require('../../../dist/omega/routes/payments/plan/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 // The suite's own seeded persona ([#406](https://github.com/Omega-JS-Stack/omega/issues/406)):
@@ -102,19 +102,19 @@ module.exports = defineCases({
 
     {
       name: 'call-plan-endpoint',
-      async run({ assert, Manager, state }) {
-        const user = buildUser(Manager, {
+      async run({ assert, omega, state }) {
+        const user = buildUser({
           auth: { uid: state.uid, email: state.email },
           roles: {},
           subscription: state.subscription,
         });
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-plan',
           user,
-          settings: {
+          data: {
             productId: state.productB.id,
             frequency: state.productB.frequency,
             confirmed: true,

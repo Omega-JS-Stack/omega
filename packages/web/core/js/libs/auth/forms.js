@@ -3,7 +3,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 import { handleEmailSignin, handleEmailSignup, handlePasswordReset } from '__main_assets__/js/libs/auth/email.js';
 import { signInWithProvider } from '__main_assets__/js/libs/auth/oauth.js';
@@ -104,7 +104,7 @@ function captureSignupConsent(data) {
   const legalLabel = document.querySelector('label[for="consent-legal"]')?.innerText?.trim() || null;
   const marketingLabel = document.querySelector('label[for="consent-marketing"]')?.innerText?.trim() || null;
 
-  omega.storage().set('consent', {
+  omega.storage.set('consent', {
     legal: {
       granted: data?.consentLegal === true || data?.consentLegal === 'on',
       text: legalLabel,
@@ -117,7 +117,7 @@ function captureSignupConsent(data) {
 }
 
 function buildFormManager(ctx, { submittingText, submittedText }) {
-  const formManager = new FormManager('#auth-form', {
+  const formManager = new FormManager(omega, '#auth-form', {
     autoReady: false, // The boot sequence calls ready() after checking redirect result
     allowResubmit: false,
     warnOnUnsavedChanges: false,

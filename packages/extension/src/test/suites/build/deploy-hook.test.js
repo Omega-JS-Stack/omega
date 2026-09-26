@@ -61,7 +61,7 @@ async function runDeploy(options) {
   fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"extension-deploy-hook-test"}');
   fs.writeFileSync(
     path.join(tmp, 'hooks', 'deploy', 'pre.js'),
-    `module.exports = async (ctx) => { global.__omegaDeployHookRan.push('deploy/pre:' + (ctx.projectRoot === process.cwd() && typeof ctx.manager === 'object' && ctx.mode === 'production' ? 'ctx ok' : 'ctx wrong')); };`,
+    `module.exports = async (ctx) => { global.__omegaDeployHookRan.push('deploy/pre:' + (ctx.projectRoot === process.cwd() && typeof ctx.build === 'object' && ctx.mode === 'production' ? 'ctx ok' : 'ctx wrong')); };`,
   );
 
   const restores = [
@@ -76,7 +76,7 @@ async function runDeploy(options) {
   global.__omegaDeployHookRan = ran;
 
   try {
-    // Required BEFORE the chdir: the verb builds its Manager at load time from
+    // Required BEFORE the chdir: the verb loads its build module at load time from
     // the real target; only the hook lookup reads cwd, at call time.
     const deploy = require(resolved);
     process.chdir(tmp);
@@ -139,7 +139,7 @@ module.exports = defineCases({
   description: 'deploy: the consumer\'s hooks/deploy/pre.js runs before the precheck (#900)',
   tests: [
     {
-      name: 'the hook runs after the scaffold and before the network precheck, with { manager, projectRoot, mode: production }',
+      name: 'the hook runs after the scaffold and before the network precheck, with { build, projectRoot, mode: production }',
       run: async (ctx) => {
         const ran = await runDeploy({});
         ctx.expect(ran).toEqual(['ensure-target', 'deploy/pre:ctx ok', 'precheck', 'STOP AT PRECHECK']);

@@ -48,7 +48,7 @@
  * mounted with, since re-theming it would mean re-fetching it.
  *
  * Source resolution (advertising.providers.inhouse.source):
- *   'self'    → this brand's api URL (manager.getApiUrl())
+ *   'self'    → this brand's api URL (omega.getApiUrl())
  *   'company' → the parent company's api URL (the RESOLVED config.company.url
  *               through the same api-URL derivation: the brand types
  *               `company: { id }` and the loader fills the url, #677)
@@ -168,11 +168,11 @@ function hostHostname() {
  * omega config (brand.id), with the parent host as the fallback when no id is
  * available. The house lane carries the same value to the backend as the serve
  * URL's `brand` param, so both lanes tag with one identity.
- * @param {object} manager - the client singleton
+ * @param {object} omega - the Omega instance
  * @returns {string} the brand id, or the host page's hostname
  */
-function utmSource(manager) {
-  return manager?.config?.brand?.id || hostHostname();
+function utmSource(omega) {
+  return omega?.config?.brand?.id || hostHostname();
 }
 
 /**
@@ -198,14 +198,14 @@ function promoHref(size, source) {
  * forward page that fired gtag before navigating. The frame now posts
  * omega-vert:click OUT to the host instead, and the HOST's own analytics
  * fires here — no forward page, no navigation delay.
- * @param {object} manager - the client singleton
+ * @param {object} omega - the Omega instance
  * @param {object} detail - { id } from the click message
  * @param {object} options - the unit's mount options ({ size, ... })
  * @param {string} lane - 'house' | 'promo'
  */
-function trackClick(manager, detail, options, lane) {
+function trackClick(omega, detail, options, lane) {
   try {
-    manager.analytics().event('vert_click', {
+    omega.analytics.event('vert_click', {
       vert_id: detail.id || '',
       vert_lane: lane,
       vert_campaign: lane === 'promo' ? UTM_CAMPAIGN_PROMO : (detail.id || ''),
@@ -294,19 +294,19 @@ function buildPromo(maxPx, theme, size, width, source) {
  */
 class PromoUnit {
   /**
-   * @param {object} manager - the client singleton (analytics on click)
+   * @param {object} omega - the Omega instance (analytics on click)
    * @param {Element} $el - host element the frame mounts into
    * @param {object} options - { size, theme } shape the frame
    * @param {Function} emit - (name, detail) host emitter
    */
-  constructor(manager, $el, options, emit) {
-    this.manager = manager;
+  constructor(omega, $el, options, emit) {
+    this.omega = omega;
     this.$el = $el;
     this.options = options;
     this.emit = emit;
     this.maxHeight = resolveSizePx(options.size);
     // The click tag's identity: this brand's own id (host fallback)
-    this.utmSource = utmSource(manager);
+    this.utmSource = utmSource(omega);
 
     this.destroyed = false;
     this.$iframe = null;
@@ -363,7 +363,7 @@ class PromoUnit {
       // The frame's own link opens omegajs.dev (target=_blank + rel) exactly
       // like a served unit, so the message carries the host-side work: the
       // analytics event no in-frame tracker could ever fire
-      trackClick(this.manager, { id: message.id }, this.options, 'promo');
+      trackClick(this.omega, { id: message.id }, this.options, 'promo');
       this.emit('click', { id: message.id });
     }
   }
@@ -396,7 +396,7 @@ class PromoUnit {
  */
 class VertUnit {
   /**
-   * @param {object} manager - the client singleton
+   * @param {object} omega - the Omega instance
    * @param {Element} $el - host element the iframe mounts into
    * @param {object} options
    * @param {string} options.source - resolved base URL of the ad server
@@ -413,8 +413,8 @@ class VertUnit {
    *   for the terminal lane
    * @param {Function} [options.onClick] - click message from the frame
    */
-  constructor(manager, $el, options = {}) {
-    this.manager = manager;
+  constructor(omega, $el, options = {}) {
+    this.omega = omega;
     this.$el = $el;
     this.options = options;
 
@@ -454,7 +454,7 @@ class VertUnit {
     // stamps it on the redirect URL, and the redirect route tags the stored
     // link with it (the parent host stays the targeting input, and the
     // fallback when this brand carries no id)
-    const brandId = this.manager?.config?.brand?.id;
+    const brandId = this.omega?.config?.brand?.id;
     if (brandId) {
       url.searchParams.set('brand', brandId);
     }
@@ -571,7 +571,7 @@ class VertUnit {
       // The frame's <a> navigates through the redirect route itself (which
       // UTM-tags the destination) — the message carries the host-side work:
       // the analytics event no in-frame tracker could ever fire
-      trackClick(this.manager, { id: message.id }, this.options, 'house');
+      trackClick(this.omega, { id: message.id }, this.options, 'house');
       this._emit('click', { id: message.id });
     }
   }
@@ -689,8 +689,8 @@ class VertUnit {
 }
 
 class Verts {
-  constructor(manager) {
-    this.manager = manager;
+  constructor(omega) {
+    this.omega = omega;
 
     // The AdSense script loads ONCE — the cached promise keeps a rejection
     // (adblock) sticky for every later unit on the page
@@ -722,7 +722,7 @@ class Verts {
    */
   resolveSource(source) {
     const configured = source
-      || this.manager.config.advertising?.providers?.inhouse?.source;
+      || this.omega.config.advertising?.providers?.inhouse?.source;
 
     if (!configured) {
       return null;
@@ -733,16 +733,16 @@ class Verts {
     }
 
     if (configured === 'self') {
-      return this.manager.getApiUrl();
+      return this.omega.getApiUrl();
     }
 
     if (configured === 'company') {
-      const companyUrl = this.manager.config.company?.url;
+      const companyUrl = this.omega.config.company?.url;
       if (!companyUrl) {
         logger.warn('inhouse source is "company" but no company url resolved (the brand names none, or its company is not reachable)');
         return null;
       }
-      return this.manager.getApiUrl(null, companyUrl);
+      return this.omega.getApiUrl(null, companyUrl);
     }
 
     logger.warn('Unsupported inhouse source:', configured);
@@ -838,7 +838,7 @@ class Verts {
    * @returns {Promise<{ lane: string, unit?: VertUnit }>}
    */
   async render($el, options = {}) {
-    const advertising = this.manager.config.advertising || {};
+    const advertising = this.omega.config.advertising || {};
     const adsense = advertising.providers?.adsense;
     const type = options.type || 'display';
 
@@ -908,10 +908,10 @@ class Verts {
 
     const tags = options.tags?.length
       ? options.tags
-      : this.manager.config.advertising?.tags || [];
+      : this.omega.config.advertising?.tags || [];
 
     // The house frame's own no-fill hands the host to the terminal lane
-    const unit = new VertUnit(this.manager, $el, {
+    const unit = new VertUnit(this.omega, $el, {
       ...options,
       source,
       tags,
@@ -945,7 +945,7 @@ class Verts {
     $el.style.removeProperty('max-height');
     $el.style.removeProperty('overflow');
 
-    const unit = new PromoUnit(this.manager, $el, options, (name, detail) => {
+    const unit = new PromoUnit(this.omega, $el, options, (name, detail) => {
       this._emitHost($el, options, name, detail);
     }).load();
 
@@ -995,7 +995,7 @@ class Verts {
    * @returns {Promise<object|null>|object}
    */
   _fallback($el, options) {
-    const fallback = this.manager.config.advertising?.fallback;
+    const fallback = this.omega.config.advertising?.fallback;
 
     if (fallback === 'inhouse') {
       return this.renderHouse($el, options);
@@ -1034,7 +1034,7 @@ class Verts {
 
   _loadAdSenseScript(client) {
     if (!this._adsenseScript) {
-      this._adsenseScript = this.manager.dom().loadScript({
+      this._adsenseScript = this.omega.dom.loadScript({
         src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}`,
         async: true,
         crossorigin: 'anonymous',

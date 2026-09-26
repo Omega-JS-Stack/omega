@@ -7,7 +7,7 @@
 
 ## Framework
 
-This project consumes **@omega.js/web**, the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime around the @omega.js/client singleton.
+This project consumes **@omega.js/web**, the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime that hands every page module the one `omega` instance.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
@@ -19,7 +19,8 @@ This project consumes **@omega.js/web**, the OMEGA web framework (Eleventy 3 + L
 
 ## 🚨 READ @omega.js/client TOO
 
-**@omega.js/web boots `@omega.js/client` as a runtime singleton on every page.**
+**@omega.js/web boots `@omega.js/client` on every page: the web runtime instance, `omega`, is the client's base class plus web's page chrome (`omega.appearance`, `omega.shell`, `omega.motion`, `omega.exitPopup`).**
+- Every page, layout, section and theme module receives it: `export default async ({ omega, options }) => { }`. Any other module imports the same instance: `import omega from '@omega.js/web/runtime'`. A consumer never writes `new`.
 - It powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.).
 - Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/web.
 

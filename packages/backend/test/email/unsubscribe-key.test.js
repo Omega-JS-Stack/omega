@@ -14,7 +14,7 @@
 const assert = require('node:assert');
 const crypto = require('crypto');
 
-const { buildUnsubscribeUrl } = require('../../dist/manager/libraries/email/prepare.js');
+const { buildUnsubscribeUrl } = require('../../dist/omega/libraries/email/prepare.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // The runner sets a key for the whole run, so every case here forces its own

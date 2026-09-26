@@ -35,7 +35,7 @@
  * GA4's `user_id` is the exception: @omega.js/client owns that one key on every
  * runtime, so nothing below writes it (see `identify()`).
  */
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 import { analytics } from '@omega.js/client/modules/analytics.js';
 import { getTrackingConsent } from '__main_assets__/js/libs/tracking-consent.js';
@@ -312,7 +312,7 @@ function compact(block) {
  * @returns {object} Only the keys that resolved to a value.
  */
 function buildAttributionContext() {
-  const attribution = omega.storage().get('attribution', {});
+  const attribution = omega.storage.get('attribution', {});
   // Last touch when there is one, else first: last is only ever written by a
   // TAGGED visit (#384), so the fallback is what gives an organic-then-direct
   // visitor their campaign back.

@@ -1,12 +1,12 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('install');
+const build = require('../build.js');
+const logger = build.logger('install');
 const { safeInstall } = require('../lib/safe-install');
 const local = require('@omega.js/devkit/local');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
 
 module.exports = async function (options) {
   // Log

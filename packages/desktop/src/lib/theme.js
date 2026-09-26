@@ -1,10 +1,10 @@
 // Theme — system-aware dynamic appearance (light / dark / follow-the-OS).
 //
 // Main-side API:
-//   manager.theme.get()        → 'system' | 'light' | 'dark'   (the SOURCE — what's chosen)
-//   manager.theme.resolved()   → 'light' | 'dark'              (what's actually showing)
-//   manager.theme.set(source)  → apply + persist a new source
-//   manager.theme.onChange(fn) → fn({ source, resolved }) on every effective change; returns unsubscribe
+//   omega.theme.get()        → 'system' | 'light' | 'dark'   (the SOURCE — what's chosen)
+//   omega.theme.resolved()   → 'light' | 'dark'              (what's actually showing)
+//   omega.theme.set(source)  → apply + persist a new source
+//   omega.theme.onChange(fn) → fn({ source, resolved }) on every effective change; returns unsubscribe
 //
 // Renderer-side (preload contextBridge):
 //   window.desktop.theme.get()      → Promise<{ source, resolved }>
@@ -38,18 +38,18 @@ const SOURCES = ['system', 'light', 'dark'];
 
 const theme = {
   _initialized: false,
-  _manager: null,
+  _omega: null,
   _nativeTheme: null,
   _listeners: new Set(),
   _lastEmitted: null,
   _onNativeUpdated: null,
 
-  initialize(manager) {
+  initialize(omega) {
     if (theme._initialized) {
       return;
     }
 
-    theme._manager = manager;
+    theme._omega = omega;
 
     let nativeTheme;
     try {
@@ -65,8 +65,8 @@ const theme = {
     theme._nativeTheme = nativeTheme;
 
     // Boot source: storage override → config default → 'system'.
-    const stored = manager.storage.get(`${STORAGE_KEY}.appearance`);
-    const configured = manager.config?.theme?.appearance;
+    const stored = omega.storage.get(`${STORAGE_KEY}.appearance`);
+    const configured = omega.config?.theme?.appearance;
     const source = SOURCES.includes(stored) ? stored
       : SOURCES.includes(configured) ? configured
       : 'system';
@@ -116,7 +116,7 @@ const theme = {
       return;
     }
 
-    theme._manager.storage.set(`${STORAGE_KEY}.appearance`, source);
+    theme._omega.storage.set(`${STORAGE_KEY}.appearance`, source);
     theme._nativeTheme.themeSource = source;
 
     // nativeTheme 'updated' only fires when the RESOLVED appearance changes — a

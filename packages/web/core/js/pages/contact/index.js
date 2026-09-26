@@ -5,14 +5,14 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupForm();
     setupFormScrolling();
@@ -24,7 +24,7 @@ export default () => {
 
 // Setup form handling
 function setupForm() {
-  const formManager = new FormManager('#contact-form', {
+  const formManager = new FormManager(omega, '#contact-form', {
     allowResubmit: false,
     resetOnSuccess: true,
   });
@@ -41,7 +41,7 @@ function setupForm() {
 
     // Check if slapformId is missing
     if (!slapformId) {
-      omega.sentry().captureException(new Error('Contact form is not configured — no forms.providers.slapform.formId'));
+      omega.sentry.captureException(new Error('Contact form is not configured: no forms.providers.slapform.formId'));
       throw new Error('Contact form is not configured properly. Please try again later.');
     }
 
@@ -79,7 +79,7 @@ function setupForm() {
 
       // Only capture technical errors to Sentry (network, timeout, API errors)
       if (error.message?.includes('network') || error.message?.includes('timeout') || !error.message?.includes('Failed')) {
-        omega.sentry().captureException(new Error('Contact form submission error', { cause: error }));
+        omega.sentry.captureException(new Error('Contact form submission error', { cause: error }));
       }
 
       // Show user-friendly error message
@@ -115,8 +115,8 @@ function setupFormScrolling() {
         try {
           omega._chatsy?.open();
         } catch (error) {
-          omega.sentry().captureException(new Error('Error opening chat', { cause: error }));
-          omega.utilities().showNotification('Chat is currently unavailable. Please try again later.', 'danger');
+          omega.sentry.captureException(new Error('Error opening chat', { cause: error }));
+          omega.utilities.showNotification('Chat is currently unavailable. Please try again later.', 'danger');
         }
         return;
       }

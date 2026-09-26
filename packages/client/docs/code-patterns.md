@@ -82,15 +82,13 @@ const defaults = {
 
 ## 7. Click Triggers
 
-Click-driven UI never hand-rolls a listener: it registers on the shared trigger
-registry (`modules/triggers.js`), which owns the ONE delegated `document` click
-listener. The class is always `omega-<name>` — callers never spell it:
+Click-driven UI never hand-rolls a listener: it registers on the instance's trigger
+registry (`omega.triggers`, `modules/triggers.js`), which owns the ONE delegated
+`document` click listener. The class is always `omega-<name>`: callers never spell it.
 
 ```javascript
-import { registerTrigger } from '@omega.js/client/modules/triggers.js';
-
 // A click on `.omega-signout` (or anything inside one) runs this
-registerTrigger('signout', async (event, element) => {
+omega.triggers.register('signout', async (event, element) => {
   // Handle signout
 });
 ```

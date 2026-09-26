@@ -52,7 +52,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\//, namespace: 'file' }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -159,8 +159,8 @@ function makeClient(showLabels, { fail = false } = {}) {
         },
       },
     },
-    dom: () => ({ ready: () => Promise.resolve() }),
-    utilities: () => ({
+    dom: { ready: () => Promise.resolve() },
+    utilities: {
       // The REAL contract since #726: a promise, and a refused clipboard
       // rejects. The confirmation therefore lands a microtask after the click.
       clipboardCopy: async (value) => {
@@ -169,7 +169,7 @@ function makeClient(showLabels, { fail = false } = {}) {
         }
         copied.push(value);
       },
-    }),
+    },
   };
 }
 
@@ -196,9 +196,9 @@ async function boot({ showLabels = true, fail = false } = {}) {
   globalThis.__omegaEvents = [];
 
   delete require.cache[require.resolve(BUNDLE)];
-  require(BUNDLE).default();
+  require(BUNDLE).default({ omega: globalThis.__omegaClient });
 
-  // The bar renders behind `omega.dom().ready()` — one turn of the microtask queue.
+  // The bar renders behind `omega.dom.ready()`: one turn of the microtask queue.
   await new Promise((resolve) => setImmediate(resolve));
 
   const $copy = document.querySelectorAll('[data-platform="copy"]')[0];

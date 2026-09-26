@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import fetch from 'wonderful-fetch';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { WAKEUP_ROUTE } from '@omega.js/client/modules/request.js';
 import { event } from '__main_assets__/js/libs/analytics.js';
 
@@ -20,7 +20,7 @@ export default () => {
     omega.request(WAKEUP_ROUTE, { wakeup: true });
 
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     setupForm();
 
@@ -128,7 +128,7 @@ function setupForm() {
   });
 
   // Initialize FormManager
-  const formManager = new FormManager('#email-preferences-form', {
+  const formManager = new FormManager(omega, '#email-preferences-form', {
     autoReady: false,
     allowResubmit: false,
   });
@@ -165,7 +165,7 @@ function setupForm() {
         formManager.showSuccess('You have been successfully resubscribed. You will start receiving these emails again.');
       }
     } catch (error) {
-      omega.sentry().captureException(new Error('Email preferences error', { cause: error }));
+      omega.sentry.captureException(new Error('Email preferences error', { cause: error }));
       throw new Error('An error occurred while processing your request. Please try again.');
     }
   });

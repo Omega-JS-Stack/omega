@@ -5,5 +5,5 @@
 // previous release before overwriting.
 
 module.exports = async (ctx) => {
-  // ctx = { manager, projectRoot }
+  // ctx = { build, projectRoot }
 };

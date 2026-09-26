@@ -3,20 +3,21 @@
  * route it dispatches to still loads.
  *
  * The deployed surface is the FRAMEWORK's own (the `omega_*` functions
- * `Manager.init(exports, {})` registers) PLUS whatever `src/index.js` exports.
+ * `omega.initialize()` registers) PLUS whatever `src/index.js` adds to
+ * `omega.functions`.
  * Nothing below is a hardcoded mirror of your tree:
  *
  *   1. The consumer functions and the route names they dispatch to are READ OUT
  *      OF `src/index.js` (as text), not listed here. A function you add there
  *      shows up in these assertions on its own.
  *   2. For each route name index.js dispatches, the handler is resolved the way
- *      `Middleware.run()` resolves it — `<routesDir>/<name>/<method>.js`, method
+ *      the request pipeline resolves it — `<routesDir>/<name>/<method>.js`, method
  *      file first, `index.js` fallback — and then REQUIRED, so a broken import
  *      in a route (an ESM-only dependency, a moved util) fails HERE rather than
  *      at cold start in production.
  *
  * `src/index.js` is read as TEXT, never required — requiring it boots the
- * Manager (Firebase Admin init, .env cascade, config load), which is exactly the
+ * framework (Firebase Admin init, .env cascade, config load), which is exactly the
  * runtime dependency this lane avoids. That nothing in any of these requires
  * reaches the network is not taken on trust: the connect trap preloaded into
  * this process (test/_helpers/connect-trap.js) throws on the first DNS lookup
@@ -46,24 +47,25 @@ const FRAMEWORK_DIR = path.dirname(require.resolve('@omega.js/backend/package.js
 // by it — either way something stops deploying.
 const RESERVED_PREFIXES = ['omega_', 'bm_'];
 
-// The HTTP verbs Middleware.run() looks for as `<route>/<method>.js`.
+// The HTTP verbs the request pipeline looks for as `<route>/<method>.js`.
 const METHOD_FILES = ['get.js', 'post.js', 'put.js', 'patch.js', 'delete.js'];
 
 /**
  * The consumer Cloud Functions index.js registers, read out of the source:
- * `exports.<name> = functions….run('<route>')`.
+ * `omega.functions.<name> = …omega.routes.run('<route>', { req, res })`.
  * @returns {Array<{name: string, route: string}>}
  */
 function consumerFunctions() {
-  return [...INDEX.matchAll(/exports\.(\w+)\s*=([\s\S]*?);\n/g)].map((match) => ({
+  return [...INDEX.matchAll(/omega\.functions\.(\w+)\s*=([\s\S]*?);\n/g)].map((match) => ({
     name: match[1],
-    route: (match[2].match(/\.run\(\s*'([^']+)'/) || [])[1],
+    route: (match[2].match(/routes\.run\(\s*'([^']+)'/) || [])[1],
   }));
 }
 
 test('index.js boots the framework from the package that is actually installed', () => {
   assert.match(INDEX, /require\('@omega\.js\/backend'\)/, 'index.js does not boot @omega.js/backend');
-  assert.match(INDEX, /\.init\(exports,/, 'Manager.init(exports, …) is the bootstrap call');
+  assert.match(INDEX, /\.initialize\(/, 'omega.initialize(…) is the bootstrap call');
+  assert.match(INDEX, /module\.exports = omega\.functions;/, 'index.js exports omega.functions, the Cloud Functions map');
 
   // The specifier index.js requires, resolved the way NODE resolves it FROM
   // src/ — the same lookup the deployed function performs at cold start. A
@@ -82,16 +84,16 @@ test('no consumer function collides with the framework namespace', () => {
     for (const prefix of RESERVED_PREFIXES) {
       assert.ok(
         !fn.name.startsWith(prefix),
-        `exports.${fn.name} takes the framework's reserved "${prefix}" prefix — one of the two functions will not deploy`,
+        `omega.functions.${fn.name} takes the framework's reserved "${prefix}" prefix — one of the two functions will not deploy`,
       );
     }
   }
 });
 
 test('every route index.js dispatches to resolves and loads the way the middleware loads it', () => {
-  // Middleware.run() resolves `path.resolve(<routesDir>, <route>)` and then
+  // The pipeline resolves `path.resolve(<routesDir>, <route>)` and then
   // takes `<method>.js` if it exists, `index.js` otherwise. A function that
-  // does not dispatch through `.run()` carries its handler inline — nothing to
+  // does not dispatch through `omega.routes.run()` carries its handler inline: nothing to
   // resolve, so it is this test's business only if it names a route.
   for (const fn of consumerFunctions().filter((f) => f.route)) {
     const routeDir = path.resolve(SRC, 'routes', fn.route);

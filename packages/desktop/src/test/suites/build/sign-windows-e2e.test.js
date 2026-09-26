@@ -27,7 +27,7 @@ const defineCases = require('@omega.js/devkit/test/define-cases');
 const signerPath = path.join(__dirname, '..', '..', '..', 'commands', 'sign-windows.js');
 const eventsPath = path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'sign-events.js');
 const signWindows = require(signerPath);
-const Manager = new (require(path.join(__dirname, '..', '..', '..', 'build.js')))();
+const build = require(path.join(__dirname, '..', '..', '..', 'build.js'));
 
 const NOT_WINDOWS  = 'Windows-only: signtool + the EV token live on the signing box';
 const NO_SIGNTOOL  = 'signtool is not reachable — install the Windows SDK / VS Build Tools, or set SIGNTOOL_PATH';
@@ -76,7 +76,7 @@ function currentGate() {
   // The strategy comes from the project's own config — the same call the signer
   // makes — and is only worth resolving where the rest of the gate has passed.
   if (process.platform !== 'win32') return gateReason(process.platform, process.env, false, null);
-  return gateReason(process.platform, process.env, signtoolOnPath(process.env), Manager.getWindowsSignStrategy());
+  return gateReason(process.platform, process.env, signtoolOnPath(process.env), build.getWindowsSignStrategy());
 }
 
 // The signer, loaded with its event log pointed inside this suite's scratch

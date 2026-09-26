@@ -2,8 +2,7 @@
  * Download and extension shortlink pages (#561) — the download/extension half
  * of the shortlink lane #429 opened for socials.
  *
- * Legacy UJM shipped these as hand-maintained default pages
- * (`src/defaults/dist/redirects/download/**`, `.../extension/*.html`):
+ * The pages it generates:
  * `/download/mac`, `/download/mac/universal`, `/download/linux/snap`,
  * `/extension/chrome`, … Each is linked from a store page, a third-party
  * listing or an old post, and every migrating brand 404s the lot of them.
@@ -25,9 +24,8 @@
  * view's per-artifact URLs are versionless, so a desktop release never touches
  * the website and these links never change.
  *
- * Legacy parity that matters: `/download/<platform>` with no format points at
- * the platform's FIRST format, the way UJM's own pages sent /download/mac to
- * the dmg and /download/linux to the .deb.
+ * `/download/<platform>` with no format points at the platform's FIRST
+ * format: /download/mac goes to the dmg and /download/linux to the .deb.
  *
  * The URL segments are FORMATS now, the one vocabulary
  * ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)):

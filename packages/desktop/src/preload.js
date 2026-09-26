@@ -1,195 +1,255 @@
-// Preload Manager singleton.
-// Consumer entry: `new (require('@omega.js/desktop/preload'))().initialize()`.
+// The preload runtime: ONE ready-made `omega` instance.
+// Consumer entry: `const omega = require('@omega.js/desktop/preload'); omega.initialize()`.
 // Wires contextBridge so renderer code can call `window.desktop.ipc.invoke(...)` without nodeIntegration.
 
 const LoggerLite = require('./lib/logger-lite.js');
 const { ENVIRONMENT_VAR } = require('@omega.js/config/environment');
+const { getEnvironment, isDevelopment, isProduction, isTesting, getVersion } = require('./utils/mode-helpers.js');
+const { getFunctionsUrl, getApiUrl, getWebsiteUrl, getAuthUrl } = require('./utils/url-helpers.js');
 
-function Manager() {
-  const self = this;
+/**
+ * The preload runtime: exposes `window.desktop` to the page. This module
+ * exports ONE instance of it; a consumer never writes `new`, and awaits
+ * `initialize()` or `ready`.
+ */
+class Omega {
+  constructor() {
+    this.logger = new LoggerLite('preload');
 
-  self.logger = new LoggerLite('preload');
-
-  return self;
-}
-
-// Async even though there's nothing to await — keeps the API uniform with main + renderer
-// so consumers can do `manager.initialize().then(...)` regardless of which entry they're in.
-Manager.prototype.initialize = async function () {
-  const self = this;
-
-  const { contextBridge, ipcRenderer } = require('electron');
-
-  if (!contextBridge || !ipcRenderer) {
-    self.logger.warn('contextBridge / ipcRenderer not available — preload running in test mode.');
-    return self;
+    // Settled by initialize() with the instance: a module that did not call
+    // initialize() can still await it
+    this._readyResolve = null;
+    this.ready = new Promise((resolve) => {
+      this._readyResolve = resolve;
+    });
   }
 
-  // Expose a stable, namespaced surface to the renderer.
-  // Real impl in pass 2 will type the channel list and proxy storage through here.
-  contextBridge.exposeInMainWorld('desktop', {
-    // The RUNNING environment, for the one context that cannot read it: a page has
-    // no `process`, so its Manager answers `OMEGA_BUILD_JSON.config.environment`,
-    // the word the BUILD was for. A test lane boots a production artifact with
-    // `OMEGA_ENVIRONMENT=testing`, so the two differ there, and a preload is Node
-    // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). The renderer
-    // bootstrap applies this over the baked word, so it answers what main answers.
-    environment: process.env[ENVIRONMENT_VAR] || null,
-    ipc: {
-      invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
-      // Returns an unsubscribe fn (docs/ipc.md contract — same shape as the
-      // sibling onChange subscriptions below).
-      on: (channel, handler) => {
-        const wrapped = (_, payload) => handler(payload);
-        ipcRenderer.on(channel, wrapped);
-        return () => ipcRenderer.removeListener(channel, wrapped);
-      },
-      send: (channel, payload) => ipcRenderer.send(channel, payload),
-    },
-    storage: {
-      get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),
-      set:    (key, val) => ipcRenderer.invoke('desktop:storage:set',    { key, val }),
-      delete: (key)      => ipcRenderer.invoke('desktop:storage:delete', { key }),
-      has:    (key)      => ipcRenderer.invoke('desktop:storage:has',    { key }),
-      clear:  ()         => ipcRenderer.invoke('desktop:storage:clear'),
-      // Subscribe to changes broadcast from main. Returns an unsubscribe fn.
-      // Pass '*' as key to receive all changes.
-      onChange: (key, handler) => {
-        const wrapped = (_, payload) => {
-          if (key === '*' || payload?.key === key) {
-            handler(payload);
-          }
-        };
-        ipcRenderer.on('desktop:storage:change', wrapped);
-        return () => ipcRenderer.removeListener('desktop:storage:change', wrapped);
-      },
-    },
-    // Theme — system-aware appearance. get/set proxy to main (lib/theme.js owns
-    // nativeTheme.themeSource + persistence). onChange is MATCHMEDIA-powered, not an
-    // IPC broadcast: setting themeSource flips `prefers-color-scheme` in every
-    // renderer of the app (including embedded WebContentsViews, which ipc.broadcast
-    // can never reach), so each renderer self-resolves. Returns an unsubscribe fn.
-    theme: {
-      get: ()       => ipcRenderer.invoke('desktop:theme:get'),
-      set: (source) => ipcRenderer.invoke('desktop:theme:set', { source }),
-      onChange: (handler) => {
-        const media = window.matchMedia('(prefers-color-scheme: dark)');
-        const wrapped = (e) => handler({ resolved: e.matches ? 'dark' : 'light' });
-        media.addEventListener('change', wrapped);
-        return () => media.removeEventListener('change', wrapped);
-      },
-    },
-    // FontAwesome — resolve a bundled icon to its inline-SVG string (or null).
-    // Renderer code rarely needs this directly: @omega.js/desktop's renderer bootstrap
-    // auto-renders `<i class="fa-solid fa-*">` elements (see src/renderer.js).
-    fontawesome: {
-      get: (name, style) => ipcRenderer.invoke('desktop:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
-    },
-    // Renderer logger — writes to console (visible in DevTools) AND forwards each
-    // call to main where it's written through electron-log's file transport. Same
-    // file (logs/runtime.log in dev, OS logs/<AppName>/runtime.log in prod) where
-    // main + preload logs land too. Each entry is scoped 'renderer' so you can
-    // grep for renderer-only output.
-    logger: makeForwardingLogger('renderer', ipcRenderer),
-    autoUpdater: {
-      getStatus:  ()  => ipcRenderer.invoke('desktop:auto-updater:status'),
-      checkNow:   ()  => ipcRenderer.invoke('desktop:auto-updater:check-now'),
-      installNow: ()  => ipcRenderer.invoke('desktop:auto-updater:install-now'),
-      // Subscribe to status broadcasts. Returns an unsubscribe fn.
-      onStatus: (handler) => {
-        const wrapped = (_, payload) => handler(payload);
-        ipcRenderer.on('desktop:auto-updater:status', wrapped);
-        return () => ipcRenderer.removeListener('desktop:auto-updater:status', wrapped);
-      },
-    },
-    // GA4 analytics — fire-and-forget event sender. Same shape as on main, just
-    // routes through IPC so renderer code is identical.
-    analytics: {
-      event:             (name, params)  => ipcRenderer.send('desktop:analytics:event', { name, params }),
-      pageview:          (path)          => ipcRenderer.send('desktop:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
-      screenview:        (screenName)    => ipcRenderer.send('desktop:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
-      setUserProperties: (props)         => ipcRenderer.send('desktop:analytics:set-user-properties', props),
-      getStatus:         ()              => ipcRenderer.invoke('desktop:analytics:status'),
-    },
-    // Runtime context (geolocation / client / session / app). Read once at
-    // renderer init or whenever fresh values are needed.
-    context: {
-      get: () => ipcRenderer.invoke('desktop:context:get'),
-    },
-    // Usage stats (opens / hoursTotal / hoursThisSession).
-    usage: {
-      get: () => ipcRenderer.invoke('desktop:usage:get'),
-    },
-    // Hot config — same get/refreshNow surface as main, plus an onUpdate
-    // subscription that fires whenever main re-fetches successfully.
-    remoteConfig: {
-      get:        (path) => ipcRenderer.invoke('desktop:remote-config:get', path),
-      refreshNow: ()     => ipcRenderer.invoke('desktop:remote-config:refresh-now'),
-      onUpdate: (handler) => {
-        const wrapped = (_, payload) => handler(payload);
-        ipcRenderer.on('desktop:remote-config:update', wrapped);
-        return () => ipcRenderer.removeListener('desktop:remote-config:update', wrapped);
-      },
-    },
-  });
+  /**
+   * Expose `window.desktop`, wire the activity pings and the theme applier,
+   * and settle `ready`. Async even though there's nothing to await: the API
+   * stays uniform with main + renderer, so `omega.initialize().then(...)`
+   * reads the same in every entry.
+   * @returns {Promise<Omega>} the instance.
+   */
+  async initialize() {
+    this._expose();
 
-  // Auto-updater activity tracking — listen for renderer-side mouse / keyboard / wheel
-  // / focus events and debounce-fire an `desktop:auto-updater:activity` IPC ping to main.
-  // Main uses these pings to keep `lastActivityAt` fresh so a downloaded update only
-  // auto-installs when the user has been idle for 15+ minutes.
-  //
-  // Debounced to once per 5s — anything more granular is just noise (the threshold is
-  // 15 min; sub-second precision doesn't matter). Listeners attach in `capture` phase
-  // on `window` so renderer code can't accidentally suppress them via stopPropagation.
-  try {
-    let lastPing = 0;
-    const ACTIVITY_DEBOUNCE_MS = 5000;
-    const ping = () => {
-      const now = Date.now();
-      if (now - lastPing < ACTIVITY_DEBOUNCE_MS) return;
-      lastPing = now;
-      try { ipcRenderer.send('desktop:auto-updater:activity'); } catch (e) { /* ignore */ }
-    };
-    const events = ['mousedown', 'keydown', 'wheel', 'touchstart', 'focus'];
-    for (const ev of events) {
-      // `passive: true` so we never accidentally block scrolling; `capture: true` so we
-      // see the event before any renderer-side handler can stopPropagation it.
-      window.addEventListener(ev, ping, { passive: true, capture: true });
+    this._readyResolve(this);
+
+    return this;
+  }
+
+  _expose() {
+    const { contextBridge, ipcRenderer } = require('electron');
+
+    // A preload loaded outside a BrowserWindow (the build-layer tests) has no bridge to expose on
+    if (!contextBridge || !ipcRenderer) {
+      this.logger.warn('contextBridge / ipcRenderer not available: preload running in test mode.');
+      return;
     }
-  } catch (e) { /* DOM not available (test mode) — skip */ }
 
-  // Theme applier — keeps `<html data-bs-theme>` matched to the RESOLVED appearance
-  // ('light'/'dark'), live, on every framework-templated page. Opt-in by presence: only pages
-  // that already carry the attribute (stamped by the page template at build) are
-  // managed — pages without it (e.g. external sites loaded in a consumer's embedded
-  // web views, which get this same preload) are never touched.
-  //
-  // This is the live-update path for ALL renderers: main flips nativeTheme.themeSource
-  // → `prefers-color-scheme` flips here → matchMedia 'change' fires → re-apply. No IPC.
-  try {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => {
-      const root = document.documentElement;
-      if (!root || !root.hasAttribute('data-bs-theme')) {
-        return;
+    // Expose a stable, namespaced surface to the renderer.
+    // Real impl in pass 2 will type the channel list and proxy storage through here.
+    contextBridge.exposeInMainWorld('desktop', {
+      // The RUNNING environment, for the one context that cannot read it: a page has
+      // no `process`, so its instance answers `OMEGA_BUILD_JSON.config.environment`,
+      // the word the BUILD was for. A test lane boots a production artifact with
+      // `OMEGA_ENVIRONMENT=testing`, so the two differ there, and a preload is Node
+      // ([#925](https://github.com/Omega-JS-Stack/omega/issues/925)). The renderer
+      // bootstrap applies this over the baked word, so it answers what main answers.
+      environment: process.env[ENVIRONMENT_VAR] || null,
+      ipc: {
+        invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
+        // Returns an unsubscribe fn (docs/ipc.md contract, same shape as the
+        // sibling onChange subscriptions below).
+        on: (channel, handler) => {
+          const wrapped = (_, payload) => handler(payload);
+          ipcRenderer.on(channel, wrapped);
+          return () => ipcRenderer.removeListener(channel, wrapped);
+        },
+        send: (channel, payload) => ipcRenderer.send(channel, payload),
+      },
+      storage: {
+        get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),
+        set:    (key, val) => ipcRenderer.invoke('desktop:storage:set',    { key, val }),
+        delete: (key)      => ipcRenderer.invoke('desktop:storage:delete', { key }),
+        has:    (key)      => ipcRenderer.invoke('desktop:storage:has',    { key }),
+        clear:  ()         => ipcRenderer.invoke('desktop:storage:clear'),
+        // Subscribe to changes broadcast from main. Returns an unsubscribe fn.
+        // Pass '*' as key to receive all changes.
+        onChange: (key, handler) => {
+          const wrapped = (_, payload) => {
+            if (key === '*' || payload?.key === key) {
+              handler(payload);
+            }
+          };
+          ipcRenderer.on('desktop:storage:change', wrapped);
+          return () => ipcRenderer.removeListener('desktop:storage:change', wrapped);
+        },
+      },
+      // Theme: system-aware appearance. get/set proxy to main (lib/theme.js owns
+      // nativeTheme.themeSource + persistence). onChange is MATCHMEDIA-powered, not an
+      // IPC broadcast: setting themeSource flips `prefers-color-scheme` in every
+      // renderer of the app (including embedded WebContentsViews, which ipc.broadcast
+      // can never reach), so each renderer self-resolves. Returns an unsubscribe fn.
+      theme: {
+        get: ()       => ipcRenderer.invoke('desktop:theme:get'),
+        set: (source) => ipcRenderer.invoke('desktop:theme:set', { source }),
+        onChange: (handler) => {
+          const media = window.matchMedia('(prefers-color-scheme: dark)');
+          const wrapped = (e) => handler({ resolved: e.matches ? 'dark' : 'light' });
+          media.addEventListener('change', wrapped);
+          return () => media.removeEventListener('change', wrapped);
+        },
+      },
+      // FontAwesome: resolve a bundled icon to its inline-SVG string (or null).
+      // Renderer code rarely needs this directly: @omega.js/desktop's renderer bootstrap
+      // auto-renders `<i class="fa-solid fa-*">` elements (see src/renderer.js).
+      fontawesome: {
+        get: (name, style) => ipcRenderer.invoke('desktop:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
+      },
+      // Renderer logger: writes to console (visible in DevTools) AND forwards each
+      // call to main where it's written through electron-log's file transport. Same
+      // file (logs/runtime.log in dev, OS logs/<AppName>/runtime.log in prod) where
+      // main + preload logs land too. Each entry is scoped 'renderer' so you can
+      // grep for renderer-only output.
+      logger: makeForwardingLogger('renderer', ipcRenderer),
+      autoUpdater: {
+        getStatus:  ()  => ipcRenderer.invoke('desktop:auto-updater:status'),
+        checkNow:   ()  => ipcRenderer.invoke('desktop:auto-updater:check-now'),
+        installNow: ()  => ipcRenderer.invoke('desktop:auto-updater:install-now'),
+        // Subscribe to status broadcasts. Returns an unsubscribe fn.
+        onStatus: (handler) => {
+          const wrapped = (_, payload) => handler(payload);
+          ipcRenderer.on('desktop:auto-updater:status', wrapped);
+          return () => ipcRenderer.removeListener('desktop:auto-updater:status', wrapped);
+        },
+      },
+      // GA4 analytics: fire-and-forget event sender. Same shape as on main, just
+      // routes through IPC so renderer code is identical.
+      analytics: {
+        event:             (name, params)  => ipcRenderer.send('desktop:analytics:event', { name, params }),
+        pageview:          (path)          => ipcRenderer.send('desktop:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
+        screenview:        (screenName)    => ipcRenderer.send('desktop:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
+        setUserProperties: (props)         => ipcRenderer.send('desktop:analytics:set-user-properties', props),
+        getStatus:         ()              => ipcRenderer.invoke('desktop:analytics:status'),
+      },
+      // Runtime context (geolocation / client / session / app). Read once at
+      // renderer init or whenever fresh values are needed.
+      context: {
+        get: () => ipcRenderer.invoke('desktop:context:get'),
+      },
+      // Usage stats (opens / hoursTotal / hoursThisSession).
+      usage: {
+        get: () => ipcRenderer.invoke('desktop:usage:get'),
+      },
+      // Hot config: same get/refreshNow surface as main, plus an onUpdate
+      // subscription that fires whenever main re-fetches successfully.
+      remoteConfig: {
+        get:        (path) => ipcRenderer.invoke('desktop:remote-config:get', path),
+        refreshNow: ()     => ipcRenderer.invoke('desktop:remote-config:refresh-now'),
+        onUpdate: (handler) => {
+          const wrapped = (_, payload) => handler(payload);
+          ipcRenderer.on('desktop:remote-config:update', wrapped);
+          return () => ipcRenderer.removeListener('desktop:remote-config:update', wrapped);
+        },
+      },
+    });
+
+    // Auto-updater activity tracking: listen for renderer-side mouse / keyboard / wheel
+    // / focus events and debounce-fire an `desktop:auto-updater:activity` IPC ping to main.
+    // Main uses these pings to keep `lastActivityAt` fresh so a downloaded update only
+    // auto-installs when the user has been idle for 15+ minutes.
+    //
+    // Debounced to once per 5s, anything more granular is just noise (the threshold is
+    // 15 min; sub-second precision doesn't matter). Listeners attach in `capture` phase
+    // on `window` so renderer code can't accidentally suppress them via stopPropagation.
+    try {
+      let lastPing = 0;
+      const ACTIVITY_DEBOUNCE_MS = 5000;
+      const ping = () => {
+        const now = Date.now();
+        if (now - lastPing < ACTIVITY_DEBOUNCE_MS) return;
+        lastPing = now;
+        try { ipcRenderer.send('desktop:auto-updater:activity'); } catch (e) { /* ignore */ }
+      };
+      const events = ['mousedown', 'keydown', 'wheel', 'touchstart', 'focus'];
+      for (const ev of events) {
+        // `passive: true` so we never accidentally block scrolling; `capture: true` so we
+        // see the event before any renderer-side handler can stopPropagation it.
+        window.addEventListener(ev, ping, { passive: true, capture: true });
       }
-      root.setAttribute('data-bs-theme', media.matches ? 'dark' : 'light');
-    };
+    } catch (e) { /* DOM not available (test mode), skip */ }
 
-    // The stamped attribute only exists once the HTML has parsed — apply at
-    // DOMContentLoaded (or immediately when the document is already past it).
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', apply, { once: true });
-    } else {
-      apply();
-    }
-    media.addEventListener('change', apply);
-  } catch (e) { /* DOM not available (test mode) — skip */ }
+    // Theme applier: keeps `<html data-bs-theme>` matched to the RESOLVED appearance
+    // ('light'/'dark'), live, on every framework-templated page. Opt-in by presence: only pages
+    // that already carry the attribute (stamped by the page template at build) are
+    // managed: pages without it (e.g. external sites loaded in a consumer's embedded
+    // web views, which get this same preload) are never touched.
+    //
+    // This is the live-update path for ALL renderers: main flips nativeTheme.themeSource
+    // → `prefers-color-scheme` flips here → matchMedia 'change' fires → re-apply. No IPC.
+    try {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const apply = () => {
+        const root = document.documentElement;
+        if (!root || !root.hasAttribute('data-bs-theme')) {
+          return;
+        }
+        root.setAttribute('data-bs-theme', media.matches ? 'dark' : 'light');
+      };
 
-  self.logger.log('@omega.js/desktop (preload) initialized.');
+      // The stamped attribute only exists once the HTML has parsed: apply at
+      // DOMContentLoaded (or immediately when the document is already past it).
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', apply, { once: true });
+      } else {
+        apply();
+      }
+      media.addEventListener('change', apply);
+    } catch (e) { /* DOM not available (test mode), skip */ }
 
-  return self;
-};
+    this.logger.log('@omega.js/desktop (preload) initialized.');
+  }
+
+  // The environment surface (#817) and the backend URL helpers: the same plain
+  // functions main and the build module call
+  getEnvironment() {
+    return getEnvironment.call(this);
+  }
+
+  isDevelopment() {
+    return isDevelopment.call(this);
+  }
+
+  isProduction() {
+    return isProduction.call(this);
+  }
+
+  isTesting() {
+    return isTesting.call(this);
+  }
+
+  getVersion() {
+    return getVersion();
+  }
+
+  getFunctionsUrl(environment) {
+    return getFunctionsUrl(this, environment);
+  }
+
+  getApiUrl(environment) {
+    return getApiUrl(this, environment);
+  }
+
+  getWebsiteUrl(environment) {
+    return getWebsiteUrl(this, environment);
+  }
+
+  getAuthUrl(environment, returnUrl) {
+    return getAuthUrl(this, environment, returnUrl);
+  }
+}
 
 // Build a console+forward logger object suitable for exposing through contextBridge
 // to the renderer. Each method:
@@ -209,7 +269,7 @@ function makeForwardingLogger(scope, ipcRenderer) {
     const fileLevel = m === 'log' ? 'info' : m;
     out[m] = function () {
       // Console first.
-      const args = ['[em]', ...Array.from(arguments)];
+      const args = ['[omega]', ...Array.from(arguments)];
       const fn = console[m] || console.log;
       try { fn.apply(console, args); } catch (e) { /* ignore */ }
       // Forward to main.
@@ -242,8 +302,8 @@ function serializeForIpc(args) {
   });
 }
 
-// Mix in shared cross-context helpers — same code path used in main, renderer, build.
-require('./utils/mode-helpers.js').attachTo(Manager);
-require('./utils/url-helpers.js').attachTo(Manager);
+// The ONE instance, initialized by the consumer's src/preload.js
+const omega = new Omega();
 
-module.exports = Manager;
+module.exports = omega;
+module.exports.Omega = Omega;

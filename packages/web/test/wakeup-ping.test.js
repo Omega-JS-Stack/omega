@@ -24,6 +24,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const { WAKEUP_ROUTE } = require('@omega.js/client/modules/request.js');
 
@@ -51,7 +52,7 @@ function bundleOnce(entry) {
           build.onResolve({ filter: /^__main_assets__\// }, (args) => {
             return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
           });
-          build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+          build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
             return { path: 'client', namespace: 'omega-client-stub' };
           });
           build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -156,14 +157,14 @@ async function bootPage(entry, { found = false, present = [] } = {}) {
     isDevelopment: () => false,
     getApiUrl: () => 'https://api.test',
     isValidRedirectUrl: () => true,
-    dom: () => ({ ready: async () => {} }),
-    bindings: () => ({ update: () => {} }),
+    dom: { ready: async () => {} },
+    bindings: { update: () => {} },
     // Auth never settles: everything asserted here happens before it does.
-    auth: () => ({ listen: () => {}, getUser: () => null, signOut: async () => {} }),
-    storage: () => ({ get: (key, fallback) => fallback, set: () => {}, remove: () => {} }),
-    firestore: () => ({ doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) }),
-    sentry: () => ({ captureException: () => {} }),
-    utilities: () => ({ getContext: () => ({}), showNotification: () => {}, getPlatform: () => 'macos' }),
+    auth: { user: new User(), listen: () => {}, signOut: async () => {} },
+    storage: { get: (key, fallback) => fallback, set: () => {}, remove: () => {} },
+    firestore: { doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) },
+    sentry: { captureException: () => {} },
+    utilities: { getContext: () => ({}), showNotification: () => {}, getPlatform: () => 'macos' },
     request: async (url, options = {}) => {
       requests.push({ url, options });
       return {};
@@ -271,12 +272,15 @@ test('#644: the newsletter band warms the backend on first focus, never on load'
 
   globalThis.window = { location: { search: '', href: 'https://brand.test/' }, addEventListener: () => {} };
   globalThis.document = makeDocument();
-  globalThis.__omegaClient = {
+  // The section takes omega from its init argument (bootSections hands it
+  // { omega, options }); the runtime stub still serves the libs it imports.
+  const omega = {
     config: { captcha: { providers: {} } },
     getApiUrl: () => 'https://api.test',
     request: async (url, options = {}) => { requests.push({ url, options }); return {}; },
-    sentry: () => ({ captureException: () => {} }),
+    sentry: { captureException: () => {} },
   };
+  globalThis.__omegaClient = omega;
 
   const $form = {
     addEventListener: (event, handler) => { (listeners[event] ||= []).push(handler); },
@@ -286,7 +290,7 @@ test('#644: the newsletter band warms the backend on first focus, never on load'
   };
 
   delete require.cache[require.resolve(bundle)];
-  require(bundle).default({ querySelector: () => $form });
+  require(bundle).default({ querySelector: () => $form }, { omega, options: {} });
 
   assert.deepStrictEqual(requests, [], 'nothing is warmed for a visitor who only scrolled past');
 

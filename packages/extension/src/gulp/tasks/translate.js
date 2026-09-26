@@ -1,6 +1,6 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('translate');
+const build = require('../../build.js');
+const logger = build.logger('translate');
 const { series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
@@ -48,7 +48,7 @@ function readConfigMessages() {
 
 // Helper: translation settings from the RESOLVED config (brand root included)
 function getSettings() {
-  return resolveTranslationSettings(Manager.getConfig());
+  return resolveTranslationSettings(build.getConfig());
 }
 
 // Helper: compose a locale's messages.json from the EN source + cache
@@ -102,7 +102,7 @@ async function deployTranslations(complete) {
 // strings without a cache entry (new or edited source) hit the provider.
 async function translateMessages(complete) {
   // Only run in build mode
-  if (!Manager.isBuildMode()) {
+  if (!build.isBuildMode()) {
     logger.log('Skipping messages translation (not in build mode)');
     return complete();
   }
@@ -119,7 +119,7 @@ async function translateMessages(complete) {
     return complete();
   }
 
-  const brand = Manager.getConfig()?.brand?.name;
+  const brand = build.getConfig()?.brand?.name;
   const limitsRules = Object.entries(LOCALE_LIMITS)
     .map(([field, limit]) => `- The translation of the "${field}" message must be at most ${limit} characters (Chrome Web Store limit).`)
     .join('\n');
@@ -175,7 +175,7 @@ async function translateMessages(complete) {
 // committed markdown with a source-hash marker (edit the source → retranslate).
 async function translateDescription(complete) {
   // Only run in build mode
-  if (!Manager.isBuildMode()) {
+  if (!build.isBuildMode()) {
     logger.log('Skipping description translation (not in build mode)');
     return complete();
   }
@@ -197,7 +197,7 @@ async function translateDescription(complete) {
   }
 
   const sourceHash = hashKey(enDescription);
-  const brand = Manager.getConfig()?.brand?.name;
+  const brand = build.getConfig()?.brand?.name;
   let provider = null;
 
   for (const lang of settings.languages) {

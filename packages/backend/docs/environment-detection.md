@@ -3,23 +3,23 @@
 `getEnvironment()` returns exactly ONE of three mutually-exclusive, exhaustive values:
 
 ```javascript
-Manager.getEnvironment()    // 'development' | 'testing' | 'production'
+omega.getEnvironment()    // 'development' | 'testing' | 'production'
 
-Manager.isDevelopment()     // true ONLY in development
-Manager.isTesting()         // true ONLY in testing
-Manager.isProduction()      // true ONLY in production
+omega.isDevelopment()     // true ONLY in development
+omega.isTesting()         // true ONLY in testing
+omega.isProduction()      // true ONLY in production
 ```
 
-**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` is `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/desktop, @omega.js/extension, @omega.js/web and @omega.js/client all answer from. It reads the `OMEGA_ENVIRONMENT` variable and nothing else, and a process whose lane never named one **throws**, naming the variable. `Manager.init()` sets it ONCE, right after the `.env` cascade loads, from `envEnvironment()`, the AMBIENT answer, whose rules are the ones this file always described (below). Nothing re-sniffs a raw signal at read time. The three `is*()` checks **derive** from it live on every call, so they can never disagree with `getEnvironment()`.
+**ONE input, and no default** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)). `getEnvironment()` is `@omega.js/config`'s [environment.js](../../config/src/environment.js), the module @omega.js/desktop, @omega.js/extension, @omega.js/web and @omega.js/client all answer from. It reads the `OMEGA_ENVIRONMENT` variable and nothing else, and a process whose lane never named one **throws**, naming the variable. `initialize()` sets it ONCE, right after the `.env` cascade loads, from `envEnvironment()`, the AMBIENT answer, whose rules are the ones this file always described (below). Nothing re-sniffs a raw signal at read time. The three `is*()` checks **derive** from it live on every call, so they can never disagree with `getEnvironment()`.
 
-**the route context (ctx) forwards to the Manager.** Request handlers receive an `ctx`, so the same methods are exposed there and return identical results — call whichever is in scope:
+**`ctx` forwards to the instance.** Every handler receives a `ctx`, so the same methods are exposed there and return identical results; call whichever is in scope:
 
 ```javascript
-ctx.getEnvironment()  // === Manager.getEnvironment() — a thin forward
-ctx.isTesting()       // === Manager.isTesting()
+ctx.getEnvironment()  // === omega.getEnvironment(), a thin forward
+ctx.isTesting()       // === omega.isTesting()
 ```
 
-(An ctx always has a Manager — `init()` throws without one. The `ctx.meta.environment` field is still populated for code that reads it, but the `is*()` checks no longer depend on that snapshot.)
+(A `Context` is always built with the instance, `ctx.omega`. The `ctx.meta.environment` field is still populated for code that reads it, but the `is*()` checks no longer depend on that snapshot.)
 
 **The three checks are mutually exclusive**: exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
 
@@ -50,10 +50,10 @@ if (isDevelopment() || isTesting()) { /* localhost URL, console logging, etc. */
 ## URL helpers
 
 ```javascript
-Manager.getApiUrl()  // this brand's API URL — the SSOT for calling the @omega.js/backend API
+omega.getApiUrl()  // this brand's API URL, the SSOT for calling the @omega.js/backend API
 ```
 
-**`Manager.getApiUrl()` is the one and only way to get the API URL.** It resolves to the **local** hosting emulator (`http://localhost:5002`) in development OR testing, and to production (`https://api.{domain}`) otherwise. Always call `getApiUrl()` directly — do NOT read the cached `Manager.project.apiUrl` property (it's a boot-time snapshot kept only for internal env-var export; the getter is the SSOT and always fresh). Build full endpoints by appending the path: `` `${Manager.getApiUrl()}/omega/admin/post` ``.
+**`omega.getApiUrl()` is the one and only way to get the API URL.** It resolves to the **local** hosting emulator (`http://localhost:5002`) in development OR testing, and to production (`https://api.{domain}`) otherwise. Always call `getApiUrl()` directly; do NOT read the cached `omega.project.apiUrl` property (it's a boot-time snapshot kept only for internal env-var export; the getter is the SSOT and always fresh). Build full endpoints by appending the path: `` `${omega.getApiUrl()}/omega/admin/post` ``.
 
 Resolving local in test mode is required because tests hit the local emulator — without it, internal @omega.js/backend→@omega.js/backend calls (and tests calling `getApiUrl()`) would leak to the live production server. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one — rarely needed, and mainly used by tests to pin a specific environment's mapping.
 
@@ -61,18 +61,18 @@ Resolving local in test mode is required because tests hit the local emulator �
 
 > `getFunctionsUrl()` (raw Cloud Functions URL) exists for the ONE internal case that must name a specific deployed function by its raw address (`ctx.tryUrl()`). Application/route code should never need it — use `getApiUrl()`.
 
-**Exception — parent helpers stay live:** `Manager.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omega.js/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.
+**Exception, parent helpers stay live:** `omega.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omega.js/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.
 
 ## Where they live
 
-Source: `@omega.js/config`'s [environment.js](../../config/src/environment.js) for the four environment calls, assigned onto the Manager in [src/manager/index.js](../src/manager/index.js) beside the URL helpers (@omega.js/backend has a single Manager, no multi-context mixin). The env reader re-exports the same function as `env.getEnvironment()` for the provider libraries, which hold no Manager handle. The `ctx` exposes the same methods and forwards each to its Manager (`ctx.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
+Source: `@omega.js/config`'s [environment.js](../../config/src/environment.js) for the four environment calls, which the `Omega` class calls in [src/omega/index.js](../src/omega/index.js) beside the URL helpers. The env reader re-exports the same function as `env.getEnvironment()` for the provider libraries, which hold no instance handle. The `ctx` exposes the same methods and forwards each to its instance (`ctx.isTesting()` → `omega.isTesting()`), so request handlers can call whichever object is in scope.
 
 ## How detection works
 
 `getEnvironment()` reads ONE input, `process.env.OMEGA_ENVIRONMENT`, and throws
 when it is absent ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
 @omega.js/backend is the target whose deployed runtime legitimately arrives with
-no lane above it, so `Manager.init()` resolves that input ONCE, from
+no lane above it, so `initialize()` resolves that input ONCE, from
 `@omega.js/config`'s `envEnvironment()`: the AMBIENT answer, whose precedence is
 unchanged:
 
@@ -89,7 +89,7 @@ the frameworks lives in [docs/shared/config.md](../../../docs/shared/config.md).
 
 ## Adding a new helper
 
-If you need a new environment-derived helper, add it next to the others on the Manager in [src/manager/index.js](../src/manager/index.js), and forward it from the route context (ctx) if request handlers need it. Don't read `process.env` ad-hoc elsewhere — derive from `getEnvironment()` so there is one source of truth and no chance of drift.
+If you need a new environment-derived helper, add it next to the others on the `Omega` class in [src/omega/index.js](../src/omega/index.js), and forward it from `Context` if handlers need it. Don't read `process.env` ad-hoc elsewhere: derive from `getEnvironment()` so there is one source of truth and no chance of drift.
 
 ## Why this matters
 

@@ -32,6 +32,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const MODULES_DIR = path.join(CORE_DIR, 'js', 'pages', 'payment', 'checkout', 'modules');
@@ -85,7 +86,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -121,7 +122,7 @@ async function openCheckout(product, { providers = ALL_PROVIDERS, trialEligible 
   globalThis.__omegaClient = {
     isDevelopment: () => false,
     getApiUrl: () => 'https://api.test',
-    auth: () => ({ getUser: () => null }),
+    auth: { user: new User() },
   };
   globalThis.__wonderfulFetch = async (url, options = {}) => {
     return options.response === 'json' ? answer : { ok: true, status: 200, headers: {}, json: async () => answer };

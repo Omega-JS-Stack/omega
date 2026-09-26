@@ -5,7 +5,10 @@
   node_modules; the emulator's function workers resolve UP from the staged
   functions/ tree (src/dist pillar — this src/ is the authored code).
 
-  Mirrors a real consumer's src/index.js: one-line @omega.js/backend bootstrap.
+  Mirrors a real consumer's src/index.js: two-line @omega.js/backend bootstrap.
 */
-const Manager = (new (require('@omega.js/backend'))).init(exports, {});
-const { functions } = Manager.libraries;
+const omega = require('@omega.js/backend');
+
+omega.initialize({});
+
+module.exports = omega.functions;

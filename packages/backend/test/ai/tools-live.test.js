@@ -9,8 +9,8 @@
  * Requires ANTHROPIC_API_KEY / OPENAI_API_KEY
  * in the runner environment.
  */
-const Anthropic = require('../../dist/manager/libraries/ai/providers/anthropic.js');
-const OpenAI = require('../../dist/manager/libraries/ai/providers/openai.js');
+const Anthropic = require('../../dist/omega/libraries/ai/providers/anthropic.js');
+const OpenAI = require('../../dist/omega/libraries/ai/providers/openai.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const WEATHER_TOOL = {
@@ -30,13 +30,13 @@ const QUESTION = 'What is the weather in Paris right now?';
 const TOOL_RESULT = '{"temperature":"21C","conditions":"sunny"}';
 
 // Minimal ctx context for direct provider construction — live tests
-// bypass Manager.AI() to pin provider behavior precisely
+// bypass ctx.ai to pin provider behavior precisely
 function directAssistant() {
   return {
     log: () => {},
     error: () => {},
     report: (message) => new Error(message),
-    getUser: () => ({ auth: { uid: 'backend-ai-live-test' } }),
+    user: { auth: { uid: 'backend-ai-live-test' } },
     request: { geolocation: { ip: '127.0.0.1' } },
   };
 }

@@ -1,9 +1,9 @@
 // Libraries
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('install');
+const build = require('../build.js');
+const logger = build.logger('install');
 const local = require('@omega.js/devkit/local');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 
 module.exports = async function (options) {
   logger.log(`Installing ${package.name}...`);

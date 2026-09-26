@@ -37,8 +37,8 @@ const RELEASES = [
  * A throwaway brand tree (`targets/desktop`) plus a `gh` recorder that answers
  * the list call with the canned releases above.
  *
- * @param {string} [brandId] - What the fake manager's config reports.
- * @returns {object} The tree paths, the recorder, the calls, the fake manager.
+ * @param {string} [brandId] - What the fake build module's config reports.
+ * @returns {object} The tree paths, the recorder, the calls, the fake build module.
  */
 function makeBrand(brandId) {
   const brandRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'playground-release-lane-')));
@@ -52,7 +52,7 @@ function makeBrand(brandId) {
     brandRoot,
     projectRoot,
     calls,
-    manager: { getConfig: () => ({ brand: { id: brandId || 'playground' } }) },
+    build: { getConfig: () => ({ brand: { id: brandId || 'playground' } }) },
     run: (args) => {
       calls.push(args);
 
@@ -81,7 +81,7 @@ module.exports = {
       run: async (ctx) => {
         const brand = makeBrand();
 
-        await prepareRelease({ manager: brand.manager, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
+        await prepareRelease({ build: brand.build, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
 
         const deleted = deletedTags(brand.calls);
 
@@ -105,7 +105,7 @@ module.exports = {
       run: async (ctx) => {
         const brand = makeBrand();
 
-        await prepareRelease({ manager: brand.manager, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
+        await prepareRelease({ build: brand.build, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
 
         const packageRaw = fs.readFileSync(path.join(brand.projectRoot, 'package.json'), 'utf8');
 
@@ -120,7 +120,7 @@ module.exports = {
         const brand = makeBrand('newsflash');
 
         await ctx.expect(async () => {
-          await prepareRelease({ manager: brand.manager, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
+          await prepareRelease({ build: brand.build, projectRoot: brand.projectRoot }, { tagFamily: /^v\d/, run: brand.run });
         }).toThrow(/playground-releases/);
 
         // The guard is FIRST: a copy of this hook into another brand can never

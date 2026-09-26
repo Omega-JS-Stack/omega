@@ -3,15 +3,18 @@
  * Drives the .omega-shell mechanics (core/css/shell/_index.scss): desktop
  * sidebar collapse (persisted) and the mobile drawer (scrim + Escape dismiss).
  * Controls are declarative — [data-shell-toggle="collapse|drawer"] and
- * [data-shell-dismiss] anywhere in the page.
+ * [data-shell-dismiss] anywhere in the page. The API is `omega.shell`.
  */
-import omega from '@omega.js/client';
 
 // Constants
 const STORAGE_KEY = 'shell.collapsed';
 
-// Module
-export default () => {
+/**
+ * Build the shell API for `omega.shell` and wire the page's shell controls.
+ * @param {object} omega - the runtime instance (its storage holds the collapse state).
+ * @returns {object} the shell API: isCollapsed, isOpen, setCollapsed, setOpen, toggleCollapsed, toggleOpen.
+ */
+export function createShell(omega) {
   const $shell = document.querySelector('[data-omega-shell]');
 
   // Create app shell API
@@ -38,7 +41,7 @@ export default () => {
       }
 
       $shell.setAttribute('data-shell-collapsed', value ? 'true' : 'false');
-      omega.storage().set(STORAGE_KEY, !!value);
+      omega.storage.set(STORAGE_KEY, !!value);
       syncControls(shellAPI);
     },
 
@@ -70,19 +73,13 @@ export default () => {
     },
   };
 
-  // Register on the omega library — web's bundle entry creates the container before
-  // this runs; vendored surfaces (desktop/extension renderers) call this
-  // module directly with no such entry, so create it if absent (#111)
-  omega._library = omega._library || {};
-  omega._library.appShell = shellAPI;
-
-  // No shell on this page — the API stays registered but inert
+  // No shell on this page: the API is still returned, but inert
   if (!$shell) {
-    return;
+    return shellAPI;
   }
 
   // Restore the persisted collapse state
-  if (String(omega.storage().get(STORAGE_KEY)) === 'true') {
+  if (String(omega.storage.get(STORAGE_KEY)) === 'true') {
     $shell.setAttribute('data-shell-collapsed', 'true');
   }
 
@@ -119,7 +116,9 @@ export default () => {
   syncControls(shellAPI);
 
   console.log('App shell module loaded');
-};
+
+  return shellAPI;
+}
 
 /**
  * Sync aria-expanded on every shell control to the current state

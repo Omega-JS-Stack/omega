@@ -18,13 +18,13 @@
  */
 const { buildUser, callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/refund/post.js');
+const handler = require('../../../dist/omega/routes/payments/refund/post.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const OWNER = '_test-refund-one-time-owner';
 
-function purchaser(Manager, uid) {
-  return buildUser(Manager, {
+function purchaser(omega, uid) {
+  return buildUser({
     auth: { uid: uid, email: `${uid}@example.com` },
     roles: {},
     // A one-time buyer is an ordinary Basic user — the whole point of the branch
@@ -54,13 +54,13 @@ function oneTimeOrder(orderId, overrides) {
   };
 }
 
-function refund(Manager, user, orderId) {
+function refund(omega, user, orderId) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-refund',
     user,
-    settings: { confirmed: true, reason: 'Bought the wrong thing', feedback: null, orderId: orderId },
+    data: { confirmed: true, reason: 'Bought the wrong thing', feedback: null, orderId: orderId },
   });
 }
 
@@ -73,8 +73,8 @@ module.exports = defineCases({
     {
       name: 'rejects-an-order-that-does-not-exist',
       auth: 'none',
-      async run({ assert, Manager }) {
-        const sent = await refund(Manager, purchaser(Manager, OWNER), '_test-order-never-existed');
+      async run({ assert, omega }) {
+        const sent = await refund(omega, purchaser(omega, OWNER), '_test-order-never-existed');
 
         assert.equal(sent.code, 400, `An unknown order should be rejected, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /order not found/i, 'The rejection should name the order');
@@ -84,11 +84,11 @@ module.exports = defineCases({
     {
       name: 'rejects-an-order-owned-by-somebody-else',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-not-yours';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
-        const sent = await refund(Manager, purchaser(Manager, '_test-refund-one-time-stranger'), orderId);
+        const sent = await refund(omega, purchaser(omega, '_test-refund-one-time-stranger'), orderId);
 
         assert.equal(sent.code, 400, `Another user's order should be rejected, got ${sent.code}: ${sent.body}`);
         // Not-found and not-yours read identically: an order id must not be a
@@ -100,11 +100,11 @@ module.exports = defineCases({
     {
       name: 'rejects-a-subscription-order',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-is-a-subscription';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, { type: 'subscription' }));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `A subscription order should be rejected here, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /one-time/i, 'The rejection should say the order is not a one-time purchase');
@@ -114,7 +114,7 @@ module.exports = defineCases({
     {
       name: 'rejects-an-already-refunded-order',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-already-refunded';
         const nowUNIX = Math.floor(Date.now() / 1000);
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
@@ -129,7 +129,7 @@ module.exports = defineCases({
           },
         }));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `A refunded order should be rejected, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded');
@@ -139,7 +139,7 @@ module.exports = defineCases({
     {
       name: 'rejects-a-dashboard-refunded-order',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         // A refund issued from the provider dashboard arrives by webhook: it
         // flips unified.status to 'refunded' but writes NO requests.refund
         const orderId = '_test-order-one-time-dashboard-refunded';
@@ -151,7 +151,7 @@ module.exports = defineCases({
           },
         }));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `A dashboard-refunded order should be rejected, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /already been refunded/i, 'The rejection should say it was already refunded, not 500 out of the provider');
@@ -161,7 +161,7 @@ module.exports = defineCases({
     {
       name: 'rejects-a-purchase-that-never-completed',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         // An abandoned Stripe checkout session stays `open` on the order, with
         // its provider and resourceId intact — so every other refusal passes it
         // and the provider is asked to reverse a charge that never happened
@@ -174,7 +174,7 @@ module.exports = defineCases({
           },
         }));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `An incomplete purchase should be refused, not sent to the provider, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /has not completed/i, 'The rejection should say the purchase never completed');
@@ -184,14 +184,14 @@ module.exports = defineCases({
     {
       name: 'rejects-a-purchase-older-than-6-months',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-too-old';
         const oldUNIX = Math.floor(Date.now() / 1000) - (200 * 24 * 60 * 60);
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
           metadata: { created: { timestamp: new Date(oldUNIX * 1000).toISOString(), timestampUNIX: oldUNIX } },
         }));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `An old purchase should be rejected, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /older than 6 months/i, 'The refund window applies to one-time purchases too');
@@ -201,11 +201,11 @@ module.exports = defineCases({
     {
       name: 'reaches-the-provider-for-a-valid-one-time-order',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-valid';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
-        const sent = await refund(Manager, purchaser(Manager, OWNER), orderId);
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
 
         assert.equal(sent.code, 400, `A valid order should reach the provider lookup, got ${sent.code}: ${sent.body}`);
         assert.match(`${sent.body}`, /Unknown provider/i, 'A valid one-time order should get PAST every guard');
@@ -215,16 +215,16 @@ module.exports = defineCases({
     {
       name: 'still-requires-confirmation',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const orderId = '_test-order-one-time-unconfirmed';
         await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId));
 
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-refund',
-          user: purchaser(Manager, OWNER),
-          settings: { confirmed: false, reason: 'Bought the wrong thing', feedback: null, orderId: orderId },
+          user: purchaser(omega, OWNER),
+          data: { confirmed: false, reason: 'Bought the wrong thing', feedback: null, orderId: orderId },
         });
 
         assert.equal(sent.code, 400, `An unconfirmed refund should be rejected, got ${sent.code}: ${sent.body}`);
@@ -235,15 +235,15 @@ module.exports = defineCases({
     {
       name: 'without-an-order-id-it-is-still-the-subscription-path',
       auth: 'none',
-      async run({ assert, Manager }) {
+      async run({ assert, omega }) {
         // No orderId: a Basic user is refused for having no paid subscription,
         // exactly as before the one-time branch existed
         const sent = await callHandler({
-          Manager,
+          omega,
           handler,
           functionName: 'payments-refund',
-          user: purchaser(Manager, OWNER),
-          settings: { confirmed: true, reason: 'Too expensive', feedback: null, orderId: null },
+          user: purchaser(omega, OWNER),
+          data: { confirmed: true, reason: 'Too expensive', feedback: null, orderId: null },
         });
 
         assert.equal(sent.code, 400, `A basic user should still be rejected, got ${sent.code}: ${sent.body}`);

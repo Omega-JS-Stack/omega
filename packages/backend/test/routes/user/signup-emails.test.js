@@ -51,13 +51,13 @@ module.exports = defineCases({
     {
       name: 'signup-captures-the-welcome-and-the-nudge-and-queues-the-follow-ups',
 
-      async run({ http, assert, accounts, admin, Manager }) {
+      async run({ http, assert, accounts, admin, omega }) {
         const account = accounts[ACCOUNT];
 
         // Clear first, so everything read back below is this signup's own.
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
 
-        const response = await http.as(ACCOUNT).post('backend-manager/user/signup', {});
+        const response = await http.as(ACCOUNT).post('omega/user/signup', {});
 
         assert.isSuccess(response, 'Signup should succeed');
 
@@ -65,7 +65,7 @@ module.exports = defineCases({
         // Addressed to THIS persona: the store is one file per project, and a
         // fire-and-forget send another suite left in flight would otherwise land in
         // the middle of this count.
-        const captured = capture.readCaptured(Manager).filter((record) => record.to.includes(account.email));
+        const captured = capture.readCaptured(omega).filter((record) => record.to.includes(account.email));
 
         assert.equal(captured.length, 2, `Signup owes two immediate emails, got ${captured.length}: ${captured.map((r) => r.subject).join(' | ')}`);
 
@@ -74,7 +74,7 @@ module.exports = defineCases({
           assert.equal(record.template, 'card', 'Both ride the card template');
         }
 
-        const brandName = Manager.config.brand.name;
+        const brandName = omega.config.brand.name;
         const welcome = captured.find((record) => record.subject === `Welcome to ${brandName}!`);
 
         assert.ok(welcome, `The welcome email is sent, got: ${captured.map((r) => r.subject).join(' | ')}`);
@@ -106,7 +106,7 @@ module.exports = defineCases({
         assert.ok(checkup.sendAt > Math.floor(Date.now() / 1000), 'Both carry the second they are due');
         assert.ok(feedback.sendAt > checkup.sendAt, 'And the feedback request comes after the checkup');
 
-        capture.clearCaptured(Manager);
+        capture.clearCaptured(omega);
       },
     },
   ],

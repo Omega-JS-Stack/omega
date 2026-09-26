@@ -12,7 +12,8 @@
  *
  * Browser code behind two bundler aliases, so the harness drives the REAL
  * main.js through esbuild (the idiom consent-gating.test.js uses) with every
- * module it pulls in replaced by a recorder — what this pins is WHICH modules a
+ * module it pulls in replaced by a recorder, and the web runtime instance a
+ * stub handed in as `{ omega, options }`: what this pins is WHICH modules a
  * config loads, not what any of them then does.
  */
 const assert = require('node:assert');
@@ -45,6 +46,7 @@ function recorderModule(id) {
     `export const setupAlertDismiss = record;`,
     `export const setupCopy = record;`,
     `export const configureAnalytics = record;`,
+    `export const createExitPopup = record;`,
   ].join('\n');
 }
 
@@ -68,12 +70,6 @@ function bundleOnce() {
         build.onLoad({ filter: /.*/, namespace: 'omega-module-recorder' }, (args) => {
           return { contents: recorderModule(path.basename(args.path)), loader: 'js' };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
-          return { path: 'client', namespace: 'omega-client-stub' };
-        });
-        build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
-          return { contents: 'export default globalThis.__omegaClient;' };
-        });
       },
     }],
   });
@@ -85,14 +81,14 @@ function bundleOnce() {
  * Boot the real main.js against one client config, and hand back the module
  * files it chose to load.
  *
- * @param {object} config - The client runtime's config blob, as main.js reads it
+ * @param {object} config - The runtime instance's config blob, as main.js reads it
  * @returns {Promise<string[]>}
  */
 async function boot(config, page = {}) {
   await bundleOnce();
 
   globalThis.__loaded = [];
-  globalThis.__omegaClient = {
+  const omega = {
     config: config,
     isDevelopment: () => page.development === true,
   };
@@ -107,7 +103,7 @@ async function boot(config, page = {}) {
   delete require.cache[require.resolve(BUNDLE)];
   const bundle = require(BUNDLE);
 
-  await bundle.default({ manager: {}, options: {} });
+  await bundle.default({ omega, options: {} });
 
   return globalThis.__loaded;
 }

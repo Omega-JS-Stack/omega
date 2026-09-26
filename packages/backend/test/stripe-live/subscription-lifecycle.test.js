@@ -62,7 +62,7 @@ module.exports = defineCases({
         // between a config price and a checkout, and it matches on interval and
         // amount to the cent. The lane created these fixtures on the way in, so
         // a failure here means the catalogue and the account disagree.
-        const StripeLib = require('../../dist/manager/libraries/payment/providers/stripe.js');
+        const StripeLib = require('../../dist/omega/libraries/payment/providers/stripe.js');
         const products = (config.payment?.products || []).filter((p) => p.id !== 'basic' && p.prices && !p.archived);
 
         assert.ok(products.length > 0, 'the brand configures at least one paid product to resolve');
@@ -128,7 +128,7 @@ module.exports = defineCases({
         // with a REAL endpoint secret configured, an unsigned delivery carrying a
         // correct `?key=` must still be refused. Everywhere else this case is
         // skipped, because no secret is configured to verify against.
-        const response = await http.as('none').post(`backend-manager/payments/webhook?provider=stripe&key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/webhook?provider=stripe&key=${config.webhookKey}`, {
           id: `evt_test_forged_${Date.now()}`,
           type: 'customer.subscription.deleted',
           data: { object: { id: 'sub_forged', object: 'subscription', status: 'canceled' } },

@@ -14,7 +14,7 @@
  *
  * The gate, in order:
  *   1. A Stripe secret resolves through the ONE env reader
- *      ([../../../manager/libraries/env.js](../../../manager/libraries/env.js)).
+ *      ([../../../omega/libraries/env.js](../../../omega/libraries/env.js)).
  *      A test lane composes its `.env` from the base plus `.env.testing`
  *      ([#586]), so the TEST credential belongs in that overlay.
  *   2. That secret is test-shaped (`sk_test_`) — the whole gate, and the reason
@@ -40,7 +40,7 @@ const chalk = require('chalk').default;
 
 const { assertDeclaredLane } = require('../../../utils/test-lanes.js');
 
-const env = require('../../../manager/libraries/env.js');
+const env = require('../../../omega/libraries/env.js');
 
 // The lane's name, as `--lane=` spells it and as the runner reads it off the
 // env. It is this module's own FILE NAME (the gate is resolved as

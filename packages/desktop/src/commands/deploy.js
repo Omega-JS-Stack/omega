@@ -18,8 +18,8 @@
  * most; a linked brand now packs its frameworks into the snapshot instead.
  */
 const path = require('node:path');
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('deploy');
+const build = require('../build.js');
+const logger = build.logger('deploy');
 const attachLogFile = require('../utils/attach-log-file.js');
 const { assertBrandVersion } = require('@omega.js/devkit/brand-version');
 const { targetNameFromDir } = require('@omega.js/config');
@@ -62,9 +62,9 @@ module.exports = async function (options) {
   if (dryRun) {
     logger.log('DRY RUN, skipping hook "deploy/pre"');
   } else {
-    // The one ctx shape every OMEGA hook takes, `{ manager, projectRoot, mode }`,
+    // The one ctx shape every OMEGA hook takes, `{ build, projectRoot, mode }`,
     // and a deploy's mode is PRODUCTION: what it is about to publish is a release.
-    await runConsumerHook('deploy/pre', { manager: Manager, projectRoot: projectDir, mode: 'production' });
+    await runConsumerHook('deploy/pre', { build, projectRoot: projectDir, mode: 'production' });
   }
 
   // The direct lane: build + sign + publish from THIS machine, for this

@@ -67,7 +67,7 @@ headers included, so it never rides a request carrying ANY credential header —
   the line ([#130](https://github.com/Omega-JS-Stack/omega/issues/130)). The module
   segment is the invocation's function name, which the context already knows
   (`options.functionName || FUNCTION_TARGET`). Home:
-  `packages/backend/src/manager/helpers/context/logging.js`. A shared backend module
+  `packages/backend/src/omega/context/logging.js`. A shared backend module
   that logs outside a ctx carries its own file identity.
 
 ### Markers and exemptions

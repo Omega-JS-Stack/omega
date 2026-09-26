@@ -18,6 +18,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
+
+// A seeded persona as the page receives it: the stored document built into a User
+const persona = (document) => new User(document, { uid: 'u1' });
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const SECURITY_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'security.js');
@@ -40,7 +44,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         build.onLoad({ filter: /.*/, namespace: 'omega-client-stub' }, () => {
@@ -76,19 +80,19 @@ async function renderSessions(client) {
   };
   globalThis.window = { location: { search: '', href: 'https://x.test/account' }, history: { replaceState() {} }, addEventListener() {} };
   globalThis.__omegaClient = {
-    auth: () => ({ getUser: () => null }),
-    utilities: () => ({ showNotification: () => {}, escapeHTML: (value) => `${value}` }),
+    auth: { user: new User() },
+    utilities: { showNotification: () => {}, escapeHTML: (value) => `${value}` },
   };
 
   delete require.cache[require.resolve(BUNDLE)];
   const security = require(BUNDLE);
 
-  security.loadData({
+  security.loadData(persona({
     activity: {
       client: { userAgent: client.userAgent, platform: client.platform },
       created: { timestamp: '2026-01-01T00:00:00.000Z', timestampUNIX: 1767225600 },
     },
-  });
+  }));
 
   return list.innerHTML;
 }

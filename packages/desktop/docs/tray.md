@@ -4,19 +4,19 @@ File-based tray/menubar. @omega.js/desktop looks for `src/integrations/tray/inde
 
 ## Config
 
-No config block. Path is conventional: `src/integrations/tray/index.js`. To opt out, call `manager.tray.disable()` from your main entry — idempotent, tears down any existing Tray.
+No config block. Path is conventional: `src/integrations/tray/index.js`. To opt out, call `omega.tray.disable()` from your main entry: idempotent, tears down any existing Tray.
 
 ## Definition file
 
 ```js
 // src/integrations/tray/index.js
-module.exports = ({ manager, tray }) => {
+module.exports = ({ omega, tray }) => {
   // @omega.js/desktop auto-resolves the tray icon from config/icons/<platform>/tray.png at build
   // time, so explicit tray.icon() is OPTIONAL. Call it only to override.
   // Note: on macOS, if you pass your own path, the filename MUST end in
   // `Template.png` for the OS to auto-invert it in dark mode.
   // tray.icon('src/assets/icons/my-trayTemplate.png');
-  tray.tooltip(manager.config?.app?.productName);
+  tray.tooltip(omega.config?.app?.productName);
 
   // Easiest: start from @omega.js/desktop's default template.
   tray.useDefaults();
@@ -25,7 +25,7 @@ module.exports = ({ manager, tray }) => {
   tray.insertAfter('open', {
     id: 'dashboard',
     label: 'Open Dashboard',
-    click: () => manager.windows.show('dashboard'),
+    click: () => omega.windows.show('dashboard'),
   });
   tray.update('open', { label: 'Show Window' });
   tray.remove('website');
@@ -47,7 +47,7 @@ tray.clear()                   // start over
 
 ## Id-path API
 
-Same shape across menu / tray / context-menu. Available **during definition** (on the `tray` builder arg) AND **at runtime** on `manager.tray`:
+Same shape across menu / tray / context-menu. Available **during definition** (on the `tray` builder arg) AND **at runtime** on `omega.tray`:
 
 ```js
 .find(idPath)                  // live descriptor or null
@@ -69,8 +69,8 @@ Tray ids are **flat** — no `tray/` prefix (the lib namespace is implicit). For
 | ID | Item |
 |---|---|
 | `title` | Disabled label showing the app name |
-| `open` | "Open `<app>`" — calls `manager.windows.show('main')` |
-| `check-for-updates` | Wired to `manager.autoUpdater` (label updates dynamically) |
+| `open` | "Open `<app>`": calls `omega.windows.show('main')` |
+| `check-for-updates` | Wired to `omega.autoUpdater` (label updates dynamically) |
 | `website` | Visit `brand.url` (only present if configured) |
 | `quit` | Quit the app |
 
@@ -84,9 +84,9 @@ tray.item({ id: 'account', label: 'Account', submenu: [
   { id: 'sign-out', label: 'Sign out', click: () => {} },
 ]});
 
-manager.tray.find('account/sign-out');
-manager.tray.update('account/sign-out', { enabled: false });
-manager.tray.appendTo('account', { id: 'profile', label: 'Profile' });
+omega.tray.find('account/sign-out');
+omega.tray.update('account/sign-out', { enabled: false });
+omega.tray.appendTo('account', { id: 'profile', label: 'Profile' });
 ```
 
 ## Item descriptors
@@ -103,30 +103,30 @@ Mirror Electron's [`MenuItemConstructorOptions`](https://www.electronjs.org/docs
 | `click` | function | Wrapped to swallow errors so a bad handler can't kill the menu |
 | `submenu` | array | Recursively resolved with the same conveniences |
 
-## Runtime API on `manager.tray`
+## Runtime API on `omega.tray`
 
 ```js
-manager.tray.refresh()                   // re-evaluate dynamic state and re-render
-manager.tray.define(fn)                  // replace the whole definition at runtime
-manager.tray.disable()                   // tear down + stop responding (idempotent)
-manager.tray.setIcon(path)
-manager.tray.setTooltip(text)
-manager.tray.addItem(descriptor)         // append (preserves existing items)
-manager.tray.clearItems()
-manager.tray.destroy()                   // tear down (mostly for tests)
+omega.tray.refresh()                   // re-evaluate dynamic state and re-render
+omega.tray.define(fn)                  // replace the whole definition at runtime
+omega.tray.disable()                   // tear down + stop responding (idempotent)
+omega.tray.setIcon(path)
+omega.tray.setTooltip(text)
+omega.tray.addItem(descriptor)         // append (preserves existing items)
+omega.tray.clearItems()
+omega.tray.destroy()                   // tear down (mostly for tests)
 
 // Id-path API — same as listed above.
-manager.tray.find('quit')
-manager.tray.update('quit', { label: 'Goodbye' })
-manager.tray.remove('website')
-manager.tray.insertAfter('open', { id: 'preferences', label: 'Preferences...', click: ... })
-manager.tray.hide('check-for-updates')
+omega.tray.find('quit')
+omega.tray.update('quit', { label: 'Goodbye' })
+omega.tray.remove('website')
+omega.tray.insertAfter('open', { id: 'preferences', label: 'Preferences...', click: ... })
+omega.tray.hide('check-for-updates')
 
 // Inspection
-manager.tray.getItems()                  // shallow copy of raw descriptors
-manager.tray.getIcon()
-manager.tray.getTooltip()
-manager.tray.isRendered()
+omega.tray.getItems()                  // shallow copy of raw descriptors
+omega.tray.getIcon()
+omega.tray.getTooltip()
+omega.tray.isRendered()
 ```
 
 ## Common patterns
@@ -135,8 +135,8 @@ manager.tray.isRendered()
 
 ```js
 // in your renderer/main code, after sign-in:
-manager.storage.set('user', { ... });
-manager.tray.refresh();    // dynamic-label functions re-evaluate
+omega.storage.set('user', { ... });
+omega.tray.refresh();    // dynamic-label functions re-evaluate
 ```
 
 ### Hide updater item if you ship without auto-update
@@ -153,7 +153,7 @@ module.exports = ({ tray }) => {
 ### Replace the entire tray at runtime
 
 ```js
-manager.tray.define(({ manager, tray }) => {
+omega.tray.define(({ omega, tray }) => {
   tray.icon('icons/dark-mode.png');
   tray.item({ id: 'x', label: 'New layout', click: ... });
 });

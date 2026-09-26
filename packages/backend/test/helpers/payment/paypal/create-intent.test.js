@@ -27,8 +27,8 @@
  *
  * Run: npx omega test backend:helpers/payment/paypal/create-intent
  */
-const intentProvider = require('../../../../dist/manager/routes/payments/intent/providers/paypal.js');
-const PayPal = require('../../../../dist/manager/libraries/payment/providers/paypal.js');
+const intentProvider = require('../../../../dist/omega/routes/payments/intent/providers/paypal.js');
+const PayPal = require('../../../../dist/omega/libraries/payment/providers/paypal.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-paypal-buyer';
@@ -104,7 +104,7 @@ const SUBSCRIPTION_RESPONSE = {
   ],
 };
 
-/** A logger the provider can talk to, with no Manager behind it */
+/** A logger the provider can talk to, with no omega behind it */
 function testCtx() {
   const lines = [];
 

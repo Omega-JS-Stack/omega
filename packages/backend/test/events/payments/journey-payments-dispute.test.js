@@ -47,7 +47,7 @@ module.exports = defineCases({
         state.paidProductId = paidProduct.id;
         state.product = payments.products[paidProduct.id];
 
-        const response = await http.as(PERSONA).post('backend-manager/payments/intent', {
+        const response = await http.as(PERSONA).post('omega/payments/intent', {
           provider: 'test',
           productId: paidProduct.id,
           frequency: state.product.frequency,
@@ -80,7 +80,7 @@ module.exports = defineCases({
         // one that did nothing.
         const alertId = `_test-dispute-nomatch-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${config.webhookKey}`, {
           id: alertId,
           card: `411111111111${CARD}`,
           cardBrand: 'visa',
@@ -115,7 +115,7 @@ module.exports = defineCases({
       async run({ http, firestore, assert, state, config, waitFor }) {
         state.alertId = `_test-dispute-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/dispute-alert?key=${config.webhookKey}`, {
+        const response = await http.as('none').post(`omega/payments/dispute-alert?key=${config.webhookKey}`, {
           id: state.alertId,
           card: `411111111111${CARD}`,
           cardBrand: 'visa',

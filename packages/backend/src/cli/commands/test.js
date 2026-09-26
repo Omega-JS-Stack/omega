@@ -156,7 +156,7 @@ class TestCommand extends BaseCommand {
     this.attachVerbLog('test');
 
     // `--extended` CLI shorthand for the shared, unprefixed TEST_EXTENDED_MODE
-    // env var (cross-framework parity with BXM/UJM/EM). Either the flag OR the
+    // env var (the same switch on every framework). Either the flag OR the
     // env var opts into REAL external services (default skipped). Set this
     // BEFORE the captureSyncedEnv/writeTestMode pre-flight below so the flag
     // flows into the emulator's test-mode.json too — making
@@ -167,7 +167,7 @@ class TestCommand extends BaseCommand {
 
     // Framework self-test: when `npx omega test` is run from the @omega.js/backend repo
     // (no firebase.json in cwd), boot the bundled fixture project under
-    // src/test/fixtures/firebase-project. Mirrors BXM/UJM *_TEST_BOOT_PROJECT.
+    // src/test/fixtures/firebase-project (OMEGA_TEST_BOOT_PROJECT forces it).
     const isSelfTest = this.setupSelfTest();
 
     // The AUDIT half of the retired `omega setup` (#675): the target checks
@@ -472,8 +472,7 @@ class TestCommand extends BaseCommand {
    * (no firebase.json) AND is the @omega.js/backend repo (or OMEGA_TEST_BOOT_PROJECT
    * is set), point the run at the bundled fixture project and link the local
    * framework + firebase deps into it so the emulator's function workers resolve
-   * them. This is @omega.js/backend's equivalent of BXM's OMEGA_TEST_BOOT_PROJECT / UJM's
-   * UJ_TEST_BOOT_PROJECT. Returns true if self-test wiring was applied.
+   * them. Returns true if self-test wiring was applied.
    */
   setupSelfTest() {
     const self = this.main;
@@ -571,7 +570,7 @@ class TestCommand extends BaseCommand {
    * carries a consumer `config/omega.json5`, so it IS a brand's backend to the
    * boot guard — and firebase-tools analyzes function definitions in its own
    * child process, which never saw the values injected into this one above, so
-   * `Manager.init()` threw before a single function loaded.
+   * `omega.initialize()` threw before a single function loaded.
    *
    * Values come from the SAME resolution the injection above does (the fixture
    * config's `omega.*` keys, the shared unsubscribe secret), so the server and
@@ -657,7 +656,7 @@ class TestCommand extends BaseCommand {
     const testScriptPath = path.join(__dirname, '..', '..', 'test', 'run-tests.js');
 
     // The RESOLVED port map, minus the TLS front. The runner loads route
-    // handlers IN-PROCESS, so its Manager's URL getters answer from
+    // handlers IN-PROCESS, so its instance's URL getters answer from
     // OMEGA_*_PORT the same way a function worker's do — unset, they fell back
     // to the classic 5002, which under `omega emulator`'s HTTPS default is the
     // mkcert proxy, not hosting: the test provider's auto-webhook followed the
@@ -685,7 +684,7 @@ class TestCommand extends BaseCommand {
       // production (nothing else marks it yet: runner.js stamps its own
       // OMEGA_TEST_MODE only later, inside run()), which wakes the
       // firebase-functions logger compat shim and turns every test line into
-      // JSON. Say what this process IS before Manager.init() looks.
+      // JSON. Say what this process IS before omega.initialize() looks.
       OMEGA_TEST_MODE: 'true',
       // An opt-in lane's own environment: the lane name the runner's discovery
       // gates on, plus whatever the lane brought up (the forwarder's signing
@@ -966,7 +965,7 @@ class TestCommand extends BaseCommand {
   }
 }
 
-// Static, alongside Middleware's precedent — the adopt-or-bump decision is
+// Static, alongside the pipeline's precedent — the adopt-or-bump decision is
 // pure, so tests exercise it directly instead of through a booted emulator, and
 // the identity read takes a tmp dir so real locator files can stand in for a
 // running hub.

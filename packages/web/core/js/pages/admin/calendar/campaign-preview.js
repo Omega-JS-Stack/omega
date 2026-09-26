@@ -4,7 +4,7 @@
  * for the campaign editor modal.
  */
 
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // Lazy-loaded markdown-it instance
 let md = null;
@@ -36,8 +36,8 @@ async function renderEmailPreview(formData) {
   return `
     <div class="email-preview">
       <div class="email-preview-header">
-        <div class="email-preview-subject">${omega.utilities().escapeHTML(subject) || '<span class="text-muted">No subject</span>'}</div>
-        ${preheader ? `<div class="email-preview-preheader">${omega.utilities().escapeHTML(preheader)}</div>` : ''}
+        <div class="email-preview-subject">${omega.utilities.escapeHTML(subject) || '<span class="text-muted">No subject</span>'}</div>
+        ${preheader ? `<div class="email-preview-preheader">${omega.utilities.escapeHTML(preheader)}</div>` : ''}
       </div>
       <div class="email-preview-body">${renderedContent}</div>
       <div class="email-preview-disclaimer text-muted small mt-3">
@@ -58,7 +58,7 @@ function renderPushPreview(formData) {
   const icon = campaign.icon || '';
 
   const iconSrc = icon && icon.match(/^https?:\/\/.+/)
-    ? omega.utilities().escapeHTML(icon)
+    ? omega.utilities.escapeHTML(icon)
     : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="50" height="50"%3E%3Crect width="50" height="50" fill="%236c757d" rx="8"/%3E%3C/svg%3E';
 
   const clickAction = campaign.clickAction || '';
@@ -74,8 +74,8 @@ function renderPushPreview(formData) {
           </span>
         </div>
         <div class="push-preview-notification"
-             ${clickAction ? `role="button" title="Click to test: ${omega.utilities().escapeHTML(clickAction)}"` : ''}
-             data-click-action="${omega.utilities().escapeHTML(clickAction)}">
+             ${clickAction ? `role="button" title="Click to test: ${omega.utilities.escapeHTML(clickAction)}"` : ''}
+             data-click-action="${omega.utilities.escapeHTML(clickAction)}">
           <div class="d-flex align-items-start">
             <img src="${iconSrc}"
                  class="rounded me-2"
@@ -83,8 +83,8 @@ function renderPushPreview(formData) {
                  height="50"
                  onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22%3E%3Crect width=%2250%22 height=%2250%22 fill=%22%236c757d%22 rx=%228%22/%3E%3C/svg%3E'">
             <div class="flex-fill">
-              <div class="fw-semibold small">${omega.utilities().escapeHTML(name)}</div>
-              <div class="small text-muted mt-1">${omega.utilities().escapeHTML(subject)}</div>
+              <div class="fw-semibold small">${omega.utilities.escapeHTML(name)}</div>
+              <div class="small text-muted mt-1">${omega.utilities.escapeHTML(subject)}</div>
               <div class="small text-muted mt-1">
                 <i class="fa-solid fa-clock fa-xs me-1"></i>
                 Now

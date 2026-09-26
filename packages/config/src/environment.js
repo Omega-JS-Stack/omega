@@ -3,8 +3,8 @@
  * ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
  *
  * Four calls, one implementation, one call form everywhere: `getEnvironment()`
- * plus `isDevelopment()` / `isProduction()` / `isTesting()`, mixed into a
- * framework's Manager with `attachTo()`. @omega.js/backend, @omega.js/desktop,
+ * plus `isDevelopment()` / `isProduction()` / `isTesting()`, called directly
+ * by every framework's `omega` instance and build module. @omega.js/backend, @omega.js/desktop,
  * @omega.js/extension and @omega.js/web each carried their own copy of this
  * logic, each with its own signal list and its own DEFAULT, and the copies
  * disagreed: desktop answered `production` with no signal while the extension
@@ -18,7 +18,7 @@
  *   neither env nor files, it is `config.environment`, the build fact every
  *   surface already bakes into `OMEGA_BUILD_JSON.config`
  *   ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)), reached as
- *   `this.config.environment` off the Manager the call is made on. Nothing else
+ *   `this.config.environment` off the instance the call is made on. Nothing else
  *   is consulted: no `app.isPackaged`, no `manifest.update_url`, no `NODE_ENV`,
  *   no terminal sniffing.
  *
@@ -31,7 +31,7 @@
  * already resolves its config, through `setEnvironment()` below (the only
  * writer, so a fourth word can never reach the variable): the backend's boot
  * takes the .env cascade's ambient answer, the desktop and extension build
- * Managers take `production` under their build-mode flag and the ambient answer
+ * modules take `production` under their build-mode flag and the ambient answer
  * otherwise, and web's verbs name their own (`omega build` is production,
  * `omega dev` is development).
  *
@@ -64,7 +64,7 @@ function fromProcess() {
 
 /**
  * The browser input: the build fact baked into `OMEGA_BUILD_JSON.config`,
- * reached through the Manager the call was made on.
+ * reached through the instance the call was made on.
  * @param {object} [context] - the `this` of the call.
  * @returns {string|undefined} the raw value.
  */
@@ -75,7 +75,7 @@ function fromBakedConfig(context) {
 /**
  * The running environment, from the one input.
  *
- * @this {object} [context] - a Manager carrying the baked `config`.
+ * @this {object} [context] - an instance carrying the baked `config`.
  * @returns {'development'|'testing'|'production'} exactly one of the three.
  * @throws {Error} when neither input names one of the three.
  */
@@ -92,7 +92,7 @@ function getEnvironment() {
 }
 
 /**
- * @this {object} [context] - a Manager carrying the baked `config`.
+ * @this {object} [context] - an instance carrying the baked `config`.
  * @returns {boolean} true only in development (never in testing).
  */
 function isDevelopment() {
@@ -100,7 +100,7 @@ function isDevelopment() {
 }
 
 /**
- * @this {object} [context] - a Manager carrying the baked `config`.
+ * @this {object} [context] - an instance carrying the baked `config`.
  * @returns {boolean} true only in production, a real positive check.
  */
 function isProduction() {
@@ -108,7 +108,7 @@ function isProduction() {
 }
 
 /**
- * @this {object} [context] - a Manager carrying the baked `config`.
+ * @this {object} [context] - an instance carrying the baked `config`.
  * @returns {boolean} true only while a test lane runs this process.
  */
 function isTesting() {
@@ -136,7 +136,7 @@ function setEnvironment(value) {
 
 /**
  * The environment a NODE BUILD LANE is for, decided once for the two frameworks
- * whose build Manager names it at load (@omega.js/desktop and
+ * whose build module names it at load (@omega.js/desktop and
  * @omega.js/extension, which carried byte-identical copies of this expression).
  * Two rules, no sniffing:
  *
@@ -151,29 +151,11 @@ function setEnvironment(value) {
  * writer. This is the only default anywhere near this module, and it belongs to
  * a build lane alone: a READER still gets no default at all.
  *
- * @param {boolean} buildMode - The lane's build-mode flag (`Manager.isBuildMode()`).
+ * @param {boolean} buildMode - The lane's build-mode flag (`build.isBuildMode()`).
  * @returns {'development'|'testing'|'production'} the word that lane is for.
  */
 function buildLaneEnvironment(buildMode) {
   return buildMode ? 'production' : (fromProcess() || 'development');
-}
-
-/**
- * Mix the surface into a Manager constructor's prototype AND the constructor
- * itself, so `Manager.isTesting()` works statically too. The idiom every
- * framework already attaches with.
- *
- * @param {Function} Manager - the constructor to extend.
- */
-function attachTo(Manager) {
-  Manager.prototype.getEnvironment = getEnvironment;
-  Manager.prototype.isDevelopment  = isDevelopment;
-  Manager.prototype.isProduction   = isProduction;
-  Manager.prototype.isTesting      = isTesting;
-  Manager.getEnvironment = getEnvironment;
-  Manager.isDevelopment  = isDevelopment;
-  Manager.isProduction   = isProduction;
-  Manager.isTesting      = isTesting;
 }
 
 module.exports = {
@@ -185,5 +167,4 @@ module.exports = {
   isTesting,
   setEnvironment,
   buildLaneEnvironment,
-  attachTo,
 };

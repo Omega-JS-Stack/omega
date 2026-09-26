@@ -11,11 +11,11 @@
  * not a mock) whose `[[delay:ms]]` directive makes the calls resolve out of
  * order. No network involved by design.
  */
-const AI = require('../../dist/manager/libraries/ai/index.js');
-const { emptyTokens, buildTokens, addTokens } = require('../../dist/manager/libraries/ai/tokens.js');
+const AI = require('../../dist/omega/libraries/ai/index.js');
+const { emptyTokens, buildTokens, addTokens } = require('../../dist/omega/libraries/ai/tokens.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
-// No Manager — the test provider falls back to the OMEGA_TEST_MODE signal, which
+// No Omega instance — the test provider falls back to the OMEGA_TEST_MODE signal, which
 // the test runner sets
 function makeAI() {
   return new AI({}, 'test');

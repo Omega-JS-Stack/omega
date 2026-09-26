@@ -14,9 +14,9 @@
 
 const path    = require('path');
 const jetpack = require('fs-jetpack');
-const Manager = new (require('../../build.js'));
+const build = require('../../build.js');
 
-const logger = Manager.logger('release');
+const logger = build.logger('release');
 
 // The two warnings electron-publish prints when it uploads nothing: one per
 // release (`gitHubPublisher.getOrCreateRelease` returns null with its reason)
@@ -37,7 +37,7 @@ module.exports = function release(done) {
 
   let builder;
   try {
-    builder = Manager.require('electron-builder');
+    builder = require('electron-builder');
   } catch (e) {
     return done(new Error(`Could not resolve electron-builder: ${e.message}. Run \`npm i -D electron-builder\` in the consumer.`));
   }

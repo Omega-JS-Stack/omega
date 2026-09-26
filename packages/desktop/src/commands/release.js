@@ -24,9 +24,9 @@ const attachLogFile = require('../utils/attach-log-file.js');
 const { deployViaDispatch, dispatchTarget, laneLabel, resolveToken } = require('@omega.js/devkit/deploy');
 const { followRun } = require('@omega.js/devkit/deploy-follow');
 const { targetNameFromDir } = require('@omega.js/config');
-const Manager = new (require('../build.js'));
+const build = require('../build.js');
 
-const logger = Manager.logger('release');
+const logger = build.logger('release');
 
 module.exports = async function release(options = {}) {
   const projectRoot = process.cwd();
@@ -58,7 +58,7 @@ module.exports = async function release(options = {}) {
   // `build.yml` standalone). ONE helper for all four targets
   // ([#847](https://github.com/Omega-JS-Stack/omega/issues/847)), where this
   // file used to keep desktop's own copy of it.
-  const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: Manager.getConfig(), workflow: 'build.yml' });
+  const { owner, repo, workflow: WORKFLOW_FILE } = dispatchTarget({ projectRoot, config: build.getConfig(), workflow: 'build.yml' });
 
   // Optional --platforms / --platform flag forwarded as a workflow input. Accepts a
   // single value ('windows') or comma-separated list ('mac,linux'). Special value

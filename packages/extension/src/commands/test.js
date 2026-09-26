@@ -1,9 +1,9 @@
 // Libraries
 const path    = require('path');
 const fs      = require('fs');
-const Manager = new (require('../build.js'));
+const build = require('../build.js');
 const { setEnvironment } = require('@omega.js/config/environment');
-const logger  = Manager.logger('test');
+const logger  = build.logger('test');
 const { run } = require('../test/runner.js');
 const attachLogFile = require('../utils/attach-log-file.js');
 const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.js');
@@ -11,8 +11,8 @@ const { noMatchMessage, noMatchExitCode } = require('@omega.js/devkit/test/scope
 const { ensureTarget } = require('./lib/ensure-target.js');
 
 module.exports = async function (options) {
-  // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
-  // EM's test.log and @omega.js/backend's test.log pattern.
+  // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped), the
+  // same test.log every framework writes.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
 
   // The local half of the retired `omega setup` (#675) — idempotent, offline,
@@ -34,7 +34,7 @@ module.exports = async function (options) {
   // Extended mode — opt into tests that hit REAL external services (Firebase via @omega.js/client,
   // push, any network call) instead of skipping them. Off by default so `npx omega test` stays
   // fast and offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var
-  // — the SAME name across @omega.js/backend/BXM/UJM/EM (cross-framework parity); `--extended` is the CLI
+  // — the SAME name on every framework (cross-framework parity); `--extended` is the CLI
   // shorthand. Once set on process.env it propagates to every spawned test environment (the
   // in-process Node runner, and Puppeteer's Chromium which inherits process.env).
   const extended    = options.extended === true
@@ -46,7 +46,7 @@ module.exports = async function (options) {
     process.env.TEST_EXTENDED_MODE = 'true';
   }
 
-  // Canonical signal — every Manager picks this up via isTesting().
+  // Canonical signal: every omega instance and the build module pick this up via isTesting().
   process.env.OMEGA_TEST_MODE = 'true';
 
   // The one environment input (#817): this lane NAMES testing, so the bundles
@@ -55,8 +55,8 @@ module.exports = async function (options) {
   // for itself (src/build.js lets OMEGA_BUILD_MODE win).
   setEnvironment('testing');
 
-  // When BXM itself runs its own boot-layer tests (the cwd's package.json is
-  // BXM's package.json), there's no real consumer extension to target. Point
+  // When @omega.js/extension runs its own boot-layer tests (the cwd's package.json is
+  // the framework's package.json), there's no real consumer extension to target. Point
   // the boot runner at the fixture under dist/test/fixtures/consumer-extension
   // unless the caller has already set OMEGA_TEST_BOOT_PROJECT explicitly.
   if (!process.env.OMEGA_TEST_BOOT_PROJECT) {

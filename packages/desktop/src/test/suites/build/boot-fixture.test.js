@@ -15,9 +15,9 @@
 
 const path = require('path');
 
-const Manager = require('../../../build.js');
+const build = require('../../../build.js');
 
-const package = Manager.getPackage('main');
+const package = build.getPackage('main');
 const fixture = require(path.join(__dirname, '..', '..', 'fixtures', 'consumer-app', 'package.json'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 

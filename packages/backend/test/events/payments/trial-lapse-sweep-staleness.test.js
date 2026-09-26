@@ -26,7 +26,7 @@
  * Run: npx omega test backend:events/payments/trial-lapse-sweep-staleness
  */
 const assert = require('node:assert');
-const sweep = require('../../../dist/manager/events/cron/daily/trial-lapse-sweep.js');
+const sweep = require('../../../dist/omega/events/cron/daily/trial-lapse-sweep.js');
 const { buildAdmin, CONFIG } = require('./_webhook-harness.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
@@ -77,16 +77,16 @@ async function runSweep({ user, onRead = null } = {}) {
   });
 
   const logs = [];
-  const Manager = { config: CONFIG, libraries: { admin } };
+  const omega = { config: CONFIG, firebase: { admin } };
   const ctx = {
-    Manager,
+    omega,
     isTesting: () => true,
     log: (...args) => logs.push(args.join(' ')),
     warn: (...args) => logs.push(args.join(' ')),
     error: (...args) => logs.push(args.join(' ')),
   };
 
-  await sweep({ Manager, ctx, context: {}, libraries: { admin } });
+  await sweep({ omega, ctx, context: {} });
 
   return { store, logs };
 }

@@ -4,7 +4,7 @@
 // `payments-orders` is admin-only to clients and a one-time purchase writes
 // nothing to `users/{uid}`, so the browser has no way to see one except through
 // this route ([#672](https://github.com/Omega-JS-Stack/omega/issues/672)).
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 
 // The in-flight (or settled) request. Two sections ask for the same history in
 // the same breath — the account page loads every section's data at once — and

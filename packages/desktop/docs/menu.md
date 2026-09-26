@@ -4,13 +4,13 @@ File-based application menu (the macOS menu bar / Windows + Linux menu). Same bu
 
 ## Config
 
-No config block. Path is conventional: `src/integrations/menu/index.js`. To opt out, call `manager.menu.disable()` from your main entry.
+No config block. Path is conventional: `src/integrations/menu/index.js`. To opt out, call `omega.menu.disable()` from your main entry.
 
 ## Definition file
 
 ```js
 // src/integrations/menu/index.js
-module.exports = ({ manager, menu, defaults }) => {
+module.exports = ({ omega, menu, defaults }) => {
   // Easiest: start from the platform-aware default template.
   menu.useDefaults();
 
@@ -18,7 +18,7 @@ module.exports = ({ manager, menu, defaults }) => {
   menu.show('main/preferences');                // @omega.js/desktop ships this hidden by default
   menu.update('main/check-for-updates', { label: 'Get Latest Version' });
   menu.insertAfter('main/check-for-updates', {
-    id: 'main/account', label: 'Account...', click: () => manager.windows.show('account'),
+    id: 'main/account', label: 'Account...', click: () => omega.windows.show('account'),
   });
   menu.remove('view/reload');
   menu.hide('main/services');
@@ -39,7 +39,7 @@ menu.clear()                   // start over
 
 ## Id-path API
 
-Same shape across menu / tray / context-menu. Available **during definition** (on the `menu` builder arg) AND **at runtime** on `manager.menu`:
+Same shape across menu / tray / context-menu. Available **during definition** (on the `menu` builder arg) AND **at runtime** on `omega.menu`:
 
 ```js
 .find(idPath)                  // live descriptor or null
@@ -108,7 +108,7 @@ Every item in @omega.js/desktop's default template carries a stable id you can t
 
 ### Development menu (dev mode only)
 
-Top-level, only visible when `manager.isDevelopment()`. Mirrors legacy @omega.js/desktop's developer utilities.
+Top-level, only visible when `omega.isDevelopment()`. Mirrors legacy @omega.js/desktop's developer utilities.
 
 | ID | Item | Action |
 |---|---|---|
@@ -120,7 +120,7 @@ Top-level, only visible when `manager.isDevelopment()`. Mirrors legacy @omega.js
 
 ## Built-in framework items
 
-`main/check-for-updates` (mac) and `help/check-for-updates` (win/linux) are **wired to `manager.autoUpdater`**:
+`main/check-for-updates` (mac) and `help/check-for-updates` (win/linux) are **wired to `omega.autoUpdater`**:
 - Label updates dynamically: *Checking…*, *Downloading 42%*, *Restart to Update v1.2.3*, *You're up to date*.
 - Click triggers `autoUpdater.checkNow()` or `autoUpdater.installNow()` depending on state.
 
@@ -135,24 +135,24 @@ Same dynamic conveniences as tray:
 - `click` wrapped to catch errors
 - `submenu` recursively resolved
 
-## Runtime API on `manager.menu`
+## Runtime API on `omega.menu`
 
 ```js
-manager.menu.refresh()                         // re-evaluate dynamic state
-manager.menu.define(fn)                        // replace the whole definition at runtime
-manager.menu.destroy()                         // tear down (mostly for tests)
-manager.menu.disable()                         // turn the menu off entirely (idempotent)
+omega.menu.refresh()                         // re-evaluate dynamic state
+omega.menu.define(fn)                        // replace the whole definition at runtime
+omega.menu.destroy()                         // tear down (mostly for tests)
+omega.menu.disable()                         // turn the menu off entirely (idempotent)
 
 // Id-path API — same as listed above.
-manager.menu.find('main/check-for-updates')
-manager.menu.update('main/check-for-updates', { label: 'Updates...' })
-manager.menu.remove('view/reload')
-manager.menu.insertAfter('main/check-for-updates', { id: 'main/account', label: 'Account...' })
+omega.menu.find('main/check-for-updates')
+omega.menu.update('main/check-for-updates', { label: 'Updates...' })
+omega.menu.remove('view/reload')
+omega.menu.insertAfter('main/check-for-updates', { id: 'main/account', label: 'Account...' })
 
 // Inspection
-manager.menu.getItems()                        // top-level descriptors (shallow copy)
-manager.menu.isRendered()                      // bool
-manager.menu.getMenu()                         // the underlying Electron Menu instance
+omega.menu.getItems()                        // top-level descriptors (shallow copy)
+omega.menu.isRendered()                      // bool
+omega.menu.getMenu()                         // the underlying Electron Menu instance
 ```
 
 ## Default scaffold

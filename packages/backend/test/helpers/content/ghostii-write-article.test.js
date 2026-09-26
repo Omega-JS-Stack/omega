@@ -10,7 +10,7 @@
  */
 const path = require('path');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
-const ghostiiPath = path.resolve(__dirname, '../../../dist/manager/libraries/content/ghostii.js');
+const ghostiiPath = path.resolve(__dirname, '../../../dist/omega/libraries/content/ghostii.js');
 
 // Capture the request body that writeArticle would send
 let capturedBody = null;

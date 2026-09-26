@@ -1,4 +1,4 @@
-// View-layer test that the same Manager surface is reachable from the options
+// View-layer test that the same omega surface is reachable from the options
 // page. Confirms that view tests can target ANY of popup / options / sidepanel
 // just by setting the `context` field — same `ctx.expect / state / skip` API
 // applies. (Sidepanel is exercised separately in sidepanel.test.js.)

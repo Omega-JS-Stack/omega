@@ -16,7 +16,7 @@
  */
 
 // Libraries
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { loadCharts, barChart, stackedBarChart, doughnutChart, lineChart } from '__main_assets__/js/libs/charts.js';
 
 function setStatus(text) {
@@ -27,15 +27,11 @@ function setStatus(text) {
 }
 
 /**
- * Await one settled auth state ({ user, account, resolved }). Each call
- * re-fetches the account from Firestore — the lane polls this to observe the
- * user doc @omega.js/backend's auth onCreate trigger writes.
+ * A fresh auth state ({ user, denied }): each call re-reads the account through
+ * `omega.auth.reload()`, which is how the lane observes the user doc
+ * @omega.js/backend's auth onCreate trigger and the webhooks write.
  */
-function authState() {
-  return new Promise((resolve) => {
-    omega.auth().listen({ once: true }, resolve);
-  });
-}
+const authState = () => omega.auth.reload();
 
 /**
  * Draw one of each chart the framework's helper builds (#74) and report what
@@ -91,7 +87,6 @@ async function drawCharts() {
 // `Page module error:` line in page.log is the diagnosis.
 window.__omega = {
   isReady: false,
-  manager: omega,
   drawCharts,
 
   // Signup is page-side in the real stack too: pages create the Firebase auth
@@ -103,18 +98,18 @@ window.__omega = {
     return credential.user.uid;
   },
   signIn(email, password) {
-    return omega.auth().signInWithEmailAndPassword(email, password)
+    return omega.auth.signInWithEmailAndPassword(email, password)
       .then((user) => user.uid);
   },
   // Persona signin for the lifecycle steps: the lane mints a custom token for a
   // seeded persona (admin SDK) and signs the browser in as them — the same
   // client method the real site's ?authCustomToken= param uses.
   signInWithCustomToken(token) {
-    return omega.auth().signInWithCustomToken(token)
+    return omega.auth.signInWithCustomToken(token)
       .then((user) => user.uid);
   },
   getIdToken() {
-    return omega.auth().getIdToken();
+    return omega.auth.getIdToken();
   },
   // Authenticated backend call: the signed-in user's ID token rides the
   // Authorization header, exactly what a real page does. The base URL comes
@@ -123,7 +118,7 @@ window.__omega = {
   // Errors come back as plain text (the backend's wire contract), successes as
   // JSON — both surfaced so steps can assert on either.
   api(method, route, body) {
-    return omega.auth().getIdToken()
+    return omega.auth.getIdToken()
       .then((token) => fetch(`${omega.getApiUrl()}/omega/${route}`, {
         method,
         headers: {
@@ -139,10 +134,10 @@ window.__omega = {
       }));
   },
   signOut() {
-    return omega.auth().signOut();
+    return omega.auth.signOut();
   },
   currentUser() {
-    return omega.auth().getUser();
+    return omega.auth.user;
   },
   authState,
 };

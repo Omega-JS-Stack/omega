@@ -111,7 +111,7 @@ const performRedirect = () => {
   }, timeout);
 };
 
-// Initialize based on Manager availability and DOM state
+// Initialize based on DOM state
 if (document.readyState === 'loading') {
   // Wait for DOM if still loading
   document.addEventListener('DOMContentLoaded', performRedirect);

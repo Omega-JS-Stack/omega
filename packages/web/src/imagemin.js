@@ -1,7 +1,7 @@
 /**
- * Responsive image matrix — the UJM imagemin successor. After the static
+ * Responsive image matrix. After the static
  * phase ships images verbatim, this build-only pass rewrites every
- * jpg/jpeg/png under dist/assets/images into the legacy matrix: widths
+ * jpg/jpeg/png under dist/assets/images into the matrix: widths
  * 320/640/1024 + the original size, each in the source format AND webp,
  * quality 80 (progressive mozjpeg for jpeg, palette quantization for png),
  * metadata stripped, upscaling allowed — so every variant name ALWAYS
@@ -24,7 +24,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const jetpack = require('fs-jetpack');
 
-// The legacy UJM matrix: 3 fixed widths + the original size, source format
+// The matrix: 3 fixed widths + the original size, source format
 // + webp each → 8 outputs per source image
 const WIDTHS = [320, 640, 1024];
 const QUALITY = 80;

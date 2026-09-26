@@ -32,18 +32,18 @@ const { buildRecorder, waitForRebuild } = require('../lib/deadlines.js');
 // lane pays the same settle window in live-decisions.test.js).
 const SETTLE_MS = 500;
 
-// The fixture client's entry, marked with the string the built bundle must
-// carry. The marker rides a function BODY: dev builds skip minification, but
+// The fixture client's entry: the base class the web runtime instance
+// (runtime/omega.js) extends, marked with the string the built bundle must
+// carry. The marker rides a method BODY: dev builds skip minification, but
 // nothing keeps an unreferenced constant alive through bundling.
 const clientEntry = (marker) => [
-  'export default {',
-  `  initialize: async () => '${marker}',`,
-  '};',
+  'export class Omega {',
+  `  async initialize() { return '${marker}'; }`,
+  '}',
 ].join('\n');
 
-// The one client subpath the boot runtime imports (runtime/boot.js).
-const CLIENT_ICON_RENDERER = 'export function createIconRenderer() { return { start: () => {} }; }';
-// The runtime's second client import (#619): the icon set's dir and its candidate walk.
+// The one client subpath the boot runtime imports (#619, runtime/icons.js):
+// the icon set's dir and its candidate walk.
 const CLIENT_ICON_CORE = "export const ICONS_DIR = 'icons'; export function candidateRelPaths() { return []; }";
 
 /**
@@ -67,7 +67,7 @@ function app(t) {
   const writeClient = write(clientDist);
 
   writeTarget('assets/js/main.js', [
-    "import omega from '@omega.js/client';",
+    "import omega from '@omega.js/web/runtime';",
     'export default () => omega.initialize();',
   ].join('\n'));
   // The core layer the boot runtime's dev-mode dynamic import reaches through
@@ -76,7 +76,6 @@ function app(t) {
   writeTarget('core/js/libs/dev.js', 'export default {};');
 
   writeClient('index.js', clientEntry('CLIENT-BEFORE'));
-  writeClient('modules/icon-renderer.js', CLIENT_ICON_RENDERER);
   writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
 
   t.after(() => {
@@ -173,7 +172,6 @@ test('a client dist DELETED and rewritten whole rebuilds the site bundle', async
   fs.rmSync(fixture.clientDist, { recursive: true, force: true });
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   fixture.writeClient('index.js', clientEntry('CLIENT-AFTER-PREPARE'));
-  fixture.writeClient('modules/icon-renderer.js', CLIENT_ICON_RENDERER);
   fixture.writeClient('modules/icon-core.js', CLIENT_ICON_CORE);
 
   await site.bundleBecomes(/CLIENT-AFTER-PREPARE/, 'a replaced dist rebuilds the site — the watch re-arms onto the new directory');

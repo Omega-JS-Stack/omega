@@ -21,8 +21,8 @@ const os      = require('os');
 const jetpack = require('fs-jetpack');
 const { execute } = require('node-powertools');
 
-const Manager = new (require('../build.js'));
-const logger = Manager.logger('sign-windows');
+const build = require('../build.js');
+const logger = build.logger('sign-windows');
 
 // The box's own signing configuration (`<runner home>\.env`: the cert, the PIN,
 // signtool) is read before anything below looks at process.env, so a manual
@@ -90,9 +90,9 @@ async function runSignCommand(options) {
     return smokeTest();
   }
 
-  const strategy = Manager.getWindowsSignStrategy();
+  const strategy = build.getWindowsSignStrategy();
 
-  const config   = Manager.getConfig();
+  const config   = build.getConfig();
   const projectRoot = process.cwd();
 
   // Resolve --in and --out (CLI flags) → directories of unsigned / signed artifacts.
@@ -441,7 +441,7 @@ async function signWithSigntool(targets, inDir, outDir, deps) {
   // (mac/linux equivalents are produced by electron-builder during their publish step,
   // but Windows is split into a post-build sign job so we have to write the yml here).
   if (signedExes.length > 0) {
-    const pkg = Manager.getPackage('project') || {};
+    const pkg = build.getPackage('project') || {};
     const version = pkg.version;
     if (!version) {
       log.warn('Could not determine version from package.json; skipping latest.yml generation.');

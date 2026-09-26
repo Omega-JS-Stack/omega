@@ -25,6 +25,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { User } = require('@omega.js/account');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const CONNECTIONS_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'dashboard', 'account', 'sections', 'connections.js');
@@ -59,7 +60,7 @@ function bundleOnce() {
         build.onResolve({ filter: /^__main_assets__\// }, (args) => {
           return { path: path.join(CORE_DIR, args.path.slice('__main_assets__/'.length)) };
         });
-        build.onResolve({ filter: /^@omega\.js\/client$/ }, () => {
+        build.onResolve({ filter: /^@omega\.js\/web\/runtime$/ }, () => {
           return { path: 'client', namespace: 'omega-client-stub' };
         });
         // The client's own modules import the singleton as `../index.js`
@@ -240,11 +241,11 @@ async function bootConnections() {
   globalThis.navigator = { userAgent: 'node', language: 'en-US' };
   globalThis.__omegaClient = {
     getApiUrl: () => 'https://api.test',
-    utilities: () => ({
+    utilities: {
       escapeHTML: (value) => `${value}`,
       getDevice: () => 'desktop',
       showNotification: () => {},
-    }),
+    },
     request: async () => ({ url: AUTHORIZE_URL }),
   };
 
@@ -252,7 +253,7 @@ async function bootConnections() {
   const section = require(bundle);
 
   await section.init();
-  await section.loadData({}, CONNECTIONS_CONFIG);
+  await section.loadData(new User({}, { uid: 'u1' }), CONNECTIONS_CONFIG);
 
   // The form arms itself behind the client's dom ready promise
   await tick();

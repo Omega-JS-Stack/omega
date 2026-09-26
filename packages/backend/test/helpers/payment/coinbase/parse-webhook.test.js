@@ -14,8 +14,8 @@
  *
  * Run: npx omega test backend:helpers/payment/coinbase/parse-webhook
  */
-const coinbaseProvider = require('../../../../dist/manager/routes/payments/webhook/providers/coinbase.js');
-const Coinbase = require('../../../../dist/manager/libraries/payment/providers/coinbase.js');
+const coinbaseProvider = require('../../../../dist/omega/routes/payments/webhook/providers/coinbase.js');
+const Coinbase = require('../../../../dist/omega/libraries/payment/providers/coinbase.js');
 
 const FIXTURE_CONFIRMED = require('../../../fixtures/coinbase/charge-confirmed.json');
 const FIXTURE_PENDING = require('../../../fixtures/coinbase/charge-pending.json');

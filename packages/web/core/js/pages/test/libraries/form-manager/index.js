@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import omega from '@omega.js/client';
+import omega from '@omega.js/web/runtime';
 import { createLogger } from '__main_assets__/js/libs/logger.js';
 
 const case1Logger = createLogger('test:form-manager:1');
@@ -19,7 +19,7 @@ const case7Logger = createLogger('test:form-manager:7');
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await omega.dom().ready();
+    await omega.dom.ready();
 
     // Initialize test forms
     initTestFormMain();
@@ -42,7 +42,7 @@ function simulateApi(ms = 1000) {
 
 // Test 1: Full Test (success/fail, nested, change events)
 function initTestFormMain() {
-  const formManager = new FormManager('#test-form-main');
+  const formManager = new FormManager(omega, '#test-form-main');
   const $status = document.getElementById('main-status');
   const $action = document.getElementById('main-action');
   const $output = document.getElementById('main-output');
@@ -108,7 +108,7 @@ function initTestFormMain() {
 
 // Test 2: Validation
 function initTestFormValidation() {
-  const formManager = new FormManager('#test-form-validation');
+  const formManager = new FormManager(omega, '#test-form-validation');
   const $status = document.getElementById('validation-status');
   const $setCorrectBtn = document.getElementById('validation-set-correct');
 
@@ -152,7 +152,7 @@ function initTestFormValidation() {
 
 // Test 3: Contact Form (one-time submit)
 function initTestFormContact() {
-  const formManager = new FormManager('#test-form-contact', {
+  const formManager = new FormManager(omega, '#test-form-contact', {
     allowResubmit: false,
     resetOnSuccess: true,
   });
@@ -176,7 +176,7 @@ function initTestFormContact() {
 
 // Test 4: Manual Ready
 function initTestFormManual() {
-  const formManager = new FormManager('#test-form-manual', { autoReady: false });
+  const formManager = new FormManager(omega, '#test-form-manual', { autoReady: false });
   const $status = document.getElementById('manual-status');
 
   formManager.on('statechange', ({ state }) => {
@@ -205,7 +205,7 @@ function initTestFormManual() {
 // Test 6: File Drop (defined below initTestFormGroups)
 
 function initTestFormGroups() {
-  const formManager = new FormManager('#test-form-groups');
+  const formManager = new FormManager(omega, '#test-form-groups');
   const $status = document.getElementById('groups-status');
   const $filter = document.getElementById('groups-filter');
   const $output = document.getElementById('groups-output');
@@ -257,7 +257,7 @@ function initTestFormGroups() {
 
 // Test 7: Disabled-State Snapshot
 function initTestFormSnapshot() {
-  const formManager = new FormManager('#test-form-snapshot');
+  const formManager = new FormManager(omega, '#test-form-snapshot');
   const $status = document.getElementById('snapshot-status');
   const $cycleCount = document.getElementById('snapshot-cycle-count');
   const $output = document.getElementById('snapshot-output');
@@ -309,7 +309,7 @@ function initTestFormSnapshot() {
 
 // Test 6: File Drop
 function initTestFormFileDrop() {
-  const formManager = new FormManager('#test-form-file-drop');
+  const formManager = new FormManager(omega, '#test-form-file-drop');
   const $status = document.getElementById('file-drop-status');
 
   formManager.on('statechange', ({ state }) => {

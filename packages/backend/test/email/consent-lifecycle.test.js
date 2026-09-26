@@ -19,8 +19,8 @@
  * and BEEHIIV_API_KEY in env. Total runtime is ~60-90s — most of it spent waiting
  * for SendGrid's async upsert/delete background jobs to surface.
  */
-const sendgridProvider = require('../../dist/manager/libraries/email/providers/sendgrid.js');
-const beehiivProvider = require('../../dist/manager/libraries/email/providers/beehiiv.js');
+const sendgridProvider = require('../../dist/omega/libraries/email/providers/sendgrid.js');
+const beehiivProvider = require('../../dist/omega/libraries/email/providers/beehiiv.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 const SETTLE_MS = 5000; // Beehiiv settles in 1-2s; SendGrid's background-job upsert can take 10-20s+
@@ -102,9 +102,9 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, ctx, config }) {
+      async run({ accounts, assert, omega, ctx, config }) {
         const granted = accounts['consent-granted'];
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
 
         // Set consent.marketing.status = 'granted' on the user doc
         await admin.firestore().doc(`users/${granted.uid}`).set({
@@ -133,7 +133,7 @@ module.exports = defineCases({
         }, { merge: true });
 
         // Trigger marketing sync via the Email() surface
-        const result = await Manager.Email(ctx).sync(granted.uid);
+        const result = await ctx.email.sync(granted.uid);
         assert.ok(result, 'sync should return a result');
         assert.notEqual(result.blocked, 'validation', 'sync should not be blocked by validation (uses _test.allow_*)');
 
@@ -161,9 +161,9 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, ctx }) {
+      async run({ accounts, assert, omega, ctx }) {
         const declined = accounts['consent-declined'];
-        const admin = Manager.libraries.admin;
+        const admin = omega.firebase.admin;
 
         // Set consent.marketing.status = 'revoked' on the user doc.
         // We deliberately do NOT call sync — the production signup route gates
@@ -207,18 +207,18 @@ module.exports = defineCases({
     },
 
     // ─────────────────────────────────────────────────────────────────────
-    // Phase 3 — Unsubscribe: granted account is removed via Manager.Email().remove
+    // Phase 3 — Unsubscribe: granted account is removed via ctx.email.remove
     // ─────────────────────────────────────────────────────────────────────
     {
       name: 'phase-3-granted-account-unsubscribe-removes-from-both',
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, ctx }) {
+      async run({ accounts, assert, omega, ctx }) {
         const granted = accounts['consent-granted'];
 
         // Trigger removal — simulates the email-preferences opt-out flow
-        const result = await Manager.Email(ctx).remove(granted.email);
+        const result = await ctx.email.remove(granted.email);
         assert.ok(result, 'remove should return a result');
 
         // Poll for absence — SendGrid's contact delete is also an async job.
@@ -238,11 +238,11 @@ module.exports = defineCases({
       auth: 'admin',
       timeout: 30000,
 
-      async run({ assert, Manager, ctx }) {
+      async run({ assert, omega, ctx }) {
         // _test.never-reaches-providers@... is NOT _test.allow_* → should be blocked
         const blockedEmail = '_test.never-reaches-providers@somiibo.com';
 
-        const result = await Manager.Email(ctx).add({ email: blockedEmail });
+        const result = await ctx.email.add({ email: blockedEmail });
 
         assert.equal(result.blocked, 'validation', 'non-allow _test.* email should be blocked by validation');
 

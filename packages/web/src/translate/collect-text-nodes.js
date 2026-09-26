@@ -4,10 +4,10 @@
  * attributes. The walk order is deterministic, so collecting again on a fresh
  * DOM yields positionally-aligned nodes for applying translations.
  *
- * Ported from UJM's collectTextNodes with two fixes: aria-describedby /
- * aria-labelledby are no longer collected (they are ID references —
- * translating them breaks the link), and `value` is only collected on
- * button-like inputs (translating hidden/token input values corrupted forms).
+ * aria-describedby / aria-labelledby are never collected (they are ID
+ * references — translating them breaks the link), and `value` is only
+ * collected on button-like inputs (translating hidden/token input values
+ * corrupts forms).
  * Opt-out: any element inside [data-omega-no-translate] is skipped.
  */
 

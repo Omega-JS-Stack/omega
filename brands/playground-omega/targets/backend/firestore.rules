@@ -51,7 +51,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ─── Your rules ──────────────────────────────────────────────────────────
-    // Custom rules
-    // ...
+    // Notes, the playground's example feature. A note is readable and deletable
+    // by its owner alone (isOwner() reads the STORED owner once the doc
+    // exists); a create or update must name the caller as the owner, so a note
+    // can never be written into, or handed to, another account.
+    match /notes/{id} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && isUser(getIncomingData().get('owner', null));
+    }
+
+    // The per-user counter the notes/on-create event keeps. Server-written only
+    // (the Admin SDK bypasses rules); its owner may read it.
+    match /notes-stats/{uid} {
+      allow read: if isUser(uid);
+    }
   }
 }

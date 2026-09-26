@@ -15,11 +15,11 @@ module.exports = defineCases({
   description: 'ipc (main)',
   cleanup: (ctx) => {
     // Always tear down the test channels so suites don't bleed into each other.
-    if (ctx.manager.ipc.hasHandler(TEST_CHANNEL)) {
-      ctx.manager.ipc.unhandle(TEST_CHANNEL);
+    if (ctx.omega.ipc.hasHandler(TEST_CHANNEL)) {
+      ctx.omega.ipc.unhandle(TEST_CHANNEL);
     }
     // Best-effort: drain test listeners.
-    while (ctx.manager.ipc.listenerCount(TEST_LISTEN) > 0) {
+    while (ctx.omega.ipc.listenerCount(TEST_LISTEN) > 0) {
       // off() needs the original fn; nothing left to remove if our local refs are gone.
       // The listenerCount === 0 guard in off() will leave the registry clean once tests unsubscribe themselves.
       break;
@@ -29,26 +29,26 @@ module.exports = defineCases({
     {
       name: 'initialized after boot',
       run: (ctx) => {
-        ctx.expect(ctx.manager.ipc._initialized).toBe(true);
+        ctx.expect(ctx.omega.ipc._initialized).toBe(true);
       },
     },
     {
       name: 'storage handlers are registered on the ipc bus',
       run: (ctx) => {
-        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:get')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:set')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:delete')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:has')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:clear')).toBe(true);
+        ctx.expect(ctx.omega.ipc.hasHandler('desktop:storage:get')).toBe(true);
+        ctx.expect(ctx.omega.ipc.hasHandler('desktop:storage:set')).toBe(true);
+        ctx.expect(ctx.omega.ipc.hasHandler('desktop:storage:delete')).toBe(true);
+        ctx.expect(ctx.omega.ipc.hasHandler('desktop:storage:has')).toBe(true);
+        ctx.expect(ctx.omega.ipc.hasHandler('desktop:storage:clear')).toBe(true);
       },
     },
     {
       name: 'handle + invoke round-trip',
       run: async (ctx) => {
-        ctx.manager.ipc.handle(TEST_CHANNEL, (payload) => {
+        ctx.omega.ipc.handle(TEST_CHANNEL, (payload) => {
           return { echoed: payload.value };
         });
-        const result = await ctx.manager.ipc.invoke(TEST_CHANNEL, { value: 42 });
+        const result = await ctx.omega.ipc.invoke(TEST_CHANNEL, { value: 42 });
         ctx.expect(result).toEqual({ echoed: 42 });
       },
     },
@@ -57,15 +57,15 @@ module.exports = defineCases({
       run: (ctx) => {
         // The previous test left TEST_CHANNEL registered.
         ctx.expect(() => {
-          ctx.manager.ipc.handle(TEST_CHANNEL, () => 'dup');
+          ctx.omega.ipc.handle(TEST_CHANNEL, () => 'dup');
         }).toThrow(/already has a handler/);
       },
     },
     {
       name: 'unhandle removes the handler',
       run: (ctx) => {
-        ctx.manager.ipc.unhandle(TEST_CHANNEL);
-        ctx.expect(ctx.manager.ipc.hasHandler(TEST_CHANNEL)).toBe(false);
+        ctx.omega.ipc.unhandle(TEST_CHANNEL);
+        ctx.expect(ctx.omega.ipc.hasHandler(TEST_CHANNEL)).toBe(false);
       },
     },
     {
@@ -73,7 +73,7 @@ module.exports = defineCases({
       run: async (ctx) => {
         let err;
         try {
-          await ctx.manager.ipc.invoke(TEST_CHANNEL, {});
+          await ctx.omega.ipc.invoke(TEST_CHANNEL, {});
         } catch (e) {
           err = e;
         }
@@ -84,28 +84,28 @@ module.exports = defineCases({
     {
       name: 'handler errors propagate through invoke',
       run: async (ctx) => {
-        ctx.manager.ipc.handle(TEST_CHANNEL, () => {
+        ctx.omega.ipc.handle(TEST_CHANNEL, () => {
           throw new Error('boom');
         });
         let err;
         try {
-          await ctx.manager.ipc.invoke(TEST_CHANNEL, {});
+          await ctx.omega.ipc.invoke(TEST_CHANNEL, {});
         } catch (e) {
           err = e;
         }
         ctx.expect(err).toBeDefined();
         ctx.expect(err.message).toBe('boom');
-        ctx.manager.ipc.unhandle(TEST_CHANNEL);
+        ctx.omega.ipc.unhandle(TEST_CHANNEL);
       },
     },
     {
       name: 'on registers a listener and returns an unsubscribe fn',
       run: (ctx) => {
         const fn = () => {};
-        const off = ctx.manager.ipc.on(TEST_LISTEN, fn);
-        ctx.expect(ctx.manager.ipc.listenerCount(TEST_LISTEN)).toBe(1);
+        const off = ctx.omega.ipc.on(TEST_LISTEN, fn);
+        ctx.expect(ctx.omega.ipc.listenerCount(TEST_LISTEN)).toBe(1);
         off();
-        ctx.expect(ctx.manager.ipc.listenerCount(TEST_LISTEN)).toBe(0);
+        ctx.expect(ctx.omega.ipc.listenerCount(TEST_LISTEN)).toBe(0);
       },
     },
     {
@@ -113,13 +113,13 @@ module.exports = defineCases({
       run: (ctx) => {
         const a = () => {};
         const b = () => {};
-        const offA = ctx.manager.ipc.on(TEST_LISTEN, a);
-        const offB = ctx.manager.ipc.on(TEST_LISTEN, b);
-        ctx.expect(ctx.manager.ipc.listenerCount(TEST_LISTEN)).toBe(2);
+        const offA = ctx.omega.ipc.on(TEST_LISTEN, a);
+        const offB = ctx.omega.ipc.on(TEST_LISTEN, b);
+        ctx.expect(ctx.omega.ipc.listenerCount(TEST_LISTEN)).toBe(2);
         offA();
-        ctx.expect(ctx.manager.ipc.listenerCount(TEST_LISTEN)).toBe(1);
+        ctx.expect(ctx.omega.ipc.listenerCount(TEST_LISTEN)).toBe(1);
         offB();
-        ctx.expect(ctx.manager.ipc.listenerCount(TEST_LISTEN)).toBe(0);
+        ctx.expect(ctx.omega.ipc.listenerCount(TEST_LISTEN)).toBe(0);
       },
     },
     {
@@ -127,15 +127,15 @@ module.exports = defineCases({
       run: (ctx) => {
         // Test harness runs with skipWindowCreation: true — no BrowserWindows exist.
         // This must not throw.
-        ctx.manager.ipc.broadcast('desktop:test:broadcast', { hello: 'world' });
+        ctx.omega.ipc.broadcast('desktop:test:broadcast', { hello: 'world' });
         ctx.expect(true).toBe(true);
       },
     },
     {
       name: 'send to a destroyed/null webContents is a safe no-op',
       run: (ctx) => {
-        ctx.manager.ipc.send(null, 'desktop:test:send', {});
-        ctx.manager.ipc.send({ isDestroyed: () => true }, 'desktop:test:send', {});
+        ctx.omega.ipc.send(null, 'desktop:test:send', {});
+        ctx.omega.ipc.send({ isDestroyed: () => true }, 'desktop:test:send', {});
         ctx.expect(true).toBe(true);
       },
     },
@@ -143,22 +143,22 @@ module.exports = defineCases({
       name: 'storage.set triggers ipc broadcast (no throw with zero renderers)',
       run: (ctx) => {
         // storage._broadcast routes through ipc.broadcast — confirm it runs cleanly here.
-        ctx.manager.storage.set('ipc-broadcast-probe', 1);
-        ctx.expect(ctx.manager.storage.get('ipc-broadcast-probe')).toBe(1);
-        ctx.manager.storage.delete('ipc-broadcast-probe');
+        ctx.omega.storage.set('ipc-broadcast-probe', 1);
+        ctx.expect(ctx.omega.storage.get('ipc-broadcast-probe')).toBe(1);
+        ctx.omega.storage.delete('ipc-broadcast-probe');
       },
     },
     {
       name: 'handle rejects non-string channel',
       run: (ctx) => {
-        ctx.expect(() => ctx.manager.ipc.handle('', () => {})).toThrow(/non-empty string/);
-        ctx.expect(() => ctx.manager.ipc.handle(null, () => {})).toThrow(/non-empty string/);
+        ctx.expect(() => ctx.omega.ipc.handle('', () => {})).toThrow(/non-empty string/);
+        ctx.expect(() => ctx.omega.ipc.handle(null, () => {})).toThrow(/non-empty string/);
       },
     },
     {
       name: 'handle rejects non-function handler',
       run: (ctx) => {
-        ctx.expect(() => ctx.manager.ipc.handle('desktop:test:bad', null)).toThrow(/handler must be a function/);
+        ctx.expect(() => ctx.omega.ipc.handle('desktop:test:bad', null)).toThrow(/handler must be a function/);
       },
     },
   ],

@@ -1,6 +1,6 @@
-// Boot harness — invoked from @omega.js/desktop's main.js after manager.initialize() resolves
+// Boot harness: invoked from @omega.js/desktop's main.js (utils/boot-harness.js) after omega.initialize() resolves
 // when OMEGA_TEST_BOOT=1. Reads the spec file pointed to by OMEGA_TEST_BOOT_SPEC,
-// runs each `inspect` against the live manager, emits results, and quits.
+// runs each `inspect` against the live instance, emits results, and quits.
 //
 // Why call from main.js instead of preloading via electron's --require?
 // Because Electron rejects unknown CLI flags, we can't sneak args/preload modules in.
@@ -11,29 +11,31 @@
 // a project view (`view: '<name>'`), each in a real window of this booted app. See
 // runViewSuite() below.
 //
-// Protocol matches main-entry.js — emit `__EM_TEST__` JSON lines on stdout.
+// Protocol matches main-entry.js, emit `__OMEGA_TEST__` JSON lines on stdout.
 
 'use strict';
+
+const { TEST_EVENT_PREFIX } = require('../../utils/test-events.js');
 
 // Belt-and-suspenders for a view suite that never emits `end` (a page that died mid-run).
 // Same 60s ceiling the harness-page renderer lane uses (harness/main-entry.js).
 const VIEW_SUITE_TIMEOUT = 60000;
 
 function emit(obj) {
-  process.stdout.write(`__EM_TEST__${JSON.stringify(obj)}\n`);
+  process.stdout.write(`${TEST_EVENT_PREFIX}${JSON.stringify(obj)}\n`);
 }
 
-async function run(manager) {
+async function run(omega) {
   const { app } = require('electron');
   const path = require('path');
 
-  // Give the consumer's `manager.initialize().then(() => { ... })` callback time
+  // Give the consumer's `omega.initialize().then(() => { ... })` callback time
   // to surface windows / wire up handlers / etc. The harness runs from setImmediate
   // already (which flushes microtasks once), but `windows.create()` is async, so
   // we additionally poll for the main window for up to 3s. Apps that intentionally
   // launch hidden never create a main window — those tests should `if (!win) return`
   // when inspecting window state.
-  await waitForMainWindow(manager, 3000);
+  await waitForMainWindow(omega, 3000);
 
   const specPath = process.env.OMEGA_TEST_BOOT_SPEC;
   if (!specPath) {
@@ -74,7 +76,7 @@ async function run(manager) {
     description:  t.description,
     timeout:      t.timeout || 15000,
     inspect:      new Function('args', 'require', 'process', 'Buffer',
-      `return (async function ({ manager, expect, projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore }) {\n${t.inspectSource}\n})(args)`,
+      `return (async function ({ omega, expect, projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore }) {\n${t.inspectSource}\n})(args)`,
     ),
   }));
 
@@ -88,7 +90,7 @@ async function run(manager) {
     const start = Date.now();
     try {
       await Promise.race([
-        t.inspect(Object.assign({ manager, expect }, args), require, process, Buffer),
+        t.inspect(Object.assign({ omega, expect }, args), require, process, Buffer),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout)),
       ]);
       const duration = Date.now() - start;
@@ -109,7 +111,7 @@ async function run(manager) {
   // remaining suites unreported. This harness exits through app.exit() below regardless.
   if (viewSuites.length > 0) app.removeAllListeners('window-all-closed');
   for (let i = 0; i < viewSuites.length; i += 1) {
-    const counts = await runViewSuite(viewSuites[i], i, manager, spec);
+    const counts = await runViewSuite(viewSuites[i], i, omega, spec);
     passed  += counts.passed;
     failed  += counts.failed;
     skipped += counts.skipped;
@@ -127,7 +129,7 @@ async function run(manager) {
 // evaluated inside the page, with a shim standing in for the preload bridge it normally
 // talks to. There is exactly one suite loop and one `expect` in this framework, and this is
 // not a second copy of either.
-async function runViewSuite(suite, index, manager, spec) {
+async function runViewSuite(suite, index, omega, spec) {
   const fs   = require('fs');
   const path = require('path');
 
@@ -145,7 +147,7 @@ async function runViewSuite(suite, index, manager, spec) {
     return counts;
   }
 
-  const win = await manager.windows.create(`omega-test-view-${index}`, {
+  const win = await omega.windows.create(`omega-test-view-${index}`, {
     view:          suite.view,
     show:          false,
     persistBounds: false,
@@ -171,11 +173,11 @@ async function runViewSuite(suite, index, manager, spec) {
     //    surface talking to main over IPC; here the page just queues events for the poll
     //    below, since main is right here.
     await win.webContents.executeJavaScript(`
-      window.__emTestQueue = [];
-      window.__emTest = {
+      window.__omegaTestQueue = [];
+      window.__omegaTest = {
         ready() {},
-        emit(evt) { window.__emTestQueue.push(evt); },
-        onSuites(handler) { window.__emTestDeliver = handler; },
+        emit(evt) { window.__omegaTestQueue.push(evt); },
+        onSuites(handler) { window.__omegaTestDeliver = handler; },
       };
       null;
     `);
@@ -187,7 +189,7 @@ async function runViewSuite(suite, index, manager, spec) {
 
     // 3. Deliver this window's one suite. One suite per window, so the entry's `end` event
     //    ends this window's run.
-    await win.webContents.executeJavaScript(`window.__emTestDeliver(${JSON.stringify([suite])}); null;`);
+    await win.webContents.executeJavaScript(`window.__omegaTestDeliver(${JSON.stringify([suite])}); null;`);
 
     // 4. Drain the queue until the run ends. Every event is forwarded verbatim, so the
     //    parent renders a view suite exactly like a harness-page one.
@@ -195,7 +197,7 @@ async function runViewSuite(suite, index, manager, spec) {
     let ended = false;
     while (!ended && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
-      const events = await win.webContents.executeJavaScript('window.__emTestQueue.splice(0)');
+      const events = await win.webContents.executeJavaScript('window.__omegaTestQueue.splice(0)');
       for (const evt of events) {
         emit(evt);
         if (evt.event === 'end') {
@@ -226,10 +228,10 @@ async function runViewSuite(suite, index, manager, spec) {
 
 // Poll for the main window for up to `timeoutMs`. Resolves when it shows up, or after
 // the timeout (no error — agent/hidden apps never create one and that's fine).
-async function waitForMainWindow(manager, timeoutMs) {
+async function waitForMainWindow(omega, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (manager?.windows?.get?.('main')) return;
+    if (omega.windows.get('main')) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }

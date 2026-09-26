@@ -22,8 +22,8 @@
  */
 const { callHandler } = require('./_route-harness.js');
 
-const handler = require('../../../dist/manager/routes/payments/webhook/post.js');
-const stripeProvider = require('../../../dist/manager/routes/payments/webhook/providers/stripe.js');
+const handler = require('../../../dist/omega/routes/payments/webhook/post.js');
+const stripeProvider = require('../../../dist/omega/routes/payments/webhook/providers/stripe.js');
 
 const FIXTURE_INVOICE_RENEWAL = require('../../fixtures/stripe/invoice-subscription-payment-succeeded.json');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
@@ -37,9 +37,9 @@ const renewalEvent = (id) => ({
 });
 
 // This suite is about which event types get through the door at all.
-function deliver(Manager, event) {
+function deliver(omega, event) {
   return callHandler({
-    Manager,
+    omega,
     handler,
     functionName: 'payments-webhook',
     req: {
@@ -109,10 +109,10 @@ module.exports = defineCases({
     {
       name: 'a-renewal-delivery-lands-a-pipeline-doc',
       auth: 'none',
-      async run({ assert, Manager, firestore }) {
+      async run({ assert, omega, firestore }) {
         const eventId = '_test-evt-renewal-ingest';
 
-        const sent = await deliver(Manager, renewalEvent(eventId));
+        const sent = await deliver(omega, renewalEvent(eventId));
 
         assert.equal(sent.code, 200, `A renewal should be accepted, got ${sent.code}: ${JSON.stringify(sent.body)}`);
         assert.ok(!sent.body?.ignored, 'A renewal must not be ignored as an unsupported event type');

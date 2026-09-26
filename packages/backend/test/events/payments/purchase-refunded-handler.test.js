@@ -19,7 +19,7 @@
  *
  * Run: npx omega test backend:events/payments/purchase-refunded-handler
  */
-const handler = require('../../../dist/manager/events/firestore/payments-webhooks/transitions/one-time/purchase-refunded.js');
+const handler = require('../../../dist/omega/events/firestore/payments-webhooks/transitions/one-time/purchase-refunded.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ORDER_ID = '9090-8080-7070';
@@ -34,9 +34,9 @@ function context(logs, sent) {
     ctx: {
       log: (line) => logs.push(line),
       error: (line) => logs.push(line),
-      Manager: {
+      email: { send: async (payload) => { sent.push(payload); return { status: 'sent' }; } },
+      omega: {
         config: { brand: { name: 'Test Brand' } },
-        Email: () => ({ send: async (payload) => { sent.push(payload); return { status: 'sent' }; } }),
       },
     },
     refundDetails: { amount: '9.99', currency: 'USD', reason: 'requested_by_customer' },

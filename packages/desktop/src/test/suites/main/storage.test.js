@@ -1,6 +1,6 @@
 // Main-process tests for lib/storage.js — round-trip, dot-notation, persistence, broadcast.
 //
-// ctx.manager is a fully-initialized @omega.js/desktop Manager (skipWindowCreation: true).
+// ctx.omega is a fully-initialized @omega.js/desktop main instance (skipWindowCreation: true).
 
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
@@ -9,58 +9,58 @@ module.exports = defineCases({
   layer: 'main',
   description: 'storage (main)',
   cleanup: async (ctx) => {
-    ctx.manager.storage.clear();
+    ctx.omega.storage.clear();
   },
   tests: [
     {
       name: 'set + get round-trip',
       run: (ctx) => {
-        ctx.manager.storage.set('hello', 'world');
-        ctx.expect(ctx.manager.storage.get('hello')).toBe('world');
+        ctx.omega.storage.set('hello', 'world');
+        ctx.expect(ctx.omega.storage.get('hello')).toBe('world');
       },
     },
     {
       name: 'get returns default when missing',
       run: (ctx) => {
-        ctx.expect(ctx.manager.storage.get('nope', 'fallback')).toBe('fallback');
-        ctx.expect(ctx.manager.storage.get('nope')).toBeUndefined();
+        ctx.expect(ctx.omega.storage.get('nope', 'fallback')).toBe('fallback');
+        ctx.expect(ctx.omega.storage.get('nope')).toBeUndefined();
       },
     },
     {
       name: 'has reflects presence',
       run: (ctx) => {
-        ctx.manager.storage.set('present', 1);
-        ctx.expect(ctx.manager.storage.has('present')).toBe(true);
-        ctx.expect(ctx.manager.storage.has('absent')).toBe(false);
+        ctx.omega.storage.set('present', 1);
+        ctx.expect(ctx.omega.storage.has('present')).toBe(true);
+        ctx.expect(ctx.omega.storage.has('absent')).toBe(false);
       },
     },
     {
       name: 'delete removes the key',
       run: (ctx) => {
-        ctx.manager.storage.set('temp', 'x');
-        ctx.manager.storage.delete('temp');
-        ctx.expect(ctx.manager.storage.has('temp')).toBe(false);
+        ctx.omega.storage.set('temp', 'x');
+        ctx.omega.storage.delete('temp');
+        ctx.expect(ctx.omega.storage.has('temp')).toBe(false);
       },
     },
     {
       name: 'dot-notation nested paths',
       run: (ctx) => {
-        ctx.manager.storage.set('window.main.bounds', { x: 10, y: 20, w: 800, h: 600 });
-        ctx.expect(ctx.manager.storage.get('window.main.bounds')).toEqual({ x: 10, y: 20, w: 800, h: 600 });
-        ctx.expect(ctx.manager.storage.get('window.main.bounds.w')).toBe(800);
+        ctx.omega.storage.set('window.main.bounds', { x: 10, y: 20, w: 800, h: 600 });
+        ctx.expect(ctx.omega.storage.get('window.main.bounds')).toEqual({ x: 10, y: 20, w: 800, h: 600 });
+        ctx.expect(ctx.omega.storage.get('window.main.bounds.w')).toBe(800);
       },
     },
     {
       name: 'onChange fires for the watched key',
       run: async (ctx) => {
         const calls = [];
-        const unsub = ctx.manager.storage.onChange('watched', (value, previous) => {
+        const unsub = ctx.omega.storage.onChange('watched', (value, previous) => {
           calls.push({ value, previous });
         });
-        ctx.manager.storage.set('watched', 'first');
-        ctx.manager.storage.set('watched', 'second');
+        ctx.omega.storage.set('watched', 'first');
+        ctx.omega.storage.set('watched', 'second');
         unsub();
-        ctx.manager.storage.set('watched', 'third'); // should NOT fire after unsub
+        ctx.omega.storage.set('watched', 'third'); // should NOT fire after unsub
         ctx.expect(calls.length).toBe(2);
         ctx.expect(calls[0].value).toBe('first');
         ctx.expect(calls[1].value).toBe('second');
@@ -70,17 +70,17 @@ module.exports = defineCases({
     {
       name: 'clear empties the store',
       run: (ctx) => {
-        ctx.manager.storage.set('a', 1);
-        ctx.manager.storage.set('b', 2);
-        ctx.manager.storage.clear();
-        ctx.expect(ctx.manager.storage.has('a')).toBe(false);
-        ctx.expect(ctx.manager.storage.has('b')).toBe(false);
+        ctx.omega.storage.set('a', 1);
+        ctx.omega.storage.set('b', 2);
+        ctx.omega.storage.clear();
+        ctx.expect(ctx.omega.storage.has('a')).toBe(false);
+        ctx.expect(ctx.omega.storage.has('b')).toBe(false);
       },
     },
     {
       name: 'getPath returns the on-disk file location',
       run: (ctx) => {
-        const p = ctx.manager.storage.getPath();
+        const p = ctx.omega.storage.getPath();
         ctx.expect(typeof p).toBe('string');
         ctx.expect(p).toMatch(/omega-storage\.json$/);
       },

@@ -1,22 +1,35 @@
-// ============================================
-// Popup Component
-// ============================================
+/**
+ * Surface: the popup (a page context)
+ * Doc: node_modules/@omega.js/extension/docs/contexts.md
+ *
+ * What it consumes, one of each: data-omega-bind for the signed-in state and
+ * the count (omega.bindings), the .omega-signin / .omega-signout classes (no
+ * JS), omega.messenger.send to background for the count, omega.storage (the
+ * page store) to paint the last count before background answers, and
+ * omega.extension.tabs to open the pages dashboard.
+ */
+import omega from '@omega.js/extension/popup';
+import { askBackground } from '../../lib/notes.js';
 
-// Import OMEGA Extension
-import Manager from '@omega.js/extension/popup';
+const COUNT_KEY = 'notes.count';
 
-// Create instance
-const manager = new Manager();
+omega.initialize()
+  .then(async () => {
+    const { extension, bindings, storage, logger } = omega;
 
-// Initialize
-manager.initialize()
-.then(() => {
-  // Shortcuts
-  const { extension, messenger, logger, omega } = manager;
+    // The last count this popup saw, painted at once: background may have to
+    // list the notes before it can answer
+    bindings.update({ notes: { count: storage.get(COUNT_KEY, 0) } });
 
-  // Add your project-specific popup logic here
-  // ...
+    document.getElementById('open-notes').addEventListener('click', () => {
+      extension.tabs.create({ url: extension.runtime.getURL('views/pages/index.html') });
+    });
 
-  // Log the initialization
-  logger.log('Popup initialized!');
-});
+    const { count } = await askBackground(omega, 'notes:count');
+
+    storage.set(COUNT_KEY, count);
+    bindings.update({ notes: { count } });
+
+    logger.log('Popup initialized!');
+  })
+  .catch((error) => omega.utilities.showNotification(error.message, { type: 'danger' }));

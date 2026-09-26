@@ -11,7 +11,7 @@
  * TEST_EXTENDED_MODE and a real provider, so the delivered outcomes are not
  * exercised here).
  */
-const { sendDisputeEmail } = require('../../../dist/manager/events/firestore/payments-disputes/on-write.js');
+const { sendDisputeEmail } = require('../../../dist/omega/events/firestore/payments-disputes/on-write.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const ALERT = {
@@ -33,10 +33,10 @@ module.exports = defineCases({
   tests: [
     {
       name: 'reports-skipped-without-a-brand-contact-email',
-      async run({ ctx, Manager, assert }) {
+      async run({ ctx, omega, assert }) {
         // The real config, with the real gap the brand would have. Restored below —
         // nothing else in the run may see a brand without a contact email.
-        const contact = Manager.config.brand?.contact || {};
+        const contact = omega.config.brand?.contact || {};
         const original = contact.email;
         delete contact.email;
 

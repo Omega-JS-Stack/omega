@@ -6,7 +6,7 @@ Offscreen documents persist in the background (unlike service workers, they don'
 
 - Only one offscreen document can exist per extension.
 - Invisible — no UI, no styling needed.
-- Lightweight Manager (no WebManager, no auth, no theme) — see [managers.md](managers.md).
+- A light context: its `omega` is the extension base, with no @omega.js/client, no auth and no theme; see [contexts.md](contexts.md).
 - Must be created programmatically from the background service worker.
 - Requires the `offscreen` permission in the manifest (opt-in — see [components.md](components.md)).
 
@@ -53,5 +53,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 ## See also
 
 - [components.md](components.md) — the seven component contexts + manifest wiring
-- [managers.md](managers.md) — lightweight vs full Manager per context
+- [contexts.md](contexts.md): light vs page contexts, one `omega` each
 - [extension.md](extension.md) — cross-browser API wrapper

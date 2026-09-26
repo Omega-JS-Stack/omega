@@ -20,7 +20,7 @@
  *
  * Run: npx omega test backend:helpers/payment/chargebee/refund-details
  */
-const Chargebee = require('../../../../dist/manager/libraries/payment/providers/chargebee.js');
+const Chargebee = require('../../../../dist/omega/libraries/payment/providers/chargebee.js');
 const defineCases = require('../../../../dist/vendor/devkit/test/define-cases.js');
 
 const CREDIT_NOTE_ID = 'cn_test_refund_details';

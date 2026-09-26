@@ -52,14 +52,14 @@ module.exports = async function (options) {
 
 ## Env var conventions
 
-Commands read BXM-prefixed env vars for behavior switches (one exception: `TEST_EXTENDED_MODE` is deliberately unprefixed — the SAME name across all OMEGA frameworks):
+Commands read `OMEGA_`-prefixed env vars for behavior switches (one exception: `TEST_EXTENDED_MODE` is deliberately unprefixed, the SAME name across all OMEGA frameworks):
 
 | Env | Used by | Purpose |
 |---|---|---|
 | `OMEGA_BUILD_MODE=true` | gulp tasks | Production build mode |
 | `OMEGA_IS_PUBLISH=true` | gulp/package | Also publish to extension stores after packaging |
 | `OMEGA_LOG_FILE` | gulp + test runners | Override the stdout/stderr tee path, or `false` to disable (see [logging.md](logging.md)) |
-| `OMEGA_TEST_MODE=true` | test runners | Powers `Manager.isTesting()` (auto-set by `npx omega test`) |
+| `OMEGA_TEST_MODE=true` | test runners | Powers `omega.isTesting()` in the test harness (auto-set by `npx omega test`) |
 | `TEST_EXTENDED_MODE=true` | test runners | Run tests that hit REAL external services (`--extended` is the CLI shorthand; see [test-framework.md](test-framework.md)) |
 | `OMEGA_TEST_BOOT_PROJECT` | test/boot | Override project root for boot tests |
 | `OMEGA_TEST_BOOT_DIR` | test/boot | Override extension dir directly |

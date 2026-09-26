@@ -1,17 +1,17 @@
 // Libraries
-const Manager = new (require('../../build.js'));
-const logger = Manager.logger('icons');
-const watcherLogger = Manager.logger('icons:watcher');
+const build = require('../../build.js');
+const logger = build.logger('icons');
+const watcherLogger = build.logger('icons:watcher');
 const { src, dest, watch, series } = require('gulp');
 const glob = require('glob').globSync;
 const responsive = require('gulp-responsive-modern');
 
 // Load package
-const package = Manager.getPackage('main');
-const project = Manager.getPackage('project');
-const config = Manager.getConfig('project');
-const rootPathPackage = Manager.getRootPath('main');
-const rootPathProject = Manager.getRootPath('project');
+const package = build.getPackage('main');
+const project = build.getPackage('project');
+const config = build.getConfig('project');
+const rootPathPackage = build.getRootPath('main');
+const rootPathProject = build.getRootPath('project');
 
 // Glob
 const input = [
@@ -104,7 +104,7 @@ function icons(complete) {
 // Watcher task
 function iconsWatcher(complete) {
   // Quit if in build mode
-  if (Manager.isBuildMode()) {
+  if (build.isBuildMode()) {
     watcherLogger.log('Skipping watcher in build mode');
     return complete();
   }

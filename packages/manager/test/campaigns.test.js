@@ -14,7 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
-const { fieldsFor, segmentsFor, BEM_GROUP_KEYS } = require('../src/lib/backend-marketing.js');
+const { fieldsFor, segmentsFor, BACKEND_GROUP_KEYS } = require('../src/lib/backend-marketing.js');
 const { buildQueryDsl } = require('../src/services/campaigns/lib/segment-query.js');
 const service = require('../src/services/campaigns/index.js');
 const { GROUP_DEFINITIONS } = require('../src/services/campaigns/ensure/unsubscribe-groups.js');
@@ -717,13 +717,13 @@ test('campaigns: config-known id writes nothing; a state-known id is promoted in
 test('campaigns: the group table covers every key @omega.js/backend sends through', () => {
   // The keys are @omega.js/backend's SSOT; the names/descriptions are this
   // service's. A key with no row would send through a group nothing provisions.
-  assert.deepEqual(GROUP_KEYS, BEM_GROUP_KEYS);
-  for (const key of BEM_GROUP_KEYS) {
+  assert.deepEqual(GROUP_KEYS, BACKEND_GROUP_KEYS);
+  for (const key of BACKEND_GROUP_KEYS) {
     assert.ok(GROUP_DEFINITIONS[key].name, `${key} has a group name`);
     assert.ok(GROUP_DEFINITIONS[key].description, `${key} has a recipient-facing description`);
   }
   // Brand-neutral names: sibling brands on ONE account must match the same groups
-  const names = BEM_GROUP_KEYS.map((key) => GROUP_DEFINITIONS[key].name);
+  const names = BACKEND_GROUP_KEYS.map((key) => GROUP_DEFINITIONS[key].name);
   assert.equal(new Set(names).size, names.length, 'group names are unique');
   assert.ok(!names.some((name) => name.includes(BRAND_NAME)), 'no brand name in a group name');
 });

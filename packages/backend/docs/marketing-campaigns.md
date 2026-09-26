@@ -172,7 +172,7 @@ Per-brand subusers provide full contact/segment/field isolation under one billin
 `cron/daily/marketing-prune.js` — runs 1st of each month. Pruning is strictly PER-PROVIDER: each provider's own engagement decides that provider's removals, so a reader who opens every newsletter but ignores offer mail is never deleted from the newsletter on a SendGrid-only signal ([#365](https://github.com/Omega-JS-Stack/omega/issues/365)). Three stages:
 1. **Re-engagement**: send email to `engagement_inactive_5m` (excluding `engagement_inactive_6m`). Each provider resolves the segment key against its own engagement tracking.
 2. **Prune (SendGrid)**: export `engagement_inactive_6m` contacts, bulk delete from SendGrid only. Never prunes paying customers: the `subscription_paid` segment is excluded from the delete list.
-3. **Prune (Beehiiv)**: list the publication's active subscriptions with Beehiiv's own per-subscriber stats (`expand[]=stats`) and delete the ones that have received at least `NEWSLETTER_RECEIVED_FLOOR` newsletters, joined more than `NEWSLETTER_MIN_AGE_DAYS` ago, and have never opened or clicked. A quiet channel keeps everyone under the floor and prunes nobody, which is the guard working. Never prunes paying customers either: Beehiiv cannot see app subscriptions, so each candidate's email is resolved to its user doc and skipped when `resolveSubscription()` reports an active paid plan, which is the same `subscription_paid` rule stage 2 uses. The skipped count rides the run log as `skippedPaid`, as it does for SendGrid.
+3. **Prune (Beehiiv)**: list the publication's active subscriptions with Beehiiv's own per-subscriber stats (`expand[]=stats`) and delete the ones that have received at least `NEWSLETTER_RECEIVED_FLOOR` newsletters, joined more than `NEWSLETTER_MIN_AGE_DAYS` ago, and have never opened or clicked. A quiet channel keeps everyone under the floor and prunes nobody, which is the guard working. Never prunes paying customers either: Beehiiv cannot see app subscriptions, so each candidate's email is resolved to its user doc and skipped when its `User` reads `active` (an active paid plan), which is the same `subscription_paid` rule stage 2 uses. The skipped count rides the run log as `skippedPaid`, as it does for SendGrid.
 
 Both lanes DELETE the contact/subscription and never unsubscribe it (an unsubscribe revokes marketing consent in Firestore permanently), and both log the deleted emails to `marketing-prune-logs/{brandId}/runs/{YYYY-MM}` (the Beehiiv lane under `{YYYY-MM}-newsletter`) for recoverability.
 
@@ -183,7 +183,7 @@ Both lanes DELETE the contact/subscription and never unsubscribe it (an unsubscr
 Pipeline:
 1. Resolve sources: `resolveSources({ sources, count: sourceCount || 6, categories })` — the unified blog/newsletter resolver (source-resolver.js). Each pick is a RANDOM source from the entry's `sources` array; failures follow the type hierarchy ($feed → other feeds → $parent; $parent → other parent items; nothing falls to $brand). Firestore-checked so used items never repeat, session-checked so one issue never gets duplicates. See [docs/ghostii.md](ghostii.md#source-picking--fallback-hierarchy) for the full hierarchy.
 2. **structure.js** — Generic dispatcher. Resolves the active template, merges `BASE_SCHEMA` (universal fields: subject, preheader, signoff, citations) with the template's own `schema` fragment, calls the template's `buildPrompt({brand, newsletterConfig, sources})` to get the AI brief, runs the AI call, and normalizes the result via the template's optional `normalize()`. Default provider: `openai` (override per-run only via `NEWSLETTER_PROVIDER_STRUCTURE` env).
-3. **image-illustrator.js** (default) — One flat-vector PNG per section in parallel (`Promise.all`), generated directly via `Manager.AI(ctx).image()` → `gpt-image-2`. Iterates `structure.sections` — templates whose content shape isn't section-based (e.g. field-report uses `dispatches`) populate `sections` in their `normalize()` step so this loop keeps working unchanged. The prompt enforces a clean flat 2D vector style (Stripe / Linear / undraw.co aesthetic) built from the brand palette (`content.theme.{primary,secondary,accent}Color`), on a white background, no text. **Legacy method:** set `marketing.newsletter.content.method.image = 'svg'` to use the older `svg-illustrator.js` (AI authors an `<svg>`, rasterized via `@resvg/resvg-js`). Both methods return the same `{ png: Buffer, fallback, meta }` contract.
+3. **image-illustrator.js** (default): one flat-vector PNG per section in parallel (`Promise.all`), generated directly via `ctx.ai.image()` → `gpt-image-2`. Iterates `structure.sections`; templates whose content shape isn't section-based (e.g. field-report uses `dispatches`) populate `sections` in their `normalize()` step so this loop keeps working unchanged. The prompt enforces a clean flat 2D vector style (Stripe / Linear / undraw.co aesthetic) built from the brand palette (`content.theme.{primary,secondary,accent}Color`), on a white background, no text. **Legacy method:** set `marketing.newsletter.content.method.image = 'svg'` to use the older `svg-illustrator.js` (AI authors an `<svg>`, rasterized via `@resvg/resvg-js`). Both methods return the same `{ png: Buffer, fallback, meta }` contract.
 4. **mjml-template.js** — Resolves the template by name from `templates/index.js`, calls `template.build({structure, imagePaths, theme, ...})` for the MJML, compiles to email-safe HTML via the `mjml` package. Brand-domain links get UTM-tagged via the existing `tagLinks()` utility.
 5. Mark used: `trackContentSource()` per source into the local `content-sources` collection — ONLY after generation succeeds. No PUT to the parent; the child tracks its own usage.
 
@@ -383,25 +383,25 @@ marketing: {
 
 | Purpose | File |
 |---------|------|
-| Marketing library | `src/manager/libraries/email/marketing/index.js` |
-| Shared preparation (brand, sender, render) | `src/manager/libraries/email/prepare.js` |
-| Email template registry | `src/manager/libraries/email/generators/lib/templates/index.js` |
-| Composable base blocks (skeleton, logo, card, etc.) | `src/manager/libraries/email/generators/lib/templates/base.js` |
-| Field + segment SSOT | `src/manager/libraries/email/constants.js` |
-| UTM tagging | `src/manager/libraries/email/utm.js` |
-| Newsletter generator | `src/manager/libraries/email/generators/newsletter.js` |
-| Newsletter copy (AI) | `src/manager/libraries/email/generators/lib/structure.js` |
-| Newsletter SVG (AI) | `src/manager/libraries/email/generators/lib/svg-illustrator.js` |
-| Newsletter MJML → HTML | `src/manager/libraries/email/generators/lib/mjml-template.js` |
-| Newsletter asset host (GitHub upload — PNGs + newsletter.html + newsletter.md + summary.md) | `src/manager/libraries/email/generators/lib/image-host.js` |
-| Newsletter markdown renderer (programmatic, no AI) | `src/manager/libraries/email/generators/lib/markdown-renderer.js` |
-| Ghostii article engine (writeArticle + publishArticle) | `src/manager/libraries/content/ghostii.js` |
-| Standalone blog article cron (off by default) | `src/manager/events/cron/daily/blog-auto-publisher.js` |
-| Unified AI library | `src/manager/libraries/ai/index.js` (OpenAI + Anthropic via `Manager.AI(ctx).request({ provider, ... })`) |
-| Notification library | `src/manager/libraries/notification.js` |
-| SendGrid provider | `src/manager/libraries/email/providers/sendgrid.js` |
-| Beehiiv provider | `src/manager/libraries/email/providers/beehiiv.js` |
-| Campaign routes | `src/manager/routes/marketing/campaign/{get,post,put,delete}.js` |
-| Campaign + newsletter cron | `src/manager/events/cron/frequent/marketing-campaigns.js` |
-| Pruning cron | `src/manager/events/cron/daily/marketing-prune.js` |
+| Marketing library | `src/omega/libraries/email/marketing/index.js` |
+| Shared preparation (brand, sender, render) | `src/omega/libraries/email/prepare.js` |
+| Email template registry | `src/omega/libraries/email/generators/lib/templates/index.js` |
+| Composable base blocks (skeleton, logo, card, etc.) | `src/omega/libraries/email/generators/lib/templates/base.js` |
+| Field + segment SSOT | `src/omega/libraries/email/constants.js` |
+| UTM tagging | `src/omega/libraries/email/utm.js` |
+| Newsletter generator | `src/omega/libraries/email/generators/newsletter.js` |
+| Newsletter copy (AI) | `src/omega/libraries/email/generators/lib/structure.js` |
+| Newsletter SVG (AI) | `src/omega/libraries/email/generators/lib/svg-illustrator.js` |
+| Newsletter MJML → HTML | `src/omega/libraries/email/generators/lib/mjml-template.js` |
+| Newsletter asset host (GitHub upload: PNGs + newsletter.html + newsletter.md + summary.md) | `src/omega/libraries/email/generators/lib/image-host.js` |
+| Newsletter markdown renderer (programmatic, no AI) | `src/omega/libraries/email/generators/lib/markdown-renderer.js` |
+| Ghostii article engine (writeArticle + publishArticle) | `src/omega/libraries/content/ghostii.js` |
+| Standalone blog article cron (off by default) | `src/omega/events/cron/daily/blog-auto-publisher.js` |
+| Unified AI library | `src/omega/libraries/ai/index.js` (OpenAI + Anthropic via `ctx.ai.request({ provider, ... })`) |
+| Notification library | `src/omega/libraries/notification.js` |
+| SendGrid provider | `src/omega/libraries/email/providers/sendgrid.js` |
+| Beehiiv provider | `src/omega/libraries/email/providers/beehiiv.js` |
+| Campaign routes | `src/omega/routes/marketing/campaign/{get,post,put,delete}.js` |
+| Campaign + newsletter cron | `src/omega/events/cron/frequent/marketing-campaigns.js` |
+| Pruning cron | `src/omega/events/cron/daily/marketing-prune.js` |
 | Seed campaigns | `src/cli/commands/setup-tests/helpers/seed-campaigns.js` |

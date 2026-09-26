@@ -1322,3 +1322,32 @@ test('dns-records: skipping the branded-link wait warns with the reason the summ
     tty.close();
   }
 });
+
+// ─── The api proxy worker ────────────────────────────────────────────────────
+
+// The worker proxies /omega to the brand's functions and nothing else: the
+// retired /backend-manager alias is no prefix, so it reaches the origin like
+// any other path (#945). `fetch` is the one global the worker calls, so the
+// test records what it was handed instead of reaching the network.
+test('api proxy worker: /omega proxies to the functions, the retired /backend-manager alias passes through', async () => {
+  const { default: worker } = await import('../src/services/edge/workers/omega-api-proxy.js');
+  const originalFetch = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (target) => {
+    seen.push(typeof target === 'string' ? target : target.url);
+    return 'response';
+  };
+
+  try {
+    const env = { FIREBASE_PROJECT_ID: 'fixture-project' };
+    await worker.fetch(new Request('https://api.fixture-brand.test/omega/user/signup?x=1'), env);
+    await worker.fetch(new Request('https://api.fixture-brand.test/backend-manager/user/signup'), env);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(seen, [
+    'https://us-central1-fixture-project.cloudfunctions.net/omega_api/user/signup?x=1',
+    'https://api.fixture-brand.test/backend-manager/user/signup',
+  ]);
+});

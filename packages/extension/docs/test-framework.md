@@ -95,9 +95,9 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 
 | Layer | Runs in | Use for |
 |---|---|---|
-| `build` | Plain Node, fast (~ms) | `Manager.getConfig/getManifest/getPackage`, CLI alias resolution, schema/manifest validation, build helpers, `lib/*.js` regex maps + utilities |
+| `build` | Plain Node, fast (~ms) | `build.getConfig/getManifest/getPackage`, CLI alias resolution, schema/manifest validation, build helpers, `lib/*.js` regex maps + utilities |
 | `background` | Real MV3 service worker via Puppeteer + CDP | Background boot sequence, Firebase auth wiring, messaging listeners, `chrome.runtime.onMessage` handlers |
-| `view` | Chromium tab loading harness extension's popup.html / options.html / sidepanel.html | DOM bindings, Manager surface, @omega.js/client integration, popup ↔ background messaging |
+| `view` | Chromium tab loading harness extension's popup.html / options.html / sidepanel.html | DOM bindings, the `omega` surface, @omega.js/client integration, popup ↔ background messaging |
 | `boot` | Real headless Chromium with the **consumer's** `packaged/<browser>/raw/` loaded as unpacked | End-to-end smoke: does the consumer's actual extension boot? Manifest validates? SW comes up? Popup renders? |
 
 `all` (default) runs build → background → view → boot.
@@ -106,7 +106,7 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 
 Every layer hands your test the **real** runtime, never a hand-rolled fake:
 
-- **No `mockManager`, no fake `chrome`/`browser` objects, no stubbed background/popup contexts.** `background`-layer tests run inside a real MV3 service worker with the real `chrome.*` API; `view`-layer tests run inside a real Chromium tab with the real DOM and real `chrome.runtime` messaging; `boot`-layer tests load the consumer's real packaged extension. Use what the harness gives you (`ctx`, `ctx.manager`, `ctx.page`, the `inspect` callback's `{ extension, page }`, and the browser globals `chrome` / `document` / `window`) — do not reconstruct any of it.
+- **No mock `omega`, no fake `chrome`/`browser` objects, no stubbed background/popup contexts.** `background`-layer tests run inside a real MV3 service worker with the real `chrome.*` API; `view`-layer tests run inside a real Chromium tab with the real DOM and real `chrome.runtime` messaging; `boot`-layer tests load the consumer's real packaged extension. Use what the harness gives you (`ctx`, `ctx.page`, the `inspect` callback's `{ extension, page }`, and the browser globals `chrome` / `document` / `window`): do not reconstruct any of it.
 - **Pure functions (zero I/O) are the only thing you call directly.** A regex map in `lib/*.js`, a string formatter, a config-shape validator — `require` it and assert on its output in a `build`-layer test. That is not mocking; it is calling a pure function. Anything that touches real I/O (storage, messaging, the SW lifecycle, the DOM, the network) runs against the real harness, not a substitute.
 
 ### Real external APIs are GATED, NOT mocked
@@ -143,7 +143,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 | Coverage | Layer | Proves |
 |---|---|---|
-| **Logic** | `build` / `background` | The feature's functions do the right thing when called directly (real Manager, real `chrome.*`, real storage/messaging) |
+| **Logic** | `build` / `background` | The feature's functions do the right thing when called directly (the real build module, real `chrome.*`, real storage/messaging) |
 | **UI** | `view` | The feature's interface is WIRED — a real event on the real DOM triggers the behavior and the visible result appears |
 | **End-to-end** | `boot` | The feature survives in the consumer's actual packaged extension (extend the boot suite's `inspect` assertions) |
 
@@ -151,7 +151,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 ## `OMEGA_TEST_MODE=true` — the canonical "we're in tests" signal
 
-Both @omega.js/extension test runners set `OMEGA_TEST_MODE=true` in spawned child envs. That powers `manager.isTesting()` (and `Manager.isTesting()` static) — the cross-context helper anything in @omega.js/extension/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
+Both @omega.js/extension test runners set `OMEGA_TEST_MODE=true` in spawned child envs. That powers `omega.isTesting()` (and the build module's `isTesting()`), the cross-context helper anything in @omega.js/extension/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
 
 Consumers writing their own tests get this automatically when running through `npx omega test`. To set it manually in another runner:
 
@@ -242,7 +242,7 @@ module.exports = {
   layer: 'build',
   description: 'manifest_version is 3',
   run: (ctx) => {
-    const m = Manager.getManifest();
+    const m = require('@omega.js/extension/build').getManifest();
     ctx.expect(m.manifest_version).toBe(3);
   },
 };
@@ -265,7 +265,6 @@ Every `run` / `cleanup` callback receives `ctx`:
 - `ctx.state` — shared object across tests in a suite/group
 - `ctx.skip(reason)` — throw to skip the current test at runtime
 - `ctx.layer` — current layer name (`'build' | 'background' | 'view' | 'boot'`)
-- `ctx.manager` — present on background-layer tests (the framework Manager instance)
 - `ctx.page` — present on view-layer tests (the loaded tab's window)
 
 Boot-layer tests use `inspect: async ({ extension, page, expect, projectRoot }) => { ... }` instead of `run`. See [test-boot-layer.md](test-boot-layer.md).
@@ -289,28 +288,25 @@ await ctx.expect(fn).toThrow(/regex/)                  // async — fn may be as
 ctx.expect(actual).not.toBe(expected)                  // negation: every matcher
 ```
 
-## Consumer pattern — use the public Manager API
+## Consumer pattern: use the build module
 
-Don't `require('json5')` or other transitive @omega.js/extension deps directly from consumer tests — they're not in your `package.json` and the resolution path is fragile. Instead use @omega.js/extension's public API:
+Don't `require('json5')` or other transitive @omega.js/extension deps directly from consumer tests: they're not in your `package.json` and the resolution path is fragile. Instead use @omega.js/extension's build module:
 
 ```js
-const Manager = require('@omega.js/extension/build');
+const build = require('@omega.js/extension/build');
 
-// Parsed JSON5 — same logic the framework uses internally
-const config   = Manager.getConfig();
-const manifest = Manager.getManifest();
-
-// Borrow any of @omega.js/extension's bundled deps without listing them yourself
-const JSON5 = Manager.require('json5');
+// Parsed JSON5, the same logic the framework uses internally
+const config   = build.getConfig();
+const manifest = build.getManifest();
 ```
 
-This is the same pattern EM and @omega.js/backend consumers use — assert on framework API output rather than re-implementing parsing/loading in every test.
+This is the same pattern @omega.js/desktop and @omega.js/backend consumers use: assert on framework API output rather than re-implementing parsing/loading in every test.
 
 ## Build-layer example
 
 ```js
 // test/build/config.test.js
-const Manager = require('@omega.js/extension/build');
+const build = require('@omega.js/extension/build');
 
 module.exports = {
   type: 'suite',
@@ -320,13 +316,13 @@ module.exports = {
     {
       name: 'brand.id is set',
       run: (ctx) => {
-        ctx.expect(Manager.getConfig().brand.id).toBeTruthy();
+        ctx.expect(build.getConfig().brand.id).toBeTruthy();
       },
     },
     {
       name: 'cloud.config.projectId matches brand.id',
       run: (ctx) => {
-        const cfg = Manager.getConfig();
+        const cfg = build.getConfig();
         ctx.expect(cfg.cloud.config.projectId).toBe(cfg.brand.id);
       },
     },
@@ -403,9 +399,9 @@ You don't have to think about this — write tests in normal JS — but it's why
 
 Browser-context code (background SW, popup DOM, content script) only runs inside Chromium. This is exactly why @omega.js/extension does not let you mock: a faked `chrome.runtime` (Jest's jsdom can't reproduce it faithfully) or a stubbed API (`webextension-polyfill` provides one, but it doesn't catch real SW lifecycle bugs) passes tests while shipping broken extensions. Puppeteer gives a real Chromium with real `chrome.*` APIs, so the harness is the real thing — not a substitute you assert against. See [NEVER mock](#never-mock--test-against-the-real-harness).
 
-Same trade-off EM ran into with Electron — tests must run inside the real runtime, so the framework owns the runner.
+Same trade-off @omega.js/desktop makes with Electron: tests must run inside the real runtime, so the framework owns the runner.
 
 ## See also
 
 - [test-boot-layer.md](test-boot-layer.md) — boot layer deep-dive (loads consumer's actual packaged extension)
-- [environment-detection.md](environment-detection.md) — `Manager.isTesting()` / `isDevelopment()` / etc.
+- [environment-detection.md](environment-detection.md): `omega.isTesting()` / `isDevelopment()` / etc.

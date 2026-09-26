@@ -17,7 +17,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: '@omega.js/backend Test Notification',
             body: 'Testing from @omega.js/backend test suite',
@@ -38,7 +38,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Filtered Notification',
             body: 'Testing owner filter',
@@ -61,7 +61,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Tagged Notification',
             body: 'Testing tags filter',
@@ -82,7 +82,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Limited Notification',
             body: 'Testing limit filter',
@@ -105,7 +105,7 @@ module.exports = defineCases({
 
       async run({ http, assert }) {
         // Omit notification entirely to test schema defaults are applied
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           filters: {
             limit: 1,
           },
@@ -123,7 +123,7 @@ module.exports = defineCases({
       skip: !process.env.TEST_FCM_TOKEN ? 'TEST_FCM_TOKEN env var not set' : false,
 
       async run({ http, assert, config }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: '@omega.js/backend Test Notification',
             body: `Test sent at ${new Date().toISOString()}`,
@@ -146,7 +146,7 @@ module.exports = defineCases({
       timeout: 30000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Fake Token Test',
             body: 'Testing with invalid token',
@@ -167,7 +167,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Test Notification',
             body: 'This is a test',
@@ -185,7 +185,7 @@ module.exports = defineCases({
       timeout: 15000,
 
       async run({ http, assert }) {
-        const response = await http.post('backend-manager/admin/notification', {
+        const response = await http.post('omega/admin/notification', {
           notification: {
             title: 'Test Notification',
             body: 'This is a test',
