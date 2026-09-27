@@ -28,20 +28,46 @@ test('the value-LESS flags are declared, so none of them eats the next token (#9
   const { parseArgv } = require('@omega.js/devkit/argv');
   const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
 
-  for (const flag of ['apply', 'major', 'force-fresh', 'https']) {
+  for (const flag of ['dry-run', 'major', 'force-fresh', 'https']) {
     assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
   }
 
   // The pin: the flag is true and the positional survives.
-  const argv = parse(['update', '--apply', 'out']);
-  assert.strictEqual(argv.apply, true);
-  assert.deepStrictEqual(argv._, ['update', 'out']);
+  const argv = parse(['update', '--dry-run', 'extra']);
+  assert.strictEqual(argv.dryRun, true);
+  assert.deepStrictEqual(argv._, ['update', 'extra']);
 
   // --https is the negation lane the dev server reads (`options.https !== false`).
   assert.strictEqual(parse(['dev', '--no-https']).https, false);
 
   // A value flag needs no declaration at all: the audit gates keep their numbers.
   assert.strictEqual(parse(['audit', '--max-lcp', '1300']).maxLcp, '1300');
+});
+
+test('update: --dry-run reaches devkit runUpdate as dryRun, and a bare run installs', async () => {
+  const devkitUpdate = require('@omega.js/devkit/update');
+  const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
+  const { parseArgv } = require('@omega.js/devkit/argv');
+  const commandFile = require.resolve('../src/commands/update.js');
+
+  // The command destructures runUpdate at load, so the stub lands before a fresh require
+  async function run(args) {
+    const original = devkitUpdate.runUpdate;
+    const seen = [];
+    devkitUpdate.runUpdate = async (options) => { seen.push(options); };
+    delete require.cache[commandFile];
+    try {
+      await require(commandFile)(parseArgv(args, { booleans: BOOLEAN_FLAGS }));
+    } finally {
+      devkitUpdate.runUpdate = original;
+      delete require.cache[commandFile];
+    }
+    assert.strictEqual(seen.length, 1, 'the command called runUpdate once');
+    return seen[0];
+  }
+
+  assert.strictEqual((await run(['update', '--dry-run'])).dryRun, true);
+  assert.ok(!(await run(['update'])).dryRun, 'a bare run is not a dry run');
 });
 
 test('dispatch table: every aliased command has a command file', () => {
@@ -52,9 +78,8 @@ test('dispatch table: every aliased command has a command file', () => {
     assert.ok(fs.existsSync(path.join(commandsDir, `${name}.js`)), `commands/${name}.js exists`);
   }
 
-  // The full B3 surface is present (+ install — the `mgr i local` parity
-  // gap the wizard rehearsal caught, cp194)
-  for (const name of ['install', 'dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
+  // The full B3 surface is present; the link flip (`omega i`) is the brand root's, never a target's
+  for (const name of ['dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
     assert.ok(aliases[name], `${name} is routed`);
   }
 

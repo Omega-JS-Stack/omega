@@ -1,9 +1,10 @@
 /**
- * `omega update` — dependency freshness report (npu-outdated semantics):
+ * `omega update` — dependency freshness (npu-outdated semantics):
  * installed/wanted/latest + patch/minor/major per dep, releases younger than
- * --min-age days (default 7) QUARANTINED. `--apply` installs the
+ * --min-age days (default 7) QUARANTINED. A bare run installs the
  * non-quarantined, non-breaking set (`--major` opts into breaking) through
- * npu when present. The whole verb is the shared devkit implementation.
+ * npu when present; `--dry-run` reports and installs nothing. The whole verb
+ * is the shared devkit implementation.
  */
 const build = require('../build.js');
 const logger = build.logger('update');
@@ -12,7 +13,7 @@ const { runUpdate } = require('@omega.js/devkit/update');
 module.exports = async function (options) {
   await runUpdate({
     dir: process.cwd(),
-    apply: options.apply,
+    dryRun: options.dryRun || options['dry-run'],
     major: options.major,
     minAge: options.minAge ?? options['min-age'],
     forceFresh: options.forceFresh || options['force-fresh'],

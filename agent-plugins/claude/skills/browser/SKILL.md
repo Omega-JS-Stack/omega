@@ -55,7 +55,7 @@ To test an unpacked extension, enable `chrome-devtools-extension`: same isolated
 
 ## The OMEGA Companion (`omega-extension`)
 
-A different job from the three above: it drives the user's OWN browser, with their logins, through the OMEGA Companion extension over a local WebSocket (port 9876). The bridge ships inside the router, so nothing else has to be installed for the upstream to start, but the tools only answer once the extension is connected: install the OMEGA Companion from the Chrome Web Store, or load `omega-omega/targets/extension/packaged/chrome/raw/` unpacked at `chrome://extensions` with Developer mode on (`npx omega build` in that target writes it). No connection → the call fails saying so.
+A different job from the three above: it drives the user's OWN browser, with their logins, through the OMEGA Companion extension over a local WebSocket (port 9876). The bridge ships inside the router, so nothing else has to be installed for the upstream to start, but the tools only answer once the extension is connected: install the OMEGA Companion from the Chrome Web Store, or load `omega-omega/targets/extension/packaged/chrome/raw/` unpacked at `chrome://extensions` with Developer mode on (`npx omega build --target=extension` at the `omega-omega` brand root writes it). No connection → the call fails saying so.
 
 ## Available tools
 

@@ -12,7 +12,8 @@ const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
 
-const { startChild, stopChild } = require('../src/test/boot-child.js');
+const { startChild, stopChild, rootDispatchEnv } = require('../src/test/boot-child.js');
+const { ROOT_DISPATCH_ENV } = require('../src/omega-bin.js');
 
 function scratch() {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'boot-child-')));
@@ -42,6 +43,30 @@ test('startChild resolves the marker capture group and tees the output to its lo
     const contents = fs.readFileSync(logFile, 'utf8');
     assert.match(contents, /booting the fixture/, 'the pre-marker output landed in the log too');
     assert.match(contents, /Dev server: http:\/\/localhost:41234/);
+  } finally {
+    await stopChild(child);
+  }
+});
+
+test('a child booted inside a brand target carries the root-dispatch marker naming the brand root', async () => {
+  const brandRoot = scratch();
+  const targetDir = path.join(brandRoot, 'targets', 'backend');
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'package.json'), '{"name":"acme","workspaces":["targets/*"]}');
+  fs.writeFileSync(path.join(targetDir, 'package.json'), '{"name":"acme-backend"}');
+
+  assert.equal(rootDispatchEnv(targetDir, {})[ROOT_DISPATCH_ENV], brandRoot);
+
+  const { child, ready } = startChild({
+    bin: process.execPath,
+    args: ['-e', `process.stdout.write('marker=' + process.env.${ROOT_DISPATCH_ENV} + '\\n'); setInterval(() => {}, 1000);`],
+    cwd: targetDir,
+    logFile: path.join(brandRoot, 'child.log'),
+    marker: /marker=(\S+)/,
+    timeout: 20000,
+  });
+  try {
+    assert.equal(await ready, brandRoot);
   } finally {
     await stopChild(child);
   }

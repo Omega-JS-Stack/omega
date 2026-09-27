@@ -346,7 +346,7 @@ test('deploy --direct: a fatal config finding stops the lane before any deploy w
   process.chdir(dir);
   await assert.rejects(
     require('../src/commands/deploy.js')({ direct: true, dryRun: true }),
-    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors\.stripe is not a key the schema declares/,
     'the findings surface as a thrown fatal, not a silently-ignored array',
   );
 });
@@ -385,7 +385,7 @@ test('deploy --direct: the PRODUCTION overlay is the config the lane reads (#856
 
   await assert.rejects(
     require('../src/commands/deploy.js')({ direct: true, dryRun: true }),
-    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors\.stripe is not a key the schema declares/,
     'the production overlay is a layer of the deploy config, so its retired key refuses the lane',
   );
 });

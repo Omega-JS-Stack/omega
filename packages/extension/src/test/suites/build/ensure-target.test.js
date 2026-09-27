@@ -195,7 +195,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'cli: no `setup` command, a bare invocation resolves to help, migrate stays its own command',
+      name: 'cli: no `setup` command, a bare invocation resolves to help, and no `migrate` command',
       run: (ctx) => {
         const { commandsDir, aliases, defaultCommand } = cli.config;
 
@@ -203,10 +203,10 @@ module.exports = defineCases({
         ctx.expect('setup' in aliases).toBe(false);
         ctx.expect(jetpack.exists(path.join(commandsDir, 'setup.js'))).toBe(false);
 
-        // The one-time hook-layout migration is a deliberate verb, not a step
-        // every build repeats.
-        ctx.expect(Boolean(aliases.migrate)).toBe(true);
-        ctx.expect(jetpack.exists(path.join(commandsDir, 'migrate.js'))).toBeTruthy();
+        // The hook-layout move is a leg of the brand root's `omega migrate`,
+        // reached through the `./migrate` entry, never a command of this CLI.
+        ctx.expect('migrate' in aliases).toBe(false);
+        ctx.expect(jetpack.exists(path.join(commandsDir, 'migrate.js'))).toBe(false);
       },
     },
   ],

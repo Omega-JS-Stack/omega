@@ -103,18 +103,31 @@ module.exports = defineCases({
       },
     },
     {
-      // #911: the task took only `errors` off validateConfig, so a consumer
-      // read `audit ok (0 warnings)` while the validator's list named real
-      // findings (a key the schema does not declare, which is what a typo
-      // looks like). The report is both lists now.
-      name: 'prints the validator\'s warnings and counts them (#911)',
+      // The schema is strict: a key nothing declares is what a typo (or a
+      // legacy shape) looks like, and it fails the build naming the fix.
+      name: 'an undeclared key fails the audit, naming omega migrate',
       run: async (ctx) => {
         const tmp = stageConsumer({ brand: { id: 'testapp', name: 'TestApp' } }, { notAKey: true });
         try {
+          const err = await runAudit(tmp);
+          ctx.expect(err).toBeDefined();
+          ctx.expect(err.message).toMatch(/config\.notAKey is not a key the schema declares/);
+          ctx.expect(err.message).toMatch(/npx omega migrate/);
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      // The resolved config carries the company the loader fills and the
+      // environment the build attaches: neither is the brand's key.
+      name: 'a clean config passes with the loader-filled and build-attached keys on it',
+      run: async (ctx) => {
+        const tmp = stageConsumer({ brand: { id: 'testapp', name: 'TestApp' } }, { electronBuilder: { mac: { hardenedRuntime: true } } });
+        try {
           const { err, output } = await runAuditCapturing(tmp);
           ctx.expect(err).toBeNull();
-          ctx.expect(output).toMatch(/notAKey/);
-          ctx.expect(output).toMatch(/audit ok \(1 warning\)/);
+          ctx.expect(output).toMatch(/audit ok \(0 warnings\)/);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

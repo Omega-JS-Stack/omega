@@ -56,7 +56,7 @@ async function runVerbFanout(verb, options = {}, deps = {}) {
 
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red(`✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target's ${verb}.`));
+    console.error(chalk.red(`✗ Not inside a brand monorepo (no config/omega.json5 up the tree): run it at a brand root, with --${PICKER_FLAG}=<name> to pick targets.`));
     process.exitCode = 1;
     return;
   }
@@ -80,6 +80,23 @@ async function runVerbFanout(verb, options = {}, deps = {}) {
 
   console.log(chalk.bold(`\nOMEGA brand ${verb}: ${path.basename(brandRoot)}${dryRun ? chalk.dim(' (dry run)') : ''} ${chalk.dim(`(${selected.map((entry) => entry.name).join(' → ')})`)}`));
 
+  await walkTargets({ verb, selected, forwarded, dryRun, run });
+}
+
+/**
+ * Run one verb on each selected target in turn, through `resolveTargetRun`, and
+ * print the summary. Targets are independent: a failure never stops the walk,
+ * and any failure lands exit 1.
+ *
+ * @param {object} input
+ * @param {string} input.verb - The verb as the targets receive it.
+ * @param {Array} input.selected - The discovered targets, already in order.
+ * @param {string[]} input.forwarded - The args every target's bin receives after the verb.
+ * @param {boolean} [input.dryRun] - Stop at each lane's plan where the verb's row says so.
+ * @param {Function} [input.run] - The runner (runCommand unless a test seams it).
+ * @returns {Promise<void>}
+ */
+async function walkTargets({ verb, selected, forwarded, dryRun = false, run = runCommand }) {
   const summary = [];
 
   for (const [index, entry] of selected.entries()) {
@@ -125,4 +142,4 @@ async function runVerbFanout(verb, options = {}, deps = {}) {
   }
 }
 
-module.exports = { runVerbFanout };
+module.exports = { runVerbFanout, walkTargets };

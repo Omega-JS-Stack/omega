@@ -36,12 +36,13 @@
     "./lib/window-manager": "./dist/lib/window-manager.js",
     "./cli": "./dist/cli-run.js",
     "./ensure-target": "./dist/commands/lib/ensure-target.js",
+    "./migrate": "./dist/commands/lib/migrate.js",
     "./scripts/sync-nvmrc": "./scripts/sync-nvmrc.js"
   },
   "bin": {
-    "omega": "./bin/omega",
-    "omg": "./bin/omg",
-    "mgr": "./bin/omega"
+    "omega": "bin/omega",
+    "omg": "bin/omg",
+    "mgr": "bin/omega"
   },
   "files": [
     "bin/",
@@ -101,7 +102,7 @@
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node ./bin/omega test"
+    "test": "node dist/cli-run.js test"
   },
   "projectScripts": {
     "start": "omega clean && npm run gulp --",

@@ -81,8 +81,8 @@ paragraph, [#740](https://github.com/Omega-JS-Stack/omega/issues/740)).
 ## `meta:` — the page's `<head>`
 
 Page frontmatter is the ONLY home of meta (Ian 2026-08-26: meta never exists in
-two places). omega.json5 declares no `meta` section, and a config still
-carrying one is a retired-key error naming the move. The site-wide default is
+two places). omega.json5 declares no `meta` section, so a config still
+carrying one fails the strict load, and `omega migrate` names the move. The site-wide default is
 `brand.name` / `brand.description`, which `core/_includes/core/head.html` falls
 back to when nothing sets a value.
 

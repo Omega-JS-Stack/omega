@@ -1,29 +1,14 @@
 /**
- * ensure-target — the LOCAL, idempotent scaffold every verb runs
- * ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)).
- *
- * `omega setup` used to own this half and nothing ran it for you, so a target
- * drifted until someone remembered the command per target. It is retired: the
- * "write it if missing" steps live here, the gulp `defaults` task calls it
- * first (so `npm start` and every gulp build heal the tree), and the non-gulp
- * verbs — `omega test`, `omega deploy` — call it themselves.
- *
- * What it guarantees, in this order:
- *
- *   package.json      the omega verb scripts + the npm-private latch — pure
- *                     manifest edits, so they land before anything that throws
- *   firefox id        the derived AMO add-on id, pinned into the brand config
- *                     when the brand declares none (#893)
- *   node version      a WARNING when the shell is older than the framework's pin
- *   peer dependencies installed when missing or behind (a satisfied target
- *                     installs nothing)
- *   defaults tree     the consumer interior, via the gulp defaults task's
- *                     scaffoldDefaults — the ONE scaffold implementation
- *   locality          a WARNING when the framework is a `file:` link
- *
- * What needs the network is NOT here: the framework freshness check is an
- * `omega deploy` precheck (deploy-precheck.js), and the one-time hook-layout
- * migration is its own command (`omega migrate`).
+ * ensure-target: the LOCAL, idempotent scaffold every verb runs. The gulp
+ * `defaults` task calls it first (so `npm start` and every gulp build heal the
+ * tree); `omega test` and `omega deploy` call it themselves. In order: the
+ * package.json verb scripts and npm-private latch (pure manifest edits, before
+ * anything can throw), the derived AMO add-on id pinned into the brand config
+ * when it declares none, a node-version WARNING, peer dependencies (a satisfied
+ * target installs nothing), the defaults tree (the gulp task's scaffoldDefaults,
+ * the ONE scaffold implementation), and a WARNING for a `file:` link. Nothing
+ * here needs the network: freshness is a deploy precheck (deploy-precheck.js),
+ * and the hook-layout move is a leg of the brand root's `omega migrate`.
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');

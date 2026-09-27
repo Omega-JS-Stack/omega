@@ -94,8 +94,10 @@ The consumer entry, the handler arguments and every other runtime shape a ported
 
 ## Part 4: The dependency-resolution report
 
-`npx omega migrate` at the target root prints what the port still owes and
-changes nothing ([#600](https://github.com/Omega-JS-Stack/omega/issues/600)).
+`npx omega migrate --target=<name>` at the brand root prints what the port
+still owes and changes nothing, `--execute` included: the backend leg of the
+ONE root verb ([#600](https://github.com/Omega-JS-Stack/omega/issues/600),
+[#885](https://github.com/Omega-JS-Stack/omega/issues/885)).
 
 Under BEM's FLAT install every framework dependency sat in the consumer's own
 `node_modules`, so a ported route could `require('fs-jetpack')` and be right.
@@ -104,15 +106,16 @@ resolves only by HOISTING, which holds on one install and not on the next. The
 requires that carry it are LAZY, inside the handler that needs them, so the
 module loads fine and the route 500s the first time a request reaches it.
 
-The verb names every bare specifier under `src/` that is neither a Node built-in
+The leg names every bare specifier under `src/` that is neither a Node built-in
 nor a package this target's own `package.json` declares, at file:line, with the
 fix. It never installs: which version a brand wants is the brand's call. The
-scan itself is `@omega.js/devkit`'s `src/bare-requires.js`, the SAME one
-@omega.js/web's `omega migrate` runs, so a brand's two ported targets cannot get
+scan itself is `@omega.js/devkit`'s `src/bare-requires.js`, the SAME one the
+web leg of `omega migrate` runs, so a brand's two ported targets cannot get
 different answers.
 
 The one-time CONVERSIONS stay their own run-alone verbs, `omega migrate:rules`
-and `omega migrate:markers`, because those change what the project enforces.
+and `omega migrate:markers` (at the brand root, `--target=<name>` picks the
+backend), because those change what the project enforces.
 
 ## See also
 

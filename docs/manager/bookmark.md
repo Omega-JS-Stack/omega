@@ -7,7 +7,7 @@ extension over the WebSocket protocol; the extension files them under `Ω / {Bra
 The extension is not this package's to ship ([#927](https://github.com/Omega-JS-Stack/omega/issues/927)):
 it is the OMEGA brand's own extension target, `omega-omega/targets/extension`. Install the OMEGA
 Companion from the Chrome Web Store, or load `omega-omega/targets/extension/packaged/chrome/raw/`
-unpacked at `chrome://extensions` (`npx omega build` in that target writes it). It dials
+unpacked at `chrome://extensions` (`npx omega build --target=extension` at the `omega-omega` brand root writes it). It dials
 `ws://localhost:9876`; `OMEGA_EXTENSION_PORT` moves the manager's side of that socket.
 
 ## What it reconciles

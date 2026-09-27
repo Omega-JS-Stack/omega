@@ -60,7 +60,7 @@ test('build: a retired config key is fatal — the command refuses, it never war
 
   await assert.rejects(
     build({ logFile: false }),
-    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors\.stripe is not a key the schema declares/,
     'the finding comes back as a thrown fatal, not a printed warning',
   );
 
@@ -77,7 +77,7 @@ test('bin: `omega build` exits non-zero on a fatal config finding (real process,
   });
 
   const output = `${run.stdout}${run.stderr}`;
-  assert.match(output, /payment\.processors is retired/, 'the finding is printed');
+  assert.match(output, /payment\.processors\.stripe is not a key the schema declares/, 'the finding is printed');
   assert.notStrictEqual(run.status, 0, 'CI and scripted callers must read the run as a failure');
   assert.strictEqual(fs.existsSync(path.join(root, 'dist')), false, 'a refused build writes no output');
 });
@@ -118,7 +118,7 @@ test('build: the PRODUCTION overlay composes, never the machine ambient one (#85
 
   await assert.rejects(
     build({ logFile: false }),
-    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors\.stripe is not a key the schema declares/,
     'the production overlay is a layer of the build config, so its retired key refuses the build',
   );
 });

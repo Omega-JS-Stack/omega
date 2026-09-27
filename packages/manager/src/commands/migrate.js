@@ -1,40 +1,31 @@
 /**
- * `omega migrate` at a brand root — bring an already-converted omega.json5
- * forward: delete every key `@omega.js/config`'s retired-keys table names,
- * in place, comments and formatting preserved.
- *
- *   omega migrate            → remove the retired keys, one line each
- *   omega migrate --dry-run  → print the same plan and write nothing
- *
- * A retired row may also carry a `convert(oldValue)` ([#858](https://github.com/Omega-JS-Stack/omega/issues/858)):
- * the setting MOVES rather than merely vanishing. The converted value is
- * WRITTEN first, through the same comment-preserving editor, and the old key
- * is deleted in the same run, so a brand never sits between the two shapes,
- * and a dry run prints both halves. This is the ONE verb for retired config
- * keys; a `--migration=` manage pass is for what a key change implies OUTSIDE
- * the config (the platform-names migration renames icon folders too).
- *
- * There is no dual-read anywhere in OMEGA, so a retired key is a setting the
- * brand still believes in and nothing reads — the validator says so loudly on
- * every load. @omega.js/web's `omega migrate` drops them on its way through,
- * but a brand ALREADY on omega.json5 had
- * only that error and an edit by hand. Editing an AUTHORED omega.json5 is the
- * manager's lane (#612), so the rule lives here.
- *
- * The file is read raw (JSON5, no merge): the retired key must be deleted
- * where the brand WROTE it, and a merged view would name paths that exist in
- * no file. Idempotent by construction — a key that isn't there is skipped, so
- * a converged brand's rerun leaves the file byte-identical.
+ * `omega migrate` at a brand root: the ONE verb that converts a legacy brand.
+ * A bare run reports and writes nothing; `--execute` converts; `--target=`
+ * narrows the target walk. The config pass judges every authored omega file,
+ * the `.env` pass every `.env` the loader reads (names only, never a value),
+ * then each selected target runs its own migration (lib/migrate-walk.js); a
+ * brand root omega file a leg merged into (or created) is judged again, and
+ * the brand config is loaded the way a build loads it. The report ends on the
+ * breaking-changes register. A report exits 1 while anything is due or
+ * refused; `--execute` exits 1 on a refusal, on a key the strict schema still
+ * refuses, or on a config the loader refuses. The rule set, src/migrate/, is
+ * the only code that knows an old name.
  */
 const fs = require('node:fs');
-const { isDeepStrictEqual } = require('node:util');
+const path = require('node:path');
 const chalk = require('chalk').default;
-const JSON5 = require('json5');
 
-const { findRetiredKeys, resolveConfigPath, removeConfigValues, writeConfigValues } = require('@omega.js/config');
-const { resolveBrandRoot } = require('../lib/brand.js');
+const { loadConfig, resolveConfigPath, TARGETS } = require('@omega.js/config');
+const { layerFiles, authoredConfigFiles, migrateConfigFile } = require('../migrate/config-pass.js');
+const { envFiles, migrateEnv } = require('../migrate/env-pass.js');
+const { resolveBrandRoot, discoverTargets, loadBrand } = require('../lib/brand.js');
+const { PICKER_FLAG, assertPickerFlags, selectTargets } = require('../lib/target-selection.js');
+const { resolveFrameworkPackage } = require('../lib/framework-bin.js');
+const { walkMigrations, printBlock } = require('../lib/migrate-walk.js');
 
 module.exports = async (options = {}) => {
+  assertPickerFlags(options);
+
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
     console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run `omega migrate` at the brand root.'));
@@ -42,118 +33,105 @@ module.exports = async (options = {}) => {
     return;
   }
 
-  const configPath = resolveConfigPath(brandRoot);
-  let authored;
+  // The picker refuses an unknown name BEFORE anything is written
+  const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
+  const { selected } = selectTargets({ targets, target: options[PICKER_FLAG] });
 
-  try {
-    authored = JSON5.parse(fs.readFileSync(configPath, 'utf8'));
-  } catch (e) {
-    console.error(chalk.red(`✗ ${configPath} does not parse — fix the syntax first: ${e.message}`));
-    process.exitCode = 1;
-    return;
-  }
+  const execute = options.execute === true;
+  console.log(chalk.bold(`\nOMEGA migrate: ${brandRoot} ${chalk.dim(execute ? '(converting)' : '(report only: --execute converts)')}`));
 
-  // One finding per key, in file order. The table can name the same path
-  // twice (a key that is both a retired NAME and a retired PATH); the file
-  // has one property to delete either way.
-  const findings = [];
-  for (const finding of findRetiredKeys(authored)) {
-    if (!findings.some((seen) => seen.path === finding.path)) findings.push(finding);
-  }
+  const baseFile = resolveConfigPath(brandRoot);
+  const configBlocks = authoredConfigFiles(baseFile, targets).map((authored) => ({ heading: path.relative(brandRoot, authored.file), ...migrateConfigFile(authored, execute) }));
+  const envBlocks = envFiles(brandRoot, targets).map((envPath) => ({ heading: path.relative(brandRoot, envPath), ...migrateEnv(envPath, execute) }));
 
-  const dryRun = !!(options['dry-run'] || options.dryRun);
+  // The config pass runs first, so a leg's merge meets the root's current key
+  // names; a root file a leg then wrote is judged as it now stands.
+  const rootFiles = layerFiles(path.dirname(baseFile));
+  const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
+  const rootBefore = rootFiles.map(read);
+  const targetBlocks = walkMigrations(selected, { execute, brandRoot });
+  rootFiles.forEach((file, index) => {
+    if (read(file) !== rootBefore[index]) rejudge(configBlocks, path.relative(brandRoot, file), file, execute);
+  });
+  const loadBlocks = [loadBlock(brandRoot, targets)];
 
-  console.log(chalk.bold(`\nOMEGA migrate — ${configPath}`));
+  for (const block of configBlocks) printBlock(block, 'no retired keys: this config is current');
+  for (const block of envBlocks) printBlock(block, 'no retired env keys');
+  for (const block of targetBlocks) printBlock(block, 'nothing to migrate');
+  for (const block of loadBlocks) printBlock(block, 'the brand config loads');
+  const blocks = [...configBlocks, ...envBlocks, ...targetBlocks, ...loadBlocks];
 
-  if (findings.length === 0) {
-    console.log(`  ${chalk.green('✓')} no retired keys — this config is current`);
-    return;
-  }
+  const count = (key) => blocks.reduce((sum, block) => sum + (Array.isArray(block[key]) ? block[key].length : block[key] || 0), 0);
+  const [due, changed, errors] = [count('due'), count('changed'), count('errors')];
+  console.log(`\n${due} due, ${changed} changed, ${errors} ${errors === 1 ? 'error' : 'errors'}`);
+  console.log(`By-hand steps for every shape OMEGA changed after a conversion: ${registerPath(brandRoot)}`);
 
-  // Conversions FIRST (#858): the new key is written while the old one is
-  // still there to read, then the removal pass takes the old key away. A row
-  // with no `convert` is a plain deletion, exactly as before.
-  //
-  // A conversion never OVERWRITES an authored value: a brand that started the
-  // migration by hand carries both keys, and the converted old setting would
-  // silently replace the one it wrote. That row is refused whole, its old key
-  // left in place too, so the human still has both halves to choose between.
-  const conversions = [];
-  const conflicts = [];
-  for (const finding of findings.filter((entry) => typeof entry.convert === 'function')) {
-    const target = convertedPath(finding);
-    const value = finding.convert(valueAt(authored, finding.path));
-    const present = valueAt(authored, target);
-
-    if (present !== undefined && !isDeepStrictEqual(present, value)) {
-      conflicts.push({ finding, path: target, present });
-      continue;
-    }
-
-    conversions.push({ finding, path: target, value });
-  }
-
-  if (conversions.length) {
-    writeConfigValues(
-      brandRoot,
-      Object.fromEntries(conversions.map(({ path, value }) => [path, value])),
-      { dryRun },
-    );
-  }
-
-  const refused = new Set(conflicts.map((entry) => entry.finding));
-  const report = removeConfigValues(brandRoot, findings.filter((finding) => !refused.has(finding)).map((finding) => finding.path), { dryRun });
-
-  for (const finding of findings) {
-    const conflict = conflicts.find((entry) => entry.finding === finding);
-    const converted = conversions.find((entry) => entry.finding === finding);
-
-    if (conflict) {
-      console.log(`  ${chalk.red('✗')} refused ${chalk.cyan(finding.path)} ${chalk.dim('→')} ${chalk.cyan(conflict.path)} ${chalk.dim(`: ${conflict.path} is already authored here = ${JSON.stringify(conflict.present)}`)}`);
-      console.log(`      ${chalk.dim('both settings are in this file: delete one of the two by hand, then run `omega migrate` again')}`);
-      continue;
-    }
-
-    if (converted) {
-      const verb = dryRun ? chalk.dim('⊘ would move') : `${chalk.green('✓')} moved`;
-      console.log(`  ${verb} ${chalk.cyan(finding.path)} ${chalk.dim('→')} ${chalk.cyan(converted.path)} ${chalk.dim(`= ${JSON.stringify(converted.value)}`)}`);
-    } else {
-      const verb = dryRun ? chalk.dim('⊘ would remove') : `${chalk.green('✓')} removed`;
-      console.log(`  ${verb} ${chalk.cyan(finding.path)} ${chalk.dim(`→ ${finding.replacement}`)}`);
-    }
-
-    console.log(`      ${chalk.dim(finding.why)}`);
-  }
-
-  const count = report.removed.length;
-  console.log(dryRun
-    ? chalk.dim(`\n  ${count} retired key${count === 1 ? '' : 's'} would be removed — nothing written (dry run)`)
-    : chalk.dim(`\n  ${count} retired key${count === 1 ? '' : 's'} removed — move each setting to the block named above`));
-
-  if (conflicts.length) process.exitCode = 1;
+  // A key the strict schema refuses still fails the brand's load, so it fails the run in both modes
+  if (errors > 0 || (!execute && due > 0) || count('undeclared') > 0) process.exitCode = 1;
 };
 
 /**
- * Where a converted setting lands: the retired path with its LAST segment
- * replaced by the replacement's, so a row registered at `targets.web.…` writes
- * back into the target the brand wrote it in.
- * @param {{ path: string, replacement: string }} finding
- * @returns {string}
+ * Load the brand config as a build would, once every file is in its final
+ * state: the brand root through the manage walk's loadBrand, then each
+ * framework target. Every error the loader throws or returns is one line,
+ * and a message a second load repeats (the brand file read again) prints once.
+ * @param {string} brandRoot
+ * @param {Array<object>} targets - discoverTargets entries.
+ * @returns {{ heading: string, due: string[], changed: string[], errors: string[] }}
  */
-function convertedPath(finding) {
-  const steps = finding.path.split('.');
-  steps[steps.length - 1] = finding.replacement.split('.').pop();
+function loadBlock(brandRoot, targets) {
+  const seen = new Set();
+  const errors = [];
+  const add = (where, message) => {
+    if (seen.has(message)) return;
+    seen.add(message);
+    errors.push(`${where}: ${message}`);
+  };
 
-  return steps.join('.');
+  const brand = loadBrand(brandRoot);
+  if (brand.configError) add('brand', brand.configError);
+  for (const message of brand.configErrors) add('brand', message);
+
+  for (const entry of targets.filter((target) => TARGETS.includes(target.target))) {
+    try {
+      for (const message of loadConfig(entry.path, entry.target).errors) add(entry.name, message);
+    } catch (error) {
+      add(entry.name, error.message);
+    }
+  }
+
+  return { heading: 'config load', due: [], changed: [], errors };
 }
 
 /**
- * Read a dot-path off the parsed config. The path came from the walk that
- * found it, so every step exists.
- * @param {object} config
- * @param {string} dotted
- * @returns {*}
+ * Judge a brand root omega file again after a leg merged into it: what the
+ * first pass changed stands, and the second pass's findings replace the first's.
+ * A file the leg created gets its first block, after the root's others.
+ * @param {object[]} blocks - The config-pass blocks, updated in place.
+ * @param {string} heading - The file, relative to the brand root.
+ * @param {string} file
+ * @param {boolean} execute
  */
-function valueAt(config, dotted) {
-  return dotted.split('.').reduce((node, key) => (node == null ? undefined : node[key]), config);
+function rejudge(blocks, heading, file, execute) {
+  const again = migrateConfigFile({ file }, execute);
+  const block = blocks.find((entry) => entry.heading === heading);
+  if (block) {
+    Object.assign(block, { changed: [...block.changed, ...again.changed], due: again.due, errors: again.errors, undeclared: again.undeclared });
+    return;
+  }
+  const after = blocks.findLastIndex((entry) => !entry.heading.startsWith('targets'));
+  blocks.splice(after + 1, 0, { heading, ...again });
+}
+
+/**
+ * The register the report points at: the copy inside the installed manager.
+ * A brand-shaped root with no installed manager runs this bundled one (the
+ * dispatcher's documented fallback), so its own copy is the one that matches.
+ * @param {string} brandRoot
+ * @returns {string}
+ */
+function registerPath(brandRoot) {
+  const installed = resolveFrameworkPackage(brandRoot, '@omega.js/manager');
+  const root = installed ? fs.realpathSync(installed.dir) : path.join(__dirname, '..', '..');
+  return path.join(root, 'docs', 'shared', 'breaking-changes.md');
 }

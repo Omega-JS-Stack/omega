@@ -1,57 +1,27 @@
 /**
- * config-convert.js — legacy UJM config → omega.json5.
- *
- * Reads `src/_config.yml` + `config/ultimate-jekyll-manager.json` and
- * produces ONE omega.json5 object per the mapping table in docs/shared/config.md:
- *
- * - Shared sections to the TOP LEVEL with unified spellings:
- *   `brand` (+ merged `url`), `socials` (#483), `translation` (#526, with its
- *   route list converted from `exclude` to `include` globs, #858), `theme`, `connections`,
- *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
- *   `web_manager.payment` → `payment` (`processors` → `providers` — #425),
- *   `web_manager.sentry` → `monitoring.providers.sentry` (#485),
- *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`,
- *   flat `advertising.<provider>` → `advertising.providers.<provider>`
- *   (`google-adsense` → `adsense` + camelCase slots — #23),
- *   `recaptcha` → `captcha.providers.recaptcha` (camelCase sub-keys),
- *   `cloudflare` → `edge.providers.cloudflare`.
- * - Everything web-only under `targets.web`: presentation sections (favicon,
- *   manifest, icons),
- *   blog/engine config (permalink, pagination,
- *   defaults, generators — codemod rule 8's home), the
- *   remaining `web_manager` client-settings blob (renamed `client` on the way
- *   out — #1: WebManager is not an OMEGA concept), and the UJM-json build
- *   settings (distribute, purgecss, imagemin, workflows).
- * - Dropped with notes: Jekyll machinery keys, the legacy `meta` block (#607 —
- *   omega.json5 has NO meta section; the site-wide default is brand.name /
- *   brand.description and per-page meta is page frontmatter), the legacy
- *   `download` / `extension` page maps (#610 — derived from
- *   targets.desktop.releases and targets.extension.listings now), `webpack`
- *   (esbuild now), `gems` (Ruby is gone), the legacy `collections` block
- *   (#589 — an OMEGA collection needs a grouping `field` no Jekyll collection
- *   carries), secret-shaped keys (they belong in .env).
- *
- * The engine composes the runtime shape back together (cloud.config →
- * client.firebase.app.config, payment → client.payment) in
- * engine.js, so templates and the client keep their contract.
+ * config-convert.js: legacy UJM config → omega.json5, per the mapping table in
+ * docs/shared/config.md. Reads `src/_config.yml` + `config/ultimate-jekyll-manager.json`
+ * and produces ONE omega.json5 object: the shared sections at the TOP LEVEL in
+ * their unified spellings (`web_manager` config and payment → `cloud` and
+ * `payment`, flat analytics/advertising/recaptcha/cloudflare → role providers),
+ * the `client` blob and the UJM-json purgecss/imagemin under `targets.<name>`, and
+ * the translation skip list converted to an include list. Jekyll machinery,
+ * the legacy `meta`, `download`, `extension` and `collections` blocks, secrets,
+ * and every key the strict schema does not declare are dropped with a note
+ * each; engine.js composes the runtime shape (client.firebase, client.payment).
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
 const JSON5 = require('json5');
-const { findSecretKeys, RETIRED_PATHS } = require('@omega.js/config');
+const { findSecretKeys, undeclaredAuthoredPaths } = require('@omega.js/config');
+const { excludeToInclude } = require('@omega.js/devkit/translation-include');
 
 // _config.yml sections that were Jekyll/UJM machinery — gone with Jekyll
 const DROPPED_JEKYLL_KEYS = [
   'exclude', 'include', 'plugins', 'plugins_dir', 'markdown', 'highlighter',
   'sass', 'compress_html', 'timezone', 'encoding', 'incremental', 'profile',
   'liquid', 'kramdown', 'destination', 'source', 'safe', 'keep_files',
-];
-
-// _config.yml sections that stay web-scoped (targets.web), in output order
-const WEB_SECTION_ORDER = [
-  'permalink', 'pagination',
-  'defaults', 'generators', 'client',
 ];
 
 // The four schema-less presentation sections #850 retired. Everything the
@@ -114,15 +84,16 @@ function isEmpty(value) {
  * @param {object} sources
  * @param {object|null} sources.jekyll - parsed _config.yml (or null)
  * @param {object|null} sources.ujm - parsed ultimate-jekyll-manager.json (or null)
+ * @param {string} [sources.name] - the target's key: its folder name inside a brand
  * @returns {{ omega: object, notes: string[] }}
  */
-function convertConfig({ jekyll, ujm }) {
+function convertConfig({ jekyll, ujm, name: targetName = 'web' }) {
   const config = { ...(jekyll || {}) };
   const notes = [];
   const omega = {};
   // The target's key is its NAME and its `type` says which framework runs it
-  // ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)); a converted
-  // legacy site is the brand's `web` target
+  // ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)); a standalone
+  // legacy site is the `web` target, a brand's is keyed by its folder
   const web = { type: 'web' };
 
   const take = (key) => {
@@ -154,16 +125,14 @@ function convertConfig({ jekyll, ujm }) {
   // other target that translates (the extension's `_locales`).
   const translation = take('translation');
   if (!isEmpty(translation)) {
-    // ---- translation.exclude → translation.include (#858). The legacy list
-    // said what to SKIP, which is a retired key now, so carrying it through
-    // would emit a config the validator refuses. The converter is the retired
-    // row's own (@omega.js/config), never a second copy of the rule: the
-    // brand lands on `['**', '!<each>']`, translating exactly what it was
-    // translating before rather than on the new framework default.
+    // ---- translation.exclude → translation.include: carrying the skip list
+    // would emit a key the strict schema refuses. devkit's conversion is the one
+    // the brand-root migrate row runs, so the brand keeps translating exactly
+    // what it translated before, never the newer framework default.
     if (translation.exclude !== undefined) {
       const excluded = translation.exclude;
       delete translation.exclude;
-      translation.include = RETIRED_PATHS['translation.exclude'].convert(excluded);
+      translation.include = excludeToInclude(excluded);
       notes.push(
         '`translation.exclude` → `translation.include` (#858): the route list says what to TRANSLATE now, '
         + `so the skip list became \`${JSON.stringify(translation.include)}\` (the same pages as before). `
@@ -357,18 +326,17 @@ function convertConfig({ jekyll, ujm }) {
     for (const name of names) {
       notes.push(
         `_config.yml \`collections.${name}\` dropped (#589) — a Jekyll collection carries no grouping field and `
-        + `\`targets.web.collections\` requires one. Declare \`targets.web.collections.${name}\` by hand with its `
+        + `\`targets.${targetName}.collections\` requires one. Declare \`targets.${targetName}.collections.${name}\` by hand with its `
         + '`field` (the dotted frontmatter path its category pages group on, e.g. `doc.category`), then move the '
         + `documents to \`src/_${name}/\``,
       );
     }
   }
 
-  // ---- the legacy `meta` block DROPPED (#607, Ian 2026-08-26). omega.json5
-  // has no meta section: the site-wide default is the brand block the head
-  // falls back to, and everything per-page lives in that page's frontmatter.
-  // Carrying it would write a config the validator refuses (retired-keys.js)
-  // — and a silently ignored one before that.
+  // ---- the legacy `meta` block DROPPED: omega.json5 has no meta section. The
+  // site-wide default is the brand block the head falls back to, every per-page
+  // value lives in page frontmatter, and a carried block would be a key the
+  // strict schema refuses.
   const legacyMeta = take('meta');
   if (!isEmpty(legacyMeta)) {
     notes.push(
@@ -390,29 +358,18 @@ function convertConfig({ jekyll, ujm }) {
     notes.push('`currency` moved to `payment.currency` (#850): the price currency belongs to the payment section every surface reads it from');
   }
 
-  // ---- web-scoped sections from _config.yml
-  for (const key of WEB_SECTION_ORDER) {
-    if (key === 'client') {
-      if (!isEmpty(legacyWebManager)) web.client = legacyWebManager;
-      continue;
-    }
-    const value = take(key);
-    if (!isEmpty(value)) web[key] = value;
-  }
+  // ---- the client blob, web-scoped
+  if (!isEmpty(legacyWebManager)) web.client = legacyWebManager;
 
-  // ---- leftovers: Jekyll machinery dropped, unknown keys carried web-scoped
+  // ---- leftovers: Jekyll machinery dropped, the rest web-scoped (the strict
+  // pass below keeps only what the schema declares)
   for (const [key, value] of Object.entries(config)) {
     if (DROPPED_JEKYLL_KEYS.includes(key)) {
       notes.push(`_config.yml \`${key}\` dropped (Jekyll machinery)`);
       continue;
     }
-    if (isEmpty(value)) continue;
-    web[key] = value;
-    notes.push(`_config.yml \`${key}\` carried to targets.web.${key} (unrecognized section — verify)`);
+    if (!isEmpty(value)) web[key] = value;
   }
-
-  if (web.generators) notes.push('dynamic-page generators carried to targets.web.generators — verify engine coverage');
-  if (web.defaults) notes.push('Jekyll per-collection defaults carried to targets.web.defaults (codemod rule 8)');
 
   // The sitemap delta (#564). Unconditional: every UJM site shipped the blog
   // taxonomy and its pagination in sitemap.xml, and OMEGA's index posture
@@ -437,7 +394,7 @@ function convertConfig({ jekyll, ujm }) {
     }
   }
 
-  omega.targets = { web };
+  omega.targets = { [targetName]: web };
 
   // ---- secrets never land in omega.json5
   const secretPaths = findSecretKeys(omega);
@@ -450,7 +407,30 @@ function convertConfig({ jekyll, ujm }) {
     notes.push(`secret-shaped key \`${dotPath}\` dropped — move the value to .env`);
   }
 
+  // ---- the schema is strict: a key no rule declares would fail the load, so
+  // it is dropped, one note per path, for the brand to carry by hand if needed
+  // (judged as a web target's own file; inside a brand, brand-config.js moves what
+  // the root's shared layer does not declare under the target)
+  for (const dotPath of undeclaredAuthoredPaths(omega, { target: 'web' })) {
+    removePath(omega, dotPath.split('.'));
+    notes.push(`\`${dotPath}\` dropped: no omega.json5 key reads it; carry the setting by hand if it still matters`);
+  }
+
   return { omega, notes };
+}
+
+/**
+ * Delete the key at `steps` and every ancestor it leaves empty.
+ * @param {object} node
+ * @param {string[]} steps
+ */
+function removePath(node, steps) {
+  const [head, ...rest] = steps;
+  if (rest.length && node[head] && typeof node[head] === 'object') {
+    removePath(node[head], rest);
+    if (Object.keys(node[head]).length) return;
+  }
+  delete node[head];
 }
 
 /**
@@ -492,4 +472,4 @@ function serializeOmega(omega) {
   return `${header}\n${JSON5.stringify(omega, null, 2)}\n`;
 }
 
-module.exports = { convertConfig, readLegacyConfigs, serializeOmega };
+module.exports = { convertConfig, readLegacyConfigs, serializeOmega, removePath };

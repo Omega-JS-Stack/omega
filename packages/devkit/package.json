@@ -15,6 +15,7 @@
     "./attach-log-file": "./src/attach-log-file.js",
     "./stop-signals": "./src/stop-signals.js",
     "./bare-requires": "./src/bare-requires.js",
+    "./translation-include": "./src/translation-include.js",
     "./env-watch": "./src/env-watch.js",
     "./cli-router": "./src/cli-router.js",
     "./argv": "./src/argv.js",
@@ -74,7 +75,9 @@
     "./test/esm-only-fixture": "./src/test/esm-only-fixture.js",
     "./vendor": "./tools/vendor.js",
     "./prepare-guard": "./tools/prepare-guard.js",
-    "./omega-bin": "./src/omega-bin.js"
+    "./omega-bin": "./src/omega-bin.js",
+    "./verbs": "./src/verbs.js",
+    "./target-picker": "./src/target-picker.js"
   },
   "scripts": {
     "test": "node scripts/run-tests.js"

@@ -112,14 +112,14 @@ test('bare run fans out to every target, each spawned `update` in its own cwd', 
   assert.equal(code, undefined, 'all targets green → no error exit code');
 });
 
-test('flags forward verbatim (--apply, --major, --min-age); --target= is consumed here', async () => {
+test('flags forward verbatim (--dry-run, --major, --min-age); --target= is consumed here', async () => {
   const { brand } = stageBrand();
-  await runUpdateCommand(brand, { apply: true, major: true, 'min-age': 14, minAge: 14 });
+  await runUpdateCommand(brand, { 'dry-run': true, dryRun: true, major: true, 'min-age': 14, minAge: 14 });
 
   const calls = readCalls(brand);
   assert.equal(calls.length, 2);
   for (const call of calls) {
-    assert.deepEqual(call.argv, ['update', '--apply', '--major', '--min-age=14'], 'the camelCase twin never forwards twice');
+    assert.deepEqual(call.argv, ['update', '--dry-run', '--major', '--min-age=14'], 'the camelCase twin never forwards twice');
   }
 
   fs.rmSync(path.join(brand, 'calls.log'));
@@ -178,11 +178,10 @@ test('outside any brand: errors with exit 1', async () => {
   assert.equal(code, 1);
 });
 
-test('cli routes `update` (+ outdated/out aliases) through ALIASES to the command file', () => {
+test('cli routes `update` through ALIASES to the command file', () => {
   const Main = require('../src/cli.js');
   assert.ok(Object.prototype.hasOwnProperty.call(Main.config.aliases, 'update'));
-  assert.ok(Main.config.aliases.update.includes('outdated'));
-  assert.ok(Main.config.aliases.update.includes('out'));
+  assert.deepEqual(Main.config.aliases.update, ['--update'], 'the report-era outdated/out aliases are gone');
   assert.ok(fs.existsSync(path.join(Main.config.commandsDir, 'update.js')));
 });
 
@@ -223,13 +222,28 @@ test('the brand ROOT rides the fan-out for @omega.js/manager, applied with --sav
     devDependencies: { '@omega.js/manager': '0.4.0', 'some-brand-tool': '^1.0.0' },
   }));
 
-  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { apply: true }));
+  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand));
 
   assert.deepEqual(commands, ['npm install @omega.js/manager@0.5.0 --save-dev --save-exact'],
     'the root pin moves with the family, exactly — and nothing else at the root is touched');
 
   // The targets still fan out exactly as before
   assert.deepEqual(readCalls(brand).map((c) => c.name).sort(), ['backend', 'web']);
+});
+
+test('--dry-run at the brand root installs nothing for the root pin, and forwards to every target', async () => {
+  const { brand } = stageBrand();
+  write(path.join(brand, 'package.json'), JSON.stringify({
+    name: 'fixture-brand', private: true, workspaces: ['targets/*'],
+    devDependencies: { '@omega.js/manager': '0.4.0' },
+  }));
+
+  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { 'dry-run': true, dryRun: true }));
+
+  assert.deepEqual(commands, [], 'the root leg only reports');
+  const calls = readCalls(brand);
+  assert.equal(calls.length, 2, 'both targets were spawned');
+  for (const call of calls) assert.deepEqual(call.argv, ['update', '--dry-run']);
 });
 
 test('a picked run leaves the brand root alone — --target= names targets', async () => {
@@ -239,7 +253,7 @@ test('a picked run leaves the brand root alone — --target= names targets', asy
     devDependencies: { '@omega.js/manager': '0.4.0' },
   }));
 
-  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { apply: true, target: 'web' }));
+  const { commands } = await withOfflineUpdate(() => runUpdateCommand(brand, { target: 'web' }));
 
   assert.deepEqual(commands, [], 'nothing ran for the root');
   assert.deepEqual(readCalls(brand).map((c) => c.name), ['web']);

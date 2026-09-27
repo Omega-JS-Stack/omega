@@ -11,7 +11,7 @@ Two lifecycle hooks let consumers run custom logic during the build pipeline.
 
 Hooks are optional — `gulp/tasks/package.js` checks for the file's presence and runs it if present.
 
-The NESTED path above is authoritative: it is what `src/defaults/hooks/build/` scaffolds and what setup's migration moves a flat `hooks/build:pre.js` to. The task resolves it first and falls back to the flat pre-migration path during the transition, so an unmigrated project keeps building ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
+The NESTED path above is authoritative: it is what `src/defaults/hooks/build/` scaffolds and what the brand root's `omega migrate --execute` moves a flat `hooks/build:pre.js` to. The task resolves it first and falls back to the flat pre-migration path during the transition, so an unmigrated project keeps building ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
 
 ## Hook shape
 

@@ -3,11 +3,14 @@
  * (npu-outdated semantics, 7-day release-age quarantine); @omega.js/backend
  * only wires it into the colon-style CLI. Pins: the built command class
  * loads from dist (so the vendored devkit module resolves), the dispatcher
- * routes update/outdated/out, and the offline core behaves (report/apply
+ * routes update and its flag spellings, and the offline core behaves (install
  * selection with an injected registry + clock — no network).
  */
 
+const path = require('path');
 const table = require('../../dist/cli/command-table.js');
+const { BOOLEAN_FLAGS } = require('../../dist/cli/flags.js');
+const { parseArgv } = require('../../dist/vendor/devkit/argv.js');
 const UpdateCommand = require('../../dist/cli/commands/update.js');
 const devkitUpdate = require('../../dist/vendor/devkit/update.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
@@ -25,12 +28,38 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'dispatcher-routes-update-outdated-out',
+      name: 'dry-run-reaches-runUpdate-and-a-bare-run-installs',
+      async run({ assert }) {
+        const commandFile = path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'update.js');
+
+        // The command destructures runUpdate at load, so the stub lands before a fresh require
+        async function run(args) {
+          const original = devkitUpdate.runUpdate;
+          const seen = [];
+          devkitUpdate.runUpdate = async (options) => { seen.push(options); };
+          delete require.cache[commandFile];
+          try {
+            const Command = require(commandFile);
+            await new Command({ firebaseProjectPath: __dirname, argv: parseArgv(args, { booleans: BOOLEAN_FLAGS }), options: {} }).execute();
+          } finally {
+            devkitUpdate.runUpdate = original;
+            delete require.cache[commandFile];
+          }
+          assert.equal(seen.length, 1, 'the command called runUpdate once');
+          return seen[0];
+        }
+
+        assert.equal((await run(['update', '--dry-run'])).dryRun, true);
+        assert.equal(Boolean((await run(['update'])).dryRun), false, 'a bare run is not a dry run');
+      },
+    },
+    {
+      name: 'dispatcher-routes-update',
       async run({ assert }) {
         const update = table.COMMANDS.find((command) => command.name === 'update');
         assert.ok(update, 'the command table carries the update verb');
 
-        for (const token of ['update', 'outdated', 'out']) {
+        for (const token of ['update', '-u', '--update']) {
           assert.equal(table.matchCommand(update, { [token]: true }), true, `\`omega ${token}\` dispatches update`);
         }
       },

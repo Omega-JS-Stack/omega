@@ -107,17 +107,9 @@ test('names are unique and every group is used', () => {
   assert.deepEqual(unused, [], 'every declared group owns at least one key');
 });
 
-// #636 — a key with no reader is not an inventory entry, it is a prompt for a
-// credential nothing will ever use. COINBASE_API_KEY named a payment provider
-// that did not exist and APOLLO_API_KEY named an enrichment lane nobody wrote.
-// Both are gone — schema row, `_.env` placeholder, config stub and all. The
-// crypto provider came back for real in #642, but under the key its API is
-// actually called with (COINBASE_COMMERCE_API_KEY, below): this bare name still
-// reads nowhere, so it stays dead.
-// #893: the six PUBLIC identifiers left .env for config. A public value that
-// a store URL, a browser bundle or a binary carries is config by the rule in
-// docs/shared/config.md, and two homes for one value drift. Each name is now a
-// RETIRED_ENV_KEYS row (env-retired.test.js) rather than a schema entry.
+// A key with no reader is no inventory entry, and a public value lives in
+// config (docs/shared/config.md "Config or env?"): the six public ids are rows
+// in @omega.js/manager's migrate table, never schema entries.
 test('the public identifiers are gone from the env schema (#893)', () => {
   const moved = {
     CHROME_EXTENSION_ID: 'extension',

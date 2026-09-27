@@ -9,7 +9,7 @@
 const BOOLEAN_FLAGS = [
   'extended', 'local', 'quick', 'q', 'direct', 'dry-run', 'secrets',
   'smoke', 'verify-only', 'find-window-id', 'publish', 'open', 'tail', 'f', 'strict',
-  'apply', 'major', 'force-fresh',
+  'major', 'force-fresh',
 ];
 
 async function run() {
@@ -39,3 +39,6 @@ async function run() {
 }
 
 module.exports = { run, BOOLEAN_FLAGS };
+
+// Runnable as a file: the package's own `npm test` calls it directly, never through the dispatcher
+if (require.main === module) run();

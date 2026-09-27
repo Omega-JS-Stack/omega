@@ -83,6 +83,34 @@ function dropDrift(lock, drift) {
 }
 
 /**
+ * Prune `root`'s package-lock.json in place: the stale path entries, then the
+ * @omega.js entries the deploy gate refuses. The lock-only regeneration runs it
+ * first, and so does `omega i live` before its tree install
+ * ([#862](https://github.com/Omega-JS-Stack/omega/issues/862)), since that
+ * install honors the lock's old links just the same.
+ *
+ * @param {object} options
+ * @param {string} options.root - The install root whose lock is pruned.
+ * @param {function} [options.log] - Line sink (silent when omitted).
+ * @returns {void}
+ */
+function pruneLockfile({ root, log }) {
+  const { lockPath, lock, drift } = brandLockfileDrift({ root });
+
+  // No lock, or one without a `packages` map, has no entry to prune.
+  if (!lock || !lock.packages) return;
+
+  const pruned = dropStalePaths(lock, root);
+  const dropped = dropDrift(lock, drift);
+
+  if (pruned.length || dropped.length) {
+    jetpack.write(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+  }
+  if (log && pruned.length) log(`Pruned the lock entries of folders no longer on disk (${pruned.join(', ')}) so npm stops honoring what they declare`);
+  if (log && dropped.length) log(`Dropped the stale lock entries of ${dropped.join(', ')} so npm resolves them from the manifests`);
+}
+
+/**
  * Regenerate `root`'s package-lock.json from its manifests, lock-only: no
  * scripts, no node_modules writes.
  *
@@ -92,19 +120,10 @@ function dropDrift(lock, drift) {
  * @returns {Promise<void>}
  */
 async function regenerateLockfile({ root, log }) {
-  const { lockPath, lock, drift } = brandLockfileDrift({ root });
-  const original = lock ? jetpack.read(lockPath) : null;
+  const lockPath = path.join(root, 'package-lock.json');
+  const original = jetpack.exists(lockPath) === 'file' ? jetpack.read(lockPath) : null;
 
-  if (lock && lock.packages) {
-    const pruned = dropStalePaths(lock, root);
-    const dropped = dropDrift(lock, drift);
-
-    if (pruned.length || dropped.length) {
-      jetpack.write(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
-    }
-    if (log && pruned.length) log(`Pruned the lock entries of folders no longer on disk (${pruned.join(', ')}) so npm stops honoring what they declare`);
-    if (log && dropped.length) log(`Dropped the stale lock entries of ${dropped.join(', ')} so npm resolves them from the manifests`);
-  }
+  pruneLockfile({ root, log });
 
   if (log) log(`Regenerating ${path.basename(root)}/package-lock.json...`);
 
@@ -124,4 +143,4 @@ async function regenerateLockfile({ root, log }) {
   }
 }
 
-module.exports = { regenerateLockfile };
+module.exports = { pruneLockfile, regenerateLockfile };

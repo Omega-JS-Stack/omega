@@ -1,31 +1,14 @@
 /**
- * @omega.js/config repo: the ONE derivation of every repo a brand owns
- * ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)).
- *
- * ONE config block says where a brand hosts its code:
- *
- *   repo: { provider: 'github', org: 'Acme-Org' }
- *
- * and nothing else. Presence of the block enables the repo service, exactly
- * as a target's key presence enables a target; `provider` defaults to `github`
- * and `org` is the only typed value. No repo NAME is ever configured: every
- * name derives from the `<brand.id>-<role>` rule (Ian 2026-09-07,
- * [#809](https://github.com/Omega-JS-Stack/omega/issues/809)), one function per
- * role, so nobody types a repo name to get the right one:
- *
- *   - `<brand.id>-omega`    the SOURCE monorepo (`sourceRepo`)
- *   - `<brand.id>-releases` the public release channel (`releasesRepo`)
- *   - `<brand.id>-<name>`   one per web target that GitHub hosts (`websiteRepo`)
- *
- * A repo name that must differ is a brand id that must differ: the override
- * keys (`repo.providers.github.repo`, the top-level `github` block,
- * `targets.<name>.github.repo`, `targets.desktop.releases.owner/repo`) are
- * retired, each with a row in retired-keys.js.
- *
- * Visibility is NOT in omega.json5 either: the brand root's package.json
- * `private` field is the one statement of it (`brandVisibility`), absent
- * meaning private, because every brand monorepo is private by default
- * (Ian 2026-09-11).
+ * @omega.js/config repo: the ONE derivation of every repo a brand owns. One
+ * block says where a brand hosts its code, `repo: { provider: 'github', org }`:
+ * its presence enables the repo service, `provider` defaults to `github`, and
+ * `org` is the only typed value. No repo NAME is configured anywhere; each
+ * derives from `<brand.id>-<role>`, one function per role: `<brand.id>-omega`
+ * the source monorepo (`sourceRepo`), `<brand.id>-releases` the public release
+ * channel (`releasesRepo`), `<brand.id>-<name>` per GitHub-hosted web target
+ * (`websiteRepo`). The old override keys are rows in @omega.js/manager's
+ * src/migrate/retired-keys.js. Visibility is the brand root package.json's
+ * `private` field (`brandVisibility`), absent meaning private.
  */
 
 const fs = require('node:fs');

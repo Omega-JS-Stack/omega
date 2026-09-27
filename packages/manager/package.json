@@ -8,9 +8,9 @@
   },
   "main": "./dist/index.js",
   "bin": {
-    "omega": "./bin/omega",
-    "omg": "./bin/omg",
-    "mgr": "./bin/omega"
+    "omega": "bin/omega",
+    "omg": "bin/omg",
+    "mgr": "bin/omega"
   },
   "files": [
     ".claude-plugin/",

@@ -66,7 +66,7 @@ const path = require('node:path');
 const JSON5 = require('json5');
 
 const { deepMerge, isPlainObject } = require('./merge.js');
-const { resolveCompany, recordBrand } = require('./company.js');
+const { resolveCompany, recordBrand, RESOLVED_COMPANY_KEYS } = require('./company.js');
 const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
@@ -134,8 +134,20 @@ function resolveOverlayEnvironment(environment, fallback) {
 function resolveOverlayPath(basePath, environment) {
   if (!basePath || !environment) return null;
 
-  const overlay = path.join(path.dirname(basePath), `${path.basename(FILE_NAME, '.json5')}.${environment}.json5`);
+  const overlay = overlayPath(basePath, environment);
   return fs.existsSync(overlay) ? overlay : null;
+}
+
+/**
+ * The ONE spelling of a layer's environment overlay: `omega.<environment>.json5`
+ * beside its base file, whether or not either exists. Every reader and writer
+ * of an overlay names it through here.
+ * @param {string} basePath - The layer's omega.json5 path.
+ * @param {string} environment - One of ENV_ENVIRONMENTS.
+ * @returns {string} Absolute overlay path.
+ */
+function overlayPath(basePath, environment) {
+  return path.join(path.dirname(basePath), `${path.basename(FILE_NAME, '.json5')}.${environment}.json5`);
 }
 
 /**
@@ -300,10 +312,6 @@ function stripTargets(config) {
   const { targets, ...shared } = config;
   return shared;
 }
-
-// The `company` keys the LOADER fills (#677): authored, they would be
-// overwritten at every load, so an author hears about it at the file.
-const RESOLVED_COMPANY_KEYS = ['name', 'url', 'images'];
 
 /**
  * The company keys nobody types, refused where a human writes them: the BRAND
@@ -737,4 +745,4 @@ function composeTargetConfig(projectDir, target, options) {
   return { config, files: { local: localPath, brand: brandPath, company: companyPath } };
 }
 
-module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, TARGET_SUBDIRS };
+module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, TARGET_SUBDIRS };

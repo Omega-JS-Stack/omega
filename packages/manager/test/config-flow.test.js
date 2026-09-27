@@ -14,7 +14,7 @@ const { setPromptStreams } = require('@omega.js/devkit/prompt');
 const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { makeStreams } = require('@omega.js/devkit/test/prompt-streams');
 const JSON5 = require('json5');
-const { resolveConfigValue, sortChoicesForBrand, setAtPath } = require('../src/lib/config-flow.js');
+const { resolveConfigValue, sortChoicesForBrand } = require('../src/lib/config-flow.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
@@ -41,14 +41,7 @@ afterEach(() => {
   setBrowserOpener(null);
 });
 
-// ─── setAtPath / sortChoicesForBrand (pure) ──────────────────────────────────
-
-test('config-flow: setAtPath creates intermediate objects and sets leaves', () => {
-  const obj = { a: { b: 1 } };
-  setAtPath(obj, 'a.c.d', 'x');
-  setAtPath(obj, 'a.b', 2);
-  assert.deepEqual(obj, { a: { b: 2, c: { d: 'x' } } });
-});
+// ─── sortChoicesForBrand (pure) ──────────────────────────────────────────────
 
 test('config-flow: sortChoicesForBrand puts create-new first, default second, brand matches before the rest', () => {
   const items = [

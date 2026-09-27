@@ -1,6 +1,6 @@
-// @omega.js/backend self-test fixture config — omega.json5 shape: shared sections top-level,
-// targets.backend presence = backend enabled. omega holds the
-// fixture's admin keys (test-only values, injected into env by the runner).
+// @omega.js/backend self-test fixture config: shared sections top-level,
+// targets.backend presence = backend enabled. The fixture's test-only admin
+// keys are the harness's own (cli/commands/test.js), never config.
 {
   brand: {
     id: '@omega.js/backend',
@@ -9,11 +9,6 @@
     contact: {
       email: 'fixture@example.com',
     },
-  },
-  omega: {
-    key: 'fixture-admin-key',
-    webhookKey: 'fixture-webhook-key',
-    namespace: '00000000-0000-0000-0000-000000000000',
   },
   // The feature catalog (#647): every feature is defined ONCE here, and the
   // products below name only their value.

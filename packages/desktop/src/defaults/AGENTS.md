@@ -44,11 +44,7 @@ npx omega test mgr:                 # run ONLY framework tests (universal alias;
 npx omega test desktop:build/config      # run only framework tests matching a path
 npx omega test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent, a shared name across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop)
 # (output is teed to logs/: dev.log on `npm start`, build.log on `npm run build`, test.log on `npx omega test`; cat instead of scrolling scrollback)
-npx omega install dev  # use LOCAL @omega.js/desktop source (to test framework edits)
-npx omega install live # restore the published @omega.js/desktop from npm
 ```
-
-> Editing the @omega.js/desktop framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/desktop`). Run `npx omega install live` to switch back.
 
 ## Where things live
 

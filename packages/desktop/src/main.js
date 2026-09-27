@@ -196,7 +196,8 @@ class Omega {
     // fails loud + early instead of partway through boot with a confusing stack trace.
     {
       const { validateConfig, formatErrors } = require('@omega.js/config');
-      const { errors } = validateConfig(this.config, { target: 'desktop' });
+      // A packaged app's config is baked, build facts included: validate it as decorated
+      const { errors } = validateConfig(this.config, { target: 'desktop', decorated: true });
       if (errors.length > 0) {
         throw new Error(`@omega.js/desktop: config validation failed. Fix the following in config/omega.json5:\n${formatErrors(errors)}`);
       }

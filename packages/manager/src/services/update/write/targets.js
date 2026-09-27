@@ -121,7 +121,7 @@ module.exports = async ({ brandRoot, targets, options }) => {
       failed = true;
       // Local-first era: the frameworks aren't on the registry yet
       if (missing.some((entry) => entry.includes('@omega.js/'))) {
-        console.log(`      ${chalk.yellow('⚠')} @omega.js/* packages are not published yet — link them per target with ${chalk.bold('mgr i local')} (or a workspace/file: reference).`);
+        console.log(`      ${chalk.yellow('⚠')} @omega.js/* packages are not published yet: link the brand with ${chalk.bold('omega i local')} at the brand root (or a workspace/file: reference).`);
       }
     }
   }

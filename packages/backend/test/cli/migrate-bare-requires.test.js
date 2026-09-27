@@ -1,27 +1,19 @@
 /**
- * Test: `omega migrate` on a backend target reports the bare requires the
- * legacy FLAT install answered and OMEGA does not
- * ([#600](https://github.com/Omega-JS-Stack/omega/issues/600)).
+ * Test: the backend leg of the brand root's `omega migrate` reports the bare
+ * requires the legacy FLAT install answered and OMEGA does not. Under BEM a
+ * ported ROUTE could `require('fs-jetpack')` and be right; under OMEGA it
+ * resolves only by HOISTING, and the requires are LAZY, so the route 500s the
+ * first time a request reaches it. The scan is devkit's, shared with the web
+ * leg; this pins that a BACKEND target gets it, judged by the target's own
+ * manifest, and that it REPORTS rather than installs, `--execute` included.
  *
- * Under BEM every framework dependency sat in the consumer's own
- * `node_modules`, so a ported ROUTE could `require('fs-jetpack')` and be right.
- * Under OMEGA the framework is a package with its own tree, and such a require
- * resolves only by HOISTING. The requires that carried this were LAZY, inside
- * the handler that needs them, so the module loads fine and the route 500s the
- * first time a request actually reaches it.
- *
- * The scan itself is devkit's, shared with @omega.js/web's migrate; what this
- * pins is that a BACKEND target gets it, that it judges by the target's own
- * manifest, and that it REPORTS rather than installs.
- *
- * Temp trees only, no project, no emulator.
- *
- * Run: npx omega test backend:cli/migrate-bare-requires
+ * Temp trees only, no project, no emulator. Run at the monorepo root:
+ * npx omega test --target=backend framework:cli/migrate-bare-requires
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
-const MigrateCommand = require('../../dist/cli/commands/migrate.js');
+const { migrateTarget } = require('../../dist/cli/utils/migrate.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A ported route, exactly as one arrives from BEM: the requires that matter are
@@ -42,15 +34,9 @@ function seedTarget(manifest) {
   return targetPath;
 }
 
-/** Run the verb against a target root, exactly as the dispatcher does. */
-async function migrate(targetPath) {
-  const command = new MigrateCommand({ firebaseProjectPath: targetPath, argv: {}, options: {} });
-
-  return command.execute();
-}
 
 module.exports = defineCases({
-  description: 'migrate: the backend target\'s bare-require scan (#600)',
+  description: 'migrateTarget: the backend target\'s bare-require scan (#600)',
   type: 'group',
 
   tests: [
@@ -64,19 +50,15 @@ module.exports = defineCases({
           dependencies: { 'node-powertools': '^3.0.0' },
         });
 
-        const findings = await migrate(targetPath);
+        const result = migrateTarget(targetPath);
 
-        assert.deepEqual(
-          findings.map((entry) => entry.module),
-          ['fs-jetpack'],
-          'only what this target does not declare: a built-in resolves everywhere, a relative path is not a package, and node-powertools IS declared',
-        );
+        assert.equal(result.due.length, 1, `only what this target does not declare: a built-in resolves everywhere, a relative path is not a package, and node-powertools IS declared: ${result.due.join(' | ')}`);
+        assert.deepEqual(result.changed, [], 'a report writes nothing');
+        assert.deepEqual(result.errors, []);
 
-        const [jetpackFinding] = findings;
-
-        assert.equal(jetpackFinding.file, path.join('src', 'routes', 'marketing', 'contact', 'post.js'), 'the finding names the route');
-        assert.equal(jetpackFinding.line, 4, 'and the line, because the require is lazy and the route only 500s when it runs');
-        assert.ok(/npm install fs-jetpack/.test(jetpackFinding.fix), 'and the fix is the dependency, never an auto-install');
+        const [line] = result.due;
+        assert.ok(line.startsWith(`${path.join('src', 'routes', 'marketing', 'contact', 'post.js')}:4: \`fs-jetpack\``), `the line names the route, the line (the require is lazy, the route only 500s when it runs) and the package: ${line}`);
+        assert.ok(/npm install fs-jetpack/.test(line), 'and the fix is the dependency, never an auto-install');
       },
     },
 
@@ -91,10 +73,12 @@ module.exports = defineCases({
         });
         const before = jetpack.read(path.join(targetPath, 'package.json'));
 
-        await migrate(targetPath);
+        const result = migrateTarget(targetPath, { execute: true });
 
         assert.equal(jetpack.read(path.join(targetPath, 'package.json')), before,
-          'which package version a brand wants is the brand\'s call, so the verb reports and stops');
+          'which package version a brand wants is the brand\'s call, so even --execute reports and stops');
+        assert.deepEqual(result.changed, [], 'nothing was written');
+        assert.match(result.due[result.due.length - 1], /--execute installs nothing/, 'and the report says so in one line');
       },
     },
 
@@ -108,7 +92,7 @@ module.exports = defineCases({
           dependencies: { 'node-powertools': '^3.0.0', 'fs-jetpack': '^5.1.0' },
         });
 
-        assert.deepEqual(await migrate(targetPath), [], 'nothing left to declare');
+        assert.deepEqual(migrateTarget(targetPath, { execute: true }), { due: [], changed: [], errors: [] }, 'nothing left to declare, and nothing to say about --execute');
       },
     },
 
@@ -120,7 +104,7 @@ module.exports = defineCases({
         const targetPath = seedTarget({ name: 'x' });
         jetpack.remove(path.join(targetPath, 'package.json'));
 
-        assert.deepEqual(await migrate(targetPath), [],
+        assert.deepEqual(migrateTarget(targetPath).due, [],
           'with no manifest there is no "undeclared": guessing would name every package the route uses');
       },
     },

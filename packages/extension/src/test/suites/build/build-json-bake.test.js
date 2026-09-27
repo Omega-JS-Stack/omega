@@ -278,7 +278,7 @@ module.exports = defineCases({
             theme: { id: 'classy' },
             analytics: { providers: { google: { id: 'G-STAGED' } } },
             cloud: { config: { apiKey: 'AIza-staged' }, billingAccount: '01ABCD-234567-89EFGH' },
-            certificates: { providers: { apple: { teamId: 'TEAM' } } },
+            certificates: { providers: { apple: { bundleIdPrefix: 'com.staged' } } },
             account: { admins: [{ email: 'root@staged.com' }] },
             repo: { provider: 'github', org: 'Staged-Org' },
             targets: { extension: { type: 'extension', listings: { chrome: { id: 'abcdefghijklmnopqrstuvwxyzabcdef' } } } },

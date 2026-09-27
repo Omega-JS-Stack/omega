@@ -64,9 +64,6 @@ const TARGET_FRAMEWORKS = {
 // property fields) plus the placeholder keys a service writes back into. The
 // exported DEFAULTS is the two composed, schema first.
 const MANAGER_DEFAULTS = {
-  // Whether the brand is active (disabled brands are skipped)
-  enabled: true,
-
   // Domain registrar + email — two roles, one providers block each (#425).
   // The domain service reconciles registrar nameservers from the KEY under
   // `providers`; the cloudflare dns/email-routing operations read the key
@@ -219,7 +216,6 @@ const MANAGER_DEFAULTS = {
   // (dashboard deep-links use the account ID from state now) and hardcoded
   // the company CDN for product images (brand.images.brandmark now).
   payment: {
-    enabled: true,
     providers: {
       stripe: {
         publishableKey: null,
@@ -327,9 +323,7 @@ const MANAGER_DEFAULTS = {
   // cross-brand features). Needs SERVER_SERVICE_ACCOUNT in the brand .env
   // (path to the company server's Firebase service-account JSON — omega-
   // manager hardcoded the company project and read company-instance secrets).
-  server: {
-    enabled: true,
-  },
+  // Its switch (`server.enabled`, on by default) is a schema default.
 
   // Parent-project brand directory (#246) — pushes this brand's own entry
   // into the PARENT project's brands collection, so whatever the parent runs
@@ -348,10 +342,7 @@ const MANAGER_DEFAULTS = {
   // operation is mtime-diffed; no brandmark → the AI generation flow when
   // MrLogo credentials are in the brand .env (MRLOGO_SERVICE_ACCOUNT /
   // MRLOGO_API_KEY / LOGO_API_ID_TOKEN — zero config options), else a
-  // clean skip.
-  assets: {
-    enabled: true,
-  },
+  // clean skip. Its switch (`assets.enabled`, on by default) is a schema default.
 
   // Apple signing certificates, bundle IDs, and provisioning profiles for
   // brands with desktop/mobile targets, reconciled via the App Store

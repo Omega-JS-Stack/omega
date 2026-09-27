@@ -1,6 +1,6 @@
 /**
  * `omega update` core — classification, wanted-resolution, quarantine math
- * (injected clock), file:-spec skipping, apply selection, and install-command
+ * (injected clock), file:-spec skipping, install selection, and install-command
  * routing (npu vs npm). Registry lookups are FIXTURES — the suite never
  * touches the network.
  */
@@ -251,25 +251,26 @@ function collectLogger() {
   return { lines, log: (line) => lines.push(String(line)), warn: (line) => lines.push(`WARN ${line}`) };
 }
 
-test('runUpdate: report-only by default — no exec ever fires', async () => {
+test('runUpdate --dry-run: reports and installs nothing, no exec ever fires', async () => {
   const dir = stageTarget({ name: 'ro', dependencies: { 'stable-pkg': '^1.2.3' } }, { 'stable-pkg': '1.2.3' });
   const logger = collectLogger();
   const calls = [];
 
   const result = await update.runUpdate({
-    dir, logger, lookup, now: NOW,
+    dir, logger, lookup, now: NOW, dryRun: true,
     execFn: (cmd) => calls.push(cmd),
     hasNpu: true,
   });
 
-  assert.equal(calls.length, 0, 'report mode never installs');
+  assert.equal(calls.length, 0, 'a dry run never installs');
   assert.equal(result.selection, null);
   assert.ok(logger.lines.some((line) => line.includes('stable-pkg')), 'table row printed');
-  assert.ok(logger.lines.some((line) => line.includes('--apply')), 'apply hint printed');
+  assert.ok(logger.lines.some((line) => line.includes('--dry-run') && line.includes('`omega update` installs')), 'dry-run hint names what a bare run does');
+  assert.ok(!logger.lines.some((line) => line.includes('--apply')), 'no retired switch in the output');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on missing npu', async () => {
+test('runUpdate bare: installs via npu, holds quarantined + majors, warns on missing npu', async () => {
   const dir = stageTarget({
     name: 'ap',
     dependencies: { 'stable-pkg': '^1.2.3', 'fresh-pkg': '^2.0.0' },
@@ -279,7 +280,7 @@ test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on 
   const logger = collectLogger();
   const calls = [];
   const result = await update.runUpdate({
-    dir, logger, lookup, now: NOW, apply: true, hasNpu: true,
+    dir, logger, lookup, now: NOW, hasNpu: true,
     execFn: (cmd, opts) => calls.push({ cmd, cwd: opts.cwd }),
   });
 
@@ -296,7 +297,7 @@ test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on 
   const logger2 = collectLogger();
   const calls2 = [];
   await update.runUpdate({
-    dir, logger: logger2, lookup, now: NOW, apply: true, hasNpu: false,
+    dir, logger: logger2, lookup, now: NOW, hasNpu: false,
     execFn: (cmd) => calls2.push(cmd),
   });
   assert.ok(calls2.every((cmd) => cmd.startsWith('npm install')), 'plain npm fallback');
@@ -305,12 +306,12 @@ test('runUpdate --apply: installs via npu, holds quarantined + majors, warns on 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('runUpdate --apply --force-fresh: quarantined release installs', async () => {
+test('runUpdate --force-fresh: quarantined release installs', async () => {
   const dir = stageTarget({ name: 'ff', dependencies: { 'fresh-pkg': '^2.0.0' } }, { 'fresh-pkg': '2.0.5' });
   const calls = [];
   await update.runUpdate({
     dir, logger: collectLogger(), lookup, now: NOW,
-    apply: true, forceFresh: true, hasNpu: true,
+    forceFresh: true, hasNpu: true,
     execFn: (cmd) => calls.push(cmd),
   });
   assert.deepEqual(calls, ['npu install fresh-pkg@2.1.0']);

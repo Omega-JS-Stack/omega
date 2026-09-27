@@ -1,7 +1,7 @@
 /**
  * lint.js — the liquid-lint scanner: checks the codemod cannot express as a
  * safe rewrite. Runs over the SAME file set as the codemod (post-rewrite in
- * a real migration, pre-flight in --check).
+ * an --execute run, pre-flight in a report).
  *
  * Known filter/tag names are derived at runtime from the REAL engine
  * registration path (a LiquidJS instance + template-kit's registerLiquid +

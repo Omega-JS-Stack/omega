@@ -16,7 +16,7 @@
 // both kinds, `=logos`/`=templates` names one, services/assets/lib/reset.js).
 const BOOLEAN_FLAGS = [
   'continue-on-error', 'dry-run', 'execute', 'manage', 'all', 'full', 'verify', 'publish', 'extended',
-  'verbose', 'strict', 'apply', 'major', 'force-fresh',
+  'verbose', 'strict', 'major', 'force-fresh', 'local',
 ];
 
 async function run() {

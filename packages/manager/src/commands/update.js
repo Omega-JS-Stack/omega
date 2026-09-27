@@ -1,15 +1,15 @@
 /**
  * `omega update` at a brand root — fan the dependency-freshness verb out over
  * the brand's targets (cp251's deploy fan-out shape: same target discovery, same
- * --target= picker, same flag forwarding), each target reporting/applying
+ * --target= picker, same flag forwarding), each target reporting/installing
  * through its OWN framework's `omega update` (all of them the one devkit
  * implementation — npu-outdated semantics, 7-day release-age quarantine,
  * file: specs skipped).
  *
- *   omega update                        → every target, report only
- *   omega update --apply                → apply the safe set per target
+ *   omega update                        → install the safe set per target
+ *   omega update --dry-run              → every target, report only
  *   omega update --target=backend       → one target (target key or dir name)
- *   omega update --apply --major       → include breaking jumps
+ *   omega update --major                → include breaking jumps
  *
  * Unlike deploy, targets are INDEPENDENT here — a failing target never blocks the
  * rest (no --continue-on-error needed); any failure still exits 1.
@@ -45,13 +45,13 @@ module.exports = async (options = {}) => {
 
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s update.'));
+    console.error(chalk.red(`✗ Not inside a brand monorepo (no config/omega.json5 up the tree): run it at a brand root, with --${PICKER_FLAG}=<name> to pick targets.`));
     process.exitCode = 1;
     return;
   }
 
   // Tee the whole fan-out to <brandRoot>/logs/update.log (#623) — which target
-  // was checked, what it reported, what applied.
+  // was checked, what it reported, what installed.
   attachLogFile(path.join(brandRoot, 'logs', 'update.log'));
 
   const targets = discoverTargets(brandRoot).filter((entry) => entry.target);
@@ -102,7 +102,7 @@ module.exports = async (options = {}) => {
       await devkitUpdate.runUpdate({
         dir: brandRoot,
         only: [ROOT_PACKAGE],
-        apply: options.apply,
+        dryRun: options.dryRun || options['dry-run'],
         major: options.major,
         minAge: options.minAge ?? options['min-age'],
         forceFresh: options.forceFresh || options['force-fresh'],

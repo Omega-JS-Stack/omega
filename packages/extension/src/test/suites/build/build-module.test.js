@@ -73,7 +73,7 @@ module.exports = defineCases({
           // JSON5 comment on purpose
           brand: { id: 'somiibo', name: 'Somiibo' },
           theme: { id: 'classy' },
-          liveReloadPort: 40000,
+          ports: { livereload: 40000 },
           targets: { extension: { type: 'extension', theme: { id: 'custom' } } },
         }` });
         try {
@@ -83,8 +83,8 @@ module.exports = defineCases({
             ctx.expect(cfg.brand.name).toBe('Somiibo');
             // targets.extension overlays the top level
             ctx.expect(cfg.theme.id).toBe('custom');
-            // custom top-level keys pass through
-            ctx.expect(cfg.liveReloadPort).toBe(40000);
+            // a shared section the overlay does not touch passes through
+            ctx.expect(cfg.ports.livereload).toBe(40000);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -134,11 +134,11 @@ module.exports = defineCases({
           inDir(tmp, (build) => {
             let first = null;
             try { build.getConfig(); } catch (e) { first = e; }
-            ctx.expect(first ? first.message : '').toMatch(/payment\.processors is retired/);
+            ctx.expect(first ? first.message : '').toMatch(/payment\.processors\.stripe is not a key the schema declares/);
 
             let second = null;
             try { build.getConfig(); } catch (e) { second = e; }
-            ctx.expect(second ? second.message : '').toMatch(/payment\.processors is retired/);
+            ctx.expect(second ? second.message : '').toMatch(/payment\.processors\.stripe is not a key the schema declares/);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });

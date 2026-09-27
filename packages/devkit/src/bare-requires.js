@@ -1,25 +1,14 @@
 /**
  * "Does this project declare everything its sources require?" The migrate
- * report's dependency-resolution scan ([#600](https://github.com/Omega-JS-Stack/omega/issues/600)).
- *
- * Under the legacy FLAT install every framework dependency sat in the
- * consumer's own `node_modules`, so a ported file could `require('fs-jetpack')`
- * and be right. Under OMEGA the framework is a package with its own tree, and a
- * bare require of something the consumer never declared resolves only by
- * HOISTING, which holds on one install and not on the next. The requires that
- * carried this were LAZY (inside the function that needs them), so the module
- * loads fine and the code 500s the first time it actually runs.
- *
- * REPORT ONLY, and by the consumer's own manifest: every bare specifier under
- * the scanned tree that is neither a Node built-in, nor an alias the caller's
- * framework resolves, nor a declared dependency, named file:line with the fix
- * (declare it). Never an auto-install: which package version a brand wants is
- * the brand's call.
- *
- * It lives HERE because both frameworks whose consumers were ported need it,
- * and the answer must not differ between them: @omega.js/web's `omega migrate`
- * and @omega.js/backend's `omega migrate` each pass their own alias list and
- * read the same verdict. Stdlib-only, like every vendorable module.
+ * report's dependency-resolution scan. Under the legacy FLAT install a ported
+ * file could `require('fs-jetpack')` and be right; under OMEGA a bare require
+ * of something the consumer never declared resolves only by HOISTING, and the
+ * LAZY ones load fine and 500 the first time they run. REPORT ONLY, by the
+ * consumer's own manifest: every bare specifier that is neither a Node
+ * built-in, nor an alias the caller's framework resolves, nor a declared
+ * dependency, named file:line with the fix, never installed. It lives HERE so
+ * the web and backend legs of the brand root's `omega migrate` read the same
+ * verdict, each passing its own alias list. Stdlib-only, like every vendorable module.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -150,4 +139,13 @@ function collectBareRequires(root, options = {}) {
   return found;
 }
 
-module.exports = { collectBareRequires, packageName };
+/**
+ * One finding as the one report line every migrate leg prints.
+ * @param {{ file: string, line: number, module: string, fix: string }} entry - a collectBareRequires finding
+ * @returns {string}
+ */
+function formatBareRequire(entry) {
+  return `${entry.file}:${entry.line}: \`${entry.module}\` is not declared: ${entry.fix}`;
+}
+
+module.exports = { collectBareRequires, formatBareRequire, packageName };

@@ -19,7 +19,7 @@ const VERBS = [
   ['omega clean', "wipe every target's build output"],
   ['omega update', 'dependency-freshness fan-out over the targets'],
   ['omega bump', "the brand's one version: `patch|minor|major` moves the root and every target"],
-  ['omega migrate', 'delete retired keys from config/omega.json5 (comments preserved)'],
+  ['omega migrate', 'report what converts a legacy brand: the config, then every target (`--execute` converts)'],
   ['omega pipeline', 'the live full-cycle test: manage → deploy → verify'],
   ['omega devlog', "the manager's own development log"],
   ['omega version', 'print the installed version'],

@@ -64,6 +64,12 @@
  * refinements, seeded from real brand configs, never from guesses.
  */
 
+// Rule sets kept in their own files, one concern each.
+const { MANAGER_RULES } = require('./schema-manager.js');
+const { CLIENT_RULES } = require('./schema-client.js');
+const { CLOUD_CONFIG_RULES } = require('./schema-cloud.js');
+const { OVERRIDE_RULES } = require('./schema-overrides.js');
+
 // The durations a winback coupon can be built for on every provider that
 // supports the offer (#268). Stripe's third option ('repeating') needs a
 // duration_in_months beside it, which is provider surface nothing here asks
@@ -201,6 +207,7 @@ const CLIENT_SECTIONS = {
 const BRAND_ID_PATTERN = /^[a-z][a-z0-9+\-.]*$/;
 
 const SHARED_SCHEMA = [
+  ...MANAGER_RULES,
   // ── the target's own url ─────────────────────────────────────────────────
   {
     path:        'url',
@@ -354,18 +361,7 @@ const SHARED_SCHEMA = [
     enum:        ['firebase'],
     description: "App/cloud platform provider. Only 'firebase' today — the discriminator exists so a second provider slots in without a key rename.",
   },
-  {
-    path:        'cloud.config',
-    type:        'object',
-    required:    false,
-    description: 'Provider app config. For firebase: the web-app config verbatim from the console. Public by design — the web API key is not a secret.',
-  },
-  {
-    path:        'cloud.config.projectId',
-    type:        'string',
-    required:    false,
-    description: 'Drives auth, emulator project selection, analytics uuidv5 namespace, remote-config URL fallbacks.',
-  },
+  ...CLOUD_CONFIG_RULES,
   {
     path:        'cloud.messaging.vapidKey',
     type:        'string',
@@ -825,7 +821,7 @@ const SHARED_SCHEMA = [
   },
   {
     path:        'edge.providers.cloudflare',
-    type:        'object',
+    type:        'object', open: true,
     required:    false,
     description: 'Cloudflare zone reconciliation (@omega.js/manager cloudflare service): dns, settings, rules, cacheRules, speedTest, workers. Tokens live in .env.',
   },
@@ -1331,58 +1327,8 @@ const SHARED_SCHEMA = [
     description: "Web only: the page routes to translate, as globs with `!` negation, read in order like a .gitignore: the LAST pattern that matches a route decides it, and a route no pattern matches is not translated. A folder pattern covers the folder itself (`!blog/**` excludes `/blog` and everything under it). The default ['**', '!blog/**'] translates the whole site except the blog, which is where the words (and the cost) pile up. A brand list REPLACES the default outright. A page overrides it for itself with `translation.include: true`/`false` in its own frontmatter, the same key name one level down (docs/web/frontmatter.md). The framework's own default pages carry their own exclusion and are never in this list's hands.",
   },
 
-  // ── client (the @omega.js/client runtime blob) ───────────────────────────
-  // The blob is a settings bag the client normalizes against its own defaults,
-  // so it is deliberately NOT enumerated key by key here. `consent` is the
-  // exception (#383): it decides whether a visitor is tracked at all, which is
-  // a legal surface, not a preference — a typo that silently disabled the
-  // banner would ship a site with no consent gate and no error.
-  //
-  // The three below are the second exception (#650 — found adopting omega in a
-  // consumer): keys a BRAND authors. They work (they reach the client payload
-  // and change what the site does), so every validate run told the brand that
-  // turned one off it might be a typo. The rest of the blob stays the client's.
-  {
-    path:        'client.consent.enabled',
-    type:        'boolean',
-    required:    false,
-    default:     true,
-    description: 'The consent banner + the provider-script gate (default true). false ships NO banner — legal only for a site that loads no analytics/marketing provider at all.',
-  },
-  {
-    path:        'client.consent.config.position',
-    type:        'string',
-    required:    false,
-    enum:        ['bottom-left', 'bottom-right', 'bottom'],
-    description: "Where the panel sits. 'bottom' is the centered full-width form.",
-  },
-  {
-    path:        'client.consent.config.content',
-    type:        'object',
-    required:    false,
-    description: "Banner copy: message, panelIntro, accept, customize, acceptAll, acceptNone (a literal `{terms}`/`{cookies}` links the terms/cookie-policy page). Category labels are framework copy — a brand renames the buttons, not the categories.",
-  },
-  {
-    path:        'client.auth.config.policy',
-    type:        'string',
-    required:    false,
-    enum:        ['authenticated', 'unauthenticated', 'disabled'],
-    description: "Who a page is FOR: 'authenticated' redirects a signed-out visitor to the signin route, 'unauthenticated' redirects a signed-in one away, 'disabled' skips the auth module entirely (a vert iframe). Absent = no policy, which is the site-wide answer — the auth/admin layouts set theirs in page frontmatter, so a brand only sets this to blanket a whole site.",
-  },
-  {
-    path:        'client.exitPopup.enabled',
-    type:        'boolean',
-    required:    false,
-    default:     true,
-    description: 'The exit-intent offer popup (default true). false ships no popup at all; its copy, timeout and avatars live under client.exitPopup.config.',
-  },
-  {
-    path:        'client.serviceWorker.enabled',
-    type:        'boolean',
-    required:    false,
-    default:     true,
-    description: 'Registers the site service worker (default true) — the offline/refresh lane and the push-notification registration ride it. false unregisters any worker the visitor already has.',
-  },
+  // ── client (the @omega.js/client runtime blob): its own file ────────────
+  ...CLIENT_RULES,
 
   // ── targets ──────────────────────────────────────────────────────────────
   {
@@ -1486,6 +1432,7 @@ const TARGET_SCHEMAS = {
 
   // Seeded from the sandbox brand's real @omega.js/backend config.
   backend: [
+    ...OVERRIDE_RULES.backend,
     // reviews, marketing, blog, dataRequest moved to SHARED_SCHEMA (#277); a
     // targets.backend block still overrides them through the merge chain.
     {
@@ -1506,6 +1453,7 @@ const TARGET_SCHEMAS = {
 
   // The per-OS key is `platforms` (avoids targets.desktop.targets).
   desktop: [
+    ...OVERRIDE_RULES.desktop,
     {
       path:        'app.category',
       type:        'string',
@@ -2007,10 +1955,9 @@ const TARGET_SCHEMAS = {
 };
 
 // Declared top-level keys that are NOT config sections: `targets` is scoping
-// machinery, and `url` is this target's RESOLVED public url (#588): a value
-// the loader derives, carried to templates as the `site.url` build fact, never
-// a namespace a page's `config:` block overrides.
-const NON_SECTION_KEYS = ['targets', 'url', 'type'];
+// machinery, `url` the target's RESOLVED public url (the `site.url` build fact),
+// `type` an entry's framework, and `enabled` the brand's on/off switch.
+const NON_SECTION_KEYS = ['targets', 'url', 'type', 'enabled'];
 
 /** The top-level sections a rule array declares (machinery keys excluded). */
 const sectionsOf = (rules) => [...new Set(rules.map((rule) => rule.path.split('.')[0]))].filter((section) => !NON_SECTION_KEYS.includes(section));

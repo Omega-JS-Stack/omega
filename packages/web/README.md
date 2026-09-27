@@ -39,8 +39,9 @@ npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → d
                     #   build.yml so CI builds + publishes; --dry-run prints the exact
                     #   POST, --local builds only (docs/shared/deploys.md in the Omega repo)
 npx omega update    # dependency freshness (npu semantics): installed/wanted/latest +
-                    #   patch/minor/major per dep; releases < 7 days old QUARANTINED
-                    #   --apply installs the non-breaking non-quarantined set via npu
+                    #   patch/minor/major per dep; releases < 7 days old QUARANTINED;
+                    #   installs the non-breaking non-quarantined set via npu (--dry-run
+                    #   only reports)
                     #   (--major explicit; --min-age N / --force-fresh tune the hold;
                     #   file: specs skipped — docs/shared/updates.md in the Omega repo)
 npx omega customize <url>  # materialize a default page into src/pages/ (spec §8):
@@ -61,8 +62,9 @@ npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
 npx omega help      # command listing (also -h/--help; router built-in — never
                     #   falls through to setup like the old flag handling did)
-npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
-npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
+npx omega migrate --target=<name>            # at the BRAND ROOT (the manager's verb, this CLI has none):
+                                             #   report the UJM → @omega.js/web conversion, zero writes
+npx omega migrate --target=<name> --execute  #   convert in place
 npx omega translate         # translate dist/ into translation.languages (committed cache;
                             #   `omega build` runs it automatically when enabled — see
                             #   docs/shared/translation.md in the Omega repo)
@@ -121,7 +123,7 @@ see the harness README for the honest before/after numbers.
 | [index.js](src/index.js) | The package export: the engine entry points plus the build-side environment surface, `getEnvironment()` → `'development' \| 'testing' \| 'production'` (mutually exclusive) and `isDevelopment()` / `isProduction()` / `isTesting()` deriving from it, re-exported from `@omega.js/config/environment`: the same four calls `@omega.js/backend`, `@omega.js/desktop`, `@omega.js/extension` and the browser runtime instance answer. The verbs name the environment (`omega build` → production, `omega dev` → development, `omega test` → testing) and the build lanes read it back |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
-| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registration path: registerLiquid plus the framework's own `{% section %}`/`{% component %}`/`{% composition %}` tags, so a fully converted tree lints clean), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
+| [migrate/](src/migrate) | `migrateTarget()` (the `@omega.js/web/migrate` entry the brand root's `omega migrate` runs) over `runMigration()`: [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [brand-config.js](src/migrate/brand-config.js) (inside a brand, the merge into the root `config/omega.json5`: the root value wins, web-only sections under `targets.<name>`, and a target's own config file, its override layer, is never touched), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registration path: registerLiquid plus the framework's own `{% section %}`/`{% component %}`/`{% composition %}` tags, so a fully converted tree lints clean), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
 | [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage/bootLayout/bootSections handshake, `omega.js` the web runtime instance (`import omega from '@omega.js/web/runtime'`: the `@omega.js/client` base class plus `appearance`, `shell`, `motion` and `exitPopup`), `icons.js` the icon watcher's transport (`/assets/icons/<style>/<name>.svg`, flags one namespace over): loud on a miss in development, silent in production |
 
 ## Packaged content (the real UJM port, B2)
@@ -418,20 +420,24 @@ example, and the four questions to read a page against them:
   concurrency group — because GitHub runs workflows from the repo root only.
   NO pages are copied — the default set stays virtual. package.json scripts
   sync to the omega commands.
-- **Migration (`omega migrate`)** — one command converts a UJM consumer in
-  place: legacy configs → validated omega.json5 (shared sections extracted
-  with unified spellings — `analytics.providers.<p>.id`, `cloud.{provider,config}`,
+- **Migration (the web leg of the brand root's `omega migrate`)** converts a UJM consumer in
+  place: legacy configs → omega.json5 keys the strict schema declares (shared sections
+  with unified spellings: `analytics.providers.<p>.id`, `cloud.{provider,config}`,
   `payment` at the top level; the legacy `web_manager` blob renamed to the
-  `client` client-settings key + presentation
-  sections + build settings under `targets.web`), the codemod rule table over
+  `client` client-settings key, and build settings under `targets.<name>`).
+  Inside a brand that config merges into the brand root's `config/omega.json5`
+  (an existing root value wins, each key kept or added is a report line) and
+  a target's own `config/omega.json5` override layer is left alone; the
+  manager's config pass judges the result. The codemod rule table over
   `src/**` templates (starting with `legacy-prefix`: `uj_*` tags/filters →
   `omega_*`, `site.uj` → `site.omega`, `uj-*` classes → `omega-*` — #44 retired
   those spellings with no aliases), seed `main.js` removal (the core main + boot runtime
   replace it), the `@use 'omega:main' with (…)` rewrite for theme-variable
   customization (the layered sass importer skips the requesting file, so a
   consumer main.scss configures the layers below it), page-css self-@use
-  drops, liquid-lint, and legacy-file removal (Gemfile & co). `--check` runs
-  everything in memory. Nothing composes a runtime shape back (#894): the build
+  drops, liquid-lint, and legacy-file removal (Gemfile & co). It runs as the
+  brand-root verb: `npx omega migrate --target=web` reports in memory and writes
+  nothing, `--execute` converts. Nothing composes a runtime shape back (#894): the build
   writes the browser subset of the resolved config as `OMEGA_BUILD_JSON.config`
   into `/build.js` (@omega.js/config's `clientConfig`, the same file desktop's
   renderer and every extension context load, #743), and @omega.js/client maps the

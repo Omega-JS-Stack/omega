@@ -122,8 +122,8 @@ module.exports = defineCases({
         ctx.expect(decode.run).toContain('if [ -n "${{ secrets.CSC_LINK }}" ]; then');
         ctx.expect(decode.run).toContain('if [ -n "${{ secrets.APPLE_API_KEY }}" ]; then');
         // The standalone verb is gone (#891): the deploy precheck pushes them.
-        ctx.expect(decode.run).toContain('No CSC_LINK secret: run omega deploy from targets/desktop');
-        ctx.expect(decode.run).toContain('No APPLE_API_KEY secret: run omega deploy from targets/desktop');
+        ctx.expect(decode.run).toContain('No CSC_LINK secret: run omega deploy at the brand root');
+        ctx.expect(decode.run).toContain('No APPLE_API_KEY secret: run omega deploy at the brand root');
         ctx.expect(decode.run).not.toContain('push-secrets');
         ctx.expect(decode.run.match(/exit 1/g).length).toBe(2);
         ctx.expect(decode.run).not.toContain('this build will not be signed');

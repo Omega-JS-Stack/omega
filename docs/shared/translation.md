@@ -219,7 +219,7 @@ restated bare and fails the build.
 
 **`translation.exclude` is RETIRED** with it. There is no dual-read: a config
 still carrying it fails validation naming its replacement, and
-`omega migrate` at the brand root CONVERTS the list (`exclude: ['docs']`
+`omega migrate --execute` at the brand root CONVERTS the list (`exclude: ['docs']`
 becomes `include: ['**', '!docs']`, which keeps translating exactly what the
 brand was translating before) and deletes the old key in the same run.
 

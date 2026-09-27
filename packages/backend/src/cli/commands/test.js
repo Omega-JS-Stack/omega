@@ -16,6 +16,14 @@ const { refuseWhenCustom } = require('../utils/project-type');
 const { runTargetChecks } = require('../utils/target-checks');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
+// The bundled fixture's test-only admin keys and uuid namespace: the harness's
+// own values, never config keys.
+const FIXTURE_ENV = {
+  OMEGA_ADMIN_KEY: 'fixture-admin-key',
+  OMEGA_WEBHOOK_KEY: 'fixture-webhook-key',
+  OMEGA_NAMESPACE: '00000000-0000-0000-0000-000000000000',
+};
+
 // The Firebase emulator hub — fixed, not part of the N7-allocated map.
 const HUB_PORT = 4400;
 
@@ -500,18 +508,9 @@ class TestCommand extends BaseCommand {
     process.env.OMEGA_TEST_BOOT_PROJECT = fixture;
     self.firebaseProjectPath = fixture;
 
-    // The test HTTP client authenticates with the fixture's admin keys (the
-    // server reads the same keys from config/omega.json5). Inject them from
-    // the fixture config so loadProjectConfig finds them — no committed .env
-    // needed (single source = the fixture config). The namespace rides the
-    // same mechanism: the uuid route's v5 default reads OMEGA_NAMESPACE in
-    // the emulated functions, which inherit this process env.
-    try {
-      const cfg = require('@omega.js/config').loadConfig(fixture, 'backend').config;
-      process.env.OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || cfg.omega?.key;
-      process.env.OMEGA_WEBHOOK_KEY = process.env.OMEGA_WEBHOOK_KEY || cfg.omega?.webhookKey;
-      process.env.OMEGA_NAMESPACE = process.env.OMEGA_NAMESPACE || cfg.omega?.namespace;
-    } catch (_) { /* fixture config unreadable — let the normal key check report it */ }
+    // The test HTTP client and the emulated functions (which inherit this
+    // process env) share the fixture's test-only keys; a shell value wins.
+    for (const [name, value] of Object.entries(FIXTURE_ENV)) process.env[name] = process.env[name] || value;
 
     // Anonymous HMAC unsubscribe tests sign links with this shared secret; the
     // emulated functions inherit it from this process env (same mechanism as the

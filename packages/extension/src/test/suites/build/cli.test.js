@@ -147,13 +147,41 @@ module.exports = defineCases({
         ctx.expect(parse(['test', '--filter', 'auth']).filter).toBe('auth');
 
         // Every value-LESS flag is declared, so none of them can eat the token
-        // after it: `omega update --apply out` keeps the alias positional.
-        const applied = parse(['update', '--apply', 'out']);
-        ctx.expect(applied.apply).toBe(true);
-        ctx.expect(applied._.join(' ')).toBe('update out');
+        // after it: `omega update --dry-run extra` keeps the positional.
+        const planned = parse(['update', '--dry-run', 'extra']);
+        ctx.expect(planned.dryRun).toBe(true);
+        ctx.expect(planned._.join(' ')).toBe('update extra');
 
         // And --help reaches the router rather than a built-in.
         ctx.expect(parse(['deploy', '--help']).help).toBe(true);
+      },
+    },
+    {
+      name: 'update: --dry-run reaches devkit runUpdate as dryRun, and a bare run installs',
+      run: async (ctx) => {
+        const devkitUpdate = require('@omega.js/devkit/update');
+        const { BOOLEAN_FLAGS } = require(path.join(__dirname, '..', '..', '..', 'cli-run.js'));
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const commandFile = path.join(COMMANDS_DIR, 'update.js');
+
+        // The command destructures runUpdate at load, so the stub lands before a fresh require
+        async function run(args) {
+          const original = devkitUpdate.runUpdate;
+          const seen = [];
+          devkitUpdate.runUpdate = async (options) => { seen.push(options); };
+          delete require.cache[commandFile];
+          try {
+            await require(commandFile)(parseArgv(args, { booleans: BOOLEAN_FLAGS }));
+          } finally {
+            devkitUpdate.runUpdate = original;
+            delete require.cache[commandFile];
+          }
+          ctx.expect(seen.length).toBe(1);
+          return seen[0];
+        }
+
+        ctx.expect((await run(['update', '--dry-run'])).dryRun).toBe(true);
+        ctx.expect(Boolean((await run(['update'])).dryRun)).toBe(false);
       },
     },
     {

@@ -66,14 +66,14 @@ module.exports = defineCases({
     {
       name: 'the-update-flags-are-value-less-and-keep-the-next-token',
       async run({ assert }) {
-        // `--apply`, `--major` and `--force-fresh` take no value (devkit's
+        // `--dry-run`, `--major` and `--force-fresh` take no value (devkit's
         // runUpdate reads all three as booleans), so none may eat a positional.
-        for (const flag of ['apply', 'major', 'force-fresh']) {
+        for (const flag of ['dry-run', 'major', 'force-fresh']) {
           assert.equal(BOOLEAN_FLAGS.includes(flag), true, `--${flag} must be declared boolean`);
         }
-        const argv = parse(['update', '--apply', 'out']);
-        assert.equal(argv.apply, true);
-        assert.deepEqual(argv._, ['update', 'out']);
+        const argv = parse(['update', '--dry-run', 'extra']);
+        assert.equal(argv.dryRun, true);
+        assert.deepEqual(argv._, ['update', 'extra']);
       },
     },
 

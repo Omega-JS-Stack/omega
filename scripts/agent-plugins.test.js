@@ -1264,8 +1264,8 @@ test('npx: an absolute cd prefix resolves from the directory it lands in', () =>
 
   assert.equal(npx(`cd ${installed} && npx omega build`, bare).status, 0, 'the cd target with the bin was refused');
   assert.equal(npx(`cd ${bare} && npx omega build`, installed).status, 2, 'the cd target without the bin was allowed');
-  // A relative hop cannot be resolved from here, so it fails open.
-  assert.equal(npx('cd targets/web && npx omega build', bare).status, 0, 'a relative cd did not fail open');
+  // A relative hop cannot be resolved from here, so it fails open; the hop lands on a root, where every verb runs.
+  assert.equal(npx('cd ../acme && npx omega build --target=web', bare).status, 0, 'a relative cd did not fail open');
   fs.rmSync(installed, { recursive: true, force: true });
   fs.rmSync(bare, { recursive: true, force: true });
 });

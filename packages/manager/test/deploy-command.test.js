@@ -198,7 +198,7 @@ function write(filePath, content) {
 /**
  * Stage a brand monorepo with a web target and a backend target (LISTED so the
  * web dir sorts before backend, proving the order comes from
- * DEPLOY_ORDER, not the directory listing), plus fake framework packages. The
+ * TARGET_ORDER, not the directory listing), plus fake framework packages. The
  * config names a repo org, because a snapshot-lane run derives its push
  * address from it (#901).
  *
@@ -287,7 +287,7 @@ test('bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in
 
   const calls = readCalls(brand);
   assert.equal(calls.length, 2);
-  // Order is DEPLOY_ORDER (backend → web), not the directory listing
+  // Order is TARGET_ORDER (backend → web), not the directory listing
   assert.deepEqual(calls.map((c) => c.name), ['backend', 'web']);
   for (const call of calls) {
     // The only flag a bare run carries is the root's own word about the
@@ -655,7 +655,7 @@ test('every selected target is SCAFFOLDED first, in order, before the push and b
     'desktop:scaffold',
     'lockfile-gate',
     'behind-check',
-  ], 'every scaffold ran, in DEPLOY_ORDER, before the run\'s one delivery');
+  ], 'every scaffold ran, in TARGET_ORDER, before the run\'s one delivery');
 
   for (const call of readCalls(brand, { verb: 'scaffold' })) {
     assert.deepEqual(call.argv, ['scaffold'], 'the bare verb: no flags are forwarded to a scaffold');
@@ -695,7 +695,7 @@ test('--target=web scaffolds web ONLY: the picked set is the scaffolded set (#90
 
 // ─── Units ───────────────────────────────────────────────────────────────────
 
-test('selectTargets: full DEPLOY_ORDER — backend, web, then the rest', () => {
+test('selectTargets: full TARGET_ORDER, backend, web, then the rest', () => {
   const targets = [
     { name: 'desktop', target: 'desktop' },
     { name: 'web', target: 'web' },

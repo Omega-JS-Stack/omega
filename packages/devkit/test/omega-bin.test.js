@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, ROOT_DISPATCH_ENV, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
@@ -45,7 +45,7 @@ test('findTarget: inside functions/ walks up to the target root', () => {
   assert.equal(hit.dir, path.join(BRAND, 'targets', 'backend-api'));
 });
 
-test('findTarget: a deep (even nonexistent) dir inside a target walks up to the target', () => {
+test('findTarget: a deep (even nonexistent) dir inside a target walks up to the target its refusal names', () => {
   const hit = findTarget(path.join(BRAND, 'targets', 'site', 'src', 'pages', 'deep'));
   assert.equal(hit.name, '@omega.js/web');
 });
@@ -535,127 +535,267 @@ test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
     await run({
       hostName: '@omega.js/web',
       hostRun: () => { throw new Error('hostRun must not fire at a brand root'); },
+      argv: ['build'],
     });
+    assert.equal(process.env[ROOT_DISPATCH_ENV], process.cwd(), 'an accepted root run marks the root for every child it spawns');
   } finally {
     process.chdir(cwd0);
+    delete process.env[ROOT_DISPATCH_ENV];
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'brand-dispatched');
 });
 
-// ─── A framework's OWN root (#757) ───────────────────────────────────────────
+// ─── Every verb runs at a root; a subfolder refuses (#863) ──────────────────
+
+const BIN = path.join(__dirname, '..', 'src', 'omega-bin.js');
 
 /**
- * A framework package's own root, as it really ships: an `@omega.js/*` name, a
- * `./cli` export, and a DEVDEPENDENCY on another framework (packages/extension
- * and packages/desktop depend on @omega.js/web for their vendorAssets, the
- * manager on @omega.js/backend). Nothing here is a consumer target.
- * @param {{ name: string, cli?: boolean, deps?: object }} spec
- * @returns {{ scratch: string, pkgDir: string, marker: string }}
+ * Run the dispatcher as a real process (a refusal exits it), wired to a host
+ * that only announces itself. The root-dispatch marker is passed explicitly, never inherited.
  */
-function stageOwnRoot({ name, cli = true, deps = {} }) {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-own-'));
-  const pkgDir = path.join(scratch, 'packages', name.split('/').pop());
-  fs.mkdirSync(pkgDir, { recursive: true });
-  fs.mkdirSync(path.join(scratch, '.git'), { recursive: true }); // bound the walk
-
-  const marker = path.join(scratch, 'marker.txt');
-  const manifest = { name, version: '0.1.0', devDependencies: deps, exports: { '.': './index.js' } };
-  if (cli) {
-    manifest.exports['./cli'] = './dist/cli-run.js';
-    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
-    fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'cli-run.js'),
-      `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, __filename); } };`
-    );
-  }
-  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(manifest, null, 2));
-
-  return { scratch, pkgDir, marker };
+function invokeBin({ scratch, hostName, cwd, args, marker }) {
+  const runner = path.join(scratch, 'runner.js');
+  fs.writeFileSync(runner, `require(${JSON.stringify(BIN)}).run({ hostName: ${JSON.stringify(hostName)}, hostRun: () => console.log('HOST-RAN') });`);
+  const env = { ...process.env };
+  delete env[ROOT_DISPATCH_ENV];
+  if (marker) env[ROOT_DISPATCH_ENV] = marker;
+  return require('child_process').spawnSync(process.execPath, [runner, ...args], { cwd, env, encoding: 'utf8' });
 }
 
-test('findTarget: a framework\'s OWN root beats the framework it DEPENDS on (#757)', () => {
-  // The bug: packages/extension devDepends on @omega.js/web (vendorAssets), so
-  // the dependency walk named WEB at the extension's own root and `omega test`
-  // there ran an Eleventy build that scaffolded a web target into the package.
-  const { pkgDir } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
+/**
+ * A brand with one web target, and a deep dir inside it. Realpaths throughout:
+ * the child's cwd resolves macOS's /var symlink, and the refusal prints that path.
+ * @returns {{ scratch: string, brandRoot: string, targetDir: string, deep: string }}
+ */
+function stageBrandTarget() {
+  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-root-')));
+  const brandRoot = path.join(scratch, 'acme');
+  const targetDir = path.join(brandRoot, 'targets', 'site');
+  const deep = path.join(targetDir, 'src', 'pages');
+  fs.mkdirSync(path.join(brandRoot, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.mkdirSync(deep, { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "acme" } }\n');
+  fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-site', devDependencies: { '@omega.js/web': '*' } }));
+  return { scratch, brandRoot, targetDir, deep };
+}
 
-  assert.deepEqual(findTarget(pkgDir), {
-    kind: 'self',
-    name: '@omega.js/extension',
-    dir: pkgDir,
-  });
+/**
+ * A monorepo checkout as the dispatcher sees it: a root named "omega" with a
+ * packages/devkit workspace, two framework packages that ship the `omega` bin and
+ * a `./cli` (extension devDepends on web, the shape that misread as a target),
+ * the manager, and a package with neither.
+ * @returns {{ root: string, marker: string }}
+ */
+function stageMonorepo() {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-mono-')));
+  const marker = path.join(root, 'marker.txt');
+  fs.mkdirSync(path.join(root, '.git'));
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'omega', workspaces: ['packages/*'] }));
+
+  const write = (dirName, manifest) => {
+    const dir = path.join(root, 'packages', dirName);
+    fs.mkdirSync(path.join(dir, 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
+    fs.writeFileSync(
+      path.join(dir, 'dist', 'cli-run.js'),
+      `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, ${JSON.stringify(manifest.name)}); } };`
+    );
+  };
+  const framework = (name, deps = {}) => ({ name, bin: { omega: 'bin/omega' }, exports: { './cli': './dist/cli-run.js' }, devDependencies: deps });
+  write('devkit', { name: '@omega.js/devkit' });
+  write('extension', framework('@omega.js/extension', { '@omega.js/web': '*' }));
+  write('web', framework('@omega.js/web'));
+  write('config', { name: '@omega.js/config' });
+  // Ships the bin, but its CLI's `test` is the brand fan-out: never a monorepo pick
+  write('manager', framework('@omega.js/manager'));
+  return { root, marker };
+}
+
+test('run(): a deep dir inside a brand target refuses with the brand root form', () => {
+  const { scratch, brandRoot, deep } = stageBrandTarget();
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build', '--dry-run'] });
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the target CLI never started');
+  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega build --target=site --dry-run`), out.stderr);
 });
 
-test('findTarget: a deep dir inside a framework package walks up to its own root (#757)', () => {
-  const { pkgDir } = stageOwnRoot({ name: '@omega.js/desktop', deps: { '@omega.js/web': '*' } });
-  const deep = path.join(pkgDir, 'test', 'boot');
+test('run(): the target dir itself is inside the brand, so it refuses too', () => {
+  const { scratch, brandRoot, targetDir } = stageBrandTarget();
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: targetDir, args: ['deploy'] });
 
-  assert.deepEqual(findTarget(deep), { kind: 'self', name: '@omega.js/desktop', dir: pkgDir });
+  assert.equal(out.status, 1);
+  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega deploy --target=site`), out.stderr);
 });
 
-test('findTarget: an @omega.js package with no CLI is still its OWN root, never a target (#757)', () => {
-  const { pkgDir } = stageOwnRoot({ name: '@omega.js/config', cli: false });
+test('run(): a deep dir inside a framework package refuses with the monorepo root form', () => {
+  const { root, marker } = stageMonorepo();
+  const deep = path.join(root, 'packages', 'extension', 'test', 'boot');
+  fs.mkdirSync(deep, { recursive: true });
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: deep, args: ['test', 'boot/manifest'] });
 
-  assert.deepEqual(findTarget(pkgDir), { kind: 'self', name: '@omega.js/config', dir: pkgDir });
+  assert.equal(out.status, 1);
+  assert.equal(fs.existsSync(marker), false, 'no package CLI started');
+  assert.ok(out.stderr.includes(`cd ${root} && npx omega test --target=extension boot/manifest`), out.stderr);
 });
 
-test('run(): a framework\'s own root dispatches to its OWN ./cli (#757)', async () => {
-  const { pkgDir, marker } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
-
+test('run(): a refused subfolder run leaves the root-dispatch marker unset', async () => {
+  const { deep } = stageBrandTarget();
   const cwd0 = process.cwd();
-  process.chdir(pkgDir);
+  const exit0 = process.exit;
+  const error0 = console.error;
+  console.error = () => {};
+  // The refusal exits the process; the stub turns that exit into a throw this test can catch
+  process.exit = (code) => { throw new Error(`exit ${code}`); };
+  process.chdir(deep);
+  try {
+    await assert.rejects(run({ hostName: '@omega.js/web', hostRun: () => {}, argv: ['build'] }), /exit 1/);
+    assert.equal(process.env[ROOT_DISPATCH_ENV], undefined);
+  } finally {
+    process.chdir(cwd0);
+    process.exit = exit0;
+    console.error = error0;
+  }
+});
+
+test('run(): OMEGA_ROOT_DISPATCH naming the brand root lets its target run', () => {
+  const { scratch, brandRoot, deep } = stageBrandTarget();
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build'], marker: brandRoot });
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(out.stdout.includes('HOST-RAN'), 'the target framework ran');
+});
+
+test('run(): OMEGA_ROOT_DISPATCH naming the monorepo root runs the package\'s OWN CLI, never the host', () => {
+  const { root, marker } = stageMonorepo();
+  const deep = path.join(root, 'packages', 'extension', 'test', 'boot');
+  fs.mkdirSync(deep, { recursive: true });
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: deep, args: ['test'], marker: root });
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stdout.includes('HOST-RAN'), false, 'web (the host) never ran inside the extension package');
+  assert.equal(fs.readFileSync(marker, 'utf8'), '@omega.js/extension');
+});
+
+test('run(): a marker naming some OTHER root lets nothing through', () => {
+  const { scratch, deep } = stageBrandTarget();
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build'], marker: path.join(scratch, 'elsewhere') });
+
+  assert.equal(out.status, 1);
+  assert.equal(out.stdout.includes('HOST-RAN'), false);
+});
+
+test('run(): a contextless verb and a box verb run from a subfolder', () => {
+  const { scratch, deep } = stageBrandTarget();
+  const version = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['version'] });
+  assert.equal(version.status, 0, version.stderr);
+  assert.ok(version.stdout.includes('HOST-RAN'), 'version ran inside the target subfolder');
+
+  const { root } = stageMonorepo();
+  const inside = path.join(root, 'packages', 'web', 'src');
+  fs.mkdirSync(inside, { recursive: true });
+  const box = invokeBin({ scratch: root, hostName: '@omega.js/desktop', cwd: inside, args: ['runner', 'status'] });
+  assert.equal(box.status, 0, box.stderr);
+  assert.ok(box.stdout.includes('HOST-RAN'), 'the box verb reached desktop from inside a package');
+});
+
+test('findTarget: the monorepo root answers kind monorepo, and a package inside it names that package', () => {
+  const { root } = stageMonorepo();
+  assert.deepEqual(findTarget(root), { kind: 'monorepo', dir: root });
+
+  // Identity beats dependency: extension devDepends on web, and is still no web target
+  assert.deepEqual(findTarget(path.join(root, 'packages', 'extension', 'test')), {
+    kind: 'monorepo',
+    dir: root,
+    package: { name: '@omega.js/extension', dir: path.join(root, 'packages', 'extension') },
+  });
+
+  const real = path.join(__dirname, '..', '..', '..');
+  assert.deepEqual(findTarget(real), { kind: 'monorepo', dir: path.resolve(real) }, 'this checkout is one');
+});
+
+test('run(): monorepo `test --target=` spawns each picked package\'s bin in its dir with the marker, in registry order', async () => {
+  const { root } = stageMonorepo();
+  const calls = [];
+  const cwd0 = process.cwd();
+  const error0 = console.error;
+  console.error = () => {};
+  process.chdir(root);
   try {
     await run({
       hostName: '@omega.js/web',
-      hostRun: () => { throw new Error('the hoist-winner host must not run inside another framework\'s package'); },
-      argv: ['test', 'boot/manifest'],
+      hostRun: () => { throw new Error('the host never runs at the monorepo root'); },
+      argv: ['test', '--target=extension,web', 'framework:'],
+      spawn: (command, args, options) => { calls.push({ command, args, options, marker: process.env[ROOT_DISPATCH_ENV] }); return { status: 0 }; },
     });
   } finally {
     process.chdir(cwd0);
+    console.error = error0;
+    delete process.env[ROOT_DISPATCH_ENV];
   }
 
-  // realpath: process.chdir() resolves macOS's /var → /private/var symlink, and
-  // the resolved CLI path comes back through the chdir'd cwd.
-  assert.equal(
-    fs.readFileSync(marker, 'utf8'),
-    fs.realpathSync(path.join(pkgDir, 'dist', 'cli-run.js'))
-  );
+  assert.deepEqual(calls.map((call) => call.args), [
+    [path.join(root, 'packages', 'web', 'bin', 'omega'), 'test', 'framework:'],
+    [path.join(root, 'packages', 'extension', 'bin', 'omega'), 'test', 'framework:'],
+  ], 'web before extension (the registry order), each through its own bin');
+  assert.equal(calls[0].command, process.execPath);
+  assert.equal(calls[0].options.cwd, path.join(root, 'packages', 'web'));
+  assert.equal(calls[0].options.env, undefined, 'the child inherits this process env, marker included');
+  assert.equal(calls[0].marker, root);
 });
 
-test('run(): a framework\'s own root with the host match runs hostRun directly (#757)', async () => {
-  const { pkgDir } = stageOwnRoot({ name: '@omega.js/extension', deps: { '@omega.js/web': '*' } });
-
+test('run(): the monorepo test stops at the first failing package with its exit code', async () => {
+  const { root } = stageMonorepo();
+  const calls = [];
   const cwd0 = process.cwd();
-  let ran = 0;
-  process.chdir(pkgDir);
+  const error0 = console.error;
+  console.error = () => {};
+  process.chdir(root);
   try {
-    await run({ hostName: '@omega.js/extension', hostRun: () => { ran += 1; }, argv: ['test'] });
+    await run({
+      hostName: '@omega.js/web',
+      hostRun: () => {},
+      argv: ['test', '--target', '@omega.js/web,extension'],
+      spawn: (command, args) => { calls.push(args); return { status: 7 }; },
+    });
+    assert.equal(process.exitCode, 7);
   } finally {
+    process.exitCode = undefined;
     process.chdir(cwd0);
+    console.error = error0;
+    delete process.env[ROOT_DISPATCH_ENV];
   }
-  assert.equal(ran, 1);
+  assert.equal(calls.length, 1, 'extension never ran after web failed');
 });
 
-test('run(): an @omega.js package that ships no CLI REFUSES, never reaching the host fallback (#757)', () => {
-  // packages/config, packages/devkit and friends: an OMEGA package is never a
-  // target, so there is nothing to scaffold and nothing to hand the host.
-  const { scratch, pkgDir } = stageOwnRoot({ name: '@omega.js/config', cli: false });
-  const runner = path.join(scratch, 'runner.js');
-  fs.writeFileSync(
-    runner,
-    `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'omega-bin.js'))})`
-      + `.run({ hostName: '@omega.js/web', hostRun: () => console.log('HOST-RAN') });`
-  );
-
-  const out = require('child_process').spawnSync(
-    process.execPath, [runner, 'build'], { cwd: pkgDir, encoding: 'utf8' }
-  );
+test('run(): an unknown --target at the monorepo root refuses naming the known packages', () => {
+  const { root } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: root, args: ['test', '--target=wbe'] });
 
   assert.equal(out.status, 1);
-  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the host CLI must never start inside an OMEGA package');
-  assert.match(out.stderr, /@omega\.js\/config/);
-  assert.match(out.stderr, /Nothing was scaffolded/);
-  assert.deepEqual(fs.readdirSync(pkgDir).sort(), ['package.json'], 'the package is untouched');
+  assert.match(out.stderr, /unknown --target "wbe": the monorepo's packages are web, extension\. Nothing ran\./);
+});
+
+test('run(): no --target at the monorepo root refuses and prints the picker', () => {
+  const { root } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: root, args: ['test', 'framework:'] });
+
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /npx omega test --target=web framework:/);
+  assert.match(out.stderr, /The packages are web, extension; the whole battery is npm test/);
+});
+
+test('run(): any verb but test at the monorepo root refuses naming the root npm script', () => {
+  const { root, marker } = stageMonorepo();
+  const build = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: root, args: ['-b'] });
+  assert.equal(build.status, 1);
+  assert.match(build.stderr, /for "-b" run the root npm script: npm run build --workspaces --if-present/);
+
+  const dev = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: root, args: ['dev'] });
+  assert.equal(dev.status, 1);
+  assert.match(dev.stderr, /run the root npm script: npm start/);
+  assert.equal(fs.existsSync(marker), false);
 });
 
 // The signing box's verbs with NO target context: a box is a machine, not a

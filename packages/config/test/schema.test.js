@@ -619,3 +619,61 @@ test('backendProjectType reads the backend target entry, firebase unless it says
   // land at the top level there.
   assert.equal(backendProjectType({ brand: { id: 'b' }, projectType: 'custom' }), 'custom');
 });
+
+// Strictness keeps every documented escape hatch open only if it has a rule:
+// an undeclared block fails the load, so each one the desktop reads is typed.
+test('the documented override blocks are declared: desktop open subtrees, the backend MCP auth url', () => {
+  const { TARGET_SCHEMAS } = require('../src/schema.js');
+  const rules = new Map(TARGET_SCHEMAS.desktop.map((rule) => [rule.path, rule]));
+
+  for (const [path, type] of [['electronBuilder', 'object'], ['windows', 'object'], ['cdp', 'object'], ['fileAssociations', 'array'], ['protocols', 'array']]) {
+    assert.equal(rules.get(path)?.type, type, `targets.desktop.${path} owes a ${type} rule`);
+    assert.equal(rules.get(path).default, undefined, `${path} carries no default: the block is the brand's own`);
+    assert.ok(rules.get(path).description, `${path} says what reads it`);
+  }
+
+  // The backend's one documented override: the MCP consumer auth URL
+  const backend = new Map(TARGET_SCHEMAS.backend.map((rule) => [rule.path, rule]));
+  assert.equal(backend.get('mcp.authUrl')?.type, 'string', 'targets.backend.mcp.authUrl owes a rule');
+});
+
+test('the manager switches default ON in the schema; its Stripe and GA4 data keep no default', () => {
+  const { SHARED_SCHEMA, configSections } = require('../src/schema.js');
+  const { schemaDefaults, missingDefaults } = require('../src/defaults.js');
+  const rules = new Map(SHARED_SCHEMA.map((rule) => [rule.path, rule]));
+
+  // Zero-data switches (case 2): default ON, materialized like every other
+  for (const path of ['enabled', 'server.enabled', 'assets.enabled', 'payment.enabled']) {
+    assert.equal(rules.get(path)?.type, 'boolean', `${path} owes a boolean rule`);
+    assert.equal(rules.get(path).default, true, `${path} defaults ON`);
+    assert.equal(rules.get(path).materialize, undefined, `${path} is written into a brand file`);
+  }
+  const defaults = schemaDefaults();
+  assert.equal(defaults.enabled, true);
+  assert.equal(defaults.server.enabled, true);
+  assert.equal(defaults.assets.enabled, true);
+  assert.equal(defaults.payment.enabled, true);
+
+  // A brand that authored none of them gets all four backfilled; one it switched off keeps its false
+  const missing = missingDefaults({ brand: { id: 'x' }, payment: { enabled: false } });
+  const paths = missing.map((entry) => entry.path);
+  for (const path of ['enabled', 'server', 'assets']) assert.ok(paths.includes(path), `${path} is backfilled`);
+  assert.ok(!paths.includes('payment.enabled'), 'an authored false is a decision, never overwritten');
+
+  // Data the payment and analytics services write back: no framework answer
+  for (const [path, type] of [
+    ['payment.providers.stripe.updateAccountInfo', 'boolean'],
+    ['payment.providers.stripe.radar', 'array'],
+    ['payment.providers.stripe.radarConfirmed', 'boolean'],
+    ['payment.providers.stripe.disputesConfirmed', 'boolean'],
+    ['analytics.providers.google.timeZone', 'string'],
+    ['analytics.providers.google.currency', 'string'],
+    ['analytics.providers.google.enhancedMeasurement', 'object'],
+  ]) {
+    assert.equal(rules.get(path)?.type, type, `${path} owes a ${type} rule`);
+    assert.equal(rules.get(path).default, undefined, `${path}: the manager's engine data is its default`);
+  }
+
+  // The brand switch is a scalar, never a namespace a page's `config:` overrides
+  assert.ok(!configSections('web').includes('enabled'));
+});

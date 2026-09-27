@@ -475,7 +475,7 @@ function assertFamilyVersions({ brandRoot, targets = [], version = FAMILY_VERSIO
   }
 
   for (const entry of skipped) {
-    console.log(`  ${chalk.dim(`⊘ ${entry.dir}: ${entry.framework} is not installed yet — skipped (npm install, or \`omega update --apply\`, is the fix)`)}`);
+    console.log(`  ${chalk.dim(`⊘ ${entry.dir}: ${entry.framework} is not installed yet — skipped (npm install, or \`omega update\`, is the fix)`)}`);
   }
 
   // An install we cannot READ is checked first: it answers "which version is
@@ -493,7 +493,7 @@ function assertFamilyVersions({ brandRoot, targets = [], version = FAMILY_VERSIO
     throw refusal(
       `the @omega.js family ships ONE version — this brand is mixed (#794):\n${lines.join('\n')}\n`
       + `  this manager is ${version}\n`
-      + '  fix: run `omega update --apply` at the brand root — it moves every target together',
+      + '  fix: run `omega update` at the brand root — it moves every target together',
     );
   }
 

@@ -22,36 +22,14 @@
  * `omega test` is the emulator lane, and both REFUSE in that mode. It stays a
  * framework target for everything else; a container host's publish command is
  * the brand's to name, and its `deploy` script is where it names it.
- *
- * A framework that does not SERVE a verb at all takes the same lane
- * (SCRIPT_LANE_VERBS): dispatching it would only print "Unknown command".
  */
 const fs = require('node:fs');
 const path = require('node:path');
 
 const { findTarget } = require('@omega.js/devkit/omega-bin');
+// Each verb's lane facts (firebaseOnly, dryRun) are its row in the one verb table
+const { findVerb } = require('@omega.js/devkit/verbs');
 const { targetScripts } = require('./custom-target.js');
-
-// The verbs @omega.js/backend serves through Firebase and therefore refuses in
-// custom-server mode (#584) — the fan-outs take the script lane for these, and
-// only these. `build`, `update` and the rest are mode-agnostic.
-const FIREBASE_ONLY_VERBS = new Set(['deploy', 'test']);
-
-// Framework → the verbs its CLI has no command for, which the fan-outs must
-// run as the target's own script instead (#603). EMPTY today: every framework
-// serves every fan-out verb, @omega.js/extension's `build` included since
-// [#81](https://github.com/Omega-JS-Stack/omega/issues/81) gave it the verb
-// its siblings already had. The mechanism stays for the next gap.
-const SCRIPT_LANE_VERBS = {};
-
-// The verbs NO framework CLI honors `--dry-run` for (checked against web,
-// backend and desktop `build`/`clean`: none reads the flag). Forwarding it
-// would really build — or really CLEAN — under a flag whose whole promise is
-// that nothing happens, so the dry run stops at the plan for the framework
-// lane too, exactly as it already does for the script lane. `deploy` is the
-// counter-case and stays off this list: every framework deploy reads the flag
-// and prints its own dispatch plan.
-const NO_FRAMEWORK_DRY_RUN_VERBS = new Set(['build', 'clean']);
 
 /**
  * @param {string} fromDir - Directory to climb from (where the dep is declared)
@@ -104,6 +82,10 @@ function resolveFrameworkPackage(fromDir, name) {
  *   command?: string, args?: string[], framework?: string, detail?: string }}
  */
 function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
+  const row = findVerb(verb);
+  // Every caller hands a verb it read from the table, so a miss is a caller's bug
+  if (!row) throw new Error(`resolveTargetRun: "${verb}" has no row in @omega.js/devkit/verbs`);
+
   // The SCRIPT lane — the target's own `npm run <verb>`, which is the whole
   // verb surface of a custom target and the fallback for a framework that
   // cannot serve this one.
@@ -124,19 +106,14 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
     return { kind: 'custom', command: 'npm', args: ['run', verb], label: `npm run ${verb}` };
   };
 
-  if (entry.custom || (entry.projectType === 'custom' && FIREBASE_ONLY_VERBS.has(verb))) {
+  // A custom-server backend refuses the verbs it serves through Firebase
+  if (entry.custom || (entry.projectType === 'custom' && row.firebaseOnly)) {
     return scriptLane();
   }
 
   const target = findTarget(entry.path);
   if (!target || target.kind !== 'framework') {
     return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
-  }
-
-  // A verb this framework's CLI has no command for is the target's script to
-  // run, not a bin dispatch that would fail on "Unknown command"
-  if (SCRIPT_LANE_VERBS[target.name]?.has(verb)) {
-    return scriptLane();
   }
 
   const binPath = resolveFrameworkBin(target.dir, target.name);
@@ -146,7 +123,7 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
 
   // A verb its own CLI has no --dry-run for stops at the plan HERE, like the
   // script lane — the flag is never forwarded to a bin that would ignore it
-  if (options.dryRun && NO_FRAMEWORK_DRY_RUN_VERBS.has(verb)) {
+  if (options.dryRun && row.dryRun) {
     return { kind: 'plan', framework: target.name, detail: `would run omega ${verb} in ${entry.dir}` };
   }
 
@@ -170,10 +147,39 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
  *   ensureTarget?: Function, detail?: string }}
  */
 function resolveTargetScaffold(entry) {
+  return resolveTargetEntry(entry, 'ensure-target', 'ensureTarget', 'a custom target has no framework scaffold');
+}
+
+/**
+ * The migration the brand-root `omega migrate` runs on one target, IN-PROCESS:
+ * every framework exposes its `migrateTarget` at the one subpath
+ * `@omega.js/<framework>/migrate`, so the walk never spawns a verb and never
+ * special-cases a framework name.
+ *
+ * @param {object} entry - A discoverTargets entry ({ name, dir, path, target, custom, projectType }).
+ * @returns {{ kind: 'framework'|'skip'|'error', framework?: string,
+ *   migrateTarget?: Function, detail?: string }}
+ */
+function resolveTargetMigrate(entry) {
+  return resolveTargetEntry(entry, 'migrate', 'migrateTarget', 'a custom target has no framework migration');
+}
+
+/**
+ * Load one named export of a target's framework subpath, from where the
+ * target declares the dependency. The one mechanism behind the in-process
+ * entries (the scaffold, the migration), so their answers cannot drift.
+ *
+ * @param {object} entry - A discoverTargets entry.
+ * @param {string} subpath - The framework subpath ('ensure-target', 'migrate').
+ * @param {string} exported - The export to hand back, under its own name.
+ * @param {string} customDetail - What a custom target's skip says.
+ * @returns {object}
+ */
+function resolveTargetEntry(entry, subpath, exported, customDetail) {
   // A custom target is the brand's own scripts end to end: no framework wrote
-  // its tree, so there is nothing to scaffold and nothing has failed.
+  // its tree, so there is nothing to run and nothing has failed.
   if (entry.custom) {
-    return { kind: 'skip', detail: 'a custom target has no framework scaffold' };
+    return { kind: 'skip', detail: customDetail };
   }
 
   const target = findTarget(entry.path);
@@ -181,28 +187,24 @@ function resolveTargetScaffold(entry) {
     return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
   }
 
-  // The subpath resolution honors an exports map (web, desktop, extension) and
-  // the backend's package-root file alike, from where the target declares the
-  // dependency. A framework that ships neither is a framework out of date with
-  // its manager, which is a loud failure rather than a skipped scaffold.
-  // The LOAD rides in the same try: a module that throws while it is being
-  // required is the same kind of failure as one that does not resolve, and both
-  // answer the fan-out's "scaffold failed, nothing was pushed" line rather than
-  // a raw stack out of the middle of a brand deploy.
+  // Resolved from where the target declares the dependency: an exports map and
+  // the backend's package-root file alike. A missing subpath (a framework out of
+  // date with its manager) and a module that throws on load are both the
+  // caller's failure line, never a raw stack out of the middle of a brand run.
   let resolved;
-  let ensureTarget;
+  let loaded;
   try {
-    resolved = require.resolve(`${target.name}/ensure-target`, { paths: [target.dir] });
-    ensureTarget = require(resolved).ensureTarget;
+    resolved = require.resolve(`${target.name}/${subpath}`, { paths: [target.dir] });
+    loaded = require(resolved)[exported];
   } catch (e) {
     // `resolved` separates the two failures the one try now covers: unset means
     // the subpath itself is missing, set means the module threw on the way in.
     return resolved
-      ? { kind: 'error', detail: `${target.name}/ensure-target failed to load: ${e.message}` }
-      : { kind: 'error', detail: `${target.name} exposes no ensure-target entry (update it)` };
+      ? { kind: 'error', detail: `${target.name}/${subpath} failed to load: ${e.message}` }
+      : { kind: 'error', detail: `${target.name} exposes no ${subpath} entry (update it)` };
   }
 
-  return { kind: 'framework', framework: target.name, ensureTarget };
+  return { kind: 'framework', framework: target.name, [exported]: loaded };
 }
 
-module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun, resolveTargetScaffold };
+module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun, resolveTargetScaffold, resolveTargetMigrate };

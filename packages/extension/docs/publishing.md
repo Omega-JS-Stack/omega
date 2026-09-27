@@ -49,7 +49,8 @@ EDGE_API_KEY="..."
 ```
 
 `CHROME_EXTENSION_ID`, `FIREFOX_EXTENSION_ID` and `EDGE_PRODUCT_ID` are RETIRED
-env keys: a `.env` still declaring one fails the load naming its config home.
+env keys: nothing reads them, and the brand-root `npx omega migrate` names each one
+still in a `.env` with its config home.
 
 ## Getting credentials
 

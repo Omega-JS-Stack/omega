@@ -7,8 +7,8 @@
 // would become extended='some/target' with NO target. @omega.js/backend's CLI
 // declares the same.
 const BOOLEAN_FLAGS = [
-  'extended', 'check', 'dry-run', 'local', 'direct', 'secrets', 'list', 'a',
-  'apply', 'major', 'force-fresh', 'https',
+  'extended', 'dry-run', 'local', 'direct', 'secrets', 'list', 'a',
+  'major', 'force-fresh', 'https',
 ];
 
 async function run() {

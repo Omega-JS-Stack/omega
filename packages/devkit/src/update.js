@@ -4,10 +4,10 @@
  * tool): per dependency report installed vs wanted vs latest, classify the
  * jump (patch/minor/major), and QUARANTINE releases younger than --min-age
  * days (default 7 — a brand-new publish may be a compromised one; hold it
- * back unless explicitly forced). Report-only by default; --apply installs
- * the non-quarantined, non-breaking set (majors need the explicit --major
- * opt-in) through `npu install` when npu is on the machine, else plain
- * `npm install` with a loud note.
+ * back unless explicitly forced). A bare run installs the non-quarantined,
+ * non-breaking set (majors need the explicit --major opt-in) through
+ * `npu install` when npu is on the machine, else plain `npm install` with a
+ * loud note; --dry-run reports and installs nothing.
  *
  * `file:`/`link:`/git specs have no registry story (the local era's linked
  * @omega.js packages) — they're skipped with a dim note, never updated.
@@ -332,7 +332,7 @@ async function buildUpdateReport(options) {
 }
 
 /**
- * Pick the updates an --apply run installs. Default tier is MINOR (highest
+ * Pick the updates a run installs. Default tier is MINOR (highest
  * same-major — npu's non-breaking lane); --major unlocks latest. A target
  * published < minAge days ago is HELD (quarantine) unless already installed.
  * @param {object[]} rows - buildUpdateReport rows
@@ -469,7 +469,7 @@ function formatReport(report, options = {}) {
     for (const cells of body) lines.push(render(cells));
 
     if (report.rows.some((row) => row.quarantined)) {
-      lines.push(`QUARANTINED = latest published < ${minAge} days ago (held from --apply; --min-age 0 or --force-fresh overrides)`);
+      lines.push(`QUARANTINED = latest published < ${minAge} days ago (held from the install; --min-age 0 or --force-fresh overrides)`);
     }
     if (report.rows.some((row) => row.bump === 'major')) {
       lines.push('major = breaking — never auto-applied (explicit --major opt-in)');
@@ -484,14 +484,14 @@ function formatReport(report, options = {}) {
 }
 
 /**
- * The one verb body every wrapper calls: report (default), then apply when
- * asked. Flags mirror npu: --apply, --major, --min-age N (default 7, 0
- * disables), --force-fresh (alias for --min-age 0).
+ * The one verb body every wrapper calls: report, then install (default) or
+ * stop at the report (--dry-run). Flags mirror npu: --major, --min-age N
+ * (default 7, 0 disables), --force-fresh (alias for --min-age 0).
  * @param {object} [options]
  * @param {string} [options.dir] - target directory (default cwd)
  * @param {string[]} [options.only] - check just these package names (#794)
- * @param {boolean} [options.apply] - install the selected set
- * @param {boolean} [options.major] - allow breaking jumps (with --apply)
+ * @param {boolean} [options.dryRun] - report only, install nothing
+ * @param {boolean} [options.major] - allow breaking jumps
  * @param {number} [options.minAge] - quarantine threshold in days
  * @param {boolean} [options.forceFresh] - disable the age quarantine
  * @param {object} [options.logger] - logger with log/warn (default console)
@@ -512,9 +512,9 @@ async function runUpdate(options = {}) {
   logger.log(`Dependency report for ${report.project}:`);
   for (const line of formatReport(report, { minAge })) logger.log(line);
 
-  if (!options.apply) {
+  if (options.dryRun) {
     if (report.rows.length > 0) {
-      logger.log('Report only — `omega update --apply` installs the non-quarantined, non-breaking set (--major for breaking).');
+      logger.log('Dry run (--dry-run): nothing installed; a bare `omega update` installs the non-quarantined, non-breaking set (--major for breaking).');
     }
     return { report, selection: null, commands: [] };
   }
@@ -529,7 +529,7 @@ async function runUpdate(options = {}) {
   }
 
   if (selection.updates.length === 0) {
-    logger.log('Nothing to apply.');
+    logger.log('Nothing to install.');
     return { report, selection, commands: [] };
   }
 
@@ -545,7 +545,7 @@ async function runUpdate(options = {}) {
     execFn(entry.command, { cwd: dir, stdio: 'inherit' });
   }
 
-  logger.log(`Applied ${selection.updates.length} update(s).`);
+  logger.log(`Installed ${selection.updates.length} update(s).`);
   return { report, selection, commands };
 }
 

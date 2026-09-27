@@ -23,19 +23,17 @@ const { TARGETS, CUSTOM_TARGET_TYPE, isCustomTargetEntry, BACKEND_PROJECT_TYPES,
 const { clientConfig, CLIENT_FACT_KEYS } = require('./client-config.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
-const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('./retired-keys.js');
 const { chosenProvider } = require('./providers.js');
-const { validateConfig, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
-const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
+const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, bakeSourceKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
 const { checkEnvRules } = require('./env-rules.js');
-const { RETIRED_ENV_KEYS, findRetiredEnvKeys, assertNoRetiredEnvKeys } = require('./env-retired.js');
 const { resolveCompany, recordBrand, readRegistry, registryFile, COMPANY_DIR, COMPANY_RESOLVED_FILE, COMPANY_SELF } = require('./company.js');
-const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('./edit.js');
-const { schemaDefaults, missingDefaults, defaultComments } = require('./defaults.js');
+const { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues } = require('./edit.js');
+const { schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath } = require('./defaults.js');
 const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js');
 const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
@@ -55,6 +53,7 @@ module.exports = {
   composeTargetConfig,
   hasOmegaConfig,
   resolveConfigPath,
+  overlayPath,
   getEnabledTargets,
   findBrandRoot,
   findBrandConfigPath,
@@ -136,13 +135,6 @@ module.exports = {
   // `requiredWhen`; every consumer calls it, none keeps its own if
   checkEnvRules,
 
-  // The .env half of the retired-key register (#893): a key that moved into
-  // config fails the layer that still declares it, naming the move. Every
-  // `.env` read goes through parseEnvFile, so nothing can miss the check
-  RETIRED_ENV_KEYS,
-  findRetiredEnvKeys,
-  assertNoRetiredEnvKeys,
-
   // The ONE company resolver (#677): `company: { id }` in, the company's public
   // facts plus its tree on this machine out. The config chain, the .env chain,
   // owner hooks and the desktop signing tree all inherit through its `file()`,
@@ -162,8 +154,10 @@ module.exports = {
   // Writeback (comment-preserving edits + canonical top-level key order)
   applyConfigEdits,
   writeConfigValues,
+  writeConfigFileValues,
   applyConfigRemovals,
   removeConfigValues,
+  removeConfigFileValues,
   applyCanonicalOrder,
   CANONICAL_TOP_LEVEL_ORDER,
 
@@ -171,6 +165,8 @@ module.exports = {
   // heal list the manage walk materializes into a brand's omega.json5
   schemaDefaults,
   missingDefaults,
+  planMerge,
+  setAtPath,
   defaultComments,
 
   // Layer-aware consumer seeding (brand target = no local-layer config at all)
@@ -244,6 +240,8 @@ module.exports = {
 
   // Validation
   validateConfig,
+  undeclaredPaths,
+  undeclaredAuthoredPaths,
   runSchema,
   formatErrors,
 
@@ -254,9 +252,6 @@ module.exports = {
 
   findSecretKeys,
   SECRET_KEY_PATTERN,
-  findRetiredKeys,
-  RETIRED_KEYS,
-  RETIRED_PATHS,
 
   // The one provider shape (#425) — `role.providers.<provider>`, where key
   // presence is the pick and `false` is the deliberate off switch

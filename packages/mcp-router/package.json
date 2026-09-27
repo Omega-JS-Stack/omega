@@ -8,8 +8,8 @@
   },
   "main": "./src/router.js",
   "bin": {
-    "mcp-router": "./bin/mcp-router.js",
-    "omega-mcp": "./bin/omega-mcp.js"
+    "mcp-router": "bin/mcp-router.js",
+    "omega-mcp": "bin/omega-mcp.js"
   },
   "files": [
     "bin/",

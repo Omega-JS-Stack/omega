@@ -18,7 +18,7 @@
 
 const BOOLEAN_FLAGS = [
   'extended', 'legacy', 'force', 'raw', 'emulator', 'seed', 'seed-campaigns', 'production',
-  'offline', 'direct', 'dry-run', 'secrets', 'https', 'merge', 'apply', 'major', 'force-fresh',
+  'offline', 'direct', 'dry-run', 'secrets', 'https', 'merge', 'major', 'force-fresh',
 ];
 
 const MULTIPLE_FLAGS = ['where'];

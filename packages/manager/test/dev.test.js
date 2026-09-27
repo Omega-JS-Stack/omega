@@ -90,6 +90,11 @@ require.cache[localPath] = {
       return sweepResult;
     },
     resolveLinkedMonorepo: () => linkedMonorepo,
+    resolveMonorepoRoot: () => '/the/monorepo',
+    linkLocalPackages: async ({ dir, monorepoRoot }) => {
+      boot.push(`link:${dir}<-${monorepoRoot}`);
+      return [];
+    },
   },
 };
 
@@ -135,6 +140,7 @@ require('./lib/temp-home.js');
 
 const devCommand = require('../src/commands/dev.js');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
+const { ROOT_DISPATCH_ENV } = require('@omega.js/devkit/omega-bin');
 const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
 // The selector takes DISCOVERED targets ({ name, target: the type }): the name
@@ -338,6 +344,33 @@ test('the non-interactive switch is restored before any leg spawns — the dev s
   assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
   assert.deepStrictEqual(nonInteractiveAt.spawnEnv, [undefined], "the leg's inherited env carries no switch");
   assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, undefined, 'and nothing leaks past the boot');
+});
+
+test('a leg inherits the root-dispatch marker, so its own verb inside the target passes the dispatcher', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  // The dispatcher sets the marker on the accepted brand-root run this boot is
+  process.env[ROOT_DISPATCH_ENV] = root;
+  try {
+    await bootDev(root, { target: 'web' });
+  } finally {
+    delete process.env[ROOT_DISPATCH_ENV];
+  }
+
+  assert.equal(legEnvs.length, 1);
+  assert.equal(legEnvs[0][ROOT_DISPATCH_ENV], root);
+});
+
+test('omega dev --local links the whole brand from the monorepo once, before the sweep and the legs', async () => {
+  resetRecorders();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageBrand();
+
+  await bootDev(root, { target: 'web', local: true });
+
+  assert.deepStrictEqual(boot, [`link:${root}<-/the/monorepo`, 'sweep:@omega.js/web', `manage:${root}`, 'spawn:web']);
 });
 
 test('a clean report with pending human gates still boots the legs — pending is not an error', async () => {
@@ -1017,7 +1050,7 @@ test('a drifted @omega.js version REFUSES the boot before anything runs — no s
   const root = stageBrand();
 
   // The target's installed framework is a release behind the manager: what
-  // `omega update --apply` exists to fix, and what nothing downstream can see
+  // `omega update` exists to fix, and what nothing downstream can see
   const installed = path.join(root, 'targets', 'web', 'node_modules', '@omega.js', 'web');
   fs.mkdirSync(installed, { recursive: true });
   fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.0.1' }));
@@ -1027,7 +1060,7 @@ test('a drifted @omega.js version REFUSES the boot before anything runs — no s
     (error) => {
       assert.strictEqual(error.refusal, true, 'a refusal prints its message alone');
       assert.match(error.message, /@omega\.js\/web 0\.0\.1/);
-      assert.match(error.message, /omega update --apply/);
+      assert.match(error.message, /fix: run `omega update` at the brand root/);
       return true;
     },
   );

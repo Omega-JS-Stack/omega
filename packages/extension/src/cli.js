@@ -21,10 +21,8 @@ module.exports = createCliRouter({
     build: ['-b', '--build'],
     clean: ['-c', '--clean'],
     deploy: ['-d', '--deploy'],
-    install: ['-i', 'i', '--install'],
-    migrate: ['-m', '--migrate', 'migration'],
     test: ['-t', '--test'],
-    update: ['-u', '--update', 'outdated', 'out'],
+    update: ['-u', '--update'],
     version: ['-v', '--version'],
   },
 });

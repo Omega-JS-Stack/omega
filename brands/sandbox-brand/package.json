@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "test": "node test/e2e/run.js",
-    "test:backend": "cd targets/backend && npm run test:offline"
+    "test:backend": "omega test --target=backend framework:"
   },
   "devDependencies": {
     "@omega.js/manager": "file:../../packages/manager"

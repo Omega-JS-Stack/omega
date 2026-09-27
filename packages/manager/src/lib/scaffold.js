@@ -19,7 +19,7 @@
  * (#794): the family ships lockstep, one number for the whole set, so a
  * brand can never install a backend from one release beside a client from
  * another. A caret (or the old `*`) let one target float ahead alone on an
- * `npm update`; pinned, only `omega update --apply` at the brand root moves it,
+ * `npm update`; pinned, only `omega update` at the brand root moves it,
  * and it moves every target together. The local era is untouched — an
  * existing `file:` spec is never rewritten, because applyScaffoldPlan()
  * leaves every file that already exists exactly as it is.
@@ -359,7 +359,7 @@ ${targetList}
 ## Next steps
 
 1. \`npm install\` — each target declares its framework (workspace link in a
-   monorepo; standalone pre-publish: \`npx mgr i local\` inside each target).
+   monorepo; before a publish, \`npx omega i local\` here links the whole brand).
 2. Fill in \`.env\` as the brand adopts external services.
 3. \`npm run manage\` — reconcile everything; rerun any time.
 4. \`npm start\` (\`npx omega dev\`) — boot the local stack; each target's verbs

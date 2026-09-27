@@ -1,21 +1,13 @@
 /**
- * rules.js — the executable codemod rules for `omega migrate`.
- *
- * The 8 rule classes extracted from the A2 real-file ports (DECISION.md
- * "consumer conversion plan"), plus the analytics-spelling normalization
- * (rule 9, from the omega.json5 flip), the WM → @omega.js/client rename
- * surface (rules 10–15, #248), the classy gradient utilities classy v2
- * dropped (rule 16, #296) and the dead `asset_path` frontmatter key (rule 17,
- * #470). Every rule is a pure text → text transform over
- * ONE file: `apply(text, ctx)` returns `{ text, edits, findings }` where
- * `edits` are applied rewrites and `findings` are lint-level observations the
- * rule could NOT safely fix (surfaced by both `omega migrate` and
- * `omega migrate --check`).
- *
- * TWO tables, by file surface: RULES over the src/** templates, JS_RULES over
- * the consumer JS. Rules run in ORDER within each: page.resolved must collapse
- * before the generic page.<key> rewrite, page.canonical.url before both, and
- * the theme-prefixed include after the leading slash is gone.
+ * rules.js: the executable codemod rules the web leg of `omega migrate` runs:
+ * the A2 real-file port classes (DECISION.md "consumer conversion plan") plus
+ * every later legacy shape, numbered below. Each is a pure text → text
+ * transform over ONE file: `apply(text, ctx)` returns `{ text, edits,
+ * findings }`, `edits` the applied rewrites and `findings` what the rule could
+ * NOT safely fix. TWO tables by file surface: RULES over src/** templates,
+ * JS_RULES over consumer JS. Rules run in ORDER within each: page.resolved
+ * collapses before the generic page.<key> rewrite, page.canonical.url before
+ * both, and the theme-prefixed include after the leading slash is gone.
  */
 
 // Tags whose quoted args template-kit resolves as variables — the rule-3
@@ -877,16 +869,25 @@ const CLIENT_MARKUP = {
   'auth-signout-btn': 'omega-signout',
 };
 
+// A User is always an object now, so a binding that shows or hides on the bare
+// `auth.user` is truthy for everyone: the condition reads the authenticated flag.
+const BINDING_ATTRIBUTE = /(?<![\w-])data-omega-bind(?![\w-])/;
+const BARE_USER_CONDITION = /(@(?:show|hide)\s+!?)auth\.user(?![\w.$])/g;
+
 const clientMarkup = {
   id: 'client-markup',
-  title: '`data-wm-bind` → `data-omega-bind`; `auth-signout-btn` → `omega-signout`',
+  title: '`data-wm-bind` → `data-omega-bind`; `auth-signout-btn` → `omega-signout`; a bare `auth.user` condition → `auth.user.authenticated`',
   apply(text) {
     // Both ends are guarded against `-` and word chars: a class list and an
     // attribute name are hyphenated namespaces, so a bare alternation would
     // eat `js-auth-signout-btn` and `auth-signout-btn-large` — consumer names
     // that are DIFFERENT hooks and must survive untouched.
     const pattern = new RegExp(`(?<![\\w-])(?:${Object.keys(CLIENT_MARKUP).join('|')})(?![\\w-])`, 'g');
-    const { text: out, edits } = replacePerLine('client-markup', text, pattern, (whole) => CLIENT_MARKUP[whole]);
+    // The condition is rewritten only on a line that carries the binding attribute itself
+    const { text: out, edits } = replacePerLine('client-markup', text, /^[^\r\n]*/, (line) => {
+      const next = line.replace(pattern, (whole) => CLIENT_MARKUP[whole]);
+      return BINDING_ATTRIBUTE.test(next) ? next.replace(BARE_USER_CONDITION, '$1auth.user.authenticated') : next;
+    });
     return { text: out, edits, findings: [] };
   },
 };
@@ -941,19 +942,18 @@ const includeThemePath = {
 };
 
 // ---------------------------------------------------------------------------
-// Rule 13 — the web-manager package + its singleton identifier
-// (WebManager is not an OMEGA concept: the package is @omega.js/client and the
-// singleton is `omega`, subpath modules included)
+// Rule 13: the web-manager singleton is `omega`, web's ONE instance at
+// `@omega.js/web/runtime` (the client exports only the class); subpaths stay the client's
 // ---------------------------------------------------------------------------
 const clientImport = {
   id: 'client-import',
-  title: "`'web-manager'` → `'@omega.js/client'`; the `webManager` singleton → `omega`",
+  title: "`'web-manager'` → `'@omega.js/web/runtime'` (subpaths → `@omega.js/client/…`); the `webManager` singleton → `omega`",
   apply(text) {
     const { lines, trailingNewline } = toLines(text);
     const edits = [];
     const out = lines.map((line, index) => {
       const replaced = line
-        .replace(/(["'])web-manager(\/[^"']*)?\1/g, (whole, quote, subpath) => `${quote}@omega.js/client${subpath || ''}${quote}`)
+        .replace(/(["'])web-manager(\/[^"']*)?\1/g, (whole, quote, subpath) => `${quote}${subpath ? `@omega.js/client${subpath}` : '@omega.js/web/runtime'}${quote}`)
         .replace(/\bwebManager\b/g, 'omega');
       if (replaced !== line) edits.push({ rule: 'client-import', line: index + 1, before: line.trim(), after: replaced.trim() });
       return replaced;
@@ -985,7 +985,7 @@ const clientImport = {
 // ---------------------------------------------------------------------------
 const FORM_MANAGER_SPECIFIER = /(["'])__main_assets__\/js\/libs\/form-manager\.js\1/g;
 const AUTHORIZED_FETCH_IMPORT = /^\s*import\s+[\w{},\s*]+\s+from\s+["']__main_assets__\/js\/libs\/authorized-fetch\.js["'];?\s*$/;
-const CLIENT_DEFAULT_IMPORT = /import\s+omega\s+from\s+["']@omega\.js\/client["']/;
+const CLIENT_DEFAULT_IMPORT = /import\s+omega\s+from\s+["']@omega\.js\/web\/runtime["']/;
 
 // `catch (err)`, `.catch((err) =>` and `.catch(err =>` — the three ways a
 // consumer binds the error whose `.status` the rewrite has to move. The arrow
@@ -1238,7 +1238,7 @@ const clientLibs = {
     if (rewroteCall && !CLIENT_DEFAULT_IMPORT.test(result)) {
       findings.push({
         check: 'client-libs', line: 1, severity: 'error',
-        message: 'rewrote `authorizedFetch()` to `omega.request()` but the file has no client singleton — add `import omega from \'@omega.js/client\';`',
+        message: 'rewrote `authorizedFetch()` to `omega.request()` but the file has no client singleton: add `import omega from \'@omega.js/web/runtime\';`',
       });
     }
 
@@ -1358,38 +1358,20 @@ const adunitSection = {
 };
 
 // ---------------------------------------------------------------------------
-// Rule 19 — the UJM library accessor
-// ([#560](https://github.com/Omega-JS-Stack/omega/issues/560))
-//
-// Rule 13 renames the singleton and stops there, so `webManager.uj()` ships as
-// `omega.uj()` — build-clean and DEAD (`@omega.js/client` has no `uj`; the
-// first call is a TypeError). The successor is `omega.library()`, the accessor
-// the web runtime installs on the singleton (core/js/main.js).
-//
-// The rewrite claims the two receivers that ARE the singleton and the no-arg
-// call `uj()` always was. Anything else wearing `.uj(` is reported: an unknown
-// receiver is not mechanically this accessor, and a silent rewrite there would
-// trade one runtime TypeError for another.
+// Rule 19: the UJM library bag has no successor (its page features are web
+// runtime properties), so every surviving `.uj(` is a loud hand-port note
 // ---------------------------------------------------------------------------
-const UJ_ACCESSOR = /\b(?:webManager|omega)\.uj\(\s*\)/g;
 const UJ_SURVIVOR = /\.uj\(/;
+const UJ_NOTE = '`.uj(` survives and no OMEGA runtime has a `uj()`, so this call is a runtime TypeError. '
+  + 'Port what it used by hand: the page features are properties of the web runtime instance (`omega.exitPopup.show()` for the exit popup)';
 
 const ujLibrary = {
   id: 'uj-library',
-  title: '`webManager.uj()`/`omega.uj()` → `omega.library()`',
+  title: '`webManager.uj()`/`omega.uj()` → a hand-port note',
   apply(text) {
-    const { text: out, edits } = replacePerLine('uj-library', text, UJ_ACCESSOR, 'omega.library()');
-    const findings = [];
-    const { lines } = toLines(out);
-    lines.forEach((line, index) => {
-      if (!UJ_SURVIVOR.test(line)) return;
-      findings.push({
-        check: 'uj-library', line: index + 1, severity: 'error',
-        message: '`.uj(` survives — `@omega.js/client` has no `uj()`, so this call is a runtime TypeError. '
-          + 'The UJM library accessor is `omega.library()` on the client singleton; rewrite this receiver by hand',
-      });
-    });
-    return { text: out, edits, findings };
+    const findings = toLines(text).lines.flatMap((line, index) => (UJ_SURVIVOR.test(line)
+      ? [{ check: 'uj-library', line: index + 1, severity: 'error', message: UJ_NOTE }] : []));
+    return { text, edits: [], findings };
   },
 };
 

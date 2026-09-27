@@ -92,7 +92,7 @@ test('#617: a crash-stale ports file never wedges a build — the dead pid is ig
   // build fails on THAT — the proof it never stopped at the stale lock.
   await assert.rejects(
     build({ logFile: false }),
-    /payment\.processors is retired/,
+    /payment\.processors\.stripe is not a key the schema declares/,
     'the build proceeded; the only thing that stopped it is the config',
   );
 });

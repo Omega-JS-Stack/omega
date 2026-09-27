@@ -68,7 +68,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // named for their type, which is the common case, not a rule: a second web
   // target is a sibling key with `type: 'web'` (see Targets below).
   targets: {
-    web:       { type: 'web', hosting: { provider: 'github' }, meta: { index }, imagemin, collections, client: { consent, … }, dev: { limitCollections } },   // `hosting` says who SERVES this target's built site (#883): web targets only, `github` by default, which publishes it to the target's own `<brand.id>-<name>` repo and serves it from Pages at the target's url. `meta` holds SITE-WIDE defaults for page-meta values, spelled exactly as a page spells them (#564; `index` is the only key today). No `redirects` key: #466 retired it; a TEMPLATED redirect is a Cloudflare redirect rule (edge.providers.cloudflare.rules.redirect), an enumerable one is a redirect PAGE (docs/web/index.md). client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …): a settings bag the client normalizes; only the keys a BRAND authors are schema-known: `consent` (see "Consent" below), plus `auth.config.policy` ('authenticated' | 'unauthenticated' | 'disabled'; absent = no policy, and the auth/admin layouts set theirs in page frontmatter), `exitPopup.enabled` and `serviceWorker.enabled` (both default true, materialized) ([#650](https://github.com/Omega-JS-Stack/omega/issues/650)). collections: the brand's OWN content collections: name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling: collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
+    web:       { type: 'web', hosting: { provider: 'github' }, meta: { index }, imagemin, collections, client: { consent, … }, dev: { limitCollections } },   // `hosting` says who SERVES this target's built site (#883): web targets only, `github` by default, which publishes it to the target's own `<brand.id>-<name>` repo and serves it from Pages at the target's url. `meta` holds SITE-WIDE defaults for page-meta values, spelled exactly as a page spells them (#564; `index` is the only key today). No `redirects` key: #466 retired it; a TEMPLATED redirect is a Cloudflare redirect rule (edge.providers.cloudflare.rules.redirect), an enumerable one is a redirect PAGE (docs/web/index.md). client: the @omega.js/client runtime blob (auth, sentry, exitPopup, …): a settings bag the client normalizes, declared as an OPEN object; only the keys a BRAND authors are typed: `consent` (see "Consent" below), plus `auth.config.policy` ('authenticated' | 'unauthenticated' | 'disabled'; absent = no policy, and the auth/admin layouts set theirs in page frontmatter), `exitPopup.enabled` and `serviceWorker.enabled` (both default true, materialized) ([#650](https://github.com/Omega-JS-Stack/omega/issues/650)). collections: the brand's OWN content collections: name → { field, size, title, description, permalink }; documents live in `_<name>/` and the engine generates the listing + one page per category of `field` (#207). dev.limitCollections: dev-only collection sampling: collection name → max documents ({ posts: 50 }) plus `randomize: true`; development builds only, production always ships the whole site (#190)
     backend:   { type: 'backend', projectType, auth: { signup: { maxPerIpPerDay } } },   // projectType: 'firebase' (default: Cloud Functions) | 'custom' (the same backend as its own server on PORT, for a container host: no Functions deploy, no emulator lane; see "Backend project type" below). auth.signup.maxPerIpPerDay: signups allowed per client IP per day, positive integer, default 2. Raise it for audiences behind shared egress (NAT/CGNAT, VPNs, offices)
     desktop:   { type: 'desktop', omega: { authPersistence }, app: { appId, productName, copyright, category, languages, darkModeSupport },
                  platforms: { mac, windows, linux },
@@ -220,12 +220,12 @@ targets: {
 - **One shared `api.<domain>`**: every web target talks to the same backend, so the manager's
   cloud hosting op ensures exactly one API domain no matter how many targets a brand runs
   ([docs/manager/cloud.md](../manager/cloud.md)).
-- **The resolved `url` is a declared key** (`packages/config/src/schema.js`), so a target load
-  raises no undeclared-key warning for the url it just derived.
+- **The resolved `url` is a declared key** (`packages/config/src/schema.js`), so the strict
+  schema never fails a target load over the url it just derived.
 - **Legacy `brand.subdomains` conversion rule**: each subdomain becomes its own web target,
   `["admin", "cdn"]` → `admin: { type: 'web' }, cdn: { type: 'web' }` beside the main site; the
-  names carry the subdomains, so nothing else is written. The key itself is a retired path
-  (below), so a config still carrying it fails validation with that recipe.
+  names carry the subdomains, so nothing else is written. The key itself is undeclared, so a
+  config still carrying it fails the strict load, and `omega migrate` names that recipe.
 - Non-goals: no cross-target shared builds, no per-target Firebase projects.
 
 ## The shipping declaration (`platforms`) and the format table (#867)
@@ -290,12 +290,12 @@ targets: {
   is spelled only in its `gulp/tasks/build-config.js`; GitHub's runner labels only in the
   generated workflow. `APPLE_*` and `SNAPCRAFT_*` env names stay as they are: they name
   vendors, not platforms.
-- **Retired, with a migration**: `platforms.win` and `platforms.linux.snap` are registered
-  retired paths, so a brand still carrying either fails validation naming its replacement.
+- **Retired, with a migration**: `platforms.win` and `platforms.linux.snap` are undeclared, so
+  a brand still carrying either fails the strict load, and `omega migrate` names the replacement.
   `npx omega manage --migration=platform-names --execute` performs the rewrite at the brand
   root (every omega.json5 it owns, brand file and target files alike) and renames
-  `config/icons/macos/` to `config/icons/mac/` with it. Run it BEFORE `omega migrate`, which
-  DELETES a retired key rather than moving it. `snap.enabled: false` becomes
+  `config/icons/macos/` to `config/icons/mac/` with it. Run it BEFORE `omega migrate --execute`,
+  which DELETES a retired key rather than moving it. `snap.enabled: false` becomes
   `formats.snap: false`, because presence is the switch now.
 
 ## Custom targets (#603)
@@ -419,17 +419,21 @@ reads it:
   laptop (`OMEGA_FONTAWESOME_ROOT`, `machineLocal`).
 - The validator enforces the first half mechanically: a secret-shaped key in
   omega.json5 hard-fails the load (Hard rules above). The second half is this
-  rule plus the retired-key register below.
+  rule, and `omega migrate` names a `.env` line that moved (below).
 - **A public value in config needs no CI delivery.** It rides the snapshot a
   deploy pushes like every other config value, so it is never a repo secret and
   never a `${{ secrets.KEY }}` line.
 
-### Retired env keys (`src/env-retired.js`)
+### Retired env keys (the migrate table, `@omega.js/manager` `src/migrate/retired-env.js`)
 
 Six public identifiers moved out of `.env` with #893. There is no dual-read, so
-a stale line is a value nothing consults: every `.env` layer read
-(`parseEnvFile`, which both the process cascade and the artifact composer go
-through) FAILS on one, naming the move.
+a stale line is a value nothing consults. The `.env` layer itself stays OPEN
+(an `.env` may carry keys outside omega, [#859](https://github.com/Omega-JS-Stack/omega/issues/859)),
+so running code never names one: the brand-root `omega migrate` does. Its report
+lists every retired key the brand root's `.env` and each `.env.<environment>`
+overlay carry, by NAME only (a value never reaches a report), and `--execute`
+renames an env-side rename in place with the value's bytes untouched. A value
+that moved into config, and a key retired outright, stay by-hand steps.
 
 | Retired `.env` key | Its config home |
 |---|---|
@@ -445,11 +449,11 @@ The by-hand move for a brand that still carries one:
 `RECAPTCHA_SECRET_KEY`, `PAYPAL_CLIENT_SECRET`, `CHARGEBEE_API_KEY` and every
 store API credential stay in `.env`.
 
-The same register carries the keys that stayed secrets and only changed NAME
-([#845](https://github.com/Omega-JS-Stack/omega/issues/845)). The refusal is
-identical, and so is the silence it prevents: the env schema does not know the
-old name, so the value reaches nothing. The fix is renaming the line, not
-deleting it. Rows are exact names, one per provider.
+The same table carries the keys that stayed secrets and only changed NAME
+([#845](https://github.com/Omega-JS-Stack/omega/issues/845)): the env schema does
+not know the old name, so the value reaches nothing. The fix is renaming the
+line, not deleting it, which is what `omega migrate --execute` does (it refuses
+when the new name is already in the file). Rows are exact names, one per provider.
 
 | Renamed `.env` key | Its new `.env` name |
 |---|---|
@@ -459,8 +463,8 @@ deleting it. Rows are exact names, one per provider.
 And it carries the keys retired OUTRIGHT
 ([#819](https://github.com/Omega-JS-Stack/omega/issues/819), Ian 2026-09-13): no config
 path and no new env name, because a MECHANISM took the key's place rather than another
-value. Such a row declares `replacement: null` and its refusal reads as a deletion with
-nowhere to move the value to. The test-lane pair is the whole set today: web, desktop and
+value. Such a row declares `replacement: null` and its report line reads as a deletion
+with nowhere to move the value to. The test-lane pair is the whole set today: web, desktop and
 extension each test their own sign-in against a persona the backend emulator seeds
 ([#904](https://github.com/Omega-JS-Stack/omega/issues/904)), so no suite holds a
 credential of its own and the `testing` schema group is gone with them.
@@ -945,13 +949,44 @@ Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../../_attic/p
 (`TARGET_SCHEMAS[target]`), run against the RESOLVED config. `brand.id` (URL-scheme-safe
 slug) and `brand.name` are the only universally required fields.
 
-**Undeclared keys WARN** ([#636](https://github.com/Omega-JS-Stack/omega/issues/636)):
-every leaf path of the resolved config no rule declares comes back as ONE warning naming
-them — never an error, because a brand config that outlives a framework version must still
-build. A rule of type `object`/`array` declares its whole subtree (a brand's postal
-address, an open provider map), and the `targets` namespace is exempt: those keys belong to
-a framework, or to a custom target. A finding is a hole to fill — either the key is dead,
-or the schema owes it a rule.
+**The schema is STRICT: an undeclared key is an ERROR** ([#859](https://github.com/Omega-JS-Stack/omega/issues/859)).
+Every leaf path of the resolved config that no rule declares fails the load, ONE error line
+per path, so a brand sees each key it has to move or delete:
+
+```
+config.<path> is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)
+```
+
+The validator knows only the present shape: a retired name fails exactly like a typo, with
+no special message, and the brand-root `omega migrate` is the one code that knows what an
+old name became (its tables are `@omega.js/manager`'s `src/migrate/`, see Migration below).
+A key the code reads owes a rule; a key nothing reads is dead and goes. What stays OPEN:
+
+- **A rule of type `object`/`array` opens its subtree ONLY when no rule is declared beneath
+  it: a brand's postal `brand.address`, `brand.images`, the `connections` provider map,
+  `payment.products`, `seo.github`, `blog.providers`, `devlog.providers.ghostii`. A section
+  with typed keys (`cloud.config`, `devlog`, `marketing`, `repo`, `targets.web.meta`,
+  `targets.desktop.platforms`, `releases`) is CLOSED, so a retired path or a typo inside it
+  fails. `cloud.config` types every key the Firebase web SDK takes. Two bags are open
+  beside typed keys on purpose, marked `open: true` on their rule: the @omega.js/client
+  `client` settings bag and the manager's `edge.providers.cloudflare` engine data.
+- **The documented override blocks** a brand hands a framework verbatim, each an open rule:
+  `targets.desktop.electronBuilder` (merged over the generated electron-builder config),
+  `targets.desktop.windows` (per-window BrowserWindow options), `targets.desktop.cdp`,
+  `targets.desktop.fileAssociations`, `targets.desktop.protocols`, and the backend's
+  `targets.backend.mcp.authUrl`.
+- **The keys framework code writes**, never a brand: the `company.name` / `.url` / `.images`
+  the loader fills (a staged compose output carries them on purpose, and the loader refuses a
+  TYPED one in a brand or company file), and, only under `validateConfig(config, { decorated:
+  true })`, the build facts a surface bakes (`runtime`, `environment`, `version`, `buildTime`,
+  `target`, `dev`). The desktop boot and its build audit validate a baked config that way; an
+  authored load declares none of them, so a brand typing one, or a typo under `dev`, fails.
+- **The `targets` namespace, on a whole-file load**: a target entry's keys are judged by that
+  target's OWN load, which hoists `targets.<name>.*` to the top level where the schema reads
+  them. A custom target's keys are its own.
+
+The `.env` layer is NOT strict: an `.env` may carry keys outside omega, and a key nothing
+reads is simply unread.
 
 **authDomain is the brand's own host** (cp268): when `cloud.config.authDomain` is set it
 must equal the BRAND host, `brand.url`, for every target a brand runs
@@ -1040,7 +1075,9 @@ used to buy.
 ### What this replaces
 
 `payment.products[].limits`, the per-product `features` ARRAY, and the product-wide
-`rateLimit` are **retired** — all three are validation errors naming their replacement.
+`rateLimit` are **retired**. The ARRAY is a validation error naming its replacement;
+`limits` and `rateLimit` sit inside the open `payment.products` subtree, so the loader does
+not judge them and the brand-root `omega migrate` is what names both.
 The cross-product definition BACKFILL retires with them: nothing repeats, so nothing needs
 unifying. The mapping is in [breaking-changes.md](breaking-changes.md).
 
@@ -1207,7 +1244,7 @@ site. Three cases:
 | Case | The switch | The read | Examples |
 |------|-----------|----------|----------|
 | **1. Data-bearing** — the feature cannot run without a value only the brand can supply | that DATA's presence | `if (value)` | `advertising.providers.adsense.client`, `monitoring.providers.sentry.dsn`, `analytics.providers.*.id`, `edge.providers.cloudflare.zone`, `advertising.providers.inhouse.source` |
-| **2. Zero-data**: the framework can run it for every brand with no input | `enabled`, default ON | `value !== false` | `forms.providers.slapform.enabled`, `inbound.chat.providers.chatsy.enabled`, `search.providers.searchConsole.enabled`, `edge.providers.cloudflare.enabled`, `targets.web.meta.index` |
+| **2. Zero-data**: the framework can run it for every brand with no input | `enabled`, default ON | `value !== false` | `forms.providers.slapform.enabled`, `inbound.chat.providers.chatsy.enabled`, `search.providers.searchConsole.enabled`, `edge.providers.cloudflare.enabled`, `targets.web.meta.index`, the manager's own `enabled`, `server.enabled`, `assets.enabled`, `payment.enabled` |
 | **3. Consequential** — it costs money, publishes to the world, or is irreversible | `enabled`, default OFF | `value === true` | `directory.enabled`, `devlog.enabled`, `targets.desktop.platforms.mac.mas.enabled` |
 
 - **A block by itself NEVER enables.** Authoring `providers: { adsense: {} }` is an opt-IN
@@ -1219,8 +1256,8 @@ site. Three cases:
   case 1 and deleted both extra gates. A state that needs a second switch to express
   (managed account, ad-free site) is deliberately inexpressible.
 - **Every code-read switch has a schema rule** ([#546](https://github.com/Omega-JS-Stack/omega/issues/546)):
-  an undeclared key validates clean, so a typo (`enbaled: false`) silently reads as ON and
-  the validator cannot document what the key does. The rule carries the `default:` that
+  with no rule, the key fails the strict load, and a rule is also where the validator
+  documents what the key does. The rule carries the `default:` that
   states the polarity — except where the SECTION is presence-gated (`advertising`), because
   a materialized default would write the section into every brand and switch the feature on
   for brands that configured none; there the ON answer lives at the read site.
@@ -1260,7 +1297,7 @@ It is the ONE home of those facts
 ([#610](https://github.com/Omega-JS-Stack/omega/issues/610)). The legacy UJM-shaped
 `targets.web.download` / `targets.web.extension` page maps — and the `site.download` /
 `site.extension` data they filled — are GONE: a brand still carrying either key fails
-validation naming the block it derives from, and `omega migrate` drops it with a note.
+the strict load, and `omega migrate` names the block it derives from and drops it.
 
 - **The desktop derivation is OPT-IN (#124)**: `releasesUrl` appears only when
   `targets.desktop.releases` is present (its
@@ -1585,8 +1622,9 @@ The brand's repo hosting used to be spelled in four places: `repo.providers.gith
 separate top-level `github` identity, a `targets.<name>.github.repo` override, and the
 desktop releases owner/repo. One block says it now (`repo: { provider, org }`), every repo
 name derives from `<brand.id>-<role>`, and visibility is the brand root package.json's
-`private` field. Each retired key is a registered PATH, so a brand still carrying one
-fails validation instead of silently addressing a repo nothing publishes to. The by-hand
+`private` field. Each retired key is undeclared, so a brand still carrying one fails the
+strict load instead of silently addressing a repo nothing publishes to, and each is a
+registered PATH in the migrate table, so `omega migrate` names its home. The by-hand
 steps are the register's
 [2026-09-11 section](breaking-changes.md#2026-09-11-one-repo-block-and-the-website-repo-883).
 
@@ -1603,26 +1641,37 @@ steps are the register's
 | `targets.desktop.releases.owner` | nothing: `<brand.id>-releases` under `repo.org` |
 | `targets.desktop.releases.repo` | nothing: `<brand.id>-releases` under `repo.org` (`releases: {}` stays the presence switch) |
 
-**Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142)):
-a name that was renamed OUTRIGHT is a validation error wherever it sits — shared level,
-inside a `targets.<name>` entry, naming its replacement and
-pointing back here. Today that is `web_manager` → `client`, `firebaseConfig` → `cloud`,
-`cookieConsent` → `client.consent`, `subdomains` → `targets.web` and `oauth2` → `connections` (`src/retired-keys.js` is the list). Without the guard the old key validated clean and
-everything under it vanished, since nothing dual-reads it. Names that live on as legitimate
+**Retired keys fail loudly** ([#142](https://github.com/Omega-JS-Stack/omega/issues/142),
+[#859](https://github.com/Omega-JS-Stack/omega/issues/859)): a retired key is undeclared,
+so the strict schema fails the load on it like on any unknown key (see Validation), and the
+loader knows nothing more. What the key BECAME is the migrate verb's knowledge: the tables
+below are `@omega.js/manager`'s `src/migrate/retired-keys.js` (config) and
+`src/migrate/retired-env.js` (`.env`), the one code that knows an old name. A name that was
+renamed OUTRIGHT is a NAME row, found wherever it sits (shared level, inside a
+`targets.<name>` entry). Today that is `web_manager` → `client`, `firebaseConfig` → `cloud`,
+`cookieConsent` → `client.consent`, `subdomains` → `targets.web`, `oauth2` → `connections`
+and `parent` → `company.webhooks`. Names that live on as legitimate
 keys elsewhere stay out of the list — the rows below are their only guide. `sentry` is the one
 that reads like a contradiction and is not: its NEW home is itself a `sentry` key
 (`monitoring.providers.sentry`), so a name test would fire on the very shape it is steering
 people toward. Same for `google`/`meta` under `analytics.providers`.
 
-**`omega migrate` at the brand root deletes them** ([#612](https://github.com/Omega-JS-Stack/omega/issues/612)): both halves of the
-list, from the file as AUTHORED, through the comment-preserving editor (`removeConfigValues`) —
+**`omega migrate --execute` at the brand root deletes them** ([#612](https://github.com/Omega-JS-Stack/omega/issues/612)): both halves of the
+list, from every authored omega file (the brand's `config/omega.json5` and its environment
+overlays, each target's own file and its overlays, one report block each), through the
+comment-preserving editor (`removeConfigFileValues`):
 the key, its subtree, and the comment documenting it, with every other byte untouched. One line
-per key naming its replacement, `--dry-run` for the plan, idempotent (a converged brand's rerun
+per key naming its replacement, a bare `omega migrate` for the plan, idempotent (a converged brand's rerun
 is byte-identical). It removes the dead key; moving the setting into the home named in the tables
 below is still by hand, EXCEPT where a row carries a converter
 ([#858](https://github.com/Omega-JS-Stack/omega/issues/858)): then the new value is written
 first, through the same comment-preserving editor, and the old key is deleted in the same
-run, so a brand never sits between the two shapes. A dry run prints both halves.
+run, so a brand never sits between the two shapes. A bare run prints both halves. The
+same pass then lists every key the strict schema still refuses and no row covers
+(config's `undeclaredAuthoredPaths()`: the whole file, then each framework target entry as
+its own load sees it), as a by-hand line:
+judged after converting under `--execute`, so it is what the brand still owes, and it
+exits 1 in both modes while any remains.
 
 `subdomains` is the newest name ([#588](https://github.com/Omega-JS-Stack/omega/issues/588),
 Ian 2026-09-01). The key was READ by exactly one thing, the cloud hosting op, which ensured an
@@ -1652,12 +1701,12 @@ are in [breaking-changes.md](breaking-changes.md#the-user-connection-feature-is-
 The de-branding rekey ([#23](https://github.com/Omega-JS-Stack/omega/issues/23)) adds a
 second, PATH-based half in the same file (`RETIRED_PATHS`): keys whose provider keeps its
 own name one level down inside the new home, so a name test would false-positive. Each
-entry matches ONE exact path from the root, array positions ignored, and the error names the
+entry matches ONE exact path from the root, array positions ignored, and the report names the
 real path, index and all
 ([#732](https://github.com/Omega-JS-Stack/omega/issues/732)). A `targets.<name>` row names the
 TYPE, and the key is a NAME, so the row fires on EVERY target of that type: with `community:
-{ type: 'web' }` declared, `targets.community.meta.title` bounces against the
-`targets.web.meta.title` row and the error names the real path
+{ type: 'web' }` declared, `targets.community.meta.title` matches the
+`targets.web.meta.title` row and the report names the real path
 ([#886](https://github.com/Omega-JS-Stack/omega/issues/886)):
 
 | Retired path | New home |
@@ -1671,7 +1720,7 @@ TYPE, and the key is a NAME, so the row fires on EVERY target of that type: with
 | `gcp` | **`cloud`** (`cloud.organizationId`, `cloud.billingAccount`) |
 | `firebase` | **`cloud`** (`cloud.shared`, `cloud.supportEmail`, `cloud.apiSubdomain`; projectId only at `cloud.config.projectId`) |
 | `advertising.providers.google-adsense` | **`advertising.providers.adsense`** + camelCase slots |
-| `github` | **`repo`** ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): the separate identity block is gone, and `github.user` / `github.website` are registered retired PATHS now, so a carrying brand hears it from the validator instead of this table |
+| `github` | **`repo`** ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)): the separate identity block is gone, and `github.user` / `github.website` are registered retired PATHS now, so a carrying brand hears it from `omega migrate` instead of this table |
 
 The one-provider-shape normalization ([#425](https://github.com/Omega-JS-Stack/omega/issues/425))
 adds its own rows to the same `RETIRED_PATHS` half — every role names its vendors
@@ -1751,9 +1800,9 @@ The four schema-less web sections are registered paths too
 everything the build processes has a schema home). They were legacy UJM
 presentation blocks the converter wrote under `targets.web` with no schema rule
 anywhere, and @omega.js/web carried a PRIVATE list (`WEB_ONLY_SECTIONS`) purely
-so its own `config:` guard would pass them. That list is gone: each key is a
-registered path now, so a brand still carrying one hears it from the validator
-instead of authoring a value nothing reads. Registered at their authored path,
+so its own `config:` guard would pass them. That list is gone: each key is
+undeclared, so a brand still carrying one fails the strict load instead of
+authoring a value nothing reads, and `omega migrate` names the home. Registered at their authored path,
 the one place a carrying brand has them, and `omega migrate` drops the three
 with a note and moves the currency.
 
@@ -1785,7 +1834,9 @@ outside `brand`, and everything else about the company is RESOLVED at load. The 
 display name and the typed parent wordmark are registered retired PATHS; the typed
 `company.url` (and any `company.name` / `company.images`) fails the LOAD instead, naming
 the file, because the resolver fills those same keys and a retired-key sweep over a
-resolved config would fire on its own answer. The by-hand step, and the `parent` /
+resolved config would fire on its own answer. Past the brand file, a resolved or baked
+config carries those three keys legitimately, so the validator treats the loader-filled
+`company.name` / `.url` / `.images` as declared. The by-hand step, and the `parent` /
 `.omega/company.json` half, are in
 [breaking-changes.md](breaking-changes.md#2026-09-12-one-company-key-and-a-company-tree-inside-the-parent-677).
 
@@ -1794,7 +1845,17 @@ resolved config would fire on its own answer. The by-hand step, and the `parent`
 | `brand.company` | **`company.name`**, resolved from `company: { id: '<parent brand.id>' }`: the parent's name is the parent's to state |
 | `brand.images.companyWordmark` | **`company.images.wordmark`**, resolved from the parent's own `brand.images.wordmark` |
 | `company.url` (typed) | **`company.url`** (resolved): type `company: { id }` and the loader fills it; an authored one fails the load |
-| `parent` (every value) | The key is RETIRED outright ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): the topology is **`company: { id: 'self' }`** / **`company: { id: '<parent brand.id>' }`**, and the opt-out `parent: false` is **`company: { webhooks: false }`**. A config still carrying `parent` fails the load naming `company.webhooks` |
+| `parent` (every value) | The key is RETIRED outright ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): the topology is **`company: { id: 'self' }`** / **`company: { id: '<parent brand.id>' }`**, and the opt-out `parent: false` is **`company: { webhooks: false }`**. A config still carrying `parent` fails the strict load, and `omega migrate` names `company.webhooks` |
+
+Two top-level sections nothing reads any more are rows too
+([#859](https://github.com/Omega-JS-Stack/omega/issues/859)), found on a live brand that
+still carried them. Each is registered at its authored path, one row for the whole section,
+so `omega migrate` names it and `--execute` deletes it.
+
+| Retired path | New home |
+|---|---|
+| `adsense` (the whole section, `accountId` included) | **`advertising.providers.adsense.client`**: the provider's own `ca-pub-…` id, from which the manager derives the account ([#527](https://github.com/Omega-JS-Stack/omega/issues/527)). Write the id there first if it is not already |
+| `download` (the top-level page map: `mac.universal`, `linux.debian`, …) | **`targets.desktop.releases`**, curated onto `site.targets.desktop.downloads` ([#610](https://github.com/Omega-JS-Stack/omega/issues/610)) |
 
 ### electron-manager (`config/electron-manager.json` → `config/omega.json5`) — DONE (checkpoint 18)
 
@@ -1819,7 +1880,7 @@ resolved config would fire on its own answer. The by-hand step, and the `parent`
 | `oauth2` | **`connections`** — the per-provider block is unchanged ([#788](https://github.com/Omega-JS-Stack/omega/issues/788)); the credentials become the `CONNECTIONS_<PROVIDER>_CLIENT_ID`/`_SECRET` pair |
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
 | `sentry` | **`monitoring: { providers: { sentry: { dsn } } }`** ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) |
-| custom keys (`omega`, `mcp`, …) | top level, unchanged |
+| custom keys (`omega`, …) | REFUSED: the schema is strict ([#859](https://github.com/Omega-JS-Stack/omega/issues/859)), so a key no rule declares fails the load. `mcp.authUrl` is the one declared backend override (`targets.backend.mcp.authUrl`); anything else moves to its real home or goes |
 | `github`, `reviews`, `marketing`, `blog`, `dataRequest` | top level, unchanged ([#277](https://github.com/Omega-JS-Stack/omega/issues/277)): shared keys the manager reads brand-level, so a website-only brand has a home for them; `targets.backend.<same key>` still overrides |
 | `parent` | RETIRED outright ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)): a URL or `'self'` becomes **`company: { id }`**, and `parent: false` becomes **`company: { webhooks: false }`**. The key itself fails the load now, naming its new home |
 
@@ -1837,7 +1898,7 @@ the backend target's local file carries only `targets.backend`.
 | `brand`, `analytics`, `theme` | top level, unchanged |
 | `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
 | `sentry` | **`monitoring: { providers: { sentry: { dsn } } }`** ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)) |
-| custom keys (`liveReloadPort`, …) | top level, unchanged |
+| custom keys (`liveReloadPort`, …) | REFUSED: the schema is strict ([#859](https://github.com/Omega-JS-Stack/omega/issues/859)), so a key no rule declares fails the load |
 | `analytics.providers.google.secret` | **`.env` → `GOOGLE_ANALYTICS_SECRET`** (secrets never in omega.json5; loader hard-fails) |
 | *(no extension-specific keys yet)* | `targets.extension: {}` — presence = enabled; extension-specific settings land here |
 
@@ -1850,9 +1911,10 @@ dropped them).
 
 ### ultimate-jekyll-manager (`src/_config.yml` + `config/ultimate-jekyll-manager.json`) — `omega migrate` (B4, checkpoint 32)
 
-One command converts the consumer in place (and `--check` previews without
-writing). The converted file is validated through `loadConfig(root, 'web')`
-before the report prints.
+The web leg of the brand-root `omega migrate` converts the consumer (a bare run
+reports, `--execute` writes). It emits declared keys only, and never judges the
+brand config itself: the brand-root config pass is the one place that does
+([manager/index.md](../manager/index.md)).
 
 | Legacy | New |
 |---|---|
@@ -1868,13 +1930,13 @@ before the report prints.
 | `web_manager.chatsy` (agentId + widget settings) | **`inbound.chat.providers.chatsy`** — the chat widget left the client blob for the one chat home the manager also provisions (#23) |
 | `socials` | **`socials`** (top level) — a SHARED_SCHEMA key, so the root is its home and the scaffold emits it there ([#483](https://github.com/Omega-JS-Stack/omega/issues/483)). A web load resolves `targets.web.socials` identically, which is why the converter used to leave it in the target; the handles are brand identity, read past the website too |
 | `translation` | **`translation`** (top level): a SHARED_SECTIONS key, so the root is its home and the scaffold emits it there ([#526](https://github.com/Omega-JS-Stack/omega/issues/526)). A web load resolves `targets.web.translation` identically, which is why the converter used to leave it in the target; but disperse copies the SHARED sections, so a target-scoped engine config is invisible to every other target that translates (the extension's `_locales`). `translation.include` stays a web-only key at that shared home, and the legacy `exclude` list CONVERTS to it on the way through ([#858](https://github.com/Omega-JS-Stack/omega/issues/858)): `exclude: ['docs']` becomes `include: ['**', '!docs']`, one note, so the brand keeps translating exactly what it was |
-| `meta` | **`targets.web.meta.index`, and nothing else**: the title/description half is DROPPED ([#607](https://github.com/Omega-JS-Stack/omega/issues/607), Ian 2026-08-26: meta never exists in two places): the site-wide defaults are `brand.name` / `brand.description` (what @omega.js/web's head falls back to) and everything per-page is that page's own `meta:` frontmatter ([docs/web/frontmatter.md](../web/frontmatter.md)). The `index` half lives on under the SAME name a page writes ([#564](https://github.com/Omega-JS-Stack/omega/issues/564), Ian 2026-09-09). `omega migrate` drops the legacy title/description with a note, and a config still carrying `meta.title` / `meta.description` is a retired-key error |
+| `meta` | **`targets.web.meta.index`, and nothing else**: the title/description half is DROPPED ([#607](https://github.com/Omega-JS-Stack/omega/issues/607), Ian 2026-08-26: meta never exists in two places): the site-wide defaults are `brand.name` / `brand.description` (what @omega.js/web's head falls back to) and everything per-page is that page's own `meta:` frontmatter ([docs/web/frontmatter.md](../web/frontmatter.md)). The `index` half lives on under the SAME name a page writes ([#564](https://github.com/Omega-JS-Stack/omega/issues/564), Ian 2026-09-09). `omega migrate` drops the legacy title/description with a note, and a config still carrying `meta.title` / `meta.description` fails the strict load |
 | `download`, `extension`, `favicon`, `manifest`, `icons`, `currency` | **DROPPED with a note, every one** (nothing lands under `targets.web`): `download` / `extension` derive from the desktop and extension targets ([#610](https://github.com/Omega-JS-Stack/omega/issues/610)); `favicon`, `manifest` and `icons` retire with [#850](https://github.com/Omega-JS-Stack/omega/issues/850) (the favicon set is minted and `theme-color` comes from `brand.color`, nothing reads a manifest block, and a link carries its own `fa-*` classes). `currency` MOVES to **`payment.currency`**. Each one is a registered retired path, so carrying it forward would write a config the validator refuses |
 | `recaptcha` (incl. `site-key`) | **`captcha.providers.recaptcha`** (`siteKey` — every key is camelCase, #23) |
 | `cloudflare` (the purge `zone`) | **`edge.providers.cloudflare`** — one cloudflare home, shared with the manager's zone reconciliation (#23) |
 | `advertising.google-adsense` (flat or under `providers`) | **`advertising.providers.adsense`** with camelCase slots (`displaySlot`, `inArticleSlot`, `inFeedSlot`, `multiplexSlot`) — provider ids drop the vendor prefix (#23). An `enabled` or `units` gate beside them is DROPPED with a note ([#628](https://github.com/Omega-JS-Stack/omega/issues/628)): `client` presence is the one switch, so carrying the gate forward would validate as retired while the id turned the account and the units back on |
-| `permalink`, `pagination`, `collections`, `defaults`, `generators` | `targets.web.<same key>` (codemod rule 8's home — engine consumption of custom collections rides the consumer-theme waves) |
-| UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` — `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs), and `purgecss.safelist` is LIVE too ([#250](https://github.com/Omega-JS-Stack/omega/issues/250)): schema-known (`{ standard, deep, greedy, keyframes }` arrays, or a bare array for `standard`), it merges over the framework's built-in safelist in the purge pass |
+| `permalink`, `pagination`, `defaults`, `generators`, and any other unrecognized section | **DROPPED with a note per path**: no omega.json5 key reads them, and the schema is strict ([#859](https://github.com/Omega-JS-Stack/omega/issues/859)), so the converter emits only declared keys. Carry a setting that still matters by hand. (`collections` is its own row: dropped with its manual step, [#589](https://github.com/Omega-JS-Stack/omega/issues/589)) |
+| UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{purgecss,imagemin}`; `distribute` and `workflows` are DROPPED with a note (undeclared, nothing reads them). `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs), and `purgecss.safelist` is LIVE too ([#250](https://github.com/Omega-JS-Stack/omega/issues/250)): schema-known (`{ standard, deep, greedy, keyframes }` arrays, or a bare array for `standard`), it merges over the framework's built-in safelist in the purge pass |
 | UJM-json `webpack`, `gems`; `_config.yml` Jekyll machinery (`plugins`, `exclude`, …) | dropped, noted in the report |
 | secret-shaped keys anywhere | dropped + warned — move to `.env` |
 
@@ -1900,6 +1962,7 @@ const {
   composeTargetConfig, // (projectDir, target) → { config, files } — company+brand+local frozen into ONE self-contained file (deploy upload boundary, #31)
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
+  overlayPath,         // (basePath, environment) → the abs omega.<environment>.json5 beside that base, existing or not: the ONE spelling of an overlay file (the loader and the migrate config pass both name it through here)
   getEnabledTargets,   // (config) → ['web', 'backend', …]
   findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one target dir (THE hierarchy rule)
   findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file a target with no local-layer file rides
@@ -1914,21 +1977,26 @@ const {
   COMPANY_RESOLVED_FILE, // 'config/company-resolved.json5': the generated layer a deploy hands a runner
   resolveHook,         // (startRoot, 'account/password') → hook file | null (brand → company)
   loadHook,            // (startRoot, hookPath) → { fn, file } | null — broken hooks THROW
-  validateConfig,      // (config, { target }?) → { errors, warnings }
+  validateConfig,      // (config, { target, decorated }?) → { errors, warnings }; an undeclared path is an error (strict, #859); `decorated` declares a baked config's build facts
+  undeclaredPaths,     // (config, { target }?) → the leaf paths no rule declares
+  undeclaredAuthoredPaths, // (fileConfig, { target }?) → the same, over one authored file: whole file, then each framework target entry (the migrate pass and the web converter)
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
   resolvedBrandHost,   // (config) → the BRAND's own host (`brand.url`, top-level `url` only as fallback), lowercased | '' — authDomain validation AND every persona address (#708)
   findSecretKeys,      // (object) → dot-paths of secret-shaped keys
-  findRetiredKeys,     // (object) → [{ path, key, replacement, why }] — renamed-outright keys (#142)
   chosenProvider,      // (role.providers) → the picked provider name | null — presence is the pick, `false` the off switch (#425)
   backendProjectType,  // (targets.backend | resolved backend config) → 'firebase' | 'custom' — how the backend runs (#584)
   BACKEND_PROJECT_TYPES,
   applyConfigEdits,    // (source, edits, { comments }?) → edited source — comment-preserving (see Writeback)
   writeConfigValues,   // (projectDir, edits, { dryRun, comments }?) → { path, changed, applied }
+  writeConfigFileValues, // (configPath, edits, options?) → the same, on one named omega file (an overlay, a target's own)
   applyConfigRemovals, // (source, paths) → edited source — deletes a key, its subtree and its own comment (#612)
   removeConfigValues,  // (projectDir, paths, { dryRun }?) → { path, changed, removed } — absent paths skip, so reruns are byte-identical
+  removeConfigFileValues, // (configPath, paths, options?) → the same, on one named omega file
   schemaDefaults,      // (target?) → the schema's own defaults, the merge chain's lowest layer (#478)
   missingDefaults,     // (rawConfig, target?) → [{ path, value }] — the blocks a brand file lacks (the manage heal's list)
+  planMerge,           // (incoming, present) → { added: [{ path, value }], kept: [{ path, value, incoming }] }: filling `present` from `incoming`, never overwriting (missingDefaults' planner; the web migrate leg's root merge)
+  setAtPath,           // (object, dotted, value) → sets the value at a dot-path, creating the objects on the way
   defaultComments,     // (target?) → { 'dot.path': description } — the guiding comments a materialized block carries
   deepMerge,           // agnostic layer merge
   // The targets map (targets.js: every key is a NAME, #886)

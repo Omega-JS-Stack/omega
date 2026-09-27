@@ -38,16 +38,13 @@ module.exports = function audit(done) {
 
   // 1. Schema-driven config validation. Single source of truth in @omega.js/config
   // (shared schema + the desktop target refinements).
-  const { errors: schemaErrors } = validateConfig(config, { target: 'desktop' });
+  // build.getConfig() attaches `environment`, a build fact: the config is decorated
+  const { errors: schemaErrors } = validateConfig(config, { target: 'desktop', decorated: true });
   errors.push(...schemaErrors);
 
-  // ...and the validator's WARNINGS, which this task used to drop on the floor
-  // while reporting `0 warnings` ([#911](https://github.com/Omega-JS-Stack/omega/issues/911)).
-  // A key the schema does not declare is what a typo looks like, and the
-  // consumer has to see it at build time. They come off the LOAD, the same
-  // resolution `build.getConfig()` runs: loadConfig judges what the brand
-  // AUTHORED, before the loader fills its own resolved facts (`company.name`
-  // and friends) and before the build attaches `environment`.
+  // ...and the load's WARNINGS (an undeclared key is an ERROR, above). They
+  // come off the LOAD, the resolution `build.getConfig()` runs, which judges
+  // what the brand AUTHORED before the build attaches its own facts.
   const { warnings: configWarnings } = hasOmegaConfig(cwd)
     ? loadConfig(cwd, 'desktop', { environment: build.getEnvironment() })
     : { warnings: [] };

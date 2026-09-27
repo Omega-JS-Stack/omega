@@ -579,12 +579,23 @@ function applyConfigEdits(source, edits, { comments = {} } = {}) {
  * @param {{ dryRun?: boolean, comments?: Object<string, string> }} [options]
  * @returns {{ path: string, changed: boolean, applied: string[] }}
  */
-function writeConfigValues(projectDir, edits, { dryRun = false, comments = {} } = {}) {
+function writeConfigValues(projectDir, edits, options) {
   const configPath = resolveConfigPath(projectDir);
   if (!configPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} — cannot write config values`);
   }
 
+  return writeConfigFileValues(configPath, edits, options);
+}
+
+/**
+ * writeConfigValues on one named omega file (an overlay, a target's own file).
+ * @param {string} configPath - The file to edit.
+ * @param {Object<string, *>} edits - Dot-path → value.
+ * @param {{ dryRun?: boolean, comments?: Object<string, string> }} [options]
+ * @returns {{ path: string, changed: boolean, applied: string[] }}
+ */
+function writeConfigFileValues(configPath, edits, { dryRun = false, comments = {} } = {}) {
   const source = fs.readFileSync(configPath, 'utf8');
   const applied = pendingEdits(JSON5.parse(source), edits).map(([path]) => path);
   // Every writeback also normalizes top-level key order (comments travel
@@ -748,12 +759,23 @@ function applyConfigRemovals(source, paths) {
  * @param {{ dryRun?: boolean }} [options]
  * @returns {{ path: string, changed: boolean, removed: string[] }}
  */
-function removeConfigValues(projectDir, paths, { dryRun = false } = {}) {
+function removeConfigValues(projectDir, paths, options) {
   const configPath = resolveConfigPath(projectDir);
   if (!configPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} — cannot remove config values`);
   }
 
+  return removeConfigFileValues(configPath, paths, options);
+}
+
+/**
+ * removeConfigValues on one named omega file (an overlay, a target's own file).
+ * @param {string} configPath - The file to edit.
+ * @param {string[]} paths - Dot-paths to delete.
+ * @param {{ dryRun?: boolean }} [options]
+ * @returns {{ path: string, changed: boolean, removed: string[] }}
+ */
+function removeConfigFileValues(configPath, paths, { dryRun = false } = {}) {
   const source = fs.readFileSync(configPath, 'utf8');
   const parsed = JSON5.parse(source);
   const removed = paths.filter((path) => getAtPath(parsed, path) !== undefined);
@@ -766,4 +788,4 @@ function removeConfigValues(projectDir, paths, { dryRun = false } = {}) {
   return { path: configPath, changed: next !== source, removed };
 }
 
-module.exports = { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues, parseRoot };
+module.exports = { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues, parseRoot };

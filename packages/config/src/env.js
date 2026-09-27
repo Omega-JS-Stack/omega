@@ -32,7 +32,6 @@ const path = require('node:path');
 const { findBrandRoot } = require('./load.js');
 const { resolveCompany } = require('./company.js');
 const { ENV_SCHEMA, envFileGroups, envSchemaEntry } = require('./env-schema.js');
-const { assertNoRetiredEnvKeys } = require('./env-retired.js');
 // The one vocabulary lives with the one environment module (#817); this file
 // re-exports it so the .env overlay names and the runtime answer stay one list.
 const { ENV_ENVIRONMENTS } = require('./environment.js');
@@ -322,11 +321,8 @@ function reloadEnv(startDir, { target, environment = envEnvironment() } = {}) {
 /**
  * Parse one .env file into a plain map. Missing files read as empty.
  *
- * The ONE place a `.env` layer is read, so it is also where a RETIRED key is
- * refused ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)): there
- * is no dual-read, so a line for a key that moved into config is a value
- * nothing consults, and both readers below (the process cascade and the
- * artifact composer) fail on it naming the move.
+ * The layer is OPEN: an .env may carry keys outside omega, so a key nothing
+ * reads (a retired one included) is simply unread. `omega migrate` names those.
  *
  * @param {string|null} envPath
  * @returns {Object<string, string>} Parsed key → value.
@@ -334,10 +330,7 @@ function reloadEnv(startDir, { target, environment = envEnvironment() } = {}) {
 function parseEnvFile(envPath) {
   if (!envPath || !fs.existsSync(envPath)) return {};
 
-  const parsed = require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
-  assertNoRetiredEnvKeys(parsed, envPath);
-
-  return parsed;
+  return require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
 }
 
 /**

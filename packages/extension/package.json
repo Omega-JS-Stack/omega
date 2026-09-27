@@ -23,18 +23,19 @@
     "./lib/logger-lite": "./dist/lib/logger-lite.js",
     "./lib/messaging": "./dist/lib/messaging.js",
     "./cli": "./dist/cli-run.js",
-    "./ensure-target": "./dist/commands/lib/ensure-target.js"
+    "./ensure-target": "./dist/commands/lib/ensure-target.js",
+    "./migrate": "./dist/commands/lib/migrate.js"
   },
   "scripts": {
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node ./bin/omega test"
+    "test": "node dist/cli-run.js test"
   },
   "bin": {
-    "omega": "./bin/omega",
-    "omg": "./bin/omg",
-    "mgr": "./bin/omega"
+    "omega": "bin/omega",
+    "omg": "bin/omg",
+    "mgr": "bin/omega"
   },
   "files": [
     "bin/",

@@ -1,37 +1,14 @@
 /**
- * Platform-names migration ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)):
- * the brand-data half of ONE platform vocabulary. OMEGA says `mac`, `windows`,
- * `linux` everywhere it speaks for itself, and what a target ships is declared
- * per FORMAT, so two things a brand may still carry are retired keys that
- * nothing reads:
- *
- *   platforms.win.*               → platforms.windows.*
- *   platforms.linux.snap.*        → platforms.linux.formats.snap.*
- *   config/icons/macos/<slot>.png → config/icons/mac/<slot>.png
- *
- * Neither key failed anything before: a brand still saying `win` got the
- * framework's default Windows installer settings with its own silently ignored,
- * and a brand still saying `snap: { enabled: true }` published no snap at all.
- * The validator errors on both now (@omega.js/config's retired-keys table), and
- * this is the fix, run ONCE by hand rather than healed inside every run:
- *
- *   npx omega manage --migration=platform-names            # prints the plan, writes nothing
- *   npx omega manage --migration=platform-names --execute  # performs it
- *
- * `snap.enabled: false` becomes `formats.snap: false`, because presence IS the
- * switch now. Every other snap setting (channels, confinement, grade,
- * autoStart) travels into the format unchanged.
- *
- * Every omega.json5 a brand owns is swept, not just the root one: the brand
- * file (where the keys live under `targets.<name>`) and each target's own
- * local-layer file (where they live at the top level). The icon dirs are swept
- * the same way, since a desktop target keeps its icons in its own
- * `config/icons/`.
- *
- * Unlike its Firestore siblings this migration touches only the brand's own
- * files, so it runs without a service account (`local: true`). Idempotent by
- * construction: a converged brand carries neither key and reports a clean
- * no-op.
+ * Platform-names migration: the brand-data half of ONE platform vocabulary
+ * (`mac`, `windows`, `linux`, and what ships declared per FORMAT). It rewrites
+ * `platforms.win.*` → `platforms.windows.*`, `platforms.linux.snap.*` →
+ * `platforms.linux.formats.snap.*` (`snap.enabled: false` becomes
+ * `formats.snap: false`, presence being the switch) and renames
+ * `config/icons/macos/` → `config/icons/mac/`, in every omega.json5 the brand
+ * owns and every target's icon dir. The strict schema fails both old keys (the
+ * rows: src/migrate/retired-keys.js); this is the fix, run ONCE by hand:
+ * `npx omega manage --migration=platform-names [--execute]`. Local files only,
+ * so no service account (`local: true`); a converged brand is a clean no-op.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;

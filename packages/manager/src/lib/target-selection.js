@@ -8,15 +8,10 @@
  * home, and deploy.js re-exports them for its own callers.
  */
 
-// Deploy order — backend's API goes live before the surfaces that call it, and
-// every other fan-out reuses it as the dependency order. A custom target (#603)
-// has no rank, so it lands after every framework one.
-const DEPLOY_ORDER = ['backend', 'web', 'extension', 'desktop', 'mobile'];
-
-// The flag that spells the target picker, on every brand-root verb (#780).
-// ONE name, one constant: commands/test.js reads this very export, so
-// `omega test --target=` and `omega deploy --target=` can never drift.
-const PICKER_FLAG = 'target';
+// The picker's flag and its comma-list parse live in devkit, shared with the monorepo root
+const { PICKER_FLAG, parseTargetTokens } = require('@omega.js/devkit/target-picker');
+// The one fan-out order (backend's API before the surfaces that call it) is the verb table's
+const { TARGET_ORDER } = require('@omega.js/devkit/verbs');
 
 // The pickers `--target=` replaced (#780). Removed, never aliased (no legacy
 // accommodations); `--only` was the collision that forced the rename, since
@@ -70,16 +65,6 @@ function assertKnownTargets(unknown, known) {
 }
 
 /**
- * A comma list of target tokens, trimmed and emptied of blanks.
- *
- * @param {string} [value] - the raw flag value
- * @returns {string[]}
- */
-function parseTargetTokens(value) {
-  return String(value || '').split(',').map((part) => part.trim()).filter(Boolean);
-}
-
-/**
  * Does this target answer to this token? A target has exactly ONE word (#886):
  * its NAME, which is also its folder under targets/. That is the ONE matcher
  * every brand-root picker uses, so `--target=` cannot mean one thing on
@@ -114,9 +99,10 @@ function selectTargets({ targets, target }) {
   const selected = targets
     .filter((entry) => tokens.length === 0 || tokens.some((token) => targetMatches(entry, token)))
     .sort((a, b) => {
+      // A custom target has no rank, so it lands after every framework one
       const rank = (entry) => {
-        const index = DEPLOY_ORDER.indexOf(entry.target);
-        return index === -1 ? DEPLOY_ORDER.length : index;
+        const index = TARGET_ORDER.indexOf(entry.target);
+        return index === -1 ? TARGET_ORDER.length : index;
       };
       return rank(a) - rank(b);
     });
@@ -154,4 +140,4 @@ function buildForwardedFlags(options, alsoConsumed = []) {
   return flags;
 }
 
-module.exports = { DEPLOY_ORDER, PICKER_FLAG, CONSUMED_KEYS, assertPickerFlags, assertKnownTargets, selectTargets, buildForwardedFlags, parseTargetTokens, targetMatches };
+module.exports = { PICKER_FLAG, CONSUMED_KEYS, assertPickerFlags, assertKnownTargets, selectTargets, buildForwardedFlags, parseTargetTokens, targetMatches };

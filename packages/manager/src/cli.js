@@ -9,6 +9,7 @@
 const path = require('node:path');
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
+const { passThroughRow, runPassThrough } = require('./lib/verb-passthrough.js');
 
 // Command name → positional/flag aliases
 const ALIASES = {
@@ -17,9 +18,11 @@ const ALIASES = {
   deploy: ['--deploy'], // brand-root deliberate publish fan-out (backend first)
   build: ['--build'], // brand-root build fan-out, every target type (#603)
   clean: ['--clean'], // brand-root clean fan-out, every target type (#603)
-  update: ['--update', 'outdated', 'out'], // brand-root dependency-freshness fan-out (devkit update per target)
+  update: ['--update'], // brand-root dependency-freshness fan-out (devkit update per target)
   test: ['--test'],
   bump: ['--bump'], // brand-root version writer: the root and every target move together (#869)
+  install: ['-i', 'i', '--install'], // brand-wide link flip: `i local` / `i live`, once for the whole tree
+  migrate: ['-m', '--migrate', 'migration'], // brand-wide legacy conversion: the config, then every target's migrate leg
   version: ['-v', '--version'],
 };
 
@@ -27,4 +30,6 @@ module.exports = createCliRouter({
   commandsDir: path.join(__dirname, 'commands'),
   aliases: ALIASES,
   defaultCommand: 'help',
+  // A framework verb the manager keeps no command for runs on the picked targets, raw args forwarded
+  fallback: (command) => (passThroughRow(command) ? () => runPassThrough(command, process.argv.slice(2)) : null),
 });

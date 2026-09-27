@@ -13,7 +13,6 @@
 // Entry shape:
 //   name        — the primary token, and the label help prints
 //   aliases     — other argv tokens that select this command
-//   args        — optional positional-argument map: `{ <arg>: [<arg aliases>] }`
 //   description — the help line
 //   default     — the command a bare `omega` runs (no entry claims it since
 //                 #675 retired setup: a bare `omega` prints help)
@@ -26,7 +25,6 @@ const VersionCommand = require('./commands/version');
 const ClearCommand = require('./commands/clear');
 const CwdCommand = require('./commands/cwd');
 const BuildCommand = require('./commands/build');
-const InstallCommand = require('./commands/install');
 const ServeCommand = require('./commands/serve');
 const DeployCommand = require('./commands/deploy');
 const TestCommand = require('./commands/test');
@@ -40,50 +38,17 @@ const AuthCommand = require('./commands/auth');
 const LogsCommand = require('./commands/logs');
 const UpdateCommand = require('./commands/update');
 const McpCommand = require('./commands/mcp');
-const MigrateCommand = require('./commands/migrate');
 const MigrateRulesCommand = require('./commands/migrate-rules');
 const MigrateMarkersCommand = require('./commands/migrate-markers');
-
-// Returned by an args-taking command's match() when the command was named but no
-// argument was given — the branch that must name the real spellings instead of
-// falling through to the unknown-command tail (which would misreport a listed command).
-const MISSING_ARG = Symbol('missing-arg');
 
 // Every argv token that selects a command.
 function tokensOf(command) {
   return [command.name, ...(command.aliases || [])];
 }
 
-// `local|live` — the argument names, in resolution order.
-function argsLabel(command) {
-  return Object.keys(command.args).join('|');
-}
-
-// `local: dev, development · live: prod, production` — the accepted argument spellings.
-function argsNote(command) {
-  return Object.entries(command.args)
-    .filter(([, aliases]) => aliases.length > 0)
-    .map(([arg, aliases]) => `${arg}: ${aliases.join(', ')}`)
-    .join(' · ');
-}
-
 // Default matcher: any of the command's tokens present in the parsed options.
-// A command with `args` also resolves WHICH argument was given, and reports
-// MISSING_ARG when it was named bare.
 function matchCommand(command, options) {
-  const named = tokensOf(command).some((token) => options[token]);
-
-  if (!command.args) {
-    return named;
-  }
-
-  for (const [arg, aliases] of Object.entries(command.args)) {
-    if ((named && aliases.some((alias) => options[alias])) || options[arg]) {
-      return arg;
-    }
-  }
-
-  return named ? MISSING_ARG : false;
+  return tokensOf(command).some((token) => options[token]);
 }
 
 const COMMANDS = [
@@ -114,22 +79,6 @@ const COMMANDS = [
     name: 'build',
     description: 'stage src/ into dist/',
     run: (self) => new BuildCommand(self).execute(),
-  },
-  {
-    name: 'install',
-    aliases: ['-i', 'i', '--install'],
-    args: { local: ['dev', 'development'], live: ['prod', 'production'] },
-    description: 'switch the installed framework copy',
-    run: (self, mode, command) => {
-      if (mode === MISSING_ARG) {
-        const spellings = Object.keys(command.args).map((arg) => `\`omega ${command.name} ${arg}\``).join(' or ');
-        console.error(`${command.name} needs a mode: ${spellings}. Aliases: ${argsNote(command)}.`);
-        process.exitCode = 1;
-        return;
-      }
-
-      return new InstallCommand(self).execute(mode);
-    },
   },
   {
     name: 'serve',
@@ -198,22 +147,14 @@ const COMMANDS = [
   },
   {
     name: 'update',
-    aliases: ['-u', '--update', 'outdated', 'out'],
-    description: 'dependency freshness report',
+    aliases: ['-u', '--update'],
+    description: 'dependency freshness: installs the safe set (--dry-run only reports)',
     run: (self) => new UpdateCommand(self).execute(),
   },
   {
     name: 'mcp',
     description: 'run the MCP server',
     run: (self) => new McpCommand(self).execute(),
-  },
-  {
-    // The ported-project REPORT: today the dependency-resolution scan (#600),
-    // shared with @omega.js/web's own migrate through devkit. It changes
-    // nothing, which is what separates it from the two conversions below.
-    name: 'migrate',
-    description: 'report what a ported backend still owes: bare requires of packages it never declared',
-    run: (self) => new MigrateCommand(self).execute(),
   },
   {
     // The one-time move onto the compiled rules model — run ALONE and
@@ -250,10 +191,9 @@ const LABEL_COLUMN = 33;
 function buildHelpText() {
   const lines = COMMANDS.map((command) => {
     const tokens = tokensOf(command).join(' | ');
-    const label = command.args ? `${tokens} <${argsLabel(command)}>` : tokens;
+    const label = tokens;
 
     const notes = [];
-    if (command.args) { notes.push(argsNote(command)); }
     if (command.default) { notes.push('default'); }
     const description = notes.length > 0 ? `${command.description} [${notes.join(' — ')}]` : command.description;
 
@@ -265,4 +205,4 @@ function buildHelpText() {
   return `Usage: omega <command> [options]\n\nCommands:\n${lines.join('\n')}`;
 }
 
-module.exports = { COMMANDS, MISSING_ARG, tokensOf, matchCommand, defaultCommand, buildHelpText };
+module.exports = { COMMANDS, tokensOf, matchCommand, defaultCommand, buildHelpText };

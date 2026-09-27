@@ -136,7 +136,7 @@ function applyJsonRules(text, filePath) {
  * Apply the codemod across a consumer's src/ tree.
  * @param {string} root - consumer project root
  * @param {object} [options]
- * @param {boolean} [options.write] - write changed files (false = report only)
+ * @param {boolean} [options.execute] - write changed files (false = report only)
  * @returns {{ files: object[], findings: object[], totalEdits: number }}
  */
 function runCodemod(root, options = {}) {
@@ -159,7 +159,7 @@ function runCodemod(root, options = {}) {
       // The WRITE answers to the text, not to the bookkeeping: a rule that
       // changes a file and reports no edit still has to reach the disk, or the
       // run prints a repair it never made.
-      if (options.write && text !== original) fs.writeFileSync(filePath, text);
+      if (options.execute && text !== original) fs.writeFileSync(filePath, text);
       if (edits.length === 0) continue;
       totalEdits += edits.length;
       results.push({ path: path.relative(root, filePath), edits });

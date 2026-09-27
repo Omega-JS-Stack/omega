@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { schemaDefaults, missingDefaults, defaultComments, loadConfig, validateConfig } = require('../src/index.js');
+const { schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath, loadConfig, validateConfig } = require('../src/index.js');
 const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
@@ -286,7 +286,7 @@ test('#793: the validator accepts the connections defaults, and a brand override
   assert.equal(config.connections['house-sso'].name, 'House SSO', "a brand's own provider is untouched by any of it");
   assert.equal(config.connections.kick.enabled, false, 'and a packaged provider the brand never named stays off');
 
-  assert.deepEqual(validateConfig(config).errors, [], 'the resolved config validates');
+  assert.deepEqual(validateConfig(config, { target: 'web' }).errors, [], 'the resolved web config validates');
 });
 
 // ─── materialize: false — a default that resolves but is never written ───
@@ -320,4 +320,24 @@ test('#793: a brand that authored a connections block still heals its OTHER hole
 
   assert.ok(!paths.some((dotted) => dotted.startsWith('connections')), 'the framework never fills in the rest of a brand\'s connections');
   assert.ok(paths.includes('marketing'), 'and the ordinary blocks are unaffected');
+});
+
+test('planMerge: a path the present config lacks is added at its highest missing point, a differing authored value is kept', () => {
+  const incoming = { brand: { id: 'sample', url: 'https://sample.test' }, socials: { twitter: 'sample' }, theme: { id: 'classy' } };
+  const present = { brand: { id: 'realbrand' }, theme: 'custom', socials: { twitter: 'sample' } };
+
+  const { added, kept } = planMerge(incoming, present);
+
+  assert.deepStrictEqual(added, [{ path: 'brand.url', value: 'https://sample.test' }]);
+  assert.deepStrictEqual(kept, [
+    { path: 'brand.id', value: 'realbrand', incoming: 'sample' },
+    { path: 'theme', value: 'custom', incoming: { id: 'classy' } },
+  ], 'an equal value is neither added nor kept');
+});
+
+test('setAtPath creates intermediate objects and sets leaves', () => {
+  const obj = { a: { b: 1 } };
+  setAtPath(obj, 'a.c.d', 'x');
+  setAtPath(obj, 'a.b', 2);
+  assert.deepStrictEqual(obj, { a: { b: 2, c: { d: 'x' } } });
 });

@@ -14,16 +14,17 @@
     "templates/",
     "test/",
     "cli.js",
-    "ensure-target.js"
+    "ensure-target.js",
+    "migrate.js"
   ],
   "bin": {
-    "omega": "./bin/omega",
-    "omg": "./bin/omg",
-    "mgr": "./bin/omega"
+    "omega": "bin/omega",
+    "omg": "bin/omg",
+    "mgr": "bin/omega"
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "test": "node src/test/parse-audit.js && node bin/omega test",
+    "test": "node src/test/parse-audit.js && node cli.js test",
     "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },

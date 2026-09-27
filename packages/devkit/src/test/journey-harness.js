@@ -5,7 +5,7 @@
  *
  *   birth   → the REAL onboard wizard (flags mode) in a temp dir OUTSIDE
  *             the monorepo — where hoist-luck can't save anything
- *   link    → `omega i local` from the web target (tree-wide file: flip +
+ *   link    → `omega i local` at the brand root (tree-wide file: flip +
  *             ONE brand-root install; also links @omega.js/manager at the
  *             brand root so brand-level verbs exist at all)
  *   boot    → `omega dev` at the brand root (web + backend emulator, N7
@@ -404,12 +404,12 @@ async function runJourney(options) {
 
     const targets = discoverBrandTargets(run.brandRoot);
 
-    // ── Link: one `i local` from the web target links the whole tree ─
+    // ── Link: one `i local` at the brand root links the whole tree ─
     await run.step('`omega i local` links every framework + the manager (one tree install)', async () => {
-      const linkFrom = targetOfType(run.brandRoot, 'web')?.dir || targets[0];
-      const webBin = path.join(run.monorepoRoot, 'packages', 'web', 'bin', 'omega');
-      await run.runToExit('link', process.execPath, [webBin, 'i', 'local'],
-        { cwd: linkFrom, env: run.childEnv(), timeout: TIMEOUTS.link });
+      // The manager's own entry: nothing is installed in the brand yet for a dispatcher to resolve it from
+      const managerBin = path.join(run.monorepoRoot, 'packages', 'manager', 'dist', 'cli-run.js');
+      await run.runToExit('link', process.execPath, [managerBin, 'i', 'local'],
+        { cwd: run.brandRoot, env: run.childEnv(), timeout: TIMEOUTS.link });
 
       // Every target's framework — and the brand root's manager — must resolve
       // to the monorepo copy (realpath through the hoisted symlinks).

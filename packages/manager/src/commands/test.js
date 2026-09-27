@@ -172,7 +172,7 @@ module.exports = async (options) => {
 
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s tests.'));
+    console.error(chalk.red(`✗ Not inside a brand monorepo (no config/omega.json5 up the tree): run it at a brand root, with --${PICKER_FLAG}=<name> to pick targets.`));
     process.exitCode = 1;
     return;
   }

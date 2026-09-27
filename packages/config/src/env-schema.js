@@ -874,12 +874,9 @@ const ENV_SCHEMA = [
     description: 'Edge Add-ons API key the publish request authenticates with.',
   },
 
-  // No test-lane credentials live here any more
-  // ([#819](https://github.com/Omega-JS-Stack/omega/issues/819), Ian
-  // 2026-09-13): web, desktop and extension each test their own sign-in
-  // against a persona the backend emulator seeds, so a suite never asks a
-  // brand for a key. The pair that used to sit here is retired outright
-  // (env-retired.js carries both rows); #904 owns the replacement.
+  // No test-lane credentials live here: web, desktop and extension each sign
+  // in as a persona the backend emulator seeds, so a suite never asks a brand
+  // for a key. The retired pair's rows are @omega.js/manager's migrate table.
 
   {
     name:        'OMEGA_FONTAWESOME_ROOT',

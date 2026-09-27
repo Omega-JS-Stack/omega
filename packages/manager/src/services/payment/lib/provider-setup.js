@@ -18,7 +18,8 @@ const chalk = require('chalk').default;
 const { input } = require('@omega.js/devkit/prompt');
 const { serviceInputSpec } = require('../../../config.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
-const { confirmSetup, setAtPath } = require('../../../lib/config-flow.js');
+const { setAtPath } = require('@omega.js/config');
+const { confirmSetup } = require('../../../lib/config-flow.js');
 const { requestServiceInput } = require('../../../lib/service-input.js');
 const { canPrompt } = require('../../../lib/run-gates.js');
 

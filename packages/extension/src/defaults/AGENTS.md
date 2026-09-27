@@ -43,11 +43,7 @@ npx omega test extension:build/config     # run only framework tests matching a 
 # Positional target selects which test FILES run; --filter=<substring> matches test NAMES within them
 npx omega test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent, a shared name across all OMEGA frameworks)
 # (output is teed to logs/: dev.log on `npm start`, build.log on `npm run build`, test.log on `npx omega test`; cat instead of scrolling scrollback)
-npx omega install dev         # use LOCAL @omega.js/extension source (to test framework edits)
-npx omega install live        # restore the published @omega.js/extension from npm
 ```
-
-> Editing the framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/extension`). Run `npx omega install live` to switch back.
 
 Load the unpacked extension in Chrome: point chrome://extensions → "Load unpacked" at `packaged/chrome/raw/`.
 

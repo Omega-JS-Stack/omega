@@ -100,6 +100,27 @@ test('unknown positional prints the available-command listing and sets exit code
   assert.equal(exitCode, 1);
 });
 
+test('a fallback handler runs a command that has no file, and a null one leaves the unknown answer', async () => {
+  const asked = [];
+  const main = makeMain({
+    fallback: (command) => {
+      asked.push(command);
+      return command === 'passed' ? async (options) => { options.__ran = 'fallback'; } : null;
+    },
+  });
+
+  const options = { _: ['passed'] };
+  await main.process(options);
+  assert.equal(options.__ran, 'fallback');
+
+  const { err, exitCode } = await captured(() => main.process({ _: ['nope'] }));
+  assert.match(err, /Unknown command "nope"/);
+  assert.equal(exitCode, 1);
+
+  await main.process({ _: ['version'] });
+  assert.deepEqual(asked, ['passed', 'nope'], 'a command with a file never asks the fallback');
+});
+
 test('command errors surface once (own stack, exit code 1) with no wrapper prefix or rethrow', async () => {
   const { err, exitCode } = await captured(() => makeMain().process({ _: ['boom'] }));
   assert.match(err, /kaboom/);

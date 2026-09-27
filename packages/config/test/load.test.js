@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, recordBrand } = require('../src/index.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, recordBrand, overlayPath } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -132,7 +132,8 @@ test('five-layer chain: defaults < brand shared < brand target < local shared < 
   const defaults = { probe: { value: 'defaults', fromDefaults: true }, theme: { id: 'classy' } };
   const { config, errors, enabled, files } = loadConfig(targetDir, 'backend', { defaults });
 
-  assert.deepStrictEqual(errors, []);
+  // `probe` is a merge tracer, undeclared on purpose: the strict schema names only it
+  assert.deepStrictEqual(errors.filter((error) => !error.startsWith('config.probe.')), []);
   assert.strictEqual(enabled, true);
   assert.strictEqual(files.brand, path.join(root, 'config', 'omega.json5'));
 
@@ -230,7 +231,8 @@ test('#886: a STANDALONE project is named by its file, not by the type word', (t
   cleanup(t, root);
 
   const api = loadConfig(root, 'backend');
-  assert.deepStrictEqual(api.errors, []);
+  // `flavor` is a merge tracer, undeclared on purpose: the strict schema names only it
+  assert.deepStrictEqual(api.errors.filter((error) => !error.startsWith('config.flavor ')), []);
   assert.strictEqual(api.name, 'api');
   assert.strictEqual(api.enabled, true);
   assert.strictEqual(api.config.flavor, 'api-target', 'the named entry is still the target layer');
@@ -283,7 +285,8 @@ test('#886: the target dir NAMES the entry, so a second web target merges its ow
   cleanup(t, root);
 
   const main = loadConfig(path.join(root, 'targets', 'web'), 'web');
-  assert.deepStrictEqual(main.errors, []);
+  // `flavor` is a merge tracer, undeclared on purpose: the strict schema names only it
+  assert.deepStrictEqual(main.errors.filter((error) => !error.startsWith('config.flavor ')), []);
   assert.strictEqual(main.name, 'web');
   assert.strictEqual(main.enabled, true);
   assert.strictEqual(main.config.flavor, 'primary');
@@ -923,6 +926,12 @@ test('company layer: composeTargetConfig freezes it into the upload (the walk-up
 });
 
 // ─── Environment overlays (#856) ───
+
+test('overlayPath: the ONE spelling of an overlay file, beside its own base, whether or not it exists', () => {
+  const base = path.join(TEMP_ROOT, 'nowhere', 'config', 'omega.json5');
+  assert.equal(overlayPath(base, 'development'), path.join(TEMP_ROOT, 'nowhere', 'config', 'omega.development.json5'));
+  assert.equal(overlayPath(base, 'production'), path.join(TEMP_ROOT, 'nowhere', 'config', 'omega.production.json5'));
+});
 
 // Every layer is TWO files: its omega.json5 and the omega.<environment>.json5
 // beside it, the config mirror of the .env / .env.<environment> pair (#586).

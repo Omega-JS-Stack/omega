@@ -98,16 +98,28 @@ One grammar, every framework (parser: `@omega.js/devkit/test/scope`, adopted by 
 | *(bare)* | **project tests only** | consumer default; `pages/x` = project tests under that path |
 | `project:` / `brand:` | project tests only | explicit spelling; optional path: `project:auth/` |
 | `framework:` / `omega:` / `mgr:` | the framework's own suite | universal aliases |
-| `backend:` `web:` `desktop:` `extension:` (+ legacy `em:` `bxm:` `ujm:`) | the framework's own suite | per-framework ids |
+| `backend:` `web:` `desktop:` `extension:` | the framework's own suite | per-framework ids |
 | `full:` | both sources | optional path applies to both: `full:auth` |
 
 - Paths after a prefix scope within that source: `framework:routes/general`, `project:checkout`.
 - Unknown prefixes (`framwork:x`) warn and are ignored — never silently match nothing.
 - Multiple targets union sources; each path binds to its own source.
 
-## The self-test exception
+## A framework's own suite: the monorepo root
 
-Inside a framework package itself (cwd package name === the framework), a bare run means the framework's own suite — each package's `npm test` keeps meaning "run my suite". Consumer context is what flips to project-only.
+A framework's own suite runs from the **monorepo root**, through the same `--target=` picker a brand root has ([#863](https://github.com/Omega-JS-Stack/omega/issues/863)):
+
+| At the monorepo root | Runs |
+|----------------------|------|
+| `npx omega test --target=web framework:` | @omega.js/web's own suite |
+| `npx omega test --target=extension framework:build/cli` | the extension suite, path-scoped |
+| `npx omega test --target=backend,desktop framework:` | both suites, in the registry's target order, stopping at the first failure |
+
+- Pickable: the four framework packages, by dir name or `@omega.js/` name. Scope words and flags forward verbatim to each picked package's own CLI, run in the package dir.
+- No `--target=` refuses and prints the picker: the monorepo has no "all", its whole battery is root `npm test`. An unknown token refuses listing the packages. The manager is no pick (its CLI's `test` is the brand fan-out); its suite is its `npm test`.
+- Every verb inside `packages/<framework>` refuses and prints this root form.
+
+**The self-test exception**: inside a framework package itself (cwd package name === the framework, which is where the picker runs each suite), a bare run of backend, desktop or extension means the framework's own suite; web's bare run is its project lane, so its suite is always spelled `framework:`. Each of those three packages' own `npm test` calls its CLI file directly (`node dist/cli-run.js test`; backend `node cli.js test`) and keeps meaning "run my suite". Consumer context is what flips to project-only.
 
 ## Corpus spelling
 
@@ -131,14 +143,15 @@ At a **brand root** (a directory carrying `config/omega.json5` with no framework
 | `npx omega test full:` | both sources, every target |
 | `npx omega test routes/x` | project filter forwarded to every target (a target that does not carry it is a no-op; a path NO target carries fails the run, [#814](https://github.com/Omega-JS-Stack/omega/issues/814)) |
 | `npx omega test web:pages/` | ONLY the web target — its framework suite, scoped |
-| `npx omega test em:` | ONLY the desktop target's framework suite |
+| `npx omega test desktop:` | ONLY the desktop target's framework suite |
+| `npx omega test --target=backend framework:` | ONLY the target named `backend`, its framework suite (the picker composes with every scope) |
 
 - Universal targets (bare paths, `framework:`/`omega:`/`mgr:`, `full:`, `project:`/`brand:`) forward to every target dir verbatim; per-framework ids route to the target owning that framework. The id → framework map is `FRAMEWORK_IDS` in `@omega.js/devkit/test/scope` — the same SSOT each framework's runner reads its own aliases from.
 - An id with no matching target warns and runs nothing (exit 0 — same semantics as a target-level filter matching no tests). Only-invalid targets fall back to bare-everywhere, mirroring the target-level parser.
 - That exit 0 holds for a bare prefix only. An id carrying a PATH whose framework this brand has no target for (`omega test desktop:renderer/typo` in a website-only brand) keeps the warning AND fails: zero runs plus a named path is the same typo the target-level rule catches ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
 - A forwarded path a target does not carry is a **no-op there, not a failure**: the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and a target CLI whose target selected nothing answers with the distinct `NO_MATCH_EXIT_CODE` (3) instead of 1 (both live in `@omega.js/devkit/test/scope`). The fan-out counts those as misses, and fails the brand run only when EVERY target missed, printing `No test file matches "<target>"` in the manager's own log tag. A standalone run in a target dir, with no signal, still exits 1 ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
 - Targets run **sequentially** with streamed output; any failing target makes the whole run exit 1 (per-target summary at the end).
-- **Flags are not fanned out** (`--layer`, `--extended`, …) — flagged runs are target-level invocations; run them from the target dir.
+- **Only the mode flags fan out**: `--extended` reaches every framework target and `--lane=<name>` the targets whose framework declares that lane ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)). A target-level flag (`--layer`, `--filter`) does not reach a target from the brand root, and a target folder refuses every verb, so a brand has no form for a flagged run yet.
 - Other manager commands ride the same handoff: bare `omega` at a brand root means the manager's manage cycle, `omega onboard` reaches the wizard, and `omega deploy` is the brand-root deliberate-deploy fan-out (docs/shared/deploys.md).
 
 ## CI runner notes

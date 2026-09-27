@@ -551,7 +551,7 @@ test('every value-LESS manage flag is declared, and the value-taking one is not'
   const { parseArgv } = require('@omega.js/devkit/argv');
   const parse = (args) => parseArgv(args, { booleans: BOOLEAN_FLAGS });
 
-  for (const flag of ['verbose', 'strict', 'apply', 'major', 'force-fresh']) {
+  for (const flag of ['verbose', 'strict', 'dry-run', 'major', 'force-fresh']) {
     assert.ok(BOOLEAN_FLAGS.includes(flag), `--${flag} takes no value, so it must be declared boolean`);
   }
 

@@ -1,19 +1,11 @@
 /**
  * Unit tests for the top-level `features` catalog and the per-product values
- * map ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
- *
- * The promises, all of them things a brand can be misled by:
- *  - a feature is DEFINED once, in the top-level catalog, and a product only
- *    ever names its VALUE — so a name/icon/definition can never disagree with
- *    itself across tiers;
- *  - a counted feature (one carrying a `usage` block) takes a number and only
- *    a number; a perk takes true/false/a string and only that — the two are
- *    different kinds of promise and swapping them silently rendered "true
- *    saves / month";
- *  - a value on an id the catalog does not define reads as nothing at all, so
- *    it fails instead of vanishing from the pricing page;
- *  - the retired shapes (`limits`, `rateLimit`, the product `features` ARRAY)
- *    fail loudly and name their replacement — there is no dual-read.
+ * map. The promises, each one a thing a brand can be misled by: a feature is
+ * DEFINED once in the catalog and a product names only its VALUE; a counted
+ * feature (a `usage` block) takes a number and a perk takes true/false/a
+ * string, never the other; a value on an id the catalog does not define fails
+ * instead of vanishing; the product `features` ARRAY fails loudly. (`limits`
+ * and `rateLimit` are `omega migrate` rows.)
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -145,28 +137,6 @@ test('a catalog entry with no name fails — the name is what every surface prin
 });
 
 // ─── the retired shapes (#647) ───
-
-test('product `limits` is retired — it names the values map', () => {
-  const { errors } = validate({
-    payment: { products: [{ id: 'basic', name: 'Basic', limits: { saves: 100 } }] },
-  });
-
-  assert.ok(
-    errors.some((e) => e.includes('config.payment.products.0.limits is retired') && e.includes('payment.products[].features')),
-    `expected a retired-limits error, got ${JSON.stringify(errors)}`,
-  );
-});
-
-test('product `rateLimit` is retired — pacing is per feature now', () => {
-  const { errors } = validate({
-    payment: { products: [{ id: 'basic', name: 'Basic', rateLimit: 'monthly' }] },
-  });
-
-  assert.ok(
-    errors.some((e) => e.includes('config.payment.products.0.rateLimit is retired') && e.includes('features.<id>.usage.pace')),
-    `expected a retired-rateLimit error, got ${JSON.stringify(errors)}`,
-  );
-});
 
 test('the product `features` ARRAY is retired — it is a map of values now', () => {
   const { errors } = validate({

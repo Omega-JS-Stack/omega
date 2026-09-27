@@ -149,7 +149,7 @@ surface attaches it at its entry point.
 | `omega dev` (the fan-out) | `<brandRoot>/logs/dev.log` | the boot walk, then every dev leg's prefixed output (consecutive duplicate lines collapse to one `  (repeated N×)` note) |
 | `omega build` / `omega clean` (the fan-outs) | `<brandRoot>/logs/build.log` · `<brandRoot>/logs/clean.log` | the walk order, every loud skip, the per-target summary |
 | `omega deploy` (the fan-out) | `<brandRoot>/logs/deploy.log` | the delivery lane, then which target published in which order and the summary. Every target additionally keeps its own `<targetRoot>/logs/deploy.log` ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), and the backend its firebase transcript `targets/backend/dist/deploy.log` |
-| `omega update` (the fan-out) | `<brandRoot>/logs/update.log` | which target was checked and what it reported/applied |
+| `omega update` (the fan-out) | `<brandRoot>/logs/update.log` | which target was checked and what it reported/installed |
 | `omega test` (the fan-out) | `<brandRoot>/logs/test.log` | which target ran which scope, and the aggregate verdict |
 | `omega pipeline` (the live full-cycle test) | `<brandRoot>/logs/pipeline.log` | the child invocation, the deploy/verify legs, the scorecard and the PASS/FAIL verdict |
 | the brand's cross-stack e2e (`@omega.js/devkit/test/e2e-harness`) | `<brandRoot>/test/e2e/.logs/` | `steps.log` (one `PASS` / `FAIL` per step — see below), `emulator.log`, `dev.log`, `page.log` |

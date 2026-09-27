@@ -1,18 +1,8 @@
-// The store listing ids
-// ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)): the ONE home
-// of the identifier each browser store knows this extension by.
-//
-// An item id is PUBLIC by design: it is the id in the listing URL every user
-// sees, so it belongs in config/omega.json5 beside the listing it identifies
-// (`targets.<name>.listings.<browser>.id`) and never in `.env`, which carries
-// secrets. The `.env` names it used to live under are retired keys now, and a
-// brand still declaring one fails the env load (@omega.js/config's env-retired.js).
-//
-// Every reader takes the RESOLVED config (the target layer already merged onto
-// the shared sections, so `listings` sits at the top level): the package task,
-// which writes the firefox id into the manifest as the gecko id, the publish
-// task, which addresses each store with it, and the local scaffold, which pins
-// the derived firefox id into the brand config.
+// The store listing ids: the ONE home of the id each browser store knows this
+// extension by, public by design, so `targets.<name>.listings.<browser>.id` in
+// config and never `.env` (`omega migrate` names an old `.env` line). Every
+// reader takes the RESOLVED config, where `listings` sits at the top level: the
+// package task (the firefox gecko id), the publish task, the local scaffold.
 
 /**
  * A browser's store listing id from the resolved config.

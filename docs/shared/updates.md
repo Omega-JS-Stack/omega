@@ -1,8 +1,10 @@
 # Dependency updates (`omega update`)
 
-One shared implementation (`@omega.js/devkit/update`) behind every framework's `omega update` verb (aliases: `outdated`, `out` — npu's muscle memory), thin wiring in web/desktop/extension (router commands), backend (colon-style command class), and the manager (brand-root fan-out). Semantics mirror Ian's `npu out` (node-power-user): report first, apply deliberately, and never trust a brand-new release.
+One shared implementation (`@omega.js/devkit/update`) behind every framework's `omega update` verb, thin wiring in web/desktop/extension (router commands), backend (colon-style command class), and the manager (brand-root fan-out). Semantics mirror Ian's `npu out` (node-power-user): report every dependency, install the safe set, and never trust a brand-new release.
 
-## The report (default — no flags)
+`omega update` acts by default, like `omega deploy`: a bare run prints the report, then installs. `omega update --dry-run` prints the same report and installs nothing.
+
+## The report (every run)
 
 For each dependency of the target's `package.json` (prod + dev, grouped):
 
@@ -18,14 +20,14 @@ For each dependency of the target's `package.json` (prod + dev, grouped):
 
 Only rows needing attention print; a fully-current tree reports one line. Rows sort prod-first.
 
-**Quarantine (supply-chain caution, npu's `--min-age` semantics):** a release published < 7 days ago may be a compromised publish — it is flagged and **excluded from `--apply`**. `--min-age N` changes the window; `--min-age 0` or `--force-fresh` disables it. Unpublished packages (the pre-publish `@omega.js/*` set) report `not on the registry (unpublished?)` instead of a version row.
+**Quarantine (supply-chain caution, npu's `--min-age` semantics):** a release published < 7 days ago may be a compromised publish — it is flagged and **excluded from the install**. `--min-age N` changes the window; `--min-age 0` or `--force-fresh` disables it. Unpublished packages (the pre-publish `@omega.js/*` set) report `not on the registry (unpublished?)` instead of a version row.
 
 **`file:`/`link:`/git specs are SKIPPED** with a dim note — they have no registry story. In the local era every brand's `@omega.js/*` dep is a `file:` spec, so the verb never touches the linked frameworks.
 
-## Applying (`--apply`)
+## Installing (a bare run)
 
 - Default tier is **non-breaking**: each dep rides to its highest same-major version (npu's minor tier) — quarantined targets are held and listed.
-- **Majors are never auto-applied**: breaking jumps are listed as held; `--apply --major` opts in explicitly.
+- **Majors are never auto-applied**: breaking jumps are listed as held; `--major` opts in explicitly.
 - Installs run through **`npu install`** when npu is on the machine (Socket supply-chain firewall); otherwise plain `npm install` with a loud warning. Dev deps install with `--save-dev` in their own pass.
 
 ## The @omega.js family is pinned, and `omega update` is its ONE mover ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
@@ -37,9 +39,9 @@ lockstep — [publishing.md](publishing.md)). A caret would let one target float
 ahead alone on somebody's `npm update`, which is how a brand ends up serving two
 copies of `@omega.js/client` and validating one omega.json5 with two validators.
 
-Pinned, the only thing that moves a brand is `omega update --apply` at the brand
-ROOT (a bare run reports and installs nothing), and it moves every target — and
-the root's own manager pin — together. `--apply` installs an `@omega.js/*` dep with
+Pinned, the only thing that moves a brand is `omega update` at the brand
+ROOT (`--dry-run` reports and installs nothing), and it moves every target — and
+the root's own manager pin — together. The install writes an `@omega.js/*` dep with
 `--save-exact`, in its own command per dep group, so the mover never un-pins
 what it just moved (npm's default save-prefix would write `^<version>` back);
 every other dependency keeps npm's default prefix, because the pin is the

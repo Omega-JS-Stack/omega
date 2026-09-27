@@ -21,9 +21,24 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { ROOT_DISPATCH_ENV } = require('../omega-bin.js');
+const { findBrandRoot } = require('../local.js');
 
 // How long a clean SIGINT gets before the group is killed outright.
 const STOP_GRACE = 20000;
+
+/**
+ * The env a lane hands a bin it runs inside a target: a lane is a root's
+ * machine caller the dispatcher never saw, so it carries the root-dispatch
+ * marker naming the brand root, or the bin would refuse the target folder.
+ *
+ * @param {string} cwd - The dir the bin runs in
+ * @param {object} [env] - The base environment (defaults to this process's)
+ * @returns {object}
+ */
+function rootDispatchEnv(cwd, env = process.env) {
+  return { ...env, [ROOT_DISPATCH_ENV]: findBrandRoot(cwd) };
+}
 
 /**
  * Spawn a long-running child, teeing its output to a log file, and resolve
@@ -47,7 +62,7 @@ function startChild({ bin, args, cwd, env, logFile, marker, timeout, relativeTo 
 
   const child = spawn(bin, args, {
     cwd,
-    env: env || process.env,
+    env: rootDispatchEnv(cwd, env || process.env),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -117,4 +132,4 @@ async function stopChild(child, { grace = STOP_GRACE } = {}) {
   }
 }
 
-module.exports = { startChild, stopChild, STOP_GRACE };
+module.exports = { startChild, stopChild, rootDispatchEnv, STOP_GRACE };

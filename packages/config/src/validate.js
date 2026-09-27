@@ -1,39 +1,19 @@
 /**
- * Schema-driven validation for resolved omega.json5 configs.
- *
- * The rule walker (runSchema) carries required/type/match/enum semantics, where match +
- * enum (and itemEnum, the same check per member of an array value) only run on
- * PRESENT values and a conditional `required` function
- * receives the full config. See schema.js for the rule format.
- *
- * validateConfig() layers on top of the walker:
- *   - SHARED_SCHEMA always runs; TARGET_SCHEMAS[options.target] adds that
- *     target's refinements against the same resolved top-level namespace
- *   - `targets` sanity (#886): every key is a target NAME, so it must be a
- *     dir-safe slug, and every entry must be an object declaring a `type` the
- *     framework list knows (an ARRAY is the retired multi-instance form, whose
- *     replacement is a sibling key; >1 backend target is a WARNING)
- *   - the `repo` block (#883): one `provider` from REPO_PROVIDERS, and an `org`
- *     that is a real non-empty string whenever the block is there, because the
- *     org is the owner of every repo the brand's names derive under
- *   - `hosting` (#883) is a WEB target's key: a non-web target carrying it says
- *     something nothing serves, and its provider comes from HOSTING_PROVIDERS
- *   - `cloud.config.authDomain`, when set, must be the brand's OWN host (the
- *     resolved target url, else brand.url): a firebaseapp.com value or a
- *     mismatch is an error, and demo-* (emulator-only) projects are exempt
- *   - retired keys are always errors (see retired-keys.js) — a name that was
- *     renamed outright reads as nothing at all, so it fails loudly instead of
- *     losing its settings silently
- *   - secret-shaped keys are always errors (see secrets.js) — loadConfig
- *     additionally hard-fails on them before any merge happens
- *   - keys the schema does not declare are WARNINGS (#636): the walker only
- *     ever visits declared paths, so a typo — or a live path nobody declared —
- *     used to pass in silence
+ * Schema-driven validation for resolved omega.json5 configs. runSchema walks
+ * the rules (required/type/match/enum/itemEnum, the value checks only on a
+ * PRESENT value; schema.js has the rule format). validateConfig() adds the
+ * target's refinements, the `targets` sanity (each key a dir-safe NAME, each
+ * entry a known `type`), the `repo` block and web-only `hosting`, the brand's
+ * own authDomain, the price and feature shapes, and secret-shaped keys. The
+ * schema is STRICT: a path no rule declares is an error, one line per path,
+ * naming `omega migrate`. The validator knows only the present shape; the
+ * migrate verb is the one code that knows an old name.
  */
 
-const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
+const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS, isCustomTargetEntry } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
-const { findRetiredKeys } = require('./retired-keys.js');
+const { CLIENT_FACT_KEYS } = require('./client-config.js');
+const { RESOLVED_COMPANY_KEYS } = require('./company.js');
 const { isPlainObject } = require('./merge.js');
 const { TARGET_NAME_PATTERN, TARGET_TYPES } = require('./targets.js');
 const { REPO_PROVIDERS, HOSTING_PROVIDERS } = require('./repo.js');
@@ -42,6 +22,14 @@ const { isCountedFeature } = require('@omega.js/account/features');
 
 // Firebase's own default authDomain shape: a third-party host by definition
 const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
+
+// The company facts the loader fills: a staged compose output carries them on
+// purpose, and the loader refuses a TYPED one in a brand or company file.
+const RESOLVED_PATHS = RESOLVED_COMPANY_KEYS.map((key) => `company.${key}`);
+
+// The build facts a surface bakes AFTER the load: declared only for
+// `decorated: true`, the re-validation of a baked config (a desktop boot).
+const BUILD_FACT_PATHS = CLIENT_FACT_KEYS;
 
 /**
  * Read a dotted path out of a config object — the path resolver the schema
@@ -419,24 +407,23 @@ function validateFeatures(config) {
 }
 
 /**
- * The LEAF paths of a resolved config the schema does not declare (#636).
- *
- * A rule declares its own path AND everything beneath it — an `object`/`array`
- * rule is a declared subtree (brand.address's postal fields, an open provider
- * map), which is what keeps a brand's own data out of this list. An empty
- * object/array is itself a leaf, declared when the schema declares anything
- * below it (`certificates: {}` against certificates.enabled).
- *
- * The `targets` subtree is skipped whole: those keys belong to a framework or,
- * for a custom target (#603), to the brand — the targets-sanity check above is
- * what polices that namespace.
- *
- * @param {object} config - The resolved config object.
+ * The LEAF paths of a config the schema does not declare. A rule declares its
+ * own path; an `object`/`array` rule opens its whole subtree only when no rule
+ * is declared beneath it (or it says `open: true`), so a section with typed
+ * keys stays closed. An empty object/array (or a `false` off switch) is a leaf,
+ * declared when the schema declares anything below it. `targets` is skipped
+ * whole: each target's own load judges its entry.
+ * @param {object} config - The config object.
  * @param {object[]} schema - Rule array in the schema.js entry format.
+ * @param {string[]} [written] - Paths framework code wrote onto a decorated config, each open.
  * @returns {string[]} Undeclared leaf paths, in config order.
  */
-function findUndeclaredPaths(config, schema) {
-  const declared = schema.map((rule) => rule.path);
+function findUndeclaredPaths(config, schema, written = []) {
+  const paths = [...schema.map((rule) => rule.path), ...written];
+  const open = schema
+    .filter((rule) => /\b(object|array)\b/.test(rule.type || '') && (rule.open || !paths.some((other) => other.startsWith(`${rule.path}.`))))
+    .map((rule) => rule.path)
+    .concat(written);
   const found = [];
 
   const walk = (value, path) => {
@@ -444,9 +431,10 @@ function findUndeclaredPaths(config, schema) {
       Object.keys(value).forEach((key) => walk(value[key], `${path}.${key}`));
       return;
     }
-    if (!declared.some((rule) => rule === path || path.startsWith(`${rule}.`) || rule.startsWith(`${path}.`))) {
-      found.push(path);
-    }
+    const declared = paths.includes(path)
+      || open.some((rule) => path.startsWith(`${rule}.`))
+      || paths.some((rule) => rule.startsWith(`${path}.`));
+    if (!declared) found.push(path);
   };
 
   Object.keys(isPlainObject(config) ? config : {})
@@ -457,24 +445,68 @@ function findUndeclaredPaths(config, schema) {
 }
 
 /**
+ * The rules a target's resolved config answers to: shared + its refinements.
+ * @param {string} [target] - Canonical target name; omitted = shared only.
+ * @returns {object[]}
+ */
+function schemaFor(target) {
+  if (target && !TARGETS.includes(target)) {
+    throw new Error(`Unknown target "${target}": must be one of [${TARGETS.join(', ')}]`);
+  }
+
+  return target ? [...SHARED_SCHEMA, ...TARGET_SCHEMAS[target]] : SHARED_SCHEMA;
+}
+
+/**
+ * The paths a config carries that no rule declares, for one target's view:
+ * what the strict check fails, for a caller (a converter) that drops them.
+ * @param {object} config - A resolved config (a target's keys at the top level).
+ * @param {object} [options]
+ * @param {string} [options.target]
+ * @returns {string[]} Undeclared leaf paths, in config order.
+ */
+function undeclaredPaths(config, options) {
+  return findUndeclaredPaths(config, schemaFor((options || {}).target), RESOLVED_PATHS);
+}
+
+/**
+ * Every path of an AUTHORED config (one omega.json5 as written) the strict
+ * schema refuses: the whole file, `targets` left to its targets, then each
+ * framework target entry the way its own load sees it (hoisted to the top
+ * level). A target's OWN file names its type, since its top level is that
+ * target's layer. A custom target's keys are its own; an unknown type is the
+ * targets check's to report.
+ * @param {object} config - One file's parsed config.
+ * @param {object} [options]
+ * @param {string} [options.target] - The type whose own file this is.
+ * @returns {string[]} Dotted paths as the file spells them.
+ */
+function undeclaredAuthoredPaths(config, options) {
+  const found = undeclaredPaths(config, { target: (options || {}).target });
+  const targets = isPlainObject(config) && isPlainObject(config.targets) ? config.targets : {};
+
+  for (const [name, entry] of Object.entries(targets)) {
+    if (!isPlainObject(entry) || isCustomTargetEntry(entry) || !TARGETS.includes(entry.type)) continue;
+    found.push(...undeclaredPaths(entry, { target: entry.type }).map((dotted) => `targets.${name}.${dotted}`));
+  }
+
+  return found;
+}
+
+/**
  * Validate a resolved config: shared schema + optional target refinements +
  * targets-key sanity + secret-shaped-key detection.
  * @param {object} config - The resolved config object.
  * @param {object} [options]
  * @param {string} [options.target] - Canonical target name; adds TARGET_SCHEMAS[target].
+ * @param {boolean} [options.decorated] - The config already carries a build's
+ *   facts (a baked config, validated again at boot).
  * @returns {{ errors: string[], warnings: string[] }}
  */
 function validateConfig(config, options) {
   options = options || {};
 
-  if (options.target && !TARGETS.includes(options.target)) {
-    throw new Error(`Unknown target "${options.target}" — must be one of [${TARGETS.join(', ')}]`);
-  }
-
-  const schema = options.target
-    ? [...SHARED_SCHEMA, ...TARGET_SCHEMAS[options.target]]
-    : SHARED_SCHEMA;
-
+  const schema = schemaFor(options.target);
   const errors = runSchema(config, schema);
   const warnings = [];
 
@@ -573,25 +605,13 @@ function validateConfig(config, options) {
   // ─── the features catalog and the values products name (#647) ──────────
   validateFeatures(config).forEach((error) => errors.push(error));
 
-  // ─── undeclared paths (#636) ───────────────────────────────────────────
-  // A warning, never an error: a brand config outliving one framework version
-  // must still build, and the finding is what closes the gap — either the key
-  // is dead, or the schema owes it a rule.
-  const undeclared = findUndeclaredPaths(config, schema);
-  if (undeclared.length > 0) {
-    warnings.push(
-      'config carries keys the schema does not declare — nothing reads them, so a typo looks exactly like a '
-      + `feature. Remove them, or give each one a rule in @omega.js/config's schema.js `
-      + `(docs/shared/config.md → Validation): ${undeclared.join(', ')}`,
-    );
-  }
-
-  // ─── retired keys (#142) ───────────────────────────────────────────────
-  findRetiredKeys(config).forEach(({ path, replacement, why }) => {
+  // ─── the schema is strict ──────────────────────────────────────────────
+  // A key nothing declares is a key nothing reads: a typo or a legacy shape.
+  // One line per path, so a brand sees every key it has to move or delete.
+  findUndeclaredPaths(config, schema, options.decorated ? [...RESOLVED_PATHS, ...BUILD_FACT_PATHS] : RESOLVED_PATHS).forEach((path) => {
     errors.push(
-      `config.${path} is retired — the key is now "${replacement}" (${why}). `
-      + `Rename it; there is no dual-read, so the old name is silently ignored `
-      + `(docs/shared/config.md → "Migration — legacy configs")`,
+      `config.${path} is not a key the schema declares. Remove it, or if it is a legacy key run `
+      + '`npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)',
     );
   });
 
@@ -610,4 +630,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, runSchema, formatErrors, getPath, resolvedBrandHost };
+module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, formatErrors, getPath, resolvedBrandHost };

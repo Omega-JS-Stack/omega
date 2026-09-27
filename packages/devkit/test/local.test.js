@@ -727,10 +727,16 @@ test('#938: linkLocalPackages writes the BRAND\'s own lockfile when the brand si
   }
 });
 
-test('#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the stale link npm would otherwise keep', async () => {
-  const { scratch, brand, targetA } = makeNestedBrand({});
-  // The linked copy sits at the SAME version the flip writes: npm alone would
-  // accept the old link as satisfying `0.1.0` and keep it (the 0.51.0 failure).
+/**
+ * A nested brand still on its local-era link: target-a's `file:` spec points at
+ * a linked copy that sits at the SAME version the flip writes, under a stale
+ * link lock. npm alone would accept the old link as satisfying `0.1.0` and keep
+ * it (the 0.51.0 failure).
+ *
+ * @returns {{ scratch: string, outer: string, brand: string, targetA: string, linked: string }}
+ */
+function makeLinkedBrand() {
+  const { scratch, outer, brand, targetA } = makeNestedBrand({});
   const linked = path.join(scratch, 'linked-client');
   fs.mkdirSync(linked, { recursive: true });
   fs.writeFileSync(path.join(linked, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
@@ -738,6 +744,11 @@ test('#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the
     name: 'nested-target-a', private: true, dependencies: { '@omega.js/client': 'file:../../../../linked-client' },
   }));
   writeStaleLinkLock(brand, '../../linked-client');
+  return { scratch, outer, brand, targetA, linked };
+}
+
+test('#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the stale link npm would otherwise keep', async () => {
+  const { scratch, brand, targetA } = makeLinkedBrand();
 
   try {
     await withRegistry(scratch, async ({ url }) => {
@@ -753,6 +764,51 @@ test('#938: restoreRegistrySpecs regenerates the BRAND\'s lockfile, dropping the
       assert.equal(entry.resolved, `${url}/client-0.1.0.tgz`, 'resolved from the registry');
       assert.equal(lock.packages['../../linked-client'], undefined, 'the link target entry is gone too');
       assert.doesNotThrow(() => assertBrandLockfile({ root: brand }), 'the deploy gate accepts it');
+    });
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('#862: restoreRegistrySpecs prunes the lock BEFORE the install, so no @omega.js package stays linked', async () => {
+  // A STANDALONE brand (the real consumer topology): nested, npm's tree install
+  // climbs to the outer root and never writes the brand's node_modules at all.
+  const { scratch, outer, brand, targetA } = makeLinkedBrand();
+  fs.rmSync(path.join(outer, 'package.json'));
+
+  try {
+    await withRegistry(scratch, async () => {
+      await local.restoreRegistrySpecs({ dir: targetA });
+
+      const installed = path.join(brand, 'node_modules/@omega.js/client');
+      assert.equal(fs.lstatSync(installed).isSymbolicLink(), false, `${installed} is still a link`);
+      assert.equal(local.resolveLinkedMonorepo(brand), null);
+    });
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('#862: restoreRegistrySpecs with nothing to flip fails loudly on a tree that is still linked', async () => {
+  // The playground's real failure shape: registry specs, a registry lock, and
+  // a node_modules copy that is still a symlink into the checkout.
+  const { scratch, outer, brand, targetA, linked } = makeLinkedBrand();
+  fs.rmSync(path.join(outer, 'package.json'));
+
+  try {
+    await withRegistry(scratch, async () => {
+      await local.restoreRegistrySpecs({ dir: targetA });
+
+      const installed = path.join(brand, 'node_modules/@omega.js/client');
+      fs.rmSync(installed, { recursive: true });
+      fs.symlinkSync(linked, installed);
+
+      await assert.rejects(
+        local.restoreRegistrySpecs({ dir: targetA }),
+        { message: `omega i live left ${installed} linked into ${linked}` },
+      );
+      // A plan writes nothing, so it verifies nothing
+      await assert.doesNotReject(local.restoreRegistrySpecs({ dir: targetA, dryRun: true }));
     });
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

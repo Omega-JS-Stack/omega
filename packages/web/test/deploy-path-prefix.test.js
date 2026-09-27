@@ -144,11 +144,11 @@ test('targetPathPrefix: a fatal config finding is a refusal, never a base path (
 
   assert.throws(
     () => targetPathPrefix(broken, {}),
-    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors is retired/,
+    /config\/omega\.json5 is invalid:[\s\S]*payment\.processors\.stripe is not a key the schema declares/,
   );
   assert.throws(
     () => targetPathPrefix(broken, { OMEGA_PATH_PREFIX: '/workkit' }),
-    /payment\.processors is retired/,
+    /payment\.processors\.stripe is not a key the schema declares/,
     'an explicit prefix does not buy a broken config a pass — the build refuses it anyway',
   );
 

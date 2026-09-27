@@ -61,7 +61,7 @@ Everything inside `.omega/` is derived data. A brand's membership in a **company
 
 ## Verbs (the whole interface)
 
-Run from the **brand root**:
+**Every verb runs at the brand root** ([#863](https://github.com/Omega-JS-Stack/omega/issues/863)); `--target=<name>` picks the targets it reaches. A target folder is never where a verb runs: inside `targets/<name>/` every verb refuses, runs nothing, and prints the one command that does (`cd <brandRoot> && npx omega <verb> --target=<name> [args]`).
 
 ```bash
 npm start                           # local dev stack (website + backend by default; `npm run dev` is the same)
@@ -72,7 +72,52 @@ npx omega build                     # build fan-out: every target, backend first
 npx omega clean                     # clean fan-out: wipe every target's build output
 npx omega test                      # test fan-out: every target, then the brand's own e2e lane
 npx omega bump                      # print the brand's version; `patch|minor|major` moves the root and EVERY target
+npx omega i local                   # link the local framework monorepo, brand-wide (ONE-TIME: the link is durable; rerun only to heal)
+npx omega i live                    # restore published registry versions, brand-wide
+npx omega translate --target=web    # any framework verb, on the targets --target= picks
 ```
+
+**Any framework verb runs here too.** A verb the manager keeps no command of its own for passes through to the targets whose framework owns it, each through that framework's own bin, in the fan-out order (backend first), with every arg after the verb forwarded as typed (scope words included). A fan-out verb with no `--target=` runs on every target that owns it; a single-target verb (Runs on "one target" below) needs exactly one `--target=` and otherwise refuses, naming the targets that own it; a picked target whose framework does not own the verb is refused by name, and nothing runs. `omega i local` / `omega i live` are the manager's own: one call flips the whole brand tree ([local-dev.md](../shared/local-dev.md)). Outside this table, `onboard`, `help` and `version` run anywhere, `cwd` and `logs` take one `--target=` here, and the signing box's `runner` and `sign-windows` run from any directory.
+
+The table is every verb a brand root runs, one row per verb of the ONE verb table (`@omega.js/devkit`'s `src/verbs.js`, [devkit/index.md](../devkit/index.md)); a test holds the two in parity.
+
+| Verb | Owner | Runs on | What it does |
+|---|---|---|---|
+| `dev` | manager | the brand root | Boot the local stack (`npm start`): web + backend by default, `--target=` / `--all` pick the legs, `--local` links the brand from the monorepo first |
+| `manage` | manager | the brand root | Reconcile every service to `config/omega.json5` (`npm run manage`) |
+| `install` | manager | the brand root | `omega i local` links every `@omega.js/*` dep from the local monorepo, `omega i live` restores registry versions; one call, brand-wide, `--dry-run` plans |
+| `bump` | manager | the brand root | Print the brand's version; `patch` / `minor` / `major` moves the root and every target |
+| `company` | manager | the brand root | `omega company init`: create the company tree in the company brand |
+| `devlog` | manager | the brand root | Generate a commit-digest post and publish it to the brand's website target |
+| `pipeline` | manager | the brand root | The brand's live full-cycle test (manage, deploy legs, verify sweep) |
+| `migrate` | manager | the brand root | Report what converts a legacy brand, `--execute` converts it: the retired config keys first, then every target's framework migration (`--target=` narrows the walk); the report ends on the path of the breaking-changes register |
+| `deploy` | every framework | every target, backend first | The DELIBERATE publish (`npm run deploy`) |
+| `build` | every framework | every target | Build each target in its own framework's hands |
+| `clean` | every framework | every target | Wipe each target's build output |
+| `update` | every framework | every target | Dependency freshness: installs the safe set and moves the whole family; `--dry-run` only reports |
+| `test` | every framework | every target, then the brand's e2e lane | Each target's suites (`framework:`, `full:` and a path scope them) |
+| `customize` | web | one target | Materialize a default page or file into a web target so it can diverge |
+| `translate` | web | every web target | Translate the built site into every configured language |
+| `audit` | web | every web target | Lighthouse over a production build |
+| `purge` | web | every web target | Purge the site's Cloudflare zone cache |
+| `package` | desktop | every desktop target | Build the installer set (`--quick`: the host platform only) |
+| `validate-certs` | desktop | every desktop target | Validate the code-signing prerequisites |
+| `publish` | desktop | one target | Publish an already-built tree (a CI leg's step) |
+| `release` | desktop | one target | Trigger the Build & Release workflow and follow its run |
+| `finalize-release` | desktop | one target | Close the release once the matrix builds finish |
+| `launch` | desktop | one target | Open a packaged app with a clean environment |
+| `cdp` | desktop | one target | Drive the running dev app over the DevTools protocol |
+| `clear` | backend | one target | Clear the backend's caches |
+| `serve` | backend | one target | The backend's emulator suite. At the brand root `serve` is `dev`'s alias, so this boots through `omega dev --target=<backend>` |
+| `indexes` | backend | every backend target | Sync the deployed Firestore indexes into `firestore.indexes.json` |
+| `emulator` | backend | one target | Emulator keep-alive mode |
+| `watch` | backend | one target | Hot-reload on framework source changes |
+| `stripe` | backend | one target | Forward Stripe webhooks into the local backend |
+| `firestore:get` | backend | one target | Firestore utilities (`firestore:get`, `:set`, `:query`, `:delete`) |
+| `auth:get` | backend | one target | Auth utilities (`auth:get`, `:list`, `:delete`, `:set-claims`, `:token`) |
+| `mcp` | backend | one target | Run the backend's MCP server |
+| `migrate:rules` | backend | one target | Migrate a legacy `firestore.rules` onto the compiled model |
+| `migrate:markers` | backend | one target | Convert pre-family marker formats to the family grammar |
 
 Every fan-out covers EVERY target type ([#603](https://github.com/Omega-JS-Stack/omega/issues/603)) — a framework target runs its framework's own verb, a custom target runs the matching `package.json` script, and a target that declares no such script steps aside loudly (naming the target and the verb) instead of failing. `build` and `clean` take `--target=` like `deploy` (and like `dev`, `update` and `test`: one picker on every fan-out, [#780](https://github.com/Omega-JS-Stack/omega/issues/780)), plus `--dry-run` (every target prints the command it would have run and nothing executes), and unlike `deploy` a failing target never stops the rest: nothing is published, so one run names every broken target.
 
@@ -82,17 +127,7 @@ Three flags shape the walk. `--target=<a,b>` is the target picker (a comma list 
 
 The scripts are the named verbs (`omega manage`, `omega dev`, `omega deploy`) — a bare `omega` prints help and runs nothing. `npm start`'s boot reconciles the LOCAL lane only (workspace, assets, disperse); `npm run manage` is the full setup. There is no per-target setup step to remember ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)): a target's verbs scaffold and heal its framework-owned files on first run, so a fresh brand goes `npm install` → `npm start`.
 
-Run from a **target root** (`targets/<target>/`):
-
-```bash
-npx omega dev        # this target's dev server/build watch
-npx omega test       # the target's test suites
-npx omega deploy     # DELIBERATE publish for this target (commits never auto-deploy)
-npx omega i local    # link the local framework monorepo (ONE-TIME — the link is durable; rerun only to heal, never per change)
-npx omega i live     # restore published registry versions
-```
-
-`omega`, `omg`, and `mgr` are the same context-aware dispatcher — the nearest target names the framework that runs.
+`omega`, `omg`, and `mgr` are the same context-aware dispatcher: at the brand root it runs the manager, and the manager runs each target's own framework CLI for it.
 
 Tests follow the layered doctrine in each framework's own `docs/test-framework.md` (unit for functions, integration for in-package systems, e2e only across framework boundaries; never mock what you can test real). Bare `npx omega test` runs are PROJECT-only — the framework corpus needs an explicit `framework:` or `full:` target.
 
@@ -109,12 +144,12 @@ has drifted is refused before any service or dev leg runs:
 the @omega.js family ships ONE version — this brand is mixed (#794):
   backend: @omega.js/backend 0.4.0, @omega.js/client 0.4.0
   this manager is 0.5.0
-  fix: run `omega update --apply` at the brand root — it moves every target together
+  fix: run `omega update` at the brand root — it moves every target together
 ```
 
-**The fix is always `omega update --apply` at the brand root** — it fans out over
+**The fix is always `omega update` at the brand root** — it fans out over
 every target AND the root's own `@omega.js/manager` pin, so the whole family
-lands on one number (a bare `omega update` only reports). Never bump a single
+lands on one number (`omega update --dry-run` only reports). Never bump a single
 target's version by hand: one target ahead means two copies of
 `@omega.js/client` in one brand and one omega.json5 validated by two validators,
 which nothing downstream can see. A target linked with a `file:` spec is exempt

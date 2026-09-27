@@ -27,6 +27,7 @@ const jetpack = require('fs-jetpack');
  * @param {string} config.commandsDir - Absolute directory of command modules — <name>.js exporting `async (options) => {}`
  * @param {Object<string, string[]>} [config.aliases] - Command name → positional/flag aliases (e.g. `{ install: ['-i', 'i', '--install'] }`)
  * @param {string} [config.defaultCommand='help'] - Command used when no positional or flag alias matches
+ * @param {Function} [config.fallback] - `(command) => handler|null`: the handler for a command with no file, else null for the unknown answer
  * @returns {Function} Main class — bins do `new Main(argv)` then `await main.process(argv)`
  */
 function createCliRouter(config) {
@@ -35,6 +36,7 @@ function createCliRouter(config) {
   const commandsDir = config.commandsDir;
   const aliases = config.aliases || {};
   const defaultCommand = config.defaultCommand || 'help';
+  const fallback = config.fallback || null;
 
   if (!commandsDir) {
     throw new Error('[devkit cli-router] commandsDir is required');
@@ -114,14 +116,18 @@ function createCliRouter(config) {
 
     // Get the command file path
     const commandFile = path.join(commandsDir, `${command}.js`);
+    const exists = jetpack.exists(commandFile);
 
-    if (!jetpack.exists(commandFile)) {
-      // Built-in help (a framework's own commands/help.js would have won above)
-      if (command === 'help') {
-        printHelp();
-        return;
-      }
+    // Built-in help (a framework's own commands/help.js would have won above)
+    if (!exists && command === 'help') {
+      printHelp();
+      return;
+    }
 
+    // A router can own verbs it keeps no file for; a null handler is the unknown answer
+    const handler = !exists && fallback ? fallback(command) : null;
+
+    if (!exists && !handler) {
       // Unknown command: name the valid surface and fail loud — the old path
       // threw a doubled "Error executing… Error: Command…" with no listing.
       // An empty listing means the dist itself is broken, not a typo — say so.
@@ -137,7 +143,7 @@ function createCliRouter(config) {
 
     try {
       // Execute the command
-      const Command = require(commandFile);
+      const Command = handler || require(commandFile);
       await Command(options);
     } catch (e) {
       // The command's own error is the only surface — no wrapper prefix, no

@@ -12,6 +12,7 @@
  *   omega dev --target=web,backend   explicit set
  *   omega dev --all                  every target with a dev leg
  *   omega dev --full                 boot on the WHOLE manage walk, not the lane
+ *   omega dev --local                link the brand from the local monorepo first (`omega i local`)
  *
  * Boot order: the freshness sweep first (one dist check for every lane), then
  * a manage cycle — the boot lane (workspace, assets, disperse: the local
@@ -29,7 +30,7 @@ const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { findTarget } = require('@omega.js/devkit/omega-bin');
-const { freshnessSweep, resolveLinkedMonorepo, startMonorepoWatch } = require('@omega.js/devkit/local');
+const { freshnessSweep, linkLocalPackages, resolveLinkedMonorepo, resolveMonorepoRoot, startMonorepoWatch } = require('@omega.js/devkit/local');
 const { mkcertCaRootPem } = require('@omega.js/devkit/local-https');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
@@ -202,6 +203,13 @@ module.exports = async (options = {}) => {
   // when its package.json declares a `start` script — the manager never
   // invents a leg for it.
   const discovered = discoverTargets(brandRoot);
+
+  // `--local` links the whole brand from the monorepo before anything reads what is installed,
+  // so the monorepo watch below starts on the fresh link
+  if (options.local) {
+    const logger = { log: (line) => console.log(chalk.dim(`   ${line}`)), warn: (line) => console.log(chalk.yellow(`   ${line}`)) };
+    await linkLocalPackages({ dir: brandRoot, monorepoRoot: resolveMonorepoRoot(), logger });
+  }
 
   // Lockstep (#794): the same gate the manage walk opens with, run here too —
   // before the freshness sweep and before any leg spawns. A boot on a brand

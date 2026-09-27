@@ -612,7 +612,8 @@ test('lockstep boot check: one target behind REFUSES, naming the target, both ve
       assert.match(error.message, /@omega\.js\/client 0\.0\.9/, 'names every drifted package under that target');
       assert.match(error.message, new RegExp(MANAGER_VERSION.replace(/\./g, '\\.')), 'names the manager\'s version');
       assert.equal(error.refusal, true, 'a refusal prints its message alone — no stack (#706)');
-      assert.match(error.message, /omega update --apply/, 'names the verb that actually installs, not the report-only form');
+      assert.match(error.message, /fix: run `omega update` at the brand root/, 'names the verb that installs, bare');
+      assert.ok(!error.message.includes('--apply'), 'no retired switch in the fix');
       assert.ok(!error.message.includes('web'), 'a target that matches is not listed');
       return true;
     },

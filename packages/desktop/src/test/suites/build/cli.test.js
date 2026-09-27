@@ -146,6 +146,34 @@ module.exports = defineCases({
       },
     },
     {
+      name: 'update: --dry-run reaches devkit runUpdate as dryRun, and a bare run installs',
+      run: async (ctx) => {
+        const devkitUpdate = require('@omega.js/devkit/update');
+        const { BOOLEAN_FLAGS } = require(path.join(root, 'dist', 'cli-run.js'));
+        const { parseArgv } = require('@omega.js/devkit/argv');
+        const commandFile = path.join(root, 'dist', 'commands', 'update.js');
+
+        // The command destructures runUpdate at load, so the stub lands before a fresh require
+        async function run(args) {
+          const original = devkitUpdate.runUpdate;
+          const seen = [];
+          devkitUpdate.runUpdate = async (options) => { seen.push(options); };
+          delete require.cache[commandFile];
+          try {
+            await require(commandFile)(parseArgv(args, { booleans: BOOLEAN_FLAGS }));
+          } finally {
+            devkitUpdate.runUpdate = original;
+            delete require.cache[commandFile];
+          }
+          ctx.expect(seen.length).toBe(1);
+          return seen[0];
+        }
+
+        ctx.expect((await run(['update', '--dry-run'])).dryRun).toBe(true);
+        ctx.expect(Boolean((await run(['update'])).dryRun)).toBe(false);
+      },
+    },
+    {
       name: 'mirrored aliases: -t routes to test, -d routes to deploy (wave-6 D6)',
       run: (ctx) => {
         const { aliases } = require(path.join(root, 'dist', 'cli.js')).config;

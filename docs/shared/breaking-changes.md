@@ -8,23 +8,58 @@ contracts in one pass.
 **No framework dual-reads a legacy form.** An old key, an old name, an old file
 is not "deprecated but accepted" — it is unknown, and the loud ones fail
 validation ([#142](https://github.com/Omega-JS-Stack/omega/issues/142)). The only
-sanctioned legacy-reading paths are the one-time converters: `npx omega migrate`
-for a UJM website, and the mapping tables in
-[config.md](config.md#migration--legacy-configs--omegajson5) for every other
-target.
+sanctioned legacy-reading paths are the one-time converter, the brand root's
+`npx omega migrate` (a report by default, `--execute` converts: the brand config
+first, then every target's own leg), and the mapping tables in
+[config.md](config.md#migration--legacy-configs--omegajson5) for what it does not
+convert.
 
-**OMEGA-to-OMEGA changes are by hand, and they live here** (Ian 2026-09-11,
-[#885](https://github.com/Omega-JS-Stack/omega/issues/885)): `omega migrate` converts a
-LEGACY brand only. A shape OMEGA changes its own mind about between two versions is a
-dated section in this register with its by-hand step, never a migrate rule; the few
-brands in the in-between state convert by hand. [#888](https://github.com/Omega-JS-Stack/omega/issues/888)
-makes `omega update` print the sections due since the installed version.
+**Legacy to OMEGA is `omega migrate`; OMEGA to newer OMEGA is by hand, here**
+([#885](https://github.com/Omega-JS-Stack/omega/issues/885),
+[#888](https://github.com/Omega-JS-Stack/omega/issues/888)). A shape OMEGA changes its
+own mind about between two versions is a dated section in this register with its
+by-hand step, never a migrate rule. Every `omega migrate` report ends on one line
+naming this file inside the installed manager, so the by-hand steps sit one path
+away from the run.
 
 **Boundaries.** What never got PORTED is [#78](https://github.com/Omega-JS-Stack/omega/issues/78)'s
 gap tables, not this file. Converter TOOLING is
 [#40](https://github.com/Omega-JS-Stack/omega/issues/40) — these rows are its
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
+
+## 2026-09-26: two switches, two names ([#946](https://github.com/Omega-JS-Stack/omega/issues/946))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| `omega update` | A bare run reported; `--apply` installed the safe set; `outdated` and `out` were aliases | A bare run installs the safe set, like every verb that acts by default; `--dry-run` reports and installs nothing; the `outdated` and `out` aliases are gone | Drop `--apply`; a script that relied on a bare report adds `--dry-run`, and `omega outdated` / `omega out` become `omega update --dry-run` |
+| The report and do-it switches | `--apply` (update's install) and `--check` (a web flag nothing read) beside `--dry-run` and `--execute` | Two names: `--dry-run` shows the plan on a verb that acts by default (deploy, manage, build, clean, install, onboard, pipeline, devlog, update), `--execute` does the work on a verb that reports by default (`omega migrate`, the manager's `--migration=<name>` lane) | Spell the switch the verb's way; no CLI declares `--apply` or `--check` any more |
+
+## 2026-09-26: the schema is strict, and `omega migrate` owns every old name ([#859](https://github.com/Omega-JS-Stack/omega/issues/859))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A config key no rule declares | A WARNING on the load ([#636](https://github.com/Omega-JS-Stack/omega/issues/636)), and a retired name was its own error naming the replacement | An ERROR at any level, one line per path, naming `npx omega migrate`; a retired name fails exactly the same way, and a section with typed keys is closed, so a typo inside it fails too. Documented override blocks (`targets.desktop.electronBuilder`, `windows`, `cdp`, `fileAssociations`, `protocols`, `targets.backend.mcp.authUrl`) and the `client` settings bag stay open ([config.md](config.md#validation)) | Run `npx omega migrate` at the brand root and `--execute` what it converts; delete every custom key of your own (a key nothing reads has no place in omega.json5) |
+| A retired `.env` key | A `.env` layer still carrying one FAILED the load | The `.env` layer is open: the line is unread, and `omega migrate` names it by NAME (never a value); `--execute` renames an env-side rename in place | Run `npx omega migrate --execute`, then move or delete what it leaves due |
+| The retired tables | `@omega.js/config` exported `findRetiredKeys`, `RETIRED_KEYS`, `RETIRED_PATHS`, `RETIRED_ENV_KEYS`, `findRetiredEnvKeys`, `assertNoRetiredEnvKeys` | Gone from config: they are the migrate verb's rule set, `@omega.js/manager`'s `src/migrate/`, and nothing else reads them | A script that imported them runs `npx omega migrate` instead |
+| The retired `.omega/company.json` stamp | A run that found one warned once | Nothing reads it and nothing warns: running code carries no legacy check | `rm .omega/company.json` in every brand ([the 2026-09-12 section](#2026-09-12-one-company-key-and-a-company-tree-inside-the-parent-677)) |
+| The UJM converter's passthrough | An unrecognized `_config.yml` section, `permalink`, `pagination`, `defaults`, `generators` and the UJM-json `distribute` / `workflows` rode to `targets.web` | Dropped with a note per path, so a converted config always loads | Carry anything that still matters by hand |
+
+## 2026-09-26: one root `omega migrate` ([#885](https://github.com/Omega-JS-Stack/omega/issues/885))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The brand-root `omega migrate` | A bare run deleted the retired config keys; `--dry-run` printed the plan | A bare run REPORTS and writes nothing, exiting 1 while a step is due; `--execute` converts. It converts the brand config first, then runs every target's own migration (`--target=` narrows the walk), and ends on the path of this register | Add `--execute` wherever a script meant to convert; drop `--dry-run` |
+| A framework's own `migrate` | `npx omega migrate` (and `--check` / `--dry-run`) in a web, backend or extension project: the UJM conversion, the bare-require report, the hook-layout move | Gone from every framework CLI: each is a leg of the brand-root verb, `npx omega migrate --target=<name>`. The backend's `migrate:rules` and `migrate:markers` are unchanged | Run the brand-root form; a standalone legacy project joins a brand first |
+| The web leg's library option | `runMigration(root, { check: true })` reported, `runMigration(root)` wrote | `runMigration(root)` reports, `runMigration(root, { execute: true })` writes; `migrateTarget(root, { execute })` answers `{ due, changed, errors }` | Flip the option in any script that calls the library |
+
+## 2026-09-26: every verb runs at a root ([#863](https://github.com/Omega-JS-Stack/omega/issues/863))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| Where a verb runs | `cd targets/<target> && npx omega <verb>`, or `npx omega test` inside `packages/<framework>` | At the root: `npx omega <verb> --target=<target>` at the brand root, `npx omega test --target=<package> framework:` at the monorepo root; inside any subfolder the verb refuses and prints that root form | Run it from the root with `--target=`; a script or alias that `cd`s into a target first drops the `cd` and adds the picker |
+| The link flip | `npx omega i local` / `npx omega i live` in any target: web, backend, desktop and extension each carried an `install` command | `npx omega i local` / `npx omega i live` at the brand root: the manager's own verb, one call for the whole tree; no framework has an `install` command, so a standalone project has no link verb | Run it at the brand root; drop any per-target `i local` from scripts and notes |
+| A framework verb the manager has no command for | Run inside the target that owns it (`cd targets/web && npx omega translate`) | Passed through from the brand root: `npx omega translate --target=web`, every arg after the verb forwarded as typed; a single-target verb (`launch`, `emulator`, `firestore:get`, ...) needs exactly one `--target=` | Add the picker at the brand root ([../manager/brand.md](../manager/brand.md) § Verbs lists every verb) |
 
 ## 2026-09-25: one runtime shape on every package ([#945](https://github.com/Omega-JS-Stack/omega/issues/945))
 
@@ -199,7 +234,7 @@ page-only, with no site-wide default.
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|
-| The translation route list | `translation: { exclude: ['docs', 'changelog'] }` in omega.json5 | `translation: { include: ['**', '!docs', '!changelog'] }` | Run `npx omega migrate` at the brand root: it writes the converted list and deletes the old key in one run (`--dry-run` prints the plan). A brand that wants the new default instead writes `['**', '!blog/**']` by hand |
+| The translation route list | `translation: { exclude: ['docs', 'changelog'] }` in omega.json5 | `translation: { include: ['**', '!docs', '!changelog'] }` | Run `npx omega migrate --execute` at the brand root: it writes the converted list and deletes the old key in one run (a bare `npx omega migrate` prints the plan). A brand that wants the new default instead writes `['**', '!blog/**']` by hand |
 | The page's catalog entry | `search: { include: false, category: 'Docs' }` in page frontmatter | `catalog: { include: false, category: 'Docs' }` | Rename the block in each page that carries it. `search:` is a bare config section now, so a page still writing it fails the build naming the file |
 | A page's translation opt-out | nothing existed | `translation: { include: false }` in page frontmatter | Nothing to migrate: pages that were named in the old `exclude` list ride the converted include list |
 
@@ -212,7 +247,8 @@ a persona the backend emulator seeds, so the pair that fed desktop's custom-toke
 integration case is retired outright ([#904](https://github.com/Omega-JS-Stack/omega/issues/904)
 owns the mechanism that replaces it). They are `env-retired.js` rows now, with no
 replacement of any kind, so a `.env` layer still declaring one FAILS the load telling you to
-delete the line. The `testing` schema group went with them, and the two `${{ secrets.* }}`
+delete the line (since the strict-schema change the line is unread instead, and `omega migrate`
+names it for deletion). The `testing` schema group went with them, and the two `${{ secrets.* }}`
 lines came off every generated web and backend workflow.
 
 | Contract | Old form | New form | Manual migration step |
@@ -352,7 +388,7 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 
 | Contract | Old form | New form | Manual migration step |
 |---|---|---|---|
-| Build engine | Jekyll 4 + Ruby/Bundler (`Gemfile`, `Gemfile.lock`, `src/_config.yml`) | Eleventy 3 + LiquidJS, Node only | Run `npx omega migrate --check`, then `npx omega migrate` in the website target: it converts the config, runs the codemod, and deletes `src/_config.yml`, `config/ultimate-jekyll-manager.json`, `Gemfile`, `Gemfile.lock`, `.ruby-version`. Drop the Ruby toolchain from CI |
+| Build engine | Jekyll 4 + Ruby/Bundler (`Gemfile`, `Gemfile.lock`, `src/_config.yml`) | Eleventy 3 + LiquidJS, Node only | Run `npx omega migrate --target=<web>` at the brand root, then again with `--execute`: it converts the config, runs the codemod, and deletes `src/_config.yml`, `config/ultimate-jekyll-manager.json`, `Gemfile`, `Gemfile.lock`, `.ruby-version`. Drop the Ruby toolchain from CI |
 | Package + CLI | `ultimate-jekyll-manager` dependency; `uj` / `ujm` / `ultimate-jekyll` / `mgr` bins | `@omega.js/web`; `omega` / `omg` / `mgr` | Swap the dependency; replace `npx mgr <verb>` with `npx omega <verb>` in every npm script and workflow |
 | Config | `src/_config.yml` + `config/ultimate-jekyll-manager.json` | `config/omega.json5` | Key-by-key table in [config.md](config.md#ultimate-jekyll-manager-src_configyml--configultimate-jekyll-managerjson--omega-migrate-b4-checkpoint-32); `omega migrate` writes it for you |
 | Client-runtime config key | `web_manager: { … }` | `client` (`targets.web.client`) | Codemod rule `client-frontmatter` renames page-frontmatter blocks; config blocks relocate per the UJM mapping table in [config.md](config.md#migration--legacy-configs--omegajson5) (the SSOT for the key-by-key moves). The old name is a validation error, not a silent no-op |
@@ -375,7 +411,7 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 | JS entry | Seeded `src/assets/js/main.js` bootstrapping the manager | Deleted — core main + the boot runtime own it | `omega migrate` deletes an untouched seed and FLAGS a customized one; port custom logic into a page or section module |
 | Client bootstrap | `import webManager from 'web-manager'`; `window.Manager` global | `import omega from '@omega.js/web/runtime'`, the web instance; no window global | Replace the import in every module and delete `window.Manager` references. The accessor and auth shapes are in [one runtime shape](#2026-09-25-one-runtime-shape-on-every-package-945) |
 | Deploy | `npu sync --message='Deploy'` shell-out | `omega deploy` (plain git sync + `workflow_dispatch`, or the direct lane) | Replace the script; contract in [deploys.md](deploys.md) |
-| Version maintenance | Setup-time `ensureManagerVersion()` + peer-dependency auto-install | The explicit `omega update` verb | Stop expecting self-updates; run `npx omega update` (`--apply` to install) — [updates.md](updates.md) |
+| Version maintenance | Setup-time `ensureManagerVersion()` + peer-dependency auto-install | The explicit `omega update` verb | Stop expecting self-updates; run `npx omega update` (`--dry-run` to only report) — [updates.md](updates.md) |
 | Charts | A page imported `chart.js` bare (it was a `@omega.js/web` dependency) and built its own `new Chart(canvas, config)` | `chart.js` is gone — the framework draws with TanStack Charts ([#772](https://github.com/Omega-JS-Stack/omega/issues/772)), reached ONLY through `__main_assets__/js/libs/charts.js` (`loadCharts`, `chartSlot`, `barChart`/`stackedBarChart`/`doughnutChart`/`lineChart`) | Replace the bare import and the hand-built config with the helpers, and the page's `<canvas>` with `chartSlot`'s markup (an SVG chart has no canvas). A page that genuinely needs the raw grammar imports `@tanstack/charts` bare instead — same framework-resolution rule, new name |
 
 ## `backend-manager` → `@omega.js/backend`
@@ -489,10 +525,10 @@ Full contract: [config.md](config.md#the-repo-block-and-the-repos-it-derives-883
 | Secrets | Secret values sat in the framework config files | Config hard-fails secret-shaped keys; secrets live in `.env`, resolved through the cascade shell > local > brand root > company | Move every secret out of config into `.env`, brand-root first so the targets inherit it |
 | CLI bins | EVERY legacy framework shipped a `mgr` bin (plus `uj`/`bm`/`em`/`bxm`), so in a multi-target repo whichever npm hoisted won | One context-aware dispatcher: `omega` / `omg` / `mgr`, all identical — the nearest `package.json` walking up from cwd names the framework whose CLI runs | Replace legacy bin names in npm scripts and CI; run the verb from the target dir that owns it |
 | CLI default | A bare `omega` / `mgr` at a brand root RAN the whole service walk (omega-manager's default command) | Every verb is named: `omega manage` is the walk (one name, no alias), `omega dev` the local stack, `omega deploy` the publish. A bare `omega` prints help and touches nothing ([#229](https://github.com/Omega-JS-Stack/omega/issues/229)) | Replace bare `omega`/`mgr` invocations with `omega manage` in scripts, cron, and CI. A brand still carrying `manage: 'omega'` must be walked ONCE by hand — `npx omega manage` — because its own `npm run manage` would print help; that walk heals the script to `omega manage` |
-| Per-target setup | `omega setup`, run BY HAND in every target (`cd targets/<dir> && npx omega setup`), and the default command a bare `omega` ran | The command is gone. Its LOCAL half — node check, defaults scaffold, `package.json` scripts sync, peer-dependency check, locality check — is `ensureTarget()`, which every verb (`dev`/`build`/`test`/`deploy`) runs first, idempotently and offline. Its NETWORK half — secret publication, cert validation, repo provisioning, framework freshness — is a precheck inside `omega deploy`, opted out with `--no-secrets` on all three frameworks (desktop's `--quick` is gone). A bare `omega` prints help ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)) | Delete `npx omega setup` from npm scripts, CI workflows and runbooks — the verb beside it already does it. A scaffolded workflow's `npx omega setup && npm run build` becomes `npm run build`. Extension consumers on a pre-2.0.0 hook layout run the one-time `npx omega migrate` once |
+| Per-target setup | `omega setup`, run BY HAND in every target (`cd targets/<dir> && npx omega setup`), and the default command a bare `omega` ran | The command is gone. Its LOCAL half — node check, defaults scaffold, `package.json` scripts sync, peer-dependency check, locality check — is `ensureTarget()`, which every verb (`dev`/`build`/`test`/`deploy`) runs first, idempotently and offline. Its NETWORK half — secret publication, cert validation, repo provisioning, framework freshness — is a precheck inside `omega deploy`, opted out with `--no-secrets` on all three frameworks (desktop's `--quick` is gone). A bare `omega` prints help ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)) | Delete `npx omega setup` from npm scripts, CI workflows and runbooks — the verb beside it already does it. A scaffolded workflow's `npx omega setup && npm run build` becomes `npm run build`. Extension consumers on a pre-2.0.0 hook layout run `npx omega migrate --target=<extension> --execute` once at the brand root |
 | Package script spelling | Backend, desktop and extension wrote `npx omega <verb>` into every framework-owned target script (web already spelled it bare) | Bare `omega <verb>` on all four frameworks ([#748](https://github.com/Omega-JS-Stack/omega/issues/748)) — npm puts `node_modules/.bin` on the path inside a script, so the prefix bought nothing there; `npx omega` stays canonical for docs and the terminal | Nothing by hand: the next verb's `ensureTarget()` rewrites every framework-owned key in place and a second run is a no-op — commit the one-line diff. A script key the framework never declares is yours and is never touched, and `npx omega <verb>` keeps working wherever you spell it yourself |
 | Publish | Per-framework release scripts and `npu sync` | `omega deploy` on every target — deliberate, never triggered by a push; at a brand root it fans out (backend → web → extension/desktop) | Replace publish scripts with `omega deploy`; contract in [deploys.md](deploys.md) |
-| Dependency updates | Framework self-update + peer-dependency auto-install at setup | The explicit `omega update` verb (report first, `--apply` installs, majors opt-in). The peer-dependency install still rides every verb's `ensureTarget()` — a satisfied target installs nothing — and the framework self-update moved to the `omega deploy` precheck ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)) | Run it deliberately — [updates.md](updates.md) |
+| Dependency updates | Framework self-update + peer-dependency auto-install at setup | The explicit `omega update` verb (installs the safe set, `--dry-run` only reports, majors opt-in). The peer-dependency install still rides every verb's `ensureTarget()` — a satisfied target installs nothing — and the framework self-update moved to the `omega deploy` precheck ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)) | Run it deliberately — [updates.md](updates.md) |
 | Environment prefixes | `BACKEND_MANAGER_*`, `BEM_*`, framework-specific names | `OMEGA_*` — except a THIRD-PARTY credential, which keeps the vendor's own name (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`); `OMEGA_*` is for the keys OMEGA itself mints or owns | Rename in `.env`, CI secrets, and every reader. `@omega.js/config`'s env schema is the current list — the brand root's `.env` stub renders from it |
 | Default/Custom file markers | The marker grammar in `_.gitignore`, `AGENTS.md` (no framework scaffolds a target `.env` any more) | **UNCHANGED — this is not legacy.** The Default/Custom marker grammar is the live defaults-engine mechanism that merges framework-owned lines into consumer-owned files | Leave the markers alone in migrated files; every verb's `ensureTarget()` rewrites the Default block and preserves everything under Custom |
 
@@ -823,7 +859,8 @@ paths. Nothing about the SECRET halves changed: `RECAPTCHA_SECRET_KEY`,
 
 There is no dual-read, so a `.env` layer that still declares one of the six FAILS the load
 naming the move (`@omega.js/config`'s `env-retired.js`, checked in the ONE place a `.env`
-layer is parsed). The three listing ids also left the extension's CI secrets block: a
+layer is parsed; since the strict-schema change the line is unread instead, and `omega migrate`
+names the move). The three listing ids also left the extension's CI secrets block: a
 public id rides the config snapshot a deploy pushes, like every other config value.
 
 | Contract | Old form | New form | Manual migration step |
@@ -872,7 +909,7 @@ and format on by default, `false` to drop one, per-format settings inside the fo
 
 **The config half is a migration, not hand-editing**:
 `npx omega manage --migration=platform-names --execute` at the brand root rewrites every
-omega.json5 the brand owns and renames its icon dirs. Run it BEFORE `omega migrate`, which
+omega.json5 the brand owns and renames its icon dirs. Run it BEFORE `omega migrate --execute`, which
 deletes a retired key rather than moving it.
 
 | Contract | Old form | New form | Manual migration step |

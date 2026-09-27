@@ -27,6 +27,8 @@
  * brand config is a copy that drifts from the thing it came from.
  */
 
+const { isDeepStrictEqual } = require('node:util');
+
 const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('./schema.js');
 const { isPlainObject } = require('./merge.js');
 
@@ -59,6 +61,12 @@ function defaultRules(target) {
   return rules.filter(hasDefault);
 }
 
+/**
+ * Set a value at a dot-path, creating the objects on the way.
+ * @param {object} target
+ * @param {string} dotted
+ * @param {*} value
+ */
 function setAtPath(target, dotted, value) {
   const names = dotted.split('.');
   const leaf = names.pop();
@@ -127,13 +135,26 @@ function defaultComments(target) {
   return comments;
 }
 
-function collectMissing(defaults, present, prefix, target, found) {
-  for (const [key, value] of Object.entries(defaults)) {
+/**
+ * What filling `present` from `incoming` does, key by key, never overwriting:
+ * a path `present` lacks is ADDED at its highest missing point (one block,
+ * not one edit per key inside it), and a path `present` already answers
+ * differently is KEPT. An equal value is neither.
+ * @param {object} incoming - The values on offer.
+ * @param {object} present - The authored config they would fill.
+ * @returns {{ added: Array<{ path: string, value: * }>, kept: Array<{ path: string, value: *, incoming: * }> }}
+ */
+function planMerge(incoming, present) {
+  return collectPlan(incoming, present, '', { added: [], kept: [] });
+}
+
+function collectPlan(incoming, present, prefix, plan) {
+  for (const [key, value] of Object.entries(incoming)) {
     const dotted = prefix ? `${prefix}.${key}` : key;
     const authored = isPlainObject(present) && Object.prototype.hasOwnProperty.call(present, key);
 
     if (!authored) {
-      found.push({ path: dotted, value });
+      plan.added.push({ path: dotted, value });
       continue;
     }
 
@@ -141,11 +162,13 @@ function collectMissing(defaults, present, prefix, target, found) {
     // A brand that authored anything else at this path (a scalar, false, null)
     // made a decision: never dive in, never overwrite.
     if (isPlainObject(value) && isPlainObject(present[key])) {
-      collectMissing(value, present[key], dotted, target, found);
+      collectPlan(value, present[key], dotted, plan);
+    } else if (!isDeepStrictEqual(value, present[key])) {
+      plan.kept.push({ path: dotted, value: present[key], incoming: value });
     }
   }
 
-  return found;
+  return plan;
 }
 
 /**
@@ -167,7 +190,7 @@ function missingDefaults(config, target) {
   // copy to drift ([#793](https://github.com/Omega-JS-Stack/omega/issues/793))
   const writable = defaultsFrom(defaultRules(target).filter(isMaterialized));
 
-  return collectMissing(writable, config || {}, '', target, []);
+  return planMerge(writable, config || {}).added;
 }
 
-module.exports = { schemaDefaults, missingDefaults, defaultComments, defaultRules };
+module.exports = { schemaDefaults, missingDefaults, defaultComments, defaultRules, planMerge, setAtPath };

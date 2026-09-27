@@ -792,3 +792,18 @@ test('the REAL templates: all four pin the SAME actions/checkout and actions/set
     }
   }
 });
+
+// Every verb runs at a root, and a composed step runs in the target dir, so the
+// workflow's own env carries the root-dispatch marker naming the checkout: one line,
+// workflow-wide, so every job and every `npm run <script>` inside the target inherits it.
+test('the REAL templates: the workflow env carries the root-dispatch marker naming the checkout', () => {
+  const { ROOT_DISPATCH_ENV } = require('../src/omega-bin');
+  const templates = frameworkTemplates();
+  assert.equal(templates.length, 4, `expected the four framework templates, found ${templates.map((t) => t.label).join(', ')}`);
+
+  for (const { label, contents } of templates) {
+    const workflowEnv = contents.slice(contents.indexOf('\nenv:\n'), contents.indexOf('\njobs:\n'));
+    assert.match(workflowEnv, new RegExp(`\\n  ${ROOT_DISPATCH_ENV}: \\$\\{\\{ github\\.workspace \\}\\}\\n`), `${label}: the workflow env lacks the marker`);
+    assert.equal(contents.split(`${ROOT_DISPATCH_ENV}:`).length, 2, `${label}: the marker is declared exactly once`);
+  }
+});

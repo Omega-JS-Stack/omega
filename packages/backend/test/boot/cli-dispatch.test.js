@@ -115,28 +115,5 @@ module.exports = defineCases({
         assert.ok(!table.buildHelpText().includes('zzz-probe-command'), 'the probe is gone again');
       },
     },
-    {
-      name: 'install-resolves-its-mode-aliases-from-the-table',
-      async run({ assert }) {
-        const install = table.COMMANDS.find((command) => command.name === 'install');
-
-        assert.equal(table.matchCommand(install, { install: true, local: true }), 'local', '`install local`');
-        assert.equal(table.matchCommand(install, { i: true, dev: true }), 'local', '`i dev`');
-        assert.equal(table.matchCommand(install, { install: true, production: true }), 'live', '`install production`');
-        assert.equal(table.matchCommand(install, { live: true }), 'live', 'bare `live`');
-        assert.equal(table.matchCommand(install, { install: true }), table.MISSING_ARG, 'a bare `install` is a missing-mode error, not an unknown command');
-        assert.equal(table.matchCommand(install, { deploy: true }), false, 'an unrelated command does not match install');
-      },
-    },
-    {
-      name: 'bare-install-names-the-real-mode-spellings',
-      async run({ assert }) {
-        const { err, exitCode } = await captured(() => new Main().process(['node', 'script', 'install']));
-
-        assert.ok(err.includes('omega install local'), 'names the local spelling');
-        assert.ok(err.includes('omega install live'), 'names the live spelling');
-        assert.equal(exitCode, 1, 'a mode-less install is a failing exit');
-      },
-    },
   ],
 });

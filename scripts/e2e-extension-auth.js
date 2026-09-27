@@ -70,6 +70,7 @@ const { readPortsFile } = require('@omega.js/config');
 // it back the way a browser does: by running the file.
 const { readBakedBuildJson } = require(path.join(ROOT, 'packages', 'extension', 'src', 'gulp', 'tasks', 'utils', 'build-json.js'));
 const { createStepsLog } = require('./steps-log');
+const { rootDispatchEnv } = require('@omega.js/devkit/test/boot-child');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const BUILD_TIMEOUT = 300000;
@@ -175,7 +176,7 @@ function startEmulator() {
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
   const child = spawn(mgrBin, ['emulator', '--no-seed', '--no-https'], {
     cwd: PLAYGROUND_BACKEND,
-    env: { ...process.env },
+    env: rootDispatchEnv(PLAYGROUND_BACKEND),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });

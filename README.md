@@ -15,7 +15,7 @@ Published packages live under the `@omega.js` npm scope. Private shared internal
 
 ## Development
 
-`npm start` at the root watches every dist-building package concurrently (src→dist). In a brand repo, `omega dev --local` links all `@omega.js/*` deps from this monorepo and starts the watch for you; `mgr i local` does the same for a single target. See [docs/shared/local-dev.md](docs/shared/local-dev.md).
+`npm start` at the root watches every dist-building package concurrently (src→dist). At a brand root, `omega i local` links every `@omega.js/*` dep from this monorepo brand-wide (`omega i live` restores the registry versions), and `omega dev --local` links first and then boots the stack with the watch. See [docs/shared/local-dev.md](docs/shared/local-dev.md).
 
 ## Status
 

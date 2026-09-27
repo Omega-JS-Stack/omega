@@ -42,7 +42,7 @@ const { runManage } = require('../manage.js');
 const { resolveBrandRoot, discoverTargets, loadBrand } = require('../lib/brand.js');
 const { resolveTargetRun, resolveTargetScaffold } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
-const { DEPLOY_ORDER, PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('../lib/target-selection.js');
+const { PICKER_FLAG, assertPickerFlags, selectTargets, buildForwardedFlags } = require('../lib/target-selection.js');
 
 /**
  * The run's ONE delivery (#901): the lane resolved once at the brand root, and
@@ -95,7 +95,7 @@ module.exports = async (options = {}) => {
 
   const brandRoot = resolveBrandRoot(process.cwd());
   if (!brandRoot) {
-    console.error(chalk.red('✗ Not inside a brand monorepo (no config/omega.json5 up the tree) — run inside a brand, or inside a target for that target\'s deploy.'));
+    console.error(chalk.red(`✗ Not inside a brand monorepo (no config/omega.json5 up the tree): run it at a brand root, with --${PICKER_FLAG}=<name> to pick targets.`));
     process.exitCode = 1;
     return;
   }
@@ -144,7 +144,7 @@ module.exports = async (options = {}) => {
   // each target's own deploy verb put it after the push: a workflow re-rendered
   // this run would not ride this run's snapshot, and a target's FIRST deploy
   // would find no workflow on the mirror at all. There is no verb and no flag
-  // for it: a deploy always scaffolds first. Sequential, in DEPLOY_ORDER, and
+  // for it: a deploy always scaffolds first. Sequential, in TARGET_ORDER, and
   // short. The target verbs scaffold again on their way past (idempotent),
   // which is why the push lane takes this same flow rather than a branch of its
   // own.
@@ -303,4 +303,3 @@ module.exports = async (options = {}) => {
 // home is lib/target-selection.js.
 module.exports.selectTargets = selectTargets;
 module.exports.buildForwardedFlags = buildForwardedFlags;
-module.exports.DEPLOY_ORDER = DEPLOY_ORDER;

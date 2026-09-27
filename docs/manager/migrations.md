@@ -42,8 +42,8 @@ brand's own files.
   discovery FAILS LOUD on the old shape, so `runManage` runs it ALONE, ahead of the load that
   would throw. A brand carrying BOTH folders is FATAL, not merged — which copy is real is a
   guess. Run `npm install` afterwards so npm re-links `node_modules/<target>` at the new path.
-- **`platform-names` runs BEFORE `omega migrate`.** Both keys it moves are registered retired
-  paths, and `omega migrate` DELETES a retired key rather than moving it: run the migration
+- **`platform-names` runs BEFORE `omega migrate --execute`.** Both keys it moves are registered retired
+  paths, and `omega migrate --execute` DELETES a retired key rather than moving it: run the migration
   first and the settings travel; run the converter first and they are gone.
 - **Migrations without schema validation are deliberate.** The payment collections' shapes are
   owned by the webhook pipeline, so `orders`, `payments-intents` and `payment-provider` touch

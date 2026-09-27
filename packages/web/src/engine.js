@@ -239,7 +239,7 @@ function buildConfig(eleventyConfig, options) {
       + `the \`site\` global, which is BUILD FACTS only (${SITE_FACT_KEYS.join(', ')}, plus the collections `
       + `targets.web.collections declares). Spell it `
       + `\`${deadValue.read.expression.replace(/^site\./, 'resolved.config.')}\` in omega.json5. `
-      + 'Run `omega migrate` to rewrite it (docs/web/index.md).',
+      + 'Run `npx omega migrate --target=<name> --execute` at the brand root to rewrite it (docs/web/index.md).',
     );
   }
 
@@ -674,7 +674,7 @@ function buildConfig(eleventyConfig, options) {
         logger.warn(
           `${inputPath}:${leftover[0].line}: reads a bare \`random_id\` — there is no per-render global, so it renders `
           + `EMPTY and every id built from it collides. Assign it first: \`${RANDOM_ID_ASSIGN_IDIOM}\`. `
-          + 'Run `omega migrate` to write it (docs/web/index.md).',
+          + 'Run `npx omega migrate --target=<name> --execute` at the brand root to write it (docs/web/index.md).',
         );
       }
     }
@@ -692,7 +692,7 @@ function buildConfig(eleventyConfig, options) {
         + `targets.web.collections declares). Spell it `
         + `\`${first.expression.replace(/^site\./, 'resolved.config.')}\``
         + `${deadReads.length > 1 ? ` (and ${deadReads.length - 1} more in this file)` : ''}. `
-        + 'Run `omega migrate` to rewrite them (docs/web/index.md).',
+        + 'Run `npx omega migrate --target=<name> --execute` at the brand root to rewrite them (docs/web/index.md).',
       );
     }
 
@@ -777,7 +777,7 @@ function buildConfig(eleventyConfig, options) {
           + `${bareConfig.length > 1 ? 'sections' : 'section'} ${bareConfig.map((key) => `\`${key}\``).join(', ')} bare. `
           + 'A page overrides omega.json5 under a `config:` parent '
           + `(config:\n  ${bareConfig[0]}:\n    …); no config section keeps a bare spelling. `
-          + 'Run `omega migrate` to move it (docs/web/frontmatter.md).',
+          + 'Run `npx omega migrate --target=<name> --execute` at the brand root to move it (docs/web/frontmatter.md).',
         );
       }
 

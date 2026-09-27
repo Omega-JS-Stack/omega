@@ -62,8 +62,8 @@ const REGISTRY_FILE = 'brands.json';
 // it visible").
 const SELF = 'self';
 
-// The legacy stamp #677 retired, warned about where an owner still carries one.
-const RETIRED_MARKER = path.join('.omega', 'company.json');
+// The `company` keys the LOADER fills: never typed, always resolved.
+const RESOLVED_COMPANY_KEYS = ['name', 'url', 'images'];
 
 // One warning per company id per process: a missing parent is a state a whole
 // build runs in, never a per-call event.
@@ -271,13 +271,6 @@ function resolveCompany(brandRoot, brandConfig) {
   const webhooks = !(config.company && config.company.webhooks === false);
   const reply = (facts) => answer({ ...facts, webhooks });
 
-  // A brand still carrying the retired stamp hears about it once: the folder it
-  // points at is not read any more, by anything.
-  if (root && fs.existsSync(path.join(root, RETIRED_MARKER)) && !warned.has(RETIRED_MARKER)) {
-    warned.add(RETIRED_MARKER);
-    console.warn(`${path.join(root, RETIRED_MARKER)} is retired (#677): delete it, and name the company with company: { id: '<parent brand.id>' } in omega.json5.`);
-  }
-
   // No company: the brand IS the whole entity, so the company facts are its own
   // and every reader works without a fallback.
   if (!id) {
@@ -347,4 +340,5 @@ module.exports = {
   COMPANY_DIR,
   COMPANY_RESOLVED_FILE,
   COMPANY_SELF: SELF,
+  RESOLVED_COMPANY_KEYS,
 };

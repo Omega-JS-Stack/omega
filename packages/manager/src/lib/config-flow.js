@@ -19,6 +19,7 @@
  * flows may offer an inline opt-out choice via `spec.optOut`.
  */
 const chalk = require('chalk').default;
+const { setAtPath } = require('@omega.js/config');
 const { input, select } = require('@omega.js/devkit/prompt');
 const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('./config-write.js');
@@ -43,22 +44,6 @@ function readTriState(obj, path) {
     node = node[key];
   }
   return { optedOut: node === false, value: node === false ? undefined : node };
-}
-
-/**
- * Set a dot-notation path on an object, creating intermediate objects.
- */
-function setAtPath(obj, path, value) {
-  const keys = path.split('.');
-  const last = keys.pop();
-  let node = obj;
-  for (const key of keys) {
-    if (typeof node[key] !== 'object' || node[key] === null) {
-      node[key] = {};
-    }
-    node = node[key];
-  }
-  node[last] = value;
 }
 
 /**
@@ -345,6 +330,5 @@ module.exports = {
   confirmSetup,
   readTriState,
   sortChoicesForBrand,
-  setAtPath,
   landValue,
 };

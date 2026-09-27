@@ -29,7 +29,7 @@ modern Firebase Cloud Functions backends. Its main export is ONE ready-made inst
 
 ## Quick start
 
-All commands run from the **target root** (this directory). `dist/` is staged build output; never edit it.
+All commands run from the **project root** (this directory). `dist/` is staged build output; never edit it.
 
 ```bash
 npx omega build             # stage src/ → dist/ (the tree firebase.json points at)
@@ -41,11 +41,7 @@ npx omega deploy            # deploy to Firebase
 npx omega logs:read         # read Cloud Functions logs (also: logs:tail to stream)
 npx omega firestore:get     # read a doc from Firestore (also: firestore:set / :query / :delete)
 npx omega auth:get          # read an Auth user (also: auth:list / :delete / :set-claims)
-npx omega install dev       # use LOCAL @omega.js/backend source (to test framework edits)
-npx omega install live      # restore the published @omega.js/backend from npm
 ```
-
-> Editing the @omega.js/backend framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/backend`). Run `npx omega install live` to switch back.
 
 ## Where things live
 

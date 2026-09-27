@@ -65,7 +65,7 @@ const SEED_NORMALIZED = normalizeJs(SEED_MAIN);
  * Migrate the consumer asset layer (JS deletion/flagging + scss rewrites).
  * @param {string} root - consumer project root
  * @param {object} [options]
- * @param {boolean} [options.write]
+ * @param {boolean} [options.execute] - write the changes (false = report only)
  * @returns {{ removed: string[], edits: object[], findings: object[] }}
  */
 function migrateConsumerAssets(root, options = {}) {
@@ -102,7 +102,7 @@ function migrateConsumerAssets(root, options = {}) {
         }
       }
 
-      if (rewritten !== text && options.write) fs.writeFileSync(full, rewritten);
+      if (rewritten !== text && options.execute) fs.writeFileSync(full, rewritten);
       continue;
     }
 
@@ -111,7 +111,7 @@ function migrateConsumerAssets(root, options = {}) {
     if (!UJM_IMPORT.test(text)) continue;
 
     if (rel === path.join('src', 'assets', 'js', 'main.js') && normalizeJs(text) === SEED_NORMALIZED) {
-      if (options.write) fs.rmSync(full);
+      if (options.execute) fs.rmSync(full);
       removed.push(rel);
       continue;
     }

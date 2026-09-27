@@ -346,20 +346,13 @@ test('a registry hit beats the generated layer: on the laptop the tree is the tr
 
 // ─── The retirements (#677) ───
 
-test('the retired company keys fail loudly, each naming its new home', () => {
+test('the retired company keys fail the load like any unknown key, naming migrate', () => {
   const base = { brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' } };
+  const fails = (config, path) => validateConfig({ ...base, ...config }).errors
+    .some((error) => error.startsWith(`config.${path} is not a key the schema declares`) && error.includes('npx omega migrate'));
 
-  const named = validateConfig({ ...base, brand: { ...base.brand, company: 'Acme Holdings Inc' } }).errors;
-  assert.ok(named.some((error) => error.includes('config.brand.company is retired') && error.includes('company.name')), named.join('\n'));
-
-  const wordmark = validateConfig({ ...base, brand: { ...base.brand, images: { companyWordmark: '/wordmark.png' } } }).errors;
-  assert.ok(wordmark.some((error) => error.includes('config.brand.images.companyWordmark is retired') && error.includes('company.images.wordmark')), wordmark.join('\n'));
-
-  // `parent` is retired OUTRIGHT (#677), its last meaning named where it went
-  for (const value of ['self', false]) {
-    const errors = validateConfig({ ...base, parent: value }).errors;
-    assert.ok(errors.some((error) => error.includes('config.parent is retired') && error.includes('company.webhooks')), errors.join('\n'));
-  }
+  assert.ok(fails({ brand: { ...base.brand, company: 'Acme Holdings Inc' } }, 'brand.company'));
+  for (const value of ['self', false]) assert.ok(fails({ parent: value }, 'parent'), `parent: ${value}`);
 });
 
 test('company.webhooks: default true, and an explicit false is carried into the resolved section', (t) => {

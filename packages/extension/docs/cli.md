@@ -11,7 +11,7 @@
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `deploy` | `-d`, `--deploy` | Dispatch the extension's CI publish workflow — `publish.yml` standalone, the composed `<target>-publish.yml` inside a brand monorepo ([defaults.md](defaults.md#brand-monorepos); see docs/shared/deploys.md in the Omega repo) |
 | `test` | `-t`, `--test` | Run the project's test suites (bare runs are project-only; `mgr:` / `framework:` / `full:` reach the framework suite). Positional target scopes by source + path; `--filter` matches test names; `--extended` enables real-external-API tests. See [test-framework.md](test-framework.md). |
-| `update` | `-u`, `--update`, `outdated`, `out` | Dependency freshness report (installed/wanted/latest + patch/minor/major, releases < 7 days old QUARANTINED). `--apply` installs the non-breaking non-quarantined set via `npu install` (plain npm + loud note without npu); `--major` opts into breaking; `--min-age N` / `--force-fresh` tune the quarantine. `file:` specs skipped. Shared devkit implementation — see docs/shared/updates.md in the Omega repo. |
+| `update` | `-u`, `--update` | Dependency freshness (installed/wanted/latest + patch/minor/major, releases < 7 days old QUARANTINED). A bare run installs the non-breaking non-quarantined set via `npu install` (plain npm + loud note without npu); `--major` opts into breaking; `--min-age N` / `--force-fresh` tune the quarantine. `file:` specs skipped. Shared devkit implementation — see docs/shared/updates.md in the Omega repo. |
 | `version` | `-v`, `--version` | Print @omega.js/extension, Node, peer-dep versions |
 | `help` | `-h`, `--help` | Command listing (router built-in, generated from this table's live aliases) |
 

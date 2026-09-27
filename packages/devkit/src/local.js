@@ -16,9 +16,9 @@
  *   into the monorepo is read-only and stops the boot loudly, any other local
  *   checkout is rebuilt and the invocation re-execs once
  *
- * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
- * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
- * own scripts/watch-all.js (lock helpers + vendor propagation).
+ * Consumers: `omega dev --local` (@omega.js/web), @omega.js/manager's
+ * brand-root `omega i local` / `omega i live` (src/commands/install.js), and the
+ * monorepo's own scripts/watch-all.js (lock helpers + vendor propagation).
  */
 
 // Libraries
@@ -277,6 +277,43 @@ function regenerateBrandLockfile(installRoot, logger) {
 }
 
 /**
+ * Prune the install root's lockfile before a tree install (#862): npm's install
+ * honors a locked link just as its lock-only run does. Loaded lazily, as above.
+ * @param {string} installRoot - The brand root (or standalone target).
+ * @param {object} [logger] - Logger with log (silent when omitted).
+ */
+function pruneBrandLockfile(installRoot, logger) {
+  const { pruneLockfile } = require('./lockfile.js');
+  pruneLockfile({ root: installRoot, log: logger ? (line) => logger.log(line) : undefined });
+}
+
+/**
+ * Throw when any @omega.js package of the tree still resolves into a checkout
+ * (#862): a symlink under the install root's or any target's node_modules, or
+ * a resolution that lands in a monorepo. The one check `omega i live` ends on.
+ * @param {string} installRoot - The brand root (or standalone target).
+ */
+function assertRegistryTree(installRoot) {
+  for (const targetDir of discoverTargets(installRoot)) {
+    const scopeDir = path.join(targetDir, 'node_modules', SCOPE);
+    // No scope folder here: this target's copies are hoisted, or it has none.
+    if (!fs.existsSync(scopeDir)) continue;
+
+    for (const name of fs.readdirSync(scopeDir)) {
+      const installed = path.join(scopeDir, name);
+      if (fs.lstatSync(installed).isSymbolicLink()) {
+        throw new Error(`omega i live left ${installed} linked into ${path.resolve(scopeDir, fs.readlinkSync(installed))}`);
+      }
+    }
+  }
+
+  const monorepoRoot = resolveLinkedMonorepo(installRoot);
+  if (monorepoRoot) {
+    throw new Error(`omega i live left ${installRoot} linked into ${monorepoRoot}`);
+  }
+}
+
+/**
  * Whether the install root's lockfile is missing or disagrees with its
  * manifests' @omega.js registry specs: the deploy gate's own read (#938).
  * @param {string} installRoot - The brand root (or standalone target).
@@ -398,8 +435,9 @@ async function linkLocalPackages(options) {
  * caller owns that string. Idempotent: registry-spec'd entries are untouched;
  * nothing to flip → no install. Same transactional manifest restore as the
  * linker when the install fails. Either way the brand's OWN lockfile ends up
- * agreeing with the manifests (#938): regenerated after the install, and
- * regenerated alone when nothing flipped but the lock still disagrees.
+ * agreeing with the manifests (#938): pruned before the install and
+ * regenerated after it, and regenerated alone when nothing flipped but the lock
+ * still disagrees. Every run but a dryRun ends on assertRegistryTree() (#862).
  * @param {object} options
  * @param {string} options.dir - Any directory inside the brand.
  * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
@@ -456,12 +494,21 @@ async function restoreRegistrySpecs(options) {
   }
 
   if (installNeeded) {
+    // The prune below rewrites the lock, so a failed install puts it back too.
+    const lockPath = path.join(installRoot, 'package-lock.json');
+    const lockBackup = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
+
     try {
+      // BEFORE the install (#862): npm keeps a locked link whose checkout
+      // satisfies the flipped spec, in the lock and in node_modules' hidden lock.
+      pruneBrandLockfile(installRoot, logger);
+      fs.rmSync(path.join(installRoot, 'node_modules', '.package-lock.json'), { force: true });
       await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
     } catch (error) {
       for (const [manifestPath, contents] of manifestBackups) {
         fs.writeFileSync(manifestPath, contents);
       }
+      if (lockBackup !== null) fs.writeFileSync(lockPath, lockBackup);
       logger && logger.warn(`install failed — restored ${manifestBackups.size} manifest(s) to their file: specs`);
       throw error;
     }
@@ -475,6 +522,10 @@ async function restoreRegistrySpecs(options) {
     // lockfile gate names, so it heals the lock here too (#938).
     await regenerateBrandLockfile(installRoot, logger);
   }
+
+  // Every run, not only after an install: a brand already on registry specs
+  // can still be linked, which is the state this verb exists to end.
+  assertRegistryTree(installRoot);
 
   return actions;
 }

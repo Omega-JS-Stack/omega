@@ -165,6 +165,9 @@ test('manager DEFAULTS derive from the schema — one home per default', () => {
   assert.equal(DEFAULTS.search.providers.searchConsole.enabled, schemaDefaults().search.providers.searchConsole.enabled);
   assert.equal(DEFAULTS.marketing.prune.enabled, true);
   assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
+  for (const [value, name] of [[DEFAULTS.enabled, 'enabled'], [DEFAULTS.server.enabled, 'server.enabled'], [DEFAULTS.assets.enabled, 'assets.enabled'], [DEFAULTS.payment.enabled, 'payment.enabled']]) {
+    assert.equal(value, true, `${name} reaches the manager from its schema default`);
+  }
 
   // …and the service-owned data the schema does not declare still lives here
   assert.equal(DEFAULTS.edge.providers.cloudflare.settings.ssl, 'full');

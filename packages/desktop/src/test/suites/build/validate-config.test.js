@@ -48,8 +48,8 @@ module.exports = defineCases({
       name: 'desktop refinements apply only with target: desktop',
       run: (ctx) => {
         const cfg = { ...VALID, startup: { mode: 'tray-only' } };
-        // Without a target, startup.mode is just an unknown key — silent.
-        ctx.expect(validateConfig(cfg).errors).toEqual([]);
+        // Without a target, startup.mode is a key nobody declared: the strict schema names it.
+        ctx.expect(validateConfig(cfg).errors.map((e) => e.split(' ')[0])).toEqual(['config.startup.mode']);
         // With the desktop target, the enum refinement fires.
         const { errors } = validateConfig(cfg, { target: 'desktop' });
         ctx.expect(errors.some((e) => e.includes('startup.mode') && e.includes('not allowed'))).toBe(true);
@@ -68,6 +68,17 @@ module.exports = defineCases({
       run: (ctx) => {
         const { errors } = validateConfig({ ...VALID, updaterSecret: 'x' }, { target: 'desktop' });
         ctx.expect(errors.some((e) => e.includes('looks like a secret'))).toBe(true);
+      },
+    },
+    {
+      // The boot (main.js) and the audit validate a BAKED config, which carries
+      // the build facts; only `decorated: true` declares them.
+      name: 'a baked config passes as decorated, and its build facts fail an authored load',
+      run: (ctx) => {
+        const baked = { ...VALID, runtime: 'electron', environment: 'production', version: '1.0.0', buildTime: 1, target: 'desktop' };
+        ctx.expect(validateConfig(baked, { target: 'desktop', decorated: true }).errors).toEqual([]);
+        const authored = validateConfig(baked, { target: 'desktop' }).errors.map((e) => e.split(' ')[0]);
+        ctx.expect(authored).toEqual(['config.runtime', 'config.environment', 'config.version', 'config.buildTime', 'config.target']);
       },
     },
     {

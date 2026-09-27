@@ -1,30 +1,23 @@
 /**
- * index.js — the `omega migrate` orchestrator: one call converts a UJM
- * consumer to @omega.js/web.
- *
- *   1. Config: _config.yml + ultimate-jekyll-manager.json → config/omega.json5
- *      (validated through the real @omega.js/config loader after writing).
- *   2. Codemod: the rule tables over src/** templates and consumer JS
- *      (rules.js), plus the consumer asset layer (consumer-assets.js).
- *   3. Lint: the liquid-lint scanner over the (rewritten) templates.
- *   4. Hygiene: legacy files removed (Gemfile, lockfile, the old configs).
- *   5. Tests: the legacy UJM harness, reported (never rewritten).
- *   6. Dependencies: bare requires the consumer never declared, reported and
- *      never installed. The scan is @omega.js/devkit's `src/bare-requires.js`,
- *      shared with @omega.js/backend's own migrate (#600); web supplies its
- *      bundler aliases.
- *
- * `check: true` runs everything IN MEMORY — full report, zero writes.
+ * index.js: the web leg of the brand root's `omega migrate`, one call that
+ * converts a UJM consumer to @omega.js/web. In order: config (legacy configs →
+ * an omega.json5 of declared keys only), codemod (rules.js over src/** templates and
+ * consumer JS, plus consumer-assets.js), lint over the rewritten templates,
+ * legacy-file removal, the legacy test harness (reported, never rewritten), and
+ * bare requires (devkit's scan, shared with the backend leg; web adds its
+ * bundler aliases). Report only by default, in memory; `execute: true` writes.
+ * `migrateTarget` folds the report into the three line lists every leg answers.
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadConfig, resolveConfigPath, findBrandConfigPath } = require('@omega.js/config');
+const { resolveConfigPath, findBrandConfigPath } = require('@omega.js/config');
 const { convertConfig, readLegacyConfigs, serializeOmega } = require('./config-convert.js');
+const { mergeIntoBrand } = require('./brand-config.js');
 const { runCodemod, collectTemplateFiles } = require('./codemod.js');
 const { configReads: configReadsRule } = require('./rules.js');
 const { lintText } = require('./lint.js');
 const { migrateConsumerAssets } = require('./consumer-assets.js');
-const { collectBareRequires } = require('@omega.js/devkit/bare-requires');
+const { collectBareRequires, formatBareRequire } = require('@omega.js/devkit/bare-requires');
 
 const BUNDLER_ALIASES = ['__main_assets__', '__theme__', '@omega.js/client'];
 
@@ -92,25 +85,44 @@ function collectLegacyTests(root) {
 }
 
 /**
- * Migrate a UJM consumer in place (or preview with `check`).
+ * Migrate a UJM consumer: a full report, and the writes only with `execute`.
  * @param {string} root - consumer project root
  * @param {object} [options]
- * @param {boolean} [options.check] - report only, write nothing
+ * @param {boolean} [options.execute] - write the conversion (default: report only)
+ * @param {string} [options.brandRoot] - the brand this target belongs to: its
+ *   root config is then the one the conversion merges into
+ * @param {string} [options.name] - the target's folder name (required with brandRoot)
  * @returns {object} report
  */
 function runMigration(root, options = {}) {
-  const write = !options.check;
-  const report = { root, check: !write, config: null, codemod: null, lint: [], removed: [], legacyTests: [], bareRequires: [], errors: [] };
+  const execute = options.execute === true;
+  const report = { root, execute, config: null, codemod: null, lint: [], removed: [], legacyTests: [], bareRequires: [], errors: [] };
+  if (options.brandRoot && !options.name) throw new Error('runMigration: a brandRoot needs the target\'s folder name');
 
   // ---- 1. Config conversion
   const { jekyll, ujm, files: legacySources } = readLegacyConfigs(root);
   const omegaPath = path.join(root, 'config', 'omega.json5');
+  const sources = legacySources.map((file) => path.relative(root, file));
   // The legacy guard runs FIRST, and stays first: a root that still carries
   // _config.yml / ultimate-jekyll-manager.json is MID-conversion — the
   // omega.json5 beside (or above) it is an earlier partial run or the brand
   // layer, and the legacy sources are the truth to convert from. Probing for a
   // converted config before this check would skip those roots forever.
-  if (!jekyll && !ujm) {
+  if (options.brandRoot) {
+    // Inside a brand the root config is the one home of the conversion; the
+    // target's own config/omega.json5 is its override layer, left alone.
+    const brandFile = resolveConfigPath(options.brandRoot);
+    // A brand root is found BY its config/omega.json5 (resolveBrandRoot)
+    if (!brandFile) throw new Error(`${options.brandRoot} carries no config/omega.json5, so it is not a brand root`);
+    const where = { path: path.relative(root, brandFile), home: `the brand root ${path.relative(options.brandRoot, brandFile)}` };
+    if (jekyll || ujm) {
+      const { omega, notes } = convertConfig({ jekyll, ujm, name: options.name });
+      const merge = mergeIntoBrand(brandFile, { name: options.name, converted: omega, execute });
+      report.config = { ...where, brand: true, sources, notes, ...merge };
+    } else {
+      report.config = { ...where, skipped: true };
+    }
+  } else if (!jekyll && !ujm) {
     // Pre-converted is the fleet-standard order, not a failure
     // ([#297](https://github.com/Omega-JS-Stack/omega/issues/297)): the brand
     // root's omega.json5 lands first and the target's UJM configs are gone before
@@ -122,38 +134,25 @@ function runMigration(root, options = {}) {
     // file, else its brand root's (a target inside a brand monorepo rides the
     // brand config alone — the local-layer file is optional there).
     const converted = resolveConfigPath(root) || findBrandConfigPath(root);
+    // Whether that config LOADS is the brand-root run's to judge, once after
+    // the walk: a target leg reports its own files only.
     if (converted) {
       report.config = { skipped: true, path: path.relative(root, converted) };
-      // "Already converted" is a claim about a config that WORKS, so the skip
-      // branch runs the same loader validation the conversion branch does —
-      // a file that throws (unparseable, secrets, bad targets) or carries
-      // schema findings is a loud error here, never a silent exit 0.
-      try {
-        const { errors } = loadConfig(root, 'web');
-        report.config.validation = errors.map((error) => error.message || String(error));
-      } catch (e) {
-        report.config.validation = [e.message];
-      }
-      report.errors.push(...report.config.validation);
     } else {
       report.errors.push('no legacy configs found (src/_config.yml / config/ultimate-jekyll-manager.json)');
     }
   } else {
     const { omega, notes } = convertConfig({ jekyll, ujm });
-    report.config = { path: path.relative(root, omegaPath), sources: legacySources.map((file) => path.relative(root, file)), notes, omega };
-    if (write) {
+    report.config = { path: path.relative(root, omegaPath), sources, notes, omega };
+    if (execute) {
       fs.mkdirSync(path.dirname(omegaPath), { recursive: true });
       fs.writeFileSync(omegaPath, serializeOmega(omega));
-
-      // Validate through the real loader — findings surface in the report
-      const { errors } = loadConfig(root, 'web');
-      report.config.validation = errors.map((error) => error.message || String(error));
     }
   }
 
   // ---- 2. Codemod over src/** templates + the consumer asset layer
-  report.codemod = runCodemod(root, { write });
-  const assets = migrateConsumerAssets(root, { write });
+  report.codemod = runCodemod(root, { execute });
+  const assets = migrateConsumerAssets(root, { execute });
   report.removed.push(...assets.removed);
   report.lint.push(...assets.findings);
   if (assets.edits.length > 0) {
@@ -161,27 +160,23 @@ function runMigration(root, options = {}) {
     report.codemod.totalEdits += assets.edits.length;
   }
 
-  // ---- 2b. The CONFIG file's own string values (#671). `targets.web.meta.title:
-  // "Agency - {{ site.brand.name }}"` is a read like any other and has rendered
-  // empty since #611 — but the codemod walks `src/**` and the build census is
-  // per-template, so nothing saw it. Rewritten in the FILE, not the parsed
-  // object: a brand's omega.json5 carries comments, and re-serializing would
-  // eat them.
-  //
-  // A CHECK run on a legacy root has no file to read — it wrote nothing — so
-  // the scan runs over the config the run WOULD have written. Skipping it there
-  // reported a clean bill for exactly the pre-flight case `--check` is for.
+  // ---- 2b. The config file's own string values: a `{{ site.<section> }}` read
+  // there renders empty like any template's. Rewritten in the FILE so comments
+  // survive; a report on a legacy root scans the config the run WOULD write.
   const resolvedConfigPath = report.config && report.config.path && path.resolve(root, report.config.path);
   const configExists = Boolean(resolvedConfigPath) && fs.existsSync(resolvedConfigPath);
-  const configText = configExists ? fs.readFileSync(resolvedConfigPath, 'utf8')
-    : (resolvedConfigPath && report.config.omega ? serializeOmega(report.config.omega) : null);
+  // A report inside a brand scans the root as the merge WOULD leave it
+  const pendingText = !execute && report.config && report.config.brand ? report.config.text : null;
+  const configText = pendingText !== null ? pendingText
+    : configExists ? fs.readFileSync(resolvedConfigPath, 'utf8')
+      : (resolvedConfigPath && report.config.omega ? serializeOmega(report.config.omega) : null);
   if (configText !== null) {
-    const rel = path.relative(root, resolvedConfigPath);
+    const rel = report.config.home || path.relative(root, resolvedConfigPath);
     const { text, edits, findings } = configReadsRule.apply(configText);
     if (edits.length > 0) {
-      // `write` implies the file exists: the conversion branch above wrote it,
+      // `execute` implies the file exists: the conversion branch above wrote it,
       // and the skip branch resolved one that was already there.
-      if (write) fs.writeFileSync(resolvedConfigPath, text);
+      if (execute) fs.writeFileSync(resolvedConfigPath, text);
       report.codemod.files.push({ path: rel, edits });
       report.codemod.totalEdits += edits.length;
       report.lint.push(...findings.map((finding) => ({ ...finding, file: rel })));
@@ -198,7 +193,7 @@ function runMigration(root, options = {}) {
   for (const rel of LEGACY_FILES) {
     const full = path.join(root, rel);
     if (!fs.existsSync(full)) continue;
-    if (write) fs.rmSync(full);
+    if (execute) fs.rmSync(full);
     report.removed.push(rel);
   }
 
@@ -220,4 +215,52 @@ function runMigration(root, options = {}) {
   return report;
 }
 
-module.exports = { runMigration, LEGACY_FILES };
+/**
+ * The web target's leg of the brand root's `omega migrate`: runMigration's
+ * report as plain lines. What the run writes is `due` in report mode and
+ * `changed` under `execute`; what only a human can port (lint findings, config
+ * notes, the legacy harness, undeclared requires) is `due` either way.
+ * @param {string} targetDir - the web target's root
+ * @param {object} [options]
+ * @param {boolean} [options.execute] - write the conversion (default: report only)
+ * @param {string} [options.brandRoot] - the brand root, whose config the conversion merges into
+ * @param {string} [options.name] - the target's folder name, its key under `targets`
+ * @returns {{ due: string[], changed: string[], errors: string[] }}
+ */
+function migrateTarget(targetDir, options = {}) {
+  const execute = options.execute === true;
+  const report = runMigration(targetDir, { execute, brandRoot: options.brandRoot, name: options.name });
+  const writes = [];
+  const byHand = [];
+  const errors = [...report.errors];
+
+  if (report.config && report.config.brand) {
+    const { home, added, kept } = report.config;
+    const from = report.config.sources.join(' + ');
+    writes.push(`${execute ? 'converted' : 'convert'} ${from} into ${home}`);
+    writes.push(...added.map((entry) => `${execute ? 'added' : 'add'} ${entry.path} to ${home} (from ${from})`));
+    byHand.push(...kept.map((entry) => `${execute ? 'kept' : 'keep'} ${entry.path} = ${JSON.stringify(entry.value)} in ${home} over ${JSON.stringify(entry.incoming)} from ${from}`));
+  } else if (report.config && !report.config.skipped) {
+    writes.push(`${execute ? 'converted' : 'convert'} ${report.config.sources.join(' + ')} into ${report.config.path}`);
+  }
+  if (report.config && report.config.notes) byHand.push(...report.config.notes.map((note) => `config note: ${note}`));
+
+  for (const file of report.codemod.files) {
+    const byRule = {};
+    for (const edit of file.edits) byRule[edit.rule] = (byRule[edit.rule] || 0) + 1;
+    const rules = Object.entries(byRule).map(([rule, count]) => `${rule}×${count}`).join(', ');
+    writes.push(`${execute ? 'rewrote' : 'rewrite'} ${file.path}: ${rules}`);
+  }
+
+  writes.push(...report.removed.map((rel) => `${execute ? 'removed' : 'remove'} ${rel}`));
+
+  byHand.push(...report.lint.map((finding) => `${finding.file}:${finding.line}: ${finding.message}`));
+  byHand.push(...report.legacyTests.map((rel) => `${rel}: a legacy harness file \`omega test\` never discovers (it runs test/**/*.test.js), port it to node:test`));
+  byHand.push(...report.bareRequires.map(formatBareRequire));
+
+  return execute
+    ? { due: byHand, changed: writes, errors }
+    : { due: [...writes, ...byHand], changed: [], errors };
+}
+
+module.exports = { runMigration, migrateTarget, LEGACY_FILES };
