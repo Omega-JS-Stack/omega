@@ -59,6 +59,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const jetpack = require('fs-jetpack');
 const { resolveCompany, COMPANY_RESOLVED_FILE } = require('@omega.js/config');
 const { gitAuthEnv, scrubToken } = require('./git-auth.js');
+const { composedWorkflowOwner } = require('./ci-workflows.js');
 
 // Constants
 const API_BASE = 'https://api.github.com';
@@ -342,7 +343,9 @@ async function defaultBranchOf({ owner, repo, token, fetchFn = fetch }) {
  * this write exists, and it is the only write a deploy ever makes to a default
  * branch (Ian, 2026-09-14: "if all we are pushing to main is the gh workflow
  * files that's fine"). Each file's bytes are compared with what the branch
- * holds; when every one matches, nothing is written at all.
+ * holds; when every one matches, nothing is written at all. A branch file
+ * that carries the GENERATED header and is no longer composed (a renamed or
+ * dropped target) is RETIRED in the same commit; a hand-written one never is.
  *
  * Through the git DATA api, never a working-tree commit: blobs, a tree on top
  * of the branch's own, a commit whose parent is its head. An EMPTY repo (no
@@ -356,14 +359,14 @@ async function defaultBranchOf({ owner, repo, token, fetchFn = fetch }) {
  * @param {string} options.token - The GitHub token.
  * @param {Function} [options.fetchFn] - Injectable fetch (tests).
  * @param {object} [options.logger] - Logger with `log` (silent when omitted).
- * @returns {Promise<{ pushed: string[], sha: string|null }>} What was written.
+ * @returns {Promise<{ pushed: string[], removed: string[], sha: string|null }>} What was written.
  */
 async function pushWorkflowFiles({ brandRoot, owner, repo, branch, token, fetchFn = fetch, logger }) {
   const files = composedWorkflowFiles(brandRoot);
 
   if (files.length === 0) {
     if (logger) logger.log(`No composed workflow in ${brandRoot}/${WORKFLOWS_DIR}: ${branch} is untouched.`);
-    return { pushed: [], sha: null };
+    return { pushed: [], removed: [], sha: null };
   }
 
   const call = async (route, init) => {
@@ -399,9 +402,31 @@ async function pushWorkflowFiles({ brandRoot, owner, repo, branch, token, fetchF
     }
   }
 
-  if (changed.length === 0) {
+  // What the branch holds that this brand no longer composes. The same double
+  // lock as the local prune: the GENERATED header and the composed naming, so
+  // a hand-written workflow is never a candidate. No listing means no files.
+  const composed = new Set(files.map((file) => file.name));
+  const listing = await read(
+    await call(`/contents/${WORKFLOWS_DIR}?ref=${encodeURIComponent(branch)}`),
+    [200, 404],
+    `Listing ${WORKFLOWS_DIR}`,
+  );
+  const retired = [];
+
+  for (const entry of listing || []) {
+    if (entry.type !== 'file' || !entry.name.endsWith('.yml') || composed.has(entry.name)) {
+      continue;
+    }
+
+    const held = await read(await call(`/contents/${entry.path}?ref=${encodeURIComponent(branch)}`), [200], `Reading ${entry.name}`);
+    if (composedWorkflowOwner(entry.name, Buffer.from(held.content || '', 'base64').toString('utf8'))) {
+      retired.push({ name: entry.name, path: entry.path });
+    }
+  }
+
+  if (changed.length === 0 && retired.length === 0) {
     if (logger) logger.log(`${owner}/${repo}#${branch} already carries ${files.map((file) => file.name).join(', ')}: nothing pushed to ${branch}.`);
-    return { pushed: [], sha: null };
+    return { pushed: [], removed: [], sha: null };
   }
 
   // The head this commit sits on. A repo with no commit at all answers 404, and
@@ -422,15 +447,21 @@ async function pushWorkflowFiles({ brandRoot, owner, repo, branch, token, fetchF
     );
     tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.sha });
   }
+  for (const file of retired) {
+    tree.push({ path: file.path, mode: '100644', type: 'blob', sha: null });
+  }
 
-  const names = changed.map((file) => file.name).join(', ');
+  const names = [
+    ...(changed.length ? [`compose ${changed.map((file) => file.name).join(', ')}`] : []),
+    ...(retired.length ? [`retire ${retired.map((file) => file.name).join(', ')}`] : []),
+  ].join(', ');
   const written = await read(
     await call('/git/trees', { method: 'POST', body: JSON.stringify({ ...(baseTree ? { base_tree: baseTree } : {}), tree }) }),
     [201],
     'Writing the tree',
   );
   const commit = await read(
-    await call('/git/commits', { method: 'POST', body: JSON.stringify({ message: `chore(ci): compose ${names}`, tree: written.sha, parents }) }),
+    await call('/git/commits', { method: 'POST', body: JSON.stringify({ message: `chore(ci): ${names}`, tree: written.sha, parents }) }),
     [201],
     'Writing the commit',
   );
@@ -444,10 +475,14 @@ async function pushWorkflowFiles({ brandRoot, owner, repo, branch, token, fetchF
   );
 
   if (logger) {
-    logger.log(`Pushed ${changed.map((file) => `${file.name} (${file.reason})`).join(', ')} to ${owner}/${repo}#${branch} as ${shortSha(commit.sha)}: GitHub registers a workflow from the default branch.`);
+    const touched = [
+      ...changed.map((file) => `${file.name} (${file.reason})`),
+      ...retired.map((file) => `${file.name} (retired)`),
+    ];
+    logger.log(`Pushed ${touched.join(', ')} to ${owner}/${repo}#${branch} as ${shortSha(commit.sha)}: GitHub registers a workflow from the default branch.`);
   }
 
-  return { pushed: changed.map((file) => file.name), sha: commit.sha };
+  return { pushed: changed.map((file) => file.name), removed: retired.map((file) => file.name), sha: commit.sha };
 }
 
 /**

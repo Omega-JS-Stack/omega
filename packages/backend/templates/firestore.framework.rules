@@ -1,15 +1,15 @@
 // ============================================================================
-// @omega.js/backend — the FRAMEWORK half of the Firestore rules.
+// @omega.js/backend: the FRAMEWORK half of the Firestore rules.
 //
 // This file ships INSIDE @omega.js/backend and never exists in a brand repo.
 // `omega build` compiles it together with the brand's own firestore.rules into
-// dist/firestore.rules — the artifact firebase.json points the emulator AND
+// dist/firestore.rules: the artifact firebase.json points the emulator AND
 // `firebase deploy` at (src/cli/utils/compile-rules.js).
 //
 // MERGE-BY-MATCH ([#353](https://github.com/Omega-JS-Stack/omega/issues/353)):
 // Firestore ORs `allow` across sibling match blocks, so a brand's own
 // `match /users/{uid}` could only ever WIDEN what this file allows. So the
-// compiler MERGES it instead — a brand block whose path matches one below
+// compiler MERGES it instead: a brand block whose path matches one below
 // (wildcard names normalized) folds in, and for an op both blocks declare the
 // brand's condition is ANDed onto the framework's. A brand writes ordinary
 // rules; there are no hook functions any more (they retired in rules v3).
@@ -22,7 +22,7 @@
 // back a VALUE to compare against (`getAuthUid()`, `getIncomingData()`).
 //
 // COST: every helper here is free except getRoles(), which bills ONE document
-// read per call — and `isAdmin()` is built on it, so the lock-by-default block
+// read per call, and `isAdmin()` is built on it, so the lock-by-default block
 // below means even a denied request pays for one read.
 // ============================================================================
 rules_version = '2';
@@ -34,7 +34,7 @@ service cloud.firestore {
     }
 
     // Protect user account data. A brand TIGHTENS this by writing its own
-    // `match /users/{uid}` block — the compiler ANDs its condition onto the
+    // `match /users/{uid}` block: the compiler ANDs its condition onto the
     // ops below. DELETE is deliberately not declared: a user document is
     // removed by the auth trigger, never by its owner, and naming the two ops
     // this rule MEANS keeps a client delete denied by the admin catch-all
@@ -45,7 +45,7 @@ service cloud.firestore {
       allow create, update: if isUser(uid) && !isWritingFrameworkField();
     }
 
-    // Protect notification data — the doc id IS the push token, a high-entropy
+    // Protect notification data: the doc id IS the push token, a high-entropy
     // capability: knowing it proves possession of the device. Point reads/updates ride
     // that capability; list is denied so tokens can never be harvested by query; owner
     // may only be null (anonymous subscribe) or the caller's own uid.
@@ -85,17 +85,17 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    // The caller IS `identity` — a uid or an email, since a doc id is one or
+    // The caller IS `identity`: a uid or an email, since a doc id is one or
     // the other across the framework's collections. The EMAIL arm requires a
     // VERIFIED token: Firebase Auth lets anyone sign up claiming any address,
     // so an unproven claim must never match an email-keyed document. The uid
-    // arm needs no such gate — a uid is Firebase Auth's own value.
+    // arm needs no such gate: a uid is Firebase Auth's own value.
     function isUser(identity) {
       return isAuthenticated() && (getAuthUid() == identity || (isEmailVerified() && getAuthEmail() == identity));
     }
     // The caller owns THIS doc: its `owner` field names them. The STORED owner
-    // once the document exists — so an update can never hand ownership to
-    // whoever is writing — and the INCOMING one on a create, where there is no
+    // once the document exists (so an update can never hand ownership to
+    // whoever is writing) and the INCOMING one on a create, where there is no
     // stored document to own yet. That is what makes the answer mean the same
     // thing on every op. `.get()` (not `.owner`) because reading a key a map
     // does not carry is an error, and an error denies the whole rule.
@@ -127,7 +127,7 @@ service cloud.firestore {
     // ========== Document data ==========
     // [READ] Data that exists on the Firestore document. `resource` is null on
     // a CREATE, and reading through a null errors (which denies the rule), so
-    // an absent document reads as the empty map — that is what makes every
+    // an absent document reads as the empty map: that is what makes every
     // field helper below correct on create as well as update.
     function getExistingData() {
       return resource == null ? {} : resource.data;
@@ -157,22 +157,22 @@ service cloud.firestore {
 
     // The user-doc keys the FRAMEWORK owns: server-written, never a client's.
     // A brand protects keys of its own by tightening `match /users/{uid}` in
-    // its own firestore.rules — e.g. `allow create, update: if !isWritingAny(['xp']);`.
+    // its own firestore.rules, e.g. `allow create, update: if !isWritingAny(['xp']);`.
     // `verifications` is on the list as a RESERVED name: nothing writes it
     // today, and a client planting one must never look like server truth.
     // `trackingConsent` and `attribution` sit beside `consent` for the same
     // reason it does: both reach the user doc through the signup route ONLY
     // (the client SENDS them in the payload; the server is what writes them),
     // so a direct client write could only ever be a forged consent answer or a
-    // rewritten campaign credit — the two records nobody may edit after the fact.
-    // `usage` covers `usage.overrides` too — the admin-granted extra credits a
-    // counted feature's limit resolves against — and `owns` names the documents
+    // rewritten campaign credit: the two records nobody may edit after the fact.
+    // `usage` covers `usage.overrides` too (the admin-granted extra credits a
+    // counted feature's limit resolves against), and `owns` names the documents
     // a feature's counters mirror onto, so a client that could write either
     // would be granting itself quota or aiming another account's counters
     // ([#647](https://github.com/Omega-JS-Stack/omega/issues/647)).
     // `connections` is a CREDENTIAL STORE, not a record: the account page renders
     // whatever sits there as a live connection, and the status route hands
-    // `connections.<provider>.token.refresh_token` straight to the provider — so a
+    // `connections.<provider>.token.refresh_token` straight to the provider, so a
     // client write forges a connection AND plants a token the server then
     // spends ([#771](https://github.com/Omega-JS-Stack/omega/issues/771)).
     // `activity` is the sign-in/security trail (IP, user agent, locale) the

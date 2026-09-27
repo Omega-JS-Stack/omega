@@ -80,6 +80,7 @@ test('renderSecretsBlock(): the indent is the caller\'s, and an empty block is s
 
   const empty = renderSecretsBlock('desktop', { schema: FIXTURE });
   assert.match(empty, /^# /, 'nothing to inject renders one self-explaining comment line');
+  assert.equal(empty.includes('\u2014'), false, 'the line lands in a committed workflow, so it carries no em dash');
 });
 
 test('bakeKeys(): only what the build writes into the artifact', () => {

@@ -15,6 +15,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const PKG = path.join(__dirname, '..');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8'));
 

@@ -51,13 +51,13 @@ function renderCompanyConfig(name) {
     '// override in its own config/omega.json5. Nothing brand-specific belongs here, and',
     '// secrets NEVER do: they go in the gitignored .env beside this file.',
     '{',
-    '  // Company identity — a brand without its own value inherits these.',
+    '  // Company identity: a brand without its own value inherits these.',
     '  // brand: {',
     '  //   contact: { email: "support@mycompany.com" },',
     '  // },',
     '',
     '  // Managed Firebase Auth accounts every brand should carry (account service).',
-    '  // Passwords never live here — see the brand scaffold\'s notes on the seed.',
+    '  // Passwords never live here. See the brand scaffold\'s notes on the seed.',
     '  // account: {',
     '  //   admins: [',
     '  //     { email: "you@mycompany.com", account: true, marketing: false },',
@@ -99,7 +99,7 @@ function renderCompanyEnvStub(name) {
     header: [
       `# ${name}: COMPANY secrets (gitignored; loaded UNDER every brand of this company).`,
       '# Precedence: shell env > brand .env > this file. Put here only what every brand',
-      '# shares — anything brand-specific belongs in that brand\'s .env, never here.',
+      '# shares. Anything brand-specific belongs in that brand\'s .env, never here.',
     ],
   });
 }
@@ -113,7 +113,7 @@ function renderCompanyEnvStub(name) {
  */
 function renderCompanyGitignore() {
   return [
-    '# Secrets — the shared .env and its per-environment overlays',
+    '# Secrets: the shared .env and its per-environment overlays',
     '.env',
     '.env.*',
     '',
@@ -141,7 +141,7 @@ at the same relative path, so a new kind of shared file costs no code.
 - \`config/omega.json5\`: the config layer (under the brand's own file).
 - \`.env\`: the shared secrets, loaded UNDER each brand's own \`.env\`
   (shell > brand \`.env\` > this file). Gitignored.
-- \`.omega/certificates/apple/\` — the shared Apple signing tree: one Apple
+- \`.omega/certificates/apple/\`: the shared Apple signing tree. One Apple
   account signs everything the company ships. Gitignored; drop the App Store
   Connect \`AuthKey_*.p8\` here.
 - \`assets/templates/\`: the shared PSD templates a brand's assets run seeds from.

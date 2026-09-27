@@ -118,7 +118,7 @@ patchModule(devkitDeployPath, {
 
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const deployCommand = require('../src/commands/deploy.js');
 const { selectTargets, buildForwardedFlags } = deployCommand;
@@ -266,6 +266,7 @@ async function runDeployCommand(cwd, options = {}) {
   refWaits.length = 0;
   composes.length = 0;
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   process.chdir(cwd);
   try {
     await deployCommand({ _: ['deploy'], ...options });
@@ -273,7 +274,7 @@ async function runDeployCommand(cwd, options = {}) {
   } finally {
     // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers
     // so the next case starts from an unpatched stdout.
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }

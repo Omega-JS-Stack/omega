@@ -33,6 +33,7 @@ test('gitignore: a missing .gitignore is created with every entry', () => {
   assert.equal(entryCount(contents, '.omega/'), 1);
   assert.equal(entryCount(contents, 'logs/'), 1);
   assert.equal(entryCount(contents, '.env.*'), 1);
+  assert.equal(contents.includes('\u2014'), false, 'the written comments carry no em dash');
 });
 
 // #586 — the environment overlays are new secret files at the brand root. Every
@@ -114,4 +115,15 @@ test('gitignore: a second run adds nothing (idempotent)', () => {
 
   assert.equal(ensureOmegaIgnored(root), 'present');
   assert.equal(readGitignore(root), afterFirst);
+});
+
+test('#971: the workspace op under --dry-run plans the missing entries and writes nothing', async () => {
+  const gitignoreOp = require('../src/services/workspace/ensure/gitignore.js');
+  const root = tmpdir();
+  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
+
+  const result = await gitignoreOp({ brandRoot: root, options: { dryRun: true } });
+
+  assert.equal(readGitignore(root), 'node_modules/\n');
+  assert.deepEqual(result.output, { gitignore: 'planned' });
 });

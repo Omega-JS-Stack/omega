@@ -22,7 +22,7 @@ const { loadConfig, recordBrand } = require('@omega.js/config');
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677). Tests that need their own
 // home still override it per test.
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const { runCompanyInit } = require('../src/company-init.js');
 const { loadBrand } = require('../src/lib/brand.js');
@@ -106,6 +106,11 @@ test('company init: one command scaffolds the tree inside the company brand', (t
     path.join('config', 'omega.json5'),
   ].sort());
   assert.deepEqual(result.kept, []);
+  // The committed files carry no em dash. The .env is gitignored and its group
+  // headers are the env schema's, so only its own header is pinned below.
+  for (const relative of result.created.filter((file) => file !== '.env')) {
+    assert.equal(fs.readFileSync(path.join(root, 'company', relative), 'utf8').includes('\u2014'), false, `${relative} carries no em dash`);
+  }
 
   // The config LAYER: brand-agnostic placeholders only, no brand, no targets,
   // nothing about the parent brand the tree sits inside
@@ -116,6 +121,7 @@ test('company init: one command scaffolds the tree inside the company brand', (t
   // has, and not one key set
   const env = fs.readFileSync(path.join(root, 'company', '.env'), 'utf8');
   assert.match(env, /^# APPLE_API_ISSUER=$/m, 'the canonical groups render as commented placeholders');
+  assert.equal(env.split('\n\n')[0].includes('\u2014'), false, 'the .env header carries no em dash');
   assert.equal(env.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 0, 'not one key is set');
 
   // The unshareable half can never be committed, whatever the root file says

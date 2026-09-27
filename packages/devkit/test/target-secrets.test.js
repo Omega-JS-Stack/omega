@@ -17,6 +17,9 @@ const { test } = require('node:test');
 
 const { execFileSync } = require('node:child_process');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('../src/test/temp-home.js');
+
 const { collectTargetSecrets, publishTargetSecrets } = require('../src/target-secrets.js');
 
 const quiet = { log() {}, warn() {}, error() {} };

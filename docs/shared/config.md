@@ -392,7 +392,10 @@ company: { id: 'self' },                 // the company brand itself, kept visib
   (`OMEGA_HOME` moves it), keyed by `brand.id`, which every `loadConfig()` refreshes for its
   own brand, and nobody maintains it. A company that has never been loaded here prints ONE line
   per run (`Company <id> is not on this machine: inheritance off…`) and the run continues with
-  no company layer.
+  no company layer. A write prunes only the lines whose root is missing on disk, checked by the
+  same test the reader resolves a parent with, lands as one atomic rename, and never rewrites a
+  registry file it cannot parse; `OMEGA_DEBUG` prints each write's caller and its kept and
+  pruned ids ([#941](https://github.com/Omega-JS-Stack/omega/issues/941)).
 - **Off-laptop, nothing ever reads `company/`**: the machine that dispatches a deploy resolves
   it and writes `config/company-resolved.json5` beside the brand config (`{ config, company }`),
   which the mirror push carries and then removes; the loader reads that generated layer when the
@@ -1521,12 +1524,18 @@ Role-level switches beside any providers block
 **`omega manage` materializes what a brand lacks.** The workspace service's `defaults` operation
 (right after the `config` health check) diffs the brand's own `config/omega.json5` against the
 schema defaults and writes the missing blocks through the comment-preserving editor, each key
-documented with the schema's own description. The rules:
+documented with the schema's own description. That description is what a brand reads in its
+own file, so it states what the key does and its default in the present tense: no em dash, no
+issue tag, no history (a config test walks every rule and fails on the first two). The rules:
 
 - **Never an overwrite.** Only keys the brand has NOT authored are written — a `false` a brand
   set (or a section it deliberately switched off) is a decision, and the heal never dives into it.
 - **Highest missing path, once.** A brand with no `marketing` at all gets one `marketing` block,
   not one edit per key inside it.
+- **Target refinements land in their target** ([#943](https://github.com/Omega-JS-Stack/omega/issues/943)).
+  A default only one framework declares (web's `meta.index`, extension's `categories`) is judged
+  per declared target on the view `loadConfig` resolves for it, and written under
+  `targets.<name>`, never at the root, which the strict schema reads as shared.
 - **Idempotent.** A converged config leaves the file byte-identical; a dry run reports the blocks
   and writes nothing.
 - **New subsystems arrive on the next run.** Adding a `default:` to the schema is all it takes for

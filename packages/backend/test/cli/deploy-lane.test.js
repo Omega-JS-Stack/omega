@@ -90,11 +90,14 @@ async function runDeploy(dir, argv) {
 
   console.log = (...args) => lines.push(args.map(String).join(' '));
   powertools.execute = async (command) => { shell.push(command); return ''; };
+  const restoreTee = attachLogFile.mark();
 
   try {
     await new DeployCommand({ firebaseProjectPath: dir, argv: { _: [], ...argv }, options: {} }).execute();
     return { output: lines.join('\n'), shell };
   } finally {
+    // The verb tees this process' writers: take off what it pushed, nothing under it.
+    restoreTee();
     console.log = originalLog;
     powertools.execute = originalExecute;
   }
@@ -149,6 +152,7 @@ async function runFollowedDeploy(dir, follower, argv = {}) {
   const originalLog = console.log;
   console.log = (...args) => lines.push(args.map(String).join(' '));
   delete require.cache[DEPLOY];
+  const restoreTee = attachLogFile.mark();
 
   let error = null;
   try {
@@ -159,7 +163,7 @@ async function runFollowedDeploy(dir, follower, argv = {}) {
   } finally {
     // The verb tees this process' writers: hand them back before the next case
     // prints through a fixture that is about to be gone.
-    attachLogFile.detach();
+    restoreTee();
     console.log = originalLog;
     for (const [module, key, value] of restore) module[key] = value;
     delete require.cache[DEPLOY];
@@ -441,7 +445,6 @@ module.exports = defineCases({
           }
         } finally {
           process.exitCode = originalExitCode;
-          attachLogFile.detach();
           fs.rmSync(root, { recursive: true, force: true });
         }
       },

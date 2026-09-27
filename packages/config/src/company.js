@@ -44,6 +44,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const JSON5 = require('json5');
+const Logger = require('@omega.js/devkit/logger');
+
+const logger = new Logger('company');
 
 // The company TREE inside the parent brand's repo, and the file an off-laptop
 // run reads the resolved layer from: GENERATED beside the brand config by the
@@ -68,6 +71,9 @@ const RESOLVED_COMPANY_KEYS = ['name', 'url', 'images'];
 // One warning per company id per process: a missing parent is a state a whole
 // build runs in, never a per-call event.
 const warned = new Set();
+
+// One warning per process for a registry file that is there but will not parse.
+let warnedUnreadable = false;
 
 /**
  * The machine home OMEGA keeps its per-machine state in. `OMEGA_HOME` moves it
@@ -119,6 +125,17 @@ function readRegistry() {
 }
 
 /**
+ * A registry line's root when it is on this machine now, else null: the ONE
+ * test both the reader and the write's prune apply, so a line the reader would
+ * resolve is never a line the prune drops.
+ * @param {object} line - A registry line.
+ * @returns {string|null}
+ */
+function liveRoot(line) {
+  return line && typeof line.root === 'string' && isDir(line.root) ? line.root : null;
+}
+
+/**
  * Record (or refresh) ONE brand's line in the machine registry, which is what
  * every `loadConfig()` does for the brand it just loaded: the map of where the
  * brands are on this machine maintains itself.
@@ -130,7 +147,13 @@ function readRegistry() {
  *
  * A write also PRUNES the lines whose root is gone: the file is a map of what
  * is on this machine, so a brand that was deleted or moved (and re-recorded
- * under its new root) leaves nothing behind to resolve into.
+ * under its new root) leaves nothing behind to resolve into. A line whose root
+ * is on disk is never pruned (`liveRoot`, the reader's own test).
+ *
+ * A registry file that is THERE but will not parse is never rewritten: writing
+ * over it would keep one line and drop every other brand. The write itself is
+ * a rename of a finished temp file, so a racing reader never sees half a file.
+ * Every write logs its caller and the kept and pruned ids at debug level.
  *
  * @param {object} entry - The brand's own facts.
  * @param {string} entry.id - `brand.id` (the key).
@@ -143,7 +166,17 @@ function recordBrand({ id, root, name, url }) {
   if (!id || !root) return false;
 
   try {
-    const registry = readRegistry();
+    const file = registryFile();
+    const registry = fs.existsSync(file) ? readJson(file) : {};
+
+    if (!registry) {
+      if (!warnedUnreadable) {
+        warnedUnreadable = true;
+        logger.warn(`Machine registry ${file} does not parse: left as it is, no brand recorded. Delete it and any omega verb rebuilds it.`);
+      }
+      return false;
+    }
+
     const current = registry[id];
     const line = { root, name: name || null, url: url || null };
 
@@ -153,10 +186,15 @@ function recordBrand({ id, root, name, url }) {
 
     registry[id] = { ...line, updatedAt: new Date().toISOString() };
 
-    const live = Object.fromEntries(Object.entries(registry).filter(([, entry]) => entry && isDir(entry.root)));
+    const live = Object.fromEntries(Object.entries(registry).filter(([, entry]) => liveRoot(entry)));
+    const pruned = Object.keys(registry).filter((key) => !(key in live));
 
     fs.mkdirSync(omegaHome(), { recursive: true });
-    fs.writeFileSync(registryFile(), `${JSON.stringify(live, null, 2)}\n`);
+    const temp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(temp, `${JSON.stringify(live, null, 2)}\n`);
+    fs.renameSync(temp, file);
+
+    logger.debug(`Registry write by ${process.argv[1] || process.argv0} (pid ${process.pid}): kept [${Object.keys(live).join(', ')}], pruned [${pruned.join(', ')}]`);
     return true;
   } catch {
     return false;
@@ -283,7 +321,7 @@ function resolveCompany(brandRoot, brandConfig) {
   }
 
   const line = readRegistry()[id];
-  const parentRoot = line && typeof line.root === 'string' && isDir(line.root) ? line.root : null;
+  const parentRoot = liveRoot(line);
 
   if (parentRoot) {
     const parentBrand = (readBrandConfig(parentRoot) || {}).brand || {};

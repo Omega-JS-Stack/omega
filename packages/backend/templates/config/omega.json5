@@ -1,13 +1,13 @@
-// omega.json5 — the ONE config file for every OMEGA project type.
+// omega.json5: the ONE config file for every OMEGA project type.
 //
 // Shared sections (brand, cloud, analytics, payment, monitoring, connections)
 // sit at the top level with identical spelling in every omega.json5. Backend
-// settings live under targets.backend — key presence under `targets` means
+// settings live under targets.backend: key presence under `targets` means
 // "this project supports this target".
 //
 // This file doubles as @omega.js/backend's framework-defaults layer: the Manager
 // resolves it through @omega.js/config and merges the consumer's own
-// functions/config/omega.json5 on top. Secrets NEVER live here — they go in
+// functions/config/omega.json5 on top. Secrets NEVER live here: they go in
 // functions/.env (the loader hard-fails on secret-shaped keys).
 {
   brand: {
@@ -17,14 +17,14 @@
     url: 'https://example.com',
     contact: {
       email: 'support@example.com',
-      // Email identity — deliberately UNSET here so this defaults layer never supplies
+      // Email identity: deliberately UNSET here so this defaults layer never supplies
       // an identity a brand did not choose. Set them in your own config when needed:
       //   person:     { name: 'Jane Doe, CEO', firstName: 'Jane', image, url, urlText }
       //               required to send email with a "personal" signoff (the send throws without it)
       //   carbonCopy: [{ email: 'audit@example.com', name: 'Audit' }]
       //               audit BCCs added to transactional sends with copy: true
     },
-    // Physical postal address — required by CAN-SPAM in commercial email footers.
+    // Physical postal address: required by CAN-SPAM in commercial email footers.
     // Rendered in the newsletter footer + transactional email footers.
     // Structured so the renderer can format it consistently across locales
     // and break onto multiple lines if needed. line2/region/postalCode are optional.
@@ -63,7 +63,7 @@
     },
   },
   connections: {},
-  // The feature catalog (#647): every feature is defined ONCE here — name,
+  // The feature catalog (#647): every feature is defined ONCE here: name,
   // icon, definition, and a `usage` block on the ones that are METERED (day
   // pacing is the default; `pace: false` opts out; `mirror` names the document
   // kinds a feature's counters also land on). No `usage` block = a perk. The
@@ -223,12 +223,12 @@
             {
               sources: ['$parent'],    // '$parent' | '$feed:https://...' | '$brand'
               sourceCount: 6,          // how many sources are picked (randomly) per issue
-              categories: [],          // e.g., ['social-media', 'marketing'] — topic constraints + AI categorization
+              categories: [],          // e.g., ['social-media', 'marketing'] (topic constraints + AI categorization)
               links: [],               // links to inject into generated content
               instructions: '',        // free-form text passed to the AI
               tone: 'professional',    // 'professional' | 'casual' | 'actionable' | 'witty' | etc.
               keywords: [],            // SEO keywords to weave in
-              template: 'clean',       // 'clean' | 'editorial' | 'field-report' — layout template
+              template: 'clean',       // 'clean' | 'editorial' | 'field-report' (layout template)
               article: {
                 enabled: false,        // expand lead section into a full blog post via Ghostii
                 author: null,
@@ -244,7 +244,7 @@
           ],
         },
         // Monthly contact prune (deletes cold contacts from your mail providers).
-        // OPT-IN: nothing runs unless enabled is true — see @omega.js/backend's
+        // OPT-IN: nothing runs unless enabled is true. See @omega.js/backend's
         // docs/marketing-campaigns.md (Contact Pruning).
         prune: {
           enabled: false,
@@ -258,11 +258,11 @@
       // (only 'ghostii' for now).
       //
       // Source types:
-      //   '$brand'                          — generic brand-topic generation
-      //   '$feed:https://example.com/feed'  — RSS/Atom/JSON feed: pick one unprocessed article per run
-      //   '$parent'                         — fetch sources from parent server's source pool (without claiming)
-      //   'https://example.com/page'        — fetch URL content as prompt seed
-      //   'Write about topic X'             — text: use directly as prompt seed
+      //   '$brand':                           generic brand-topic generation
+      //   '$feed:https://example.com/feed':   RSS/Atom/JSON feed: pick one unprocessed article per run
+      //   '$parent':                          fetch sources from parent server's source pool (without claiming)
+      //   'https://example.com/page':         fetch URL content as prompt seed
+      //   'Write about topic X':              text: use directly as prompt seed
       //
       // All feed/parent sources are tracked in Firestore (`content-sources`) so the same
       // article is never reprocessed. When a feed is unreachable or exhausted, falls back to $brand.

@@ -24,14 +24,14 @@ const ENTRIES = [
   {
     entry: 'logs/',
     aliases: ['logs', 'logs/'],
-    comment: '# Run logs (truncated on every launch — never committed)',
+    comment: '# Run logs (truncated on every launch, never committed)',
   },
   {
     // `.env` itself is the scaffold's, and every brand already carries it; this
     // is the environment OVERLAY half (#586), which is just as much a secret
     entry: '.env.*',
     aliases: ['.env.*', '.env*'],
-    comment: '# Secrets — the environment overlays beside .env',
+    comment: '# Secrets: the environment overlays beside .env',
   },
 ];
 
@@ -40,9 +40,10 @@ const ENTRIES = [
  * Idempotent — only the missing entries get appended, each under its own comment.
  *
  * @param {string} rootDir - Directory whose .gitignore gets the entries
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
  * @returns {'present'|'added'}
  */
-function ensureOmegaIgnored(rootDir) {
+function ensureOmegaIgnored(rootDir, { dryRun = false } = {}) {
   const gitignorePath = join(rootDir, '.gitignore');
   const existing = jetpack.read(gitignorePath) || '';
 
@@ -51,6 +52,9 @@ function ensureOmegaIgnored(rootDir) {
 
   if (missing.length === 0) {
     return 'present';
+  }
+  if (dryRun) {
+    return 'added';
   }
 
   const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';

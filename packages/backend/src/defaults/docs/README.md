@@ -1,6 +1,6 @@
 # Project docs
 
-Per-subsystem deep references live here. Keep `AGENTS.md` short — it should read as a **table of contents** that points at files in this directory.
+Per-subsystem deep references live here. Keep `AGENTS.md` short: it should read as a **table of contents** that points at files in this directory.
 
 ## Pattern
 
@@ -14,4 +14,4 @@ Examples of good `docs/*.md` topics:
 
 ## See also
 
-`node_modules/@omega.js/AGENTS.md` is the OMEGA map — follow it to `docs/backend/index.md`, the framework's own overview.
+`node_modules/@omega.js/AGENTS.md` is the OMEGA map: follow it to `docs/backend/index.md`, the framework's own overview.

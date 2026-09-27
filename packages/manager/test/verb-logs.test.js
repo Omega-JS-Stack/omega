@@ -52,7 +52,7 @@ require.cache[runCommandPath] = {
 
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const manageCommand = require('../src/commands/manage.js');
 const buildCommand = require('../src/commands/build.js');
@@ -116,6 +116,7 @@ function stageFanoutBrand() {
  */
 async function runVerb(command, root, options = {}) {
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
   delete process.env.CI;
   delete process.env.GITHUB_ACTIONS;
@@ -124,7 +125,7 @@ async function runVerb(command, root, options = {}) {
     process.chdir(root);
     await command(options);
   } finally {
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
     for (const [key, value] of Object.entries(priorCi)) {

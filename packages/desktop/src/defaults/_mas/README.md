@@ -1,4 +1,4 @@
-# MAS (Mac App Store) Reference Plists — ARCHIVED
+# MAS (Mac App Store) Reference Plists (ARCHIVED)
 
 These entitlement plists are reference material for a future Mac App Store
 distribution implementation. They are **NOT** part of the active scaffold copied
@@ -24,7 +24,7 @@ Team ID + appId at build time.
 ## Roadmap
 
 When MAS support is implemented (currently stubbed in
-`config.targets.mac.mas` — see `docs/installer-options.md`), this folder will be
+`config.targets.mac.mas`, see `docs/installer-options.md`), this folder will be
 the starting point for the entitlements @omega.js/desktop auto-generates into `dist/config/`
 when `mac.mas.enabled === true`. The structure should be similar to the existing
 `writeMacEntitlements` flow but with separate output files for `mas`, `mas.inherit`,
@@ -42,7 +42,7 @@ The other MAS-specific concerns:
 MAS distribution adds significant non-trivial complexity (sandboxed app, App Store
 review cycle, separate provisioning profile per app, manual submission to App
 Store Connect via Transporter or Xcode). It's the right move only for apps that
-genuinely benefit from App Store distribution — most consumer apps ship via DMG
+genuinely benefit from App Store distribution: most consumer apps ship via DMG
 download from a website, not the Mac App Store.
 
 If you need MAS now, the legacy @omega.js/desktop (pre-v1) had support that you

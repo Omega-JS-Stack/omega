@@ -1,5 +1,5 @@
 // ============================================================================
-// YOUR Firestore rules. This file is the SOURCE and it is yours — @omega.js/backend
+// YOUR Firestore rules. This file is the SOURCE and it is yours: @omega.js/backend
 // never rewrites the rules you write here.
 //
 // `omega build` COMPILES this file together with the framework half into
@@ -7,9 +7,9 @@
 // `firebase deploy` at that compiled artifact. Never edit the compiled file.
 //
 //   Framework half : node_modules/@omega.js/backend/templates/firestore.framework.rules
-//   Compiled output: dist/firestore.rules  (GENERATED — do not edit)
+//   Compiled output: dist/firestore.rules  (GENERATED, do not edit)
 //
-// MERGE-BY-MATCH — how you TIGHTEN a framework rule. Firestore ORs `allow`
+// MERGE-BY-MATCH: how you TIGHTEN a framework rule. Firestore ORs `allow`
 // across sibling match blocks, so a second `match /users/{uid}` could only ever
 // widen access. Instead, a match block here whose PATH matches a framework
 // block's (wildcard names do not have to agree) is MERGED into it: for an op
@@ -26,14 +26,14 @@
 //                           }
 //
 // Ops pair by NAME, so name the same ones the framework does (`allow write`
-// beside its `allow create, update` would WIDEN, not tighten — the compiler
+// beside its `allow create, update` would WIDEN, not tighten, the compiler
 // says so out loud). An op ONLY you declare is appended as written (that op
 // widens, as sibling blocks always did); a nested match of yours splices in; a
 // path the framework does not define is yours alone and passes through
 // untouched.
 //
 // Both halves land in the SAME `match /databases/{database}/documents` scope,
-// so your rules may call ANY framework helper — declaration order does not
+// so your rules may call ANY framework helper: declaration order does not
 // matter. `is*` asks a question, `get*` hands back a value:
 //
 //   isAuthenticated()   isUser(id)          isOwner()

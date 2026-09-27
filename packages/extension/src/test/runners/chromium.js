@@ -19,6 +19,7 @@ const path = require('path');
 const fs   = require('fs');
 const chalk = require('chalk').default;
 const { waitForTarget } = require('./helpers.js');
+const { attachLiveWorker } = require('./service-worker.js');
 
 // Inline the source of assert.js so we can build it into the injected harness
 // payload. The runner reads it from disk once at module-load time. Resolved through
@@ -29,6 +30,9 @@ const ASSERT_SRC = fs.readFileSync(require.resolve('@omega.js/devkit/test/assert
 // The ONE prefix every harness event line carries, written inside the SW / tab
 // and read back here (the same word @omega.js/desktop's harness writes)
 const TEST_EVENT_PREFIX = '__OMEGA_TEST__';
+
+// How long a background suite waits for a live worker before failing by name.
+const SW_LIVE_TIMEOUT_MS = 10000;
 
 async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, frameworkDistRoot }) {
   let puppeteer;
@@ -70,11 +74,13 @@ async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, 
       return { passed: 0, failed: total, skipped: 0 };
     }
 
+    const extId = swTarget.url().split('/')[2];   // chrome-extension://<id>/background.js
+
     // Background suites first.
     if (backgroundSuiteFiles.length > 0) {
       const r = await runBackgroundSuites({
         browser,
-        swTarget,
+        extId,
         suiteFiles: backgroundSuiteFiles,
         filter,
       });
@@ -86,7 +92,6 @@ async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, 
     // View suites next — popup/options/sidepanel are all loaded as plain
     // chrome-extension:// pages. Same Chromium instance, fresh tab per suite.
     if (viewSuiteFiles.length > 0) {
-      const extId = swTarget.url().split('/')[2];   // chrome-extension://<id>/background.js
       const r = await runViewSuites({
         browser,
         extId,
@@ -106,76 +111,83 @@ async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, 
 
 // ─── Background layer ────────────────────────────────────────────────────────
 
-async function runBackgroundSuites({ browser, swTarget, suiteFiles, filter }) {
+async function runBackgroundSuites({ browser, extId, suiteFiles, filter }) {
   const counts = { passed: 0, failed: 0, skipped: 0 };
 
-  // Attach a CDP session to the SW so we can Runtime.evaluate inside it.
-  // Puppeteer's WorkerTarget exposes `.worker()` for accessing the underlying
-  // Worker handle.
-  const worker = await swTarget.worker();
-  if (!worker) {
-    console.log(chalk.red(`    ✗ Could not attach to harness service worker.`));
-    return { passed: 0, failed: suiteFiles.length, skipped: 0 };
-  }
-
-  // Subscribe to console output from the SW. Each TEST_EVENT_PREFIX line is a
-  // structured test event. Anything else is incidental SW logging — surface it
-  // in OMEGA_TEST_DEBUG mode.
-  const consoleHandler = (msg) => {
-    const text = msg.text();
+  // Each TEST_EVENT_PREFIX line from the SW is a structured test event. Anything
+  // else is incidental SW logging, surfaced in OMEGA_TEST_DEBUG mode.
+  const consoleHandler = (evt) => {
+    const text = evt.args.map((a) => (a.value !== undefined ? String(a.value) : (a.description || ''))).join(' ');
     if (text.startsWith(TEST_EVENT_PREFIX)) {
       handleConsoleLine(text, counts);
     } else if (process.env.OMEGA_TEST_DEBUG) {
-      process.stdout.write(chalk.gray(`      [sw:${msg.type()}] ${text}\n`));
+      process.stdout.write(chalk.gray(`      [sw:${evt.type}] ${text}\n`));
     }
   };
-  worker.on('console', consoleHandler);
 
-  try {
-    for (const file of suiteFiles) {
-      let mod;
-      try {
-        delete require.cache[require.resolve(file)];
-        mod = require(file);
-      } catch (e) {
-        console.log(chalk.red(`    ✗ ${file}: Failed to load: ${e.message}`));
-        counts.failed += 1;
-        continue;
-      }
-      if (Array.isArray(mod)) mod = { type: 'group', tests: mod };
-      if (mod.layer !== 'background') continue;
-
-      const suiteName = mod.description || path.basename(file);
-      console.log(chalk.cyan(`    ⤷ ${suiteName}`));
-
-      if (mod.skip) {
-        const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
-        console.log(chalk.yellow(`      ○ ${suiteName}`) + chalk.gray(` (skipped)`));
-        counts.skipped += count;
-        continue;
-      }
-
-      const isSuite = mod.type === 'suite' || mod.type === 'group' || Array.isArray(mod.tests);
-      const tests   = isSuite ? (mod.tests || []) : [{ name: suiteName, run: mod.run, timeout: mod.timeout }];
-      const isGroup = mod.type === 'group';
-      const stopOnFailure = !isGroup && isSuite && mod.stopOnFailure !== false;
-
-      // Build a single payload that runs every test in the suite sequentially
-      // inside the SW. Shared `state` lives inside the SW for the lifetime of
-      // the suite. The runner emits one TEST_EVENT_PREFIX event per test.
-      const payload = buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: mod.timeout });
-      try {
-        await worker.evaluate(payload);
-      } catch (e) {
-        // worker.evaluate rejects on syntax errors / top-level throws inside
-        // the SW. The injected harness traps per-test errors itself; a
-        // rejection here means the wrapper code itself broke.
-        console.log(chalk.red(`      ✗ ${suiteName}: harness threw: ${e.message}`));
-        counts.failed += tests.length;
-      }
+  for (const file of suiteFiles) {
+    let mod;
+    try {
+      delete require.cache[require.resolve(file)];
+      mod = require(file);
+    } catch (e) {
+      console.log(chalk.red(`    ✗ ${file}: Failed to load: ${e.message}`));
+      counts.failed += 1;
+      continue;
     }
-  } finally {
-    worker.off('console', consoleHandler);
+    if (Array.isArray(mod)) mod = { type: 'group', tests: mod };
+    if (mod.layer !== 'background') continue;
+
+    const suiteName = mod.description || path.basename(file);
+    console.log(chalk.cyan(`    ⤷ ${suiteName}`));
+
+    if (mod.skip) {
+      const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
+      console.log(chalk.yellow(`      ○ ${suiteName}`) + chalk.gray(` (skipped)`));
+      counts.skipped += count;
+      continue;
+    }
+
+    const isSuite = mod.type === 'suite' || mod.type === 'group' || Array.isArray(mod.tests);
+    const tests   = isSuite ? (mod.tests || []) : [{ name: suiteName, run: mod.run, timeout: mod.timeout }];
+    const isGroup = mod.type === 'group';
+    const stopOnFailure = !isGroup && isSuite && mod.stopOnFailure !== false;
+
+    // The worker is resolved per suite: the one a previous suite ran in may have
+    // been stopped or restarted since, and its old handle no longer answers.
+    let session;
+    try {
+      session = await attachLiveWorker(browser, extId, SW_LIVE_TIMEOUT_MS);
+    } catch (e) {
+      console.log(chalk.red(`      ✗ ${suiteName}: ${e.message}`));
+      counts.failed += tests.length;
+      continue;
+    }
+
+    // Build a single payload that runs every test in the suite sequentially
+    // inside the SW. Shared `state` lives inside the SW for the lifetime of
+    // the suite. The runner emits one TEST_EVENT_PREFIX event per test.
+    const payload = buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: mod.timeout });
+    session.on('Runtime.consoleAPICalled', consoleHandler);
+    try {
+      // Enabling replays the worker's stored console lines, earlier suites' events
+      // included, so they are dropped first.
+      await session.send('Runtime.discardConsoleEntries');
+      await session.send('Runtime.enable');
+      const { exceptionDetails } = await session.send('Runtime.evaluate', { expression: payload, awaitPromise: true });
+      if (exceptionDetails) {
+        throw new Error((exceptionDetails.exception && exceptionDetails.exception.description) || exceptionDetails.text);
+      }
+    } catch (e) {
+      // A throw here means the wrapper code itself broke (syntax error, top-level
+      // throw): the injected harness traps per-test errors itself.
+      console.log(chalk.red(`      ✗ ${suiteName}: harness threw: ${e.message}`));
+      counts.failed += tests.length;
+    } finally {
+      session.off('Runtime.consoleAPICalled', consoleHandler);
+      // A worker that died mid-suite takes its session with it.
+      await session.detach().catch(() => {});
+    }
   }
 
   return counts;
@@ -392,4 +404,4 @@ function extractFnBody(fn) {
   return `return (${src}).call(null, ctx);`;
 }
 
-module.exports = { runChromiumTests };
+module.exports = { runChromiumTests, runBackgroundSuites };

@@ -23,6 +23,9 @@ env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
   CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
   NODE_VERSION: '22'
+  # Every verb runs at a root: the steps below run in the target dir, so they carry the
+  # root-dispatch marker naming the checkout, which lets the target's bin through.
+  OMEGA_ROOT_DISPATCH: ${{ github.workspace }}
   # No NODE_ENV here, deliberately (#872): npm skips devDependencies under
   # `NODE_ENV=production`, so the install below left the brand's own
   # @omega.js/manager and every framework declared as a devDependency off the

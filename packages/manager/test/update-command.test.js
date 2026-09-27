@@ -81,6 +81,7 @@ function readCalls(brand) {
 /** Run the command from `cwd` with parsed options, restoring cwd + exitCode. */
 async function runUpdateCommand(cwd, options = {}) {
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   process.chdir(cwd);
   try {
     await updateCommand({ _: ['update'], ...options });
@@ -88,7 +89,7 @@ async function runUpdateCommand(cwd, options = {}) {
   } finally {
     // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers
     // so the next case starts from an unpatched stdout.
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }

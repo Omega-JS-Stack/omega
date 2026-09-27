@@ -44,6 +44,11 @@
       },
       {
         "package": "@omega.js/devkit",
+        "from": "src/test/dashed-files.js",
+        "to": "vendor/devkit/test/dashed-files.js"
+      },
+      {
+        "package": "@omega.js/devkit",
         "from": "src/test/fixtures/esm-only-package",
         "to": "vendor/devkit/test/fixtures/esm-only-package"
       }

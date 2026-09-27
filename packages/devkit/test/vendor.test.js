@@ -152,7 +152,7 @@ test('dep-guard ignores comment prose that reads like an ESM from-clause', (t) =
   // The real case: @omega.js/config's edit.js has JSDoc prose "('brand' from
   // brand, 'a b' from 'a b')" — the guard reported a phantom host dep 'a b'.
   const root = makeFixture('vendor-prose', {
-    packageJSON: { name: 'fixture-prose', version: '1.0.0', dependencies: { json5: '*', dotenv: '*' } }, // dotenv: config's env.js rides along
+    packageJSON: { name: 'fixture-prose', version: '1.0.0', dependencies: { json5: '*', dotenv: '*', chalk: '*' } }, // dotenv: config's env.js rides along; chalk: its company.js logs through the devkit logger
     files: {
       'dist/lib/uses-config.js': `const config = require('@omega.js/config');\nmodule.exports = config;`,
     },

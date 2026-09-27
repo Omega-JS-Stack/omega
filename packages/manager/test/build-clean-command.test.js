@@ -74,6 +74,7 @@ async function runFanout(command, root, options = {}, { fail = [] } = {}) {
   const originalLog = console.log;
   const originalError = console.error;
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
 
   console.log = (...args) => lines.push(args.join(' '));
   console.error = (...args) => lines.push(args.join(' '));
@@ -91,7 +92,7 @@ async function runFanout(command, root, options = {}, { fail = [] } = {}) {
     // The fan-out tees to <brandRoot>/logs/<verb>.log (#623) — release the
     // writers before the fixture is removed, or the tee keeps this process'
     // stdout pointed at a deleted file.
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     console.log = originalLog;
     console.error = originalError;
     process.chdir(cwd0);

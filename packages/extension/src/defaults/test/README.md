@@ -4,7 +4,7 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers — OMEGA Extension's test runner discovers files by the directory they sit in:
+Match the framework's four layers. OMEGA Extension's test runner discovers files by the directory they sit in:
 
 | Directory | Runtime | Use for |
 |---|---|---|
@@ -15,9 +15,9 @@ Match the framework's four layers — OMEGA Extension's test runner discovers fi
 
 ## Coverage
 
-Every feature ships with tests at every layer it has a surface in — logic (`build`/`background`), UI (`view`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
+Every feature ships with tests at every layer it has a surface in: logic (`build`/`background`), UI (`view`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
 
-Tests that hit REAL external services (Firebase, push, network) are skipped by default — gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across every OMEGA framework (@omega.js/backend, @omega.js/extension, @omega.js/web, @omega.js/desktop). Never mock the external service — skip it in-source.
+Tests that hit REAL external services (Firebase, push, network) are skipped by default. Gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across every OMEGA framework (@omega.js/backend, @omega.js/extension, @omega.js/web, @omega.js/desktop). Never mock the external service: skip it in-source.
 
 ## Quick example
 
@@ -38,4 +38,4 @@ That is the standalone form: one test per file. Every `run` receives `ctx`, whos
 
 ## See also
 
-`node_modules/@omega.js/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/extension/docs/test-framework.md`: full reference for the test framework (layers, assert API, fixtures, runner internals).

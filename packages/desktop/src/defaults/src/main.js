@@ -8,7 +8,7 @@ omega.initialize()
     // ─────────────────────────────────────────────────────────────────────────────
     // 1. Create the main window
     // ─────────────────────────────────────────────────────────────────────────────
-    // Always create `main` — @omega.js/desktop uses its presence in the registry to surface UI when
+    // Always create `main`: @omega.js/desktop uses its presence in the registry to surface UI when
     // the user double-clicks the dock icon (macOS) or relaunches the app (win/linux).
     // In hidden launches (agent / menubar apps with `startup.mode = 'hidden'`, or auto-
     // launch at login), pass `show: false` so the window is registered but invisible:
@@ -43,7 +43,7 @@ omega.initialize()
     //   },
     // });
 
-    // Secondary windows — built-in defaults (800x600, hideOnClose:false) are good
+    // Secondary windows: built-in defaults (800x600, hideOnClose:false) are good
     // enough for most cases. Examples:
     //
     //   windows.create('settings');                                  // baked defaults

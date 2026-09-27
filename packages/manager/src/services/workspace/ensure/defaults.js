@@ -18,8 +18,41 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const JSON5 = require('json5');
 
-const { missingDefaults, defaultComments, writeConfigValues, resolveConfigPath, FILE_NAME } = require('@omega.js/config');
+const {
+  missingDefaults, defaultComments, writeConfigValues, resolveConfigPath, FILE_NAME,
+  deepMerge, setAtPath, targetEntries, TARGETS,
+} = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
+
+/**
+ * The target-only defaults a brand file lacks: each framework target's
+ * refinements, judged on the view loadConfig resolves for it (the shared
+ * blocks, then `targets.<name>`) once the shared heal has landed, and written
+ * back under `targets.<name>`, the layer that view reads them from.
+ *
+ * @param {object} raw - The parsed brand file.
+ * @param {Array<{ path: string, value: * }>} shared - The shared heal.
+ * @returns {{ missing: Array<{ path: string, value: * }>, comments: Object<string, string> }}
+ */
+function targetDefaults(raw, shared) {
+  const filled = structuredClone(raw);
+  for (const entry of shared) setAtPath(filled, entry.path, structuredClone(entry.value));
+  const { targets = {}, ...base } = filled;
+
+  const missing = [];
+  const comments = {};
+  for (const { name, type } of targetEntries(raw).filter((entry) => TARGETS.includes(entry.type))) {
+    const prefix = `targets.${name}`;
+    for (const entry of missingDefaults(deepMerge(base, targets[name]), type)) {
+      missing.push({ path: `${prefix}.${entry.path}`, value: entry.value });
+    }
+    for (const [dotted, description] of Object.entries(defaultComments(type))) {
+      comments[`${prefix}.${dotted}`] = description;
+    }
+  }
+
+  return { missing, comments };
+}
 
 module.exports = async ({ brandRoot, options = {} }) => {
   const configPath = resolveConfigPath(brandRoot);
@@ -30,7 +63,10 @@ module.exports = async ({ brandRoot, options = {} }) => {
 
   // The RAW file, not the resolved config: resolution already merged the
   // defaults in, so every block would read as present.
-  const missing = missingDefaults(JSON5.parse(jetpack.read(configPath)));
+  const raw = JSON5.parse(jetpack.read(configPath));
+  const shared = missingDefaults(raw);
+  const target = targetDefaults(raw, shared);
+  const missing = [...shared, ...target.missing];
 
   if (missing.length === 0) {
     console.log(`      ${chalk.green('✓')} ${FILE_NAME} carries every schema default`);
@@ -49,7 +85,7 @@ module.exports = async ({ brandRoot, options = {} }) => {
   writeConfigValues(
     brandRoot,
     Object.fromEntries(missing.map((entry) => [entry.path, entry.value])),
-    { comments: defaultComments() },
+    { comments: { ...defaultComments(), ...target.comments } },
   );
 
   for (const block of blocks) {

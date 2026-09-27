@@ -1,5 +1,5 @@
 // Build-time logger — timestamped, tag-scoped console output for CLI commands, gulp
-// tasks, and test runners. `new Logger('setup')` then logger.log/error/warn/info,
+// tasks, and test runners. `new Logger('setup')` then logger.log/error/warn/info/debug,
 // which prints `[HH:MM:SS] [@omega.js/<package>:setup] message`.
 //
 // NOT for app/runtime logging — frameworks with runtime logging needs (e.g. desktop's
@@ -87,8 +87,13 @@ function Logger(name) {
 }
 
 // Make methods that log to console with the tag and time: [xx:xx:xx] [@omega.js/pkg:name] message
-['log', 'error', 'warn', 'info'].forEach((method) => {
+['log', 'error', 'warn', 'info', 'debug'].forEach((method) => {
   Logger.prototype[method] = function () {
+    // debug is the one opt-in level (docs/shared/logging.md): OMEGA_DEBUG, read live.
+    if (method === 'debug' && !process.env.OMEGA_DEBUG) {
+      return;
+    }
+
     const time = new Date().toLocaleTimeString('en-US', {
       hour12: false,
       hour:   '2-digit',

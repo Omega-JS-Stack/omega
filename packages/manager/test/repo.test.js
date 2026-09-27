@@ -17,6 +17,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const devkit = require('@omega.js/devkit/github-repo');
 const { OPERATIONS } = require('../src/config.js');
 const service = require('../src/services/repo/index.js');

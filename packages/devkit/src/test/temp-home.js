@@ -1,6 +1,5 @@
 /**
- * The machine home, pointed at a temp dir for the length of ONE test file
- * ([#677](https://github.com/Omega-JS-Stack/omega/issues/677)).
+ * The machine home, pointed at a temp dir for the length of ONE test file.
  *
  * Every `loadConfig()` records its own brand's line in the machine registry
  * (`$OMEGA_HOME/brands.json`, default `~/.omega`), which is what makes a
@@ -9,13 +8,18 @@
  * under /tmp is a line about a brand that does not exist.
  *
  * node:test runs each FILE in its own process, so one require at the top of a
- * file that loads a brand fixture is the whole contract — no per-test setup,
- * nothing to restore.
+ * file that loads a brand fixture (or spawns a verb that does) is the whole
+ * contract: no per-test setup, nothing to restore, and every child the file
+ * spawns inherits the redirect through its env. The dir goes when the file's
+ * process exits.
  */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
 process.env.OMEGA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-test-home-'));
+const OMEGA_HOME = process.env.OMEGA_HOME;
 
-module.exports = { OMEGA_HOME: process.env.OMEGA_HOME };
+process.on('exit', () => fs.rmSync(OMEGA_HOME, { recursive: true, force: true }));
+
+module.exports = { OMEGA_HOME };

@@ -136,7 +136,7 @@ require.cache[managePath] = {
 
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const devCommand = require('../src/commands/dev.js');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
@@ -970,11 +970,12 @@ test('boot tees the brand-level fan-out to <brandRoot>/logs/dev.log, ANSI stripp
   delete process.env.CI;
   delete process.env.GITHUB_ACTIONS;
 
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   try {
     await bootDev(root, { target: 'web' });
   } finally {
     // dev() never returns, so nothing else would restore the writers.
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     for (const [key, value] of Object.entries(priorCi)) {
       if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; }
     }

@@ -1,4 +1,4 @@
-// config/omega.json5 — the single OMEGA config file (JSON5: comments + trailing commas OK).
+// config/omega.json5: the single OMEGA config file (JSON5: comments + trailing commas OK).
 //
 // Shape: SHARED sections at the top level (identical spelling in every OMEGA project
 // type: web, backend, extension, desktop), then a `targets` object whose every KEY
@@ -7,7 +7,7 @@
 // that surface only (e.g. an extension-specific monitoring.providers.sentry.dsn
 // under targets.extension).
 //
-// Secrets NEVER live here — they live in .env. The validator hard-fails on
+// Secrets NEVER live here: they live in .env. The validator hard-fails on
 // secret-shaped keys (…Secret, …privateKey).
 {
   brand: {
@@ -38,7 +38,7 @@
     },
   },
 
-  // Firebase web-app config (public client keys — real secrets stay in .env).
+  // Firebase web-app config (public client keys, real secrets stay in .env).
   // Fill from Firebase console → Project settings → your web app.
   cloud: {
     provider: 'firebase',
@@ -57,7 +57,7 @@
   },
 
   // KEY PRESENCE = enabled. `extension: {}` = enabled with defaults (the extension
-  // target section is near-empty by design — extension-specific settings land here).
+  // target section is near-empty by design: extension-specific settings land here).
   targets: {
     extension: {
       type: 'extension',

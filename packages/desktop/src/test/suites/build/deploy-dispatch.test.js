@@ -108,6 +108,7 @@ async function runRelease(follower, options = {}, token = {}) {
   else process.env.GH_TOKEN = envToken;
   process.chdir(targetDir);
   delete require.cache[require.resolve(RELEASE)];
+  const restoreTee = attachLogFile.mark();
 
   let error = null;
   try {
@@ -117,7 +118,7 @@ async function runRelease(follower, options = {}, token = {}) {
   } finally {
     // The verb tees this process' writers: hand them back before the next
     // suite prints through a fixture that is about to be gone.
-    attachLogFile.detach();
+    restoreTee();
     console.log = previousLog;
     process.chdir(previousCwd);
     if (previousToken === undefined) delete process.env.GH_TOKEN;

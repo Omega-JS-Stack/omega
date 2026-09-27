@@ -172,6 +172,7 @@ module.exports = defineCases({
         const resolved = require.resolve(DEPLOY);
         const cached = require.cache[resolved];
         delete require.cache[resolved];
+        const restoreTee = attachLogFile.mark();
 
         try {
           const deploy = require(resolved);
@@ -183,7 +184,7 @@ module.exports = defineCases({
           ctx.expect(ran).toEqual(['ensure-target', 'npm run build']);
         } finally {
           // The verb tees this process' writers now (#873): hand them back.
-          attachLogFile.detach();
+          restoreTee();
           for (const restore of restores) restore();
           if (cached) require.cache[resolved] = cached;
           else delete require.cache[resolved];

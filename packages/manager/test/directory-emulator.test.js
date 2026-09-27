@@ -25,7 +25,7 @@ const jetpack = require('fs-jetpack');
 // The machine home is a temp dir for this file: the parent brand below is
 // registered in a REGISTRY, and a fixture line must never land in the
 // developer's own (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const { recordBrand, resolveCompany } = require('@omega.js/config');
 

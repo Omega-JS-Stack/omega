@@ -101,6 +101,7 @@ async function runDeploy(follower, options = {}) {
   const previousCwd = process.cwd();
   process.chdir(targetDir);
   delete require.cache[DEPLOY];
+  const restoreTee = attachLogFile.mark();
 
   let error = null;
   try {
@@ -110,7 +111,7 @@ async function runDeploy(follower, options = {}) {
   } finally {
     // The verb tees this process' writers: hand them back before the next test
     // prints through a fixture that is about to be gone.
-    attachLogFile.detach();
+    restoreTee();
     console.log = previousLog;
     process.chdir(previousCwd);
     for (const [module, key, value] of restore) module[key] = value;

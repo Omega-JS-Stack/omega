@@ -159,3 +159,17 @@ test('claude-settings: op is a silent no-op in the local era and warns on an unr
   assert.equal(result.status, 'warned');
   assert.equal(result.output.claudeSettings, 'invalid');
 });
+
+test('#971: op under --dry-run plans the create and the heal, and writes nothing', async () => {
+  const fresh = publishedBrand();
+  const created = await claudeSettingsOp({ brandRoot: fresh, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+  assert.deepEqual(created.output, { claudeSettings: 'planned' });
+  assert.equal(fs.existsSync(path.join(fresh, SETTINGS_FILE)), false);
+
+  const dir = publishedBrand();
+  fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(dir, SETTINGS_FILE), '{ "model": "x" }\n');
+  const healed = await claudeSettingsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+  assert.deepEqual(healed.output, { claudeSettings: 'planned' });
+  assert.equal(fs.readFileSync(path.join(dir, SETTINGS_FILE), 'utf8'), '{ "model": "x" }\n');
+});

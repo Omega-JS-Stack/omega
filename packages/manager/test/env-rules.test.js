@@ -28,7 +28,7 @@ const { execSync } = require('node:child_process');
 
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const envRulesOp = require('../src/services/workspace/ensure/env-rules.js');
 const { loadBrand } = require('../src/lib/brand.js');

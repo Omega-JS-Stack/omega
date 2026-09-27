@@ -6,6 +6,10 @@
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
+
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('../src/test/temp-home.js');
+
 const {
   parseRemoteUrl,
   dispatchRepo,

@@ -6,11 +6,16 @@
 const chalk = require('chalk').default;
 
 const { ensureOmegaIgnored } = require('../../../lib/gitignore.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
-module.exports = async ({ brandRoot }) => {
-  if (ensureOmegaIgnored(brandRoot) === 'present') {
+module.exports = async ({ brandRoot, options = {} }) => {
+  if (ensureOmegaIgnored(brandRoot, { dryRun: options.dryRun }) === 'present') {
     console.log(`      ${chalk.green('✓')} .gitignore has the omega entries`);
     return null;
+  }
+
+  if (options.dryRun) {
+    return dryRunPlan('add the missing omega entries to .gitignore', { output: { gitignore: 'planned' } });
   }
 
   console.log(`      ${chalk.green('✓')} Added missing omega entries to .gitignore`);

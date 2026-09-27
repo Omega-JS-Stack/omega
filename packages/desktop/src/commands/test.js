@@ -21,7 +21,7 @@ module.exports = async function (options) {
 
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
   // @omega.js/backend's test.log and @omega.js/desktop's own dev.log pattern.
-  attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
+  const detachLog = attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
 
   // The local half of the retired `omega setup` (#675) — idempotent, offline,
   // and quiet on a converged target. The gulp verbs get it from the `defaults`
@@ -104,19 +104,19 @@ module.exports = async function (options) {
     // ONE target to every target, so a distinct code lets it count this as a
     // miss rather than a failure (#814).
     process.exitCode = noMatchExitCode();
-    await attachLogFile.detach();
+    detachLog();
     return;
   }
 
   if (result.failed > 0) {
     process.exitCode = 1;
-    await attachLogFile.detach();
+    detachLog();
     throw new Error(`${result.failed} test(s) failed`);
   }
 
   // Close test.log before exiting. Nothing to flush: every write already went
   // to the fd synchronously (#197), so the Results block survives the exit
   // below whatever happens — detach() just closes the handle.
-  await attachLogFile.detach();
+  detachLog();
   process.exit(0);
 };

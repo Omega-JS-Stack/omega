@@ -33,12 +33,15 @@ The `dev`/`test` names match desktop, extension and web for cross-framework pari
 ```js
 const attachLogFile = require('../utils/attach-log-file');
 
-attachLogFile(this.getLogsPath('deploy.log'));
-// ... run command — all stdout/stderr is now teed to the log file ...
-attachLogFile.detach();
+const detachLog = attachLogFile(this.getLogsPath('deploy.log'));
+try {
+  // ... run command: all stdout/stderr is now teed to the log file ...
+} finally {
+  detachLog();
+}
 ```
 
-- **Singleton**: default export is a process-wide singleton (one file at a time)
+- **Singleton, stackable**: the default export is a process-wide singleton, and attaches of different paths on it stack (a verb run inside another verb's process). A verb detaches through the handle its own attach returned, never a blind `attachLogFile.detach()`, so it takes off only its own layer; a test harness that runs a verb takes `attachLogFile.mark()` first and calls the restore it returns after
 - **Factory**: `attachLogFile.createTee()` returns an independent tee for stacking, with LIFO detach
 - **Idempotent**: attaching the same path twice returns the existing handle
 - **Crash-safe**: writes go to an open fd synchronously, so the lines describing a crash survive it

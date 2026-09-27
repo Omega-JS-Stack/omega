@@ -1,7 +1,7 @@
 // Tray definition. Called by @omega.js/desktop during boot.
 //
 // `omega`: the running @omega.js/desktop main-process instance.
-// `tray`    — builder API + id-path API (find/update/remove/insertAfter/etc.).
+// `tray`: builder API + id-path API (find/update/remove/insertAfter/etc.).
 //
 // @omega.js/desktop auto-resolves the tray icon by convention (most specific wins):
 //   1. config/icons/<platform>/tray.png   (platform-specific override)
@@ -10,14 +10,14 @@
 //   4. @omega.js/desktop bundled default
 // And auto-sets the tooltip to config.app.productName.
 //
-// Default items shipped by @omega.js/desktop (flat ids — no `tray/` prefix needed):
-//   title              — disabled label showing the app name
-//   open               — "Open <app>"
-//   check-for-updates  — wired to autoUpdater (label/enabled auto-updated)
-//   website            — opens brand.url in external browser (only if configured)
-//   quit               — quits the app
+// Default items shipped by @omega.js/desktop (flat ids, no `tray/` prefix needed):
+//   title:               disabled label showing the app name
+//   open:                "Open <app>"
+//   check-for-updates:   wired to autoUpdater (label/enabled auto-updated)
+//   website:             opens brand.url in external browser (only if configured)
+//   quit:                quits the app
 //
-// This file is OPTIONAL — delete it and @omega.js/desktop still ships a working tray.
+// This file is OPTIONAL: delete it and @omega.js/desktop still ships a working tray.
 
 module.exports = ({ omega, tray }) => {
   // Use @omega.js/desktop's default template + auto-resolved icon + auto-resolved tooltip.
@@ -51,7 +51,7 @@ module.exports = ({ omega, tray }) => {
   // // Disable without removing (sets enabled:false):
   // tray.enable('quit', false);
   //
-  // // Add a submenu — items inside addressable as 'account/sign-out' etc.
+  // // Add a submenu: items inside addressable as 'account/sign-out' etc.
   // tray.insertBefore('quit', {
   //   id: 'account', label: 'Account', submenu: [
   //     { id: 'sign-out', label: 'Sign out', click: () => {} },

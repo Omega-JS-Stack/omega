@@ -50,6 +50,7 @@ function spyWriters() {
 test('exports the expected surface', () => {
   assert.equal(typeof attachLogFile, 'function');
   assert.equal(typeof attachLogFile.detach, 'function');
+  assert.equal(typeof attachLogFile.mark, 'function');
   assert.equal(typeof attachLogFile.stripAnsi, 'function');
   assert.equal(typeof attachLogFile.createTee, 'function');
   assert.equal(typeof attachLogFile.createChildLog, 'function');
@@ -210,6 +211,60 @@ test('the singleton stacks too: a second attach layers instead of replacing', (t
 
   // Both layers fanned out to the terminal exactly once per write.
   assert.deepEqual(spy.chunks.stdout, ['both layers\n', 'outer only\n']);
+});
+
+test('mark() hands back a restore that takes off exactly what the run pushed', (t) => {
+  // A harness around a verb marks the singleton stack first and restores to the
+  // mark after, whatever the verb did: pushed one layer, pushed several, pushed
+  // none (declined under CI) or already popped its own. The outer layer (the
+  // `omega test` log the harness itself runs under) survives every one.
+  const outerPath = scratchFile('mark-outer.log');
+  const pushedPath = scratchFile('mark-pushed.log');
+  const secondPath = scratchFile('mark-second.log');
+  const poppedPath = scratchFile('mark-popped.log');
+  t.after(() => {
+    for (const file of [outerPath, pushedPath, secondPath, poppedPath]) fs.rmSync(file, { force: true });
+  });
+
+  const spy = spyWriters();
+  const detachOuter = attachLogFile(outerPath, NO_CI);
+  try {
+    // Pushed two layers.
+    let restoreTee = attachLogFile.mark();
+    attachLogFile(pushedPath, NO_CI);
+    attachLogFile(secondPath, NO_CI);
+    process.stdout.write('run one\n');
+    restoreTee();
+    process.stdout.write('after run one\n');
+
+    // Pushed none: the attach declined under a runner.
+    restoreTee = attachLogFile.mark();
+    attachLogFile(pushedPath, { env: { CI: 'true' } });
+    restoreTee();
+    process.stdout.write('after run two\n');
+
+    // Already popped its own layer.
+    restoreTee = attachLogFile.mark();
+    attachLogFile(poppedPath, NO_CI)();
+    restoreTee();
+    process.stdout.write('after run three\n');
+  } finally {
+    detachOuter();
+    spy.restore();
+  }
+
+  const outer = fs.readFileSync(outerPath, 'utf8');
+  assert.match(outer, /^run one$/m);
+  assert.match(outer, /^after run one$/m, 'the restore left the outer layer in place');
+  assert.match(outer, /^after run two$/m, 'a run that pushed nothing costs the outer layer nothing');
+  assert.match(outer, /^after run three$/m, 'a run that popped its own costs the outer layer nothing');
+
+  for (const file of [pushedPath, secondPath]) {
+    const contents = fs.readFileSync(file, 'utf8');
+    assert.match(contents, /^run one$/m);
+    assert.ok(!contents.includes('after run one'), `${path.basename(file)} came off at the restore`);
+  }
+  assert.deepEqual(spy.chunks.stdout, ['run one\n', 'after run one\n', 'after run two\n', 'after run three\n']);
 });
 
 test('detach restores the exact prior writers', () => {

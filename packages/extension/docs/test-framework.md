@@ -102,6 +102,8 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 
 `all` (default) runs build → background → view → boot.
 
+Each background suite attaches the harness's LIVE service worker afresh, releasing a restarted worker's start pause and probing `chrome.runtime.id` first, so a worker that is gone fails that suite as `service worker for <id> is not active` instead of an undefined `chrome.runtime` read.
+
 ## NEVER mock — test against the real harness
 
 Every layer hands your test the **real** runtime, never a hand-rolled fake:

@@ -55,9 +55,10 @@ module.exports = defineCases({
         const { root, command } = commandInTempApp();
 
         const logPath = withoutCiEnv(() => {
+          const restoreTee = attachLogFile.mark();
           const resolved = command.attachVerbLog('test');
           console.log('\x1B[33mverb log line\x1B[0m');
-          attachLogFile.detach();
+          restoreTee();
           return resolved;
         });
 

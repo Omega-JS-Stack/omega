@@ -18,6 +18,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const assert = require('node:assert');
 
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
@@ -66,6 +67,7 @@ module.exports = defineCases({
         const realResolve = license.resolveLicenseStamp;
         const savedKey = process.env.OMEGA_LICENSE_KEY;
         const seen = [];
+        const restoreTee = attachLogFile.mark();
 
         try {
           delete process.env.OMEGA_LICENSE_KEY;
@@ -94,13 +96,74 @@ module.exports = defineCases({
           assert.deepEqual(seen, ['brand-root-key'],
             'the cascade is loaded first, so the brand root\'s key is the one the verdict answers for');
         } finally {
-          await attachLogFile.detach();
+          restoreTee();
           license.resolveLicenseStamp = realResolve;
           delete require.cache[deployPath];
           if (savedKey === undefined) delete process.env.OMEGA_LICENSE_KEY;
           else process.env.OMEGA_LICENSE_KEY = savedKey;
           cleanup();
         }
+      },
+    },
+
+    {
+      // A refusal thrown before the stage (here the license seam) still takes the
+      // direct lane's own dist/deploy.log layer off, so the tee the run started
+      // under keeps receiving and the firebase transcript stops at the refusal.
+      name: 'a-refusal-before-the-stage-leaves-the-outer-tee-receiving',
+      auth: 'none',
+
+      async run() {
+        const { projectDir, cleanup } = makeBrand();
+        const license = require('../../dist/vendor/devkit/license.js');
+        const attachLogFile = require('../../dist/cli/utils/attach-log-file');
+        const deployPath = require.resolve('../../dist/cli/commands/deploy.js');
+        const realResolve = license.resolveLicenseStamp;
+        const outerPath = path.join(path.dirname(path.dirname(projectDir)), 'outer.log');
+        const laneLog = path.join(projectDir, 'dist', 'deploy.log');
+        const verbLog = path.join(projectDir, 'logs', 'deploy.log');
+        const priorCi = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
+
+        // The tee declines under a runner by design; this asserts what it does
+        // when it does not decline.
+        delete process.env.CI;
+        delete process.env.GITHUB_ACTIONS;
+        const restoreOuter = attachLogFile.mark();
+        attachLogFile(outerPath);
+        const restoreTee = attachLogFile.mark();
+
+        try {
+          license.resolveLicenseStamp = () => { throw new ResolvedHere(); };
+          delete require.cache[deployPath];
+          const DeployCommand = require(deployPath);
+          const command = new DeployCommand({ firebaseProjectPath: projectDir, argv: { direct: true }, options: {} });
+          command.log = () => {};
+
+          await assert.rejects(() => command.execute(), ResolvedHere);
+          process.stdout.write('after the refusal\n');
+          restoreTee();
+          process.stdout.write('after the restore\n');
+        } finally {
+          restoreTee();
+          restoreOuter();
+          license.resolveLicenseStamp = realResolve;
+          delete require.cache[deployPath];
+          for (const [key, value] of Object.entries(priorCi)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+          }
+        }
+
+        const outer = fs.readFileSync(outerPath, 'utf8');
+        const lane = fs.readFileSync(laneLog, 'utf8');
+        const verb = fs.readFileSync(verbLog, 'utf8');
+        cleanup();
+
+        assert.match(outer, /^after the refusal$/m, 'the outer tee receives through the run');
+        assert.match(outer, /^after the restore$/m, 'and after the harness restores to its mark');
+        assert.ok(!lane.includes('after the refusal'), 'the direct lane took its own layer off at the refusal');
+        assert.match(verb, /^after the refusal$/m, 'the verb log stays on for the rest of the process');
+        assert.ok(!verb.includes('after the restore'), 'until the harness restores to its mark');
       },
     },
   ],

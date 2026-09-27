@@ -32,7 +32,7 @@ Liquid form.
 # lives in the page BODY, below, as {% section %} calls. The `config:` rule
 # runs both ways: a config section (theme, client, analytics…) restated BARE
 # is a build ERROR, and a key under `config:` that omega.json5 has no section
-# for is one too. Everything above except `config` is page machinery — `meta`
+# for is one too. Everything above except `config` is page machinery, `meta`
 # included, which is why omega.json5 carries no meta section at all.
 layout: frontend/core/base
 permalink: /example

@@ -1,5 +1,5 @@
 /**
- * Connect trap — the static lane's proof that no test opens a socket.
+ * Connect trap: the static lane's proof that no test opens a socket.
  *
  * Preloaded into EVERY test process by this target's `test` script
  * (`node --require ./test/_helpers/connect-trap.js --test …`; node forwards the
@@ -7,14 +7,14 @@
  *
  * The static lane requires your real source: route handlers, schemas, the
  * framework module itself. One require deeper than you think and that tree
- * reaches firebase-admin's gRPC client — against whatever credentials `.env`
+ * reaches firebase-admin's gRPC client, against whatever credentials `.env`
  * and `.omega/secrets/` happen to carry for the REAL project. So the failure
  * mode is made structural: the socket layer itself refuses, loudly, before any
  * DNS lookup or TCP connect can happen.
  *
  * Everything that can open an outbound connection in Node funnels through
- * `net.Socket.prototype.connect` — http/https agents, undici/fetch, gRPC
- * (firebase-admin), and every fetch wrapper on top of them — so trapping that
+ * `net.Socket.prototype.connect` (http/https agents, undici/fetch, gRPC
+ * (firebase-admin), and every fetch wrapper on top of them), so trapping that
  * one method covers the lot. `dns.lookup` is trapped too, since a resolver call
  * is already an escape even when the connect never happens.
  *
@@ -30,7 +30,7 @@ const MARKER = '__omegaConnectTrap';
 function refuse(what, detail) {
   const error = new Error(
     `connect-trap: ${what} was attempted in the static test lane (${detail}). `
-    + 'This lane is socket-free by contract — stub the network client instead.',
+    + 'This lane is socket-free by contract: stub the network client instead.',
   );
   error.code = 'CONNECT_TRAP';
   return error;
@@ -46,13 +46,13 @@ function describe(target) {
   return `${target.host || target.path || 'unknown'}:${target.port || '?'}`;
 }
 
-// Sockets — the one funnel every outbound protocol goes through.
+// Sockets: the one funnel every outbound protocol goes through.
 const realConnect = net.Socket.prototype.connect;
 net.Socket.prototype.connect = function connect(...args) {
   throw refuse('a TCP connect', describe(args[0]));
 };
 
-// Resolver — an escape in its own right, and it runs BEFORE the connect above.
+// Resolver: an escape in its own right, and it runs BEFORE the connect above.
 const realLookup = dns.lookup;
 dns.lookup = function lookup(hostname) {
   throw refuse('a DNS lookup', String(hostname));
@@ -66,7 +66,7 @@ dns.promises.lookup = function lookup(hostname) {
 globalThis[MARKER] = {
   installed: true,
   marker: MARKER,
-  // The originals are kept ONLY so the trap can describe what it replaced —
-  // nothing in the lane is allowed to put them back.
+  // The originals are kept ONLY so the trap can describe what it replaced.
+  // Nothing in the lane is allowed to put them back.
   replaced: { connect: typeof realConnect, lookup: typeof realLookup },
 };

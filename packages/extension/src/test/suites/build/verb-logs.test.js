@@ -10,6 +10,10 @@
 const path = require('path');
 const fs   = require('fs');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { runTestVerbUnderOuterTee } = require('@omega.js/devkit/test/run-verb-under-tee');
+
+const COMMANDS = path.join(__dirname, '..', '..', '..', 'commands');
+const PREFIX = 'extension-test-verb-';
 
 module.exports = defineCases({
   type: 'suite',
@@ -37,6 +41,22 @@ module.exports = defineCases({
           .split('\n')
           .find((entry) => entry.includes(marker));
         ctx.expect(line).toBe(marker);
+      },
+    },
+    {
+      // The verb takes off only the layer its own attach pushed: a declined
+      // attach pushes none, and a blind pop would eat the tee underneath.
+      name: 'a verb whose attach declined leaves the outer tee receiving (no-match exit)',
+      run: async (ctx) => {
+        const { outer } = await runTestVerbUnderOuterTee({ commands: COMMANDS, prefix: PREFIX, positionals: ['project:does-not-exist'] });
+        ctx.expect(outer.includes('after the verb')).toBe(true);
+      },
+    },
+    {
+      name: 'a verb whose attach declined leaves the outer tee receiving (green exit)',
+      run: async (ctx) => {
+        const { outer } = await runTestVerbUnderOuterTee({ commands: COMMANDS, prefix: PREFIX, positionals: [] });
+        ctx.expect(outer.includes('after the verb')).toBe(true);
       },
     },
   ],

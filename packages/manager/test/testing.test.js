@@ -17,7 +17,7 @@ const jetpack = require('fs-jetpack');
 
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677).
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const { SERVICE_ORDER, OPERATIONS, TARGET_FRAMEWORKS } = require('../src/config.js');
 const { compareVersions, installedVersion, parseWorkingTree } = require('../src/services/testing/lib/checks.js');

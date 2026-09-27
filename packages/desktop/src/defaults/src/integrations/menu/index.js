@@ -1,10 +1,10 @@
 // Application menu definition. Called by @omega.js/desktop during boot.
 //
 // `omega`: the running @omega.js/desktop main-process instance.
-// `menu`     — builder API + id-path API (find/update/remove/insertAfter/etc.).
-// `defaults` — the platform-aware default template (an array you can mutate manually if needed).
+// `menu`:      builder API + id-path API (find/update/remove/insertAfter/etc.).
+// `defaults`:  the platform-aware default template (an array you can mutate manually if needed).
 //
-// This file is OPTIONAL — delete it and @omega.js/desktop still ships a working application menu.
+// This file is OPTIONAL: delete it and @omega.js/desktop still ships a working application menu.
 //
 // @omega.js/desktop ships a default menu template with stable id paths. Highlights:
 //   main/about, main/check-for-updates, main/preferences (hidden), main/services,
@@ -20,13 +20,13 @@
 
 module.exports = ({ omega, menu, defaults }) => {
   // Start from the platform-appropriate default template. Don't add anything
-  // by default — leave it identical to what the framework would do without
+  // by default: leave it identical to what the framework would do without
   // this file. Add your own customizations below.
   menu.useDefaults();
 
   // ───────── Examples (uncomment to use) ─────────
   //
-  // // Show the Preferences item (hidden by default — flip its visibility once you
+  // // Show the Preferences item (hidden by default, flip its visibility once you
   // // wire up your settings window):
   // menu.show(process.platform === 'darwin' ? 'main/preferences' : 'file/preferences');
   //

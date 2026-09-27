@@ -17,7 +17,7 @@ const { recordBrand } = require('@omega.js/config');
 // The machine registry is per-machine state: this file's fixtures write into a
 // temp home, never the developer's ~/.omega (#677). Tests that need their own
 // home still override it per test.
-require('./lib/temp-home.js');
+require('@omega.js/devkit/test/temp-home');
 
 const { runOnboard, deriveId, deriveName, deriveUrl } = require('../src/onboard.js');
 const { runManage } = require('../src/manage.js');

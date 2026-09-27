@@ -181,60 +181,63 @@ class DeployCommand extends BaseCommand {
     }
 
     const logPath = this.getLogsPath('deploy.log');
-    attachLogFile(logPath);
-    this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
+    const detachLog = attachLogFile(logPath);
+    let staging = null;
 
-    // The .env cascade, loaded HERE because nothing else in the CLI boot does:
-    // the license key below is read from this process's environment, and a
-    // licensed brand keeps OMEGA_LICENSE_KEY in the brand root's .env. Named
-    // `production` — the same environment the stage below composes dist/.env
-    // for (#586), so the verdict and the artifact read one overlay.
-    loadEnv(path.join(self.firebaseProjectPath, 'dist'), { environment: 'production' });
-
-    // The license check ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)),
-    // once per deploy and BEFORE the stage: a backend deploy runs straight
-    // from the CLI, so the key comes out of the .env cascade in this process
-    // and never near the artifact. The verdict itself rides the composed
-    // dist/.env as OMEGA_LICENSE_STATUS — a keyless deploy gates the payment
-    // provider libraries at runtime. A key that cannot be answered for throws
-    // here, which stops the deploy rather than shipping the wrong verdict.
-    const licenseStatus = (await resolveLicenseStamp({
-      // The verdict rides the artifact (dist/.env), so it is asked for against
-      // the PRODUCTION config, the same environment the stage below composes
-      // both halves of the upload for (#856).
-      config,
-      production: true,
-    })).status;
-    this.log(chalk.gray(`  License: ${licenseStatus}\n`));
-
-    // dist/ is staged output (src/dist pillar): a fresh stage carries the
-    // composed config + public/ hosting boilerplate across the upload boundary.
-    // The upload is composed for PRODUCTION — base .env + `.env.production`,
-    // and no other environment's overlay ever rides along (#586).
-    this.ensureStaged({ environment: 'production', licenseStatus });
-
-    // --only above passes through (e.g. `omega deploy --only hosting` deploys
-    // hosting on Spark plans where functions would demand Blaze).
-
-    // Local file: dependencies (local-first @omega.js packages) can't be
-    // followed by Cloud Build — stage them into the upload as packed tarballs
-    const firebaseJSON = jetpack.read(path.join(self.firebaseProjectPath, 'firebase.json'), 'json') || {};
-    const functionsBlock = Array.isArray(firebaseJSON.functions) ? firebaseJSON.functions[0] : firebaseJSON.functions;
-    const functionsPath = path.join(self.firebaseProjectPath, functionsBlock?.source || 'dist');
-    const deployingFunctions = !self.argv?.only || String(self.argv.only).split(',').some((t) => t.trim().startsWith('functions'));
-
-    // Without an Artifact Registry cleanup policy, firebase deploy EXITS 1
-    // after a successful functions deploy — and the post-steps below (public
-    // invoker) never run. Ensure it up front.
-    if (deployingFunctions) {
-      await this.ensureArtifactCleanupPolicy();
-    }
-
-    const staging = deployingFunctions
-      ? await stageLocalPackages({ dir: functionsPath, log: (message) => this.log(message) })
-      : null;
-
+    // Opened at the attach, so a refusal anywhere below still takes this layer off.
     try {
+      this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
+
+      // The .env cascade, loaded HERE because nothing else in the CLI boot does:
+      // the license key below is read from this process's environment, and a
+      // licensed brand keeps OMEGA_LICENSE_KEY in the brand root's .env. Named
+      // `production`: the same environment the stage below composes dist/.env
+      // for (#586), so the verdict and the artifact read one overlay.
+      loadEnv(path.join(self.firebaseProjectPath, 'dist'), { environment: 'production' });
+
+      // The license check ([#320](https://github.com/Omega-JS-Stack/omega/issues/320)),
+      // once per deploy and BEFORE the stage: a backend deploy runs straight
+      // from the CLI, so the key comes out of the .env cascade in this process
+      // and never near the artifact. The verdict itself rides the composed
+      // dist/.env as OMEGA_LICENSE_STATUS: a keyless deploy gates the payment
+      // provider libraries at runtime. A key that cannot be answered for throws
+      // here, which stops the deploy rather than shipping the wrong verdict.
+      const licenseStatus = (await resolveLicenseStamp({
+        // The verdict rides the artifact (dist/.env), so it is asked for against
+        // the PRODUCTION config, the same environment the stage below composes
+        // both halves of the upload for (#856).
+        config,
+        production: true,
+      })).status;
+      this.log(chalk.gray(`  License: ${licenseStatus}\n`));
+
+      // dist/ is staged output (src/dist pillar): a fresh stage carries the
+      // composed config + public/ hosting boilerplate across the upload boundary.
+      // The upload is composed for PRODUCTION: base .env + `.env.production`,
+      // and no other environment's overlay ever rides along (#586).
+      this.ensureStaged({ environment: 'production', licenseStatus });
+
+      // --only above passes through (e.g. `omega deploy --only hosting` deploys
+      // hosting on Spark plans where functions would demand Blaze).
+
+      // Local file: dependencies (local-first @omega.js packages) can't be
+      // followed by Cloud Build, so stage them into the upload as packed tarballs
+      const firebaseJSON = jetpack.read(path.join(self.firebaseProjectPath, 'firebase.json'), 'json') || {};
+      const functionsBlock = Array.isArray(firebaseJSON.functions) ? firebaseJSON.functions[0] : firebaseJSON.functions;
+      const functionsPath = path.join(self.firebaseProjectPath, functionsBlock?.source || 'dist');
+      const deployingFunctions = !self.argv?.only || String(self.argv.only).split(',').some((t) => t.trim().startsWith('functions'));
+
+      // Without an Artifact Registry cleanup policy, firebase deploy EXITS 1
+      // after a successful functions deploy, and the post-steps below (public
+      // invoker) never run. Ensure it up front.
+      if (deployingFunctions) {
+        await this.ensureArtifactCleanupPolicy();
+      }
+
+      staging = deployingFunctions
+        ? await stageLocalPackages({ dir: functionsPath, log: (message) => this.log(message) })
+        : null;
+
       await powertools.execute(`firebase deploy${only}`, {
         log: false,
         config: {
@@ -255,7 +258,7 @@ class DeployCommand extends BaseCommand {
       if (staging) {
         await staging.restore();
       }
-      await attachLogFile.detach();
+      detachLog();
     }
   }
 

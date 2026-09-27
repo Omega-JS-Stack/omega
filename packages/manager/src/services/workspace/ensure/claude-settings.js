@@ -9,9 +9,10 @@
 const chalk = require('chalk').default;
 
 const { ensureClaudeSettings, SETTINGS_FILE, PLUGIN_ID } = require('../../../lib/claude-settings.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
-module.exports = async ({ brandRoot }) => {
-  const result = ensureClaudeSettings(brandRoot);
+module.exports = async ({ brandRoot, options = {} }) => {
+  const result = ensureClaudeSettings(brandRoot, { dryRun: options.dryRun });
 
   if (result === 'skipped') {
     console.log(`      ${chalk.green('✓')} No vendored omega plugin in node_modules/@omega.js/manager (local era) — ${SETTINGS_FILE} left alone`);
@@ -21,6 +22,10 @@ module.exports = async ({ brandRoot }) => {
   if (result === 'invalid') {
     console.log(`      ${chalk.yellow('⚠')} ${SETTINGS_FILE} is not valid JSON — fix it so the omega plugin (${PLUGIN_ID}) can be registered`);
     return { status: 'warned', reason: `${SETTINGS_FILE} is not valid JSON`, output: { claudeSettings: result } };
+  }
+
+  if (options.dryRun && result !== 'present') {
+    return dryRunPlan(`${result === 'created' ? 'create' : 'heal'} ${SETTINGS_FILE} to enable the omega plugin (${PLUGIN_ID})`, { output: { claudeSettings: 'planned' } });
   }
 
   const label = {

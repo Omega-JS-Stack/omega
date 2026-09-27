@@ -1,4 +1,4 @@
-// Optional consumer extension hook — called BEFORE the build pipeline runs (defaults →
+// Optional consumer extension hook, called BEFORE the build pipeline runs (defaults →
 // distribute → bundle → sass → html → audit → build-config). No-op by default.
 //
 // Use this for: pre-flight checks, generating build-time artifacts, mutating config before

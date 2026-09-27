@@ -17,7 +17,8 @@ join with `:`). Ratified 2026-07-29 ([#12](https://github.com/Omega-JS-Stack/ome
 backend `ctx.debug(...)` line is dropped whole — console AND the log file — unless
 `OMEGA_DEBUG` is set (truthy STRING semantics, the house's `TEST_EXTENDED_MODE` idiom:
 `OMEGA_DEBUG=0` reads as on; read live per line). Fat payloads belong there: full user
-records, raw webhook bodies. Two related quieting rules from the same issue: boot-time
+records, raw webhook bodies. The build-time devkit logger's `logger.debug(...)` reads the same
+switch the same way. Two related quieting rules from the same issue: boot-time
 environment notes (the TEST banner, the resolved-mode line) are suppressed under the
 emulator (`FUNCTIONS_EMULATOR`) and latched once-per-process everywhere else, and the
 `omega dev` leg output collapses consecutive duplicate lines into one plus a
@@ -108,7 +109,10 @@ surface attaches it at its entry point.
   CURRENT writers, so tees nest and each detach restores exactly what it found (LIFO).
   The default export is the process-wide singleton, which is what a CLI verb wants; two
   attaches of different paths on the singleton stack the same way (a verb run inside
-  another verb's process), and its `detach()` pops the newest.
+  another verb's process), and its `detach()` pops the newest. A verb detaches through
+  the handle its own attach returned; a test harness that runs a verb takes
+  `attachLogFile.mark()` first and calls the restore it returns after, which takes off
+  exactly the layers the run pushed (one, several, or none), never a blind `detach()`.
 - **`createChildLog()` for spawned children.** A child's stdout/stderr never pass
   through this process' writers; the caller mirrors each buffer to the terminal —
   which the verb's own tee then catches, making the verb log a SUPERSET of the child

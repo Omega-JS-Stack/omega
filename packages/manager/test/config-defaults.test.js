@@ -100,6 +100,31 @@ test('#883: the repo block is never materialized, because its presence IS the sw
   assert.ok(!result.output.defaults.materialized.includes('repo'));
 });
 
+test('#943: a target-only default (web meta.index) lands under targets.<name>, where loadConfig reads it', async () => {
+  const { missingDefaults, deepMerge, undeclaredAuthoredPaths } = require('@omega.js/config');
+  const root = makeBrand();
+
+  const result = await defaultsOp({ brandRoot: root, options: {} });
+
+  const parsed = JSON5.parse(read(root));
+  assert.equal(parsed.targets.web.meta.index, true, 'the web refinement materialized in the web entry');
+  assert.equal(parsed.meta, undefined, 'never at the root, which the strict schema reads as shared');
+  assert.deepEqual(undeclaredAuthoredPaths(parsed), [], 'the healed file still validates');
+  assert.ok(result.output.defaults.materialized.includes('targets.web.meta'));
+
+  const { targets, ...shared } = parsed;
+  assert.deepEqual(missingDefaults(deepMerge(shared, targets.web), 'web'), [], 'the web view carries every default');
+  assert.equal(await defaultsOp({ brandRoot: root, options: {} }), null, 'and a second run is a no-op');
+});
+
+test('#943: a target that already answers its own default is left alone', async () => {
+  const root = makeBrand(AUTHORED.replace("web: { type: 'web' },", "web: { type: 'web', meta: { index: false } },"));
+
+  await defaultsOp({ brandRoot: root, options: {} });
+
+  assert.equal(JSON5.parse(read(root)).targets.web.meta.index, false);
+});
+
 test('defaults: a value the brand authored is never overwritten', async () => {
   const root = makeBrand();
 

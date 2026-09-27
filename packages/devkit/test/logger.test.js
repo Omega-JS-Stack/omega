@@ -96,3 +96,27 @@ test('non-string, non-Error args pass through untouched', () => {
   assert.equal(captured[1], payload);
   assert.equal(captured[2], 42);
 });
+
+test('debug() prints only while OMEGA_DEBUG is set, read live per line', (t) => {
+  const logger = new Logger('debug-scope');
+  const previous = process.env.OMEGA_DEBUG;
+  t.after(() => {
+    if (previous === undefined) delete process.env.OMEGA_DEBUG;
+    else process.env.OMEGA_DEBUG = previous;
+  });
+
+  const lines = [];
+  const original = console.debug;
+  console.debug = (...args) => lines.push(args.map((arg) => stripAnsi(String(arg))).join(' '));
+  try {
+    delete process.env.OMEGA_DEBUG;
+    logger.debug('hidden');
+    process.env.OMEGA_DEBUG = '0';
+    logger.debug('shown');
+  } finally {
+    console.debug = original;
+  }
+
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^\[\d{2}:\d{2}:\d{2}\] \[@omega\.js\/devkit:debug-scope\] shown$/);
+});

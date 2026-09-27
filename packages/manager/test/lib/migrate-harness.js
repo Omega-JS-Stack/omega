@@ -7,6 +7,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// The machine registry is per-machine state: every staged brand records into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const migrateCommand = require('../../src/commands/migrate.js');
 
 function write(filePath, content) {

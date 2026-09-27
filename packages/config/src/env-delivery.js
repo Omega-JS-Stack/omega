@@ -54,7 +54,7 @@ const WORKFLOW_OWNED_KEYS = ['GH_TOKEN', 'CLOUDFLARE_TOKEN', 'NODE_VERSION', 'NO
 
 // Rendered in place of the block when a target delivers nothing, so the
 // generated region is always a valid, self-explaining line of YAML.
-const EMPTY_BLOCK = '# (no CI-delivered keys for this target — the next omega verb regenerates this block)';
+const EMPTY_BLOCK = '# (no CI-delivered keys for this target: the next omega verb regenerates this block)';
 
 // What a target's generated workflow carries in the runner env, per target.
 //

@@ -12,6 +12,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const { schemaDefaults, missingDefaults, defaultComments, planMerge, setAtPath, loadConfig, validateConfig } = require('../src/index.js');
 const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
 

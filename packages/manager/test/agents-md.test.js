@@ -196,7 +196,8 @@ test('agents-md: missing AGENTS.md is created — import first, then a short bra
   const lines = read(dir, 'AGENTS.md').split('\n');
   assert.equal(lines[0], IMPORT_LINE);
   assert.equal(lines[1], '');
-  assert.equal(lines[2], '# Fixture Brand — brand notes');
+  assert.equal(lines[2], '# Fixture Brand: brand notes');
+  assert.ok(!read(dir, 'AGENTS.md').includes('\u2014'), 'no em dash in the written AGENTS.md');
   assert.ok(!read(dir, 'AGENTS.md').includes('<!--'), 'no marker comment (culled 2026-07-20)');
 
   assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'present');
@@ -278,4 +279,24 @@ test('agents-md: op warns (status warned) on a content-bearing CLAUDE.md', async
   const result = await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } });
   assert.equal(result.status, 'warned');
   assert.equal(result.output.claude, 'content-bearing');
+});
+
+test('#971: op under --dry-run plans the link, both files and the heal, and writes nothing', async () => {
+  const { brand, manager } = publishedFixture();
+  fs.writeFileSync(path.join(manager, 'docs', 'AGENTS.md'), '# vendored map\n');
+
+  const fresh = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+
+  assert.deepEqual(fresh.output, { guide: 'planned', agents: 'planned', claude: 'planned' });
+  assert.deepEqual(fs.readdirSync(brand), ['node_modules']);
+  assert.deepEqual(fs.readdirSync(path.join(brand, 'node_modules', '@omega.js')), ['manager']);
+
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# notes without the import\n');
+  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '@AGENTS.md\n');
+
+  const heal = await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+
+  assert.equal(heal.output.agents, 'planned');
+  assert.equal(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8'), '# notes without the import\n');
 });

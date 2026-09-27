@@ -10,6 +10,9 @@ const path = require('node:path');
 const { test } = require('node:test');
 const JSON5 = require('json5');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('../src/order.js');
 const { writeConfigValues } = require('../src/edit.js');
 

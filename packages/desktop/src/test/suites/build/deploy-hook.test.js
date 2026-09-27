@@ -69,6 +69,7 @@ async function runDeploy(options) {
   const origCwd = process.cwd();
 
   delete require.cache[resolved];
+  const restoreTee = attachLogFile.mark();
   global.__omegaDeployHookRan = ran;
 
   try {
@@ -80,7 +81,7 @@ async function runDeploy(options) {
     return ran;
   } finally {
     // The verb tees this process' writers now (#873): hand them back.
-    attachLogFile.detach();
+    restoreTee();
     process.chdir(origCwd);
     delete global.__omegaDeployHookRan;
     for (const restore of restores) restore();
@@ -116,6 +117,7 @@ async function runDriftedDeploy() {
   const origCwd = process.cwd();
 
   delete require.cache[resolved];
+  const restoreTee = attachLogFile.mark();
 
   try {
     const deploy = require(resolved);
@@ -124,7 +126,7 @@ async function runDriftedDeploy() {
     return ran;
   } finally {
     // The verb tees this process' writers now (#873): hand them back.
-    attachLogFile.detach();
+    restoreTee();
     process.chdir(origCwd);
     for (const restore of restores) restore();
     if (cached) require.cache[resolved] = cached;

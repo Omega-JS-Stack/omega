@@ -105,6 +105,7 @@ function readCalls(brand) {
 /** Run the command from `cwd` with positional targets, restoring cwd + exitCode. */
 async function runTestCommand(cwd, targets, flags = {}) {
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   process.chdir(cwd);
   try {
     await testCommand({ _: ['test', ...targets], ...flags });
@@ -112,7 +113,7 @@ async function runTestCommand(cwd, targets, flags = {}) {
   } finally {
     // The verb tees to <brandRoot>/logs/<verb>.log (#623) — release the writers
     // so the next case starts from an unpatched stdout.
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }
@@ -505,11 +506,12 @@ test('`omega test --extended full:` parses as a value-less flag and still carrie
   // …and that argv drives the fan-out for real
   const { brand } = stageBrand();
   const cwd0 = process.cwd();
+  const restoreTee = require('@omega.js/devkit/attach-log-file').mark();
   process.chdir(brand);
   try {
     await testCommand(argv);
   } finally {
-    require('@omega.js/devkit/attach-log-file').detach();
+    restoreTee();
     process.chdir(cwd0);
     process.exitCode = undefined;
   }

@@ -73,9 +73,10 @@ function hasVendoredPlugin(brandRoot) {
  * plugin from its installed manager package.
  *
  * @param {string} brandRoot - Absolute brand monorepo root
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
  * @returns {'skipped'|'present'|'created'|'healed'|'invalid'} - What happened
  */
-function ensureClaudeSettings(brandRoot) {
+function ensureClaudeSettings(brandRoot, { dryRun = false } = {}) {
   if (!hasVendoredPlugin(brandRoot)) {
     return 'skipped';
   }
@@ -105,7 +106,9 @@ function ensureClaudeSettings(brandRoot) {
     [MARKETPLACE_KEY]: { ...marketplaces, [MARKETPLACE_NAME]: marketplaceEntry() },
     [PLUGIN_KEY]: { ...plugins, [PLUGIN_ID]: true },
   };
-  jetpack.write(file, `${JSON.stringify(updated, null, 2)}\n`);
+  if (!dryRun) {
+    jetpack.write(file, `${JSON.stringify(updated, null, 2)}\n`);
+  }
 
   return raw === undefined ? 'created' : 'healed';
 }

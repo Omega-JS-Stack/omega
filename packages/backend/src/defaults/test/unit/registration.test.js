@@ -1,5 +1,5 @@
 /**
- * Registration guard — what this target actually deploys, and whether every
+ * Registration guard: what this target actually deploys, and whether every
  * route it dispatches to still loads.
  *
  * The deployed surface is the FRAMEWORK's own (the `omega_*` functions
@@ -11,12 +11,12 @@
  *      OF `src/index.js` (as text), not listed here. A function you add there
  *      shows up in these assertions on its own.
  *   2. For each route name index.js dispatches, the handler is resolved the way
- *      the request pipeline resolves it — `<routesDir>/<name>/<method>.js`, method
- *      file first, `index.js` fallback — and then REQUIRED, so a broken import
+ *      the request pipeline resolves it (`<routesDir>/<name>/<method>.js`, method
+ *      file first, `index.js` fallback) and then REQUIRED, so a broken import
  *      in a route (an ESM-only dependency, a moved util) fails HERE rather than
  *      at cold start in production.
  *
- * `src/index.js` is read as TEXT, never required — requiring it boots the
+ * `src/index.js` is read as TEXT, never required: requiring it boots the
  * framework (Firebase Admin init, .env cascade, config load), which is exactly the
  * runtime dependency this lane avoids. That nothing in any of these requires
  * reaches the network is not taken on trust: the connect trap preloaded into
@@ -44,7 +44,7 @@ const FRAMEWORK_DIR = path.dirname(require.resolve('@omega.js/backend/package.js
 
 // The prefixes the framework's own registrations occupy. A consumer export
 // wearing one would silently overwrite a framework function, or be overwritten
-// by it — either way something stops deploying.
+// by it. Either way something stops deploying.
 const RESERVED_PREFIXES = ['omega_', 'bm_'];
 
 // The HTTP verbs the request pipeline looks for as `<route>/<method>.js`.
@@ -68,7 +68,7 @@ test('index.js boots the framework from the package that is actually installed',
   assert.match(INDEX, /module\.exports = omega\.functions;/, 'index.js exports omega.functions, the Cloud Functions map');
 
   // The specifier index.js requires, resolved the way NODE resolves it FROM
-  // src/ — the same lookup the deployed function performs at cold start. A
+  // src/, the same lookup the deployed function performs at cold start. A
   // renamed dependency, a missing workspace link or a `file:` path off by a
   // directory all fail here instead of at boot.
   const resolved = require.resolve('@omega.js/backend', { paths: [SRC] });
@@ -84,7 +84,7 @@ test('no consumer function collides with the framework namespace', () => {
     for (const prefix of RESERVED_PREFIXES) {
       assert.ok(
         !fn.name.startsWith(prefix),
-        `omega.functions.${fn.name} takes the framework's reserved "${prefix}" prefix — one of the two functions will not deploy`,
+        `omega.functions.${fn.name} takes the framework's reserved "${prefix}" prefix: one of the two functions will not deploy`,
       );
     }
   }
@@ -97,7 +97,7 @@ test('every route index.js dispatches to resolves and loads the way the middlewa
   // resolve, so it is this test's business only if it names a route.
   for (const fn of consumerFunctions().filter((f) => f.route)) {
     const routeDir = path.resolve(SRC, 'routes', fn.route);
-    assert.ok(fs.existsSync(routeDir), `src/routes/${fn.route}/ does not exist — the route answers 500`);
+    assert.ok(fs.existsSync(routeDir), `src/routes/${fn.route}/ does not exist: the route answers 500`);
 
     const handlers = [...METHOD_FILES, 'index.js']
       .map((file) => path.join(routeDir, file))
@@ -105,7 +105,7 @@ test('every route index.js dispatches to resolves and loads the way the middlewa
 
     assert.ok(
       handlers.length > 0,
-      `src/routes/${fn.route}/ has no <method>.js and no index.js — every request answers 405`,
+      `src/routes/${fn.route}/ has no <method>.js and no index.js: every request answers 405`,
     );
 
     // Requiring is the point: a route's own imports are exercised here instead
@@ -129,10 +129,10 @@ test('the omega_api rewrite still serves the framework prefixes, first', () => {
   const rewrites = FIREBASE.hosting.rewrites;
   const api = rewrites.find((r) => r.function === 'omega_api');
 
-  assert.ok(api, 'no omega_api rewrite — every built-in route would 404');
+  assert.ok(api, 'no omega_api rewrite: every built-in route would 404');
 
   // Firebase hosting glob groups match a WHOLE path, so `/omega/**` alone would
-  // not cover the bare `/omega` — each prefix is listed on its own as well.
+  // not cover the bare `/omega`. Each prefix is listed on its own as well.
   const alternatives = api.source.replace(/^\{|\}$/g, '').split(',');
 
   for (const prefix of ['/omega', '/omega/**']) {

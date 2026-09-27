@@ -106,7 +106,7 @@ Every feature ships with tests at every layer it has a surface in: **logic** (`t
 - Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live).
 - See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
 
-<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
+<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below. They are preserved. -->
 
 # ========== Custom Values ==========
 

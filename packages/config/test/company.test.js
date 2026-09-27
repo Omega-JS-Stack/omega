@@ -197,6 +197,117 @@ test('recordBrand: a line whose root is gone is pruned on the next write', (t) =
   assert.deepStrictEqual(Object.keys(readRegistry()), ['acme'], 'the registry maps what is on this machine now');
 });
 
+// Seed the registry file by hand, as another brand's run would have left it.
+function seedRegistry(lines) {
+  fs.mkdirSync(process.env.OMEGA_HOME, { recursive: true });
+  fs.writeFileSync(registryFile(), `${JSON.stringify(lines, null, 2)}\n`);
+}
+
+test('recordBrand: a prune keeps a line whose root exists and drops a line whose root is missing', (t) => {
+  const root = makeFixture('company-registry-keep', {
+    'company/config/omega.json5': `{ brand: { id: 'itw-creative-works' } }`,
+    'brand/config/omega.json5': `{ brand: { id: 'playground' } }`,
+  });
+  useHome(t, root);
+  fs.symlinkSync(path.join(root, 'company'), path.join(root, 'company-link'));
+
+  seedRegistry({
+    'itw-creative-works': { root: path.join(root, 'company'), name: 'ITW Creative Works', url: null, updatedAt: '2026-09-01T00:00:00.000Z' },
+    linked: { root: path.join(root, 'company-link'), name: null, url: null, updatedAt: '2026-09-01T00:00:00.000Z' },
+    ghost: { root: path.join(root, 'deleted-brand'), name: null, url: null, updatedAt: '2026-09-01T00:00:00.000Z' },
+  });
+
+  assert.strictEqual(recordBrand({ id: 'playground', root: path.join(root, 'brand') }), true);
+
+  const registry = readRegistry();
+  assert.deepStrictEqual(Object.keys(registry).sort(), ['itw-creative-works', 'linked', 'playground']);
+  assert.strictEqual(registry['itw-creative-works'].root, path.join(root, 'company'));
+  assert.strictEqual(resolveCompany(path.join(root, 'brand'), { company: { id: 'linked' } }).root, path.join(root, 'company-link'), 'the reader resolves the kept symlinked root the same way');
+});
+
+test('recordBrand: a registry it cannot read is left untouched, never rewritten to one line', (t) => {
+  const root = makeFixture('company-registry-torn', {
+    'company/config/omega.json5': `{ brand: { id: 'itw-creative-works' } }`,
+    'brand/config/omega.json5': `{ brand: { id: 'playground' } }`,
+  });
+  useHome(t, root);
+
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  t.after(() => { console.warn = realWarn; });
+
+  // What a reader sees mid-write from a racing process: the first half of a file.
+  seedRegistry({ 'itw-creative-works': { root: path.join(root, 'company'), name: 'ITW Creative Works', url: null } });
+  const torn = fs.readFileSync(registryFile(), 'utf8').slice(0, 40);
+  fs.writeFileSync(registryFile(), torn);
+
+  assert.strictEqual(recordBrand({ id: 'playground', root: path.join(root, 'brand') }), false);
+  assert.strictEqual(fs.readFileSync(registryFile(), 'utf8'), torn);
+  assert.strictEqual(warnings.length, 1);
+  assert.match(warnings[0], /\[@omega\.js\/config:company\]/);
+  assert.ok(warnings[0].includes(registryFile()), 'the warning names the file');
+});
+
+test('recordBrand: racing writers never lose a line whose root exists', async (t) => {
+  const root = makeFixture('company-registry-race', {
+    'company/config/omega.json5': `{ brand: { id: 'itw-creative-works' } }`,
+    'a/config/omega.json5': '{}',
+    'b/config/omega.json5': '{}',
+  });
+  useHome(t, root);
+  seedRegistry({ 'itw-creative-works': { root: path.join(root, 'company'), name: 'ITW Creative Works', url: null } });
+
+  // Each writer flips its own line between two roots, so every call writes.
+  const writer = (id) => new Promise((resolve, reject) => {
+    const script = `
+      const { recordBrand } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'company.js'))});
+      for (let i = 0; i < 150; i++) recordBrand({ id: ${JSON.stringify(id)}, root: ${JSON.stringify(root)} + (i % 2 ? '/a' : '/b') });
+    `;
+    const child = require('node:child_process').spawn(process.execPath, ['-e', script], { env: process.env, stdio: 'ignore' });
+    child.on('error', reject);
+    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`writer ${id} exited ${code}`))));
+  });
+
+  await Promise.all(['w1', 'w2', 'w3', 'w4', 'w5', 'w6'].map(writer));
+
+  assert.ok(readRegistry()['itw-creative-works'], 'the company line survived every concurrent write');
+});
+
+test('recordBrand: every write logs its caller, the ids kept and the ids pruned at debug level', (t) => {
+  const root = makeFixture('company-registry-debug', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+  });
+  useHome(t, root);
+
+  const lines = [];
+  const realDebug = console.debug;
+  const previous = process.env.OMEGA_DEBUG;
+  console.debug = (...args) => lines.push(args.join(' '));
+  t.after(() => {
+    console.debug = realDebug;
+    if (previous === undefined) delete process.env.OMEGA_DEBUG;
+    else process.env.OMEGA_DEBUG = previous;
+  });
+
+  seedRegistry({ ghost: { root: path.join(root, 'deleted-brand'), name: null, url: null } });
+
+  delete process.env.OMEGA_DEBUG;
+  recordBrand({ id: 'acme', root: path.join(root, 'brand'), name: 'Acme' });
+  assert.deepStrictEqual(lines, [], 'silent without OMEGA_DEBUG');
+
+  process.env.OMEGA_DEBUG = '1';
+  recordBrand({ id: 'acme', root: path.join(root, 'brand'), name: 'Acme Renamed' });
+  seedRegistry({ acme: readRegistry().acme, ghost: { root: path.join(root, 'deleted-brand'), name: null, url: null } });
+  recordBrand({ id: 'acme', root: path.join(root, 'brand'), name: 'Acme' });
+
+  assert.strictEqual(lines.length, 2);
+  assert.match(lines[1], /\[@omega\.js\/config:company\]/);
+  assert.ok(lines[1].includes(process.argv[1]), 'names the calling process');
+  assert.ok(lines[1].includes('kept [acme]'), lines[1]);
+  assert.ok(lines[1].includes('pruned [ghost]'), lines[1]);
+});
+
 test('loadConfig writes the brand its own registry line, idempotently', (t) => {
   const { root, parentRoot, childRoot } = makeCompanyFixture('company-registry-load');
   useHome(t, root);

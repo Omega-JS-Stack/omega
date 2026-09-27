@@ -5,17 +5,17 @@
  * That is correct for a STANDALONE target (the target dir is the git root) and dead on
  * arrival inside a brand monorepo: GitHub executes workflows from the REPO
  * ROOT's `.github/workflows/` only, so `targets/extension/.github/workflows/publish.yml`
- * never runs — CI builds and store publishes silently do not exist.
+ * never runs: CI builds and store publishes silently do not exist.
  *
  * In a monorepo the target's workflow is COMPOSED into the root dir instead: one
  * file per target (`<target>-<workflow>.yml`), every post-checkout `run:` step scoped
- * to the target's path, regenerated from the framework template on every setup — so
+ * to the target's path, regenerated from the framework template on every setup, so
  * a re-run updates the target's own file and can never duplicate a job. Each target's
  * runs also get their own concurrency group, so one target's deploy never cancels
  * another's.
  *
  * Scoping is by working directory, not by a `paths:` trigger filter: OMEGA
- * workflows carry NO push triggers by design (deliberate deploys — D13), and a
+ * workflows carry NO push triggers by design (deliberate deploys, D13), and a
  * path filter on a dispatch-only workflow filters nothing. It is declared PER
  * STEP, not as a workflow-level `defaults.run.working-directory`: that would
  * also scope the steps that run before actions/checkout (and the jobs that never
@@ -23,7 +23,7 @@
  *
  * Composition RECONCILES (#636): the enabled target set derives the composed
  * file set, so a target the brand's config no longer enables has its composed
- * files DELETED (reconcileComposedWorkflows) — the ratified example of a
+ * files DELETED (reconcileComposedWorkflows): the ratified example of a
  * dropped config key becoming a real removal.
  */
 const path = require('path');
@@ -68,7 +68,7 @@ const INSTALL_WORKSPACE_FLAG = '--workspace .';
  * an unscoped artifact upload collects an empty repo-root path.
  *
  * Named per action on purpose: a blanket "any input called path" rule would
- * rewrite inputs that mean something else — `actions/checkout`'s `path:` names
+ * rewrite inputs that mean something else: `actions/checkout`'s `path:` names
  * where to CLONE the repo, not a file in it. An action missing from this table
  * is left alone; add it here when a template starts using it.
  */
@@ -164,7 +164,7 @@ function composeWorkflow(contents, options) {
   // (and its own engines.node pin) sits beside it.
   composed = renderInstallWorkspace(composed, { composed: true });
 
-  // Display name carries the target — two targets' runs are told apart in the
+  // Display name carries the target: two targets' runs are told apart in the
   // Actions list, where only the workflow name shows.
   composed = composed.replace(/^name:[ \t]*(.*)$/m, (full, value) => `name: ${value.trim()} (${targetPath})`);
 
@@ -173,7 +173,7 @@ function composeWorkflow(contents, options) {
   composed = composed.replace(/^(concurrency:\n(?:[ \t]+.*\n)*?[ \t]+group:[ \t]*)(.*)$/m, (full, prefix, value) => `${prefix}${targetName}-${value.trim()}`);
 
   // Every `run:` step that follows its job's checkout executes in the target dir
-  // (`uses:` actions — checkout and friends — stay at the repo root, which is
+  // (`uses:` actions, checkout and friends, stay at the repo root, which is
   // what they want).
   composed = scopeRunSteps(composed, targetPath);
 
@@ -238,12 +238,12 @@ function composeTargetWorkflows(options) {
 /**
  * Delete the composed workflows of targets this brand no longer has (#636).
  * Composing is per-target and a dropped target's framework never runs again, so
- * the file it wrote at the brand root would outlive it forever — a workflow
+ * the file it wrote at the brand root would outlive it forever: a workflow
  * Actions still lists and still dispatches for a target that is gone.
  *
  * The brand root's `.github/workflows/` is a MIXED dir: the brand's own
  * human-authored workflows live beside the composed ones. So a file goes only
- * past a DOUBLE lock — it carries the GENERATED header (which also NAMES the
+ * past a DOUBLE lock: it carries the GENERATED header (which also NAMES the
  * target it was composed for) AND it is named the composed way,
  * `<target>-<framework file>.yml`. A human file matches neither and is never
  * even a candidate; nothing here reads or edits one.
@@ -283,14 +283,14 @@ function reconcileComposedWorkflows(options) {
       jetpack.remove(file);
     }
     result.removed.push(`.github/workflows/${name}`);
-    logger.log(`Removed .github/workflows/${name} — ${owned.targetPath} is no longer a target of this brand`);
+    logger.log(`Removed .github/workflows/${name}: ${owned.targetPath} is no longer a target of this brand`);
   }
 
   return result;
 }
 
 /**
- * The workflow file name to dispatch for a target — composed in a brand monorepo,
+ * The workflow file name to dispatch for a target: composed in a brand monorepo,
  * the framework's own name standalone. The ONE place deploy verbs and the
  * compose step agree on the name.
  * @param {object} options
@@ -324,7 +324,7 @@ function composedWorkflowNameFor(name, workflow) {
 // A workflow-level `defaults.run.working-directory` reads cleaner but applies to
 // EVERY run step, including the ones that execute before actions/checkout (the
 // git config step, a matrix-resolving step) and the jobs that never check out at
-// all — the target dir does not exist there yet, and the job dies on step 1.
+// all: the target dir does not exist there yet, and the job dies on step 1.
 function scopeRunSteps(contents, targetPath) {
   const lines = contents.split('\n');
   const output = [];
@@ -343,7 +343,7 @@ function scopeRunSteps(contents, targetPath) {
 
   for (const line of lines) {
     const indent = line.search(/\S/);
-    // Comments and blank lines never close a block — they belong to what follows
+    // Comments and blank lines never close a block; they belong to what follows
     const structural = indent >= 0 && !line.trimStart().startsWith('#');
 
     // A top-level key closes any open steps list and says whether we are in `jobs:`
@@ -417,8 +417,8 @@ function actionOf(step, keyIndent) {
   return line ? line.slice(line.indexOf('uses:') + 5).trim().split('@')[0] : null;
 }
 
-// `hashFiles()` globs from GITHUB_WORKSPACE wherever it appears — no step key
-// moves it — so a composed target workflow's patterns carry the target path or match
+// `hashFiles()` globs from GITHUB_WORKSPACE wherever it appears (no step key
+// moves it), so a composed target workflow's patterns carry the target path or match
 // nothing at all.
 function scopeHashFiles(step, targetPath) {
   return step.map((line) => line.replace(/hashFiles\(([^)]*)\)/g, (full, args) => {
@@ -491,7 +491,7 @@ function scopeValue(value, targetPath) {
 }
 
 // A target-relative path/glob. Absolute paths and expression-built values name
-// something other than a file in the checkout — those are left as written.
+// something other than a file in the checkout; those are left as written.
 function joinTargetPath(value, targetPath) {
   const trimmed = value.trim();
   const scoped = trimmed.replace(/^\.\//, '');
@@ -503,7 +503,7 @@ function joinTargetPath(value, targetPath) {
   return `${targetPath}/${scoped}`;
 }
 
-// Declare `working-directory` on one run step's lines — a step that already
+// Declare `working-directory` on one run step's lines. A step that already
 // declares its own is left alone.
 function scopeRunStep(step, keyIndent, targetPath) {
   const pad = ' '.repeat(keyIndent);
@@ -544,11 +544,11 @@ function sweepTargetCopy(context) {
     jetpack.remove(targetCopy);
     pruneEmptyDirs(path.dirname(targetCopy), targetDir);
     result.removed.push(`.github/workflows/${name}`);
-    logger.log(`Removed ${targetPath}/.github/workflows/${name} — GitHub only runs workflows from the repo root`);
+    logger.log(`Removed ${targetPath}/.github/workflows/${name}: GitHub only runs workflows from the repo root`);
     return;
   }
 
-  logger.warn(`Kept ${targetPath}/.github/workflows/${name} — it differs from the current framework template (your edits, or an older framework version), and GitHub NEVER runs a workflow from a target dir. Compare it against ${composedName}, move anything it still needs, then delete ${targetPath}/.github/workflows/${name}`);
+  logger.warn(`Kept ${targetPath}/.github/workflows/${name}: it differs from the current framework template (your edits, or an older framework version), and GitHub NEVER runs a workflow from a target dir. Compare it against ${composedName}, move anything it still needs, then delete ${targetPath}/.github/workflows/${name}`);
 }
 
 // Is every line of the target's copy a line the current template still ships, in
@@ -559,7 +559,7 @@ function sweepTargetCopy(context) {
 // same file minus those lines, #334). A line the consumer ADDED or CHANGED is a
 // line no template of this framework ever shipped, so it fails here and the
 // copy is kept. Accepted blind spot: an edit that ONLY deletes lines is still a
-// subsequence and gets swept — bounded, because a target-dir workflow never runs
+// subsequence and gets swept. Bounded, because a target-dir workflow never runs
 // and the composed root file is regenerated from the current template.
 function isFrameworkGeneration(existing, rendered) {
   const template = rendered.split('\n');
@@ -587,7 +587,7 @@ function pruneEmptyDirs(dir, rootDir) {
   }
 }
 
-// posix-style target path — this string ends up inside a YAML workflow.
+// posix-style target path: this string ends up inside a YAML workflow.
 function relativePath(from, to) {
   return path.relative(from, to).split(path.sep).join('/');
 }
@@ -596,14 +596,14 @@ function relativePath(from, to) {
 // the file is framework-owned AND which target it belongs to, which is what
 // makes the reconcile able to tell a composed file from a brand's own workflow
 // without guessing from the name alone.
-const generatedMark = (targetPath) => `# GENERATED by the ${targetPath} framework scaffold — do not edit.`;
-// Reading accepts the LEGACY wording too (`# GENERATED by \`omega setup\` for
-// <targetPath> — do not edit.`): a target dropped before the rewording keeps its
-// old-header file forever, which is exactly the file the reconcile exists to
-// remove. Composing only ever writes the current sentence.
-const GENERATED_MARK = /^# GENERATED by (?:the (\S+) framework scaffold|`omega setup` for (\S+)) — do not edit\.$/;
+const generatedMark = (targetPath) => `# GENERATED by the ${targetPath} framework scaffold. Do not edit.`;
+// Reading also accepts the older forms (the `omega setup` wording, the em dash
+// separator): a dropped target keeps its old-header file forever, which is exactly
+// the file the reconcile exists to remove. Composing only ever writes the current
+// sentence.
+const GENERATED_MARK = /^# GENERATED by (?:the (\S+) framework scaffold|`omega setup` for (\S+))(?:\. Do| \u2014 do) not edit\.$/;
 
-// Which target a brand-root workflow file was composed for — null when the file
+// Which target a brand-root workflow file was composed for, null when the file
 // is not a composed one. BOTH locks must hold: the generation mark on line 1,
 // and the `<target>-<framework file>.yml` naming the compose writes.
 function composedWorkflowOwner(name, contents) {
@@ -633,4 +633,4 @@ function header(targetPath) {
   ].join('\n');
 }
 
-module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, composedWorkflowNameFor, reconcileComposedWorkflows, renderInstallFirewall, renderInstallWorkspace, FIREWALL_ACTION, FIREWALL_STEP_ID, FIREWALL_TOKEN, INSTALL_WORKSPACE_TOKEN, INSTALL_WORKSPACE_FLAG };
+module.exports = { composeWorkflow, composeTargetWorkflows, composedWorkflowName, composedWorkflowNameFor, composedWorkflowOwner, reconcileComposedWorkflows, renderInstallFirewall, renderInstallWorkspace, FIREWALL_ACTION, FIREWALL_STEP_ID, FIREWALL_TOKEN, INSTALL_WORKSPACE_TOKEN, INSTALL_WORKSPACE_FLAG };

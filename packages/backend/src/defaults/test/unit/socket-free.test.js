@@ -3,8 +3,8 @@
  *
  * `test/_helpers/connect-trap.js` is preloaded into every test process by the
  * `test` script. If that flag is ever dropped from package.json, or node stops
- * forwarding execArgv to test children, the rest of this lane would still pass
- * — quietly able to reach the REAL Firebase project through the framework tree
+ * forwarding execArgv to test children, the rest of this lane would still pass,
+ * quietly able to reach the REAL Firebase project through the framework tree
  * registration.test.js loads, with whatever credentials the environment happens
  * to carry. This file is what turns that silent regression into a red test.
  *
@@ -20,7 +20,7 @@ const dns = require('node:dns');
 test('the connect trap is loaded in this test process', () => {
   assert.ok(
     globalThis.__omegaConnectTrap?.installed,
-    'the connect-trap preload is missing — the static lane can reach the network',
+    'the connect-trap preload is missing: the static lane can reach the network',
   );
 });
 
@@ -30,7 +30,7 @@ test('opening a TCP socket is refused', () => {
   assert.throws(
     () => socket.connect(443, 'firestore.googleapis.com'),
     (e) => e.code === 'CONNECT_TRAP',
-    'a TCP connect went through — the live Firestore is one call away',
+    'a TCP connect went through: the live Firestore is one call away',
   );
 });
 

@@ -54,9 +54,9 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 - `config/messages.json`: i18n source. Auto-translated at build time to the languages in `translation.languages` (omega.json5); only missing keys regenerated, cache committed under `translations/`.
 - `config/description.md`: store-listing description (used by the publish step).
 - `src/manifest.json`: extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension.
-  - Anything you DO declare wins outright — an array you write replaces the framework's, and an empty one ships nothing.
+  - Anything you DO declare wins outright: an array you write replaces the framework's, and an empty one ships nothing.
   - The firefox artifact needs `browser_specific_settings.gecko.id` (packaging fails without it) and gets `side_panel` translated to `sidebar_action` automatically.
-- `src/assets/images/`: static images. They copy to `dist/` as-is — no hook, no imagemin step.
+- `src/assets/images/`: static images. They copy to `dist/` as-is: no hook, no imagemin step.
 - `src/views/<context>/index.html`: per-context HTML (popup / options / sidepanel / pages).
 - `src/assets/js/components/<context>/index.js`: per-context script entry. One-line bootstrap of `@omega.js/extension/<context>`.
 - `src/assets/css/components/<context>/index.scss`: per-context styles.
@@ -102,7 +102,7 @@ Every feature ships with tests at every layer it has a surface in: **logic** (`t
 - Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
 - See `test/README.md` and `node_modules/@omega.js/extension/docs/test-framework.md`.
 
-<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below — they are preserved. -->
+<!-- Everything above this marker is owned by the framework and rewritten by every omega verb. Add your project-specific notes below. They are preserved. -->
 
 # ========== Custom Values ==========
 

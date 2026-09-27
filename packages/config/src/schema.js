@@ -214,7 +214,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: "This TARGET's own public URL, and the one key a target entry may set at the top level. A target whose name is not its type derives it from the name (`admin: { type: 'web' }` → https://admin.<host of brand.url>, #588/#886; docs/shared/config.md → Targets); an entry's own `url` overrides it for a custom host. `brand.url` stays the BRAND's url, which is what brand-level facts (authDomain, the persona domain) read.",
+    description: "This TARGET's own public URL, and the one key a target entry may set at the top level. A target whose name is not its type derives it from the name (`admin: { type: 'web' }` → https://admin.<host of brand.url>; docs/shared/config.md → Targets); an entry's own `url` overrides it for a custom host. `brand.url` stays the BRAND's url, which is what brand-level facts (authDomain, the persona domain) read.",
   },
 
   // ── the target's own type (#886) ─────────────────────────────────────────
@@ -227,7 +227,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     enum:        [...TARGETS, CUSTOM_TARGET_TYPE],
-    description: "The FRAMEWORK that runs this target (#886), or `custom` for a target no framework owns. Key presence in `targets` enables a target by NAME, and this is what says which code runs there, so a target named `admin` with `type: 'web'` is a web build. A resolved target config carries it at the top level like every other key in the entry.",
+    description: "The FRAMEWORK that runs this target, or `custom` for a target no framework owns. Key presence in `targets` enables a target by NAME, and this is what says which code runs there, so a target named `admin` with `type: 'web'` is a web build. A resolved target config carries it at the top level like every other key in the entry.",
   },
 
   // ── brand ────────────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ const SHARED_SCHEMA = [
     path:        'brand.type',
     type:        'string',
     required:    false,
-    description: "The brand's schema.org type ('Organization', 'Corporation', 'LocalBusiness'). @omega.js/web stamps it on the JSON-LD brand node and every @id that cross-references it; unset renders the framework default 'Organization' (#271).",
+    description: "The brand's schema.org type ('Organization', 'Corporation', 'LocalBusiness'). @omega.js/web stamps it on the JSON-LD brand node and every @id that cross-references it; unset renders the framework default 'Organization'.",
   },
   {
     path:        'brand.font',
@@ -292,7 +292,7 @@ const SHARED_SCHEMA = [
     path:        'brand.contact.person.name',
     type:        'string',
     required:    false,
-    description: 'The human who signs "personal" emails, as it should read ("Jane Doe, CEO"). Required only when something sends a personal-signoff email — that path fails loudly rather than substituting a framework identity.',
+    description: 'The human who signs "personal" emails, as it should read ("Jane Doe, CEO"). Required only when something sends a personal-signoff email; that path fails loudly rather than substituting a framework identity.',
   },
   {
     path:        'brand.contact.person.firstName',
@@ -336,7 +336,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     match:       /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/,
-    description: 'Brand accent color as a hex string (#RGB or #RRGGBB). @omega.js/web composes the --omega-accent ramps (light + dark) from it; unset leaves the theme\'s neutral placeholder standing.',
+    description: "Brand accent color as a hex string, #RGB or #RRGGBB. @omega.js/web composes the --omega-accent ramps (light + dark) from it; unset leaves the theme's neutral placeholder standing.",
   },
   {
     path:        'brand.images',
@@ -350,7 +350,7 @@ const SHARED_SCHEMA = [
     path:        'socials',
     type:        'object',
     required:    false,
-    description: "Platform → handle ({ twitter: 'somiibo' }). The handle derives the profile URL every surface reads (JSON-LD sameAs, the footer row, omega_social), and @omega.js/web emits a redirect shortlink page at /<platform> for each entry (#429). An entry that redirects somewhere OTHER than its profile URL takes the object form { handle, redirect } — the redirect target wins for the shortlink, the handle still names the profile.",
+    description: "Platform → handle ({ twitter: 'somiibo' }). The handle derives the profile URL every surface reads (JSON-LD sameAs, the footer row, omega_social), and @omega.js/web emits a redirect shortlink page at /<platform> for each entry. An entry that redirects somewhere OTHER than its profile URL takes the object form { handle, redirect }: the redirect target wins for the shortlink, the handle still names the profile.",
   },
 
   // ── cloud (role: app/cloud platform; D12 provider-discriminated) ─────────
@@ -359,14 +359,14 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     enum:        ['firebase'],
-    description: "App/cloud platform provider. Only 'firebase' today — the discriminator exists so a second provider slots in without a key rename.",
+    description: "App/cloud platform provider. Only 'firebase' today; the discriminator exists so a second provider slots in without a key rename.",
   },
   ...CLOUD_CONFIG_RULES,
   {
     path:        'cloud.messaging.vapidKey',
     type:        'string',
     required:    false,
-    description: 'Web-push VAPID public key (Firebase console → Cloud Messaging → Web Push certificates). Public by design — it ships to every browser; the private half stays in the console.',
+    description: 'Web-push VAPID public key (Firebase console → Cloud Messaging → Web Push certificates). Public by design: it ships to every browser, and the private half stays in the console.',
   },
   {
     path:        'cloud.shared',
@@ -380,19 +380,19 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     match:       /@/,
-    description: "OAuth consent screen support email. Defaults to the AUTHORIZING user's email — the provider rejects any address the caller doesn't own; set only for an owned Google Group.",
+    description: "OAuth consent screen support email. Defaults to the AUTHORIZING user's email, because the provider rejects any address the caller doesn't own; set only for an owned Google Group.",
   },
   {
     path:        'cloud.oauthRedirectsConfigured',
     type:        'boolean',
     required:    false,
-    description: "true = the Google OAuth client's authorized origins + redirect URIs are configured by hand. The ONE reconcile flag config keeps (#434) — that surface has no API to re-check, so the cloud service asks once, writes the answer back here, and every later run trusts it. Never set it without doing the work: the confirm is the only proof there is.",
+    description: "true = the Google OAuth client's authorized origins + redirect URIs are configured by hand. The ONE reconcile flag config keeps: that surface has no API to re-check, so the cloud service asks once, writes the answer back here, and every later run trusts it. Never set it without doing the work: the confirm is the only proof there is.",
   },
   {
     path:        'cloud.consentAudience',
     type:        'boolean',
     required:    false,
-    description: "false = stop asking about the OAuth consent screen's audience. Tri-state opt-out (#667): Google gives NO API write for the audience, so an Internal screen (Error 403: org_internal for every non-org account) is a manage-time stopper that opens the console page and polls — `false` records the deliberate choice to live with an org-only sign-in, and only the cloud service's audience step goes quiet.",
+    description: "false = stop asking about the OAuth consent screen's audience. A tri-state opt-out: Google gives NO API write for the audience, so an Internal screen (Error 403: org_internal for every non-org account) is a manage-time stopper that opens the console page and polls; `false` records the deliberate choice to live with an org-only sign-in, and only the cloud service's audience step goes quiet.",
   },
   {
     path:        'cloud.apiSubdomain',
@@ -405,13 +405,13 @@ const SHARED_SCHEMA = [
     path:        'cloud.organizationId',
     type:        'string|boolean',
     required:    false,
-    description: 'Cloud organization ID the project is created inside — tri-state: unset = ask at project create, false = no org (standalone), value = create inside it.',
+    description: 'Cloud organization ID the project is created inside, a tri-state: unset = ask at project create, false = no org (standalone), value = create inside it.',
   },
   {
     path:        'cloud.billingAccount',
     type:        'string|boolean',
     required:    false,
-    description: "Billing account ('billingAccounts/XXXXXX-XXXXXX-XXXXXX') — tri-state: unset = ask, false = stay on the free tier, value = auto-upgrade.",
+    description: "Billing account ('billingAccounts/XXXXXX-XXXXXX-XXXXXX'), a tri-state: unset = ask, false = stay on the free tier, value = auto-upgrade.",
   },
 
   // ── analytics ────────────────────────────────────────────────────────────
@@ -426,13 +426,13 @@ const SHARED_SCHEMA = [
     path:        'analytics.providers.google.propertyId',
     type:        'string',
     required:    false,
-    description: 'GA4 property id (digits, as the Admin API returns it) — the manager\'s analytics service reconciles the brand\'s data streams and the Firebase link against it, and it gates the whole google half: no propertyId, no google operations. Interactive setup selects/creates the property and writes it back here.',
+    description: "GA4 property id (digits, as the Admin API returns it). The manager's analytics service reconciles the brand's data streams and the Firebase link against it, and it gates the whole google half: no propertyId, no google operations. Interactive setup selects/creates the property and writes it back here.",
   },
   {
     path:        'analytics.providers.google.accountId',
     type:        'string',
     required:    false,
-    description: "GA account id the property lives under (digits) — the analytics property picker and the console bookmarks read it. A company-managed brand inherits the COMPANY layer's value through the merge chain; a brand-level value always wins.",
+    description: "GA account id the property lives under (digits), read by the analytics property picker and the console bookmarks. A company-managed brand inherits the COMPANY layer's value through the merge chain; a brand-level value always wins.",
   },
   {
     path:        'analytics.providers.meta.id',
@@ -444,7 +444,7 @@ const SHARED_SCHEMA = [
     path:        'analytics.providers.meta.accountId',
     type:        'string',
     required:    false,
-    description: "Meta AD ACCOUNT id ('act_…' or the bare digits) the pixel is created on and found by name against. A non-secret platform id, so it lives here beside google.accountId — the token that reaches the account stays in .env (META_ACCESS_TOKEN).",
+    description: "Meta AD ACCOUNT id ('act_…' or the bare digits) the pixel is created on and found by name against. A non-secret platform id, so it lives here beside google.accountId; the token that reaches the account stays in .env (META_ACCESS_TOKEN).",
   },
   {
     path:        'analytics.providers.tiktok.id',
@@ -462,7 +462,7 @@ const SHARED_SCHEMA = [
     path:        'analytics.providers.tiktok.appId',
     type:        'string',
     required:    false,
-    description: "TikTok DEVELOPER APP id the access-token mint authorizes through (#448) — public config, so the manager can walk the portal without asking twice; setup writes it back here (#635). The app secret is pasted once and never saved, and the token lands in .env (TIKTOK_ACCESS_TOKEN).",
+    description: 'TikTok DEVELOPER APP id the access-token mint authorizes through. Public config, so the manager can walk the portal without asking twice; setup writes it back here. The app secret is pasted once and never saved, and the token lands in .env (TIKTOK_ACCESS_TOKEN).',
   },
 
   // ── advertising ──────────────────────────────────────────────────────────
@@ -470,7 +470,7 @@ const SHARED_SCHEMA = [
     path:        'advertising.providers.adsense.client',
     type:        'string',
     required:    false,
-    description: 'AdSense publisher client id (ca-pub-…). The ONE adsense switch (#527), presence-driven: set it and the manager service manages the account, the site renders units from it and ads.txt carries the record; leave it out and none of that happens. No second gate — a managed-but-ad-free brand is deliberately inexpressible.',
+    description: 'AdSense publisher client id (ca-pub-…). The ONE adsense switch, presence-driven: set it and the manager service manages the account, the site renders units from it and ads.txt carries the record; leave it out and none of that happens. No second gate exists, so a managed-but-ad-free brand is deliberately inexpressible.',
   },
   {
     path:        'advertising.providers.adsense.displaySlot',
@@ -506,13 +506,13 @@ const SHARED_SCHEMA = [
     path:        'advertising.fallback',
     type:        'string|boolean',
     required:    false,
-    description: "The role a provider miss falls through to — 'inhouse' renders the house unit, false (or absent) ends the ladder at the built-in promo. Role-level, beside `providers` (docs/web/ads-system.md).",
+    description: "The role a provider miss falls through to: 'inhouse' renders the house unit, false (or absent) ends the ladder at the built-in promo. Role-level, beside `providers` (docs/web/ads-system.md).",
   },
   {
     path:        'advertising.tags',
     type:        'array',
     required:    false,
-    description: "This brand's contextual tags (['music', 'audio-tools']) — the targeting match input a house unit sends with its serve request unless the include passes its own. No user tracking.",
+    description: "This brand's contextual tags (['music', 'audio-tools']), the targeting match input a house unit sends with its serve request unless the include passes its own. No user tracking.",
   },
 
   // ── company (ONE typed key, the rest RESOLVED) ───────────────────────────
@@ -539,7 +539,7 @@ const SHARED_SCHEMA = [
     // would be noise, and the fact belongs to the brands that actually share
     // somebody else's provider account.
     materialize: false,
-    description: "Whether the manage walk may repoint this company's provider ACCOUNT webhooks (#677). `false` says the SendGrid Event Webhook and the Beehiiv webhook belong to someone else (a shared account whose one account-level webhook points at their production), so the campaigns and newsletter services leave them alone. The successor to the retired top-level `parent: false`.",
+    description: "Whether the manage walk may repoint this company's provider ACCOUNT webhooks. `false` says the SendGrid Event Webhook and the Beehiiv webhook belong to someone else (a shared account whose one account-level webhook points at their production), so the campaigns and newsletter services leave them alone.",
   },
 
   // ── features (the catalog every product prices) ──────────────────────────
@@ -547,7 +547,7 @@ const SHARED_SCHEMA = [
     path:        'features',
     type:        'object',
     required:    false,
-    description: "The feature catalog (#647): every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon (the full Font Awesome class string, #929), definition — and, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
+    description: "The feature catalog: every feature DEFINED once, keyed by id, in the order every surface renders it. An entry carries name, icon (the full Font Awesome class string) and definition, plus, when the feature is METERED, a `usage` block ({ pace: 'daily' | false, mirror: ['<doc kind>'] }); an entry without one is a perk. Products name only the VALUE (payment.products[].features). Key order is row order on the pricing page and the account's usage bars.",
   },
 
   // ── payment (role: billing; provider-discriminated) ──────────────────────
@@ -556,7 +556,7 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     default:     'USD',
-    description: "The ISO 4217 code every price in payment.products is quoted in (#850). One currency per brand, named wherever a price is shown or recorded: the pricing page's JSON-LD, the checkout, and the backend's order history (GET /user/orders). Defaults to 'USD', the fallback its readers carried before the fact had a home. The successor to the retired targets.web.currency.",
+    description: "The ISO 4217 code every price in payment.products is quoted in. One currency per brand, named wherever a price is shown or recorded: the pricing page's JSON-LD, the checkout, and the backend's order history (GET /user/orders). Defaults to 'USD'.",
   },
   {
     path:        'payment.providers.stripe.publishableKey',
@@ -582,20 +582,20 @@ const SHARED_SCHEMA = [
     type:        'boolean',
     required:    false,
     default:     false,
-    description: "Coinbase Commerce (crypto) checkout, one-time purchases only. Its ONLY credential is a secret (COINBASE_COMMERCE_API_KEY), so there is no public datum to gate on — this is the switch, default OFF, because an accidental ON shows a Crypto button no key can complete.",
+    description: 'Coinbase Commerce (crypto) checkout, one-time purchases only. Its ONLY credential is a secret (COINBASE_COMMERCE_API_KEY), so there is no public datum to gate on: this is the switch, default OFF, because an accidental ON shows a Crypto button no key can complete.',
   },
   {
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, prices, per-provider IDs) — referenceable from every target. The ONLY pricing-page source (C2); optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every provider and purchasable by id — QA tiers, grandfathered plans — but never rendered on the pricing page), url, features { <catalog id>: value } — a number on a counted feature (the MONTHLY limit, -1 unlimited), true/false/a string on a perk (#647).',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, prices, per-provider IDs), referenceable from every target and the ONLY pricing-page source. Optional presentation fields: tagline, popular, enterprise (the talk-to-us tier: its own full-width row, never a card), hidden (still created on every provider and purchasable by id, as QA tiers and grandfathered plans are, but never rendered on the pricing page), url, and features { <catalog id>: value }, a number on a counted feature (the MONTHLY limit, -1 unlimited) or true/false/a string on a perk.',
   },
   {
     path:        'payment.winback.enabled',
     type:        'boolean',
     required:    false,
     default:     true,
-    description: 'The cancel-flow save offer (#268), shown before the cancellation questionnaire. Defaults ON — false is the whole off switch, and the cancel flow goes straight to the questionnaire.',
+    description: 'The cancel-flow save offer, shown before the cancellation questionnaire. Defaults ON; false is the whole off switch, and the cancel flow goes straight to the questionnaire.',
   },
   {
     path:        'payment.winback.percent',
@@ -634,7 +634,7 @@ const SHARED_SCHEMA = [
     path:        'monitoring.providers.sentry.org',
     type:        'string',
     required:    false,
-    description: 'Sentry organization slug (public). Auto-detected when the auth token sees exactly one org — the monitoring service writes it back here.',
+    description: 'Sentry organization slug (public). Auto-detected when the auth token sees exactly one org; the monitoring service writes it back here.',
   },
   {
     path:        'monitoring.providers.sentry.dsn',
@@ -671,7 +671,7 @@ const SHARED_SCHEMA = [
     required:    false,
     min:         0,
     max:         1,
-    description: 'Browser only: fraction of SESSIONS recorded as a replay, 0..1. Defaults to 0 — replay costs bandwidth and captures the DOM, so it is strictly opt-in; any value above 0 loads the replay integration.',
+    description: 'Browser only: fraction of SESSIONS recorded as a replay, 0..1. Defaults to 0, because replay costs bandwidth and captures the DOM, so it is strictly opt-in; any value above 0 loads the replay integration.',
   },
   {
     path:        'monitoring.providers.sentry.replaysOnErrorSampleRate',
@@ -697,7 +697,7 @@ const SHARED_SCHEMA = [
     path:        'monitoring.providers.sentry.bundlePatterns',
     type:        'array',
     required:    false,
-    description: "Browser only: the URL fragments that identify OUR bundles — a browser event reports only when a stack frame matches one. Defaults to ['/assets/js/'], where both @omega.js/web and @omega.js/extension serve every framework bundle.",
+    description: "Browser only: the URL fragments that identify OUR bundles; a browser event reports only when a stack frame matches one. Defaults to ['/assets/js/'], where both @omega.js/web and @omega.js/extension serve every framework bundle.",
   },
 
   // ── connections ──────────────────────────────────────────────────────────
@@ -751,7 +751,7 @@ const SHARED_SCHEMA = [
         description: 'Connect your Kick channel',
       },
     },
-    description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`) — public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false — set it true to offer one; a brand's own provider is on unless this is false), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws — the CONFIG is the only card list, #793: `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. packages/backend/docs/connections.md",
+    description: "Per-provider user-connection settings, keyed by provider name (`connections: { twitch: {…} }`), public values only, never client secrets (those are the CONNECTIONS_<PROVIDER>_CLIENT_ID/_SECRET env pair). The set of providers is OPEN (a brand ships its own as `src/connections/<name>.js`), so the section stays free-form; the keys every entry may carry are `enabled` (the packaged providers default to false, so set it true to offer one; a brand's own provider is on unless this is false), `scope` (an array that wins over the provider module's default), `name` and `logo` (what the account page's card draws; the CONFIG is the only card list, and `logo` is the name of a mark @omega.js/web ships in core/logos/brandmarks/original, rendered inline, or a full URL rendered as an img), and `description` (the line under the card's title). The five packaged providers carry all three by default, so enabling one is one line. packages/backend/docs/connections.md",
   },
 
   // ── repo (where the brand hosts its source; #883) ───────────────────────
@@ -763,7 +763,7 @@ const SHARED_SCHEMA = [
     path:        'repo',
     type:        'object',
     required:    false,
-    description: 'Where the brand hosts its source. Presence enables the repo service; the block is provider + org and nothing else, since every repo name derives from `<brand.id>-<role>` (#883).',
+    description: 'Where the brand hosts its source. Presence enables the repo service; the block is provider + org and nothing else, since every repo name derives from `<brand.id>-<role>`.',
   },
   {
     path:        'repo.provider',
@@ -790,19 +790,19 @@ const SHARED_SCHEMA = [
     path:        'domain.providers',
     type:        'object',
     required:    false,
-    description: "The brand's REGISTRAR, named as the one KEY under it ({ namecheap: {} }) — presence picks it, and no entry means nothing chosen, so the domain service skips. The provider set is open; the entry may be empty.",
+    description: "The brand's REGISTRAR, named as the one KEY under it ({ namecheap: {} }). Presence picks it, and no entry means nothing chosen, so the domain service skips. The provider set is open; the entry may be empty.",
   },
   {
     path:        'domain.providers.namecheap',
     type:        'object',
     required:    false,
-    description: 'Namecheap as the registrar — the one provider whose nameservers the domain service points at the Cloudflare zone via API (NAMECHEAP_USERNAME + NAMECHEAP_API_KEY in .env). An empty object is the whole declaration; every other registrar gets manual instructions.',
+    description: 'Namecheap as the registrar, the one provider whose nameservers the domain service points at the Cloudflare zone via API (NAMECHEAP_USERNAME + NAMECHEAP_API_KEY in .env). An empty object is the whole declaration; every other registrar gets manual instructions.',
   },
   {
     path:        'domain.email.providers',
     type:        'object',
     required:    false,
-    description: "The brand's MAILBOX provider, named as the one KEY under it ({ cloudflare: {} } | { squarespace: {} } | { privateemail: {} }) — presence picks it; no entry leaves the edge service's email-routing operations off.",
+    description: "The brand's MAILBOX provider, named as the one KEY under it ({ cloudflare: {} } | { squarespace: {} } | { privateemail: {} }). Presence picks it; no entry leaves the edge service's email-routing operations off.",
   },
   {
     path:        'domain.email.forwarding',
@@ -817,7 +817,7 @@ const SHARED_SCHEMA = [
     type:        'boolean',
     required:    false,
     default:     true,
-    description: 'false = the edge service skips entirely — no zone, DNS, settings, rules, speed-test or worker reconciliation for this brand.',
+    description: 'false = the edge service skips entirely: no zone, DNS, settings, rules, speed-test or worker reconciliation for this brand.',
   },
   {
     path:        'edge.providers.cloudflare',
@@ -835,7 +835,7 @@ const SHARED_SCHEMA = [
     path:        'edge.providers.cloudflare.rules.redirect',
     type:        'array',
     required:    false,
-    description: "The zone's dynamic redirect rules, ORDERED — the ONE home for a TEMPLATED redirect, i.e. one whose destination is computed from the request path (#466): [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }]. `expression` and `targetUrl` ({ value } for a fixed URL, { expression } for a computed one) are Cloudflare's own filter language, because only the edge can answer a URL the build cannot enumerate — DashQR's printed `/c/<id>` codes redirect to `/code?id=<id>` with `targetUrl.expression: concat(\"https://\", http.host, \"/code?id=\", substring(http.request.uri.path, 3))`. The @omega.js/manager edge service reconciles them by `name`. A redirect whose URLs CAN be enumerated is a redirect PAGE instead (docs/web/index.md), never config.",
+    description: "The zone's dynamic redirect rules, ORDERED, and the ONE home for a TEMPLATED redirect, i.e. one whose destination is computed from the request path: [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }]. `expression` and `targetUrl` ({ value } for a fixed URL, { expression } for a computed one) are Cloudflare's own filter language, because only the edge can answer a URL the build cannot enumerate: DashQR's printed `/c/<id>` codes redirect to `/code?id=<id>` with `targetUrl.expression: concat(\"https://\", http.host, \"/code?id=\", substring(http.request.uri.path, 3))`. The @omega.js/manager edge service reconciles them by `name`. A redirect whose URLs CAN be enumerated is a redirect PAGE instead (docs/web/index.md), never config.",
   },
 
   // ── captcha (role: bot defense; provider-discriminated) ──────────────────
@@ -843,13 +843,13 @@ const SHARED_SCHEMA = [
     path:        'captcha.providers.recaptcha.project',
     type:        'string',
     required:    false,
-    description: "The brand's OWN GCP project hosting the classic reCAPTCHA key — used only for the console deep-link in guidance. Site/secret keys stay in .env.",
+    description: "The brand's OWN GCP project hosting the classic reCAPTCHA key, used only for the console deep-link in guidance. Site/secret keys stay in .env.",
   },
   {
     path:        'captcha.providers.recaptcha.siteKey',
     type:        'string',
     required:    false,
-    description: 'Classic reCAPTCHA site key rendered client-side. Public by design — the secret half stays in .env (RECAPTCHA_SECRET_KEY).',
+    description: 'Classic reCAPTCHA site key rendered client-side. Public by design; the secret half stays in .env (RECAPTCHA_SECRET_KEY).',
   },
   {
     path:        'captcha.providers.recaptcha.domainsConfirmed',
@@ -870,7 +870,7 @@ const SHARED_SCHEMA = [
     path:        'forms.providers.slapform.formId',
     type:        'string',
     required:    false,
-    description: 'Slapform form id — the contact page posts to https://api.slapform.com/{formId}. Interactive manager runs land it here.',
+    description: 'Slapform form id; the contact page posts to https://api.slapform.com/{formId}. Interactive manager runs land it here.',
   },
   {
     path:        'forms.providers.slapform.templateFormId',
@@ -890,7 +890,7 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     default:     { id: 'grandmaster', name: 'Grandmaster' },
-    description: 'Tier granted to the form-owner account ({ id, name }) — Slapform-operator only.',
+    description: 'Tier granted to the form-owner account ({ id, name }), for Slapform operators only.',
   },
 
   // ── inbound (role: inbound conversations; per-channel providers) ─────────
@@ -911,7 +911,7 @@ const SHARED_SCHEMA = [
     path:        'inbound.chat.providers.chatsy.accountId',
     type:        'string',
     required:    false,
-    description: "Chatsy owner-account uid the agent belongs to — the account whose subscription the chat service reconciles to `plan`. The service resolves it from the agent itself; set it only when the agent's owner is provisioned elsewhere.",
+    description: "Chatsy owner-account uid the agent belongs to, the account whose subscription the chat service reconciles to `plan`. The service resolves it from the agent itself; set it only when the agent's owner is provisioned elsewhere.",
   },
   {
     path:        'inbound.chat.providers.chatsy.templateAgentId',
@@ -931,7 +931,7 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     default:     { id: 'max', name: 'Max' },
-    description: 'Tier granted to the agent-owner account ({ id, name }) — Chatsy-operator only.',
+    description: 'Tier granted to the agent-owner account ({ id, name }), for Chatsy operators only.',
   },
   {
     path:        'inbound.chat.providers.chatsy.sponsorshipsUrl',
@@ -976,7 +976,7 @@ const SHARED_SCHEMA = [
     type:        'object',
     required:    false,
     default:     { id: 'max', name: 'Max' },
-    description: 'Tier granted to the agent-owner account ({ id, name }) — Replyify-operator only.',
+    description: 'Tier granted to the agent-owner account ({ id, name }), for Replyify operators only.',
   },
   {
     path:        'inbound.email.providers.replyify.discount',
@@ -991,7 +991,7 @@ const SHARED_SCHEMA = [
     type:        'boolean',
     required:    false,
     default:     true,
-    description: 'false = the search service skips entirely — the property is never verified and no sitemap is submitted (submitSitemap only turns the sitemap half off).',
+    description: 'false = the search service skips entirely: the property is never verified and no sitemap is submitted (submitSitemap only turns the sitemap half off).',
   },
   {
     path:        'search.providers.searchConsole.submitSitemap',
@@ -1019,13 +1019,13 @@ const SHARED_SCHEMA = [
     path:        'certificates.enabled',
     type:        'boolean',
     required:    false,
-    description: 'false = the certificates service skips entirely — no bundle ids, no signing certificates, no provisioning profiles for this brand. Absent reads as ON for brands with a desktop/mobile target (the service still skips one with neither).',
+    description: 'false = the certificates service skips entirely: no bundle ids, no signing certificates, no provisioning profiles for this brand. Absent reads as ON for brands with a desktop/mobile target (the service still skips one with neither).',
   },
   {
     path:        'certificates.providers.apple.bundleIdPrefix',
     type:        'string',
     required:    false,
-    description: "Reverse-DNS prefix the brand's bundle id is composed from ('com.mycompany' + brand.id → com.mycompany.my.brand). The brand's own answer — the onboard wizard seeds it and setup asks for it (#635); unset, the Apple operations have no id to reconcile.",
+    description: "Reverse-DNS prefix the brand's bundle id is composed from ('com.mycompany' + brand.id → com.mycompany.my.brand). The brand's own answer: the onboard wizard seeds it and setup asks for it; unset, the Apple operations have no id to reconcile.",
   },
   {
     path:        'certificates.providers.apple.capabilities',
@@ -1043,7 +1043,7 @@ const SHARED_SCHEMA = [
     path:        'certificates.providers.apple.certificates',
     type:        'array',
     required:    false,
-    description: "Certificate types managed for the Apple Developer account ([{ type, manual }]) — `manual: true` marks the ones Apple's API cannot create, which the Account Holder downloads from the portal. Unset uses the framework set.",
+    description: "Certificate types managed for the Apple Developer account ([{ type, manual }]); `manual: true` marks the ones Apple's API cannot create, which the Account Holder downloads from the portal. Unset uses the framework set.",
   },
 
   // ── publishing (role: ship credentials; no provider) ─────────────────
@@ -1051,7 +1051,7 @@ const SHARED_SCHEMA = [
     path:        'publishing.enabled',
     type:        'boolean',
     required:    false,
-    description: "The manage walk's ship-credential gate ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)): the `publishing` service asks for every developer key and listing id the brand's declared formats need (`targets.<name>.platforms.<platform>.formats`). `false` is the permanent opt-out the gate's Disable lands; absence means ask, and no default is materialized. Dropping ONE store is the declaration's job (`platforms.<store>.formats.store: false`), never this switch.",
+    description: "The manage walk's ship-credential gate: the `publishing` service asks for every developer key and listing id the brand's declared formats need (`targets.<name>.platforms.<platform>.formats`). `false` is the permanent opt-out the gate's Disable lands; absence means ask, and no default is materialized. Dropping ONE store is the declaration's job (`platforms.<store>.formats.store: false`), never this switch.",
   },
 
   // ── devlog (role: commit-digest publishing; provider-discriminated) ──────
@@ -1065,7 +1065,7 @@ const SHARED_SCHEMA = [
     path:        'devlog.enabled',
     type:        'boolean',
     required:    false,
-    description: 'true PUBLISHES AI-written commit-digest posts to the brand\'s live website. Case 3 (docs/shared/config.md): the literal true is the only ON, absence is off, and no default is materialized — publishing is never implicit.',
+    description: "true PUBLISHES AI-written commit-digest posts to the brand's live website. Case 3 (docs/shared/config.md): the literal true is the only ON, absence is off, and no default is materialized, so publishing is never implicit.",
   },
 
   // ── seo ──────────────────────────────────────────────────────────────────
@@ -1073,7 +1073,7 @@ const SHARED_SCHEMA = [
     path:        'seo',
     type:        'object',
     required:    false,
-    description: 'Parasite-SEO content: seo.github.content is the @omega.js/manager seo service\'s repos, and big content blocks may live in the config/seo.json5 sidecar. The indexing switch is NOT here: it is `targets.web.meta.index`, the same name a page writes (#564).',
+    description: "Parasite-SEO content: seo.github.content is the @omega.js/manager seo service's repos, and big content blocks may live in the config/seo.json5 sidecar. The indexing switch is NOT here: it is `targets.web.meta.index`, the same name a page writes.",
   },
 
   // ── account ──────────────────────────────────────────────────────────────
@@ -1081,7 +1081,7 @@ const SHARED_SCHEMA = [
     path:        'account',
     type:        'object',
     required:    false,
-    description: "Managed Firebase Auth accounts (@omega.js/manager account service): enabled + admins ([{ email, account, marketing }]; '{domain}' templates to the brand domain). Owner-defined — typically set once in the COMPANY omega.json5 (arrays replace, so the company list wins whole). Passwords NEVER live here: per-account OMEGA_ACCOUNT_PASSWORD__* env vars, the config/hooks/account/password.js hook, or the ACCOUNT_PASSWORD_SEED derivation.",
+    description: "Managed Firebase Auth accounts (@omega.js/manager account service): enabled + admins ([{ email, account, marketing }]; '{domain}' templates to the brand domain). Owner-defined, typically set once in the COMPANY omega.json5 (arrays replace, so the company list wins whole). Passwords NEVER live here: per-account OMEGA_ACCOUNT_PASSWORD__* env vars, the config/hooks/account/password.js hook, or the ACCOUNT_PASSWORD_SEED derivation.",
   },
 
   // ── reviews ──────────────────────────────────────────────────────────────
@@ -1137,7 +1137,7 @@ const SHARED_SCHEMA = [
     path:        'marketing.campaigns.providers.sendgrid.groups.account',
     type:        'integer',
     required:    false,
-    description: "SendGrid unsubscribe (ASM) group id for account-action email (deletion, data requests) — also the fallback for any send naming no group. Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.",
+    description: 'SendGrid unsubscribe (ASM) group id for account-action email (deletion, data requests), and the fallback for any send naming no group. Written back by the campaigns service, which provisions the group by name; ASM ids are per SendGrid ACCOUNT, so this is config and never code. Unset makes @omega.js/backend fail the send loudly.',
   },
   {
     path:        'marketing.campaigns.providers.sendgrid.groups.marketing',
@@ -1180,14 +1180,14 @@ const SHARED_SCHEMA = [
     path:        'marketing.newsletter.content',
     type:        'object|array',
     required:    false,
-    description: 'Newsletter-PIPELINE config (sources, categories, tone, template, theme, sponsorships) — a single object or an array whose first entry the generator uses. Role-level on purpose: it configures @omega.js/backend\'s generator, not Beehiiv.',
+    description: "Newsletter-PIPELINE config (sources, categories, tone, template, theme, sponsorships), a single object or an array whose first entry the generator uses. Role-level on purpose: it configures @omega.js/backend's generator, not Beehiiv.",
   },
   {
     path:        'marketing.prune.enabled',
     type:        'boolean',
     required:    false,
     default:     true,
-    description: 'Monthly cold-contact prune across both providers. ON by default (Ian 2026-08-22) and materialized into every brand config — false is the per-brand off switch.',
+    description: 'Monthly cold-contact prune across both providers. ON by default and materialized into every brand config; false is the per-brand off switch.',
   },
 
   // ── blog ─────────────────────────────────────────────────────────────────
@@ -1215,14 +1215,14 @@ const SHARED_SCHEMA = [
     path:        'directory',
     type:        'object',
     required:    false,
-    description: "Directory participation (@omega.js/manager directory service): { enabled } opts in to pushing this brand's entry into the parent project's `brands` collection. Absent or false never pushes. Needs `company.id` to name a parent (#677) and DIRECTORY_SERVICE_ACCOUNT in the brand .env.",
+    description: "Directory participation (@omega.js/manager directory service): { enabled } opts in to pushing this brand's entry into the parent project's `brands` collection. Absent or false never pushes. Needs `company.id` to name a parent and DIRECTORY_SERVICE_ACCOUNT in the brand .env.",
   },
   {
     path:        'directory.enabled',
     type:        'boolean',
     required:    false,
     default:     false,
-    description: 'true opts the brand into the directory push. Default false — participation is never implicit.',
+    description: 'true opts the brand into the directory push. Default false, so participation is never implicit.',
   },
 
   // ── sponsorships ─────────────────────────────────────────────────────────
@@ -1230,7 +1230,7 @@ const SHARED_SCHEMA = [
     path:        'sponsorships',
     type:        'object',
     required:    false,
-    description: "The brand's sponsorship terms — the first directory BLOCK (#246), and the section the server service also publishes. Public terms only: { acceptable, unacceptable, prices }.",
+    description: "The brand's sponsorship terms, the first directory BLOCK and the section the server service also publishes. Public terms only: { acceptable, unacceptable, prices }.",
   },
   {
     path:        'sponsorships.acceptable',
@@ -1248,7 +1248,7 @@ const SHARED_SCHEMA = [
     path:        'sponsorships.prices',
     type:        'object',
     required:    false,
-    description: "Price in USD per placement type — placement key to number ({ 'guest-post': 70, 'link-insertion': 50 }). A placement with no price is not for sale.",
+    description: "Price in USD per placement type, placement key to number ({ 'guest-post': 70, 'link-insertion': 50 }). A placement with no price is not for sale.",
   },
 
   // ── ports (dev-only) ─────────────────────────────────────────────────────
@@ -1256,7 +1256,7 @@ const SHARED_SCHEMA = [
     path:        'ports',
     type:        'object',
     required:    false,
-    description: 'Explicit dev-port pins (N7). Unset ports auto-allocate (classic defaults, bump-if-taken); a pinned port never bumps — busy pin is a hard error. Keys: auth, functions, firestore, database, hosting, storage, pubsub, ui, website, livereload, cdp. Dev/emulator only — production never reads this.',
+    description: 'Explicit dev-port pins. Unset ports auto-allocate (classic defaults, bump-if-taken); a pinned port never bumps, and a busy pin is a hard error. Keys: auth, functions, firestore, database, hosting, storage, pubsub, ui, website, livereload, cdp. Dev/emulator only; production never reads this.',
   },
 
   // ── theme ────────────────────────────────────────────────────────────────
@@ -1264,7 +1264,7 @@ const SHARED_SCHEMA = [
     path:        'theme.id',
     type:        'string',
     required:    false,
-    description: "Theme id (seeded 'classy' at onboarding). Project-owned — the manager never overwrites it.",
+    description: "Theme id (seeded 'classy' at onboarding). Project-owned: the manager never overwrites it.",
   },
   {
     path:        'theme.appearance',
@@ -1279,7 +1279,7 @@ const SHARED_SCHEMA = [
     path:        'ai.enabled',
     type:        'boolean',
     required:    false,
-    description: "The manager's AI-provider setup gate ([#639](https://github.com/Omega-JS-Stack/omega/issues/639)): the `ai` service asks once for OPENAI_API_KEY / ANTHROPIC_API_KEY. `false` is the permanent opt-out the gate's Disable lands; absence means ask. No default is materialized — a brand that never answers is never re-shaped.",
+    description: "The manager's AI-provider setup gate: the `ai` service asks once for OPENAI_API_KEY / ANTHROPIC_API_KEY. `false` is the permanent opt-out the gate's Disable lands; absence means ask. No default is materialized, so a brand that never answers is never re-shaped.",
   },
 
   // ── translation ──────────────────────────────────────────────────────────
@@ -1307,7 +1307,7 @@ const SHARED_SCHEMA = [
     path:        'translation.providers',
     type:        'object',
     required:    false,
-    description: "AI translation provider, keyed by name — presence picks the engine ({ claude: {} } or { chatgpt: {} }). 'claude' (the default when the block is absent) rides the local Claude Code install — no API key; 'chatgpt' uses the OpenAI API via OPENAI_API_KEY in env.",
+    description: "AI translation provider, keyed by name; presence picks the engine ({ claude: {} } or { chatgpt: {} }). 'claude' (the default when the block is absent) rides the local Claude Code install with no API key; 'chatgpt' uses the OpenAI API via OPENAI_API_KEY in env.",
   },
   {
     path:        'translation.model',
@@ -1335,7 +1335,7 @@ const SHARED_SCHEMA = [
     path:        'targets',
     type:        'object',
     required:    false,
-    description: "Every key is a target NAME, which is the folder `targets/<name>`, the `--target=<name>` word and the derived-repo suffix (#886). Key presence = target enabled; the value is an object of target-scoped config (any shared key inside overrides it) and MUST declare `type`: web/backend/desktop/extension/mobile, or `custom` (#603) for a target the manager drives entirely through its own package.json scripts. Anything else is an error.",
+    description: 'Every key is a target NAME, which is the folder `targets/<name>`, the `--target=<name>` word and the derived-repo suffix. Key presence = target enabled; the value is an object of target-scoped config (any shared key inside overrides it) and MUST declare `type`: web/backend/desktop/extension/mobile, or `custom` for a target the manager drives entirely through its own package.json scripts. Anything else is an error.',
   },
 ];
 
@@ -1349,7 +1349,7 @@ const TARGET_SCHEMAS = {
       path:        'hosting',
       type:        'object',
       required:    false,
-      description: 'Where this web target is SERVED from (#883). Web targets only: a non-web target carrying it is a validation error.',
+      description: 'Where this web target is SERVED from. Web targets only: a non-web target carrying it is a validation error.',
     },
     {
       path:        'hosting.provider',
@@ -1372,7 +1372,7 @@ const TARGET_SCHEMAS = {
       type:        'boolean',
       required:    false,
       default:     true,
-      description: "false takes the WHOLE site out of search: every page emits noindex and sitemap.xml, llms.txt and pages.json list nothing. It is the site-wide DEFAULT of the one flag every signal reads (#564), so a page's own `meta.index: true` still exempts it. Case 2 (docs/shared/config.md): default ON, and the literal false is the only OFF.",
+      description: "false takes the WHOLE site out of search: every page emits noindex and sitemap.xml, llms.txt and pages.json list nothing. It is the site-wide DEFAULT of the one flag every signal reads, so a page's own `meta.index: true` still exempts it. Case 2 (docs/shared/config.md): default ON, and the literal false is the only OFF.",
     },
     {
       path:        'imagemin',
@@ -1384,13 +1384,13 @@ const TARGET_SCHEMAS = {
       path:        'dev.limitCollections',
       type:        'object',
       required:    false,
-      description: "Dev-only collection sampling (#190): collection name → max documents ({ posts: 50 }), plus `randomize: true` for a random sample instead of the first N. Collection names are @omega.js/web's (posts, alternatives, team, updates) plus the brand's own `collections`, and the engine hard-fails an unknown one. Development builds only — production never samples.",
+      description: "Dev-only collection sampling: collection name → max documents ({ posts: 50 }), plus `randomize: true` for a random sample instead of the first N. Collection names are @omega.js/web's (posts, alternatives, team, updates) plus the brand's own `collections`, and the engine hard-fails an unknown one. Development builds only; production never samples.",
     },
     {
       path:        'collections',
       type:        'object',
       required:    false,
-      description: "The brand's own content collections (#207): collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
+      description: "The brand's own content collections: collection name → { field, size, title, description, permalink }. Documents live in `_<name>/`, and @omega.js/web generates the paginated listing page plus one page per category of `field` (the dotted frontmatter path the categories group on, e.g. 'doc.category'). A built-in collection name (posts, alternatives, team, updates) is an error.",
     },
     {
       path:        'purgecss',
@@ -1402,7 +1402,7 @@ const TARGET_SCHEMAS = {
       path:        'purgecss.safelist',
       type:        'object|array',
       required:    false,
-      description: "Selectors the content scan cannot see, merged OVER the framework's own safelist (#250). The object form takes PurgeCSS's lanes (standard, deep, greedy, keyframes); a bare array is PurgeCSS's shorthand for `standard`.",
+      description: "Selectors the content scan cannot see, merged OVER the framework's own safelist. The object form takes PurgeCSS's lanes (standard, deep, greedy, keyframes); a bare array is PurgeCSS's shorthand for `standard`.",
     },
     {
       path:        'purgecss.safelist.standard',
@@ -1420,7 +1420,7 @@ const TARGET_SCHEMAS = {
       path:        'purgecss.safelist.greedy',
       type:        'array',
       required:    false,
-      description: 'Patterns (strings, compiled to RegExp) keeping every selector that contains a match — the lane for a runtime-stamped namespace.',
+      description: 'Patterns (strings, compiled to RegExp) keeping every selector that contains a match, the lane for a runtime-stamped namespace.',
     },
     {
       path:        'purgecss.safelist.keyframes',
@@ -1440,7 +1440,7 @@ const TARGET_SCHEMAS = {
       type:        'string',
       required:    false,
       enum:        BACKEND_PROJECT_TYPES,
-      description: "How this backend RUNS and deploys (#584). 'firebase' (default) exports Cloud Functions; 'custom' runs the same app as an Express server on `PORT` for a container host (Render & co) — no Functions deploy, no emulator lane, and the target's own `deploy` script is the publish lane. Everything else — the auth middleware, the routes, the schemas, every helper — is identical in both modes.",
+      description: "How this backend RUNS and deploys. 'firebase' (default) exports Cloud Functions; 'custom' runs the same app as an Express server on `PORT` for a container host (Render & co), with no Functions deploy, no emulator lane, and the target's own `deploy` script as the publish lane. Everything else (the auth middleware, the routes, the schemas, every helper) is identical in both modes.",
     },
     {
       path:        'auth.signup.maxPerIpPerDay',
@@ -1469,7 +1469,7 @@ const TARGET_SCHEMAS = {
       path:        'app.appId',
       type:        'string',
       required:    false,
-      description: "The bundle identifier the app is signed and registered under. Unset, it derives as `certificates.providers.apple.bundleIdPrefix` plus `brand.id` with the dashes as dots ([#909](https://github.com/Omega-JS-Stack/omega/issues/909)), the very id the certificates service registers; a brand with no prefix falls back to the reverse-domain of `brand.url`, then `app.<brand.id>`. Set it only to stay on an id already-shipped builds carry.",
+      description: 'The bundle identifier the app is signed and registered under. Unset, it derives as `certificates.providers.apple.bundleIdPrefix` plus `brand.id` with the dashes as dots, the very id the certificates service registers; a brand with no prefix falls back to the reverse-domain of `brand.url`, then `app.<brand.id>`. Set it only to stay on an id already-shipped builds carry.',
     },
     {
       path:        'app.productName',
@@ -1512,7 +1512,7 @@ const TARGET_SCHEMAS = {
       path:        'platforms',
       type:        'object',
       required:    false,
-      description: "What this desktop target SHIPS, plus each platform's install knobs (#867): `platforms.<mac|windows|linux>.formats.<dmg|nsis|deb|appimage|snap>`. Presence = enabled; drop a default with `false`. The install knobs beside `formats` (arch, the NSIS flags, mac entitlements) map onto the same electron-builder concepts, which @omega.js/desktop owns the target list of.",
+      description: "What this desktop target SHIPS, plus each platform's install knobs: `platforms.<mac|windows|linux>.formats.<dmg|nsis|deb|appimage|snap>`. Presence = enabled; drop a default with `false`. The install knobs beside `formats` (arch, the NSIS flags, mac entitlements) map onto the same electron-builder concepts, which @omega.js/desktop owns the target list of.",
     },
     {
       path:        'platforms.mac',
@@ -1694,7 +1694,7 @@ const TARGET_SCHEMAS = {
       path:        'releases',
       type:        'object',
       required:    false,
-      description: "Presence opts the brand into the release surface (the site's download links, desktop publishing). WHICH repo is not configurable: it is the brand's one public `<brand.id>-releases` (#883).",
+      description: "Presence opts the brand into the release surface (the site's download links, desktop publishing). WHICH repo is not configurable: it is the brand's one public `<brand.id>-releases`.",
     },
     {
       path:        'restartManager.enabled',
@@ -1734,14 +1734,14 @@ const TARGET_SCHEMAS = {
       path:        'remoteScripts.enabled',
       type:        'boolean',
       required:    false,
-      description: 'Emergency remote code execution in the main process — OPT-IN: only `true` arms the lane, anything else leaves it inert.',
+      description: 'Emergency remote code execution in the main process, OPT-IN: only `true` arms the lane, anything else leaves it inert.',
     },
     {
       path:        'remoteScripts.url',
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: 'Remote-script source override (default `${brand.url}/data/scripts/main.js`). https-only at runtime — a cleartext URL is refused (localhost excepted for dev).',
+      description: 'Remote-script source override (default `${brand.url}/data/scripts/main.js`). https-only at runtime: a cleartext URL is refused (localhost excepted for dev).',
     },
     {
       path:        'restartManager.feed.url',
@@ -1763,7 +1763,7 @@ const TARGET_SCHEMAS = {
       path:        'platforms',
       type:        'object',
       required:    false,
-      description: 'What this extension target SHIPS (#867): `platforms.<chrome|firefox|edge>.formats.<zip|store>`. Presence = enabled; drop a default with `false`. The zip is attached to the release, the store is published to, and @omega.js/config\'s platforms.js says which credentials each store cannot ship without.',
+      description: "What this extension target SHIPS: `platforms.<chrome|firefox|edge>.formats.<zip|store>`. Presence = enabled; drop a default with `false`. The zip is attached to the release, the store is published to, and @omega.js/config's platforms.js says which credentials each store cannot ship without.",
     },
     {
       path:        'platforms.chrome',
@@ -1787,7 +1787,7 @@ const TARGET_SCHEMAS = {
       path:        'platforms.chrome.formats.store',
       type:        'object|boolean',
       required:    false,
-      description: 'The Chrome Web Store publish. Needs the CHROME_* API credentials plus `listings.chrome.id` (the walk asks for both, #893).',
+      description: 'The Chrome Web Store publish. Needs the CHROME_* API credentials plus `listings.chrome.id` (the walk asks for both).',
     },
     {
       path:        'platforms.firefox',
@@ -1842,7 +1842,7 @@ const TARGET_SCHEMAS = {
       path:        'platforms.edge.formats.store',
       type:        'object|boolean',
       required:    false,
-      description: 'The Edge Add-ons publish. Needs EDGE_CLIENT_ID + EDGE_API_KEY plus `listings.edge.id` (the Partner Center product id, #893).',
+      description: 'The Edge Add-ons publish. Needs EDGE_CLIENT_ID + EDGE_API_KEY plus `listings.edge.id` (the Partner Center product id).',
     },
     {
       path:        'categories',
@@ -1850,20 +1850,20 @@ const TARGET_SCHEMAS = {
       required:    false,
       itemEnum:    AMO_CATEGORIES,
       default:     ['alerts-updates'],
-      description: "The AMO categories a FIRST Firefox publish lists the add-on under (#884): addons.mozilla.org requires them on a new listing, and the Firefox lane writes them into the `--amo-metadata` file it hands `web-ext sign`. Slugs come from AMO's own set; the default is `alerts-updates`, the most generic one that is not `other`. Chrome and Edge pick their category in their own dashboards.",
+      description: "The AMO categories a FIRST Firefox publish lists the add-on under: addons.mozilla.org requires them on a new listing, and the Firefox lane writes them into the `--amo-metadata` file it hands `web-ext sign`. Slugs come from AMO's own set; the default is `alerts-updates`, the most generic one that is not `other`. Chrome and Edge pick their category in their own dashboards.",
     },
     {
       path:        'listings.chrome.id',
       type:        'string',
       required:    false,
-      description: "The Chrome Web Store ITEM ID the publish uploads to, the 32-letter id in the listing URL (#893). Public by design, so it lives here and not in .env; the manage walk asks for it.",
+      description: 'The Chrome Web Store ITEM ID the publish uploads to, the 32-letter id in the listing URL. Public by design, so it lives here and not in .env; the manage walk asks for it.',
     },
     {
       path:        'listings.chrome.url',
       type:        'string',
       required:    false,
       match:       /^https?:\/\//,
-      description: "Chrome Web Store listing URL. Feeds site.targets.extension.listings.chrome — the /extension page's button and its /extension/chrome shortlink.",
+      description: "Chrome Web Store listing URL. Feeds site.targets.extension.listings.chrome, the /extension page's button and its /extension/chrome shortlink.",
     },
     {
       path:        'listings.chrome.state',
@@ -1875,7 +1875,7 @@ const TARGET_SCHEMAS = {
       path:        'listings.firefox.id',
       type:        'string',
       required:    false,
-      description: "The addons.mozilla.org ADD-ON ID, which IS the manifest's browser_specific_settings.gecko.id (AMO uses it as the add-on guid, #893). Declared here it is authoritative: the firefox package writes it into the manifest. A brand that declares none gets the derived id pinned here by the extension's local scaffold, never by a publish.",
+      description: "The addons.mozilla.org ADD-ON ID, which IS the manifest's browser_specific_settings.gecko.id (AMO uses it as the add-on guid). Declared here it is authoritative: the firefox package writes it into the manifest. A brand that declares none gets the derived id pinned here by the extension's local scaffold, never by a publish.",
     },
     {
       path:        'listings.firefox.url',
@@ -1894,7 +1894,7 @@ const TARGET_SCHEMAS = {
       path:        'listings.edge.id',
       type:        'string',
       required:    false,
-      description: "The Microsoft Edge Partner Center PRODUCT ID (a GUID) the publish uploads to (#893). Public by design, so it lives here and not in .env; the manage walk asks for it.",
+      description: 'The Microsoft Edge Partner Center PRODUCT ID (a GUID) the publish uploads to. Public by design, so it lives here and not in .env; the manage walk asks for it.',
     },
     {
       path:        'listings.edge.url',

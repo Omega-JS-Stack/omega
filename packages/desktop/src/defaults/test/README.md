@@ -4,7 +4,7 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers — OMEGA Desktop's test runner discovers files by the directory they sit in:
+Match the framework's four layers. OMEGA Desktop's test runner discovers files by the directory they sit in:
 
 | Directory | Runtime | Use for |
 |---|---|---|
@@ -17,7 +17,7 @@ A renderer suite that declares `view: '<name>'` runs against that view of YOUR a
 
 ## Coverage
 
-Every feature ships with tests at every layer it has a surface in — logic (`build`/`main`), UI (`renderer`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
+Every feature ships with tests at every layer it has a surface in: logic (`build`/`main`), UI (`renderer`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
 
 ## Quick example
 
@@ -38,4 +38,4 @@ That is the standalone form: one test per file. Every `run` receives `ctx`, whos
 
 ## See also
 
-`node_modules/@omega.js/desktop/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/desktop/docs/test-framework.md`: full reference for the test framework (layers, assert API, fixtures, runner internals).

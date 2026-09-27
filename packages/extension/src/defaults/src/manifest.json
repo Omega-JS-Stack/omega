@@ -62,7 +62,7 @@
 
   // Origins allowed to message this extension. The framework default is your
   // brand's own origin (from `brand.url`), plus the local dev website's origin
-  // in a dev build — so the live site can message the published extension.
+  // in a dev build, so the live site can message the published extension.
   // DECLARING the key is authoritative: it REPLACES that default outright, and
   // an empty array ships NO origins at all. Leave it out to keep the default.
   // externally_connectable: {
@@ -115,7 +115,7 @@
     gecko: {
       // The firefox artifact needs an add-on id (Firefox cannot identify, sign,
       // or update an add-on without one). Leave this commented out and the build
-      // DERIVES `extension@<your brand host>` from the brand config — only a
+      // DERIVES `extension@<your brand host>` from the brand config. Only a
       // project with no brand facts at all fails. Declare your own before the
       // FIRST publish: the id must stay stable across releases, an id assigned
       // at submission can never be changed from a self-hosted build, and

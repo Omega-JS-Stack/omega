@@ -67,7 +67,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'refuses a workspace root, loudly, without writing a single file (#699)',
+      name: 'refuses a workspace root, loudly, leaving its AGENTS.md and .gitignore byte-identical (#699, #973)',
       run: async (ctx) => {
         // The accident: `omega deploy` at a workspace root scaffolded a whole
         // desktop target into it — gulpfile, src/, hooks/, workflows, rewritten
@@ -78,6 +78,12 @@ module.exports = defineCases({
         manifest.workspaces = ['packages/*'];
         jetpack.write(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
         const before = jetpack.read(manifestPath);
+        // A root's hand-authored AGENTS.md and .gitignore are what the marker
+        // merge rewrites in place: `#` headings and blank lines are its comments.
+        const agentsDoc = '# Monorepo\n\n## HARD RULES\n\n1. Rule one.\n';
+        const ignoreFile = '# Dependencies\nnode_modules/\n\n# Scratch\n.temp/\n';
+        jetpack.write(path.join(tmp, 'AGENTS.md'), agentsDoc);
+        jetpack.write(path.join(tmp, '.gitignore'), ignoreFile);
 
         try {
           let refusal = null;
@@ -92,9 +98,11 @@ module.exports = defineCases({
           ctx.expect(refusal.message).toMatch(/declares "workspaces"/);
           ctx.expect(refusal.message.includes(tmp)).toBe(true);
 
-          // Nothing scaffolded, and the manifest is byte-identical.
-          ctx.expect(jetpack.list(tmp)).toEqual(['package.json']);
+          // Nothing scaffolded, and every root file is byte-identical.
+          ctx.expect(jetpack.list(tmp).sort()).toEqual(['.gitignore', 'AGENTS.md', 'package.json']);
           ctx.expect(jetpack.read(manifestPath)).toBe(before);
+          ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toBe(agentsDoc);
+          ctx.expect(jetpack.read(path.join(tmp, '.gitignore'))).toBe(ignoreFile);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

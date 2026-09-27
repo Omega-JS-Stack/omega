@@ -57,9 +57,9 @@ npx omega auth:get          # read an Auth user (also: auth:list / :delete / :se
 - `service-account.json`: Firebase Admin credentials (STANDALONE projects; brand targets keep it in the brand's `.omega/secrets/`). Gitignored.
 - `firebase.json`: Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by the verbs' scaffold.
 - `.firebaserc`: Firebase project ID alias.
-- `firestore.rules`: YOUR security rules — the whole file, no managed block. `omega build` compiles it with @omega.js/backend's framework half into `dist/firestore.rules`, which the emulator and `firebase deploy` read (never edit that).
+- `firestore.rules`: YOUR security rules: the whole file, no managed block. `omega build` compiles it with @omega.js/backend's framework half into `dist/firestore.rules`, which the emulator and `firebase deploy` read (never edit that).
   - Your rules may call any framework helper: `is*` asks a question (`isUser`, `isOwner`, `isAdmin`, `isWritingAny`), `get*` hands back a value (`getAuthUid`, `getExistingData`).
-  - A match block of yours whose path names a framework block's MERGES into it (your condition ANDs onto the framework's) — that is how you TIGHTEN. Ops pair by NAME: `match /users/{uid} { allow create, update: if !isWritingAny(['xp']); }`.
+  - A match block of yours whose path names a framework block's MERGES into it (your condition ANDs onto the framework's). That is how you TIGHTEN. Ops pair by NAME: `match /users/{uid} { allow create, update: if !isWritingAny(['xp']); }`.
 - `database.rules.json`: Realtime Database security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside it; everything outside is yours.
 - `dist/`: GENERATED staged output (`omega build`) carrying the src copy, derived manifest, composed config, and hosting boilerplate. Never edit; gitignored.
 
@@ -124,15 +124,15 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically;
 
 Every feature ships with tests at every surface it exposes:
 
-- **logic** — `test/routes/`, `test/events/`: handler suites against the real emulator
-- **wiring** — route round-trips over `http.as(...)`: registration, auth gates, schema validation
-- **rules** — `test/rules/`, when Firestore rules change
+- **logic** (`test/routes/`, `test/events/`): handler suites against the real emulator
+- **wiring** (route round-trips over `http.as(...)`): registration, auth gates, schema validation
+- **rules**: `test/rules/`, when Firestore rules change
 
 Skip a surface only when the feature genuinely doesn't have one; "the handler test covers it" does
 not excuse the route round-trip. See `test/README.md` and
 `node_modules/@omega.js/backend/docs/test-framework.md`.
 
-<!-- Everything above this marker is owned by the framework and rewritten by every OMEGA verb. Add your project-specific notes below — they are preserved. -->
+<!-- Everything above this marker is owned by the framework and rewritten by every OMEGA verb. Add your project-specific notes below. They are preserved. -->
 
 # ========== Custom Values ==========
 

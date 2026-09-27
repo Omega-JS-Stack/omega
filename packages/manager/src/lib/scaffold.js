@@ -61,9 +61,9 @@ const FAMILY_VERSION = require('../../package.json').version;
  */
 function renderOmegaConfig(answers) {
   const lines = [
-    `// ${answers.name} — brand-level omega.json5: the shared config layer every target`,
+    `// ${answers.name}: brand-level omega.json5, the shared config layer every target`,
     '// under targets/ inherits. Local files override any key per-surface; key presence',
-    '// under `targets` = this brand supports that target. Secrets NEVER live here —',
+    '// under `targets` = this brand supports that target. Secrets NEVER live here:',
     '// they go in the gitignored .env (the loader hard-fails on secret-shaped keys).',
     '{',
     '  brand: {',
@@ -115,17 +115,17 @@ function renderOmegaConfig(answers) {
   }
 
   lines.push(
-    '  // Social handles (platform: "handle") — each entry lights its footer icon, its JSON-LD sameAs entry, and a /<platform> shortlink.',
+    '  // Social handles (platform: "handle"): each entry lights its footer icon, its JSON-LD sameAs entry, and a /<platform> shortlink.',
     '  socials: {},',
     '',
-    '  // Project-owned theme — seeded at onboarding, yours to change.',
+    '  // Project-owned theme, seeded at onboarding, yours to change.',
     '  theme: {',
     '    id: "classy",',
     '    appearance: "system", // "system" | "light" | "dark"',
     '  },',
     '',
     '  // AI translation (web /{lang}/ pages, extension _locales). Provider',
-    '  // "claude" (default) rides the local Claude Code install — no API key;',
+    '  // "claude" (default) rides the local Claude Code install, no API key;',
     '  // "chatgpt" needs OPENAI_API_KEY in .env. Uncomment to enable:',
     '  // translation: {',
     '  //   languages: ["es", "fr", "de"],',
@@ -139,7 +139,7 @@ function renderOmegaConfig(answers) {
   if (answers.accountAdmins) {
     lines.push(
       '  // Managed Firebase Auth accounts (account service). Passwords never live',
-      '  // here — OMEGA_ACCOUNT_PASSWORD__* env vars, config/hooks/account/password.js,',
+      '  // here: OMEGA_ACCOUNT_PASSWORD__* env vars, config/hooks/account/password.js,',
       '  // or the generated ACCOUNT_PASSWORD_SEED.',
       '  account: {',
       '    admins: [',
@@ -155,7 +155,7 @@ function renderOmegaConfig(answers) {
   // emulator boots before any real project exists (dogfood friction #3).
   if (answers.targets.some((entry) => entry.type === 'backend')) {
     lines.push(
-      '  // Cloud project (backend target). demo-* ids are EMULATOR-ONLY — the',
+      '  // Cloud project (backend target). demo-* ids are EMULATOR-ONLY: the',
       '  // emulators boot against this immediately; swap in a real Firebase project',
       '  // id at launch (the cloud service can create one).',
       '  cloud: {',
@@ -169,10 +169,10 @@ function renderOmegaConfig(answers) {
   }
 
   lines.push(
-    '  // Payment catalog — pricing pages render THESE products (no products =',
+    '  // Payment catalog: pricing pages render THESE products (no products =',
     '  // honest empty state). Uncomment + edit to start selling; ids are',
     '  // permanent once live. Provider id fields (stripe/paypal/chargebee) are',
-    '  // filled by the payment service — leave them null. Presentation fields',
+    '  // filled by the payment service, so leave them null. Presentation fields',
     '  // (tagline, popular, features) are optional card garnish.',
     '  // payment: {',
     '  //   products: [',
@@ -283,10 +283,10 @@ function renderGitignore() {
     '# Build output',
     'dist/',
     '',
-    '# OMEGA manager state (derived data — never committed)',
+    '# OMEGA manager state (derived data, never committed)',
     '.omega/',
     '',
-    '# Run logs (truncated on every launch — never committed)',
+    '# Run logs (truncated on every launch, never committed)',
     'logs/',
     '',
     '# Secrets',
@@ -350,19 +350,19 @@ to it, idempotently.
 
 ## Structure
 
-- \`config/omega.json5\` — brand-level shared config (targets inherit + override)
+- \`config/omega.json5\`: brand-level shared config (targets inherit + override)
 ${targetList}
-- \`.env\` — credentials (gitignored; see the stub for every service's keys)
-- \`.env.<environment>\` — the per-environment overlay (\`development\`, \`testing\`, \`production\`): only the keys that differ there
-- \`.omega/\` — manager state + run output (gitignored, machine-owned)
+- \`.env\`: credentials (gitignored; see the stub for every service's keys)
+- \`.env.<environment>\`: the per-environment overlay (\`development\`, \`testing\`, \`production\`): only the keys that differ there
+- \`.omega/\`: manager state + run output (gitignored, machine-owned)
 
 ## Next steps
 
-1. \`npm install\` — each target declares its framework (workspace link in a
+1. \`npm install\`: each target declares its framework (workspace link in a
    monorepo; before a publish, \`npx omega i local\` here links the whole brand).
 2. Fill in \`.env\` as the brand adopts external services.
-3. \`npm run manage\` — reconcile everything; rerun any time.
-4. \`npm start\` (\`npx omega dev\`) — boot the local stack; each target's verbs
+3. \`npm run manage\`: reconcile everything; rerun any time.
+4. \`npm start\` (\`npx omega dev\`): boot the local stack; each target's verbs
    scaffold its consumer interior on first run.
 `;
 }

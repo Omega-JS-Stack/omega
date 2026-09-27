@@ -677,3 +677,17 @@ test('the manager switches default ON in the schema; its Stripe and GA4 data kee
   // The brand switch is a scalar, never a namespace a page's `config:` overrides
   assert.ok(!configSections('web').includes('enabled'));
 });
+
+// The manage walk copies each description into a brand's omega.json5 as the
+// materialized block's comment, so a description is a clean present-tense line.
+test('every schema description reads clean: no em dash, no issue tag', () => {
+  const { SHARED_SCHEMA, TARGET_SCHEMAS } = require('../src/schema.js');
+  const rules = [...SHARED_SCHEMA, ...Object.values(TARGET_SCHEMAS).flat()];
+  const dirty = rules
+    .filter((rule) => typeof rule.description === 'string')
+    .filter((rule) => /\u2014|\(#|#\d/.test(rule.description))
+    .map((rule) => rule.path);
+
+  assert.ok(rules.length > 200, 'the walk reaches every rule set');
+  assert.deepStrictEqual(dirty, []);
+});

@@ -1,5 +1,5 @@
 /**
- * Boot-layer test — the packaged extension can be messaged by YOUR site.
+ * Boot-layer test: the packaged extension can be messaged by YOUR site.
  *
  * `externally_connectable.matches` is baked at package time from `brand.url`
  * (plus the local dev origin in a dev build). A packaged build used to carry the
@@ -8,7 +8,7 @@
  * the extension Chromium just loaded.
  *
  * Declaring `externally_connectable` in `src/manifest.json` is authoritative and
- * replaces the default outright — if you do that deliberately, edit this test to
+ * replaces the default outright. If you do that deliberately, edit this test to
  * match the origins you declared.
  */
 

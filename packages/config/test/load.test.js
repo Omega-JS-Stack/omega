@@ -11,6 +11,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+// The machine registry is per-machine state: this file's fixtures record into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot, recordBrand, overlayPath } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');

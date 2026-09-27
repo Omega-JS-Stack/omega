@@ -1,5 +1,5 @@
 /**
- * Rules-posture guard — every rule this brand opens is a rule someone reviewed.
+ * Rules-posture guard: every rule this brand opens is a rule someone reviewed.
  *
  * `firestore.rules` is YOUR half of the compiled model: `omega build` splices it
  * together with the framework half into `dist/firestore.rules`, and that is what
@@ -34,7 +34,7 @@ const APP_DIR = path.join(__dirname, '..', '..');
 // it owns and the default lock closes the rest.
 //
 //   const AUTHORED_FIRESTORE_PATHS = [
-//     '/posts/{id}',   // public blog posts — read-only to clients, admin writes
+//     '/posts/{id}',   // public blog posts: read-only to clients, admin writes
 //   ];
 const AUTHORED_FIRESTORE_PATHS = [];
 const EXPOSED_STORAGE_PATHS = [];
@@ -44,7 +44,7 @@ function read(file) {
   return fs.readFileSync(path.join(APP_DIR, file), 'utf8');
 }
 
-// Comments carry no posture — strip them before any rule text is read, so a
+// Comments carry no posture: strip them before any rule text is read, so a
 // commented-out example never counts as an open path.
 function rulePaths(contents) {
   const live = contents
@@ -63,7 +63,7 @@ test('firestore.rules opens exactly the paths this brand declared', () => {
   assert.deepEqual(
     authored,
     AUTHORED_FIRESTORE_PATHS,
-    'firestore.rules opens a path this suite does not declare — add it to AUTHORED_FIRESTORE_PATHS with the reason, or take the rule out',
+    'firestore.rules opens a path this suite does not declare: add it to AUTHORED_FIRESTORE_PATHS with the reason, or take the rule out',
   );
 });
 
@@ -72,7 +72,7 @@ test('storage.rules denies every path this brand has not exposed', () => {
 
   assert.ok(
     /match \/\{allPaths=\*\*\} \{\s*\n\s*allow read, write: if false;/.test(storage),
-    'the storage deny-all default is gone — every path without its own rule is now open',
+    'the storage deny-all default is gone: every path without its own rule is now open',
   );
 
   const exposed = rulePaths(storage)
@@ -81,7 +81,7 @@ test('storage.rules denies every path this brand has not exposed', () => {
   assert.deepEqual(
     exposed,
     EXPOSED_STORAGE_PATHS,
-    'storage.rules exposes a path this suite does not declare — add it to EXPOSED_STORAGE_PATHS with the reason, or take the rule out',
+    'storage.rules exposes a path this suite does not declare: add it to EXPOSED_STORAGE_PATHS with the reason, or take the rule out',
   );
 });
 
@@ -90,11 +90,11 @@ test('firebase.json reads the COMPILED firestore rules, not the source half', ()
 
   // `firestore.rules` here is source: on its own it carries none of the
   // framework's gating. Pointed at directly, a deploy would ship whatever this
-  // file alone says — which for a fresh brand is nothing at all.
+  // file alone says, which for a fresh brand is nothing at all.
   assert.equal(
     firebase.firestore.rules,
     'dist/firestore.rules',
-    'firestore rules no longer read the compiled artifact — the framework half is not being deployed',
+    'firestore rules no longer read the compiled artifact: the framework half is not being deployed',
   );
   assert.equal(firebase.database.rules, 'database.rules.json', 'the Realtime Database rules file moved');
   assert.equal(firebase.storage.rules, 'storage.rules', 'the Storage rules file moved');

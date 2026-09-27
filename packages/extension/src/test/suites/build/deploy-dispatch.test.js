@@ -113,13 +113,14 @@ function stubsFor({ dispatch, follower }) {
 /** Run the verb from a staged target, and put the cwd back when it is done. */
 async function inTarget(targetDir, run) {
   const previous = process.cwd();
+  const restoreTee = attachLogFile.mark();
   process.chdir(targetDir);
   try {
     return await run();
   } finally {
     // The verb tees this process' writers: hand them back before the next
     // suite prints through a fixture that is about to be gone.
-    attachLogFile.detach();
+    restoreTee();
     process.chdir(previous);
   }
 }

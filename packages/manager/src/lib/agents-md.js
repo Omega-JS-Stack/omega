@@ -1,7 +1,7 @@
 /**
- * Brand agent-docs chain (Ian 2026-07-20, amended 2026-07-27): every brand
+ * Brand agent-docs chain: every brand
  * root carries an AGENTS.md whose FIRST line imports the TOP-LEVEL omega
- * AGENTS.md — the map, the one agent entry — through the scope path
+ * AGENTS.md (the map, the one agent entry) through the scope path
  * `node_modules/@omega.js/AGENTS.md`, plus a one-line CLAUDE.md pointer
  * (`@AGENTS.md`). The scope file is a symlink this service maintains: it
  * resolves the framework monorepo through the installed manager package and
@@ -45,7 +45,7 @@ function findScope(brandRoot) {
     // Only a scope that can back the import counts: the map link is already
     // there, or the manager package is present for ensureGuideLink to resolve
     // it. An empty dir from a partial install would leave the import dangling
-    // while the real scope sits a level up (#153).
+    // while the real scope sits a level up.
     if (jetpack.exists(join(scopeDir, 'AGENTS.md')) !== false
       || jetpack.exists(join(scopeDir, 'manager')) !== false) {
       return { prefix, scopeDir };
@@ -55,7 +55,7 @@ function findScope(brandRoot) {
 }
 
 /**
- * Resolve the import line for THIS brand — the depth that reaches the scope
+ * Resolve the import line for THIS brand: the depth that reaches the scope
  * directory holding `@omega.js/AGENTS.md`. Falls back to the canonical
  * brand-local path when nothing is installed yet (pre-install).
  *
@@ -71,15 +71,16 @@ function resolveImportLine(brandRoot) {
  * Ensure `node_modules/@omega.js/AGENTS.md` links at the omega map. The
  * installed manager package's real path (the local-era file: symlink) names
  * both candidates, in this order: the monorepo's LIVE map two dirs up, then
- * the copy the prepare lane vendors into the package (`docs/AGENTS.md`, #144).
+ * the copy the prepare lane vendors into the package (`docs/AGENTS.md`).
  * The live map wins wherever it exists, so a locally linked brand never lands
  * on the generated copy sitting in that same monorepo's packages/manager.
  * Neither present (pre-install) → the link is left alone and the step skips.
  *
  * @param {string} brandRoot - Absolute brand monorepo root
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
  * @returns {'present'|'created'|'healed'|'skipped'} - What happened
  */
-function ensureGuideLink(brandRoot) {
+function ensureGuideLink(brandRoot, { dryRun = false } = {}) {
   const scope = findScope(brandRoot);
   if (!scope) {
     return 'skipped';
@@ -105,12 +106,14 @@ function ensureGuideLink(brandRoot) {
       return 'present';
     }
   } catch {
-    // Not a symlink (missing, or a stale regular file) — fall through and place it.
+    // Not a symlink (missing, or a stale regular file), so fall through and place it.
   }
 
   const existed = jetpack.exists(linkPath) !== false;
-  jetpack.remove(linkPath);
-  fs.symlinkSync(mapFile, linkPath);
+  if (!dryRun) {
+    jetpack.remove(linkPath);
+    fs.symlinkSync(mapFile, linkPath);
+  }
   return existed ? 'healed' : 'created';
 }
 
@@ -124,7 +127,7 @@ function renderAgentsMd(brandName, importLine = IMPORT_LINE) {
   return [
     importLine,
     '',
-    `# ${brandName} — brand notes`,
+    `# ${brandName}: brand notes`,
     '',
   ].join('\n');
 }
@@ -136,15 +139,16 @@ function renderAgentsMd(brandName, importLine = IMPORT_LINE) {
  *
  * @param {string} brandRoot - Absolute brand monorepo root
  * @param {string} brandName - Display name used when creating fresh
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
  * @returns {'present'|'created'|'healed'} - What happened
  */
-function ensureAgentsMd(brandRoot, brandName) {
+function ensureAgentsMd(brandRoot, brandName, { dryRun = false } = {}) {
   const file = join(brandRoot, 'AGENTS.md');
   const importLine = resolveImportLine(brandRoot);
   const existing = jetpack.read(file);
 
   if (existing === undefined) {
-    jetpack.write(file, renderAgentsMd(brandName, importLine));
+    if (!dryRun) jetpack.write(file, renderAgentsMd(brandName, importLine));
     return 'created';
   }
 
@@ -158,24 +162,25 @@ function ensureAgentsMd(brandRoot, brandName) {
   // Heal: the resolved import goes to the top; drop any stray/stale-depth
   // import copy so heals never stack cruft
   const body = lines.filter((line) => !isImportLine(line));
-  jetpack.write(file, [importLine, ...(body[0]?.trim() === '' ? [] : ['']), ...body].join('\n'));
+  if (!dryRun) jetpack.write(file, [importLine, ...(body[0]?.trim() === '' ? [] : ['']), ...body].join('\n'));
   return 'healed';
 }
 
 /**
  * Ensure the brand-root CLAUDE.md is the one-line `@AGENTS.md` pointer.
- * A content-bearing CLAUDE.md is NEVER clobbered — that content belongs in
+ * A content-bearing CLAUDE.md is NEVER clobbered: that content belongs in
  * AGENTS.md (the caller warns with the move-it message).
  *
  * @param {string} brandRoot - Absolute brand monorepo root
+ * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
  * @returns {'present'|'created'|'content-bearing'} - What happened
  */
-function ensureClaudePointer(brandRoot) {
+function ensureClaudePointer(brandRoot, { dryRun = false } = {}) {
   const file = join(brandRoot, 'CLAUDE.md');
   const existing = jetpack.read(file);
 
   if (existing === undefined) {
-    jetpack.write(file, `${CLAUDE_POINTER}\n`);
+    if (!dryRun) jetpack.write(file, `${CLAUDE_POINTER}\n`);
     return 'created';
   }
 

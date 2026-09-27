@@ -25,7 +25,8 @@
 // Two attaches on ONE tee stack the same way: a second attach of a DIFFERENT path pushes a
 // layer on top of the first instead of replacing it, so a verb that runs another verb in
 // process (`omega test` running `omega deploy`) keeps teeing both files. Detach order is
-// LIFO, and the module-level `detach()` pops the newest layer.
+// LIFO, and the module-level `detach()` pops the newest layer. A harness that runs a verb
+// takes `mark()` first and calls the restore it returns after, never a blind `detach()`.
 //
 // Skipped in CI: a runner has its own log capture and wants no logs/ left in the workspace.
 // `attachInCI: true` opts out of that skip, for a sink whose file is the POINT rather than
@@ -142,8 +143,20 @@ function createTee() {
     return detach;
   }
 
+  // A harness around a verb restores to the mark instead of popping blind: a run can
+  // push one layer, several, or none, and only what it pushed comes off, newest first.
+  function mark() {
+    const kept = layers.slice();
+    return function restore() {
+      for (const layer of layers.slice().reverse()) {
+        if (!kept.includes(layer)) { layer.detach(); }
+      }
+    };
+  }
+
   return {
     attach,
+    mark,
     detach: () => {
       const newest = layers[layers.length - 1];
       if (newest) { newest.detach(); }
@@ -265,6 +278,7 @@ function attachLogFile(filePath, options) {
 
 module.exports = attachLogFile;
 module.exports.detach         = singleton.detach;
+module.exports.mark           = singleton.mark;
 module.exports.stripAnsi      = stripAnsi;
 module.exports.createTee      = createTee;
 module.exports.createChildLog = createChildLog;
