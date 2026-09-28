@@ -11,7 +11,7 @@
     "gulp": "^5.0.1"
   },
   "scripts": {
-    "start": "omega clean && npm run gulp --",
+    "start": "omega dev",
     "gulp": "gulp",
     "build": "omega build",
     "package": "omega package",

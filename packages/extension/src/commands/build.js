@@ -10,7 +10,7 @@ const { ensureTarget } = require('./lib/ensure-target.js');
 // `gulp` script is bare `gulp`, so there's no alias to recurse through. The
 // gulp `build` series does no cleaning of its own, so the verb owns that step
 // too. Desktop runs the same model through utils/build-pipeline.js because
-// three verbs share it there; extension has the one plan, so it lives here.
+// three verbs share it there; extension has two plans (this and dev) and both run through runPlan here.
 function plan() {
   return {
     env: { OMEGA_BUILD_MODE: 'true' },
@@ -21,11 +21,15 @@ function plan() {
   };
 }
 
+function gulpCommand(task, args = []) {
+  return `npm run gulp -- ${[task, ...args].join(' ')}`;
+}
+
 // Step implementations — the seam runPlan takes as an argument, so a test can
 // record the order without running a real gulp build.
 const RUNNERS = {
   clean: (options) => require('./clean.js')(options),
-  gulp: (options, step) => execute(`npm run gulp -- ${step.task}`, { log: true }),
+  gulp: (options, step) => execute(gulpCommand(step.task, step.args), { log: true }),
 };
 
 async function runPlan(plan, options, runners) {
@@ -64,4 +68,5 @@ module.exports = async function (options) {
 
 module.exports.plan = plan;
 module.exports.runPlan = runPlan;
+module.exports.gulpCommand = gulpCommand;
 module.exports.RUNNERS = RUNNERS;

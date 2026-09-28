@@ -203,17 +203,19 @@ module.exports = defineCases({
           const scripts = manifestOf(dir).scripts;
           const derived = verbScripts(frameworkPackage.name);
 
+          const declaredScripts = frameworkPackage.projectScripts || {};
           for (const [verb, command] of Object.entries(derived)) {
-            const declared = frameworkPackage.projectScripts[verb];
+            const declared = declaredScripts[verb];
             assert.equal(scripts[verb], declared || command, `${verb} lands as ${declared ? 'its declared command' : 'its bare verb'}`);
           }
-          assert.equal(scripts.start, 'omega serve', 'the declared start still lands');
+          assert.equal(scripts.start, 'omega dev', 'the dev row derives npm\'s start, like on every framework');
           assert.equal(scripts.test, 'omega test', 'test is the verb like on every framework');
-          assert.equal(scripts['test:static'], "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'", 'the static lane keeps its own name');
-          assert.equal(scripts['test:emulator'], undefined, 'no second name for `test`');
+          for (const retired of ['emulator', 'test:static', 'test:emulator']) {
+            assert.equal(scripts[retired], undefined, `no \`${retired}\` script: dev and test are the entries`);
+          }
 
           // No verb script is typed by hand: the manifest declares only what the table cannot derive
-          const typed = Object.keys(frameworkPackage.projectScripts).filter((key) => key in derived);
+          const typed = Object.keys(declaredScripts).filter((key) => key in derived);
           assert.deepEqual(typed, []);
         } finally {
           jetpack.remove(dir);

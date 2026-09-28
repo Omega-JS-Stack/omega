@@ -26,8 +26,8 @@ auto-bumps past whatever the playground's live stack holds (the boot log and
 `.temp/ports.json` name the resolved set):
 
 ```bash
-# backend emulator (N7-resolved ports)
-cd targets/backend && npm run emulator
+# backend emulator (from the brand root)
+npx omega dev --target=backend
 
 # website dev server (pinned: https://localhost:4100)
 cd targets/web && npm start

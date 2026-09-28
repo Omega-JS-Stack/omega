@@ -49,11 +49,10 @@ module.exports = defineCases({
           'CLAUDE.md',
           'docs/README.md',
           'test/README.md',
-          'test/_helpers/connect-trap.js',
           'test/_init.js',
-          'test/_unit/registration.test.js',
-          'test/_unit/rules-posture.test.js',
-          'test/_unit/socket-free.test.js',
+          'test/unit/registration.test.js',
+          'test/unit/rules-posture.test.js',
+          'test/unit/socket-free.test.js',
         ];
         assert.deepEqual(result.written.slice().sort(), expected);
 
@@ -72,45 +71,38 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'static-test-lane-scaffolds-socket-free-with-its-preload-wired',
+      name: 'unit-suites-scaffold-where-the-runner-discovers-them-and-the-trap-is-framework-code',
       async run({ assert }) {
-        // #567: every ported brand hand-copied this lane. It ships from the
-        // defaults tree now — the connect trap, the three skeleton suites, and
-        // the `test` script that preloads the trap into every test process.
+        // The unit suites are runner case files under test/unit/, which the
+        // runner discovers like any other suite. The connect trap is the
+        // runner's own guard, so no helper and no preload script ships.
         const tmp = makeTmp();
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        const trap = path.join(tmp, 'test', '_helpers', 'connect-trap.js');
-        assert.equal(jetpack.exists(trap), 'file', 'the connect trap is the lane — without it the suite can reach live Firebase');
-
-        // The trap is a PRELOAD: requiring it installs the refusal, and the
-        // skeleton asserts the marker it leaves behind.
-        const trapSource = jetpack.read(trap);
-        assert.ok(trapSource.includes('net.Socket.prototype.connect'), 'the trap must own the one funnel every outbound protocol uses');
-        assert.ok(trapSource.includes('dns.lookup'), 'a resolver call is an escape in its own right');
-
-        // Under `_unit/`: the framework runner skips `_`-prefixed paths, so the
-        // static lane never runs inside the emulator lane.
         for (const suite of ['registration', 'rules-posture', 'socket-free']) {
-          assert.equal(jetpack.exists(path.join(tmp, 'test', '_unit', `${suite}.test.js`)), 'file', `${suite} skeleton missing`);
+          const file = path.join(tmp, 'test', 'unit', `${suite}.test.js`);
+          assert.equal(jetpack.exists(file), 'file', `${suite} skeleton missing`);
+          assert.equal(/node:test/.test(jetpack.read(file)), false, `${suite} is a runner case file, not a node:test one`);
+        }
+        for (const retired of ['_unit', '_helpers', 'helpers']) {
+          assert.equal(jetpack.exists(path.join(tmp, 'test', retired)), false, `test/${retired}/ is no longer scaffolded`);
         }
 
-        // The script `omega setup` writes onto the target manifest. Without the
-        // --require the rest of the lane still passes — quietly networked.
-        const script = require('../../package.json').projectScripts['test:static'];
-        assert.ok(script.includes('--require ./test/_helpers/connect-trap.js'), 'the test:static script does not preload the trap');
-        assert.ok(script.includes("--test 'test/_unit/**/*.test.js'"), 'the test:static script does not run the static lane');
+        const trap = require('../../dist/test/connect-trap.js');
+        assert.equal(typeof trap.install, 'function', 'the runner installs the trap from the framework');
+        const manifest = require('../../package.json');
+        assert.equal((manifest.projectScripts || {})['test:static'], undefined, 'no static lane script: `omega test` is the one entry');
       },
     },
     {
-      name: 'static-lane-skeletons-are-the-consumers-to-edit',
+      name: 'unit-skeletons-are-the-consumers-to-edit',
       async run({ assert }) {
         // Copy-if-missing, like every other default: a brand that already has
         // the lane (every hand-ported one does) is left alone.
         const tmp = makeTmp();
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        const suite = path.join(tmp, 'test', '_unit', 'rules-posture.test.js');
+        const suite = path.join(tmp, 'test', 'unit', 'rules-posture.test.js');
         jetpack.write(suite, '// the brand pinned its own posture here\n');
 
         const second = scaffoldDefaults({ outputDir: tmp, logger: quiet });

@@ -16,10 +16,18 @@ test('verbScripts: every fan-out (`each`) row a framework owns, as its bare `ome
     const expected = VERBS
       .filter((row) => row.owners.includes(framework) && row.fanout === 'each')
       .map((row) => row.name);
-    const scripts = verbScripts(framework);
+    const { start, ...scripts } = verbScripts(framework);
 
     assert.deepEqual(Object.keys(scripts), expected, framework);
     for (const [verb, command] of Object.entries(scripts)) assert.equal(command, `omega ${verb}`);
+  }
+});
+
+test('verbScripts: the `dev` row derives npm\'s own `start` script on every framework', () => {
+  for (const framework of FRAMEWORKS) {
+    const scripts = verbScripts(framework);
+    assert.equal(scripts.start, 'omega dev', framework);
+    assert.equal(scripts.dev, undefined, `${framework}: dev lands as start, never as its own key`);
   }
 });
 
@@ -41,9 +49,9 @@ test('verbScripts: a single-target command (`fanout: none`) is never a target sc
 });
 
 test('projectScripts: the framework\'s declared scripts merge over the derived set', () => {
-  const scripts = projectScripts({ name: '@omega.js/web', projectScripts: { start: 'omega dev', test: 'node --test' } });
+  const scripts = projectScripts({ name: '@omega.js/web', projectScripts: { gulp: 'gulp', test: 'node --test' } });
 
-  assert.equal(scripts.start, 'omega dev', 'a declared non-verb script lands');
+  assert.equal(scripts.gulp, 'gulp', 'a declared non-verb script lands');
   assert.equal(scripts.test, 'node --test', 'a declared script wins over the derived one');
   assert.equal(scripts.build, 'omega build', 'the derived set fills the rest');
   assert.deepEqual(projectScripts({ name: '@omega.js/web' }), verbScripts('@omega.js/web'), 'no declarations, the derived set alone');

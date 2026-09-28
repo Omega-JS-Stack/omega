@@ -120,7 +120,7 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically;
 
 ## Testing
 
-**Two lanes.** `npm run test:static` is the STATIC lane: `node --test` over `test/_unit/**/*.test.js` with `test/_helpers/connect-trap.js` preloaded, which turns any TCP connect or DNS lookup into a throw. `npm test` (`npx omega test`) is the emulator lane. A test needing a real client goes there; in the static lane, pass a stub.
+**One entry.** `npm test` (`npx omega test`) runs every suite under `test/`, the no-emulator unit suites in `test/unit/` included. A plain run arms the runner's connect trap: any TCP connect or DNS lookup to a host but loopback throws, so a suite reaches the local emulator and nothing past it. A test that needs a real external service runs under `--extended`; anywhere else, pass a stub.
 
 Every feature ships with tests at every surface it exposes:
 

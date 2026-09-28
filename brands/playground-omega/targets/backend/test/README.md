@@ -8,6 +8,7 @@ Match the framework's layout — OMEGA Backend's test runner discovers files by 
 
 | Directory | Use for |
 |---|---|
+| `test/unit/` | No-emulator suites (registration, rules posture, socket-free, and `mcp-tools.test.js`: every consumer MCP tool loads and names a shipped route); a plain run arms the runner's connect trap, so they reach nothing past loopback |
 | `test/routes/` | Custom HTTP route handlers (`functions/routes/<verb>/<path>.js`) |
 | `test/events/` | Pub/Sub / Firestore-trigger handlers |
 | `test/mcp/` | Consumer MCP tools called over `/omega/mcp` as a persona (`count-notes.test.js`: `count_notes` answers the caller's own count) |

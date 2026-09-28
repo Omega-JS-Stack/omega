@@ -101,7 +101,6 @@
     ]
   },
   "projectScripts": {
-    "start": "omega clean && npm run gulp --",
     "gulp": "gulp",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish"
   },

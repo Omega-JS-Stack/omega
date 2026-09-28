@@ -329,7 +329,7 @@ test('scripts op: a custom TARGET owns every script — no framework maps to it,
 test('scripts op: a custom-server backend is PER-KEY: the framework-owned subset syncs, its own verbs are left alone (#689)', async () => {
   const root = tmpBrand({ name: 'e2', workspaces: ['targets/*'], scripts: ROOT_OK });
   const backendPath = plantTarget(root, 'backend',
-    { name: 'e2-backend', dependencies: { '@omega.js/backend': '*' }, scripts: { start: 'node server.js', 'test:static': 'echo stale', render: 'render deploy' } },
+    { name: 'e2-backend', dependencies: { '@omega.js/backend': '*' }, scripts: { start: 'node server.js', test: 'echo stale', render: 'render deploy' } },
     '@omega.js/backend',
     REAL_BACKEND);
   // The installed backend's scaffold entry names its brand-owned scripts
@@ -346,10 +346,9 @@ test('scripts op: a custom-server backend is PER-KEY: the framework-owned subset
 
   const pkg = JSON.parse(fs.readFileSync(path.join(backendPath, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.start, 'node server.js', 'the brand names its own server command (#584)');
-  for (const key of ['deploy', 'emulator', 'test']) {
-    assert.equal(pkg.scripts[key], undefined, `${key} runs a verb this mode refuses: brand-owned, never scaffolded`);
-  }
-  assert.equal(pkg.scripts['test:static'], REAL_BACKEND.projectScripts['test:static'], 'a hand-edited framework-owned key is rewritten to the default');
+  assert.deepEqual([...CUSTOM_OWNED_SCRIPTS].sort(), ['deploy', 'start'], 'the keys whose verbs this mode refuses');
+  assert.equal(pkg.scripts.deploy, undefined, 'deploy runs a verb this mode refuses: brand-owned, never scaffolded');
+  assert.equal(pkg.scripts.test, 'omega test', 'a hand-edited framework-owned key is rewritten to the default: test runs in custom mode');
   assert.equal(pkg.scripts.indexes, 'omega indexes', 'a derived verb that works in this mode is framework-owned');
   assert.equal(pkg.scripts.render, 'render deploy', 'a consumer-added key is untouched');
 

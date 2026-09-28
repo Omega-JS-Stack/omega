@@ -638,7 +638,29 @@ test('run(): ownership reads every row a token selects: `serve` runs in a web ta
   fs.mkdirSync(desktopDir);
   fs.writeFileSync(path.join(desktopDir, 'package.json'), JSON.stringify({ name: 'acme-app', dependencies: { '@omega.js/desktop': '*' } }));
   const desktop = invokeBin({ scratch, hostName: '@omega.js/desktop', cwd: desktopDir, args: ['serve'] });
-  assert.equal(desktop.status, 1, 'no row that `serve` selects is desktop\'s');
+  assert.equal(desktop.status, 0, desktop.stderr);
+  assert.ok(desktop.stdout.includes('HOST-RAN'), '`serve` is dev\'s alias, and desktop owns dev');
+});
+
+test('run(): `dev` runs in place in a backend, desktop and extension target, and the brand root hands it to the manager', () => {
+  const { scratch, brandRoot, targetDir } = stageBrandTarget();
+  for (const [dir, framework] of [['api', 'backend'], ['app', 'desktop'], ['ext', 'extension']]) {
+    const cwd = path.join(path.dirname(targetDir), dir);
+    fs.mkdirSync(cwd);
+    fs.writeFileSync(path.join(cwd, 'package.json'), JSON.stringify({ name: `acme-${dir}`, devDependencies: { [`@omega.js/${framework}`]: '*' } }));
+    const out = invokeBin({ scratch, hostName: `@omega.js/${framework}`, cwd, args: ['dev'] });
+    assert.equal(out.status, 0, `${framework}: ${out.stderr}`);
+    assert.ok(out.stdout.includes('HOST-RAN'), `${framework} ran its own dev in place`);
+  }
+
+  const managerDir = path.join(brandRoot, 'node_modules', '@omega.js', 'manager');
+  fs.mkdirSync(managerDir, { recursive: true });
+  fs.writeFileSync(path.join(managerDir, 'package.json'), JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } }));
+  fs.writeFileSync(path.join(managerDir, 'cli.js'), 'module.exports = { run() { console.log(\'MANAGER-RAN\'); } };');
+  const root = invokeBin({ scratch, hostName: '@omega.js/backend', cwd: brandRoot, args: ['dev'] });
+  assert.equal(root.status, 0, root.stderr);
+  assert.ok(root.stdout.includes('MANAGER-RAN'), root.stdout);
+  assert.equal(root.stdout.includes('HOST-RAN'), false, 'the brand root runs the manager, never the host framework');
 });
 
 test('run(): a brand-wide verb inside a target refuses and prints the brand-root form, no picker', () => {

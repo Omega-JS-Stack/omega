@@ -1,8 +1,9 @@
 /**
- * `omega dev` (brand root) — ONE command boots the local stack: the website
- * dev server AND the backend emulator suite together, each spawned in its
- * own target with its own Node (web/backend pin different majors), output
- * line-prefixed per target, one Ctrl-C killing everything.
+ * `omega dev` (brand root): ONE command boots the local stack: every selected
+ * target's own `start` script (`omega dev` in a framework target: the website
+ * dev server, the backend emulator suite), each spawned in its own target with
+ * its own Node (web/backend pin different majors), output line-prefixed per
+ * target, one Ctrl-C killing everything.
  *
  * Target selection (Ian 2026-07-16): the default set is web + backend — the
  * local web loop. GUI/watcher targets (desktop opens an Electron window,
@@ -42,32 +43,9 @@ const { targetScripts } = require('../lib/custom-target.js');
 const { resolveTargetNode, nodeEnvFor } = require('../lib/node-version.js');
 const { PICKER_FLAG, assertPickerFlags, assertKnownTargets, parseTargetTokens } = require('../lib/target-selection.js');
 
-// Target → the npm leg that IS local dev for that target
-const DEV_LEGS = {
-  web: ['npm', 'run', 'start'], // omega dev — watch + serve (:4000)
-  backend: ['npm', 'run', 'emulator'], // omega emulator — FULL suite + seeded personas
-  desktop: ['npm', 'run', 'start'], // opt-in: opens an Electron window
-  extension: ['npm', 'run', 'start'], // opt-in: extension build watcher
-};
-
-// Every custom target's leg is the same one: its own `start` script (#603)
-const CUSTOM_DEV_LEG = ['npm', 'run', 'start'];
-
-/**
- * The leg that IS local dev for one discovered target.
- *
- * A backend in custom-server mode (#584) has no Cloud Functions to emulate, so
- * its leg is its own `start` — the same script a custom target boots with. Its
- * server is the local stack's API either way, so it keeps the backend's place
- * in the default set and its boot-first ordering.
- *
- * @param {{ target: string, custom?: boolean, projectType?: string }} entry
- * @returns {string[]} argv for the leg
- */
-function devLegFor(entry) {
-  if (entry.custom || entry.projectType === 'custom') return CUSTOM_DEV_LEG;
-  return DEV_LEGS[entry.target] || CUSTOM_DEV_LEG;
-}
+// Every target's dev leg is its own `start` script: `omega dev` in a framework
+// target, the brand's own command in a custom one
+const DEV_LEG = ['npm', 'run', 'start'];
 
 /**
  * Stop one dev leg. A leg is a CHAIN (npm run <leg> → the real server), so the
@@ -95,13 +73,12 @@ const DEFAULT_TARGETS = ['web', 'backend'];
 /**
  * Pure target selection — which legs boot for a given flag set.
  *
- * Custom targets (#603) join the same fan-out: their leg is `npm run start`,
- * and a custom target only reaches `custom` at all when its package.json
- * declares that script — no script, no dev leg.
+ * Custom targets join the same fan-out and the default set. Whether a
+ * picked target has a `start` script to run is the boot's question, not this one.
  *
  * @param {object} input
- * @param {Array<{ name: string, target: string|null }>} input.available - the discovered targets that have a dev leg ({ name, target: the TYPE })
- * @param {string[]} [input.custom] - custom target names with a `start` script
+ * @param {Array<{ name: string, target: string|null }>} input.available - the discovered targets ({ name, target: the TYPE })
+ * @param {string[]} [input.custom] - the custom target names
  * @param {string} [input.target] - the --target= comma list: exact set to boot
  * @param {boolean} [input.all] - start every target with a dev leg
  * @returns {{ selected: string[] }}
@@ -111,9 +88,8 @@ function selectDevTargets({ available, custom = [], target, all }) {
   const names = available.map((entry) => entry.name);
   const typeOf = new Map(available.map((entry) => [entry.name, entry.target]));
 
-  // A custom target is a first-class leg once it has a start script — the
-  // default set boots it beside web + backend (it is part of the local stack,
-  // never an opt-in GUI surface)
+  // A custom target is a first-class leg: the default set boots it beside web +
+  // backend (it is part of the local stack, never an opt-in GUI surface)
   // The vocabulary is the SAME one `test`, `deploy` and `update` take (#886):
   // this brand's declared target NAMES, custom ones included. A type word is
   // only a token when a target answers to it, so `--target=web` on a brand
@@ -199,9 +175,8 @@ module.exports = async (options = {}) => {
   // with it, and the two are read for different questions (#231).
   attachLogFile(path.join(brandRoot, 'logs', 'dev.log'));
 
-  // A custom target (#603) joins the fan-out under its own NAME, and only
-  // when its package.json declares a `start` script — the manager never
-  // invents a leg for it.
+  // A custom target joins the fan-out under its own NAME; like every
+  // target, it boots only when its package.json declares a `start` script.
   const discovered = discoverTargets(brandRoot);
 
   // `--local` links the whole brand from the monorepo before anything reads what is installed,
@@ -218,30 +193,20 @@ module.exports = async (options = {}) => {
   // downstream can see it, so the refusal belongs at the door.
   assertFamilyVersions({ brandRoot, targets: discovered });
 
-  const customLegs = discovered.filter((entry) => entry.custom && targetScripts(entry.path).start);
-  const targets = [
-    ...discovered.filter((entry) => entry.target && DEV_LEGS[entry.target]),
-    ...customLegs,
-  ];
-
-  const custom = customLegs.map((entry) => entry.name);
+  const targets = discovered.filter((entry) => entry.target || entry.custom);
+  const custom = targets.filter((entry) => entry.custom).map((entry) => entry.name);
 
   // A --target= token is the target NAME (#886), the one word every
   // brand-root verb takes, so the picker passes straight through: a token
   // that names nothing reaches the selector, which refuses it.
-  const { selected } = selectDevTargets({
+  const { selected: picked } = selectDevTargets({
     available: targets,
     custom,
     target: options[PICKER_FLAG],
     all: options.all,
   });
 
-  if (selected.length === 0) {
-    console.error(chalk.red('✖ omega dev: nothing to boot (no selected target has a dir here)'));
-    process.exit(1);
-  }
-
-  console.log(chalk.bold(`🚀 omega dev — booting ${selected.join(' + ')} ${chalk.dim(`(${brandRoot})`)}`));
+  console.log(chalk.bold(`🚀 omega dev — booting ${picked.join(' + ')} ${chalk.dim(`(${brandRoot})`)}`));
   if (!options[PICKER_FLAG] && !options.all) {
     console.log(chalk.dim('   default set is web + backend — `--target=`, `--all` pick it'));
   }
@@ -254,7 +219,7 @@ module.exports = async (options = {}) => {
   // through the web package the web leg was mid-rebuild on. Swept first, every
   // lane's own check is a no-op.
   const hosts = [];
-  for (const name of selected) {
+  for (const name of picked) {
     const entry = targets.find((item) => item.name === name);
     const found = findTarget(entry.path);
     if (found && found.kind === 'framework') {
@@ -341,6 +306,20 @@ module.exports = async (options = {}) => {
   // bypass, so Node prints no warning. A shell-set value wins verbatim.
   const caPem = process.env.NODE_EXTRA_CA_CERTS || mkcertCaRootPem();
 
+  // A target with no `start` script has no dev leg: it steps aside, loudly.
+  // Read after the manage cycle, which writes a fresh target's scripts.
+  const selected = picked.filter((name) => {
+    const entry = targets.find((item) => item.name === name);
+    if (targetScripts(entry.path).start) return true;
+    console.log(chalk.yellow(`   ⊘ ${name}: no \`start\` script in ${entry.dir}/package.json, no dev leg`));
+    return false;
+  });
+
+  if (selected.length === 0) {
+    console.error(chalk.red('✖ omega dev: nothing to boot (no selected target has a `start` script)'));
+    process.exit(1);
+  }
+
   const pad = Math.max(...selected.map((name) => name.length));
   const children = [];
   let shuttingDown = false;
@@ -363,15 +342,14 @@ module.exports = async (options = {}) => {
 
   for (const name of selected) {
     const entry = targets.find((item) => item.name === name);
-    const leg = devLegFor(entry);
     const node = resolveTargetNode(entry.path);
     if (node?.error) {
       console.log(chalk.yellow(`   ⚠ ${name}: ${node.error}, using the inherited node`));
     }
 
-    console.log(chalk.dim(`   ${name.padEnd(pad)} → ${leg.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
+    console.log(chalk.dim(`   ${name.padEnd(pad)} → ${DEV_LEG.join(' ')} in ${entry.dir}${node ? ` (node ${node.major})` : ''}`));
 
-    const child = spawn(leg[0], leg.slice(1), {
+    const child = spawn(DEV_LEG[0], DEV_LEG.slice(1), {
       cwd: entry.path,
       stdio: ['ignore', 'pipe', 'pipe'],
       // Legs pipe their output — keep chalk colors when the parent's terminal
@@ -435,8 +413,7 @@ module.exports = async (options = {}) => {
 };
 
 module.exports.selectDevTargets = selectDevTargets;
-module.exports.devLegFor = devLegFor;
 module.exports.createLineDeduper = createLineDeduper;
 module.exports.stopChild = stopChild;
-module.exports.DEV_LEGS = DEV_LEGS;
+module.exports.DEV_LEG = DEV_LEG;
 module.exports.DEFAULT_TARGETS = DEFAULT_TARGETS;

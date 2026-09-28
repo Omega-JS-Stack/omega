@@ -30,13 +30,6 @@ const WORKFLOW = '.github/workflows/deploy.yml';
 // mergeLines rules name `_.gitignore`, not its output.
 const FILE_MAP = {
   '**/*': { overwrite: false },
-  // The socket-free static test lane (#567). It lands under `_`-prefixed dirs —
-  // the framework's test discovery skips those, so the static suites never run
-  // inside the emulator lane — but the defaults ENGINE reads a leading-`_`
-  // directory as an archive dir and skips it, so the tree ships them unprefixed
-  // and they are re-destinationed here.
-  'test/helpers/**': { overwrite: false, path: () => 'test/_helpers' },
-  'test/unit/**': { overwrite: false, path: () => 'test/_unit' },
   // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
   // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
   // missing by the `**/*` rule above, never clobbered.

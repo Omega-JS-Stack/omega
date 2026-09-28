@@ -387,7 +387,7 @@ test('#400: a roster the emulator cannot answer leaves the placeholder alone and
   );
   assert.strictEqual(
     who().textContent,
-    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm start at the brand root)',
     'and the who line carries the same failure every other control reports',
   );
 
@@ -399,7 +399,7 @@ test('#400: a roster the emulator cannot answer leaves the placeholder alone and
 
   assert.strictEqual(
     who().textContent,
-    'Signed out\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'Signed out\n✕ Failed to fetch. Is the backend emulator running? (npm start at the brand root)',
     'the auth readout lands beside the failure, never on top of it',
   );
 });
@@ -435,7 +435,7 @@ test('#402: an unreachable backend shows a starting indicator and schedules anot
   // says the backend is starting, the who line says how to start it.
   assert.strictEqual(
     who().textContent,
-    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm run emulator)',
+    'Checking auth…\n✕ Failed to fetch. Is the backend emulator running? (npm start at the brand root)',
     'the who line keeps carrying the reason during the retry loop',
   );
 

@@ -28,8 +28,8 @@ const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 const frameworkPackage = require('../../../package.json');
 
 // package.json scripts every consumer gets: the verb scripts the verb table
-// derives for this framework, with the manifest's `projectScripts` (the
-// non-verb `start`) merged over them. The manager's workspace walk derives the
+// derives for this framework (`start` included), with any manifest
+// `projectScripts` merged over them. The manager's workspace walk derives the
 // same set to heal a fresh target before any verb has run.
 const PROJECT_SCRIPTS = projectScripts(frameworkPackage);
 

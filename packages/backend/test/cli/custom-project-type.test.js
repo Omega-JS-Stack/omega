@@ -40,6 +40,7 @@ const { requiredEnvKeys } = require('../../dist/vendor/config/index.js');
 const { resolveProjectType, isCustomProject, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS } = require('../../dist/cli/utils/project-type.js');
 const BuildCommand = require('../../dist/cli/commands/build.js');
 const DeployCommand = require('../../dist/cli/commands/deploy.js');
+const DevCommand = require('../../dist/cli/commands/dev.js');
 const EmulatorCommand = require('../../dist/cli/commands/emulator.js');
 const ServeCommand = require('../../dist/cli/commands/serve.js');
 const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
@@ -270,11 +271,11 @@ module.exports = defineCases({
         try {
           assert.deepStrictEqual(
             Object.keys(FIREBASE_ONLY_VERBS).sort(),
-            ['deploy', 'emulator', 'serve', 'test'],
+            ['deploy', 'dev', 'emulator', 'serve'],
             'the refused verbs live in ONE table',
           );
 
-          for (const [CommandClass, verb] of [[EmulatorCommand, 'emulator'], [ServeCommand, 'serve'], [TestCommand, 'test']]) {
+          for (const [CommandClass, verb] of [[DevCommand, 'dev'], [EmulatorCommand, 'emulator'], [ServeCommand, 'serve']]) {
             const run = await runCommand(CommandClass, dir);
 
             assert.deepStrictEqual(run.shell, [], `omega ${verb} must not reach the shell in custom mode`);
@@ -282,6 +283,30 @@ module.exports = defineCases({
             assert.match(run.output, /custom/, `omega ${verb} must name the mode`);
             assert.ok(run.output.includes(FIREBASE_ONLY_VERBS[verb]), `omega ${verb} must print its own replacement lane: ${run.output}`);
           }
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      },
+    },
+
+    {
+      name: 'omega test runs the discovered suites with no boot',
+
+      async run() {
+        // No emulator, no hosting health check, no seeded accounts: the runner
+        // goes straight to the project's suites, which pass or fail on their own
+        const { stageProject, runRunnerChild } = require('./_runner-child.js');
+        const dir = stageProject({
+          'unit/trivial.test.js': "module.exports = { type: 'group', tests: [{ name: 'trivial-case', run({ assert }) { assert.equal(1, 1); } }] };\n",
+        });
+
+        try {
+          const run = runRunnerChild(dir);
+
+          assert.strictEqual(run.status, 0, run.output);
+          assert.match(run.output, /✓ trivial-case/, 'the discovered suite ran and passed');
+          assert.doesNotMatch(run.output, /Checking server health/, 'no hosting health check');
+          assert.doesNotMatch(run.output, /rules testing context/, 'no account setup');
         } finally {
           fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -300,7 +325,7 @@ module.exports = defineCases({
         const { CUSTOM_OWNED_SCRIPTS: projectScriptsCustomOwned, verbOfCommand: verbOf } = require('../../dist/cli/utils/project-type.js');
         const projectScripts = require('../../dist/vendor/devkit/verb-scripts.js').projectScripts(frameworkPackage);
         assert.strictEqual(frameworkPackage.projectScriptsCustomOwned, undefined, 'derived from FIREBASE_ONLY_VERBS, never hand-kept');
-        assert.deepStrictEqual([...projectScriptsCustomOwned].sort(), ['deploy', 'emulator', 'start', 'test']);
+        assert.deepStrictEqual([...projectScriptsCustomOwned].sort(), ['deploy', 'start']);
 
         for (const key of projectScriptsCustomOwned) {
           assert.ok(projectScripts[key], `projectScriptsCustomOwned names ${key}, which the target scripts must carry`);

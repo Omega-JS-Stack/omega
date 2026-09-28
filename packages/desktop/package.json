@@ -105,7 +105,6 @@
     "test": "node dist/cli-run.js test"
   },
   "projectScripts": {
-    "start": "omega clean && npm run gulp --",
     "gulp": "gulp",
     "package:quick": "omega package --quick",
     "release:local": "omega publish --local",

@@ -1,4 +1,4 @@
-// The build-mode pipeline shared by the `build`, `package`, and `publish` verbs.
+// The pipeline shared by the `build`, `package`, `publish` and `dev` verbs.
 //
 // The CLI verbs are canonical and the synced projectScripts are thin
 // `omega <verb>` aliases, so a verb must run the pipeline ITSELF and never
@@ -10,8 +10,8 @@
 // Libraries
 const { execute } = require('node-powertools');
 
-function gulpCommand(task) {
-  return `npm run gulp -- ${task}`;
+function gulpCommand(task, args = []) {
+  return `npm run gulp -- ${[task, ...args].join(' ')}`;
 }
 
 // Default step implementations — required lazily so requiring a plan never
@@ -30,7 +30,7 @@ const RUNNERS = {
   'ship-keys': () => require('./ship-keys.js').assertShipKeys(),
   // `strict` rides the STEP: publish declares it (#891), a bare verb does not.
   'validate-certs': (options, step) => require('../commands/validate-certs.js')({ ...options, strict: step.strict === true || options.strict === true }),
-  gulp: (options, step) => execute(gulpCommand(step.task), { log: true }),
+  gulp: (options, step) => execute(gulpCommand(step.task, step.args), { log: true }),
 };
 
 async function runPipeline(plan, options, runners) {

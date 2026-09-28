@@ -18,6 +18,8 @@ const childProcess = require('node:child_process');
 
 const boot = [];
 let manageReport = { hasErrors: false, results: {}, brand: {} };
+// What the manage cycle does to the brand before it reports (the scripts step writes a fresh target's scripts)
+let manageSideEffect = () => {};
 
 // What OMEGA_NON_INTERACTIVE reads as at each boundary (#228): '1' during the
 // boot manage cycle, back to its prior value by the time a leg spawns.
@@ -38,6 +40,9 @@ const legEnvs = [];
 // What each boot cycle asks runManage for — the lane lives here (#228)
 const manageOptions = [];
 
+// The command line every leg was spawned with, by target dir
+const legCommands = [];
+
 // Every child the boot spawned, so a leg's output can be driven by hand (#230)
 const spawned = [];
 
@@ -51,6 +56,7 @@ childProcess.spawn = (command, args, options) => {
     forceColorAt.push(options.env.FORCE_COLOR);
     spawnDetached.push(options.detached);
     legEnvs.push(options.env);
+    legCommands.push(`${path.basename(options.cwd)}: ${[command, ...args].join(' ')}`);
   }
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
@@ -129,6 +135,7 @@ require.cache[managePath] = {
       boot.push(`manage:${startDir}`);
       nonInteractiveAt.manage.push(process.env.OMEGA_NON_INTERACTIVE);
       manageOptions.push(options);
+      manageSideEffect(startDir);
       return manageReport;
     },
   },
@@ -164,6 +171,7 @@ function stageBrand() {
     name: 'fixture-web',
     private: true,
     dependencies: { '@omega.js/web': '*' }, // the target declares its framework, as every real one does
+    scripts: { start: 'omega dev' },
   }));
 
   return root;
@@ -304,6 +312,7 @@ function resetRecorders() {
   manageOptions.length = 0;
   forceColorAt.length = 0;
   legEnvs.length = 0;
+  legCommands.length = 0;
   caRootPemCalls = 0;
   Object.values(nonInteractiveAt).forEach((seen) => { seen.length = 0; });
 }
@@ -448,29 +457,94 @@ test('omega manage --execute is declared boolean, so it never eats the next toke
 
 // ─── Hoisted freshness sweep (#340) ──────────────────────────────────────────
 
-/** Stage a brand with a web AND a backend target, each declaring its framework. */
-function stageFanOutBrand() {
+/**
+ * Stage a brand with one target per type (web and backend by default), each
+ * declaring its framework and the `start` script its scaffold writes. A type
+ * listed in `withoutStart` declares no scripts; `custom` adds a custom target.
+ */
+function stageFanOutBrand({ types = ['web', 'backend'], withoutStart = [], custom = null } = {}) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-dev-')));
+  const targets = types.map((type) => `${type}: { type: '${type}' }`);
+  if (custom) targets.push(`${custom}: { type: 'custom' }`);
 
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  targets: { web: { type: 'web' }, backend: { type: 'backend' } },
+  targets: { ${targets.join(', ')} },
 }
 `);
 
-  for (const [dir, framework] of [['web', '@omega.js/web'], ['backend', '@omega.js/backend']]) {
-    const targetPath = path.join(root, 'targets', dir);
+  for (const type of types) {
+    const targetPath = path.join(root, 'targets', type);
     fs.mkdirSync(targetPath, { recursive: true });
     fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify({
-      name: `fixture-${dir}`,
+      name: `fixture-${type}`,
       private: true,
-      dependencies: { [framework]: '*' },
+      dependencies: { [`@omega.js/${type}`]: '*' },
+      ...(withoutStart.includes(type) ? {} : { scripts: { start: 'omega dev' } }),
     }));
+  }
+  if (custom) {
+    fs.mkdirSync(path.join(root, 'targets', custom), { recursive: true });
+    fs.writeFileSync(path.join(root, 'targets', custom, 'package.json'), JSON.stringify({ name: `fixture-${custom}`, scripts: { start: 'node server.js' } }));
   }
 
   return root;
 }
+
+test('every target\'s dev leg is its own `npm run start`, whatever its kind', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand({ types: ['web', 'backend', 'desktop', 'extension'], custom: 'api' });
+
+  const outcome = await bootDev(root, { all: true });
+
+  assert.strictEqual(outcome, 'running');
+  assert.deepStrictEqual([...legCommands].sort(), [
+    'api: npm run start',
+    'backend: npm run start',
+    'desktop: npm run start',
+    'extension: npm run start',
+    'web: npm run start',
+  ], 'one leg for every kind: the target\'s own start script');
+  assert.strictEqual(legCommands[0], 'backend: npm run start', 'the backend still boots first');
+});
+
+test('a selected target with no `start` script is skipped loudly, and nothing spawns for it', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand({ withoutStart: ['backend'] });
+
+  const log = await captureLogAsync(() => bootDev(root));
+
+  assert.deepStrictEqual(legCommands, ['web: npm run start'], 'only the target with a start script boots');
+  assert.match(log, /backend: no `start` script/, `the skip names the target and the missing script: ${log}`);
+});
+
+test('a fresh target gains its `start` script from the manage cycle and boots (onboard, then dev)', async () => {
+  resetRecorders();
+  resetSweep();
+  manageReport = { hasErrors: false, results: {}, brand: {} };
+  const root = stageFanOutBrand({ withoutStart: ['web', 'backend'] });
+  manageSideEffect = (brandRoot) => {
+    for (const type of ['web', 'backend']) {
+      const manifestPath = path.join(brandRoot, 'targets', type, 'package.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, scripts: { start: 'omega dev' } }));
+    }
+  };
+
+  try {
+    const outcome = await bootDev(root);
+
+    assert.strictEqual(outcome, 'running');
+    assert.deepStrictEqual(legCommands, ['backend: npm run start', 'web: npm run start'], 'both legs boot on the scripts the cycle wrote');
+  } finally {
+    manageSideEffect = () => {};
+  }
+});
 
 /** Clear the sweep recorders and put the result back to an all-fresh brand. */
 function resetSweep() {

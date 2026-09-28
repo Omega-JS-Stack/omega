@@ -44,9 +44,6 @@
     "./cli": "./dist/cli-run.js",
     "./ensure-target": "./dist/commands/lib/ensure-target.js"
   },
-  "projectScripts": {
-    "start": "omega dev"
-  },
   "scripts": {
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",

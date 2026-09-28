@@ -310,7 +310,7 @@ export default function devPalette() {
 
   const renderWho = () => {
     who.textContent = failure
-      ? `${identity}\n✕ ${failure}. Is the backend emulator running? (npm run emulator)`
+      ? `${identity}\n✕ ${failure}. Is the backend emulator running? (npm start at the brand root)`
       : identity;
   };
 
@@ -579,7 +579,7 @@ export default function devPalette() {
 
   const note = doc.createElement('p');
   note.className = 'omega-devbar__note';
-  note.textContent = `Personas are seeded by the backend emulator (npm run emulator) against ${domain}; they all use the shared test password.`;
+  note.textContent = `Personas are seeded by the backend emulator (npm start at the brand root) against ${domain}; they all use the shared test password.`;
 
   // The sections the palette owns, by id — a page that registers under one of
   // these ids merges into it rather than repeating its heading (#234).

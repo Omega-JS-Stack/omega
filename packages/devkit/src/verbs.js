@@ -60,7 +60,8 @@ const VERBS = Object.freeze([
   // root: the link flip walks every target from the brand root, so it runs once, never per target
   { name: 'install', aliases: ['-i', 'i', '--install'], scope: 'root', owners: [MANAGER],
     fanout: 'root', order: null, dryRun: false },
-  { name: 'dev', aliases: ['--dev', 'serve', 'start'], scope: 'root', owners: [MANAGER, WEB],
+  // root: the brand root boots every target's dev at once; a target runs its own framework's in place
+  { name: 'dev', aliases: ['--dev', 'serve', 'start'], scope: 'root', owners: ALL,
     fanout: 'root', order: null, dryRun: false },
   { name: 'manage', aliases: [], scope: 'root', owners: [MANAGER],
     fanout: 'root', order: null, dryRun: false },
@@ -154,9 +155,8 @@ function tokensOf(entry) {
 }
 
 /**
- * The verb a token selects, or null. A name wins over an alias: `serve` is
- * web's and the manager's `dev` alias AND the backend's own verb (no CLI owns
- * both), and the row that NAMES it answers.
+ * The verb a token selects, or null. A name wins over an alias: `serve` is a
+ * `dev` alias AND the backend's own verb, and the row that NAMES it answers.
  *
  * @param {string} token - The token as typed.
  * @returns {object|null} The VERBS entry.

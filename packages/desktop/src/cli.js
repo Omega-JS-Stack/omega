@@ -36,6 +36,7 @@ module.exports = createCliRouter({
   defaultCommand: 'help',
   aliases: {
     clean:            ['-c', '--clean'],
+    dev:              ['serve', 'start', '--dev'],
     version:          ['-v', '--version'],
     build:            ['-b', '--build'],
     deploy:           ['-d', '--deploy'],

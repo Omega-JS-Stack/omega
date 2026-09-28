@@ -71,7 +71,7 @@ test('verbs: every row carries every field, each with an allowed value', () => {
   }
 });
 
-test('verbs: names and aliases are unique, and the one shared token never shares a CLI', () => {
+test('verbs: names and aliases are unique, and the one shared token means one verb per CLI', () => {
   const names = VERBS.map((entry) => entry.name);
   assert.deepEqual(names, [...new Set(names)], 'no name repeats');
 
@@ -83,7 +83,10 @@ test('verbs: names and aliases are unique, and the one shared token never shares
   assert.deepEqual(shared, ['serve'], 'serve (a dev alias AND the backend verb) is the only token two rows share');
 
   const [dev, serve] = rowsOf('serve');
-  assert.equal(dev.owners.some((owner) => serve.owners.includes(owner)), false, 'no CLI owns both serve rows');
+  // A CLI owning both rows answers the token as the row that NAMES it, so its dev never lists it
+  for (const owner of dev.owners.filter((owner) => serve.owners.includes(owner))) {
+    assert.equal((CLIS[owner].dev || []).includes('serve'), false, `${owner} answers serve as its own verb, never as dev`);
+  }
   assert.equal(findVerb('serve'), serve, 'the row that NAMES a token answers it');
 });
 

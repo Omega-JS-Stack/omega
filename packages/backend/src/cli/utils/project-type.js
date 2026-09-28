@@ -7,10 +7,10 @@
  * `targets.backend.projectType`, so ONE file decides it for the runtime
  * (`omega.initialize()`) and for the CLI alike.
  *
- * Custom mode takes three VERBS away, and FIREBASE_ONLY_VERBS is the one home
- * of that list: the Functions deploy, the local emulator, and the emulator test
- * run. It also takes away the Firebase-only ARTIFACTS those verbs read —
- * FIREBASE_ONLY_SCAFFOLD and FIREBASE_ONLY_SETUP_CHECKS are the one home of
+ * Custom mode takes the Firebase VERBS away, and FIREBASE_ONLY_VERBS is the one
+ * home of that list: the Functions deploy and every verb that boots the local
+ * emulator or hosting. It also takes away the Firebase-only ARTIFACTS those
+ * verbs read — FIREBASE_ONLY_SCAFFOLD and FIREBASE_ONLY_SETUP_CHECKS are the one home of
  * that list ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)) — and
  * the package SCRIPTS that run them, CUSTOM_OWNED_SCRIPTS, derived from the
  * verbs.
@@ -31,9 +31,9 @@ const frameworkPackage = require('../../../package.json');
 // lane is just a wall.
 const FIREBASE_ONLY_VERBS = {
   deploy: "a custom backend publishes through its host (Render & co) — put that command in this target's `deploy` script, which the brand-root `omega deploy` runs",
+  dev: "there are no Cloud Functions to emulate: this target's own `start` script boots the server on PORT, and the brand-root `omega dev` runs it",
   serve: 'a custom backend runs its own server — `npm start` boots it on PORT',
   emulator: 'there are no Cloud Functions to emulate — `npm start` boots the server on PORT',
-  test: "the emulator lane needs Cloud Functions; `npm run test:static` runs this target's static suite",
 };
 
 /**

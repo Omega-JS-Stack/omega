@@ -54,11 +54,6 @@
       }
     ]
   },
-  "projectScripts": {
-    "start": "omega serve",
-    "emulator": "omega emulator",
-    "test:static": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'"
-  },
   "keywords": [
     "omega",
     "firebase",

@@ -29,6 +29,7 @@ const ServeCommand = require('./commands/serve');
 const DeployCommand = require('./commands/deploy');
 const TestCommand = require('./commands/test');
 const EmulatorCommand = require('./commands/emulator');
+const DevCommand = require('./commands/dev');
 const CleanCommand = require('./commands/clean');
 const IndexesCommand = require('./commands/indexes');
 const WatchCommand = require('./commands/watch');
@@ -107,6 +108,13 @@ const COMMANDS = [
     aliases: ['emulators'],
     description: 'emulator keep-alive mode',
     run: (self) => new EmulatorCommand(self).execute(),
+  },
+  {
+    // Not `serve`: that token is the backend's own verb, matched above.
+    name: 'dev',
+    aliases: ['start', '--dev'],
+    description: 'the dev loop: the full emulator suite (what `npm start` runs)',
+    run: (self) => new DevCommand(self).execute(),
   },
   {
     // `clean` accepted bare — every router framework answers it.

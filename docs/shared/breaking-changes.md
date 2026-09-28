@@ -28,6 +28,15 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-09-27: one dev verb on every framework, one test entry on the backend ([#983](https://github.com/Omega-JS-Stack/omega/issues/983))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A target's `start` script | web `omega dev`; backend `omega serve`; desktop and extension `omega clean && npm run gulp --` | `omega dev` on every framework target, derived from the verb table's `dev` row. Desktop's and extension's `dev` is clean, then the gulp default task, with the `--` flags forwarded; the backend's is the full emulator suite | None: every verb and the manage walk rewrite `start` |
+| The brand-root `omega dev` legs | web `npm run start`, backend `npm run emulator`, desktop and extension `npm run start`, a custom target its `start` | Every target's own `npm run start`; a selected target with no `start` script is skipped in one loud line | None |
+| The backend's `emulator` and `test:static` scripts | `emulator` ran `omega emulator`; `test:static` ran `node --test` over `test/_unit` with `test/_helpers/connect-trap.js` preloaded | Gone. `omega emulator` stays a verb, and `npm start` (`omega dev`) boots the same suite. `omega test` is the one test entry: it runs `test/unit/` with the rest, under the runner's own connect trap (loopback only; stood down under `--extended` and `--lane=`) | Delete `emulator` and `test:static` from the backend target's `package.json` (the walk never deletes a key). Move `test/_unit/` to `test/unit/`, convert each file from `node:test` to a runner case file (`module.exports = { type: 'group', tests: [{ name, run(context) }] }`; the new skeletons show the shape), and delete `test/_helpers/connect-trap.js` |
+| A custom-server backend's `test` and `dev` | `omega test` refused; `test` was a brand-owned script | `omega test` runs the discovered suites with no emulator boot, health check or account setup, and `test` is framework-owned again (`omega test`); `omega dev` refuses, so `start` and `deploy` are the brand's scripts | None: the walk writes `test`. A brand-written `test` is rewritten to `omega test` |
+
 ## 2026-09-27: a verb runs in a target of one of its owners ([#985](https://github.com/Omega-JS-Stack/omega/issues/985))
 
 | Contract | Old form | New form | Manual migration step |

@@ -12,13 +12,11 @@
     "firebase-functions": "^7.2.5"
   },
   "scripts": {
-    "start": "omega serve",
+    "start": "omega dev",
     "deploy": "omega deploy",
-    "emulator": "omega emulator",
     "test": "omega test",
     "test:offline": "npx omega test",
     "build": "omega build",
-    "test:static": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
     "clean": "omega clean",
     "update": "omega update",
     "indexes": "omega indexes"

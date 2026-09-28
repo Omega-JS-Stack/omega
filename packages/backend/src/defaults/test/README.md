@@ -1,30 +1,26 @@
 # Project tests
 
-This project has **two test lanes**, both scaffolded by the OMEGA verbs.
+`npm test` (= `npx omega test`) runs every suite under `test/` against a **real Firebase emulator**: yours, and the framework's when you ask for them. A custom-server backend boots no emulator and runs the suites directly. While the suites run, a plain run is **socket-free past this machine**: the runner arms a connect trap after the emulator health check and account setup, and a TCP connect or DNS lookup to any host but loopback throws. The emulator on loopback stays reachable; `--extended` and `--lane=` runs stand the trap down, since they exist to reach real services.
 
-| Lane | Command | What it is |
-|---|---|---|
-| Static | `npm run test:static` | Plain `node --test` over `test/_unit/**/*.test.js`. **Socket-free**: `test/_helpers/connect-trap.js` is preloaded into every test process and turns any TCP connect or DNS lookup into a throw. No emulator, no network, no credentials: seconds to run. |
-| Emulator | `npm test` (= `npx omega test`) | Everything below: your suites, and the framework's, against a **real Firebase emulator**. |
+## The unit suites (`test/unit/`)
 
-## The static lane (`test/_unit/`)
-
-The `_` prefix is load-bearing: the framework's test discovery skips `_`-prefixed paths, so these suites never run inside the emulator lane. Three skeletons ship with the project and are YOURS to extend:
+Three skeletons ship with the project and are YOURS to extend. They need no emulator, so they also run on a custom-server backend (`projectType: 'custom'`), where a case whose Firebase file is absent skips:
 
 | File | Pins |
 |---|---|
-| `_unit/registration.test.js` | `src/index.js` boots the framework that is actually installed; every route it dispatches to exists and its imports load (a broken require fails here, not at cold start) |
-| `_unit/rules-posture.test.js` | Every Firestore/Storage path your rules open is declared in the suite: adding a rule is a deliberate act, not a diff nobody read |
-| `_unit/socket-free.test.js` | The connect trap is loaded and refuses. Leave this one as shipped: without it, a lane that lost the `--require` flag would pass while reaching live Firebase |
+| `unit/registration.test.js` | `src/index.js` boots the framework that is actually installed; every route it dispatches to exists and its imports load (a broken require fails here, not at cold start) |
+| `unit/rules-posture.test.js` | Every Firestore/Storage path your rules open is declared in the suite: adding a rule is a deliberate act, not a diff nobody read |
+| `unit/socket-free.test.js` | The connect trap is armed and refuses. Leave this one as shipped: it is what turns a run that lost the trap into a red test |
 
-A test that needs a real network client belongs in the emulator lane, which boots the environment it talks to. In the static lane, pass a stub.
+A test that needs a real network client passes a stub, or runs under `--extended`.
 
-## Layout (emulator lane)
+## Layout
 
 Name every test file `<concern>.test.js`: the suffix is how the runner finds it, and a plain `.js` file under `test/` is support code that never runs. Match the framework's layout. OMEGA Backend's test runner discovers files by the directory they sit in. Mirror the same per-area split as the framework's own `test/` (see `node_modules/@omega.js/backend/test/`):
 
 | Directory | Use for |
 |---|---|
+| `test/unit/` | No-emulator suites: registration, rules posture, socket-free (above) |
 | `test/routes/` | Custom HTTP route handlers (`src/routes/<path>/<method>.js`) |
 | `test/events/` | Pub/Sub / Firestore-trigger handlers |
 | `test/helpers/` | Shared test utilities for your project |

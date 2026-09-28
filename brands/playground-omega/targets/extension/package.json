@@ -9,7 +9,7 @@
   },
   "dependencies": {},
   "scripts": {
-    "start": "omega clean && npm run gulp --",
+    "start": "omega dev",
     "gulp": "gulp",
     "build": "omega build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",

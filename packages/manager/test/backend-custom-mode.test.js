@@ -35,7 +35,7 @@ const jetpack = require('fs-jetpack');
 
 const { discoverTargets } = require('../src/lib/brand.js');
 const { resolveTargetRun } = require('../src/lib/framework-bin.js');
-const { devLegFor } = require('../src/commands/dev.js');
+const devCommand = require('../src/commands/dev.js');
 const { checkTargetFiles } = require('../src/services/testing/lib/checks.js');
 
 const BASE = { brand: { id: 'b', name: 'B', url: 'https://b.test' } };
@@ -123,12 +123,10 @@ test('a firebase-mode backend runs the same lane, and its own `omega deploy` tak
 
 // ─── The dev leg ─────────────────────────────────────────────────────────────
 
-test('the dev leg for a custom-mode backend is its own server, not the emulator', () => {
-  assert.deepEqual(devLegFor({ target: 'backend', projectType: 'custom' }), ['npm', 'run', 'start']);
-  assert.deepEqual(devLegFor({ target: 'backend', projectType: 'firebase' }), ['npm', 'run', 'emulator']);
-  assert.deepEqual(devLegFor({ target: 'backend' }), ['npm', 'run', 'emulator']);
-  assert.deepEqual(devLegFor({ target: 'web' }), ['npm', 'run', 'start']);
-  assert.deepEqual(devLegFor({ target: 'api', custom: true }), ['npm', 'run', 'start'], "#603's custom targets keep their leg");
+test('the dev leg for a custom-mode backend is its own start script, the one leg every target runs', () => {
+  assert.deepEqual(devCommand.DEV_LEG, ['npm', 'run', 'start']);
+  assert.equal(devCommand.devLegFor, undefined, 'no per-kind leg table: the mode decides what `start` runs, never the manager');
+  assert.equal(devCommand.DEV_LEGS, undefined);
 });
 
 // ─── The Firebase-only check ─────────────────────────────────────────────────

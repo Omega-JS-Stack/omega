@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#212](../../issues/212) - `POST /payments/intent` takes `simulate: 'abandon'` - the session is created and no webhook is fired, which is what an abandoned checkout IS. Test-provider only, never persisted.
 
 ### Changed
+- [#983](../../issues/983) - `omega dev` is one verb on all four frameworks, and every target's `start` script is `omega dev`, the one leg the brand-root boot runs. The backend's unit suites run inside `omega test` under the runner's connect trap; a custom-server backend runs its suites with no emulator.
 - [#985](../../issues/985) - A verb runs inside a target its framework owns (`npm test`, `npm start`), a brand-wide verb refuses there, and framework source refuses every verb. Every brand-root fan-out runs each target's own `npm run <verb>`, custom targets included, and the target scripts derive from the one verb table.
 - [#863](../../issues/863) - Verbs run from a root: `--target=` picks the target or package. A framework's suite runs from the monorepo root (`npx omega test --target=web framework:`); one devkit table declares every verb.
 - [#863](../../issues/863) - The brand root runs every framework verb: `npx omega translate --target=web` reaches the web target's own CLI, arguments as typed. `omega i local` and `omega i live` run once at the brand root, and the fan-outs and the dispatcher read one verb table.

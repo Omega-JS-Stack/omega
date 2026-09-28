@@ -8,6 +8,7 @@ Match the framework's layout — Backend Manager's test runner discovers files b
 
 | Directory | Use for |
 |---|---|
+| `test/unit/` | No-emulator suites (registration, rules posture, socket-free); a plain run arms the runner's connect trap, so they reach nothing past loopback |
 | `test/routes/` | Custom HTTP route handlers (`functions/routes/<verb>/<path>.js`) |
 | `test/events/` | Pub/Sub / Firestore-trigger handlers |
 | `test/helpers/` | Shared test utilities for your project |

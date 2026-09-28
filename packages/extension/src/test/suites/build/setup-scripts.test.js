@@ -159,7 +159,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'the verb scripts derive from the verb table, the declared start merged over them',
+      name: 'the verb scripts derive from the verb table, `start` among them',
       run: async (ctx) => {
         const tmp = stageProject(CONSUMER_PKG);
 
@@ -172,7 +172,8 @@ module.exports = defineCases({
             for (const [verb, command] of Object.entries(derived)) {
               ctx.expect(scripts[verb]).toBe(command);
             }
-            ctx.expect(scripts.start).toBe('omega clean && npm run gulp --');
+            ctx.expect(scripts.start).toBe('omega dev');
+            ctx.expect(scripts.gulp).toBe('gulp');
 
             // No verb script is typed by hand: the manifest declares only what the table cannot derive
             const declared = require(path.join(SRC, '..', 'package.json')).projectScripts;

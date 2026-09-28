@@ -12,7 +12,7 @@ const { javaInstallHint } = require('./setup-tests/helpers');
 const { readPortsFile, portsToEnv } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
-const { refuseWhenCustom } = require('../utils/project-type');
+const { isCustomProject } = require('../utils/project-type');
 const { runTargetChecks } = require('../utils/target-checks');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
 
@@ -155,9 +155,6 @@ class TestCommand extends BaseCommand {
     const self = this.main;
     const argv = self.argv;
 
-    // The emulator test lane needs Cloud Functions; custom mode has none (#584)
-    if (refuseWhenCustom(self.firebaseProjectPath, 'test')) return;
-
     // Tee THIS process to <targetRoot>/logs/test.log (#197) — the setup lines, the
     // port summary and the emulator boot that the runner-child's dist/test.log
     // never sees.
@@ -271,7 +268,16 @@ class TestCommand extends BaseCommand {
       testPaths,
       emulatorPorts,
       isFrameworkSelfTest: isSelfTest, // gates the boot/ smoke layer (excluded for consumers)
+      custom: isCustomProject(projectDir),
     };
+
+    // A custom-server backend has no emulator to boot: the runner goes straight
+    // to the discovered suites, and one that needs the emulator fails on its own
+    if (testConfig.custom) {
+      this.log(chalk.cyan('Custom-server backend: running the suites with no emulator'));
+      await this.runRunnerChild(this.buildTestCommand(testConfig), functionsDir);
+      return;
+    }
 
     // Adopt the running emulator only when it PROVES it is ours — a listener on
     // the functions port is not evidence of ownership
@@ -777,6 +783,13 @@ class TestCommand extends BaseCommand {
     this.log(chalk.gray(`  Auth: 127.0.0.1:${emulatorPorts.auth}`));
     this.log(chalk.gray(`  UI: http://127.0.0.1:${emulatorPorts.ui}`));
 
+    await this.runRunnerChild(testCommand, functionsDir);
+  }
+
+  /**
+   * Run the test-runner child, its output teed to logs/test.log
+   */
+  async runRunnerChild(testCommand, functionsDir) {
     // Set up log file in the project's functions/ directory (alongside firebase-tools logs)
     const logPath = this.getLogsPath('test.log');
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });

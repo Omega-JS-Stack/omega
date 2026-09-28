@@ -13,9 +13,8 @@ const dirs = [
 ]
 
 module.exports = async function (options) {
-  // The local scaffold (#675): the consumer `start` and `build` scripts are
-  // `omega clean && … npm run gulp …`, and gulp itself is one of the peer
-  // deps the ensure installs — clean is the only verb that runs before it.
+  // The local scaffold: dev and build clean before gulp runs, and gulp
+  // itself is one of the peer deps the ensure installs.
   await ensureTarget({ log: (line) => logger.log(line), warn: (line) => logger.warn(line) });
 
   // Log

@@ -9,6 +9,7 @@ const assertions = require('./utils/assertions.js');
 const { seed } = require('./seed.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
+const connectTrap = require('./connect-trap.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
 const { markRunnerActive } = require('@omega.js/devkit/test/define-cases');
 const { parseTestScope, isPathTargeted, noMatchMessage, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
@@ -118,24 +119,33 @@ class TestRunner {
       return this.results;
     }
 
-    // Health check (use basic http client without accounts)
-    // Use hosting URL for all requests (rewrites to omega_api function)
-    const healthHttp = new HttpClient({
-      apiUrl: this.options.apiUrl,
-      timeout: this.options.timeout,
-    });
+    // A custom-server backend has no hosting to check and no emulator to seed:
+    // its run goes straight to the suites
+    if (!this.options.custom) {
+      // Health check (use basic http client without accounts)
+      // Use hosting URL for all requests (rewrites to omega_api function)
+      const healthHttp = new HttpClient({
+        apiUrl: this.options.apiUrl,
+        timeout: this.options.timeout,
+      });
 
-    const healthy = await this.healthCheck(healthHttp);
-    if (!healthy) {
-      this.results.aborted = true;
-      return this.results;
+      const healthy = await this.healthCheck(healthHttp);
+      if (!healthy) {
+        this.results.aborted = true;
+        return this.results;
+      }
+
+      // Setup accounts
+      const accountsReady = await this.setupAccounts();
+      if (!accountsReady) {
+        this.results.aborted = true;
+        return this.results;
+      }
     }
 
-    // Setup accounts
-    const accountsReady = await this.setupAccounts();
-    if (!accountsReady) {
-      this.results.aborted = true;
-      return this.results;
+    // A plain run reaches only loopback; extended and lane runs exist to reach real services
+    if (!process.env.TEST_EXTENDED_MODE && !process.env.OMEGA_TEST_LANE) {
+      connectTrap.install();
     }
 
     // Run @omega.js/backend default tests
