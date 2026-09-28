@@ -1,23 +1,25 @@
 /**
  * The brand root's pass-through: a framework verb the manager keeps no command
- * for runs on the targets `--target=` picks, each through its own framework's
- * bin (`resolveTargetRun`), in the verb table's TARGET_ORDER. The verb's row
- * decides the selection: `fanout: 'each'` with no picker runs every target whose
- * framework owns the verb, `fanout: 'none'` runs exactly one picked target, and a
- * picked target whose framework does not own the verb is refused by name. The
- * args after the verb forward verbatim, scope words included.
+ * for runs on the targets `--target=` picks, in the verb table's TARGET_ORDER.
+ * The verb's row decides how. A fan-out verb (`fanout: 'each'`) runs each
+ * target's own `npm run <verb>` (`resolveTargetRun`), custom targets included,
+ * every target that owns it or carries the script when nothing is picked. A
+ * single-target command (`fanout: 'none'`) runs exactly one picked target's
+ * framework CLI with the argv as typed (`resolveTargetCommand`), and steps aside
+ * on a custom target. A picked framework target that does not own the verb is
+ * refused by name. The args after the verb forward verbatim, scope words included.
  */
 const path = require('node:path');
 const chalk = require('chalk').default;
 
-const { findTarget } = require('@omega.js/devkit/omega-bin');
+const { findTarget, MANAGER } = require('@omega.js/devkit/omega-bin');
+const { parseArgv } = require('@omega.js/devkit/argv');
 const { findVerb } = require('@omega.js/devkit/verbs');
 const { PICKER_FLAG, takePicker } = require('@omega.js/devkit/target-picker');
 const { resolveBrandRoot, discoverTargets } = require('./brand.js');
 const { selectTargets } = require('./target-selection.js');
 const { walkTargets } = require('./verb-fanout.js');
-
-const MANAGER = '@omega.js/manager';
+const { resolveTargetCommand } = require('./framework-bin.js');
 
 /** Throw a refusal: the cli-router prints its message alone and exits 1. */
 function refuse(message) {
@@ -63,6 +65,9 @@ async function runPassThrough(token, argv, deps = {}) {
 
   const { tokens, rest } = takePicker(argv);
   const forwarded = rest.filter((_, index) => index !== rest.indexOf(token));
+  // Read the way every fan-out reads it; the flag itself still forwards to the framework's own CLI
+  const options = parseArgv(rest, { booleans: ['dry-run', 'dryRun'] });
+  const dryRun = !!(options['dry-run'] || options.dryRun);
 
   const targets = discoverTargets(brandRoot).filter((entry) => entry.target || entry.custom);
   const { selected: picked } = selectTargets({ targets, target: tokens.join(',') });
@@ -74,17 +79,23 @@ async function runPassThrough(token, argv, deps = {}) {
     refuse(`"${token}" runs on one target: npx omega ${token} --${PICKER_FLAG}=<name>, the name one of ${owning.join(', ') || `nothing here (it is ${owners}'s verb)`}. Nothing ran.`);
   }
 
-  const refused = tokens.length > 0 ? picked.filter((entry) => !owns(entry)) : [];
+  // A custom target is no framework's to refuse: its own script (or its loud skip) answers
+  const refused = tokens.length > 0 ? picked.filter((entry) => !entry.custom && !owns(entry)) : [];
   if (refused.length > 0) {
-    const named = refused.map((entry) => `${entry.name} (${frameworkOf(entry) || 'custom'})`).join(', ');
+    const named = refused.map((entry) => `${entry.name} (${frameworkOf(entry)})`).join(', ');
     refuse(`"${token}" is ${owners}'s verb, and ${named} cannot run it. Nothing ran.`);
   }
 
-  const selected = picked.filter(owns);
+  const selected = picked.filter((entry) => entry.custom || owns(entry));
   if (selected.length === 0) refuse(`no target in this brand runs "${token}" (it is ${owners}'s verb). Nothing ran.`);
 
   console.log(chalk.bold(`\nOMEGA brand ${token}: ${path.basename(brandRoot)} ${chalk.dim(`(${selected.map((entry) => entry.name).join(' → ')})`)}`));
-  await walkTargets({ verb: token, selected, forwarded, run: deps.run });
+
+  if (row.fanout === 'none') {
+    await walkTargets({ verb: row.name, selected, run: deps.run, resolve: (entry) => resolveTargetCommand(entry, token, rest, { dryRun }) });
+    return;
+  }
+  await walkTargets({ verb: row.name, selected, forwarded, dryRun, run: deps.run });
 }
 
 module.exports = { passThroughRow, runPassThrough };

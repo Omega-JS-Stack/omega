@@ -23,15 +23,15 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const { scaffoldDefaults, NODE_VERSION } = require('../../scaffold.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
 const frameworkPackage = require('../../../package.json');
 
-// package.json scripts every consumer gets. Declared in the framework
-// manifest's `projectScripts` (sibling parity: backend/desktop/extension all
-// declare theirs there, and the manager's workspace walk reads it to heal a
-// fresh target before any verb has run). No `setup` entry: the verbs run
-// ensureTarget themselves (#675).
-const PROJECT_SCRIPTS = frameworkPackage.projectScripts;
+// package.json scripts every consumer gets: the verb scripts the verb table
+// derives for this framework, with the manifest's `projectScripts` (the
+// non-verb `start`) merged over them. The manager's workspace walk derives the
+// same set to heal a fresh target before any verb has run.
+const PROJECT_SCRIPTS = projectScripts(frameworkPackage);
 
 /**
  * Sync the consumer manifest's omega scripts, engines floor + license (#884,

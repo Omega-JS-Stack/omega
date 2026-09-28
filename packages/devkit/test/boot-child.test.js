@@ -12,8 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
 
-const { startChild, stopChild, rootDispatchEnv } = require('../src/test/boot-child.js');
-const { ROOT_DISPATCH_ENV } = require('../src/omega-bin.js');
+const { startChild, stopChild } = require('../src/test/boot-child.js');
 
 function scratch() {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'boot-child-')));
@@ -48,25 +47,24 @@ test('startChild resolves the marker capture group and tees the output to its lo
   }
 });
 
-test('a child booted inside a brand target carries the root-dispatch marker naming the brand root', async () => {
+test('a child booted inside a brand target runs on the caller\'s env as given, with no marker added', async () => {
   const brandRoot = scratch();
   const targetDir = path.join(brandRoot, 'targets', 'backend');
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(path.join(brandRoot, 'package.json'), '{"name":"acme","workspaces":["targets/*"]}');
   fs.writeFileSync(path.join(targetDir, 'package.json'), '{"name":"acme-backend"}');
 
-  assert.equal(rootDispatchEnv(targetDir, {})[ROOT_DISPATCH_ENV], brandRoot);
-
   const { child, ready } = startChild({
     bin: process.execPath,
-    args: ['-e', `process.stdout.write('marker=' + process.env.${ROOT_DISPATCH_ENV} + '\\n'); setInterval(() => {}, 1000);`],
+    args: ['-e', "process.stdout.write('env=' + process.env.LANE_WORD + ':' + process.env.OMEGA_ROOT_DISPATCH + '\\n'); setInterval(() => {}, 1000);"],
     cwd: targetDir,
+    env: { PATH: process.env.PATH, LANE_WORD: 'kept' },
     logFile: path.join(brandRoot, 'child.log'),
-    marker: /marker=(\S+)/,
+    marker: /env=(\S+)/,
     timeout: 20000,
   });
   try {
-    assert.equal(await ready, brandRoot);
+    assert.equal(await ready, 'kept:undefined');
   } finally {
     await stopChild(child);
   }

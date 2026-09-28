@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, ROOT_DISPATCH_ENV, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
@@ -537,29 +537,25 @@ test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
       hostRun: () => { throw new Error('hostRun must not fire at a brand root'); },
       argv: ['build'],
     });
-    assert.equal(process.env[ROOT_DISPATCH_ENV], process.cwd(), 'an accepted root run marks the root for every child it spawns');
+    assert.equal(process.env.OMEGA_ROOT_DISPATCH, undefined, 'an accepted root run sets no env marker for its children');
   } finally {
     process.chdir(cwd0);
-    delete process.env[ROOT_DISPATCH_ENV];
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'brand-dispatched');
 });
 
-// ─── Every verb runs at a root; a subfolder refuses (#863) ──────────────────
+// ─── A verb runs wherever one of its owners is; brand-wide verbs refuse below the root ───
 
 const BIN = path.join(__dirname, '..', 'src', 'omega-bin.js');
 
 /**
  * Run the dispatcher as a real process (a refusal exits it), wired to a host
- * that only announces itself. The root-dispatch marker is passed explicitly, never inherited.
+ * that only announces itself.
  */
-function invokeBin({ scratch, hostName, cwd, args, marker }) {
+function invokeBin({ scratch, hostName, cwd, args }) {
   const runner = path.join(scratch, 'runner.js');
   fs.writeFileSync(runner, `require(${JSON.stringify(BIN)}).run({ hostName: ${JSON.stringify(hostName)}, hostRun: () => console.log('HOST-RAN') });`);
-  const env = { ...process.env };
-  delete env[ROOT_DISPATCH_ENV];
-  if (marker) env[ROOT_DISPATCH_ENV] = marker;
-  return require('child_process').spawnSync(process.execPath, [runner, ...args], { cwd, env, encoding: 'utf8' });
+  return require('child_process').spawnSync(process.execPath, [runner, ...args], { cwd, encoding: 'utf8' });
 }
 
 /**
@@ -599,7 +595,8 @@ function stageMonorepo() {
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));
     fs.writeFileSync(
       path.join(dir, 'dist', 'cli-run.js'),
-      `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, ${JSON.stringify(manifest.name)}); } };`
+      `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, ${JSON.stringify(manifest.name)}); } };\n`
+        + 'if (require.main === module) module.exports.run();\n'
     );
   };
   const framework = (name, deps = {}) => ({ name, bin: { omega: 'bin/omega' }, exports: { './cli': './dist/cli-run.js' }, devDependencies: deps });
@@ -612,78 +609,121 @@ function stageMonorepo() {
   return { root, marker };
 }
 
-test('run(): a deep dir inside a brand target refuses with the brand root form', () => {
-  const { scratch, brandRoot, deep } = stageBrandTarget();
-  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build', '--dry-run'] });
-
-  assert.equal(out.status, 1);
-  assert.equal(out.stdout.includes('HOST-RAN'), false, 'the target CLI never started');
-  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega build --target=site --dry-run`), out.stderr);
-});
-
-test('run(): the target dir itself is inside the brand, so it refuses too', () => {
-  const { scratch, brandRoot, targetDir } = stageBrandTarget();
-  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: targetDir, args: ['deploy'] });
-
-  assert.equal(out.status, 1);
-  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega deploy --target=site`), out.stderr);
-});
-
-test('run(): a deep dir inside a framework package refuses with the monorepo root form', () => {
-  const { root, marker } = stageMonorepo();
-  const deep = path.join(root, 'packages', 'extension', 'test', 'boot');
-  fs.mkdirSync(deep, { recursive: true });
-  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: deep, args: ['test', 'boot/manifest'] });
-
-  assert.equal(out.status, 1);
-  assert.equal(fs.existsSync(marker), false, 'no package CLI started');
-  assert.ok(out.stderr.includes(`cd ${root} && npx omega test --target=extension boot/manifest`), out.stderr);
-});
-
-test('run(): a refused subfolder run leaves the root-dispatch marker unset', async () => {
-  const { deep } = stageBrandTarget();
-  const cwd0 = process.cwd();
-  const exit0 = process.exit;
-  const error0 = console.error;
-  console.error = () => {};
-  // The refusal exits the process; the stub turns that exit into a throw this test can catch
-  process.exit = (code) => { throw new Error(`exit ${code}`); };
-  process.chdir(deep);
-  try {
-    await assert.rejects(run({ hostName: '@omega.js/web', hostRun: () => {}, argv: ['build'] }), /exit 1/);
-    assert.equal(process.env[ROOT_DISPATCH_ENV], undefined);
-  } finally {
-    process.chdir(cwd0);
-    process.exit = exit0;
-    console.error = error0;
+test('run(): a verb the target\'s framework owns runs in place, in the target dir and deep inside it', () => {
+  const { scratch, targetDir, deep } = stageBrandTarget();
+  for (const cwd of [targetDir, deep]) {
+    for (const verb of ['test', 'build', 'dev']) {
+      const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd, args: [verb, '--dry-run'] });
+      assert.equal(out.status, 0, `${verb} in ${cwd}: ${out.stderr}`);
+      assert.ok(out.stdout.includes('HOST-RAN'), `${verb} ran the target framework's CLI in ${cwd}`);
+      assert.equal(out.stderr.includes('refusing'), false, out.stderr);
+    }
   }
 });
 
-test('run(): OMEGA_ROOT_DISPATCH naming the brand root lets its target run', () => {
+test('run(): ownership reads every row a token selects: `serve` runs in a web target (dev\'s alias) and in a backend target (its own verb)', () => {
+  const { scratch, targetDir } = stageBrandTarget();
+  const web = invokeBin({ scratch, hostName: '@omega.js/web', cwd: targetDir, args: ['serve'] });
+  assert.equal(web.status, 0, web.stderr);
+  assert.ok(web.stdout.includes('HOST-RAN'));
+
+  const backendDir = path.join(path.dirname(targetDir), 'api');
+  fs.mkdirSync(backendDir);
+  fs.writeFileSync(path.join(backendDir, 'package.json'), JSON.stringify({ name: 'acme-api', dependencies: { '@omega.js/backend': '*' } }));
+  const backend = invokeBin({ scratch, hostName: '@omega.js/backend', cwd: backendDir, args: ['serve'] });
+  assert.equal(backend.status, 0, backend.stderr);
+  assert.ok(backend.stdout.includes('HOST-RAN'));
+
+  const desktopDir = path.join(path.dirname(targetDir), 'app');
+  fs.mkdirSync(desktopDir);
+  fs.writeFileSync(path.join(desktopDir, 'package.json'), JSON.stringify({ name: 'acme-app', dependencies: { '@omega.js/desktop': '*' } }));
+  const desktop = invokeBin({ scratch, hostName: '@omega.js/desktop', cwd: desktopDir, args: ['serve'] });
+  assert.equal(desktop.status, 1, 'no row that `serve` selects is desktop\'s');
+});
+
+test('run(): a brand-wide verb inside a target refuses and prints the brand-root form, no picker', () => {
+  const { scratch, brandRoot, targetDir, deep } = stageBrandTarget();
+  for (const cwd of [targetDir, deep]) {
+    for (const verb of ['install', 'manage', 'migrate']) {
+      const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd, args: [verb, 'local'] });
+      assert.equal(out.status, 1, `${verb} in ${cwd} must refuse: ${out.stdout}`);
+      assert.equal(out.stdout.includes('HOST-RAN'), false, 'the target CLI never started');
+      assert.match(out.stderr, /this verb runs at the brand root/);
+      assert.ok(out.stderr.includes(`Run: cd ${brandRoot} && npx omega ${verb} local`), out.stderr);
+      assert.equal(out.stderr.includes('--target='), false, `a brand-wide verb picks no target: ${out.stderr}`);
+    }
+  }
+});
+
+test('run(): a verb the target\'s framework does not own refuses with the brand-root form and its picker', () => {
   const { scratch, brandRoot, deep } = stageBrandTarget();
-  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build'], marker: brandRoot });
-
-  assert.equal(out.status, 0, out.stderr);
-  assert.ok(out.stdout.includes('HOST-RAN'), 'the target framework ran');
-});
-
-test('run(): OMEGA_ROOT_DISPATCH naming the monorepo root runs the package\'s OWN CLI, never the host', () => {
-  const { root, marker } = stageMonorepo();
-  const deep = path.join(root, 'packages', 'extension', 'test', 'boot');
-  fs.mkdirSync(deep, { recursive: true });
-  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: deep, args: ['test'], marker: root });
-
-  assert.equal(out.status, 0, out.stderr);
-  assert.equal(out.stdout.includes('HOST-RAN'), false, 'web (the host) never ran inside the extension package');
-  assert.equal(fs.readFileSync(marker, 'utf8'), '@omega.js/extension');
-});
-
-test('run(): a marker naming some OTHER root lets nothing through', () => {
-  const { scratch, deep } = stageBrandTarget();
-  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['build'], marker: path.join(scratch, 'elsewhere') });
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: deep, args: ['package', '--quick'] });
 
   assert.equal(out.status, 1);
   assert.equal(out.stdout.includes('HOST-RAN'), false);
+  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega package --target=site --quick`), out.stderr);
+});
+
+test('run(): a brand subfolder that is no framework target still refuses every verb', () => {
+  const { scratch, brandRoot } = stageBrandTarget();
+  const docs = path.join(brandRoot, 'docs');
+  fs.mkdirSync(docs);
+  const out = invokeBin({ scratch, hostName: '@omega.js/web', cwd: docs, args: ['build'] });
+
+  assert.equal(out.status, 1);
+  assert.ok(out.stderr.includes(`cd ${brandRoot} && npx omega build`), out.stderr);
+});
+
+test('run(): framework source is never a target: every verb inside a framework package refuses with the monorepo root form', () => {
+  const { root, marker } = stageMonorepo();
+  const deep = path.join(root, 'packages', 'extension', 'test', 'boot');
+  fs.mkdirSync(deep, { recursive: true });
+
+  // Each refusal prints the one form the monorepo root accepts for that verb
+  const forms = {
+    test: 'npx omega test --target=extension boot/manifest',
+    build: 'npm run build --workspaces --if-present',
+    clean: 'npm run clean --workspaces --if-present',
+  };
+  for (const [verb, ...rest] of [['test', 'boot/manifest'], ['build', '--dry-run'], ['clean']]) {
+    const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: deep, args: [verb, ...rest] });
+    assert.equal(out.status, 1, `${verb} must refuse: ${out.stdout}`);
+    assert.equal(fs.existsSync(marker), false, `${verb}: no package CLI started`);
+    assert.match(out.stderr, /this verb runs at the monorepo root/);
+    assert.ok(out.stderr.includes(`Run: cd ${root} && ${forms[verb]}`), out.stderr);
+  }
+});
+
+test('run(): a verb the package does not own refuses with the monorepo root form', () => {
+  const { root, marker } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: path.join(root, 'packages', 'extension'), args: ['package', '--quick'] });
+
+  assert.equal(out.status, 1);
+  assert.equal(fs.existsSync(marker), false, 'no package CLI started');
+  assert.match(out.stderr, /this verb runs at the monorepo root/);
+  assert.ok(out.stderr.includes(`Run: cd ${root} && npm run package --workspaces --if-present`), out.stderr);
+});
+
+test('run(): the manager package is source too: its own verbs refuse there', () => {
+  const { root, marker } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: path.join(root, 'packages', 'manager'), args: ['manage'] });
+
+  assert.equal(out.status, 1);
+  assert.equal(fs.existsSync(marker), false);
+  assert.ok(out.stderr.includes(`Run: cd ${root} && npm run manage --workspaces --if-present`), out.stderr);
+
+  const dev = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: path.join(root, 'packages', 'manager'), args: ['dev'] });
+  assert.ok(dev.stderr.includes(`Run: cd ${root} && npm start`), dev.stderr);
+});
+
+test('run(): a package that owns no verb refuses every one', () => {
+  const { root, marker } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: path.join(root, 'packages', 'devkit'), args: ['test'] });
+
+  assert.equal(out.status, 1);
+  assert.equal(fs.existsSync(marker), false);
+  // devkit is no framework pick, so its suite is its own workspace's npm test
+  assert.ok(out.stderr.includes(`Run: cd ${root} && npm test --workspace packages/devkit`), out.stderr);
 });
 
 test('run(): a contextless verb and a box verb run from a subfolder', () => {
@@ -715,7 +755,7 @@ test('findTarget: the monorepo root answers kind monorepo, and a package inside 
   assert.deepEqual(findTarget(real), { kind: 'monorepo', dir: path.resolve(real) }, 'this checkout is one');
 });
 
-test('run(): monorepo `test --target=` spawns each picked package\'s bin in its dir with the marker, in registry order', async () => {
+test('run(): monorepo `test --target=` spawns each picked package\'s CLI file in its dir, in registry order', async () => {
   const { root } = stageMonorepo();
   const calls = [];
   const cwd0 = process.cwd();
@@ -727,22 +767,30 @@ test('run(): monorepo `test --target=` spawns each picked package\'s bin in its 
       hostName: '@omega.js/web',
       hostRun: () => { throw new Error('the host never runs at the monorepo root'); },
       argv: ['test', '--target=extension,web', 'framework:'],
-      spawn: (command, args, options) => { calls.push({ command, args, options, marker: process.env[ROOT_DISPATCH_ENV] }); return { status: 0 }; },
+      spawn: (command, args, options) => { calls.push({ command, args, options }); return { status: 0 }; },
     });
   } finally {
     process.chdir(cwd0);
     console.error = error0;
-    delete process.env[ROOT_DISPATCH_ENV];
   }
 
   assert.deepEqual(calls.map((call) => call.args), [
-    [path.join(root, 'packages', 'web', 'bin', 'omega'), 'test', 'framework:'],
-    [path.join(root, 'packages', 'extension', 'bin', 'omega'), 'test', 'framework:'],
-  ], 'web before extension (the registry order), each through its own bin');
+    [path.join(root, 'packages', 'web', 'dist', 'cli-run.js'), 'test', 'framework:'],
+    [path.join(root, 'packages', 'extension', 'dist', 'cli-run.js'), 'test', 'framework:'],
+  ], 'web before extension (the registry order), each through its own CLI file, never the dispatcher');
   assert.equal(calls[0].command, process.execPath);
   assert.equal(calls[0].options.cwd, path.join(root, 'packages', 'web'));
-  assert.equal(calls[0].options.env, undefined, 'the child inherits this process env, marker included');
-  assert.equal(calls[0].marker, root);
+  assert.equal(calls[0].options.env, undefined, 'the child inherits this process env');
+  assert.equal(process.env.OMEGA_ROOT_DISPATCH, undefined, 'no env marker rides into the children');
+});
+
+test('run(): the monorepo root really runs the picked package\'s own CLI, which the in-package refusal never sees', () => {
+  const { root, marker } = stageMonorepo();
+  const out = invokeBin({ scratch: root, hostName: '@omega.js/web', cwd: root, args: ['test', '--target=extension'] });
+
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stderr.includes('refusing'), false, out.stderr);
+  assert.equal(fs.readFileSync(marker, 'utf8'), '@omega.js/extension');
 });
 
 test('run(): the monorepo test stops at the first failing package with its exit code', async () => {
@@ -764,7 +812,6 @@ test('run(): the monorepo test stops at the first failing package with its exit 
     process.exitCode = undefined;
     process.chdir(cwd0);
     console.error = error0;
-    delete process.env[ROOT_DISPATCH_ENV];
   }
   assert.equal(calls.length, 1, 'extension never ran after web failed');
 });

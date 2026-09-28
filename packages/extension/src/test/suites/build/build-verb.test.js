@@ -135,10 +135,10 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'the synced projectScripts build script is the thin `omega build` alias (#748)',
+      name: 'the scaffolded build script is the thin `omega build` alias the verb table derives',
       run: (ctx) => {
         const pkg = JSON.parse(fs.readFileSync(path.join(SRC, '..', 'package.json'), 'utf8'));
-        ctx.expect(pkg.projectScripts.build).toBe('omega build');
+        ctx.expect(require('@omega.js/devkit/verb-scripts').projectScripts(pkg).build).toBe('omega build');
       },
     },
   ],

@@ -34,7 +34,7 @@ The `main` window is still created (just with `show: false`) so it sits in @omeg
 
 Use this for: menubar apps, agent apps (clipboard managers, time trackers, system monitors), apps that should be invisible at boot but available on demand.
 
-**Dev caveat**: in dev (`npm start` / `electron .`), the packaged `Info.plist` isn't in effect, so macOS will still briefly bounce. Production builds (`npm run build` / `npm run release`) get the real zero-bounce behavior.
+**Dev caveat**: in dev (`npm start` / `electron .`), the packaged `Info.plist` isn't in effect, so macOS will still briefly bounce. Production builds (`npm run build` / `npx omega release --target=<name>` at the brand root) get the real zero-bounce behavior.
 
 > **Note:** the deprecated `'tray-only'` mode is no longer valid — its behavior was always identical to `'hidden'`, so they've been folded into one. Old `tray-only` configs fall back to `'normal'` per `getMode()` validation.
 

@@ -29,3 +29,6 @@ async function run() {
 }
 
 module.exports = { run, BOOLEAN_FLAGS };
+
+// Runnable as a file: the monorepo root's `omega test --target=web` calls it directly, never through the dispatcher
+if (require.main === module) run();

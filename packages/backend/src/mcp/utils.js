@@ -1,4 +1,5 @@
 const path = require('path');
+const safeCompare = require('../omega/helpers/safe-compare.js');
 
 const ROLE_HIERARCHY = {
   admin: ['admin', 'user', 'public'],
@@ -11,9 +12,9 @@ const ROLE_HIERARCHY = {
  * Actual validation happens at the route level when a tool is called.
  */
 function resolveAuthInfo(token) {
-  const configKey = process.env.OMEGA_ADMIN_KEY || '';
+  const configKey = process.env.OMEGA_ADMIN_KEY;
 
-  if (token && configKey && token === configKey) {
+  if (safeCompare(token, configKey)) {
     return { role: 'admin', authType: 'adminKey', token };
   }
 

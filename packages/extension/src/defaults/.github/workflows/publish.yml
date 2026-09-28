@@ -15,9 +15,6 @@ env:
   NODE_VERSION: '[versions.node]'
   OMEGA_BUILD_MODE: 'true'
   OMEGA_IS_PUBLISH: 'true'
-  # Every verb runs at a root: the steps below run in the target dir, so they carry the
-  # root-dispatch marker naming the checkout, which lets the target's bin through.
-  OMEGA_ROOT_DISPATCH: ${{ github.workspace }}
 
   # The brand's cross-repo token, never `secrets.GITHUB_TOKEN`: the publish
   # uploads its zips to the brand's `<brand.id>-releases` repo (#883), which is

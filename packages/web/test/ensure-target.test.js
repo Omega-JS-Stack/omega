@@ -11,6 +11,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const { ensureTarget, PROJECT_SCRIPTS } = require('../src/commands/lib/ensure-target.js');
+const { verbScripts } = require('@omega.js/devkit/verb-scripts');
 const { deployPrecheck, STEPS } = require('../src/commands/lib/deploy-precheck.js');
 const Main = require('../src/cli.js');
 
@@ -19,6 +20,22 @@ const quiet = { log() {}, warn() {}, error() {} };
 function tmpConsumer() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-ensure-'));
 }
+
+test('ensureTarget: the verb scripts derive from the verb table, the declared start merged over them', () => {
+  const root = tmpConsumer();
+  ensureTarget({ projectDir: root });
+
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const derived = verbScripts('@omega.js/web');
+  for (const [verb, command] of Object.entries(derived)) {
+    assert.strictEqual(scripts[verb], command, `${verb} is scaffolded as its bare verb`);
+  }
+  assert.strictEqual(scripts.start, 'omega dev', 'the declared start still lands');
+
+  // No verb script is typed by hand: the manifest declares only what the table cannot derive
+  const declared = require('../package.json').projectScripts;
+  assert.deepStrictEqual(Object.keys(declared).filter((key) => key in derived), []);
+});
 
 test('ensureTarget: writes on a fresh target, no-op on the rerun', () => {
   const root = tmpConsumer();

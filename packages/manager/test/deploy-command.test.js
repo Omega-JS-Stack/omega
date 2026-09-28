@@ -149,8 +149,11 @@ const record = (phase) => fs.appendFileSync(path.join(brandRoot, 'calls.log'), J
   argv: process.argv.slice(2),
 }) + '\\n');
 record('start');
-// Long enough that a SEQUENTIAL fan-out could not interleave these.
-Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 120);
+// Long enough that a SEQUENTIAL fan-out could not interleave these; a HOLD-MS
+// sentinel stretches it past each npm-run start-up for the concurrency cases.
+const holdFile = path.join(brandRoot, 'HOLD-MS');
+const hold = fs.existsSync(holdFile) ? Number(fs.readFileSync(holdFile, 'utf8')) : 120;
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, hold);
 record('end');
 if (fs.existsSync(path.join(brandRoot, 'SKIP-' + ${JSON.stringify(name)}))) {
   console.log('  Skipping the ' + ${JSON.stringify(name)} + ' deploy: cloud.shared is true');
@@ -223,7 +226,7 @@ function stageBrand(extra = []) {
 
   for (const type of types) {
     write(path.join(brand, 'targets', type, 'package.json'), JSON.stringify({
-      name: type, private: true, dependencies: { [`@omega.js/${type}`]: '*' },
+      name: type, private: true, dependencies: { [`@omega.js/${type}`]: '*' }, scripts: { deploy: 'omega deploy' },
     }));
 
     const pkgDir = path.join(brand, 'node_modules', `@omega.js/${type}`);
@@ -232,6 +235,12 @@ function stageBrand(extra = []) {
     }));
     write(path.join(pkgDir, 'bin.js'), fakeBinSource(type));
     write(path.join(pkgDir, 'ensure-target.js'), fakeEnsureTargetSource(type));
+
+    // The target's own `omega` on its npm-script PATH: `npm run deploy` reaches the fake bin
+    const binDir = path.join(brand, 'targets', type, 'node_modules', '.bin');
+    fs.chmodSync(path.join(pkgDir, 'bin.js'), 0o755);
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.symlinkSync(path.join(pkgDir, 'bin.js'), path.join(binDir, 'omega'));
   }
 
   return { scratch, brand };
@@ -281,6 +290,23 @@ async function runDeployCommand(cwd, options = {}) {
 }
 
 // ─── Execution over the staged brand ─────────────────────────────────────────
+
+test('a custom target\'s own deploy script runs bare: no --snapshot, no brand flag', async () => {
+  const { brand } = stageBrand();
+  const configPath = path.join(brand, 'config', 'omega.json5');
+  fs.writeFileSync(configPath, fs.readFileSync(configPath, 'utf8').replace("targets: {", "targets: { api: { type: 'custom' },"));
+  const record = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'api',phase:'start',cwd:process.cwd(),argv:['deploy'].concat(process.argv.slice(1))})+'\\n')\"";
+  write(path.join(brand, 'targets', 'api', 'package.json'), JSON.stringify({ name: 'api', private: true, scripts: { deploy: record } }));
+
+  const code = await runDeployCommand(brand, { direct: false, platforms: 'mac' });
+
+  const api = readCalls(brand).find((call) => call.name === 'api');
+  assert.ok(api, 'the custom target deployed');
+  assert.deepEqual(api.argv, ['deploy'], 'the brand\'s own script hears neither the root\'s --snapshot nor a brand flag');
+  const web = readCalls(brand).find((call) => call.name === 'web');
+  assert.ok(web.argv.includes('--snapshot=sha1234567890abcdef'), 'while the framework\'s own `omega deploy` still hears them');
+  assert.equal(code, undefined);
+});
 
 test('bare run fans out to every target, BACKEND FIRST, each spawned `deploy` in its own cwd', async () => {
   const { brand } = stageBrand();
@@ -590,6 +616,7 @@ test('a --dry-run pushes NOTHING: the run promises to send nothing at all (#901)
 
 test('web, desktop and extension deploy CONCURRENTLY, after the backend (#901)', async () => {
   const { brand } = stageBrand(['desktop', 'extension']);
+  fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
   const code = await runDeployCommand(brand);
 
   const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');
@@ -627,6 +654,7 @@ test('a failing member of the group lets its siblings finish, then exits 1 namin
 
 test('--target=web,desktop: no backend, and the two run together (#901)', async () => {
   const { brand } = stageBrand(['desktop', 'extension']);
+  fs.writeFileSync(path.join(brand, 'HOLD-MS'), '1500');
   await runDeployCommand(brand, { target: 'web,desktop' });
 
   const calls = readCalls(brand, { phases: true }).filter((entry) => entry.name !== 'delivery-lane');

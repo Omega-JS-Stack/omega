@@ -18,10 +18,10 @@ const COMMANDS = path.join(__dirname, '..', '..', '..', 'commands');
 const DEPLOY = path.join(COMMANDS, 'deploy.js');
 const WORKFLOW = path.join(__dirname, '..', '..', '..', 'defaults', '.github', 'workflows', 'publish.yml');
 
-// The scripts every target gets from the scaffold, read from the one place that
-// declares them: expanding a command through THESE is what makes a second
+// The scripts every target gets from the scaffold, derived the one way the
+// scaffold derives them: expanding a command through THESE is what makes a second
 // publish visible.
-const SCRIPTS = require(path.join(__dirname, '..', '..', '..', '..', 'package.json')).projectScripts;
+const SCRIPTS = require('@omega.js/devkit/verb-scripts').projectScripts(require(path.join(__dirname, '..', '..', '..', '..', 'package.json')));
 
 const { deployDirect } = require(DEPLOY);
 

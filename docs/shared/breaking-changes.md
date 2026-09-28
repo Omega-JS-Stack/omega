@@ -28,6 +28,16 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-09-27: a verb runs in a target of one of its owners ([#985](https://github.com/Omega-JS-Stack/omega/issues/985))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| Where a verb runs | Every verb refused below a root; only a child carrying the `OMEGA_ROOT_DISPATCH` env marker ran there | Inside a target, a verb its framework owns runs in place (`npm test`, `npm start`, `npx omega build`); a brand-wide verb, one only the manager owns, refuses there and prints `cd <brandRoot> && npx omega <verb>`. Framework source (`packages/*`) is never a target and still refuses every verb. The marker is gone: nothing sets or reads it | Drop `OMEGA_ROOT_DISPATCH` from any script or hand-written workflow; the generated workflows lose it on the next verb |
+| The brand-root fan-out | A framework target ran its framework's bin by path; a custom target, and a custom-server backend's `deploy` / `test`, ran `npm run <verb>` with no flags | Every target runs its own `npm run <verb>`. Only the framework's own script, exactly `omega <verb>`, hears the brand's flags and scope after `--` (a deploy's `--snapshot=<sha>` included); a brand-owned script (a custom target's, a custom-server backend's) runs bare, and under `--dry-run` it stops at the plan | None |
+| A framework target's scripts | Each framework's hand-typed `projectScripts` | One `"<verb>": "omega <verb>"` per fan-out verb (`fanout: 'each'`) the framework owns, derived from the verb table, with the scripts the table cannot derive merged over them | None to write them: every verb and the manage walk do. The walk never deletes a key, so delete the ones no framework writes any more by hand: `publish` and `release` from a desktop target (`npx omega publish` / `release --target=<name>` at the brand root replace them) |
+| A single-target command at the brand root (`firestore:set`, `emulators`, `launch`, ...) | The picked target's framework bin | Unchanged: the picked target's framework CLI with the argv as typed, never a script; on a custom target it steps aside in one line instead of refusing | None |
+| The backend's test scripts | `test` was the static lane (`node --test` over `test/_unit`), `test:static` ran `npm test`, `test:emulator` ran `omega test` | `test` is `omega test` like every framework's, `test:static` is the static lane itself, `test:emulator` is gone; `projectScriptsCustomOwned` is gone (the backend derives the list), and in custom mode `test` is the brand's: a custom-server backend with no `test` script of its own is skipped, loudly, by the brand-root `omega test` | Run the static lane as `npm run test:static`; delete `test:emulator` from the target's `package.json` |
+
 ## 2026-09-26: two switches, two names ([#946](https://github.com/Omega-JS-Stack/omega/issues/946))
 
 | Contract | Old form | New form | Manual migration step |

@@ -36,6 +36,7 @@ const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
 const logger = build.logger('ensure-target');
 const package = build.getPackage('main');
@@ -52,11 +53,8 @@ function setupScripts(projectDir, result) {
 
   const project = readProject(projectDir);
 
-  project.scripts = project.scripts || {};
-
-  Object.keys(package.projectScripts || {}).forEach((key) => {
-    project.scripts[key] = package.projectScripts[key];
-  });
+  // The verb table's scripts for this framework, the manifest's declarations over them
+  project.scripts = { ...project.scripts, ...projectScripts(package) };
 
   // Electron consumer projects should not be published to npm
   project.private = true;

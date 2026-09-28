@@ -202,16 +202,15 @@ test('custom-target: the brand deploy fan-out includes custom targets, LAST', ()
   assert.deepEqual(selected.map((entry) => entry.name), ['backend', 'web', 'api']);
 });
 
-test('custom-target: the fan-outs run a custom target\'s own script, never a framework bin', () => {
+test('custom-target: the fan-outs run a custom target\'s own script, bare', () => {
   const root = makeBrand({ scripts: { deploy: 'render deploy', test: 'node --test' } });
   try {
     const entry = discoverTargets(root).find((item) => item.name === 'api');
 
-    const deploy = resolveTargetRun(entry, 'deploy', ['--dry-run']);
+    const deploy = resolveTargetRun(entry, 'deploy', ['--snapshot=abc']);
     assert.equal(deploy.kind, 'custom');
     assert.equal(deploy.command, 'npm');
-    // Framework flags are NOT forwarded — a custom script has no contract for them
-    assert.deepEqual(deploy.args, ['run', 'deploy']);
+    assert.deepEqual(deploy.args, ['run', 'deploy'], 'a package script has no contract for the brand flags');
     assert.equal(deploy.label, 'npm run deploy');
 
     // An absent verb is the loud skip, never an error
@@ -219,8 +218,7 @@ test('custom-target: the fan-outs run a custom target\'s own script, never a fra
     assert.equal(clean.kind, 'skip');
     assert.match(clean.detail, /no "clean" script/);
 
-    // A DRY RUN must never execute a custom script: the flag it would have
-    // needed to honor is exactly the one that is not forwarded
+    // A DRY RUN must never execute a custom script: it has no contract for the flag
     const dry = resolveTargetRun(entry, 'deploy', ['--dry-run'], { dryRun: true });
     assert.equal(dry.kind, 'plan');
     assert.match(dry.detail, /npm run deploy/);

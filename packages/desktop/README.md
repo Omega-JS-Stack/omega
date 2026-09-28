@@ -40,7 +40,7 @@ npx omega cdp status       # drive the running dev app over CDP: status|eval|sho
 npm run build            # local production build (bundles only, no installer)
 npm run package:quick    # fast packaged build for host platform/arch (.app/.exe-folder/linux-unpacked, ~20-30s) — for smoke-testing packaged behavior
 npm run package          # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
-npm run release          # signed + published release via GitHub Actions
+npx omega release        # signed + published release via GitHub Actions
 npx omega test             # YOUR project tests only (C5 scoping — docs/shared/testing.md)
 npx omega test framework:  # the framework's own suite (aliases: omega:, mgr:, desktop:, em:; add a path to narrow)
 npx omega test full:       # both sources
@@ -82,7 +82,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 | `dev.log` | Gulp pipeline output — sass, bundle, html, electron child stdout from `npm start` | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail, harness boot lines) | Truncated each test run |
-| `deploy.log` | `omega deploy` and `npm run release`, the whole deploy: the scaffold, the precheck, the dispatch, then the streamed GH Actions run | Truncated each deploy |
+| `deploy.log` | `omega deploy` and `omega release`, the whole deploy: the scaffold, the precheck, the dispatch, then the streamed GH Actions run | Truncated each deploy |
 
 ```bash
 npx omega logs                  # tail last 50 of runtime.log

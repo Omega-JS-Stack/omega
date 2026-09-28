@@ -113,7 +113,7 @@ To turn snap publishing on for a project that ships the format:
    ```
 2. Paste the entire blob (multi-line) into `.env` as `SNAPCRAFT_STORE_CREDENTIALS=...`.
 3. Run `npx omega deploy` (its precheck flows the secret to GitHub Actions).
-4. Next `npm run release` builds + uploads the snap automatically. No config flip needed.
+4. The next `npx omega release --target=<name>` at the brand root builds + uploads the snap automatically. No config flip needed.
 
 Reference: the workflow's Linux step conditionally installs `snapcraft` (`sudo snap install snapcraft --classic`) only when both (a) the brand still ships the snap format (read through `@omega.js/config`'s own `enabledFormats`, so the check cannot drift from the build's) AND (b) the `SNAPCRAFT_STORE_CREDENTIALS` secret is present.
 

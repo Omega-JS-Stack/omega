@@ -13,7 +13,7 @@ meta:
   index: false
 ---
 
-<main class="container py-5">
+<main id="main-content" class="container py-5">
   <h1>Sandbox e2e</h1>
   <p>Driven by <code>test/e2e/run.js</code> against the local stack.</p>
   <div id="status">booting</div>

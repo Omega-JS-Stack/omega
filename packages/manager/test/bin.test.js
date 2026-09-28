@@ -43,8 +43,6 @@ function runBin(name, args, cwd) {
  */
 function spawnBin(name, args, cwd) {
   const env = Object.assign({}, process.env, { OMEGA_SKIP_FRESHNESS: '1' });
-  // A root fan-out's marker would let a subfolder through: these runs are a human's
-  delete env.OMEGA_ROOT_DISPATCH;
   return spawnSync(process.execPath, [path.join(PKG, 'bin', name), ...args], {
     cwd,
     encoding: 'utf8',
@@ -157,17 +155,28 @@ function stageBrandWithTarget(prefix) {
   return { scratch, targetDir };
 }
 
-test('bin: inside a target, the manager\'s bin refuses and prints the brand root form', () => {
-  // Every verb runs at a root: the manager winning npm's bin link inside a
-  // target must neither run the manager nor hand over to the target's framework.
+test('bin: inside a target, the manager\'s bin hands a verb the target owns to the target\'s framework', () => {
+  // The manager winning npm's bin link inside a target never runs the manager there
   const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-target-');
 
   const { status, stdout, stderr } = spawnBin('omega', ['build'], targetDir);
 
+  assert.equal(status, 0, stderr);
+  assert.match(stdout, /WEB-CLI-RAN/, 'the target\'s framework ran in place');
+  assert.doesNotMatch(stdout, /brand orchestration/, 'the manager did not');
+
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
+
+test('bin: inside a target, a brand-wide verb refuses and prints the brand root form', () => {
+  const { scratch, targetDir } = stageBrandWithTarget('omega-manager-bin-brandwide-');
+
+  const { status, stdout, stderr } = spawnBin('omega', ['install', 'local'], targetDir);
+
   assert.equal(status, 1, stderr);
   assert.doesNotMatch(stdout, /WEB-CLI-RAN/, 'the target\'s framework never ran');
   assert.doesNotMatch(stdout, /brand orchestration/, 'nor did the manager');
-  assert.ok(stderr.includes(`cd ${scratch} && npx omega build --target=site`), stderr);
+  assert.ok(stderr.includes(`cd ${scratch} && npx omega install local`), stderr);
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });
@@ -221,7 +230,8 @@ test('bin: inside a target, `omega migrate` refuses and prints the brand root fo
 
   assert.equal(status, 1, stderr);
   assert.doesNotMatch(stdout, /WEB-CLI-RAN/);
-  assert.ok(stderr.includes(`cd ${scratch} && npx omega migrate --target=site`), stderr);
+  assert.ok(stderr.includes(`cd ${scratch} && npx omega migrate`), stderr);
+  assert.doesNotMatch(stderr, /--target=/, 'a brand-wide verb picks no target');
 
   fs.rmSync(scratch, { recursive: true, force: true });
 });

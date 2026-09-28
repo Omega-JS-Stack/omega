@@ -11,7 +11,7 @@ const path = require('path');
 const { VERBS, TARGET_ORDER, SCOPES, FANOUTS, tokensOf, findVerb } = require('../src/verbs.js');
 
 const PACKAGES = path.join(__dirname, '..', '..');
-const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'firebaseOnly', 'dryRun'];
+const FIELDS = ['name', 'aliases', 'scope', 'owners', 'fanout', 'order', 'dryRun'];
 
 /**
  * A router CLI's alias table, read from its source: the object literal after
@@ -67,9 +67,7 @@ test('verbs: every row carries every field, each with an allowed value', () => {
     for (const owner of entry.owners) assert.ok(owner in CLIS, `${entry.name} owner ${owner} is one of the five CLIs`);
     // The one order constant, by reference: a per-row copy is the drift this table exists to stop
     assert.equal(entry.order, entry.fanout === 'each' ? TARGET_ORDER : null, `${entry.name}.order`);
-    for (const flag of ['firebaseOnly', 'dryRun']) {
-      assert.equal(typeof entry[flag], 'boolean', `${entry.name}.${flag}`);
-    }
+    assert.equal(typeof entry.dryRun, 'boolean', `${entry.name}.dryRun`);
   }
 });
 

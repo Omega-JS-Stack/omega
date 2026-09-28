@@ -10,7 +10,11 @@
     "build": "omega build",
     "test": "omega test",
     "clean": "omega clean",
-    "deploy": "omega deploy"
+    "deploy": "omega deploy",
+    "update": "omega update",
+    "translate": "omega translate",
+    "audit": "omega audit",
+    "purge": "omega purge"
   },
   "engines": {
     "node": ">=24"

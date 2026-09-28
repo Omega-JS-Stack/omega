@@ -7,8 +7,8 @@
  * What the contract promises, and what these tests hold it to:
  *   - every target type runs, framework and custom alike, in DEPENDENCY order
  *     (the deploy order — backend first, custom targets last);
- *   - a framework target dispatches its framework's own `omega <verb>`; a
- *     custom target runs `npm run <verb>` in its dir with no flags forwarded;
+ *   - every target, framework and custom alike, runs its own
+ *     `npm run <verb>` in its dir (a framework target's script is `omega <verb>`);
  *   - a target that declares no such script steps aside LOUDLY (naming the
  *     target AND the verb) and is never counted a failure;
  *   - a failing target does not stop the rest, and the run exits 1.
@@ -46,19 +46,14 @@ function stageBrand({ scripts = { build: 'tsc', clean: 'rm -rf dist' }, extensio
 }
 `);
 
-  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, devDependencies: { '@omega.js/web': '*' } });
-  write(path.join(root, 'targets', 'backend', 'package.json'), { name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' } });
+  const verbScripts = { build: 'omega build', clean: 'omega clean' };
+  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, devDependencies: { '@omega.js/web': '*' }, scripts: verbScripts });
+  write(path.join(root, 'targets', 'backend', 'package.json'), { name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' }, scripts: verbScripts });
   write(path.join(root, 'targets', 'api', 'package.json'), { name: 'api', private: true, scripts });
   if (extension) {
     write(path.join(root, 'targets', 'extension', 'package.json'), {
       name: 'extension', private: true, dependencies: { '@omega.js/extension': '*' }, scripts: { build: 'gulp build' },
     });
-  }
-
-  for (const pkg of ['@omega.js/web', '@omega.js/backend', '@omega.js/extension']) {
-    const pkgDir = path.join(root, 'node_modules', pkg);
-    write(path.join(pkgDir, 'package.json'), { name: pkg, bin: { omega: './bin.js' } });
-    write(path.join(pkgDir, 'bin.js'), '#!/usr/bin/env node\n');
   }
 
   return root;
@@ -109,15 +104,11 @@ test('omega build: every target type builds, in dependency order, custom LAST', 
   assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
   assert.equal(code, undefined, 'all targets green → no error exit code');
 
-  // A framework target dispatches its OWN framework's `omega build`
-  assert.equal(calls[0].command, process.execPath);
-  assert.deepEqual(calls[0].args.slice(1), ['build']);
-  assert.match(calls[0].args[0], /@omega\.js\/backend/);
-  assert.match(calls[1].args[0], /@omega\.js\/web/);
-
-  // A custom target runs its own script — no framework bin, no flags
-  assert.equal(calls[2].command, 'npm');
-  assert.deepEqual(calls[2].args, ['run', 'build']);
+  // Every target runs its own script, framework and custom alike
+  for (const call of calls) {
+    assert.equal(call.command, 'npm');
+    assert.deepEqual(call.args, ['run', 'build']);
+  }
 });
 
 test('omega build: a custom target with no build script is a LOUD skip, never a failure', async () => {
@@ -129,17 +120,13 @@ test('omega build: a custom target with no build script is a LOUD skip, never a 
   assert.equal(code, undefined, 'an absent script is not an error');
 });
 
-test('omega build: an extension target takes the FRAMEWORK lane — its CLI serves the verb (#81)', async () => {
+test('omega build: a framework target runs the build script it declares, never a bin behind it', async () => {
   const { calls } = await runFanout(buildCommand, stageBrand({ extension: true }));
 
-  // The fixture target declares a `build` script of its own, so this also
-  // proves the framework lane WINS over one: @omega.js/extension ships
-  // `omega build` (the verb owns clean + the gulp build), and the script it
-  // scaffolds is the thin alias of that verb.
+  // The fixture extension declares `gulp build`: the target's script is the verb's one lane
   const extension = calls.find((call) => call.name === 'extension');
-  assert.equal(extension.command, process.execPath);
-  assert.deepEqual(extension.args.slice(1), ['build']);
-  assert.match(extension.args[0], /@omega\.js\/extension/);
+  assert.equal(extension.command, 'npm');
+  assert.deepEqual(extension.args, ['run', 'build']);
 });
 
 test('omega build: a failing target never stops the rest — every one is reported, exit 1', async () => {
@@ -192,10 +179,10 @@ test('omega build/clean: --only and --except are REFUSED, naming --target=', asy
 test('omega build --dry-run: nothing runs at all, every target prints its plan', async () => {
   const { calls, output, code } = await runFanout(buildCommand, stageBrand(), { 'dry-run': true, dryRun: true });
 
-  assert.deepEqual(calls, [], 'a dry run executes NOTHING — no framework bin, no package script');
-  assert.match(output, /would run omega build in targets\/backend/, 'the framework lane reports the plan');
-  assert.match(output, /would run omega build in targets\/web/);
-  assert.match(output, /would run npm run build in targets\/api/, 'the custom lane reports its plan too');
+  assert.deepEqual(calls, [], 'a dry run executes NOTHING');
+  assert.match(output, /would run npm run build in targets\/backend/, 'every target reports its plan');
+  assert.match(output, /would run npm run build in targets\/web/);
+  assert.match(output, /would run npm run build in targets\/api/);
   assert.equal(code, undefined, 'a dry run is not a failure');
 });
 
@@ -205,8 +192,8 @@ test('omega clean: every target type cleans, in the same order', async () => {
   const { calls, code } = await runFanout(cleanCommand, stageBrand());
 
   assert.deepEqual(calls.map((call) => call.name), ['backend', 'web', 'api']);
-  assert.deepEqual(calls[0].args.slice(1), ['clean'], 'the framework lane runs `omega clean`');
-  assert.deepEqual(calls[2].args, ['run', 'clean'], 'the custom lane runs its own script');
+  assert.deepEqual(calls[0].args, ['run', 'clean'], 'a framework target runs its own script');
+  assert.deepEqual(calls[2].args, ['run', 'clean'], 'and so does a custom target');
   assert.equal(code, undefined);
 });
 

@@ -3,6 +3,8 @@
  * run through omega.events.run('notes/on-create'): bumps the owner's counter
  * Doc: node_modules/@omega.js/backend/docs/routes.md (New Event Handler)
  */
+const { FieldValue } = require('firebase-admin/firestore');
+
 module.exports = async ({ ctx, omega, snapshot }) => {
   const note = snapshot.data();
 
@@ -12,14 +14,12 @@ module.exports = async ({ ctx, omega, snapshot }) => {
     throw new Error(`notes/on-create: note ${snapshot.id} has no owner`);
   }
 
-  const admin = omega.firebase.admin;
-
   // The counter lives beside the user doc, not on it: the account schema
   // resolves only the fields it declares, so a users/{uid}.notes key would never
   // reach the User a route or the browser reads
-  await admin.firestore().doc(`notes-stats/${note.owner}`).set({
+  await omega.firebase.admin.firestore().doc(`notes-stats/${note.owner}`).set({
     owner: note.owner,
-    created: admin.firestore.FieldValue.increment(1),
+    created: FieldValue.increment(1),
   }, { merge: true });
 
   ctx.log(`notes/on-create: counted note ${snapshot.id} for ${note.owner}`);

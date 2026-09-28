@@ -37,7 +37,7 @@ const omegaConfig = require('@omega.js/config');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
 
 const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
-const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD } = require('./project-type');
+const { isCustomProject, frameworkOwnedScripts, FIREBASE_ONLY_SCAFFOLD, CUSTOM_OWNED_SCRIPTS } = require('./project-type');
 
 // The framework's own manifest — its `omega.functionsRuntime` is the pinned
 // Cloud Functions runtime every consumer app inherits (SSOT with the .nvmrc
@@ -326,4 +326,6 @@ function ensureTarget(options) {
   return result;
 }
 
-module.exports = { ensureTarget, resolveProjectId };
+// The brand-owned scripts ride the entry the manager already loads, so its
+// workspace walk reads them without a second home
+module.exports = { ensureTarget, resolveProjectId, CUSTOM_OWNED_SCRIPTS };

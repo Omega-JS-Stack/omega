@@ -1,33 +1,29 @@
 /**
  * Resolve a framework's `omega` bin FILE via the node_modules directory climb
  * from where the target declares it. A manual walk (not require.resolve) because
- * exports-restricted packages don't expose ./package.json. Shared by the
- * brand-root fan-out commands (`omega test`, `omega deploy`).
+ * exports-restricted packages don't expose ./package.json.
  *
- * Also the ONE place those commands decide HOW to run a verb on a target, so
- * the framework lane and the custom-target lane (#603) never drift apart:
- * a framework target dispatches through its own `omega <verb>` bin with the
- * brand's flags forwarded; a custom target runs `npm run <verb>` in its dir
- * with NO flags (a package script has no contract for them) and steps aside
- * loudly when it declares no such script.
+ * Also the ONE place the brand root decides HOW to run a verb on a target, by
+ * the verb's row. A fan-out verb (`fanout: 'each'`: test, deploy, build, clean,
+ * the pass-through's translate and the like) has one lane: every target,
+ * framework and custom alike, runs `npm run <verb>` in its dir, and steps aside
+ * loudly when it declares no such script. Only the framework's own script
+ * (exactly `omega <verb>`) hears the brand's flags, after `--`; a brand-owned
+ * script runs bare, because it has no contract for them. A
+ * single-target command (`fanout: 'none'`) is the framework's own: it passes
+ * through to that framework's CLI in the target dir with the argv as typed.
  *
  * And the ONE place they decide WHERE a target's scaffold comes from
  * (`resolveTargetScaffold`, #901): the deploy fan-out runs each selected
  * target's `ensureTarget` in-process, through the `./ensure-target` subpath
  * every framework exposes, because there is no scaffold verb to spawn. A
  * custom target has no framework scaffold and steps aside the same way.
- *
- * A backend in CUSTOM-SERVER mode (#584) takes the script lane for the verbs
- * its framework cannot serve — `omega deploy` is a Functions deploy and
- * `omega test` is the emulator lane, and both REFUSE in that mode. It stays a
- * framework target for everything else; a container host's publish command is
- * the brand's to name, and its `deploy` script is where it names it.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { findTarget } = require('@omega.js/devkit/omega-bin');
-// Each verb's lane facts (firebaseOnly, dryRun) are its row in the one verb table
+const { findTarget, MANAGER } = require('@omega.js/devkit/omega-bin');
+// A verb's dryRun fact is its row in the one verb table
 const { findVerb } = require('@omega.js/devkit/verbs');
 const { targetScripts } = require('./custom-target.js');
 
@@ -70,45 +66,86 @@ function resolveFrameworkPackage(fromDir, name) {
 }
 
 /**
- * How the brand-root fan-out should run `verb` on one discovered target.
+ * Is this target script the framework's own, the one that takes the brand's
+ * flags? Exactly `omega <verb>`: anything else is the brand's own command.
+ *
+ * @param {string} command - The script's command.
+ * @param {string} verb - The script (verb) name.
+ * @returns {boolean}
+ */
+function isFrameworkScript(command, verb) {
+  return command === `omega ${verb}`;
+}
+
+/**
+ * How the brand-root fan-out should run `verb` on one discovered target: its
+ * own `npm run <verb>`, the flags after `--` when the script is the framework's own.
  *
  * @param {object} entry - A discoverTargets entry ({ name, dir, path, target, custom, projectType }).
- * @param {string} verb - The verb ('deploy', 'test', …).
- * @param {string[]} [forwarded] - Brand-level flags to forward (framework lane only).
+ * @param {string} verb - The verb as typed ('deploy', 'firestore:set', '--build', ...).
+ * @param {string[]} [forwarded] - Brand-level flags and args, handed to the script after `--`.
  * @param {object} [options]
- * @param {boolean} [options.dryRun] - The run is a dry run: any lane that cannot
- *   hand the flag on returns kind:'plan' instead of a command.
+ * @param {boolean} [options.dryRun] - The run is a dry run: a script that cannot
+ *   honor the flag returns kind:'plan' instead of a command.
  * @returns {{ kind: 'framework'|'custom'|'plan'|'skip'|'error', label?: string,
- *   command?: string, args?: string[], framework?: string, detail?: string }}
+ *   command?: string, args?: string[], framework?: string, frameworkScript?: boolean, detail?: string }}
  */
 function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
   const row = findVerb(verb);
-  // Every caller hands a verb it read from the table, so a miss is a caller's bug
+  // Every caller hands a fan-out verb it read from the table, so a miss is a caller's bug
   if (!row) throw new Error(`resolveTargetRun: "${verb}" has no row in @omega.js/devkit/verbs`);
+  if (row.fanout !== 'each') throw new Error(`resolveTargetRun: "${verb}" is a single-target command, never a fan-out script (resolveTargetCommand runs it)`);
 
-  // The SCRIPT lane — the target's own `npm run <verb>`, which is the whole
-  // verb surface of a custom target and the fallback for a framework that
-  // cannot serve this one.
-  const scriptLane = () => {
-    const scripts = targetScripts(entry.path);
-    if (!scripts[verb]) {
-      return { kind: 'skip', detail: `no "${verb}" script in ${entry.dir}/package.json` };
+  // Every spelling of a fan-out verb runs the one script its row names
+  const script = row.name;
+
+  let framework;
+  if (!entry.custom) {
+    const target = findTarget(entry.path);
+    if (!target || target.kind !== 'framework') {
+      return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
     }
+    framework = target.name;
+  }
 
-    // A framework target honors --dry-run itself; a package script has no
-    // such contract and the flag is not forwarded to it, so the dry run stops
-    // HERE and reports the plan. Running a real deploy under --dry-run would
-    // be the worst possible reading of the flag.
-    if (options.dryRun) {
-      return { kind: 'plan', detail: `would run npm run ${verb} in ${entry.dir}` };
-    }
+  const owner = framework ? { framework } : {};
+  const command = targetScripts(entry.path)[script];
+  if (!command) {
+    return { kind: 'skip', ...owner, detail: `no "${script}" script in ${entry.dir}/package.json` };
+  }
 
-    return { kind: 'custom', command: 'npm', args: ['run', verb], label: `npm run ${verb}` };
-  };
+  // Only the framework's own `omega <verb>` honors --dry-run, and a row marked
+  // dryRun is answered here for every target, so either way the run is the plan
+  const frameworkScript = isFrameworkScript(command, script);
+  if (options.dryRun && (row.dryRun || !frameworkScript)) {
+    return { kind: 'plan', ...owner, frameworkScript, detail: `would run npm run ${script} in ${entry.dir}` };
+  }
 
-  // A custom-server backend refuses the verbs it serves through Firebase
-  if (entry.custom || (entry.projectType === 'custom' && row.firebaseOnly)) {
-    return scriptLane();
+  const args = ['run', script, ...(frameworkScript && forwarded.length ? ['--', ...forwarded] : [])];
+  return { kind: framework ? 'framework' : 'custom', ...owner, frameworkScript, command: 'npm', args, label: `npm ${args.join(' ')}` };
+}
+
+/**
+ * How the brand root runs a single-target command (`fanout: 'none'`) on the one
+ * target `--target=` picked: the target framework's own CLI, through its bin by
+ * path, in the target dir, with the argv exactly as typed (an alias included).
+ *
+ * @param {object} entry - A discoverTargets entry ({ name, dir, path, target, custom }).
+ * @param {string} verb - The verb as typed ('firestore:set', 'emulators', ...).
+ * @param {string[]} argv - The whole argv the CLI receives, the verb included.
+ * @param {object} [options]
+ * @param {boolean} [options.dryRun] - The run is a dry run: return the plan, spawn nothing.
+ * @returns {{ kind: 'framework'|'plan'|'skip'|'error', label?: string, command?: string,
+ *   args?: string[], framework?: string, detail?: string }}
+ */
+function resolveTargetCommand(entry, verb, argv, options = {}) {
+  const row = findVerb(verb);
+  if (!row) throw new Error(`resolveTargetCommand: "${verb}" has no row in @omega.js/devkit/verbs`);
+
+  // A custom target has no framework CLI: nothing to run, and nothing has failed
+  if (entry.custom) {
+    const owners = row.owners.filter((owner) => owner !== MANAGER).join(', ');
+    return { kind: 'skip', detail: `${verb} is a ${owners} command; ${entry.name} is custom` };
   }
 
   const target = findTarget(entry.path);
@@ -121,19 +158,11 @@ function resolveTargetRun(entry, verb, forwarded = [], options = {}) {
     return { kind: 'error', detail: `${target.name} is not installed (node_modules climb from ${target.dir} found no bin)` };
   }
 
-  // A verb its own CLI has no --dry-run for stops at the plan HERE, like the
-  // script lane — the flag is never forwarded to a bin that would ignore it
-  if (options.dryRun && row.dryRun) {
-    return { kind: 'plan', framework: target.name, detail: `would run omega ${verb} in ${entry.dir}` };
+  if (options.dryRun) {
+    return { kind: 'plan', framework: target.name, detail: `would run ${target.name} ${argv.join(' ')} in ${entry.dir}` };
   }
 
-  return {
-    kind: 'framework',
-    framework: target.name,
-    command: process.execPath,
-    args: [binPath, verb, ...forwarded],
-    label: `omega ${verb} ${forwarded.join(' ')}`.trimEnd(),
-  };
+  return { kind: 'framework', framework: target.name, command: process.execPath, args: [binPath, ...argv], label: `omega ${argv.join(' ')}` };
 }
 
 /**
@@ -162,6 +191,20 @@ function resolveTargetScaffold(entry) {
  */
 function resolveTargetMigrate(entry) {
   return resolveTargetEntry(entry, 'migrate', 'migrateTarget', 'a custom target has no framework migration');
+}
+
+/**
+ * The scripts a target in CUSTOM mode owns instead of its framework, named by
+ * that framework's own scaffold entry (`@omega.js/<framework>/ensure-target`'s
+ * `CUSTOM_OWNED_SCRIPTS`), so the workspace walk and the framework's scaffold
+ * read one list.
+ *
+ * @param {object} entry - A discoverTargets entry ({ name, dir, path, target, custom, projectType }).
+ * @returns {{ kind: 'framework'|'skip'|'error', framework?: string,
+ *   CUSTOM_OWNED_SCRIPTS?: string[], detail?: string }}
+ */
+function resolveTargetCustomOwned(entry) {
+  return resolveTargetEntry(entry, 'ensure-target', 'CUSTOM_OWNED_SCRIPTS', 'a custom target owns every script');
 }
 
 /**
@@ -207,4 +250,4 @@ function resolveTargetEntry(entry, subpath, exported, customDetail) {
   return { kind: 'framework', framework: target.name, [exported]: loaded };
 }
 
-module.exports = { resolveFrameworkBin, resolveFrameworkPackage, resolveTargetRun, resolveTargetScaffold, resolveTargetMigrate };
+module.exports = { resolveFrameworkBin, resolveFrameworkPackage, isFrameworkScript, resolveTargetRun, resolveTargetCommand, resolveTargetScaffold, resolveTargetMigrate, resolveTargetCustomOwned };

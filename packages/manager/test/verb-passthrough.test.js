@@ -1,8 +1,9 @@
 /**
  * The brand root's pass-through: a framework verb the manager keeps no command
- * for runs on the picked targets through each target's own bin, the args after
- * the verb forwarded verbatim, and every spawned child inheriting the
- * root-dispatch marker the dispatcher set. A real fixture brand on disk; only
+ * for. A fan-out verb (`fanout: 'each'`) runs each target's own
+ * `npm run <verb>`, custom targets included, the args after `--`; a
+ * single-target command (`fanout: 'none'`) runs the picked target's framework
+ * CLI with the argv as typed. A real fixture brand on disk; only
  * child_process.spawn is replaced (before run-command.js binds it), so nothing
  * real starts.
  */
@@ -22,7 +23,6 @@ childProcess.spawn = (command, args, options) => {
   return child;
 };
 
-const { ROOT_DISPATCH_ENV } = require('@omega.js/devkit/omega-bin');
 const { parseArgv } = require('@omega.js/devkit/argv');
 const Main = require('../src/cli.js');
 const { BOOLEAN_FLAGS } = require('../src/cli-run.js');
@@ -35,7 +35,7 @@ function write(filePath, content) {
 
 /**
  * A brand with two web targets (web, admin), a backend, a desktop and a custom
- * api, plus a fake installed bin for each framework.
+ * api, each framework target carrying the verb scripts its scaffold writes.
  * @returns {string} the brand root
  */
 function stageBrand() {
@@ -46,11 +46,12 @@ function stageBrand() {
   targets: { web: { type: 'web' }, admin: { type: 'web' }, backend: { type: 'backend' }, desktop: { type: 'desktop' }, api: { type: 'custom' } },
 }
 `);
-  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, dependencies: { '@omega.js/web': '*' } });
-  write(path.join(root, 'targets', 'admin', 'package.json'), { name: 'admin', private: true, dependencies: { '@omega.js/web': '*' } });
+  const web = { translate: 'omega translate' };
+  write(path.join(root, 'targets', 'web', 'package.json'), { name: 'web', private: true, dependencies: { '@omega.js/web': '*' }, scripts: web });
+  write(path.join(root, 'targets', 'admin', 'package.json'), { name: 'admin', private: true, dependencies: { '@omega.js/web': '*' }, scripts: web });
   write(path.join(root, 'targets', 'backend', 'package.json'), { name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' } });
   write(path.join(root, 'targets', 'desktop', 'package.json'), { name: 'desktop', private: true, dependencies: { '@omega.js/desktop': '*' } });
-  write(path.join(root, 'targets', 'api', 'package.json'), { name: 'api', private: true, scripts: { translate: 'echo no' } });
+  write(path.join(root, 'targets', 'api', 'package.json'), { name: 'api', private: true, scripts: { translate: 'echo api' } });
   for (const pkg of ['@omega.js/web', '@omega.js/backend', '@omega.js/desktop']) {
     write(path.join(root, 'node_modules', pkg, 'package.json'), { name: pkg, bin: { omega: './bin.js' } });
     write(path.join(root, 'node_modules', pkg, 'bin.js'), '#!/usr/bin/env node\n');
@@ -60,7 +61,7 @@ function stageBrand() {
 
 const binOf = (root, pkg) => path.join(root, 'node_modules', '@omega.js', pkg, 'bin.js');
 
-/** Run fn from the brand root with the marker the dispatcher sets, output captured and everything restored. */
+/** Run fn from the brand root, output captured and everything restored. */
 async function atRoot(root, fn) {
   spawned.length = 0;
   const cwd0 = process.cwd();
@@ -70,21 +71,19 @@ async function atRoot(root, fn) {
   const lines = [];
   console.log = (...args) => lines.push(args.join(' '));
   console.error = (...args) => lines.push(args.join(' '));
-  process.env[ROOT_DISPATCH_ENV] = root;
   process.chdir(root);
   try {
     await fn();
     return { lines: lines.join('\n'), exitCode: process.exitCode };
   } finally {
     process.chdir(cwd0);
-    delete process.env[ROOT_DISPATCH_ENV];
     console.log = log0;
     console.error = error0;
     process.exitCode = exitCode0;
   }
 }
 
-test('translate --target=web at the brand root spawns web\'s bin with the verb and the forwarded args, marker inherited', async () => {
+test('translate --target=web at the brand root runs web\'s own `npm run translate`, the args after --', async () => {
   const root = stageBrand();
   const argv0 = process.argv;
   const args = ['translate', '--target=web', '--lang', 'de', 'framework:'];
@@ -96,18 +95,37 @@ test('translate --target=web at the brand root spawns web\'s bin with the verb a
   }
 
   assert.equal(spawned.length, 1);
-  assert.equal(spawned[0].command, process.execPath);
-  assert.deepEqual(spawned[0].args, [binOf(root, 'web'), 'translate', '--lang', 'de', 'framework:']);
+  assert.equal(spawned[0].command, 'npm');
+  assert.deepEqual(spawned[0].args, ['run', 'translate', '--', '--lang', 'de', 'framework:']);
   assert.equal(spawned[0].cwd, path.join(root, 'targets', 'web'));
-  assert.equal(spawned[0].env[ROOT_DISPATCH_ENV], root, 'the child passes the dispatcher\'s check inside the target');
+  assert.equal(spawned[0].env.OMEGA_ROOT_DISPATCH, undefined, 'the child needs no marker inside the target');
 });
 
-test('translate with no picker runs every web target, and nothing else', async () => {
+test('translate with no picker runs every web target and every custom target, and no other framework', async () => {
   const root = stageBrand();
   await atRoot(root, () => runPassThrough('translate', ['translate']));
 
-  assert.deepEqual(spawned.map((call) => path.basename(call.cwd)).sort(), ['admin', 'web']);
-  assert.ok(spawned.every((call) => call.args[0] === binOf(root, 'web') && call.args[1] === 'translate'));
+  assert.deepEqual(spawned.map((call) => path.basename(call.cwd)).sort(), ['admin', 'api', 'web'], 'a fan-out verb is each target\'s own script, custom included');
+  assert.ok(spawned.every((call) => call.command === 'npm' && call.args.join(' ') === 'run translate'));
+});
+
+test('a single-target command passes through to the framework CLI with the alias as typed, never an npm script', async () => {
+  const root = stageBrand();
+  await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '{"a":1}']));
+
+  assert.equal(spawned.length, 1);
+  assert.equal(spawned[0].command, process.execPath);
+  assert.deepEqual(spawned[0].args, [binOf(root, 'backend'), 'firestore:set', 'users/abc', '{"a":1}']);
+  assert.equal(spawned[0].cwd, path.join(root, 'targets', 'backend'));
+});
+
+test('a single-target command on a custom target steps aside loudly, and nothing fails', async () => {
+  const root = stageBrand();
+  const { lines, exitCode } = await atRoot(root, () => runPassThrough('emulators', ['emulators', '--target=api']));
+
+  assert.equal(spawned.length, 0);
+  assert.match(lines, /emulators is a @omega\.js\/backend command; api is custom/);
+  assert.equal(exitCode, undefined);
 });
 
 test('launch with no picker refuses, naming the desktop targets; with one it runs there', async () => {
@@ -121,6 +139,24 @@ test('launch with no picker refuses, naming the desktop targets; with one it run
 
   await atRoot(root, () => runPassThrough('launch', ['launch', '--target', 'desktop']));
   assert.deepEqual(spawned.map((call) => call.args), [[binOf(root, 'desktop'), 'launch']]);
+});
+
+test('--dry-run on a fan-out verb reaches the walk: a brand-owned script plans, the framework\'s own hears the flag', async () => {
+  const root = stageBrand();
+  const { lines } = await atRoot(root, () => runPassThrough('translate', ['translate', '--dry-run']));
+
+  assert.deepEqual(spawned.map((call) => path.basename(call.cwd)).sort(), ['admin', 'web'], 'only the framework scripts ran');
+  assert.ok(spawned.every((call) => call.args.join(' ') === 'run translate -- --dry-run'));
+  assert.match(lines, /api: dry run .*would run npm run translate in targets\/api/, 'the custom target stopped at its plan');
+});
+
+test('--dry-run on a single-target command prints the plan and spawns nothing', async () => {
+  const root = stageBrand();
+  const { lines, exitCode } = await atRoot(root, () => runPassThrough('firestore:set', ['firestore:set', '--target=backend', 'users/abc', '--dry-run']));
+
+  assert.equal(spawned.length, 0);
+  assert.match(lines, /would run @omega\.js\/backend firestore:set users\/abc --dry-run in targets\/backend/);
+  assert.equal(exitCode, undefined);
 });
 
 test('audit --target=backend refuses by name: the backend does not own audit', async () => {

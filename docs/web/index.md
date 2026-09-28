@@ -37,7 +37,7 @@ OMEGA Web (`@omega.js/web`) is the framework for building a brand's marketing si
 
 `omg` and `mgr` are aliases for `omega`, and those three are the whole bin set ([#877](https://github.com/Omega-JS-Stack/omega/issues/877)).
 
-> **Important:** every `npx omega ...` command runs at the brand root, `--target=<name>` naming the website target; inside `targets/<name>/` every verb refuses and prints that root form ([docs/manager/brand.md](../manager/brand.md) § Verbs). A standalone project is its own root and drops the picker. `dist/` and `.omega/` are generated: never edit them.
+> **Important:** every `npx omega ...` command runs at the brand root, `--target=<name>` naming the website target; inside `targets/<name>/` the verbs web owns run in place (`npm start`, `npm test`, `npx omega build`) while a brand-wide verb refuses and prints the root form ([docs/manager/brand.md](../manager/brand.md) § Verbs). A standalone project is its own root and drops the picker. `dist/` and `.omega/` are generated: never edit them.
 
 ### For Framework Development (This Repository)
 

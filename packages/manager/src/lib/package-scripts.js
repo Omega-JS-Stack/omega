@@ -87,12 +87,13 @@ function withoutRetiredSetup(value) {
 }
 
 /**
- * Sync a TARGET manifest's scripts to its framework's own `projectScripts`
- * declaration. ONE ownership policy (#689): a key the framework declares is
- * FRAMEWORK-owned and takes the default value on every run — the walk and the
- * framework's own ensureTarget agree, so a hand-edited standard script is
- * rewritten either way and hook points are the customization seam. A key the
- * framework never declares is the consumer's own and is never touched.
+ * Sync a TARGET manifest's scripts to the scripts its framework writes (the
+ * verb table's, its `projectScripts` merged over them). ONE ownership policy:
+ * a key the framework writes is FRAMEWORK-owned and takes the default value on
+ * every run, since the walk and the framework's own ensureTarget agree, so a
+ * hand-edited standard script is rewritten either way and hook points are the
+ * customization seam. A key the framework never writes is the consumer's own
+ * and is never touched.
  *
  * Two rules, in order:
  *
@@ -113,7 +114,7 @@ function withoutRetiredSetup(value) {
  * written, never scaffolded, not even a placeholder to delete.
  *
  * @param {Object} pkg - parsed target package.json
- * @param {Object} projectScripts - the framework package's projectScripts map
+ * @param {Object} projectScripts - the scripts the framework writes into a target
  * @param {string[]} [brandOwnedKeys] - declared keys this target owns instead
  * @returns {{ scripts: Object, changes: string[], skipped: string[] }}
  *   skipped = the brand-owned keys the framework declares, for the report

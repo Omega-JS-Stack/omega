@@ -23,9 +23,6 @@ env:
   OMEGA_IS_PUBLISH: 'true'
   OMEGA_IS_SERVER:  'true'
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  # Every verb runs at a root: the steps below run in the target dir, so they carry the
-  # root-dispatch marker naming the checkout, which lets the target's bin through.
-  OMEGA_ROOT_DISPATCH: ${{ github.workspace }}
   # Every CI-delivered key of the env schema, GENERATED (#627): one
   # `KEY: ${{ secrets.KEY }}` line per `delivery: { desktop: 'ci' | 'bake' }`
   # entry (@omega.js/config's env-delivery.js), re-rendered by every verb's

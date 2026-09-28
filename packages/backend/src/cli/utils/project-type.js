@@ -12,9 +12,8 @@
  * run. It also takes away the Firebase-only ARTIFACTS those verbs read —
  * FIREBASE_ONLY_SCAFFOLD and FIREBASE_ONLY_SETUP_CHECKS are the one home of
  * that list ([#614](https://github.com/Omega-JS-Stack/omega/issues/614)) — and
- * the package SCRIPTS that run them, which the framework manifest's
- * `projectScriptsCustomOwned` names
- * ([#689](https://github.com/Omega-JS-Stack/omega/issues/689)).
+ * the package SCRIPTS that run them, CUSTOM_OWNED_SCRIPTS, derived from the
+ * verbs.
  * Everything else — the routes, the schemas, the auth middleware, every
  * helper, and the rest of setup — is identical in both modes, which is the
  * whole point of the mode.
@@ -22,11 +21,10 @@
 const chalk = require('chalk').default;
 
 const { hasOmegaConfig, loadConfig, backendProjectType } = require('@omega.js/config');
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
-// The framework's own manifest: `projectScripts` (every standard target script)
-// and `projectScriptsCustomOwned` (the ones a custom-server backend owns
-// instead). Declared THERE, not here, because the manager walk reads the same
-// pair off the installed package without loading any backend code (#689).
+// The framework's own manifest: its `projectScripts` are the target scripts the
+// verb table cannot derive.
 const frameworkPackage = require('../../../package.json');
 
 // verb → what replaces it in custom mode. A refusal that doesn't name the
@@ -35,8 +33,24 @@ const FIREBASE_ONLY_VERBS = {
   deploy: "a custom backend publishes through its host (Render & co) — put that command in this target's `deploy` script, which the brand-root `omega deploy` runs",
   serve: 'a custom backend runs its own server — `npm start` boots it on PORT',
   emulator: 'there are no Cloud Functions to emulate — `npm start` boots the server on PORT',
-  test: "the emulator lane needs Cloud Functions — `npm test` runs this target's static suite",
+  test: "the emulator lane needs Cloud Functions; `npm run test:static` runs this target's static suite",
 };
+
+/**
+ * The omega verb a package script runs, or undefined when it runs none.
+ *
+ * @param {string} command - The script's command.
+ * @returns {string|undefined}
+ */
+function verbOfCommand(command) {
+  return (String(command).match(/(?:^|&& )omega (\S+)/) || [])[1];
+}
+
+// The target scripts a custom-server backend owns instead of the framework: every
+// one whose command runs a verb this mode refuses (its own server, its own host deploy).
+const CUSTOM_OWNED_SCRIPTS = Object.entries(projectScripts(frameworkPackage))
+  .filter(([, command]) => FIREBASE_ONLY_VERBS[verbOfCommand(command)])
+  .map(([key]) => key);
 
 // The files the scaffold writes ONLY for the Firebase lane: firebase.json
 // (deploy targets + emulator config), and the rules sources firebase.json
@@ -101,19 +115,19 @@ function isCustomProject(targetRoot) {
  * verb runs (ensure-target.js) and the setup check that holds a target to them
  * (setup-tests/npm-project-scripts.js).
  *
- * Every `projectScripts` key in firebase mode. In custom mode, all but the keys
- * whose verbs that mode refuses — those are the BRAND's (its own server command,
- * its own host deploy), so they are never written and never scaffolded.
+ * Every target script in firebase mode: the verb table's, the manifest's
+ * declarations merged over them. In custom mode, all but the keys whose verbs
+ * that mode refuses: those are the BRAND's (its own server command, its own host
+ * deploy), so they are never written and never scaffolded.
  *
  * @param {string} targetRoot - The backend target root.
- * @returns {Object} Script key → the command this framework owns it as.
+ * @returns {Object} Script key to the command this framework owns it as.
  */
 function frameworkOwnedScripts(targetRoot) {
-  const declared = frameworkPackage.projectScripts || {};
-  if (!isCustomProject(targetRoot)) return { ...declared };
+  const declared = projectScripts(frameworkPackage);
+  if (!isCustomProject(targetRoot)) return declared;
 
-  const brandOwned = frameworkPackage.projectScriptsCustomOwned || [];
-  return Object.fromEntries(Object.entries(declared).filter(([key]) => !brandOwned.includes(key)));
+  return Object.fromEntries(Object.entries(declared).filter(([key]) => !CUSTOM_OWNED_SCRIPTS.includes(key)));
 }
 
 /**
@@ -137,4 +151,4 @@ function refuseWhenCustom(targetRoot, verb) {
   return true;
 }
 
-module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, frameworkOwnedScripts, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS };
+module.exports = { resolveProjectType, isCustomProject, refuseWhenCustom, frameworkOwnedScripts, verbOfCommand, FIREBASE_ONLY_VERBS, FIREBASE_ONLY_SCAFFOLD, FIREBASE_ONLY_SETUP_CHECKS, CUSTOM_OWNED_SCRIPTS };

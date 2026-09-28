@@ -2,7 +2,7 @@
 // run it started.
 //
 // Replaces the old "do it from my laptop" release flow with "let CI do it, but make it
-// feel local." User runs `npm run release` (or `npx omega release`) and gets:
+// feel local." User runs `npx omega release` and gets:
 //   1. The ONE deploy lane every target takes (`@omega.js/devkit/deploy`'s
 //      deployViaDispatch, #872, #915): the composed workflow files reach the
 //      default branch when they differ there (GitHub registers a workflow from

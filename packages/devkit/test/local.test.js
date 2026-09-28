@@ -146,12 +146,13 @@ test('linkLocalPackages plans the WHOLE brand tree: sibling targets included (cp
   );
 });
 
-test('linkLocalPackages skips deps already resolving to the monorepo copy', async () => {
+test('linkLocalPackages skips deps already resolving to the monorepo copy under its file: spec', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-test-'));
   try {
+    const clientSpec = `file:${path.relative(fs.realpathSync(scratch), fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client'))).split(path.sep).join('/')}`;
     fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
       name: 'scratch-target',
-      dependencies: { '@omega.js/client': '^5.0.0' },
+      dependencies: { '@omega.js/client': clientSpec },
     }));
     fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
     fs.symlinkSync(path.join(FAKE_MONOREPO, 'packages', 'client'), path.join(scratch, 'node_modules', '@omega.js', 'client'));
@@ -159,6 +160,36 @@ test('linkLocalPackages skips deps already resolving to the monorepo copy', asyn
     const actions = await local.linkLocalPackages({ dir: scratch, monorepoRoot: FAKE_MONOREPO, dryRun: true });
     assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
       { name: '@omega.js/client', action: 'skip' },
+    ]);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('linkLocalPackages flips a registry pin even when a parent node_modules already resolves local', async () => {
+  // An in-repo brand resolves every @omega.js package through the monorepo
+  // root's workspace links, so the tree alone must never excuse a registry pin.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-pin-'));
+  try {
+    const webPackage = path.join(scratch, 'packages', 'web');
+    fs.mkdirSync(webPackage, { recursive: true });
+    fs.writeFileSync(path.join(webPackage, 'package.json'), JSON.stringify({ name: '@omega.js/web', version: '0.51.0' }));
+    fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
+    fs.symlinkSync(webPackage, path.join(scratch, 'node_modules', '@omega.js', 'web'));
+
+    const brand = path.join(scratch, 'brands', 'x');
+    const webTarget = path.join(brand, 'targets', 'web');
+    fs.mkdirSync(webTarget, { recursive: true });
+    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({
+      name: 'x', private: true, workspaces: ['targets/*'],
+    }));
+    fs.writeFileSync(path.join(webTarget, 'package.json'), JSON.stringify({
+      name: 'x-web', private: true, dependencies: { '@omega.js/web': '0.51.0' },
+    }));
+
+    const actions = await local.linkLocalPackages({ dir: webTarget, monorepoRoot: scratch, dryRun: true });
+    assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
+      { name: '@omega.js/web', action: 'link' },
     ]);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

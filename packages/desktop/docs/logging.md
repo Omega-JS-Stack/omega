@@ -217,7 +217,7 @@ Five separate logs in `<projectRoot>/logs/`:
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
-| `deploy.log` | GH Actions run output, streamed locally by the follower every target's deploy uses (`omega deploy`, `npm run release`) ([#873](https://github.com/Omega-JS-Stack/omega/issues/873); this was `ci.log`) | Truncated each deploy |
+| `deploy.log` | GH Actions run output, streamed locally by the follower every target's deploy uses (`omega deploy`, `npx omega release --target=<name>` at the brand root) ([#873](https://github.com/Omega-JS-Stack/omega/issues/873); this was `ci.log`) | Truncated each deploy |
 | `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `omega-signing.log` instead) | Appended (not truncated) |
 
 `dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `OMEGA_LOG_FILE=false`; override its path with `OMEGA_LOG_FILE=<path>`.)

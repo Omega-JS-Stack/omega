@@ -1,7 +1,7 @@
 /**
- * `omega test` at a brand root — C5's brand layer: fan the test run out over
- * the brand's targets, each in its own framework's hands, and then run the
- * brand's OWN e2e lane.
+ * `omega test` at a brand root, C5's brand layer: fan the test run out over
+ * the brand's targets, each through its own `npm run test` (the scope and the
+ * mode flags after `--`), and then run the brand's OWN e2e lane.
  *
  *   omega test                → every target's PROJECT tests, then test/e2e/
  *   omega test framework:     → every target's framework suite
@@ -40,9 +40,8 @@
  * The BRAND E2E LANE (`<brandRoot>/test/e2e/run.js`) runs last, when it
  * exists: one browser lane driving the brand's real pages against its real
  * local stack, which is a brand-level surface no target owns. It is a runner
- * script, so — exactly like a custom target's `test` script — it hears no
- * scope vocabulary and no flags: a bare run reaches it, and a scoped,
- * picked (`--target=`) or laned run never does.
+ * script that hears no scope vocabulary and no flags: a bare run reaches it,
+ * and a scoped, picked (`--target=`) or laned run never does.
  *
  * Targets run sequentially with streamed output; any failing target → exit 1.
  */
@@ -167,6 +166,29 @@ function declaresLane(entry, framework, lane) {
   return Array.isArray(lanes) && lanes.includes(lane);
 }
 
+/**
+ * The run's summary: every target that ran, then every one that stepped aside.
+ * It prints on every run, so a run that skipped everything still reports.
+ *
+ * @param {Array} summary - `{ name, ok, missed, detail }` per target that ran.
+ * @param {Array} skipped - `{ name, detail }` per target that stepped aside.
+ */
+function printSummary(summary, skipped) {
+  console.log(chalk.bold('\nTest summary'));
+  for (const entry of summary) {
+    if (entry.missed) {
+      console.log(`  ${chalk.dim('⊘')} ${entry.name} ${chalk.dim(`(${entry.detail})`)}`);
+      continue;
+    }
+    console.log(entry.ok
+      ? `  ${chalk.green('✓')} ${entry.name}`
+      : `  ${chalk.red('✗')} ${entry.name} ${chalk.dim(`(${entry.detail})`)}`);
+  }
+  for (const entry of skipped) {
+    console.log(`  ${chalk.dim('⊘')} ${entry.name} ${chalk.dim(`(skipped: ${entry.detail})`)}`);
+  }
+}
+
 module.exports = async (options) => {
   assertPickerFlags(options);
 
@@ -209,6 +231,8 @@ module.exports = async (options) => {
 
   // ─── Plan: which targets run, with which forwarded ids ────────────────────
   const runs = [];
+  // The targets that stepped aside, so the summary reports them even when nothing ran
+  const skipped = [];
 
   // Resolved ONCE per target: the plan below and the --target/id contradiction
   // check both need to know which framework owns which target.
@@ -233,25 +257,6 @@ module.exports = async (options) => {
   for (const { entry, run } of resolvedRuns) {
     if (!picked.selected.includes(entry)) continue;
 
-    // A target whose tests ARE its own `npm run test` — a custom target
-    // (#603), or a backend in custom-server mode whose framework has no
-    // emulator lane to run (#584) — never hears the scope vocabulary: it is
-    // the frameworks', and means nothing to a package script. So a SCOPED run
-    // never addresses one, a bare run does, and nothing is forwarded.
-    if (run.kind === 'custom' || run.kind === 'skip') {
-      // A lane is scope too — an opt-in lane a framework declares means
-      // nothing to a package script, so a laned run never addresses one.
-      if (!runAllBare || lane) continue;
-
-      if (run.kind === 'skip') {
-        console.log(chalk.dim(`  ⊘ ${entry.name}: ${run.detail} — skipped`));
-        continue;
-      }
-
-      runs.push({ entry, framework: 'custom', command: run.command, args: run.args, label: run.label });
-      continue;
-    }
-
     if (run.kind === 'error') {
       // Only an error if this target was (or would be) addressed
       if (runAllBare || shared.length > 0) {
@@ -260,32 +265,48 @@ module.exports = async (options) => {
       continue;
     }
 
+    // A brand-owned script (a custom target's, a custom-mode backend's) never
+    // hears the scope vocabulary: it is the frameworks', and a lane is scope too,
+    // so only a bare, unlaned run addresses one. A missing script is the brand's
+    // only on a custom target.
+    const brandOwned = run.kind === 'skip' ? !run.framework : !run.frameworkScript;
+    if (brandOwned && (!runAllBare || lane)) continue;
+
     // An opt-in lane reaches only the frameworks that serve it; the rest say
     // so in one line and the run stays green (#775).
-    if (lane && !declaresLane(entry, run.framework, lane)) {
-      console.log(chalk.dim(`  ⊘ ${entry.name}: no "${lane}" lane in ${run.framework} — skipped`));
+    if (!brandOwned && lane && !declaresLane(entry, run.framework, lane)) {
+      console.log(chalk.dim(`  ⊘ ${entry.name}: no "${lane}" lane in ${run.framework}: skipped`));
+      skipped.push({ name: entry.name, detail: `no "${lane}" lane` });
       continue;
     }
 
-    const args = [...shared, ...(perFramework[run.framework] || [])];
+    const args = brandOwned ? [] : [...shared, ...(perFramework[run.framework] || [])];
     if (!runAllBare && args.length === 0) continue; // targeted run, not addressed to this target
 
-    // MODE flags ride the same `forwarded` seam every other brand-root fan-out
-    // uses (commands/deploy.js, lib/verb-fanout.js), so the flags land where
-    // that one place decides they land. Re-resolved only when there ARE flags:
-    // a bare run has nothing to forward and keeps its first resolution.
+    // An addressed target with no `test` script has nothing to run and nothing broken
+    if (run.kind === 'skip') {
+      console.log(chalk.dim(`  ⊘ ${entry.name}: ${run.detail}: skipped`));
+      skipped.push({ name: entry.name, detail: run.detail });
+      continue;
+    }
+
+    // MODE flags and the scope ride the same `forwarded` seam every other
+    // brand-root fan-out uses (commands/deploy.js, lib/verb-fanout.js), so they
+    // land after the script's `--`. Re-resolved only when there IS something to
+    // forward: a bare run keeps its first resolution.
     const forwarded = [
       ...(extended ? ['--extended'] : []),
       ...(lane ? [`--lane=${lane}`] : []),
+      ...args,
     ];
     const flagged = forwarded.length ? resolveTargetRun(entry, 'test', forwarded) : run;
 
     runs.push({
       entry,
-      framework: flagged.framework,
+      framework: flagged.framework || 'custom',
       command: flagged.command,
-      args: [...flagged.args, ...args],
-      label: `omega test ${[...forwarded, ...args].join(' ')}`.trimEnd(),
+      args: flagged.args,
+      label: flagged.label,
       // This target is being ASKED, not chosen: a path it does not carry is a
       // no-op here, and the signal is what lets its CLI say so with a code of
       // its own instead of failing the whole brand run (#814).
@@ -313,6 +334,7 @@ module.exports = async (options) => {
 
   if (runs.length === 0) {
     console.log(chalk.yellow('⚠ No target matches the requested scope — nothing ran.'));
+    printSummary([], skipped);
 
     // Nothing ran AND a path was named: the brand carries no target that could
     // even be asked for it, which is the same typo the target-level rule
@@ -353,16 +375,7 @@ module.exports = async (options) => {
   }
 
   // ─── Summary + aggregate exit ──────────────────────────────────────────────
-  console.log(chalk.bold('\nTest summary'));
-  for (const entry of summary) {
-    if (entry.missed) {
-      console.log(`  ${chalk.dim('⊘')} ${entry.name} ${chalk.dim(`— ${entry.detail}`)}`);
-      continue;
-    }
-    console.log(entry.ok
-      ? `  ${chalk.green('✓')} ${entry.name}`
-      : `  ${chalk.red('✗')} ${entry.name} ${chalk.dim(`— ${entry.detail}`)}`);
-  }
+  printSummary(summary, skipped);
 
   // Every target missed: the path exists nowhere in this brand, so the run
   // tested nothing at all. One target carrying it is enough to be a real run

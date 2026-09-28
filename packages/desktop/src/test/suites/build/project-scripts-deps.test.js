@@ -13,6 +13,7 @@
 const path = require('path');
 const fs = require('fs');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
 module.exports = defineCases({
   type: 'suite',
@@ -26,7 +27,7 @@ module.exports = defineCases({
         const peers = pkg.peerDependencies || {};
 
         const tools = new Set();
-        for (const script of Object.values(pkg.projectScripts || {})) {
+        for (const script of Object.values(projectScripts(pkg))) {
           for (const match of String(script).matchAll(/npx\s+([a-z0-9@/_-]+)/g)) {
             const tool = match[1];
             if (tool !== 'omega' && !tool.startsWith('@omega.js/')) {
@@ -44,7 +45,7 @@ module.exports = defineCases({
       name: 'the build-mode env flags live in the CLI verbs, not in the scaffolded scripts',
       run: (ctx) => {
         const pkg = require(path.join(__dirname, '..', '..', '..', '..', 'package.json'));
-        const scripts = pkg.projectScripts || {};
+        const scripts = projectScripts(pkg);
 
         for (const script of Object.values(scripts)) {
           ctx.expect(String(script).includes('cross-env')).toBe(false);
@@ -58,7 +59,9 @@ module.exports = defineCases({
         ctx.expect(scripts.build).toBe('omega build');
         ctx.expect(scripts.package).toBe('omega package');
         ctx.expect(scripts['package:quick']).toBe('omega package --quick');
-        ctx.expect(scripts.publish).toBe('omega publish');
+        // A single-target command is the CLI's, reached from the brand root, never a script
+        ctx.expect(scripts.publish).toBe(undefined);
+        ctx.expect(scripts.release).toBe(undefined);
         ctx.expect(scripts['release:local']).toBe('omega publish --local');
       },
     },
@@ -77,13 +80,6 @@ module.exports = defineCases({
       run: (ctx) => {
         const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'ensure-target.js'), 'utf8');
         ctx.expect(source.includes('cross-env')).toBe(false);
-      },
-    },
-    {
-      name: 'ensure-target syncs projectScripts unconditionally — consumers heal on the next verb',
-      run: (ctx) => {
-        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'lib', 'ensure-target.js'), 'utf8');
-        ctx.expect(/project\.scripts\[key\] = package\.projectScripts\[key\]/.test(source)).toBe(true);
       },
     },
   ],

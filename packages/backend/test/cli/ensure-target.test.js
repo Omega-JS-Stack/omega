@@ -25,10 +25,11 @@ function seedTarget() {
   return dir;
 }
 
-/** The framework's own script declarations — the SSOT both writers read. */
+/** The scripts both writers derive: the verb table's, the manifest's declarations over them. */
 const frameworkPackage = require('../../package.json');
-const PROJECT_SCRIPTS = frameworkPackage.projectScripts;
-const CUSTOM_OWNED = frameworkPackage.projectScriptsCustomOwned || [];
+const { verbScripts, projectScripts } = require('../../dist/vendor/devkit/verb-scripts.js');
+const { CUSTOM_OWNED_SCRIPTS: CUSTOM_OWNED } = require('../../dist/cli/utils/project-type.js');
+const PROJECT_SCRIPTS = projectScripts(frameworkPackage);
 
 /** The target manifest, parsed. */
 function manifestOf(dir) {
@@ -184,6 +185,36 @@ module.exports = defineCases({
           const third = run(dir);
           assert.deepEqual(third.changed, [], 'a converged manifest is not a change');
           assert.equal(jetpack.read(path.join(dir, 'package.json')), before, 'and is byte-identical');
+        } finally {
+          jetpack.remove(dir);
+        }
+      },
+    },
+
+    {
+      name: 'the-verb-scripts-derive-from-the-verb-table',
+      auth: 'none',
+
+      async run({ assert }) {
+        const dir = seedTarget();
+
+        try {
+          run(dir);
+          const scripts = manifestOf(dir).scripts;
+          const derived = verbScripts(frameworkPackage.name);
+
+          for (const [verb, command] of Object.entries(derived)) {
+            const declared = frameworkPackage.projectScripts[verb];
+            assert.equal(scripts[verb], declared || command, `${verb} lands as ${declared ? 'its declared command' : 'its bare verb'}`);
+          }
+          assert.equal(scripts.start, 'omega serve', 'the declared start still lands');
+          assert.equal(scripts.test, 'omega test', 'test is the verb like on every framework');
+          assert.equal(scripts['test:static'], "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'", 'the static lane keeps its own name');
+          assert.equal(scripts['test:emulator'], undefined, 'no second name for `test`');
+
+          // No verb script is typed by hand: the manifest declares only what the table cannot derive
+          const typed = Object.keys(frameworkPackage.projectScripts).filter((key) => key in derived);
+          assert.deepEqual(typed, []);
         } finally {
           jetpack.remove(dir);
         }

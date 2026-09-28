@@ -54,7 +54,6 @@ const LOG_DIR = path.join(ROOT, '.temp', 'verts-e2e');
 
 const { readPortsFile, composeTargetConfig } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
-const { rootDispatchEnv } = require('@omega.js/devkit/test/boot-child');
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -160,7 +159,6 @@ function startEmulator() {
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
   const child = spawn(mgrBin, ['emulator', '--no-seed'], {
     cwd: PLAYGROUND_BACKEND,
-    env: rootDispatchEnv(PLAYGROUND_BACKEND),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });

@@ -1,8 +1,9 @@
 /**
  * omega-bin: the context-aware dispatcher behind every framework's `omega`/`omg`/`mgr`
  * bin. npm links one arbitrary winner of those bins, so this resolves the ROOT that owns
- * the cwd (a brand root, a standalone target, the monorepo root) and runs THAT root's CLI;
- * inside a subfolder every verb refuses and prints the root form. Stdlib plus its data
+ * the cwd (a brand root, a standalone target, the monorepo root) and runs THAT root's CLI.
+ * Below a root, a verb runs in place only inside a target of one of its owner frameworks;
+ * any other verb refuses and prints the root form. Stdlib plus its data
  * siblings (verbs.js, target-picker.js): it is vendored into every framework dist.
  * The contract: docs/devkit/index.md.
  */
@@ -180,10 +181,11 @@ function findTarget(startDir) {
 }
 
 /**
- * The root a context runs its verbs from, and the `--target=` word that picks
- * the cwd's target or package there (null when the cwd sits in none).
+ * The root a context runs its verbs from, what kind of root it is, and the
+ * `--target=` word that picks the cwd's target or package there (null when the
+ * cwd sits in none).
  *
- * @returns {{ dir: string, target: string|null }}
+ * @returns {{ dir: string, kind: 'brand'|'target'|'monorepo', target: string|null }}
  */
 function rootOf(context, cwd) {
   if (context.kind === 'framework') {
@@ -191,38 +193,38 @@ function rootOf(context, cwd) {
     const brandRoot = path.dirname(targetsDir);
     // A target under a brand's targets/ runs from the brand root; a standalone target is its own root
     if (path.basename(targetsDir) === 'targets' && isBrandRoot(brandRoot)) {
-      return { dir: brandRoot, target: path.basename(context.dir) };
+      return { dir: brandRoot, kind: 'brand', target: path.basename(context.dir) };
     }
-    return { dir: context.dir, target: null };
+    return { dir: context.dir, kind: 'target', target: null };
   }
 
   if (context.kind === 'monorepo') {
-    return { dir: context.dir, target: context.package ? path.basename(context.package.dir) : null };
+    return { dir: context.dir, kind: 'monorepo', target: context.package ? path.basename(context.package.dir) : null };
   }
 
   // A brand: a dir under targets/ with no framework dep is still a target (a custom one)
   const [top, name] = path.relative(context.dir, cwd).split(path.sep);
-  return { dir: context.dir, target: top === 'targets' && name ? name : null };
+  return { dir: context.dir, kind: 'brand', target: top === 'targets' && name ? name : null };
 }
 
-// Set by the dispatcher on every accepted root run and inherited by every child it
-// spawns: the root walk runs each target's CLI inside the target dir.
-const ROOT_DISPATCH_ENV = 'OMEGA_ROOT_DISPATCH';
-
-/** Does the root-dispatch marker name a root this cwd sits under? */
-function underRootDispatch(cwd) {
-  const root = process.env[ROOT_DISPATCH_ENV];
-  if (!root) return false;
-  const relative = path.relative(path.resolve(root), cwd);
-  return !relative.startsWith('..') && !path.isAbsolute(relative);
+/** Does the verb this token selects run in place below its root? */
+function ownsInPlace(context, token) {
+  // Only in a TARGET of one of its owner frameworks (a brand target or a standalone project); framework source is never a target
+  if (context.kind !== 'framework') return false;
+  // Every row the token selects counts: `serve` is web's dev alias and the backend's own verb
+  return VERBS.some((row) => tokensOf(row).includes(token) && row.owners.includes(context.name));
 }
 
 /** Refuse a verb run below its root, printing the one command that runs it. */
-function refuseOutsideRoot(verb, argv, root) {
+function refuseOutsideRoot(verb, argv, root, row) {
   const rest = argv.filter((arg, index) => index !== argv.indexOf(verb));
-  const picker = root.target ? ` --${PICKER_FLAG}=${root.target}` : '';
-  const form = [`npx omega ${verb}${picker}`, ...rest].join(' ');
-  console.error(`omega: refusing to run "${verb}" in ${process.cwd()}: every verb runs at a root. Run: cd ${root.dir} && ${form}`);
+  // A brand-wide verb (only the manager owns it) runs once for the whole brand, so it picks no target
+  const brandWide = root.kind === 'brand' && !!row && row.owners.every((owner) => owner === MANAGER);
+  const picker = root.target && !brandWide ? ` --${PICKER_FLAG}=${root.target}` : '';
+  const form = root.kind === 'monorepo'
+    ? monorepoForm(root.dir, verb, rest, root.target)
+    : [`npx omega ${verb}${picker}`, ...rest].join(' ');
+  console.error(`omega: refusing to run "${verb}" in ${process.cwd()}: this verb runs at the ${root.kind} root. Run: cd ${root.dir} && ${form}`);
   process.exit(1);
 }
 
@@ -266,27 +268,6 @@ function verbOf(argv) {
   return argv.find((arg) => !arg.startsWith('-')) || argv[0] || null;
 }
 
-/** A root fan-out's child inside a monorepo package runs that package's OWN CLI. */
-function runPackageCli(pkg, hostName, hostRun) {
-  // The marker lets a subfolder through, but only a package has a CLI to run there
-  if (!pkg) {
-    console.error(`omega: refusing to run in ${process.cwd()}: no OMEGA package owns this directory. Nothing was scaffolded.`);
-    process.exit(1);
-  }
-  if (pkg.name === hostName) return hostRun();
-
-  const { cliPath, error } = tryResolveCli(pkg.name, pkg.dir);
-  if (!cliPath) {
-    // A package that exports no `./cli` at all versus one whose `./cli` does not resolve yet
-    const reason = error && error.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED'
-      ? 'which ships no CLI'
-      : `whose './cli' did not resolve (${error ? error.message : 'unknown'}; an unbuilt dist? run its prepare)`;
-    console.error(`omega: refusing to run: ${pkg.dir} is the ${pkg.name} package, ${reason}. Nothing was scaffolded.`);
-    process.exit(1);
-  }
-  return require(cliPath).run();
-}
-
 /**
  * The framework packages, in the registry's target order: their CLI's `test` runs
  * their own suite. The manager's `test` is the brand fan-out, so its suite is `npm test`.
@@ -301,16 +282,37 @@ function monorepoPackages(root) {
 }
 
 /**
+ * The ONE command the monorepo root accepts for a verb, shared by the root's own
+ * refusal and the in-package refusal so the two cannot drift: `test` picks a
+ * framework package (any other package's suite is its own workspace's npm test),
+ * `dev` is the root watch, and every other verb is a workspace script.
+ *
+ * @param {string} root - The monorepo root.
+ * @param {string} verb - The verb as typed.
+ * @param {string[]} rest - The args after the verb.
+ * @param {string|null} pkg - The package dir name the cwd sits in, if any.
+ * @returns {string}
+ */
+function monorepoForm(root, verb, rest, pkg) {
+  const entry = findVerb(verb);
+  if (entry && entry.name === 'test') {
+    if (pkg && !monorepoPackages(root).some((candidate) => candidate.dirName === pkg)) return `npm test --workspace packages/${pkg}`;
+    return [`npx omega test --${PICKER_FLAG}=${pkg || '<package>'}`, ...rest].join(' ');
+  }
+  if (entry && entry.name === 'dev') return 'npm start';
+  return `npm run ${entry ? entry.name : verb} --workspaces --if-present`;
+}
+
+/**
  * The monorepo root: `test` runs each package `--target=` picks through its own
- * bin, in the package dir, stopping at the first failure; every other verb is a
- * root npm script and refuses naming it.
+ * CLI file, never the dispatcher (which refuses inside a package), in the package
+ * dir, stopping at the first failure; every other verb is a root npm script and
+ * refuses naming it.
  */
 function runMonorepoRoot({ root, argv, verb, spawn }) {
   const entry = findVerb(verb);
   if (!entry || entry.name !== 'test') {
-    // `dev` is the root watch; every other verb is a workspace script
-    const script = entry && entry.name === 'dev' ? 'npm start' : `npm run ${entry ? entry.name : verb} --workspaces --if-present`;
-    console.error(`omega: the monorepo root runs only \`npx omega test --${PICKER_FLAG}=<package>\`; for "${verb}" run the root npm script: ${script}`);
+    console.error(`omega: the monorepo root runs only \`npx omega test --${PICKER_FLAG}=<package>\`; for "${verb}" run the root npm script: ${monorepoForm(root, verb, [])}`);
     process.exit(1);
   }
 
@@ -332,8 +334,15 @@ function runMonorepoRoot({ root, argv, verb, spawn }) {
   }
 
   for (const pkg of packages.filter((candidate) => tokens.some((token) => matches(candidate, token)))) {
+    const { cliPath, error } = tryResolveCli(pkg.manifest.name, pkg.dir);
+    if (!cliPath) {
+      console.error(`omega: ${pkg.manifest.name}'s './cli' did not resolve (${error.message}; an unbuilt dist? run its prepare). Nothing ran for it.`);
+      process.exitCode = 1;
+      return;
+    }
+
     console.error(`omega: ${pkg.manifest.name}: omega test ${rest.join(' ')}`.trimEnd());
-    const result = spawn(process.execPath, [path.join(pkg.dir, pkg.manifest.bin.omega), 'test', ...rest], {
+    const result = spawn(process.execPath, [cliPath, 'test', ...rest], {
       cwd: pkg.dir,
       stdio: 'inherit',
     });
@@ -356,10 +365,8 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
 
   if (target && !rootless) {
     const root = rootOf(target, cwd);
-    if (cwd !== root.dir && !underRootDispatch(cwd)) refuseOutsideRoot(verb, argv, root);
-    // Every descendant spawn inherits it: a fan-out child, an npm script inside a target
-    // and a backend's spawn inside functions/ all pass the check without setting anything
-    if (cwd === root.dir) process.env[ROOT_DISPATCH_ENV] = root.dir;
+    const row = findVerb(verb);
+    if (cwd !== root.dir && !ownsInPlace(target, verb)) refuseOutsideRoot(verb, argv, root, row);
   }
 
   // No context — the bootstrap case (a verb run in a fresh directory has
@@ -407,11 +414,8 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
     return hostRun();
   }
 
-  // The monorepo root runs `test` over its packages; a root fan-out's child runs its package's CLI
-  if (target.kind === 'monorepo') {
-    if (cwd !== target.dir) return runPackageCli(target.package, hostName, hostRun);
-    return runMonorepoRoot({ root: target.dir, argv, verb, spawn });
-  }
+  // Below the monorepo root every verb refused above, so this is the root, which runs `test` over its packages
+  if (target.kind === 'monorepo') return runMonorepoRoot({ root: target.dir, argv, verb, spawn });
 
   // A brand root — the manager owns brand-level commands (`omega test` fans
   // out over targets/*). Resolve it from the brand root and hand over.
@@ -438,16 +442,16 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
     return require(cliPath).run();
   }
 
-  // The bin that won npm's .bin link belongs to this target's framework — run it directly.
+  // The bin that won npm's .bin link belongs to this target's framework: run it directly.
   if (target.name === hostName) {
     return hostRun();
   }
 
-  // The target belongs to a DIFFERENT framework — resolve its CLI from where the
+  // The target belongs to a DIFFERENT framework: resolve its CLI from where the
   // dependency is declared and hand over.
   const cliPath = resolveCli(target.name, target.dir,
     'Is the framework installed? Try npm install, or `npx omega i local` at the brand root for a monorepo link.');
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, isMonorepoRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, CONTEXTLESS_VERBS, BOX_VERBS, ROOT_DISPATCH_ENV, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, isBrandRoot, isMonorepoRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, CONTEXTLESS_VERBS, BOX_VERBS, FRAMEWORKS, MANAGER };

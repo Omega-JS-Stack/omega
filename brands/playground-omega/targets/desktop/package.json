@@ -5,7 +5,7 @@
   "private": true,
   "description": "OMEGA desktop app",
   "devDependencies": {
-    "@omega.js/desktop": "0.51.0",
+    "@omega.js/desktop": "file:../../../../packages/desktop",
     "electron": "^42.6.0",
     "electron-builder": "^26.16.1",
     "gulp": "^5.0.1"
@@ -16,12 +16,14 @@
     "build": "omega build",
     "package": "omega package",
     "package:quick": "omega package --quick",
-    "publish": "omega publish",
-    "release": "omega release",
     "release:local": "omega publish --local",
     "postinstall": "node -e \"try { require('@omega.js/desktop/scripts/sync-nvmrc') } catch (e) {}\"",
     "test": "omega test",
-    "electron": "electron ."
+    "electron": "electron .",
+    "deploy": "omega deploy",
+    "clean": "omega clean",
+    "update": "omega update",
+    "validate-certs": "omega validate-certs"
   },
   "main": "dist/main.bundle.js",
   "license": "UNLICENSED",

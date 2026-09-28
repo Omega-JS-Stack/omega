@@ -4,7 +4,7 @@
   "private": true,
   "description": "OMEGA extension app",
   "devDependencies": {
-    "@omega.js/extension": "0.51.0",
+    "@omega.js/extension": "file:../../../../packages/extension",
     "gulp": "^5.0.1"
   },
   "dependencies": {},
@@ -13,7 +13,10 @@
     "gulp": "gulp",
     "build": "omega build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
-    "test": "omega test"
+    "test": "omega test",
+    "deploy": "omega deploy",
+    "clean": "omega clean",
+    "update": "omega update"
   },
   "license": "UNLICENSED"
 }

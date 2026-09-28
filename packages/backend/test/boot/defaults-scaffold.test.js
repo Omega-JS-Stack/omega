@@ -97,9 +97,9 @@ module.exports = defineCases({
 
         // The script `omega setup` writes onto the target manifest. Without the
         // --require the rest of the lane still passes — quietly networked.
-        const script = require('../../package.json').projectScripts.test;
-        assert.ok(script.includes('--require ./test/_helpers/connect-trap.js'), 'the test script does not preload the trap');
-        assert.ok(script.includes("--test 'test/_unit/**/*.test.js'"), 'the test script does not run the static lane');
+        const script = require('../../package.json').projectScripts['test:static'];
+        assert.ok(script.includes('--require ./test/_helpers/connect-trap.js'), 'the test:static script does not preload the trap');
+        assert.ok(script.includes("--test 'test/_unit/**/*.test.js'"), 'the test:static script does not run the static lane');
       },
     },
     {

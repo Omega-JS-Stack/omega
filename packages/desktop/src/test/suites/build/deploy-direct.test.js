@@ -26,10 +26,10 @@ const COMMANDS = path.join(__dirname, '..', '..', '..', 'commands');
 const DEPLOY = path.join(COMMANDS, 'deploy.js');
 const WORKFLOW = path.join(__dirname, '..', '..', '..', 'defaults', '.github', 'workflows', 'build.yml');
 
-// The scripts every target gets from the scaffold, read from the one place that
-// declares them: expanding the workflow's command through THESE is what ties
+// The scripts every target gets from the scaffold, derived the one way the
+// scaffold derives them: expanding the workflow's command through THESE is what ties
 // the runner's step to the verb this laptop runs.
-const SCRIPTS = require(path.join(__dirname, '..', '..', '..', '..', 'package.json')).projectScripts;
+const SCRIPTS = require('@omega.js/devkit/verb-scripts').projectScripts(require(path.join(__dirname, '..', '..', '..', '..', 'package.json')));
 
 const { directPlatform } = require(DEPLOY);
 

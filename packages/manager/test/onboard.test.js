@@ -77,6 +77,11 @@ function stubFrameworks(root, names) {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: MANAGER_VERSION }));
   }
+  // A real install links every framework's `omega` bin, which the derived target
+  // scripts (`build: omega build`) call; the stub's answers every verb with success
+  const bin = path.join(root, 'node_modules', '.bin', 'omega');
+  fs.mkdirSync(path.dirname(bin), { recursive: true });
+  fs.writeFileSync(bin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
 }
 
 // ─── Derivation units ────────────────────────────────────────────────────────

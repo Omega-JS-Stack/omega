@@ -128,7 +128,7 @@ You should see ✓ for each secret in the output.
 For testing the full sign + notarize + publish flow on your own machine:
 
 ```bash
-npm run release
+npx omega release --target=<name>   # at the brand root
 ```
 
 This runs as a **single gulp invocation** (`gulp publish` with `OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true`):

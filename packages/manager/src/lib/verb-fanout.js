@@ -12,7 +12,7 @@
  * the same `--target=` picker and the same dependency ORDER
  * (selectTargets — backend first, custom targets last), the same flag
  * forwarding, and `resolveTargetRun` as the one place a verb becomes a command
- * (a framework's own `omega <verb>`, or the target's `npm run <verb>`).
+ * (the target's own `npm run <verb>`, framework and custom alike).
  *
  * What differs from deploy: targets are INDEPENDENT here. Neither verb
  * publishes anything, so a failure never stops the walk — knowing every broken
@@ -91,17 +91,19 @@ async function runVerbFanout(verb, options = {}, deps = {}) {
  * @param {object} input
  * @param {string} input.verb - The verb as the targets receive it.
  * @param {Array} input.selected - The discovered targets, already in order.
- * @param {string[]} input.forwarded - The args every target's bin receives after the verb.
+ * @param {string[]} input.forwarded - The args every target's script receives after `--`.
  * @param {boolean} [input.dryRun] - Stop at each lane's plan where the verb's row says so.
  * @param {Function} [input.run] - The runner (runCommand unless a test seams it).
+ * @param {Function} [input.resolve] - entry to its run; a fan-out verb's `resolveTargetRun` unless given.
  * @returns {Promise<void>}
  */
-async function walkTargets({ verb, selected, forwarded, dryRun = false, run = runCommand }) {
+async function walkTargets({ verb, selected, forwarded, dryRun = false, run = runCommand, resolve }) {
   const summary = [];
+  const resolveEntry = resolve || ((entry) => resolveTargetRun(entry, verb, forwarded, { dryRun }));
 
   for (const [index, entry] of selected.entries()) {
     const label = `[${index + 1}/${selected.length}] ${entry.name}`;
-    const resolved = resolveTargetRun(entry, verb, forwarded, { dryRun });
+    const resolved = resolveEntry(entry);
 
     // A target that declares no such script has nothing to do and nothing
     // broken — the skip NAMES the target and the verb, because a verb that

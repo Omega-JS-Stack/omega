@@ -80,6 +80,7 @@
     "./prepare-guard": "./tools/prepare-guard.js",
     "./omega-bin": "./src/omega-bin.js",
     "./verbs": "./src/verbs.js",
+    "./verb-scripts": "./src/verb-scripts.js",
     "./target-picker": "./src/target-picker.js"
   },
   "scripts": {

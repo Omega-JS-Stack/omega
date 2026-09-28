@@ -16,7 +16,6 @@ const fs = require('fs');
 
 const BaseTest = require('../../dist/cli/commands/setup-tests/base-test.js');
 const NpmProjectScriptsTest = require('../../dist/cli/commands/setup-tests/npm-project-scripts.js');
-const frameworkPackage = require('../../package.json');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 // A minimal instance around a temp target dir: `stale` is the boot-time
@@ -49,8 +48,8 @@ module.exports = defineCases({
         const written = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
         assert.equal(written.dependencies['firebase-admin'], '^13.0.0',
           'the npm-added dep must survive a manifest-writing fix');
-        assert.equal(written.scripts.setup, frameworkPackage.projectScripts.setup,
-          'the fix still lands every projectScript');
+        assert.equal(written.scripts.deploy, 'omega deploy',
+          'the fix still lands every framework-owned script');
         assert.equal(instance.self.package.dependencies['firebase-admin'], '^13.0.0',
           'the shared in-memory manifest resyncs to disk truth');
 

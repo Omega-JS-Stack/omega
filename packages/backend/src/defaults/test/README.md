@@ -4,8 +4,8 @@ This project has **two test lanes**, both scaffolded by the OMEGA verbs.
 
 | Lane | Command | What it is |
 |---|---|---|
-| Static | `npm test` (= `npm run test:static`) | Plain `node --test` over `test/_unit/**/*.test.js`. **Socket-free**: `test/_helpers/connect-trap.js` is preloaded into every test process and turns any TCP connect or DNS lookup into a throw. No emulator, no network, no credentials: seconds to run. |
-| Emulator | `npm run test:emulator` (= `npx omega test`) | Everything below: your suites, and the framework's, against a **real Firebase emulator**. |
+| Static | `npm run test:static` | Plain `node --test` over `test/_unit/**/*.test.js`. **Socket-free**: `test/_helpers/connect-trap.js` is preloaded into every test process and turns any TCP connect or DNS lookup into a throw. No emulator, no network, no credentials: seconds to run. |
+| Emulator | `npm test` (= `npx omega test`) | Everything below: your suites, and the framework's, against a **real Firebase emulator**. |
 
 ## The static lane (`test/_unit/`)
 

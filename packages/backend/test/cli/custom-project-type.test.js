@@ -292,15 +292,18 @@ module.exports = defineCases({
       name: 'the brand-owned scripts are exactly the ones running a refused verb',
 
       async run() {
-        // The declaration the manager walk and this framework's own scaffold
-        // both read (#689). It is DERIVED knowledge — a script key is the
-        // brand's in custom mode precisely because the verb it runs refuses —
-        // so it must never drift from the verb table beside it.
-        const { projectScripts, projectScriptsCustomOwned } = require('../../package.json');
-        const verbOf = (command) => (String(command).match(/(?:^|&& )omega (\S+)/) || [])[1];
+        // The list the manager walk and this framework's own scaffold
+        // both read. It is DERIVED knowledge: a script key is the brand's in
+        // custom mode precisely because the verb it runs refuses, so it must
+        // never drift from the verb table beside it.
+        const frameworkPackage = require('../../package.json');
+        const { CUSTOM_OWNED_SCRIPTS: projectScriptsCustomOwned, verbOfCommand: verbOf } = require('../../dist/cli/utils/project-type.js');
+        const projectScripts = require('../../dist/vendor/devkit/verb-scripts.js').projectScripts(frameworkPackage);
+        assert.strictEqual(frameworkPackage.projectScriptsCustomOwned, undefined, 'derived from FIREBASE_ONLY_VERBS, never hand-kept');
+        assert.deepStrictEqual([...projectScriptsCustomOwned].sort(), ['deploy', 'emulator', 'start', 'test']);
 
         for (const key of projectScriptsCustomOwned) {
-          assert.ok(projectScripts[key], `projectScriptsCustomOwned names ${key}, which projectScripts must declare`);
+          assert.ok(projectScripts[key], `projectScriptsCustomOwned names ${key}, which the target scripts must carry`);
           assert.ok(FIREBASE_ONLY_VERBS[verbOf(projectScripts[key])],
             `\`${key}\` is only the brand's because \`omega ${verbOf(projectScripts[key])}\` refuses in custom mode`);
         }

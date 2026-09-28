@@ -86,6 +86,49 @@ module.exports = defineCases({
       },
     },
 
+    {
+      name: 'resolveAuthInfo: the admin key check goes through safeCompare',
+      async run() {
+        // Swap the helper in the require cache and load a fresh utils.js against it,
+        // restoring both entries so later cases keep the real modules.
+        const safeComparePath = require.resolve('../../dist/omega/helpers/safe-compare.js');
+        const utilsPath = require.resolve('../../dist/mcp/utils.js');
+        const realSafeCompare = require(safeComparePath);
+        const savedSafeCompare = require.cache[safeComparePath];
+        const savedUtils = require.cache[utilsPath];
+        const saved = process.env.OMEGA_ADMIN_KEY;
+        const calls = [];
+
+        try {
+          require.cache[safeComparePath] = {
+            id: safeComparePath,
+            filename: safeComparePath,
+            loaded: true,
+            exports: (a, b) => {
+              calls.push([a, b]);
+              return realSafeCompare(a, b);
+            },
+          };
+          delete require.cache[utilsPath];
+          process.env.OMEGA_ADMIN_KEY = 'test-admin-key';
+
+          const { resolveAuthInfo } = require(utilsPath);
+          const result = resolveAuthInfo('test-admin-key');
+
+          assert.equal(result.role, 'admin', 'Should still classify the admin key as admin');
+          assert.deepEqual(calls, [['test-admin-key', 'test-admin-key']], 'safeCompare receives the presented token and the admin key');
+        } finally {
+          process.env.OMEGA_ADMIN_KEY = saved;
+          require.cache[safeComparePath] = savedSafeCompare;
+          if (savedUtils) {
+            require.cache[utilsPath] = savedUtils;
+          } else {
+            delete require.cache[utilsPath];
+          }
+        }
+      },
+    },
+
     // --- filterToolsByRole ---
 
     {

@@ -12,6 +12,7 @@ const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { verbScripts } = require('@omega.js/devkit/verb-scripts');
 
 const SRC        = path.join(__dirname, '..', '..', '..');
 const SETUP_PATH = path.join(SRC, 'commands', 'lib', 'ensure-target.js');
@@ -128,6 +129,31 @@ module.exports = defineCases({
             const healed = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
             ctx.expect(healed.scripts.build).toBe('omega build');
             ctx.expect(fs.readFileSync(pkgPath, 'utf8').endsWith('}\n')).toBe(true);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'the verb scripts derive from the verb table, the declared start merged over them',
+      run: async (ctx) => {
+        const tmp = stageProject(CONSUMER_PKG);
+
+        try {
+          await inProject(tmp, async (setup) => {
+            setup.setupScripts();
+
+            const { scripts } = JSON.parse(fs.readFileSync(path.join(tmp, 'package.json'), 'utf8'));
+            const derived = verbScripts('@omega.js/desktop');
+            for (const [verb, command] of Object.entries(derived)) {
+              ctx.expect(scripts[verb]).toBe(command);
+            }
+            ctx.expect(scripts.start).toBe('omega clean && npm run gulp --');
+
+            // No verb script is typed by hand: the manifest declares only what the table cannot derive
+            const declared = require(path.join(SRC, '..', 'package.json')).projectScripts;
+            ctx.expect(Object.keys(declared).filter((key) => key in derived)).toEqual([]);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });

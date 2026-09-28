@@ -42,6 +42,18 @@ function write(filePath, content) {
 }
 
 /**
+ * The target's own `omega` on its npm-script PATH, pointing at the fake
+ * framework bin: `npm run test` in the target reaches it as `omega test`.
+ */
+function linkTargetBin(brand, target, pkg) {
+  const binDir = path.join(brand, 'targets', target, 'node_modules', '.bin');
+  const bin = path.join(brand, 'node_modules', pkg, 'bin.js');
+  fs.chmodSync(bin, 0o755);
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.symlinkSync(bin, path.join(binDir, 'omega'));
+}
+
+/**
  * Stage a brand monorepo with a web target (dep in its own package.json) and a
  * backend target (functions/ layout), plus fake @omega.js/web + @omega.js/backend
  * packages hoisted to the brand root.
@@ -62,14 +74,14 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
 `);
 
   write(path.join(brand, 'targets', 'web', 'package.json'), JSON.stringify({
-    name: 'web', private: true, devDependencies: { '@omega.js/web': '*' },
+    name: 'web', private: true, devDependencies: { '@omega.js/web': '*' }, scripts: { test: 'omega test' },
   }));
 
   // Target-root manifest (src/dist pillar): the backend's framework dep is a
   // RUNTIME dependency on the ONE target package.json — no functions/ manifest.
   write(path.join(brand, 'targets', 'backend', 'package.json'), JSON.stringify({
     name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
-    ...(backendScripts ? { scripts: backendScripts } : {}),
+    scripts: backendScripts === undefined ? { test: 'omega test' } : backendScripts,
   }));
 
 
@@ -82,6 +94,7 @@ function stageBrand({ backend = {}, backendScripts, lanes = {}, brandE2e } = {})
       ...(lanes[pkg] ? { omega: { testLanes: lanes[pkg] } } : {}),
     }));
     write(path.join(pkgDir, 'bin.js'), fakeBinSource(short));
+    linkTargetBin(brand, short, pkg);
   }
 
   // The brand's OWN e2e lane (#775): test/e2e/run.js, recording like a bin
@@ -268,33 +281,37 @@ test('cli routes `test` through ALIASES to the command file', () => {
 
 // ─── A backend in custom-server mode (#584) ──────────────────────────────────
 
-// Its framework `omega test` is the EMULATOR lane and refuses in that mode, so
-// the fan-out runs the target's own `test` script instead — the same lane a
-// custom target takes, scope vocabulary and all.
+// It is a framework target like any other: the fan-out runs its own `test`
+// script, which in this mode is the brand's command, the scope after `--`.
 const RECORDING_SCRIPT = "node -e \"require('fs').appendFileSync(require('path').join(process.cwd(),'..','..','calls.log'), JSON.stringify({name:'backend-script',cwd:process.cwd(),argv:process.argv.slice(1)})+'\\n')\"";
 
-test("custom-server backend: a bare run takes its own `test` script, and no framework id is forwarded", async () => {
+test('custom-server backend: a bare run takes its own `test` script, forwarding nothing', async () => {
   const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
 
   await runTestCommand(brand, []);
 
   const calls = readCalls(brand);
-  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the web target its framework bin');
+  assert.deepEqual(calls.map((c) => c.name).sort(), ['backend-script', 'web'], 'the backend ran its script, the web target its own');
   const script = calls.find((c) => c.name === 'backend-script');
   assert.equal(script.cwd, path.join(brand, 'targets', 'backend'));
-  assert.deepEqual(script.argv, [], 'a package script hears no scope ids and no flags');
+  assert.deepEqual(script.argv, [], 'a bare run forwards no scope ids and no flags');
 });
 
-test('custom-server backend: a SCOPED run never addresses it — the scope vocabulary is the frameworks\'', async () => {
+test('custom-server backend: a brand-owned test script runs bare', async () => {
   const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
 
+  // A scope is the frameworks' vocabulary: a scoped run never addresses the brand's script
   await runTestCommand(brand, ['backend:']);
-
   assert.deepEqual(readCalls(brand), [], 'nothing ran: the scoped id means nothing to a package script');
+
+  // A bare run reaches it, and a mode flag never does
+  await runTestCommand(brand, [], { extended: true });
+  const script = readCalls(brand).find((c) => c.name === 'backend-script');
+  assert.deepEqual(script.argv, [], 'the brand\'s script hears no scope and no flags');
 });
 
 test('custom-server backend with no `test` script: skipped loudly on a bare run, never failed', async () => {
-  const { brand } = stageBrand({ backend: { projectType: 'custom' } });
+  const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: {} });
 
   const code = await runTestCommand(brand, []);
 
@@ -429,11 +446,11 @@ test('a --lane no framework declares runs nothing and still exits clean', async 
   assert.equal(code, undefined);
 });
 
-test('a --lane run never addresses a custom-server backend\'s own test script', async () => {
+test('a --lane run reaches a custom-server backend only when its framework declares the lane', async () => {
   const { brand } = stageBrand({ backend: { projectType: 'custom' }, backendScripts: { test: RECORDING_SCRIPT } });
   await runTestCommand(brand, [], { lane: 'stripe-live' });
 
-  assert.deepEqual(readCalls(brand), [], 'a package script has no lane vocabulary');
+  assert.deepEqual(readCalls(brand), [], 'the backend framework declares no stripe-live lane here');
 });
 
 // ─── The brand's own e2e lane (#775) ─────────────────────────────────────────

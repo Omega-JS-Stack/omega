@@ -5,9 +5,10 @@
  * content is ever touched. Idempotent: a converged file rewrites nothing.
  *
  * Root: `deploy: 'omega deploy'` guaranteed plus the start/manage migration
- * (package-scripts.js). Targets: every key the framework declares in its own
- * `projectScripts` is FRAMEWORK-owned and is rewritten to the default here,
- * exactly as that framework's ensureTarget does on every verb run (#689) —
+ * (package-scripts.js). Targets: every script the framework writes (the verb
+ * table's `omega <verb>` scripts, its manifest's `projectScripts` merged over
+ * them) is FRAMEWORK-owned and is rewritten to the default here, exactly as
+ * that framework's ensureTarget does on every verb run:
  * one policy, two writers, so a consumer customizes behavior through hook
  * points and never by editing a standard script. The walk running it at all
  * is the onboard→dev cycle break (#675): the dev fan-out reaches those verbs
@@ -15,16 +16,17 @@
  * verb has ever run. Keys the consumer added are never touched.
  *
  * The exceptions: a custom TARGET maps to no framework at all (#603), so it
- * is skipped whole; a custom-server backend is skipped PER KEY (#584) — the
- * verbs its mode refuses are the brand's own, named by the framework's
- * `projectScriptsCustomOwned` declaration.
+ * is skipped whole; a custom-server backend is skipped PER KEY: the
+ * scripts running a verb its mode refuses are the brand's own, named by the
+ * framework's scaffold entry (`CUSTOM_OWNED_SCRIPTS`).
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 const { healPackageScripts, syncTargetScripts } = require('../../../lib/package-scripts.js');
-const { resolveFrameworkPackage } = require('../../../lib/framework-bin.js');
+const { resolveFrameworkPackage, resolveTargetCustomOwned } = require('../../../lib/framework-bin.js');
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -56,9 +58,8 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
 
     const framework = TARGET_FRAMEWORKS[entry.target];
     const resolved = framework ? resolveFrameworkPackage(entry.path, framework) : null;
-    // Not installed yet (pre-`npm install`), or a framework that declares no
-    // projectScripts — nothing to fill from; the next walk heals it
-    if (!resolved || !resolved.pkg.projectScripts) continue;
+    // Not installed yet (pre-`npm install`): nothing to fill from; the next walk heals it
+    if (!resolved) continue;
 
     const manifestPath = join(entry.path, 'package.json');
     const targetRaw = jetpack.read(manifestPath);
@@ -73,11 +74,21 @@ module.exports = async ({ brandRoot, targets = [], options = {} }) => {
       continue;
     }
 
-    // A custom-server backend owns the keys whose verbs its mode refuses
-    // (#584) — the framework declares WHICH, so no list lives here (#689)
-    const brandOwnedKeys = entry.projectType === 'custom' ? (resolved.pkg.projectScriptsCustomOwned || []) : [];
+    // A custom-server backend owns the keys whose verbs its mode refuses; the
+    // framework names WHICH, so no list lives here
+    let brandOwnedKeys = [];
+    if (entry.projectType === 'custom') {
+      const owned = resolveTargetCustomOwned(entry);
+      if (owned.kind !== 'framework' || !Array.isArray(owned.CUSTOM_OWNED_SCRIPTS)) {
+        const reason = owned.detail || `${owned.framework} names no CUSTOM_OWNED_SCRIPTS`;
+        console.log(`      ${chalk.yellow('⚠')} ${entry.dir}: cannot read its brand-owned scripts (${reason}), left untouched`);
+        warnings.push(`${entry.dir} brand-owned scripts unreadable`);
+        continue;
+      }
+      brandOwnedKeys = owned.CUSTOM_OWNED_SCRIPTS;
+    }
 
-    const synced = syncTargetScripts(targetPkg, resolved.pkg.projectScripts, brandOwnedKeys);
+    const synced = syncTargetScripts(targetPkg, projectScripts(resolved.pkg), brandOwnedKeys);
     if (synced.changes.length) targetWork.push({ entry, manifestPath, targetPkg, synced });
   }
 

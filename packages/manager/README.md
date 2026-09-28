@@ -30,7 +30,7 @@ npx omega help                 # command listing (also bare `npx omega`, -h, --h
 npx omega company init         # create the shared company/ tree in this brand (idempotent)
 ```
 
-Runs at the brand root: inside `targets/<name>/` (a backend's `functions/` included) every verb refuses and prints the root form to run instead. One walk is always one brand: a company is a LAYER a brand names (see [The company layer](#the-company-layer)).
+Runs at the brand root: inside `targets/<name>/` (a backend's `functions/` included) a verb the target's framework owns runs in place, and a brand-wide verb (one only the manager owns) refuses and prints the root form to run instead. One walk is always one brand: a company is a LAYER a brand names (see [The company layer](#the-company-layer)).
 
 ## Two homes, one log
 

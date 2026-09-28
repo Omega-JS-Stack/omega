@@ -119,7 +119,7 @@ A framework's own suite runs from the **monorepo root**, through the same `--tar
 
 - Pickable: the four framework packages, by dir name or `@omega.js/` name. Scope words and flags forward verbatim to each picked package's own CLI, run in the package dir.
 - No `--target=` refuses and prints the picker: the monorepo has no "all", its whole battery is root `npm test`. An unknown token refuses listing the packages. The manager is no pick (its CLI's `test` is the brand fan-out); its suite is its `npm test`.
-- Every verb inside `packages/<framework>` refuses and prints this root form.
+- Framework source is never a target: every verb inside `packages/<framework>` or `packages/manager` refuses and prints this root form. The picker runs each package's own CLI file directly, never the dispatcher.
 
 **The self-test exception**: inside a framework package itself (cwd package name === the framework, which is where the picker runs each suite), a bare run of backend, desktop or extension means the framework's own suite; web's bare run is its project lane, so its suite is always spelled `framework:`. Each of those three packages' own `npm test` calls its CLI file directly (`node dist/cli-run.js test`; backend `node cli.js test`) and keeps meaning "run my suite". Consumer context is what flips to project-only.
 
@@ -136,7 +136,7 @@ The sandbox brand's backend corpus is the framework suite run in consumer contex
 
 ## Brand root (cp94b)
 
-At a **brand root** (a directory carrying `config/omega.json5` with no framework declared nearer), every framework's `omega` bin hands over to `@omega.js/manager` — the omega-bin dispatcher detects the brand the same way it detects targets (nearest context wins, walking up; the rule twins `@omega.js/config`'s `resolveBrandRoot`). The manager's `test` command then fans out over the brand's target-mapped dirs, spawning each target's own framework bin with `cwd` = the target dir:
+At a **brand root** (a directory carrying `config/omega.json5` with no framework declared nearer), every framework's `omega` bin hands over to `@omega.js/manager`: the omega-bin dispatcher detects the brand the same way it detects targets (nearest context wins, walking up; the rule twins `@omega.js/config`'s `resolveBrandRoot`). The manager's `test` command then fans out over the brand's target-mapped dirs, running each target's own `npm run test` with `cwd` = the target dir and the scope after `--` ([#985](https://github.com/Omega-JS-Stack/omega/issues/985)). Every framework target's `test` script is `omega test`, so its framework's CLI takes the scope:
 
 | At the brand root | Runs |
 |-------------------|------|
@@ -153,7 +153,7 @@ At a **brand root** (a directory carrying `config/omega.json5` with no framework
 - That exit 0 holds for a bare prefix only. An id carrying a PATH whose framework this brand has no target for (`omega test desktop:renderer/typo` in a website-only brand) keeps the warning AND fails: zero runs plus a named path is the same typo the target-level rule catches ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
 - A forwarded path a target does not carry is a **no-op there, not a failure**: the manager sets `OMEGA_TEST_FANOUT=1` on every forwarded run, and a target CLI whose target selected nothing answers with the distinct `NO_MATCH_EXIT_CODE` (3) instead of 1 (both live in `@omega.js/devkit/test/scope`). The fan-out counts those as misses, and fails the brand run only when EVERY target missed, printing `No test file matches "<target>"` in the manager's own log tag. A standalone run in a target dir, with no signal, still exits 1 ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
 - Targets run **sequentially** with streamed output; any failing target makes the whole run exit 1 (per-target summary at the end).
-- **Only the mode flags fan out**: `--extended` reaches every framework target and `--lane=<name>` the targets whose framework declares that lane ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)). A target-level flag (`--layer`, `--filter`) does not reach a target from the brand root, and a target folder refuses every verb, so a brand has no form for a flagged run yet.
+- **Only the mode flags fan out**: `--extended` reaches every framework target and `--lane=<name>` the targets whose framework declares that lane ([#775](https://github.com/Omega-JS-Stack/omega/issues/775)). A target-level flag (`--layer`, `--filter`) does not reach a target from the brand root; a flagged run goes in the target itself (`npx omega test --layer build` in `targets/<name>`), where the verbs its framework owns run in place.
 - Other manager commands ride the same handoff: bare `omega` at a brand root means the manager's manage cycle, `omega onboard` reaches the wizard, and `omega deploy` is the brand-root deliberate-deploy fan-out (docs/shared/deploys.md).
 
 ## CI runner notes

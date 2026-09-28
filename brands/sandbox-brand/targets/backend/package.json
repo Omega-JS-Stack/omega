@@ -15,11 +15,13 @@
     "start": "omega serve",
     "deploy": "omega deploy",
     "emulator": "omega emulator",
-    "test": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
+    "test": "omega test",
     "test:offline": "npx omega test framework:",
-    "build": "npx omega build",
-    "test:static": "npm test",
-    "test:emulator": "omega test"
+    "build": "omega build",
+    "test:static": "node --require ./test/_helpers/connect-trap.js --test 'test/_unit/**/*.test.js'",
+    "clean": "omega clean",
+    "update": "omega update",
+    "indexes": "omega indexes"
   },
   "license": "UNLICENSED"
 }

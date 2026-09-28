@@ -14,6 +14,7 @@ const path = require('node:path');
 
 const scriptsOp = require('../src/services/workspace/ensure/scripts.js');
 const { healPackageScripts, syncTargetScripts, DEPLOY_SCRIPT, START_SCRIPT, MANAGE_SCRIPT } = require('../src/lib/package-scripts.js');
+const { projectScripts, verbScripts } = require('@omega.js/devkit/verb-scripts');
 
 function tmpBrand(pkg) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mgr-ws-scripts-'));
@@ -203,8 +204,8 @@ const ROOT_OK = { start: START_SCRIPT, manage: MANAGE_SCRIPT, deploy: DEPLOY_SCR
 
 const FRAMEWORK_SCRIPTS = { start: 'omega serve', emulator: 'omega emulator', test: 'omega test' };
 
-// @omega.js/backend's own declaration pair: the standard keys, and the ones a
-// custom-server backend owns instead (the verbs that mode refuses, #584/#689)
+// A backend-shaped script map, the pure sync's fixture (the real backend's set
+// is REAL_BACKEND below)
 const BACKEND_PROJECT_SCRIPTS = {
   start: 'omega serve',
   deploy: 'omega deploy',
@@ -214,7 +215,11 @@ const BACKEND_PROJECT_SCRIPTS = {
   'test:emulator': 'omega test',
 };
 
-const CUSTOM_OWNED_KEYS = ['start', 'deploy', 'emulator', 'test:emulator'];
+// The real @omega.js/backend manifest and scaffold entry, for the op cases that hold its policy
+// (ensure-target.js loads packages/backend/dist: it needs the backend's prepare to have run)
+const REAL_BACKEND_DIR = path.join(__dirname, '..', '..', 'backend');
+const REAL_BACKEND = require(path.join(REAL_BACKEND_DIR, 'package.json'));
+const { CUSTOM_OWNED_SCRIPTS } = require(path.join(REAL_BACKEND_DIR, 'ensure-target.js'));
 
 test('syncTargetScripts: rewrites every standard key to its default, keeps every consumer-added key (#689)', () => {
   const synced = syncTargetScripts(
@@ -251,20 +256,22 @@ test('syncTargetScripts: brand-owned keys are never written and never scaffolded
   assert.deepEqual(syncTargetScripts({ scripts: synced.scripts }, FRAMEWORK_SCRIPTS, ['start', 'emulator']).changes, []);
 });
 
-test('scripts op: a script-less scaffolded target gets its framework projectScripts — the onboard→dev cycle break', async () => {
+test('scripts op: a script-less scaffolded target gets its framework\'s scripts, the verb table\'s and its declared ones', async () => {
   const root = tmpBrand({ name: 'fresh-brand', workspaces: ['targets/*'], scripts: ROOT_OK });
+  const framework = { name: '@omega.js/backend', projectScripts: { start: 'omega serve', emulator: 'omega emulator' } };
   plantTarget(root, 'backend',
     { name: 'fresh-brand-backend', version: '0.0.1', private: true, dependencies: { '@omega.js/backend': '*' } },
     '@omega.js/backend',
-    { name: '@omega.js/backend', projectScripts: { start: 'omega serve', emulator: 'omega emulator' } });
+    framework);
 
   const result = await scriptsOp(opInput(root));
-  assert.deepEqual(result.output.targetScripts, {
-    backend: ["start: 'omega serve'", "emulator: 'omega emulator'"],
-  });
+  const expected = projectScripts(framework);
+  assert.deepEqual(result.output.targetScripts.backend, Object.entries(expected).map(([key, value]) => `${key}: '${value}'`));
 
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'));
+  assert.deepEqual(pkg.scripts, expected);
   assert.equal(pkg.scripts.emulator, 'omega emulator', 'the dev fan-out leg exists before any verb ever ran');
+  assert.equal(pkg.scripts.deploy, 'omega deploy', 'and so does every verb script the table derives');
   assert.equal(pkg.name, 'fresh-brand-backend', 'everything else survives verbatim');
 
   // Second pass: converged, byte-identical
@@ -273,18 +280,20 @@ test('scripts op: a script-less scaffolded target gets its framework projectScri
   assert.equal(fs.readFileSync(path.join(root, 'targets', 'backend', 'package.json'), 'utf8'), bytes);
 });
 
-test('scripts op: the walk OVERWRITES a hand-edited standard script back to the default — one policy with the verbs (#689)', async () => {
+test('scripts op: the walk OVERWRITES a hand-edited standard script back to the default, one policy with the verbs (#689)', async () => {
   const root = tmpBrand({ name: 'b', workspaces: ['targets/*'], scripts: ROOT_OK });
   plantTarget(root, 'web',
-    { name: 'b-web', scripts: { start: 'node my-own-dev.js', lint: 'eslint .' } },
+    { name: 'b-web', scripts: { start: 'node my-own-dev.js', build: 'echo mine', lint: 'eslint .' } },
     '@omega.js/web',
-    { name: '@omega.js/web', projectScripts: { start: 'omega dev', build: 'omega build' } });
+    { name: '@omega.js/web', projectScripts: { start: 'omega dev' } });
 
   const result = await scriptsOp(opInput(root));
-  assert.deepEqual(result.output.targetScripts, { web: ["start: 'omega dev'", "build: 'omega build'"] });
+  assert.ok(result.output.targetScripts.web.includes("start: 'omega dev'"));
+  assert.ok(result.output.targetScripts.web.includes("build: 'omega build'"));
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
-  assert.equal(pkg.scripts.start, 'omega dev', 'the framework owns its own script keys — an edited one is rewritten, hooks are the customization seam');
-  assert.equal(pkg.scripts.lint, 'eslint .', 'a key the framework never declares is the consumer\'s own');
+  assert.equal(pkg.scripts.start, 'omega dev', 'the framework owns its own script keys: an edited one is rewritten, hooks are the customization seam');
+  assert.equal(pkg.scripts.build, 'omega build', 'a derived verb script is framework-owned the same way');
+  assert.equal(pkg.scripts.lint, 'eslint .', 'a key the framework never writes is the consumer\'s own');
 
   // Second pass: converged, byte-identical
   const bytes = fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8');
@@ -292,12 +301,15 @@ test('scripts op: the walk OVERWRITES a hand-edited standard script back to the 
   assert.equal(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'), bytes);
 });
 
-test('scripts op: an uninstalled framework and a projectScripts-less one are skipped quietly', async () => {
+test('scripts op: an uninstalled framework is skipped quietly; one that declares no projectScripts still gets its verb scripts', async () => {
   const root = tmpBrand({ name: 'c', workspaces: ['targets/*'], scripts: ROOT_OK });
   plantTarget(root, 'backend', { name: 'c-backend' }); // no node_modules at all
   plantTarget(root, 'web', { name: 'c-web' }, '@omega.js/web', { name: '@omega.js/web' }); // no projectScripts
 
-  assert.equal(await scriptsOp(opInput(root)), null, 'nothing to heal from — converged');
+  const result = await scriptsOp(opInput(root));
+  assert.deepEqual(Object.keys(result.output.targetScripts), ['web'], 'the uninstalled backend has nothing to heal from');
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'targets', 'web', 'package.json'), 'utf8'));
+  assert.deepEqual(pkg.scripts, verbScripts('@omega.js/web'));
 });
 
 test('scripts op: a custom TARGET owns every script — no framework maps to it, so it is skipped whole (#603)', async () => {
@@ -314,31 +326,31 @@ test('scripts op: a custom TARGET owns every script — no framework maps to it,
   assert.equal(fs.readFileSync(path.join(serverPath, 'package.json'), 'utf8'), before);
 });
 
-test('scripts op: a custom-server backend is PER-KEY — the framework-owned subset syncs, its own verbs are left alone (#689)', async () => {
+test('scripts op: a custom-server backend is PER-KEY: the framework-owned subset syncs, its own verbs are left alone (#689)', async () => {
   const root = tmpBrand({ name: 'e2', workspaces: ['targets/*'], scripts: ROOT_OK });
   const backendPath = plantTarget(root, 'backend',
-    { name: 'e2-backend', scripts: { start: 'node server.js', 'test:static': 'echo stale', render: 'render deploy' } },
+    { name: 'e2-backend', dependencies: { '@omega.js/backend': '*' }, scripts: { start: 'node server.js', 'test:static': 'echo stale', render: 'render deploy' } },
     '@omega.js/backend',
-    {
-      name: '@omega.js/backend',
-      projectScripts: BACKEND_PROJECT_SCRIPTS,
-      projectScriptsCustomOwned: CUSTOM_OWNED_KEYS,
-    });
+    REAL_BACKEND);
+  // The installed backend's scaffold entry names its brand-owned scripts
+  fs.writeFileSync(path.join(backendPath, 'node_modules', '@omega.js', 'backend', 'ensure-target.js'),
+    `module.exports = require(${JSON.stringify(path.join(REAL_BACKEND_DIR, 'ensure-target.js'))});\n`);
 
   // A custom-server backend carries projectType 'custom' (#584)
   const entries = [{ name: 'backend', dir: 'targets/backend', path: backendPath, target: 'backend', projectType: 'custom' }];
   const result = await scriptsOp({ brandRoot: root, targets: entries });
 
-  assert.deepEqual(result.output.targetScripts, {
-    backend: [`test: '${BACKEND_PROJECT_SCRIPTS.test}'`, "test:static: 'npm test'"],
-  }, 'only the keys whose verbs still work in custom mode are written');
+  const owned = Object.entries(projectScripts(REAL_BACKEND)).filter(([key]) => !CUSTOM_OWNED_SCRIPTS.includes(key));
+  assert.deepEqual(result.output.targetScripts.backend.sort(), owned.map(([key, value]) => `${key}: '${value}'`).sort(),
+    'only the keys whose verbs still work in custom mode are written');
 
   const pkg = JSON.parse(fs.readFileSync(path.join(backendPath, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.start, 'node server.js', 'the brand names its own server command (#584)');
-  assert.equal(pkg.scripts.deploy, undefined, 'a brand-owned key is never scaffolded — no placeholder to delete');
-  assert.equal(pkg.scripts.emulator, undefined, 'there are no Cloud Functions to emulate');
-  assert.equal(pkg.scripts['test:emulator'], undefined, 'the emulator test lane refuses in this mode');
-  assert.equal(pkg.scripts['test:static'], 'npm test', 'a hand-edited framework-owned key is rewritten to the default');
+  for (const key of ['deploy', 'emulator', 'test']) {
+    assert.equal(pkg.scripts[key], undefined, `${key} runs a verb this mode refuses: brand-owned, never scaffolded`);
+  }
+  assert.equal(pkg.scripts['test:static'], REAL_BACKEND.projectScripts['test:static'], 'a hand-edited framework-owned key is rewritten to the default');
+  assert.equal(pkg.scripts.indexes, 'omega indexes', 'a derived verb that works in this mode is framework-owned');
   assert.equal(pkg.scripts.render, 'render deploy', 'a consumer-added key is untouched');
 
   // Second pass: converged, byte-identical
@@ -441,7 +453,8 @@ test('scripts op: a pre-#675 target is healed on the walk — the boot leg lives
     { name: '@omega.js/backend', projectScripts: BACKEND_PROJECT_SCRIPTS });
 
   const result = await scriptsOp(opInput(root));
-  assert.deepEqual(result.output.targetScripts.backend, [
+  const migrated = result.output.targetScripts.backend.filter((change) => change.endsWith("(was 'npx omega setup')"));
+  assert.deepEqual(migrated, [
     "start: 'omega serve' (was 'npx omega setup')",
     "deploy: 'omega deploy' (was 'npx omega setup')",
     "emulator: 'omega emulator' (was 'npx omega setup')",

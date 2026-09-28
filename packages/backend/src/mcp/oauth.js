@@ -6,6 +6,7 @@
  * - Token: exchanges the auth code (the admin key, or a Firebase ID token) for an access token
  * - Register: dynamic client registration (RFC 7591)
  */
+const safeCompare = require('../omega/helpers/safe-compare.js');
 const { sendJson } = require('./utils.js');
 
 /**
@@ -213,8 +214,8 @@ function handleRegister(req, res) {
 // --- Helpers ---
 
 function isAdminKey(key) {
-  const configKey = process.env.OMEGA_ADMIN_KEY || '';
-  return !!key && !!configKey && key === configKey;
+  const configKey = process.env.OMEGA_ADMIN_KEY;
+  return safeCompare(key, configKey);
 }
 
 function resolveConsumerAuthUrl(omega) {

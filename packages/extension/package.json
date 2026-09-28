@@ -103,9 +103,7 @@
   "projectScripts": {
     "start": "omega clean && npm run gulp --",
     "gulp": "gulp",
-    "build": "omega build",
-    "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
-    "test": "omega test"
+    "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish"
   },
   "engines": {
     "node": ">=22"

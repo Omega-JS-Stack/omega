@@ -338,9 +338,10 @@ function brandLockfileStale(installRoot) {
  * ONE `npm install` materializes the links for the whole tree. Standalone
  * targets degenerate to themselves.
  *
- * Idempotent: dependencies already resolving to the monorepo copy are
- * skipped, and when nothing needs linking no install runs. An install is
- * followed by the brand's OWN lockfile regeneration (#938).
+ * Idempotent: dependencies already resolving to the monorepo copy AND
+ * already declaring its file: spec are skipped, and when nothing needs
+ * linking no install runs. An install is followed by the brand's OWN
+ * lockfile regeneration (#938).
  * @param {object} options
  * @param {string} options.dir - Target directory to link from (any target in the brand).
  * @param {string} options.monorepoRoot - Monorepo root path.
@@ -376,13 +377,13 @@ async function linkLocalPackages(options) {
         continue;
       }
 
-      if (isLinkedTo(entry.dir, entry.name, target)) {
+      const spec = `file:${relativeSpecPath(entry.dir, target)}`;
+      if (isLinkedTo(entry.dir, entry.name, target) && entry.spec === spec) {
         actions.push({ name: entry.name, dir: entry.dir, target, action: 'skip' });
         logger && logger.log(`${entry.name}: already linked to the monorepo`);
         continue;
       }
 
-      const spec = `file:${relativeSpecPath(entry.dir, target)}`;
       if (entry.spec === spec) {
         // Spec already correct, only the install is missing — no rewrite,
         // so a committed relative spec is never churned to a new layout.

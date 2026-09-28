@@ -140,7 +140,6 @@ require('@omega.js/devkit/test/temp-home');
 
 const devCommand = require('../src/commands/dev.js');
 const { STOP_SIGNALS } = require('@omega.js/devkit/stop-signals');
-const { ROOT_DISPATCH_ENV } = require('@omega.js/devkit/omega-bin');
 const { selectDevTargets, DEFAULT_TARGETS, createLineDeduper } = devCommand;
 
 // The selector takes DISCOVERED targets ({ name, target: the type }): the name
@@ -344,23 +343,6 @@ test('the non-interactive switch is restored before any leg spawns — the dev s
   assert.deepStrictEqual(nonInteractiveAt.spawn, [undefined], 'the switch is off the process env again by spawn time');
   assert.deepStrictEqual(nonInteractiveAt.spawnEnv, [undefined], "the leg's inherited env carries no switch");
   assert.strictEqual(process.env.OMEGA_NON_INTERACTIVE, undefined, 'and nothing leaks past the boot');
-});
-
-test('a leg inherits the root-dispatch marker, so its own verb inside the target passes the dispatcher', async () => {
-  resetRecorders();
-  manageReport = { hasErrors: false, results: {}, brand: {} };
-  const root = stageBrand();
-
-  // The dispatcher sets the marker on the accepted brand-root run this boot is
-  process.env[ROOT_DISPATCH_ENV] = root;
-  try {
-    await bootDev(root, { target: 'web' });
-  } finally {
-    delete process.env[ROOT_DISPATCH_ENV];
-  }
-
-  assert.equal(legEnvs.length, 1);
-  assert.equal(legEnvs[0][ROOT_DISPATCH_ENV], root);
 });
 
 test('omega dev --local links the whole brand from the monorepo once, before the sweep and the legs', async () => {

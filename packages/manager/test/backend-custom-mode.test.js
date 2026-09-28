@@ -5,20 +5,21 @@
  * `targets.backend.projectType: 'custom'` is the same @omega.js/backend
  * running as an Express app on `PORT` for a container host (Render & co)
  * instead of exporting Cloud Functions. The framework's Firebase-only verbs
- * refuse in that mode, so the manager must not dispatch them: a custom-mode
- * backend deploys and tests through its OWN package.json scripts — the same
- * lane a custom TARGET uses (#603) — and its dev leg is `npm run start`, not
- * the emulator.
+ * refuse in that mode, so the brand owns the scripts that would run them: its
+ * `deploy` is the host's publish command, which the fan-out's one lane
+ * (`npm run <verb>`, every target alike) runs, and its dev leg is
+ * `npm run start`, not the emulator.
  *
  * Not to be confused with #603's `type: 'custom'`: that is a target no
  * framework owns. This one IS a framework target, with a different artifact.
  *
  * What these tests hold it to:
  *   - discovery reads the mode off the brand config and marks the entry;
- *   - `resolveTargetRun` sends deploy and test through the target's scripts,
- *     skips loudly when the script is absent, and stops at the plan on a dry run;
- *   - a firebase-mode backend is completely unchanged (it still dispatches
- *     through its framework bin);
+ *   - `resolveTargetRun` runs deploy and test through the target's scripts,
+ *     skips loudly when the script is absent, and stops at the plan on a dry
+ *     run, since the brand's own script cannot honor the flag;
+ *   - a firebase-mode backend runs the same lane, its `omega deploy` script
+ *     taking the flag;
  *   - the dev fan-out boots the server, not the emulator;
  *   - the testing service stops failing a custom backend for the
  *     `firebase.json` it correctly does not have, and says why.
@@ -83,14 +84,14 @@ test('discovery reads the project type off the brand config and marks the backen
 
 // ─── The verb lanes ──────────────────────────────────────────────────────────
 
-test('a custom-mode backend deploys and tests through its OWN scripts, no flags forwarded', () => {
+test('a custom-mode backend deploys and tests through its OWN scripts, bare', () => {
   const entry = backendEntry(makeBrand({ projectType: 'custom', scripts: { deploy: 'render deploys create', test: 'node --test' } }));
 
   for (const verb of ['deploy', 'test']) {
-    const run = resolveTargetRun(entry, verb, ['--dry-run']);
-    assert.equal(run.kind, 'custom', `${verb} must not dispatch through the framework bin`);
+    const run = resolveTargetRun(entry, verb, ['--snapshot=abc']);
+    assert.equal(run.kind, 'framework', 'a custom-MODE backend is still a framework target');
     assert.equal(run.command, 'npm');
-    assert.deepEqual(run.args, ['run', verb], 'a package script has no contract for framework flags');
+    assert.deepEqual(run.args, ['run', verb], 'the brand\'s own script hears no framework flags');
   }
 });
 
@@ -111,17 +112,13 @@ test('a custom-mode backend stops at the PLAN on a dry run — its script cannot
   assert.match(run.detail, /npm run deploy/);
 });
 
-test('a firebase-mode backend is untouched — every verb still dispatches through the framework', () => {
-  const root = makeBrand({ scripts: { deploy: 'never run this' } });
-  const entry = backendEntry(root);
-  // A real bin so the framework lane can resolve (the climb reads package.json)
-  jetpack.write(join(root, 'node_modules', '@omega.js/backend', 'package.json'), { name: '@omega.js/backend', bin: { omega: 'bin/omega' } });
-  jetpack.write(join(root, 'node_modules', '@omega.js/backend', 'bin', 'omega'), '#!/usr/bin/env node\n');
+test('a firebase-mode backend runs the same lane, and its own `omega deploy` takes the dry-run flag', () => {
+  const entry = backendEntry(makeBrand({ scripts: { deploy: 'omega deploy' } }));
 
-  const run = resolveTargetRun(entry, 'deploy', ['--dry-run']);
-  assert.equal(run.kind, 'framework', 'the default mode must keep dispatching `omega deploy`');
+  const run = resolveTargetRun(entry, 'deploy', ['--dry-run'], { dryRun: true });
+  assert.equal(run.kind, 'framework');
   assert.equal(run.framework, '@omega.js/backend');
-  assert.deepEqual(run.args.slice(1), ['deploy', '--dry-run'], 'and it still forwards the brand flags');
+  assert.deepEqual(run.args, ['run', 'deploy', '--', '--dry-run'], 'the framework verb plans itself');
 });
 
 // ─── The dev leg ─────────────────────────────────────────────────────────────

@@ -135,7 +135,7 @@ The electron-builder floor is 26.16.1 (the package's peer range, installed by en
 ### 5. Build + notarize
 
 ```bash
-npm run release   # signs + notarizes + publishes
+npx omega release --target=<name>   # at the brand root: signs + notarizes + publishes
 ```
 
 @omega.js/desktop's built-in notarize is wired as electron-builder's `afterSign` hook (via `gulp/build-config`) and calls `@electron/notarize` with the API key creds. Consumers can extend it with an optional `hooks/notarize/post.js` for post-notarization work.
@@ -222,7 +222,7 @@ The corresponding decode step in CI looks like:
     APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
     APPLE_TEAM_ID:    ${{ secrets.APPLE_TEAM_ID }}
 - name: Build and release
-  run: npm run release
+  run: npm run release:local
   env:
     CSC_LINK:         config/certs/dev-id.p12
     APPLE_API_KEY:    config/certs/AuthKey.p8

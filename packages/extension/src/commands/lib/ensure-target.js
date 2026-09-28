@@ -16,6 +16,7 @@ const version = require('wonderful-version');
 const build = require('../../build.js');
 const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 const { listingId, deriveFirefoxId, listingConfigPath } = require('../../lib/listings.js');
 
 const logger = build.logger('ensure-target');
@@ -33,12 +34,8 @@ function setupScripts(projectDir, result) {
 
   const project = readProject(projectDir);
 
-  // Setup the scripts
-  project.scripts = project.scripts || {};
-
-  Object.keys(package.projectScripts).forEach((key) => {
-    project.scripts[key] = package.projectScripts[key];
-  });
+  // The verb table's scripts for this framework, the manifest's declarations over them
+  project.scripts = { ...project.scripts, ...projectScripts(package) };
 
   // Ensure the project is private (extensions should never be published to npm)
   project.private = true;
