@@ -30,6 +30,7 @@ const {
   LINK_ATTR,
   fileDir,
   normalize,
+  openTag,
   toPosix,
 } = require('./link-resolver.js');
 
@@ -102,9 +103,11 @@ function attributes(tag) {
   return out;
 }
 
+const META_TAG = openTag('meta');
+
 /** The `content` of the first `<meta name="…">` a page carries ('' = none). */
 function metaContent(html, name) {
-  for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
+  for (const match of html.matchAll(META_TAG)) {
     const attr = attributes(match[0]);
     if ((attr.name || '').toLowerCase() === name) return attr.content || '';
   }
@@ -147,6 +150,8 @@ function metaFindings(page) {
 // and the leading space keeps `data-alt=` from answering for it.
 const ALT_ATTR = /\salt(?=[\s=/>]|$)/i;
 
+const IMG_TAG = openTag('img');
+
 /**
  * The image alt check: every `<img>` carries the attribute. An EMPTY `alt` is
  * the decorative declaration and passes — the failure is having no answer at
@@ -157,7 +162,7 @@ const ALT_ATTR = /\salt(?=[\s=/>]|$)/i;
 function altFindings(page) {
   const found = new Set();
 
-  for (const match of page.html.matchAll(/<img\b[^>]*>/gi)) {
+  for (const match of page.html.matchAll(IMG_TAG)) {
     if (ALT_ATTR.test(match[0])) continue;
     const attr = attributes(match[0]);
     found.add(attr.src || attr['data-src'] || '(no src)');

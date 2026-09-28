@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
 ### Fixed
+- [#987](../../issues/987) - The dist audit reads a whole `<meta>` or `<img>` tag even when a quoted attribute holds a raw `>` (the minifier decodes `&gt;` there), so a description or title with angle brackets no longer hides the tag from the meta and alt checks.
 - [#815](../../issues/815) - The dependency tree moved off 93 of the 121 open Dependabot findings: same-major bumps through the update verb (mjml, fast-xml-parser, sanitize-html, liquidjs, cheerio, js-yaml) and a lock refresh under the 7-day quarantine; the 28 that stay are pinned by upstream ranges or have no patched version.
 - [#976](../../issues/976) - `omega i local` flips a registry pin whose tree already resolves to the monorepo copy, so a playground manifest left on a published version cannot let the next install shadow the local code.
 - [#963](../../issues/963) - The two MCP admin-key checks (the OAuth admin path and the token classification) compare with the constant-time `safeCompare` the request pipeline uses, so a plain `===` no longer leaks the match length through timing.

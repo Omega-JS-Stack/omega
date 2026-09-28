@@ -46,6 +46,11 @@ const EXTERNAL = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|#)/;
 // that closes it, and the whole value is consumed before the next match.
 const LINK_ATTR = /\s([a-zA-Z_:][a-zA-Z0-9_:.-]*)=(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
 
+// One whole opening tag by name. A quoted value may hold a raw `>` (the minifier
+// decodes `&gt;` inside attributes), so a quote that opens a value must close
+// before the tag's own `>` can end it.
+const openTag = (name) => new RegExp(`<${name}\\b(?:"[^"]*"|'[^']*'|[^"'>])*>`, 'gi');
+
 // The attributes whose value IS a site URL. `srcset` and `data-src` are not
 // among them, exactly as before: the name has to be the whole name.
 const LINK_ATTR_NAMES = new Set(['href', 'src']);
@@ -295,6 +300,7 @@ module.exports = {
   toPosix,
   EXTERNAL,
   LINK_ATTR,
+  openTag,
   HTML_OUTPUT,
   CODE_DISPLAY,
   EXCEPTIONS_FILE,

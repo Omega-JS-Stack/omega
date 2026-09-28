@@ -77,6 +77,19 @@ test('#468: a title or description rendered EMPTY is a missing one', () => {
   ]);
 });
 
+test('#987: a raw `>` inside a quoted `content` does not end the meta tag', () => {
+  // The production minifier decodes `&lt;`/`&gt;` inside attribute values, so a
+  // description that mentions `<11th Floor>` ships the brackets raw.
+  const { out } = tmpTarget({
+    ...CLEAN,
+    'tower.html': '<html><head><title>Orbis Tower</title>'
+      + '<meta name="description" content="Orbis Tower <11th Floor> is a map."/></head><body>x</body></html>',
+    'sitemap.xml': sitemap('/', '/about', '/tower'),
+  });
+
+  assert.deepStrictEqual(auditDist({ distDir: out }).meta.offenders, []);
+});
+
 test('#468: a healthy build passes every check with ZERO exceptions', () => {
   const audit = auditDist({ distDir: tmpTarget(CLEAN).out });
 
@@ -196,6 +209,19 @@ test('#468: `alt` as the MINIFIER writes it — a valueless attribute — is an 
   });
 
   assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['lazy.html → /assets/b.jpg']);
+});
+
+test('#987: a raw `>` inside a quoted attribute value does not end the img tag', () => {
+  // The `alt` sits AFTER the bracket, so a scan that stops at the first `>`
+  // never reaches it; the last image has none and is reported by its real src.
+  const { out } = tmpTarget({
+    ...CLEAN,
+    'compare.html': page('Compare', '<img title="a > b" alt="A" src="/assets/a.png">'
+      + "<img data-note='c > d' alt src=\"/assets/c.png\"><img title=\"e > f\" src=\"/assets/e.png\">"),
+    'sitemap.xml': sitemap('/', '/about', '/compare'),
+  });
+
+  assert.deepStrictEqual(auditDist({ distDir: out }).alt.offenders, ['compare.html → /assets/e.png']);
 });
 
 test('#468: an <img> DISPLAYED as escaped code is not an image the page emits', () => {
