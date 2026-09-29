@@ -264,12 +264,10 @@ function isFrameworkOwned(existing, rendered) {
   return existing.trim() === rendered.trim();
 }
 
-// A generation change: the destination carries the OMEGA marker grammar — which
-// only this framework's own scaffold writes — while the current template has
-// dropped it. That file is a PRIOR GENERATION's generated copy (e.g. the
-// content-bearing CLAUDE.md written before it became the one-line `@AGENTS.md`
-// pointer), so comparing it against the current render can never match and the
-// framework, not the consumer, owns it.
+// A generation change: the destination carries the OMEGA marker grammar (only
+// this framework's scaffold writes it) while the current template dropped it.
+// That file is a PRIOR GENERATION's copy: it can never match the current
+// render, and the framework, not the consumer, owns it.
 function isLegacyMarkerArtifact(existing, rendered) {
   return hasSectionMarkers(existing) && !hasSectionMarkers(rendered);
 }

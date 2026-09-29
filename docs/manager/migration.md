@@ -64,7 +64,7 @@ The shape is [brand.md § Brand root anatomy](brand.md#brand-root-anatomy): one 
 
 **Exit criteria**
 
-- The repo root holds `config/omega.json5`, `.env`, `package.json` with a `targets/*` workspaces glob, and `AGENTS.md` + `CLAUDE.md` per the doc chain.
+- The repo root holds `config/omega.json5`, `.env`, `package.json` with a `targets/*` workspaces glob, and `AGENTS.md` per the doc chain.
 - `ls` shows `targets/` and no `apps/`, and `grep -r "apps/" ` over brand-authored files is empty.
 - `npm install` at the brand root links every target; `npx omega manage --service=workspace` reports no unmapped target.
 - Every `.github/workflows/*.yml` is composer output at framework HEAD, and no `targets/*/.github/` directory survives.

@@ -94,7 +94,7 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   const result = scaffoldDefaults({ outputDir: root, logger: quiet });
 
   // `_.` renames + templating
-  for (const file of ['.gitignore', 'AGENTS.md', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
+  for (const file of ['.gitignore', 'AGENTS.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
     assert.ok(fs.existsSync(path.join(root, file)), `${file} scaffolded`);
   }
 
@@ -103,10 +103,10 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   // .env is an optional per-key override a HUMAN writes, and no machine writes one.
   assert.ok(!fs.existsSync(path.join(root, '.env')), 'no target .env is scaffolded');
 
-  // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is the
-  // one-line `@AGENTS.md` pointer.
+  // AGENTS.md carries the content; Claude Code reads it natively, so no
+  // CLAUDE.md scaffolds beside it.
   assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /node_modules\/@omega\.js\/AGENTS\.md/, 'AGENTS.md points at the OMEGA map');
-  assert.strictEqual(fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8').trim(), '@AGENTS.md');
+  assert.ok(!fs.existsSync(path.join(root, 'CLAUDE.md')), 'a fresh scaffold writes no CLAUDE.md');
   assert.strictEqual(fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim(), `v${NODE_VERSION}`, '.nvmrc templated');
 
   // src/ seed dirs exist (via .gitkeep), but NO default pages are copied —
@@ -263,20 +263,19 @@ test('scaffold: inside a brand monorepo the per-target agent docs never scaffold
   // Standalone scaffold first (no brand config yet) — the per-target agent docs land.
   scaffoldDefaults({ outputDir: targetDir, logger: quiet });
   assert.ok(fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'standalone projects keep the per-project AGENTS.md');
-  assert.ok(fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'standalone projects keep the per-project CLAUDE.md pointer');
+  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'no scaffold writes a CLAUDE.md');
 
   // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: { type: 'web' } } }\n");
   const swept = scaffoldDefaults({ outputDir: targetDir, logger: quiet });
-  assert.deepStrictEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CLAUDE.md'], 'framework-owned per-target agent docs are swept');
+  assert.deepStrictEqual(swept.removed, ['AGENTS.md'], 'the framework-owned per-target AGENTS.md is swept');
   assert.ok(!fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'the brand root is the doc home');
-  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'the brand root is the doc home');
 
   // Rerun never resurrects them.
   scaffoldDefaults({ outputDir: targetDir, logger: quiet });
   assert.ok(!fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'reruns do not resurrect the per-target doc');
-  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'reruns do not resurrect the per-target pointer');
+  assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'reruns write no CLAUDE.md');
 
   // Consumer content is never destroyed: real notes below the Custom marker keep the file.
   const warnings = [];

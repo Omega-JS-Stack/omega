@@ -676,7 +676,7 @@ const OPERATIONS = {
     { name: 'company', ensure: true },    // The ONE key joining this brand to its company, asked when the file carries none (#677)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` + deploy exists; target scripts fill from framework projectScripts (#675)
-    { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
+    { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + its scope link
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
     { name: 'workflows', ensure: true },  // Composed .github/workflows/<target>-*.yml for targets the config no longer enables are removed (#636)
     { name: 'env-keys', ensure: true },   // Brand-generated keys (the OMEGA_* trio + UNSUBSCRIBE_HMAC_KEY) minted into the brand .env when the cascade has none (#569)

@@ -31,9 +31,7 @@ const NODE_VERSION = '24';
 // target .env — so the template is gone.
 const FILE_MAP = {
   '**/*': { overwrite: false },
-  // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
-  // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied
-  // when missing by the `**/*` rule above, never clobbered.
+  // AGENTS.md carries the agent docs, marker-merged like .gitignore.
   'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
   // JSON5 defaults-merge: consumer values win, new framework keys are added
@@ -91,11 +89,10 @@ function scaffoldDefaults(options) {
     logger.log('brand monorepo detected: no target-level config seed; the brand root config and the agent docs cover this target');
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home — the per-target AGENTS.md/CLAUDE.md never
-    // scaffold, and existing framework-owned-only copies are swept (retire
-    // rules; consumer content is never destroyed). Standalone projects keep them.
+    // BRAND ROOT is the one doc home: the per-target AGENTS.md never
+    // scaffolds, and an existing framework-owned-only copy is swept (retire
+    // rule; consumer content is never destroyed). Standalone projects keep it.
     fileMap['AGENTS.md'] = { retire: true };
-    fileMap['CLAUDE.md'] = { retire: true };
     // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
     // .github/workflows/ in a brand monorepo can never fire. It is composed
     // into the brand root below instead — scoped to this target's path.

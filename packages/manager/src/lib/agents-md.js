@@ -2,10 +2,9 @@
  * Brand agent-docs chain: every brand
  * root carries an AGENTS.md whose FIRST line imports the TOP-LEVEL omega
  * AGENTS.md (the map, the one agent entry) through the scope path
- * `node_modules/@omega.js/AGENTS.md`, plus a one-line CLAUDE.md pointer
- * (`@AGENTS.md`). The scope file is a symlink this service maintains: it
- * resolves the framework monorepo through the installed manager package and
- * links straight at the live top-level map; a published install has no
+ * `node_modules/@omega.js/AGENTS.md`. The scope file is a symlink this
+ * service maintains: it resolves the framework monorepo through the installed
+ * manager package and links straight at the live top-level map; a published install has no
  * monorepo, so it links at the map the prepare lane vendored into the package
  * (`docs/AGENTS.md`). Idempotent: create when missing, heal a missing/stale
  * first-line import in place, never touch consumer content below the import.
@@ -16,7 +15,6 @@ const jetpack = require('fs-jetpack');
 
 const GUIDE_SUBPATH = 'node_modules/@omega.js/AGENTS.md';
 const IMPORT_LINE = `@${GUIDE_SUBPATH}`;
-const CLAUDE_POINTER = '@AGENTS.md';
 
 const SCOPE_PREFIXES = ['', '../', '../../', '../../../'];
 
@@ -166,41 +164,13 @@ function ensureAgentsMd(brandRoot, brandName, { dryRun = false } = {}) {
   return 'healed';
 }
 
-/**
- * Ensure the brand-root CLAUDE.md is the one-line `@AGENTS.md` pointer.
- * A content-bearing CLAUDE.md is NEVER clobbered: that content belongs in
- * AGENTS.md (the caller warns with the move-it message).
- *
- * @param {string} brandRoot - Absolute brand monorepo root
- * @param {{ dryRun?: boolean }} [options] - dryRun: the same verdict, nothing written
- * @returns {'present'|'created'|'content-bearing'} - What happened
- */
-function ensureClaudePointer(brandRoot, { dryRun = false } = {}) {
-  const file = join(brandRoot, 'CLAUDE.md');
-  const existing = jetpack.read(file);
-
-  if (existing === undefined) {
-    if (!dryRun) jetpack.write(file, `${CLAUDE_POINTER}\n`);
-    return 'created';
-  }
-
-  const meaningful = existing.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (meaningful.includes(CLAUDE_POINTER)) {
-    return 'present';
-  }
-
-  return 'content-bearing';
-}
-
 module.exports = {
   GUIDE_SUBPATH,
   IMPORT_LINE,
-  CLAUDE_POINTER,
   isImportLine,
   findScope,
   resolveImportLine,
   ensureGuideLink,
   renderAgentsMd,
   ensureAgentsMd,
-  ensureClaudePointer,
 };

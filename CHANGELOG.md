@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#995](../../issues/995) - A subagent spawned in an OMEGA project is handed the omega skills as `SKILL.md` paths to read, since it may have no Skill tool. At a brand root that covers every target plus the framework map, ending on the command that lets the edit gate through. Once per subagent.
 - [#709](../../issues/709) - Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value - an explicit `data-omega-copy-value`/property, a selector, else the sibling input - copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) - `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
 - [#212](../../issues/212) - A test dispute provider, so a chargeback is provable end to end: an alert matches by amount and card against the emulator's records, then issues the cancel as the `customer.subscription.deleted` event Stripe's own cancel produces. Refuses in production.
 - [#212](../../issues/212) - `POST /payments/intent` takes `simulate: 'abandon'` - the session is created and no webhook is fired, which is what an abandoned checkout IS. Test-provider only, never persisted.
 
 ### Changed
+- [#991](../../issues/991) - The gate deadline env line is gone from `.claude/settings.json`: the commit gate no longer runs the suite itself, so nothing read it. The playground targets' own suites run by hand from the brand root, not at the commit.
 - [#983](../../issues/983) - `omega dev` is one verb on all four frameworks, and every target's `start` script is `omega dev`, the one leg the brand-root boot runs. The backend's unit suites run inside `omega test` under the runner's connect trap; a custom-server backend runs its suites with no emulator.
 - [#985](../../issues/985) - A verb runs inside a target its framework owns (`npm test`, `npm start`), a brand-wide verb refuses there, and framework source refuses every verb. Every brand-root fan-out runs each target's own `npm run <verb>`, custom targets included, and the target scripts derive from the one verb table.
 - [#863](../../issues/863) - Verbs run from a root: `--target=` picks the target or package. A framework's suite runs from the monorepo root (`npx omega test --target=web framework:`); one devkit table declares every verb.
@@ -22,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#946](../../issues/946) - Two switches, two names: `--dry-run` shows the plan on a verb that acts by default, `--execute` does the work on one that reports by default. A bare `omega update` installs the safe set; `--apply`, `--check` and the `outdated`/`out` aliases are gone.
 - [#888](../../issues/888) - `omega migrate`'s report ends with one line naming the breaking-changes register inside the installed manager, where every by-hand step for a shape OMEGA changed after a conversion lives.
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
+
+### Removed
+- [#994](../../issues/994) - OMEGA writes no `CLAUDE.md` anywhere: a manage run no longer creates the `@AGENTS.md` pointer at the brand root, and the target scaffolds no longer copy one. Claude Code reads `AGENTS.md` itself; a `CLAUDE.md` you keep is left alone.
 
 ### Fixed
 - [#987](../../issues/987) - The dist audit reads a whole `<meta>` or `<img>` tag even when a quoted attribute holds a raw `>` (the minifier decodes `&gt;` there), so a description or title with angle brackets no longer hides the tag from the meta and alt checks.

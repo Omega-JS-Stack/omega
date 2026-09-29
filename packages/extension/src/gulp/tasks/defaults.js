@@ -66,9 +66,8 @@ const FILE_MAP = {
     mergeLines: true,
   },
 
-  // The agent-docs chain (#63): AGENTS.md carries the content and uses the same
-  // marker-based merge as .gitignore; CLAUDE.md is the one-line `@AGENTS.md`
-  // pointer, left to the `**/*.md` rule above (copied when missing, never clobbered).
+  // AGENTS.md carries the agent docs and uses the same marker-based merge as
+  // .gitignore.
   // Must come AFTER `**/*.md` (which sets overwrite: false) — last-match-wins,
   // so this rule's `mergeLines: true` activates the merge path even though the
   // catch-all would otherwise skip.
@@ -201,12 +200,11 @@ function scaffoldDefaults(options) {
   if (!seed.standalone) {
     fileMap['config/omega.json5'] = { skip: true };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home — per-target AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
+    // BRAND ROOT is the one doc home: per-target AGENTS.md/CHANGELOG.md/docs/
     // never scaffold, and existing framework-owned-only copies are swept
     // (retire rules; consumer content is never destroyed). Standalone projects
     // keep them. Last-match-wins over the `**/*.md` preserve rule.
     fileMap['AGENTS.md'] = { retire: true };
-    fileMap['CLAUDE.md'] = { retire: true };
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
     // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target

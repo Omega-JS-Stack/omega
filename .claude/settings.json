@@ -1,7 +1,4 @@
 {
-  "env": {
-    "WORKKIT_GATE_TEST_DEADLINE": "2700"
-  },
   "extraKnownMarketplaces": {
     "omega": {
       "source": {

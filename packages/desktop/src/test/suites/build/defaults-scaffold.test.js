@@ -34,10 +34,10 @@ module.exports = defineCases({
         // .env and every verb delivers them.
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
-        // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
-        // the one-line `@AGENTS.md` pointer.
+        // AGENTS.md carries the content; Claude Code reads it natively, so no
+        // CLAUDE.md scaffolds beside it.
         ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toContain('node_modules/@omega.js/AGENTS.md');
-        ctx.expect(jetpack.read(path.join(tmp, 'CLAUDE.md')).trim()).toBe('@AGENTS.md');
+        ctx.expect(jetpack.exists(path.join(tmp, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '_mas'))).toBe(false);
         // `_`-prefixed FILENAMES are not archives — test/_init.js ships.
         ctx.expect(jetpack.exists(path.join(tmp, 'test', '_init.js'))).toBeTruthy();
@@ -240,7 +240,6 @@ module.exports = defineCases({
         // Standalone scaffold first (no brand config yet) — per-target docs land.
         await copyDefaults(targetDir);
         ctx.expect(jetpack.exists(path.join(targetDir, 'AGENTS.md'))).toBeTruthy();
-        ctx.expect(jetpack.exists(path.join(targetDir, 'CLAUDE.md'))).toBeTruthy();
 
         // Wrap it in a brand monorepo: the next setup sweeps the untouched docs.
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");

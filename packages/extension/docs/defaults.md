@@ -15,7 +15,7 @@ const FILE_MAP = {
   'src/**/*':            { overwrite: false },      // never overwrite user code
   'hooks/**/*':          { overwrite: false },      // never overwrite hooks
   '_.gitignore':         { mergeLines: true },      // marker-section merge (rename is an engine built-in)
-  'AGENTS.md':           { mergeLines: true },      // the agent-docs chain; CLAUDE.md is the one-line pointer
+  'AGENTS.md':           { mergeLines: true },      // the agent-docs chain
   'config/omega.json5':  { overwrite: true, merge: true },  // JSON5 defaults merge
   '.nvmrc':              { template: cleanVersions },       // `{{ versions.node }}` render
 };

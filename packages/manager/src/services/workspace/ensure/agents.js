@@ -1,12 +1,11 @@
 /**
  * Ensure the brand agent-docs chain (Ian 2026-07-20): root AGENTS.md opens
- * with the framework-guide import, root CLAUDE.md is the one-line
- * `@AGENTS.md` pointer. Consumer content is preserved; a content-bearing
- * CLAUDE.md warns with the move-it message instead of being clobbered.
+ * with the framework-guide import, and the scope link resolves it. Consumer
+ * content is preserved.
  */
 const chalk = require('chalk').default;
 
-const { ensureAgentsMd, ensureClaudePointer, ensureGuideLink, IMPORT_LINE, CLAUDE_POINTER } = require('../../../lib/agents-md.js');
+const { ensureAgentsMd, ensureGuideLink, IMPORT_LINE } = require('../../../lib/agents-md.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 /**
@@ -45,20 +44,8 @@ module.exports = async ({ brandRoot, brand, options = {} }) => {
     healed: 'move the framework-guide import to line 1 of AGENTS.md',
   }, dryRun);
 
-  let claude = ensureClaudePointer(brandRoot, { dryRun });
-  if (claude === 'content-bearing') {
-    console.log(`      ${chalk.yellow('⚠')} CLAUDE.md carries content — move it into AGENTS.md (below the import) and reduce CLAUDE.md to the one-line \`${CLAUDE_POINTER}\` pointer`);
-    return { status: 'warned', reason: 'CLAUDE.md carries content — move it into AGENTS.md', output: { guide, agents, claude } };
-  }
-  claude = settle(claude, {
-    present: `CLAUDE.md is the \`${CLAUDE_POINTER}\` pointer`,
-    created: `CLAUDE.md created as the \`${CLAUDE_POINTER}\` pointer`,
-  }, {
-    created: `create CLAUDE.md as the \`${CLAUDE_POINTER}\` pointer`,
-  }, dryRun);
-
-  if (agents === 'present' && claude === 'present' && (guide === 'present' || guide === 'skipped')) {
+  if (agents === 'present' && (guide === 'present' || guide === 'skipped')) {
     return null;
   }
-  return { output: { guide, agents, claude } };
+  return { output: { guide, agents } };
 };

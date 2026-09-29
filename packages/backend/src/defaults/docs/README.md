@@ -4,7 +4,7 @@ Per-subsystem deep references live here. Keep `AGENTS.md` short: it should read 
 
 ## Pattern
 
-When you find yourself adding more than a paragraph to `AGENTS.md`, create a new `docs/<topic>.md` instead and link to it from `AGENTS.md`. Goal: the project's `AGENTS.md` stays under ~250 lines (`CLAUDE.md` is only the one-line `@AGENTS.md` pointer).
+When you find yourself adding more than a paragraph to `AGENTS.md`, create a new `docs/<topic>.md` instead and link to it from `AGENTS.md`. Goal: the project's `AGENTS.md` stays under ~250 lines.
 
 Examples of good `docs/*.md` topics:
 - Subsystem deep-dives (one per area of the codebase)

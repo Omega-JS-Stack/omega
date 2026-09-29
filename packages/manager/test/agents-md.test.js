@@ -1,10 +1,9 @@
 // Tests for src/lib/agents-md.js + the workspace `agents` ensure op — the
 // brand agent-docs chain (Ian 2026-07-20, amended 2026-07-27): AGENTS.md
 // line 1 imports the TOP-LEVEL omega AGENTS.md through the scope path
-// `node_modules/@omega.js/AGENTS.md` (a symlink this service maintains),
-// CLAUDE.md is the one-line `@AGENTS.md` pointer. Create / present / heal
-// are idempotent, consumer content survives every path, content-bearing
-// CLAUDE.md warns (never clobbered), and no package ships agent docs.
+// `node_modules/@omega.js/AGENTS.md` (a symlink this service maintains).
+// Create / present / heal are idempotent, consumer content survives every
+// path, a CLAUDE.md is never written or read, and no package ships agent docs.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,13 +11,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const {
-  IMPORT_LINE,
-  CLAUDE_POINTER,
-  ensureAgentsMd,
-  ensureClaudePointer,
-  ensureGuideLink,
-} = require('../src/lib/agents-md.js');
+const agentsMd = require('../src/lib/agents-md.js');
+
+const { IMPORT_LINE, ensureAgentsMd, ensureGuideLink } = agentsMd;
 const agentsOp = require('../src/services/workspace/ensure/agents.js');
 
 function tmpdir() {
@@ -240,60 +235,50 @@ test('agents-md: healing removes a stray mid-file copy of the import — no dupl
   assert.match(content, /More notes\./);
 });
 
-// ─── ensureClaudePointer ─────────────────────────────────────────────────────
+// ─── No CLAUDE.md: Claude Code reads AGENTS.md itself ────────────────────────
 
-test('agents-md: missing CLAUDE.md is created as the one-line pointer; pointer-bearing is present', () => {
-  const dir = tmpdir();
-  assert.equal(ensureClaudePointer(dir), 'created');
-  assert.equal(read(dir, 'CLAUDE.md'), `${CLAUDE_POINTER}\n`);
-  assert.equal(ensureClaudePointer(dir), 'present');
-});
-
-test('agents-md: content-bearing CLAUDE.md is NEVER clobbered — reported for the move-it warning', () => {
-  const dir = tmpdir();
-  const content = '# Real content someone wrote\n\nRules live here.\n';
-  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content);
-
-  assert.equal(ensureClaudePointer(dir), 'content-bearing');
-  assert.equal(read(dir, 'CLAUDE.md'), content);
+test('agents-md: the lib carries no CLAUDE.md pointer helper', () => {
+  assert.deepEqual(Object.keys(agentsMd).filter((key) => /claude/i.test(key)), []);
 });
 
 // ─── The workspace ensure op ─────────────────────────────────────────────────
 
-test('agents-md: op creates both files on a fresh brand and is a no-op second run', async () => {
+test('agents-md: op creates AGENTS.md and no CLAUDE.md on a fresh brand, then is a no-op', async () => {
   const dir = tmpdir();
   const context = { brandRoot: dir, brand: { id: 'fixture', config: { brand: { name: 'Fixture' } } } };
 
   const first = await agentsOp(context);
-  assert.deepEqual(first.output, { guide: 'skipped', agents: 'created', claude: 'created' });
+  assert.deepEqual(first.output, { guide: 'skipped', agents: 'created' });
   assert.equal(read(dir, 'AGENTS.md').split('\n')[0], IMPORT_LINE);
-  assert.equal(read(dir, 'CLAUDE.md'), `${CLAUDE_POINTER}\n`);
+  assert.equal(fs.existsSync(path.join(dir, 'CLAUDE.md')), false, 'a manage run writes no CLAUDE.md');
 
   assert.equal(await agentsOp(context), null);
+  assert.equal(fs.existsSync(path.join(dir, 'CLAUDE.md')), false);
 });
 
-test('agents-md: op warns (status warned) on a content-bearing CLAUDE.md', async () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# content\n');
+test('agents-md: op leaves an existing CLAUDE.md alone, content or pointer, with no warning', async () => {
+  for (const content of ['# content\n', '@AGENTS.md\n']) {
+    const dir = tmpdir();
+    fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# Fixture: brand notes\n`);
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content);
 
-  const result = await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } });
-  assert.equal(result.status, 'warned');
-  assert.equal(result.output.claude, 'content-bearing');
+    assert.equal(await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } }), null);
+    assert.equal(read(dir, 'CLAUDE.md'), content);
+  }
 });
 
-test('#971: op under --dry-run plans the link, both files and the heal, and writes nothing', async () => {
+test('#971: op under --dry-run plans the link, AGENTS.md and the heal, and writes nothing', async () => {
   const { brand, manager } = publishedFixture();
   fs.writeFileSync(path.join(manager, 'docs', 'AGENTS.md'), '# vendored map\n');
 
   const fresh = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
 
-  assert.deepEqual(fresh.output, { guide: 'planned', agents: 'planned', claude: 'planned' });
+  assert.deepEqual(fresh.output, { guide: 'planned', agents: 'planned' });
   assert.deepEqual(fs.readdirSync(brand), ['node_modules']);
   assert.deepEqual(fs.readdirSync(path.join(brand, 'node_modules', '@omega.js')), ['manager']);
 
   const dir = tmpdir();
   fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# notes without the import\n');
-  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '@AGENTS.md\n');
 
   const heal = await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
 

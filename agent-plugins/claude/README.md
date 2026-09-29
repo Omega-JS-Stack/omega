@@ -37,7 +37,7 @@ Structure is validated by `scripts/agent-plugins.test.js` at the monorepo root, 
 
 ## The inject hook
 
-The plugin carries the mechanism that loads its own skills. `hooks/inject/run.sh` runs on every prompt (`UserPromptSubmit`), reads the project's `package.json` — the working directory's own, else the nearest one up to the git root — and asks the session to invoke the skill for the framework it finds:
+The plugin carries the mechanism that loads its own skills. `hooks/inject/run.sh` runs on every prompt (`UserPromptSubmit`) and on every subagent spawn (`SubagentStart`, below), reads the project's `package.json` (the working directory's own, else the nearest one up to the git root) and asks the session to invoke the skill for the framework it finds:
 
 | package | skill |
 |---|---|
@@ -56,6 +56,16 @@ Every row also matches the manifest's own `name`, which is what covers working i
 A brand injection also names the framework map — the brand `AGENTS.md` import line, `node_modules/@omega.js/AGENTS.md` — as required reading BEFORE the first edit, which is what the gate hook below enforces.
 
 Each skill is asked for once per session per SKILL (a marker file under `TMPDIR`, keyed on the session id), so a target that appears mid-session still gets its own line while the skills already asked for stay quiet. The hook fails open — no `package.json`, unparseable JSON, an unreadable config, no `jq`, and it exits silently without touching the prompt. Behavior is covered by the inject cases in `scripts/agent-plugins.test.js`, which run the script directly against fixture projects.
+
+**Subagents get the same answer as paths.** `hooks.json` also registers the script on `SubagentStart` with the argument `subagent` and no matcher, so every spawned agent runs the same detection against its own `cwd` (a spawn carries no prompt). A subagent may have no Skill tool, so it is handed each skill's `SKILL.md` path under `CLAUDE_PLUGIN_ROOT` to read instead, in the shape the dotfiles `claude:skill-loader` hook emits too:
+
+```
+OMEGA project detected. Read these skills with the Read tool before working (a subagent may have no Skill tool):
+- omega:web: <plugin root>/skills/web/SKILL.md
+- omega:manager: <plugin root>/skills/manager/SKILL.md
+```
+
+At a brand root the framework-map line follows, and the text always ends on the gate's `mark.sh` command with the session id filled in, so an agent that read a skill can record it and pass the gate below. The marker keys on the session id plus the subagent's `agent_id`: each agent gets its copy once, and the main chat's own once-per-session injection is untouched. Covered by `scripts/agent-plugins-subagent.test.js`, which shares its fixtures with the main suite through `scripts/agent-plugins-fixtures.js`.
 
 ## The gate hook
 

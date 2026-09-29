@@ -79,7 +79,7 @@ test('#971: a dry-run workspace walk plans every write and leaves the brand tree
   const { output } = result;
   assert.ok(output.defaults.planned.length > 0);
   assert.equal(output.gitignore, 'planned');
-  assert.deepEqual([output.guide, output.agents, output.claude], ['planned', 'planned', 'planned']);
+  assert.deepEqual([output.guide, output.agents], ['planned', 'planned']);
   assert.equal(output.claudeSettings, 'planned');
   assert.equal(output.scripts, 'planned');
   assert.equal(output.envOrder.brand, 'planned');

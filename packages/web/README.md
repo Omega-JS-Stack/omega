@@ -411,8 +411,7 @@ example, and the four questions to read a page against them:
   no stub may name a `default` esbuild can prove undefined, #742).
 - **Scaffolding (`ensureTarget()`, every verb)** — devkit's defaults engine over
   `scaffold/`: marker-section merges live-sync .gitignore/AGENTS.md
-  (Custom sections preserved verbatim; CLAUDE.md is the one-line `@AGENTS.md`
-  pointer, copied when missing), config/omega.json5 seeds then
+  (Custom sections preserved verbatim), config/omega.json5 seeds then
   JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +
   .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
   Inside a brand monorepo that CI workflow is composed into the BRAND ROOT

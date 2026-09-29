@@ -193,18 +193,15 @@ async function copyDefaults(projectDir, engineLogger) {
       // material really lives, so a target keeps the explanation that matches
       // the ignore rules the scaffold just wrote, never an older one.
       'config/certs/README.md': { overwrite: true },
-      // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
-      // like .gitignore), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied
-      // when missing by the `**/*` rule above, never clobbered.
+      // AGENTS.md carries the agent docs, marker-merged like .gitignore.
       'AGENTS.md': { mergeLines: true, template: templateContext },
       // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-      // BRAND ROOT is the one doc home — per-target AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
+      // BRAND ROOT is the one doc home: per-target AGENTS.md/CHANGELOG.md/docs/
       // never scaffold, and existing framework-owned-only copies are swept
       // (retire rules; consumer content is never destroyed). Standalone projects
       // keep them. Last-match-wins: these override the rules above.
       ...(isBrandTarget ? {
         'AGENTS.md': { retire: true, template: templateContext },
-        'CLAUDE.md': { retire: true, template: templateContext },
         'CHANGELOG.md': { retire: true },
         'docs/**/*': { retire: true },
       } : {}),

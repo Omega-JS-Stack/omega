@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# omega:inject — UserPromptSubmit hook
+# omega:inject: UserPromptSubmit hook (no argument), and SubagentStart with
+# `subagent` (the same detection against the spawn's cwd).
 # Reads the project's package.json and asks the session to invoke the matching
 # framework skill. At a BRAND root the nearest manifest carries the manager
 # alone, so the brand's targets are discovered too (config/omega.json5 and
 # every targets/*/package.json) and the whole set is asked for at once, with
-# the framework map named as required reading.
-# Once per session per skill; fails open on anything unexpected.
+# the framework map named as required reading. Once per session per skill
+# (per subagent, for a spawn); fails open on anything unexpected.
 
 set -euo pipefail
+
+mode="${1:-prompt}"
 
 input=$(cat)
 
@@ -16,6 +19,14 @@ command -v jq >/dev/null 2>&1 || exit 0
 session_id=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null || true)
 cwd=$(jq -r '.cwd // ""' <<<"$input" 2>/dev/null || true)
 [ -n "$cwd" ] && [ -d "$cwd" ] || exit 0
+
+# A spawn is handed SKILL.md paths under the plugin root, and its marker keys
+# on the subagent's own agent_id; without either there is nothing to hand.
+agent_id=""
+if [ "$mode" = subagent ]; then
+  agent_id=$(jq -r '.agent_id // ""' <<<"$input" 2>/dev/null || true)
+  [ -n "$agent_id" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] || exit 0
+fi
 
 # The project's package.json: the cwd's own, else the nearest one above it —
 # stopping at the git root, since past it is somebody else's project.
@@ -87,14 +98,16 @@ fi
 
 [ "${#matched[@]}" -gt 0 ] || exit 0
 
-# One injection per session per skill.
+# One injection per session per skill; a spawn's marker also carries its
+# agent_id, so each subagent gets its own copy and the main chat keeps its own.
 marker_dir="${TMPDIR:-/tmp}/omega-inject"
 mkdir -p "$marker_dir" 2>/dev/null || true
-safe_session="${session_id//[^a-zA-Z0-9]/_}"
+marker_prefix="${session_id//[^a-zA-Z0-9]/_}"
+[ -z "$agent_id" ] || marker_prefix="${marker_prefix}__${agent_id//[^a-zA-Z0-9]/_}"
 
 fresh=()
 for skill in $(printf '%s\n' "${matched[@]}" | sort -u); do
-  marker="$marker_dir/${safe_session}__${skill//[:\/]/_}.loaded"
+  marker="$marker_dir/${marker_prefix}__${skill//[:\/]/_}.loaded"
   [ -f "$marker" ] && continue
   : > "$marker" 2>/dev/null || true
   fresh+=("$skill")
@@ -102,7 +115,14 @@ done
 
 [ "${#fresh[@]}" -gt 0 ] || exit 0
 
-if [ "${#fresh[@]}" -eq 1 ]; then
+if [ "$mode" = subagent ]; then
+  # A subagent may have no Skill tool, so it gets each SKILL.md path to Read;
+  # the dotfiles claude:skill-loader hook emits this same shape.
+  ctx="OMEGA project detected. Read these skills with the Read tool before working (a subagent may have no Skill tool):"
+  for skill in "${fresh[@]}"; do
+    ctx+=$'\n'"- ${skill}: ${CLAUDE_PLUGIN_ROOT}/skills/${skill#omega:}/SKILL.md"
+  done
+elif [ "${#fresh[@]}" -eq 1 ]; then
   ctx="OMEGA project detected: invoke the ${fresh[0]} skill via the Skill tool before responding. Follow its rules and the framework docs it routes to for any work in this project. (Injected once per session; do not re-invoke on later prompts unless the work shifts.)"
 else
   skill_list=$(printf ', %s' "${fresh[@]}")
@@ -118,9 +138,19 @@ if [ -n "$brand_root" ]; then
 This is an OMEGA brand monorepo: every skill above, plus the framework map it points at (the brand AGENTS.md import line — node_modules/@omega.js/AGENTS.md), is required reading BEFORE the first edit. Writes under targets/ and to config/omega.json5 are refused until the skill owning that surface has been invoked."
 fi
 
-jq -n --arg ctx "$ctx" '{
+# The gate's sanctioned lane for an agent with no Skill tool: mark.sh writes
+# the marker invoking the skill would have written, for this session.
+event="UserPromptSubmit"
+if [ "$mode" = subagent ]; then
+  event="SubagentStart"
+  mark_cmd="\"${CLAUDE_PLUGIN_ROOT}/hooks/gate/mark.sh\" <skill>"
+  [ -z "$session_id" ] || mark_cmd="$mark_cmd --session $session_id"
+  ctx+=$'\n'"After reading a skill, record it so the edit gate lets its surfaces through: $mark_cmd"
+fi
+
+jq -n --arg ctx "$ctx" --arg event "$event" '{
   "hookSpecificOutput": {
-    "hookEventName": "UserPromptSubmit",
+    "hookEventName": $event,
     "additionalContext": $ctx
   }
 }'

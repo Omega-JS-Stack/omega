@@ -1,14 +1,15 @@
-# Brand agent-docs chain (AGENTS.md / CLAUDE.md)
+# Brand agent-docs chain (AGENTS.md)
 
 **The problem**: every brand needs current framework guidance for AI agents, but copying it into each brand drifts. **The design (Ian 2026-07-20, amended 2026-07-27)**: every brand reads the SAME entry the monorepo uses — the top-level omega `AGENTS.md`, the map — and the map's pointers (plus the omega plugin's hooks) orchestrate which docs load. The brand-root knowledge itself lives in `docs/manager/brand.md`; no AGENTS.md anywhere carries content.
 
 ## The chain
 
 ```
-brand/CLAUDE.md            @AGENTS.md                          (one line, Claude Code's entry)
-brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level omega map — see below)
-                  below:   `# <brand>: brand notes` + the brand's own notes — NEVER touched by the framework
+brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level omega map, see below)
+                  below:   `# <brand>: brand notes` + the brand's own notes, NEVER touched by the framework
 ```
+
+`AGENTS.md` is the entry for every agent: Claude Code reads it natively, so the framework writes no `CLAUDE.md` anywhere, and one a brand keeps for itself is the brand's own file, never read or touched by the manage cycle or a scaffold.
 
 `node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. A published install has no monorepo above the package, so the link lands on the map prepare vendored INTO it (`@omega.js/manager/docs/AGENTS.md`, below). The two candidates are tried in that order, live map first, so a locally linked brand never lands on the generated copy sitting in that same monorepo's `packages/manager` ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)).
 
@@ -27,10 +28,8 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 | No `AGENTS.md` | Created: import + brand-notes skeleton |
 | Import present at line 1 (right depth) | No-op |
 | Import missing / not first / stale depth | Healed: resolved import moved to line 1, duplicates removed, consumer content preserved verbatim |
-| No `CLAUDE.md` | Created as the one-line `@AGENTS.md` pointer |
-| `CLAUDE.md` carries content | WARNED (never clobbered) with the move-it-to-AGENTS.md message |
 
-Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip against both the local-era and published-install shapes, path resolution, create/heal/idempotence, content preservation).
+Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip against both the local-era and published-install shapes, path resolution, create/heal/idempotence, content preservation, no `CLAUDE.md` written or read).
 
 ## Published packages carry their own docs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64))
 
@@ -72,7 +71,7 @@ Reading the chain is one half; acting on it is the other. The guard hook holds t
 
 ## Packages carry no agent docs (Ian 2026-07-27)
 
-No `packages/<pkg>/` has an `AGENTS.md` or `CLAUDE.md` — deleted outright, no exceptions. Monorepo sessions get the map from the parent walk; consumer brands get it through the maintained scope symlink; a standalone package install has no resolvable chain anyway; the publish era generates whatever a shipped package needs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+No `packages/<pkg>/` has an agent doc of its own, deleted outright, no exceptions. Monorepo sessions get the map from the parent walk; consumer brands get it through the maintained scope symlink; a standalone package install has no resolvable chain anyway; the publish era generates whatever a shipped package needs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
 
 ## The one deliberate gap
 
@@ -84,6 +83,6 @@ The brand-root guide is [docs/manager/brand.md](../manager/brand.md) — framewo
 
 ## Per-target docs — RETIRED in brand context (cp246)
 
-Per-target `AGENTS.md`/`CLAUDE.md`/`CHANGELOG.md`/`docs/` scaffolds predate the brand-monorepo era; Claude Code walks parent directories, so the brand-root chain covers target-dir sessions. The shared defaults engine now has a `retire` fileMap rule (devkit `defaults-engine.js`), wired mirrored in all four frameworks' brand branches (detection = the existing `@omega.js/config` brand-root resolution): in a brand target those files NEVER scaffold; an existing framework-owned-only copy (Custom section empty/whitespace or byte-equal to the shipped boilerplate; marker-less files must equal the rendered template) is deleted once, loudly; a copy carrying real consumer content is preserved with a move-it-to-the-brand-root warning. Standalone projects keep full per-project doc scaffolding, and it follows the same shape as a brand root (#63): the framework template is an `AGENTS.md` (marker-merged, so consumer notes below the Custom marker survive every setup) beside a one-line `@AGENTS.md` `CLAUDE.md` pointer. Test-pinned both ways. That merge never reaches a workspace root: every framework's ensure-target runs devkit's `assertScaffoldable` before its first write, which refuses a directory whose nearest package.json declares `workspaces`, so this monorepo's own `AGENTS.md` and `.gitignore` and a brand root's are never merged over ([docs/devkit/index.md](../devkit/index.md)).
+Per-target `AGENTS.md`/`CHANGELOG.md`/`docs/` scaffolds predate the brand-monorepo era; Claude Code walks parent directories, so the brand-root chain covers target-dir sessions. The shared defaults engine now has a `retire` fileMap rule (devkit `defaults-engine.js`), wired mirrored in all four frameworks' brand branches (detection = the existing `@omega.js/config` brand-root resolution): in a brand target those files NEVER scaffold; an existing framework-owned-only copy (Custom section empty/whitespace or byte-equal to the shipped boilerplate; marker-less files must equal the rendered template) is deleted once, loudly; a copy carrying real consumer content is preserved with a move-it-to-the-brand-root warning. Standalone projects keep full per-project doc scaffolding, and it follows the same shape as a brand root (#63): the framework template is an `AGENTS.md` (marker-merged, so consumer notes below the Custom marker survive every setup), and no scaffold writes a `CLAUDE.md`. Test-pinned both ways. That merge never reaches a workspace root: every framework's ensure-target runs devkit's `assertScaffoldable` before its first write, which refuses a directory whose nearest package.json declares `workspaces`, so this monorepo's own `AGENTS.md` and `.gitignore` and a brand root's are never merged over ([docs/devkit/index.md](../devkit/index.md)).
 
-**Prior-generation files ([#101](https://github.com/Omega-JS-Stack/omega/issues/101)).** A destination carrying the OMEGA section markers when the current template no longer does is a file an EARLIER generation of the same framework generated — the pre-#63/#91 content-bearing `CLAUDE.md` against today's one-line pointer. Its markers are the framework's own signature, so the engine treats it as framework-owned on both paths: the brand branch retires it (instead of keeping it behind a false "carries consumer content" warning), and on the standalone upgrade path `overwrite: false` still heals it to the current template (instead of leaving a stale doc beside the new `AGENTS.md`). A file with no markers is judged as before — consumer-authored unless it equals the rendered template.
+**Prior-generation files ([#101](https://github.com/Omega-JS-Stack/omega/issues/101)).** A destination carrying the OMEGA section markers when the current template no longer does is a file an EARLIER generation of the same framework generated. Its markers are the framework's own signature, so the engine treats it as framework-owned on both paths: the brand branch retires it (instead of keeping it behind a false "carries consumer content" warning), and on the standalone upgrade path `overwrite: false` still heals it to the current template (instead of leaving a stale doc beside the new `AGENTS.md`). A file with no markers is judged as before: consumer-authored unless it equals the rendered template.

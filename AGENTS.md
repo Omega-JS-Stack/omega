@@ -27,7 +27,7 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
 
 - **`docs/` is the SSOT.** Cross-framework contracts live in `docs/shared/`; each framework's guide is `docs/<framework>/index.md` with its deep docs beside it. No line budget applies inside `docs/`.
 - **This file is the ONE agent entry — packages carry no agent docs.** Agents work at this level; the parent walk hands every session this map, and the map plus the plugin's hooks route to `docs/`. Knowledge lives in `docs/`, never in any AGENTS.md.
-  - No `packages/<pkg>/AGENTS.md` or `CLAUDE.md` exists, none. ONE lookalike, never read or edited here: `packages/manager/docs/AGENTS.md`, a gitignored GENERATED copy of this map the prepare lane vendors ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)).
+  - No `packages/<pkg>/AGENTS.md` exists, none. ONE lookalike, never read or edited here: `packages/manager/docs/AGENTS.md`, a gitignored GENERATED copy of this map the prepare lane vendors ([#144](https://github.com/Omega-JS-Stack/omega/issues/144)).
 - **Loading is deterministic, not preloaded.** The omega Claude plugin's hooks detect where the chat is working — a `packages/<framework>/` tree here, or a target's tree in a consumer repo — and inject the relevant docs then. Nobody reads guides "just in case".
 - **Consumer brands read THIS file.** A brand root's `AGENTS.md` line-1 import is `@node_modules/@omega.js/AGENTS.md` — a symlink the manager's workspace service maintains, pointing at this map.
   - It resolves to the LIVE file in a locally linked brand, and to the copy prepare vendors into `@omega.js/manager/docs/AGENTS.md` (links retargeted) on a published install.
