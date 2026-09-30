@@ -1634,6 +1634,12 @@ const TARGET_SCHEMAS = {
       enum:        ['normal', 'hidden'],
       description: 'How an AT-LOGIN launch behaves, independently of `startup.mode` (which owns user-direct launches). Unset reads as hidden, so a normal app still starts quietly at login and surfaces when the user opens it.',
     },
+    {
+      path:        'protocol.singleInstance',
+      type:        'boolean',
+      required:    false,
+      description: 'Whether the app takes the single-instance lock, so a later launch hands its argv (and any deep link) to the running copy and quits. Unset reads as true; `false` suits a CLI-shaped app whose every launch is its own short process, and gives up second-instance forwarding.',
+    },
     // ── the auto-updater block (#911) ────────────────────────────────────
     // Its runtime answers live in the lib's own DEFAULTS, which every
     // unset key falls through to; the cadences are two separate timers on

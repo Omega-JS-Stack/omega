@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#992](../../issues/992) - `targets.desktop.protocol.singleInstance: false` turns the desktop single-instance lock off, so each launch of a CLI-shaped app runs as its own process. Unset reads as true; off, a second launch's argv and a Windows or Linux deep link never reach a running copy.
 - [#709](../../issues/709) - Any element carrying `data-omega-copy` is a copy control, with no page JS: one delegated handler resolves the value - an explicit `data-omega-copy-value`/property, a selector, else the sibling input - copies it and reports it. Every hand-wired copy on the account page is gone ([#727](../../issues/727)).
 - [#212](../../issues/212) - `npx omega test --lane=stripe-live`: an opt-in lane running the payment pipeline against REAL Stripe test-mode events, forwarded by `stripe listen`. Opens only for an `sk_test_` secret resolved through the one env reader, else prints one skip line. Idempotent, tagged product/price fixtures.
 - [#212](../../issues/212) - A test dispute provider, so a chargeback is provable end to end: an alert matches by amount and card against the emulator's records, then issues the cancel as the `customer.subscription.deleted` event Stripe's own cancel produces. Refuses in production.

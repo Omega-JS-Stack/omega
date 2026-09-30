@@ -73,5 +73,29 @@ module.exports = defineCases({
         ctx.expect(after).toEqual(before);
       },
     },
+    {
+      name: 'protocol.singleInstance false: the lock is never requested and the process keeps running',
+      run: (ctx) => {
+        const { app } = require('electron');
+        const protocol = ctx.omega.protocol;
+        const origProtocolConfig = ctx.omega.config.protocol;
+        const origRequest = app.requestSingleInstanceLock;
+        let requests = 0;
+        app.requestSingleInstanceLock = (...args) => { requests++; return origRequest.apply(app, args); };
+        ctx.omega.config.protocol = { singleInstance: false };
+        protocol._initialized = false;
+        protocol._hasLock = false;
+        try {
+          protocol.initialize(ctx.omega);
+          ctx.expect(requests).toBe(0);
+          ctx.expect(protocol.hasSingleInstanceLock()).toBe(true);
+        } finally {
+          app.requestSingleInstanceLock = origRequest;
+          if (origProtocolConfig !== undefined) ctx.omega.config.protocol = origProtocolConfig; else delete ctx.omega.config.protocol;
+          protocol._hasLock = true;
+          protocol._initialized = true;
+        }
+      },
+    },
   ],
 });

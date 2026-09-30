@@ -47,8 +47,14 @@ const protocol = {
     // the end), so a brand parsing it reads its flags empty (#921). `additionalData`
     // arrives untouched as the fourth argument of second-instance, so every brand
     // gets the duplicate's real command line, in order, for free.
-    protocol._hasLock = app.requestSingleInstanceLock({ argv: process.argv, cwd: process.cwd() });
-    if (!protocol._hasLock) {
+
+    // `protocol.singleInstance: false` is for a CLI-shaped app whose every launch is
+    // its own short process: no lock is requested, so no launch is ever a duplicate.
+    const lockOff = omega.config.protocol?.singleInstance === false;
+    protocol._hasLock = lockOff || app.requestSingleInstanceLock({ argv: process.argv, cwd: process.cwd() });
+    if (lockOff) {
+      logger.log('single-instance lock off by config');
+    } else if (!protocol._hasLock) {
       logger.warn('single-instance lock lost — another copy of the app is running.');
     } else {
       logger.log('single-instance lock acquired.');

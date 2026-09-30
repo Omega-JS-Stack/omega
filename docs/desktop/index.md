@@ -91,7 +91,7 @@ omega.initialize().then(() => { const { logger, desktop } = omega; });
 | `tray` / `menu` / `context-menu` | file-based definitions; unified id-path API; default templates with id-tagged items |
 | `startup` | `mode: 'normal' \| 'hidden'`; `'hidden'` bakes `LSUIElement: true` for zero dock bounce |
 | `app-state` | storage-backed launch flags + crash sentinel |
-| `protocol` | single-instance lock + scheme registration |
+| `protocol` | single-instance lock + scheme registration; `protocol.singleInstance: false` skips the lock for a CLI-shaped app whose every launch is its own short process ([docs/desktop/deep-link.md](deep-link.md)) |
 | `fontawesome` | serves the bundled icon SVGs to renderers over IPC (`desktop:fontawesome:get`); the renderer auto-renders `fa-*` markup ([docs/desktop/fontawesome.md](fontawesome.md)) |
 | `deep-link` | unified deep-link dispatch (cold + warm start, mac + win + linux), built-in routes, pattern matching |
 | `auth` | `omega.auth`: main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the account document their client resolved, so main's `omega.auth.user` is the same `User` |

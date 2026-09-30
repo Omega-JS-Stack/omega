@@ -154,6 +154,8 @@ app.on('second-instance', (event, argv, cwd, additionalData) => additionalData.a
 
 Never parse the event's own `argv` for flags: Chromium re-serializes it (switches first, Chromium's own switches spliced in, the values detached at the end), so a `--message two` launch arrives with the value detached from the flag.
 
+`targets.desktop.protocol.singleInstance: false` turns the lock off (unset reads as true). `protocol.initialize()` then never requests it, logs `single-instance lock off by config`, and `hasSingleInstanceLock()` answers true, so no launch quits as a duplicate. It is for a CLI-shaped app whose every launch is its own short process (a notifier that shows one banner and exits), where a stuck running copy would otherwise swallow every later launch. What it gives up: `second-instance` never fires, so a second launch's argv and a warm-start deep link on Windows and Linux reach the new process, never the running copy. The lock's other job is yours too: two live copies share the app store, any local servers, and the restart-manager registration, so keep the process short.
+
 ## Linking with `appState`
 
 When a deep link is detected at cold-start, @omega.js/desktop calls `omega.appState.setLaunchedFromDeepLink(true)`. This means:
