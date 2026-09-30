@@ -327,7 +327,7 @@ jobs:
       - id: resolve
         working-directory: targets/desktop
         run: |
-          STRATEGY=$(node -e "const c=require('@omega.js/desktop/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.windows?.signing?.strategy || 'self-hosted');")
+          STRATEGY=$(node -e "const o=require('@omega.js/desktop/config');console.log(o.windowsSigningStrategy(o.loadConfig(process.cwd(),'desktop').config));")
           echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
           echo "Resolved Windows signing strategy: $STRATEGY"
 

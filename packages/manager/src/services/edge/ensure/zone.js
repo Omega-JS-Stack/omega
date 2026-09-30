@@ -20,7 +20,7 @@
 const chalk = require('chalk').default;
 const { openBrowserAndPoll, pollWithSpinner } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
-const { API_PROVIDERS, REGISTRAR_NAMESERVER_URLS, resolveRegistrar } = require('../../domain/lib/registrars.js');
+const { DOMAIN_PROVIDERS, resolveRegistrar } = require('../../domain/lib/providers.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -60,11 +60,12 @@ function reportPending(zone) {
 async function waitForActiveZone(context, zone) {
   const { cloudflareApi: api, brandConfig, zoneDomain, options = {} } = context;
   const provider = resolveRegistrar(brandConfig);
+  const registrar = DOMAIN_PROVIDERS.registrar[provider];
 
   // API registrars: the domain service sets the nameservers right after this
   // service. No provider yet: nothing to open (fresh brand). Non-interactive
   // and dry runs never sit in a poll.
-  if (!canPrompt(options) || !provider || API_PROVIDERS.has(provider)) {
+  if (!canPrompt(options) || !provider || registrar?.api) {
     console.log(`      ${chalk.dim('Rerun after the nameservers propagate (the domain service automates this for API registrars).')}`);
     return null;
   }
@@ -75,7 +76,7 @@ async function waitForActiveZone(context, zone) {
   };
 
   // provider is user config — unknown registrars poll without a browser step
-  const registrarUrl = REGISTRAR_NAMESERVER_URLS[provider]?.(zoneDomain);
+  const registrarUrl = registrar?.nameserverUrl(zoneDomain);
   const result = registrarUrl
     ? await openBrowserAndPoll({
       url: registrarUrl,

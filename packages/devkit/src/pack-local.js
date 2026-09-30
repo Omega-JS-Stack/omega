@@ -48,6 +48,7 @@ const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const chalk = require('chalk').default;
 const { regenerateLockfile } = require('./lockfile.js');
+const { resolvePackageDir } = require('./local.js');
 
 // Constants
 const STAGING_DIR = 'omega_modules';
@@ -71,9 +72,9 @@ function fileSpec(from, target) {
 }
 
 /**
- * Resolve a LINKED local package: the first node_modules entry walking up from
- * `fromDir` (mirroring Node resolution, since npm workspaces and `omega i local`
- * hoist to the brand/monorepo root), and only when that entry is a SYMLINK. A
+ * Resolve a LINKED local package: the installed entry `resolvePackageDir` walks
+ * to from `fromDir` (npm workspaces and `omega i local` hoist to the
+ * brand/monorepo root), and only when that entry is a SYMLINK. A
  * symlink IS the local-era shape, and the registry may have no copy of what it
  * points at; a real directory is a registry install the remote can fetch itself.
  * @param {string} name - Package name.
@@ -81,26 +82,12 @@ function fileSpec(from, target) {
  * @returns {string|null} Absolute real path of the linked checkout, or null.
  */
 function resolveLinkedPackage(name, fromDir) {
-  let current = path.resolve(fromDir);
-
-  while (true) {
-    const candidate = path.join(current, 'node_modules', name);
-    const entry = jetpack.inspect(candidate);
-
-    if (entry) {
-      if (entry.type !== 'symlink') {
-        return null;
-      }
-      const real = fs.realpathSync(candidate);
-      return jetpack.exists(path.join(real, 'package.json')) ? real : null;
-    }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      return null;
-    }
-    current = parent;
+  const installed = resolvePackageDir(name, fromDir);
+  if (!installed || jetpack.inspect(installed).type !== 'symlink') {
+    return null;
   }
+
+  return fs.realpathSync(installed);
 }
 
 /** The workspace globs a manifest declares, in either supported spelling. */

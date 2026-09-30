@@ -42,7 +42,7 @@ const { composeBrandTokens } = require('@omega.js/devkit/brand-tokens');
 const { resolveFontAwesomeRoots, createIconLoader } = require('@omega.js/devkit/icons');
 const { inlineIcons } = require('./inline-icons.js');
 const { getEnvironment, setEnvironment } = require('@omega.js/config/environment');
-const { ogLocale } = require('@omega.js/devkit/translate');
+const { registerHeadGlobals } = require('./head-globals.js');
 const { PATHS } = require('./paths.js');
 const {
   CONFIG_SECTIONS, DEAD_SITE_SECTIONS, SITE_FACT_KEYS, RANDOM_ID_ASSIGN_IDIOM,
@@ -1226,10 +1226,9 @@ function buildConfig(eleventyConfig, options) {
     ...(config.characters || {}),
   };
   eleventyConfig.addGlobalData('site', site);
-  // og:locale wants Open Graph's language_TERRITORY form (en → en_US), and the
-  // code → locale map is the devkit language SSOT — the head include cannot
-  // derive it in Liquid, so it arrives as a computed global.
-  eleventyConfig.addGlobalData('ogLocale', ogLocale(config.translation?.default || 'en'));
+  // What the head include cannot derive in Liquid (og:locale, the first-paint
+  // starter's reveal stagger) arrives as computed globals from its JS home.
+  registerHeadGlobals(eleventyConfig, { language: config.translation?.default || 'en' });
   // `jekyll.environment` is the build's verdict for templates (the root layout's
   // `data-environment`, the draft filters). The local stack's `dev` map is NOT
   // here any more (#743): it rides the one build snapshot below, which is the

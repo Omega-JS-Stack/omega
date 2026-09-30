@@ -68,7 +68,10 @@
 const { MANAGER_RULES } = require('./schema-manager.js');
 const { CLIENT_RULES } = require('./schema-client.js');
 const { CLOUD_CONFIG_RULES } = require('./schema-cloud.js');
+const { DOMAIN_RULES } = require('./schema-domain.js');
+const { EDGE_RULES } = require('./schema-edge.js');
 const { OVERRIDE_RULES } = require('./schema-overrides.js');
+const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS } = require('./windows-signing.js');
 
 // The durations a winback coupon can be built for on every provider that
 // supports the offer (#268). Stripe's third option ('repeating') needs a
@@ -785,58 +788,11 @@ const SHARED_SCHEMA = [
     description: "GitHub org/user every repo the brand owns lives in: `<brand.id>-omega` (source), `<brand.id>-releases` (public artifacts), `<brand.id>-<name>` (one per GitHub-hosted web target). No org → the repo service skips and the site's desktop release URLs stay underived.",
   },
 
-  // ── domain (two roles: registrar + mailbox; provider-keyed, #425) ────────
-  {
-    path:        'domain.providers',
-    type:        'object',
-    required:    false,
-    description: "The brand's REGISTRAR, named as the one KEY under it ({ namecheap: {} }). Presence picks it, and no entry means nothing chosen, so the domain service skips. The provider set is open; the entry may be empty.",
-  },
-  {
-    path:        'domain.providers.namecheap',
-    type:        'object',
-    required:    false,
-    description: 'Namecheap as the registrar, the one provider whose nameservers the domain service points at the Cloudflare zone via API (NAMECHEAP_USERNAME + NAMECHEAP_API_KEY in .env). An empty object is the whole declaration; every other registrar gets manual instructions.',
-  },
-  {
-    path:        'domain.email.providers',
-    type:        'object',
-    required:    false,
-    description: "The brand's MAILBOX provider, named as the one KEY under it ({ cloudflare: {} } | { squarespace: {} } | { privateemail: {} }). Presence picks it; no entry leaves the edge service's email-routing operations off.",
-  },
-  {
-    path:        'domain.email.forwarding',
-    type:        'array',
-    required:    false,
-    description: "Address forwarding rules ([{ from: 'support' | '*', to: 'inbox@example.com' }]) the mailbox provider reconciles. Role-level and provider-agnostic.",
-  },
+  // ── domain (two roles: registrar + mailbox; provider-keyed) ────────────────
+  ...DOMAIN_RULES,
 
   // ── edge (role: CDN/DNS edge; provider-discriminated) ────────────────────
-  {
-    path:        'edge.providers.cloudflare.enabled',
-    type:        'boolean',
-    required:    false,
-    default:     true,
-    description: 'false = the edge service skips entirely: no zone, DNS, settings, rules, speed-test or worker reconciliation for this brand.',
-  },
-  {
-    path:        'edge.providers.cloudflare',
-    type:        'object', open: true,
-    required:    false,
-    description: 'Cloudflare zone reconciliation (@omega.js/manager cloudflare service): dns, settings, rules, cacheRules, speedTest, workers. Tokens live in .env.',
-  },
-  {
-    path:        'edge.providers.cloudflare.zone',
-    type:        'string',
-    required:    false,
-    description: "Cloudflare zone id. The web build's cache purge (`omega purge`) targets it; unset = purge skips.",
-  },
-  {
-    path:        'edge.providers.cloudflare.rules.redirect',
-    type:        'array',
-    required:    false,
-    description: "The zone's dynamic redirect rules, ORDERED, and the ONE home for a TEMPLATED redirect, i.e. one whose destination is computed from the request path: [{ name, expression, statusCode, preserveQueryString, targetUrl, enabled }]. `expression` and `targetUrl` ({ value } for a fixed URL, { expression } for a computed one) are Cloudflare's own filter language, because only the edge can answer a URL the build cannot enumerate: DashQR's printed `/c/<id>` codes redirect to `/code?id=<id>` with `targetUrl.expression: concat(\"https://\", http.host, \"/code?id=\", substring(http.request.uri.path, 3))`. The @omega.js/manager edge service reconciles them by `name`. A redirect whose URLs CAN be enumerated is a redirect PAGE instead (docs/web/index.md), never config.",
-  },
+  ...EDGE_RULES,
 
   // ── captcha (role: bot defense; provider-discriminated) ──────────────────
   {
@@ -1015,12 +971,6 @@ const SHARED_SCHEMA = [
   },
 
   // ── certificates (role: code signing; provider-discriminated) ────────────
-  {
-    path:        'certificates.enabled',
-    type:        'boolean',
-    required:    false,
-    description: 'false = the certificates service skips entirely: no bundle ids, no signing certificates, no provisioning profiles for this brand. Absent reads as ON for brands with a desktop/mobile target (the service still skips one with neither).',
-  },
   {
     path:        'certificates.providers.apple.bundleIdPrefix',
     type:        'string',
@@ -1554,8 +1504,21 @@ const TARGET_SCHEMAS = {
       path:        'platforms.windows.signing.strategy',
       type:        'string',
       required:    false,
-      enum:        ['self-hosted', 'cloud', 'local'],
+      enum:        WINDOWS_SIGNING_STRATEGIES,
       description: 'Windows code-signing path. self-hosted = EV USB token on a runner; cloud = provider CLI; local = developer signs manually. The env schema gates each signing credential on this value, so the walk only ever asks for the set this strategy uses.',
+    },
+    {
+      path:        'platforms.windows.signing.cloud.provider',
+      type:        'string',
+      required:    false,
+      enum:        WINDOWS_CLOUD_PROVIDERS,
+      description: 'Whose service signs under the cloud strategy. The env schema gates each provider\'s credentials on this value, so the walk asks for that provider\'s set and no other\'s.',
+    },
+    {
+      path:        'platforms.windows.signing.cloud.options',
+      type:        'object',
+      required:    false,
+      description: 'Provider-specific options for the cloud signing provider named beside it. Credentials never go here: they are .env keys the env schema gates on the provider.',
     },
     {
       path:        'platforms.linux',

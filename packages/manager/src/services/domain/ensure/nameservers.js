@@ -17,6 +17,7 @@ const { pollWithSpinner } = require('@omega.js/devkit/flows');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 const { isWhitelistError } = require('../lib/namecheap-api.js');
 const { walkWhitelist } = require('../lib/whitelist-walkthrough.js');
+const { DOMAIN_PROVIDERS } = require('../lib/providers.js');
 
 // A freshly created zone gets its nameservers within seconds; a zone still
 // bare after this many reads is not going to fill in while we watch (#662).
@@ -42,7 +43,7 @@ function warnUnreadable(message) {
 }
 
 module.exports = async function ensureNameservers(context) {
-  const { cloudflareApi, namecheapApi, domain, provider, options = {} } = context;
+  const { cloudflareApi, registrarApi, domain, provider, options = {} } = context;
 
   // Nameservers live at the REGISTRABLE domain — for subdomain projects
   // (playground.omegajs.dev) that's the parent (omegajs.dev): the zone the
@@ -76,8 +77,8 @@ module.exports = async function ensureNameservers(context) {
 
   console.log(`      ${chalk.dim('→')} Cloudflare nameservers: ${required.map((ns) => chalk.cyan(ns)).join(', ')}`);
 
-  if (provider === 'namecheap') {
-    return await ensureNamecheap(zoneName, required, namecheapApi, options);
+  if (DOMAIN_PROVIDERS.registrar[provider]?.api) {
+    return await ensureRegistrarNameservers(zoneName, required, registrarApi, options);
   }
 
   // === Manual registrars — no read API, but the zone status is proof enough:
@@ -125,7 +126,7 @@ async function waitForAssignedNameservers(api, zoneName, zone) {
   return result.success && assigned ? assigned : zone;
 }
 
-async function ensureNamecheap(domain, required, api, options) {
+async function ensureRegistrarNameservers(domain, required, api, options) {
   const { sld, tld } = psl.parse(domain);
 
   // Read current nameservers. Fails for domains not in the Namecheap account

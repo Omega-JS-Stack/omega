@@ -1,3 +1,6 @@
+// The browser globals every case needs, loaded here so one file runs on its own
+// (`node --test packages/client/test/<file>`), not only behind the package's preload.
+require('./setup.js');
 const assert = require('assert');
 const { before, beforeEach, after } = require('node:test');
 

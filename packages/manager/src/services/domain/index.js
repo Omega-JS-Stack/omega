@@ -19,8 +19,7 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 const { requestServiceInput } = require('../../lib/service-input.js');
 const { CloudflareAPI } = require('../edge/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
-const { NamecheapAPI } = require('./lib/namecheap-api.js');
-const { API_PROVIDERS, resolveRegistrar } = require('./lib/registrars.js');
+const { DOMAIN_PROVIDERS, resolveRegistrar } = require('./lib/providers.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -51,17 +50,19 @@ module.exports.run = createServiceRunner({
       if (gate) return gate;
     }
 
-    if (provider === 'namecheap' && !context.namecheapApi) {
-      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] }));
+    // provider is user config: a registrar outside the registry is manual
+    const { api: RegistrarAPI = null, envKeys = [] } = DOMAIN_PROVIDERS.registrar[provider] || {};
+    if (envKeys.length > 0 && !context.registrarApi) {
+      const gate = await requestServiceInput(context, serviceInputSpec('domain', { names: envKeys }));
       if (gate) return gate;
     }
 
-    console.log(`    Provider: ${chalk.cyan(provider)}${API_PROVIDERS.has(provider) ? '' : chalk.dim(' (manual)')}`);
+    console.log(`    Provider: ${chalk.cyan(provider)}${RegistrarAPI ? '' : chalk.dim(' (manual)')}`);
 
-    // Tests inject fake clients via context.cloudflareApi / context.namecheapApi
+    // Tests inject fake clients via context.cloudflareApi / context.registrarApi
     return {
       cloudflareApi: context.cloudflareApi || new CloudflareAPI(),
-      namecheapApi: provider === 'namecheap' ? (context.namecheapApi || new NamecheapAPI()) : null,
+      registrarApi: RegistrarAPI ? (context.registrarApi || new RegistrarAPI()) : null,
       domain: getApexDomain(url), // nameservers live on the apex's registrar entry
       provider,
     };

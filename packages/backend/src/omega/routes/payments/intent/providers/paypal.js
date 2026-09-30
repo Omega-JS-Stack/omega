@@ -51,7 +51,7 @@ async function createSubscriptionIntent({ uid, orderId, product, productId, freq
   const listPrice = product.prices?.[frequency];
   const firstCharge = takingTrial
     ? 0
-    : chargeableAmount(listPrice, discount, { provider: 'PayPal' });
+    : chargeableAmount(listPrice, discount, { provider: 'paypal' });
 
   // Resolve the PayPal plan ID at runtime (fetches this product's plans and
   // matches by interval + amount + trial-cycle presence). A trial is a property
@@ -195,7 +195,7 @@ async function createOneTimeIntent({ uid, orderId, product, productId, discount,
   // ([#758](https://github.com/Omega-JS-Stack/omega/issues/758)). A code that
   // covers the whole price is refused before the order is created: a v2 Order
   // has no zero amount ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)).
-  const amount = chargeableAmount(listPrice, discount, { provider: 'PayPal' });
+  const amount = chargeableAmount(listPrice, discount, { provider: 'paypal' });
 
   const brandName = ctx.omega?.config?.brand?.name || product.name || productId;
 

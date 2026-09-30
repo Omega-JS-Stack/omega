@@ -12,6 +12,7 @@
  *     If omitted, the code is valid for everyone.
  */
 const { User } = require('../../helpers/account.js');
+const registry = require('./providers/index.js');
 
 // A User from a raw doc; a User passes through
 const toUser = (user) => (user instanceof User ? user : new User(user));
@@ -157,39 +158,30 @@ function applyToAmount(amount, discount) {
 }
 
 /**
- * The first charge for a provider that has no coupon object — applyToAmount()
- * with the zero-total refusal in front of it.
- *
- * Stripe and Chargebee hand their hosted page a real coupon and let it decide
- * what a zero total means. PayPal and Coinbase are prices THIS framework
- * computes and sends, and neither a PayPal v2 Order/setup fee nor a Coinbase
- * charge accepts a zero amount — so a code that covered the whole price was
- * sent as a real $0.00 charge and came back as a provider 400 the buyer read as
- * the checkout's generic failure sentence
- * ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)). It is refused
- * here instead, before the provider is called at all, and the refusal is coded
- * 400 so `POST /payments/intent` answers the buyer with THESE words (naming
- * their code and the price) rather than its neutral 500 line.
- *
- * A product priced 0 is NOT this case: it carries no code that could have taken
- * anything off, and every provider already refuses it with its own "No price
- * configured for …" — which stays theirs.
+ * applyToAmount() with a 400 refusal in front of it for a provider whose
+ * registry row takes no $0 charge. A product priced 0 is not this case: each
+ * provider refuses it with its own "No price configured".
  *
  * @param {number} listPrice - The charge before any code
  * @param {object} [discount] - A validate() result, or null for no discount
  * @param {object} options
- * @param {string} options.provider - The provider's display name, for the message
- * @returns {number} The discounted charge, always above zero
- * @throws {Error} Coded 400 when the code leaves nothing to charge
+ * @param {string} options.provider - The provider id, a registry row
+ * @returns {number} The discounted charge, above zero unless the provider takes $0
+ * @throws {Error} Coded 400 when the code leaves nothing the provider can charge
  */
 function chargeableAmount(listPrice, discount, { provider }) {
+  const capability = registry.paymentProvider(provider);
+
+  if (!capability) {
+    throw new Error(`No payment provider "${provider}" in the registry (libraries/payment/providers/index.js)`);
+  }
+
   const amount = applyToAmount(listPrice, discount);
 
   // A priced product that discounts to nothing can only have got there through a
-  // code — applyToAmount() returns the base untouched without one — so the
-  // refusal can always name it
-  if (listPrice > 0 && amount <= 0) {
-    const error = new Error(`Discount code ${discount.code} covers the full $${Number(listPrice).toFixed(2)} price, so there is nothing for ${provider} to charge. Remove the code or choose another payment method.`);
+  // code, since applyToAmount() returns the base untouched without one
+  if (!capability.acceptsZeroCharge && listPrice > 0 && amount <= 0) {
+    const error = new Error(`Discount code ${discount.code} covers the full $${Number(listPrice).toFixed(2)} price, so there is nothing for ${capability.name} to charge. Remove the code or choose another payment method.`);
 
     error.code = 400;
 

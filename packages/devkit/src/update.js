@@ -18,6 +18,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { execSync } = require('node:child_process');
+const { resolvePackageRealDir } = require('./local.js');
 
 const REGISTRY_BASE = 'https://registry.npmjs.org';
 const DEFAULT_MIN_AGE_DAYS = 7;
@@ -189,26 +190,21 @@ function highestWithin(versions, current, tier) {
 }
 
 /**
- * Find a dependency's physically installed version — nearest node_modules
- * copy walking UP from dir (npm hoists to the brand root in brand monorepos).
+ * Find a dependency's physically installed version: the nearest copy
+ * `resolvePackageRealDir` finds from dir (npm hoists to the brand root in
+ * brand monorepos).
  * @param {string} name - package name
  * @param {string} dir - starting directory
  * @returns {string|null}
  */
 function findInstalledVersion(name, dir) {
-  let current = path.resolve(dir);
-  for (;;) {
-    const manifest = path.join(current, 'node_modules', ...name.split('/'), 'package.json');
-    if (fs.existsSync(manifest)) {
-      try {
-        return JSON.parse(fs.readFileSync(manifest, 'utf8')).version || null;
-      } catch (e) {
-        return null;
-      }
-    }
-    const parent = path.dirname(current);
-    if (parent === current) return null;
-    current = parent;
+  const installed = resolvePackageRealDir(name, dir);
+  if (!installed) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(path.join(installed, 'package.json'), 'utf8')).version || null;
+  } catch (e) {
+    return null;
   }
 }
 

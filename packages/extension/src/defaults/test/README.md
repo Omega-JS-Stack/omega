@@ -1,3 +1,4 @@
+<!-- ========== Default Values ========== -->
 # Project tests
 
 Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx omega test`.
@@ -40,3 +41,5 @@ That is the standalone form: one test per file. Every case file wraps its spec i
 ## See also
 
 `node_modules/@omega.js/manager/docs/extension/test-framework.md`: full reference for the test framework (layers, assert API, fixtures, runner internals).
+
+<!-- ========== Custom Values ========== -->

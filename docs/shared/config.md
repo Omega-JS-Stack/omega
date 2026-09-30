@@ -892,7 +892,9 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   restarts.
 - **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
   children; `envPort(name)` reads one, `envPorts(env)` reads the whole map back out.
-  URL getters resolve env → classic default.
+  The name (`envName()`) and the positive-integer check (`parsePort()`) live in the
+  browser-safe `src/dev-facts.js`, re-exported here, so the browser chain below reads
+  env the same way.
 - **Browser channel (cp89, [#300](https://github.com/Omega-JS-Stack/omega/issues/300))** —
   browser code can read neither env nor files, so a surface BAKES the map into its
   client config, under the same key on all three (`OMEGA_BUILD_JSON.config.dev`, #894):
@@ -933,6 +935,17 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   resolves the LOCAL stack for every source, including `source: 'company'` —
   `company.url` is a production concept, and dev deliberately makes no live server
   hits (ratified, Ian 2026-08-03, [#34](https://github.com/Omega-JS-Stack/omega/issues/34)).
+- **The local port chain**: `@omega.js/client/modules/dev-ports.js` is its ONE home,
+  browser-safe and instance-free. It reads `OMEGA_<NAME>_PORT` (Node-side contexts
+  only), then the `dev.ports` map it is given, then throws `devFactMissing()` naming the
+  caller's writer, and it builds the local URLs on that port with one host rule: the
+  mkcert proxy (`https`) answers `https://localhost:<port>`, the name its certificate
+  carries, and every plain-http emulator (the `hosting` API, functions, auth) answers
+  `http://127.0.0.1:<port>`, because `localhost` can resolve to `::1` in Node and miss an
+  emulator bound to `127.0.0.1`. The client base class calls it with the map
+  `_providedDevPorts()` builds (chrome over `window.__OMEGA_DEV_PORTS__`);
+  @omega.js/desktop's and @omega.js/extension's `utils/url-helpers.js` call it with
+  their baked map and their own writer, and keep no copy of their own.
 - **Website port (cp89)** — `omega dev` allocates through the same model: classic
   **4000** (pre-N7 it defaulted to 8080, colliding with the SAME brand's firestore
   emulator), bump when taken, `--port` flag or config `ports.website` pins; publishes
@@ -1032,8 +1045,17 @@ the bare number, so an object-shaped price rendered a correct order summary and 
 the confirmation URL as `[object Object]`. There is no shared resolver to settle it in —
 the browser bundle cannot reach a build-time package, and the deployed backend runtime
 carries none either — so the SHAPE is settled here, in the one place both sides' catalog
-comes from. (`prices.amount` as a KEY is a different thing, a legacy one-time spelling the
-checkout still reads; its value is a number like every other.)
+comes from.
+
+**A one-time price is `once`, and only `once`** ([#849](https://github.com/Omega-JS-Stack/omega/issues/849)):
+a one-time product writes `prices: { once: 49.99 }` and a subscription names its cadence
+(`monthly`, `annually`, …). The checkout page and every backend reader take `once` alone,
+so the validator refuses the legacy one-time spellings, naming `once`: `prices.amount` on
+any product (it is no cadence) and any cadence key (`daily`, `weekly`, `monthly`,
+`annually`: `SUBSCRIPTION_CADENCES`, the one list) on a one-time product. It refuses
+`once` on a subscription too, naming the cadence keys. `npx omega migrate --execute`
+moves an `amount` to `once` inside its own product; a cadence key on a one-time product
+is renamed by hand ([breaking-changes.md](breaking-changes.md)).
 
 ## The features catalog (`features`) and a product's values — #647
 
@@ -1268,7 +1290,7 @@ site. Three cases:
 | Case | The switch | The read | Examples |
 |------|-----------|----------|----------|
 | **1. Data-bearing** — the feature cannot run without a value only the brand can supply | that DATA's presence | `if (value)` | `advertising.providers.adsense.client`, `monitoring.providers.sentry.dsn`, `analytics.providers.*.id`, `edge.providers.cloudflare.zone`, `advertising.providers.inhouse.source` |
-| **2. Zero-data**: the framework can run it for every brand with no input | `enabled`, default ON | `value !== false` | `forms.providers.slapform.enabled`, `inbound.chat.providers.chatsy.enabled`, `search.providers.searchConsole.enabled`, `edge.providers.cloudflare.enabled`, `targets.web.meta.index`, the manager's own `enabled`, `server.enabled`, `assets.enabled`, `payment.enabled` |
+| **2. Zero-data**: the framework can run it for every brand with no input | `enabled`, default ON | `value !== false` | `forms.providers.slapform.enabled`, `inbound.chat.providers.chatsy.enabled`, `search.providers.searchConsole.enabled`, `edge.providers.cloudflare.enabled`, `targets.web.meta.index`, the manager's own `enabled`, `server.enabled`, `assets.enabled`, `payment.enabled`, `seo.enabled`, `certificates.enabled`, `account.enabled` |
 | **3. Consequential** — it costs money, publishes to the world, or is irreversible | `enabled`, default OFF | `value === true` | `directory.enabled`, `devlog.enabled`, `targets.desktop.platforms.mac.mas.enabled` |
 
 - **A block by itself NEVER enables.** Authoring `providers: { adsense: {} }` is an opt-IN
@@ -1542,6 +1564,26 @@ slapform, chatsy, replyify) DO carry defaults — see the polarity doctrine abov
 Role-level switches beside any providers block
 (`monitoring.enabled`, `marketing.campaigns.enabled`) are nobody's pick and always may.
 
+**The manager backfills only what the schema cannot default**
+([#972](https://github.com/Omega-JS-Stack/omega/issues/972)). `@omega.js/manager`'s `DEFAULTS` is
+`schemaDefaults()` with `MANAGER_DEFAULTS` (`packages/manager/src/config.js`) on top, and a manager
+test fails on any key both of them default. What stays in that table is what no schema `default:`
+can carry:
+
+- **Placeholders**, `null` or empty: the ids a service writes back
+  (`payment.providers.stripe.publishableKey`, `forms.providers.slapform.formId`, the agent and list
+  ids), the tri-states that mean "ask" (`cloud.organizationId`, `cloud.billingAccount`) and the
+  lists an owner fills (`payment.products`, `domain.email.forwarding`). None has a framework
+  answer, which is the rule above.
+- **Settings under a vendor key whose presence picks that vendor**: Stripe's `updateAccountInfo`
+  and Radar rules, GA4's `timeZone`, `currency` and `enhancedMeasurement`, the Ghostii devlog
+  writer's settings, and the Apple capability, profile and certificate sets. A schema default
+  resolves in every target and materializes into every brand, so it would name that vendor for
+  every brand; under `certificates.providers.apple` it would also make the `APPLE_API_*` keys
+  required everywhere, through their `requiredWhen`.
+- **`devlog.enabled: false`**: the case-3 switch whose rule keeps devlog out of the schema's
+  defaults layer ([#553](https://github.com/Omega-JS-Stack/omega/issues/553)).
+
 **`omega manage` materializes what a brand lacks.** The workspace service's `defaults` operation
 (right after the `config` health check) diffs the brand's own `config/omega.json5` against the
 schema defaults and writes the missing blocks through the comment-preserving editor, each key
@@ -1577,7 +1619,10 @@ rarely does — presentation the framework owns — belongs at the layer that ow
 every brand config is a copy that drifts from the thing it came from. The `connections` section is
 the first: the framework ships the five packaged providers' `name`, `logo` and `description`, a
 brand overrides any key through the ordinary merge chain, and nothing is copied into a brand file to
-go stale ([docs/backend/connections.md](../backend/connections.md)).
+go stale ([docs/backend/connections.md](../backend/connections.md)). The Cloudflare engine data
+(`edge.providers.cloudflare.dns`, `settings`, `speedTest`, `cacheRules`, `rules.*`) and
+`account.admins` are the others: platform answers and a list a company config typically sets once,
+where a copy in every brand file would shadow the company layer (arrays replace whole).
 
 ## Writeback (comment-preserving edits)
 

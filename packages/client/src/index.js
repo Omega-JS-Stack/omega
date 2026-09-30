@@ -22,22 +22,16 @@ import { pathPrefix } from './modules/path-prefix.js';
 // a browser is `config.environment`, the build fact every OMEGA surface bakes.
 import { getEnvironment, isDevelopment, isProduction, isTesting } from '@omega.js/config/environment';
 import { devFactMissing } from '@omega.js/config/dev-facts';
+import { requiredPort, localApiUrl, localFunctionsUrl, localAuthEmulatorUrl } from './modules/dev-ports.js';
 
 const firebaseLogger = createLogger('firebase');
 const analyticsLogger = createLogger('analytics');
 const chatsyLogger = createLogger('chatsy');
 const versionLogger = createLogger('version');
 
-// The classic dev ports and the classic dev origin used to be repeated HERE as
-// browser-side fallbacks, in lockstep with @omega.js/config's CLASSIC_PORTS.
-// They are gone ([#834](https://github.com/Omega-JS-Stack/omega/issues/834)):
-// the numbers are DEFINED once, in @omega.js/config, and every surface bakes the
-// resolved map into `OMEGA_BUILD_JSON.config.dev` for the browser to read. A
-// real dev build always carries it, so a missing map is a broken build, not a
-// case to assume through. `_devFactMissing` below is what a missing one raises,
-// and it names the step that writes it.
-// This runtime is embedded in all three browser surfaces, so the step that
-// wrote the map depends on which one is hosting it.
+// The step that wrote the baked dev map, named in every missing-dev-fact error
+// (`_devFactMissing` below, and modules/dev-ports.js handed this writer). This
+// runtime is embedded in all three browser surfaces, so it names each one.
 const DEV_FACT_WRITER = '`omega dev` (into the page chrome, per response) on a website, and the @omega.js/desktop and @omega.js/extension bundle tasks at build time';
 
 /**
@@ -619,7 +613,7 @@ class Omega {
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
       connectAuthEmulator(this._firebaseAuth, authEmulatorUrl, { disableWarnings: true });
-      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', firestorePort);
+      connectFirestoreEmulator(this._firebaseFirestore, '127.0.0.1', firestorePort);
       firebaseLogger.log('Emulators connected');
     }
 
@@ -766,19 +760,11 @@ class Omega {
     return this._providedDevPorts();
   }
 
-  // ONE port, by name, from the resolved map (#834). No fallback: a classic
-  // number nobody resolved is a guess, nothing identity-checks what answers on
-  // it, and a neighbouring project's emulator holding it reads as an auth
-  // mystery (`auth/user-not-found` for hours) instead of a port problem. So the
-  // guess is gone and the miss is loud, at the call that needed the number.
+  // ONE port, by name, through the shared chain over the map this page was
+  // given. No classic fallback: a miss is loud, at the call that needed the
+  // number, naming the step that writes the map.
   _devPort(name) {
-    const port = this._providedDevPorts()[name];
-
-    if (!port) {
-      throw _devFactMissing(`dev port for \`${name}\``);
-    }
-
-    return port;
+    return requiredPort(this._providedDevPorts(), name, DEV_FACT_WRITER);
   }
 
   // Where the dev WEBSITE answers — the one shared answer for every surface
@@ -815,7 +801,7 @@ class Omega {
       return window.location.origin;
     }
 
-    return `http://localhost:${this._devPort('auth')}`;
+    return localAuthEmulatorUrl(this._providedDevPorts(), DEV_FACT_WRITER);
   }
 
   getFunctionsUrl(environment) {
@@ -827,7 +813,7 @@ class Omega {
     }
 
     if (this._localStack(env)) {
-      return `http://localhost:${this._devPort('functions')}/${projectId}/us-central1`;
+      return localFunctionsUrl(this._providedDevPorts(), projectId, DEV_FACT_WRITER);
     }
 
     return `https://us-central1-${projectId}.cloudfunctions.net`;
@@ -843,23 +829,11 @@ class Omega {
       || queryEnv
       || this.getEnvironment();
 
+    // Scheme and host follow what the provided dev map says is running (N7):
+    // the shared chain answers the mkcert proxy, else the hosting emulator,
+    // else throws by name.
     if (this._localStack(env)) {
-      // Scheme follows what the provided dev map says is actually running (N7):
-      // - `https` key → `mgr serve`'s mkcert proxy (it owns publishing that key).
-      // - `hosting` key → an allocator-booted emulator stack; the hosting
-      //   emulator speaks plain http on 127.0.0.1 (rewrites /omega/** to the API).
-      // - no map → nothing to assume (#834). The classic
-      //   `https://localhost:5002` guess is gone: a dev build always carries the
-      //   resolved map, and a wrong API base fails as a silent connection
-      //   refusal or, worse, as a hit on a neighbouring project's stack.
-      const provided = this._providedDevPorts();
-      if (provided.https) {
-        return `https://localhost:${provided.https}`;
-      }
-      if (provided.hosting) {
-        return `http://127.0.0.1:${provided.hosting}`;
-      }
-      throw _devFactMissing('dev `https` or `hosting` port');
+      return localApiUrl(this._providedDevPorts(), DEV_FACT_WRITER);
     }
 
     // The API rides the BRAND domain (api.<brand host>). Never derive from

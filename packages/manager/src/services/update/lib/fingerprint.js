@@ -22,6 +22,7 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { resolvePackageDir } = require('@omega.js/devkit/local');
 
 // Never part of a target's input set: installed deps (node_modules), build
 // output (dist), run logs (logs), and the machinery `omega build` / `omega
@@ -70,30 +71,6 @@ function sweep(dir) {
 }
 
 /**
- * Where does `name` resolve from `fromDir` via the node_modules climb? A
- * manual walk (not require.resolve) so exports-restricted packages and
- * bin-only packages don't false-negative.
- *
- * @param {string} fromDir - Directory to climb from.
- * @param {string} name - Package name.
- * @returns {string|null} The package directory, or null when it doesn't resolve.
- */
-function resolvePackageDir(fromDir, name) {
-  let dir = path.resolve(fromDir);
-
-  while (true) {
-    const candidate = path.join(dir, 'node_modules', name);
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
-
-/**
  * Hash the installed identity of every `@omega.js/*` package the target declares.
  *
  * @param {string} targetPath - The target root.
@@ -106,7 +83,8 @@ function frameworkFingerprint(targetPath) {
     .sort();
 
   const parts = declared.map((name) => {
-    const dir = resolvePackageDir(targetPath, name);
+    // The LINK path, not its real one: a symlinked install is what earns the dist sweep
+    const dir = resolvePackageDir(name, targetPath);
     if (!dir) {
       return `${name}@missing`;
     }
@@ -154,4 +132,4 @@ function fingerprintTarget(targetPath, chainFiles = []) {
   };
 }
 
-module.exports = { fingerprintTarget, resolvePackageDir, sweep, EXCLUDED_DIRS };
+module.exports = { fingerprintTarget, sweep, EXCLUDED_DIRS };

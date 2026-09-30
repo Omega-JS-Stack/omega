@@ -9,7 +9,7 @@
 import { initializeApp, getApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signOut, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
 import { User } from '@omega.js/account';
-import { requiredPort } from '../utils/url-helpers.js';
+import { getAuthEmulatorUrl } from '../utils/url-helpers.js';
 import LoggerLite from './logger-lite.js';
 import Messaging from './messaging.js';
 
@@ -351,9 +351,9 @@ class BackgroundAuth {
       // up; it is gone (#834), numbers and all, because a neighbouring
       // project's emulator holding that port reads as an auth mystery rather
       // than as a port problem.
-      const port = requiredPort(this.omega, 'OMEGA_AUTH_PORT', 'auth');
-      this.logger.log(`Testing build: connecting auth to the emulator on :${port}`);
-      connectAuthEmulator(this._firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
+      const url = getAuthEmulatorUrl(this.omega);
+      this.logger.log(`Testing build: connecting auth to the emulator at ${url}`);
+      connectAuthEmulator(this._firebaseAuth, url, { disableWarnings: true });
     }
 
     // Set up auth state change listener (background is source of truth)

@@ -1,3 +1,4 @@
+<!-- ========== Default Values ========== -->
 # Project tests
 
 `npm test` (= `npx omega test`) runs every suite under `test/` against a **real Firebase emulator**: yours, and the framework's when you ask for them. A custom-server backend boots no emulator and runs the suites directly. While the suites run, a plain run is **socket-free past this machine**: the runner arms a connect trap after the emulator health check and account setup, and a TCP connect or DNS lookup to any host but loopback throws. The emulator on loopback stays reachable; `--extended` and `--lane=` runs stand the trap down, since they exist to reach real services.
@@ -71,3 +72,5 @@ module.exports = defineCases({
 ## See also
 
 The framework's own test suites at `node_modules/@omega.js/backend/test/` are the canonical reference for how each layer is structured.
+
+<!-- ========== Custom Values ========== -->

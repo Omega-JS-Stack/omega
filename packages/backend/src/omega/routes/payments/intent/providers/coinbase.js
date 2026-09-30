@@ -52,7 +52,7 @@ module.exports = {
     // covers the whole price is refused by that same helper before this charge
     // is ever created: Coinbase Commerce does not take a $0.00 one
     // ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)).
-    const amount = chargeableAmount(listPrice, discount, { provider: 'Coinbase Commerce' });
+    const amount = chargeableAmount(listPrice, discount, { provider: 'coinbase' });
 
     const brandName = ctx.omega?.config?.brand?.name || product.name || productId;
 

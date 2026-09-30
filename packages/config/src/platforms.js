@@ -61,6 +61,16 @@ function windowsSigningKeys() {
     .map((entry) => entry.name);
 }
 
+/**
+ * The env keys one cloud signing provider needs: the schema entries gated on it.
+ * @param {string} provider - A cloud provider (windows-signing.js's WINDOWS_CLOUD_PROVIDERS).
+ * @returns {string[]} Key names, in schema order ([] for a provider nobody gates on).
+ */
+function windowsCloudProviderKeys(provider) {
+  const gate = `platforms.windows.signing.cloud.provider=${provider}`;
+  return ENV_SCHEMA.filter((entry) => entry.requiredWhen === gate).map((entry) => entry.name);
+}
+
 // Every format each platform ships, in offer order. `requires` names env keys
 // (the env schema is the one home of what each is and where it is minted);
 // `listing` names CONFIG paths (#893). A `store` also carries the two facts a
@@ -269,6 +279,7 @@ module.exports = {
   FORMATS,
   enabledFormats,
   formatKeys,
+  windowsCloudProviderKeys,
   desktopProductName,
   sanitizeProductName,
   desktopArtifactName,

@@ -4,6 +4,7 @@ const powertools = require('node-powertools');
 const OrderId = require('../../../libraries/payment/order-id.js');
 const recaptcha = require('../../../libraries/recaptcha.js');
 const discountCodes = require('../../../libraries/payment/discount-codes.js');
+const registry = require('../../../libraries/payment/providers/index.js');
 const { hasAuthUser } = require('../../../libraries/auth-user.js');
 const { COLLECTION: CART_COLLECTION } = require('../../../libraries/abandoned-cart-config.js');
 
@@ -76,6 +77,19 @@ module.exports = async ({ ctx, omega, user, data }) => {
 
   ctx.log(`Product resolved: id=${product.id}, name=${product.name}, type=${productType}, trialDays=${product.trial?.days || 'none'}`);
 
+  // The provider gate: what a provider sells is its registry row's answer,
+  // refused here before an order id is minted or a provider module runs
+  const capability = registry.paymentProvider(provider);
+
+  if (!capability) {
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
+  }
+
+  if (!(productType === 'subscription' ? capability.subscriptions : capability.oneTime)) {
+    ctx.log(`Checkout refused: provider=${provider} does not sell type=${productType}`);
+    return ctx.respond(`${capability.name} cannot sell ${productType === 'subscription' ? 'a subscription' : 'a one-time purchase'}. Choose another payment method.`, { code: 400 });
+  }
+
   // Subscription-specific guards
   if (productType === 'subscription') {
     // Require frequency for subscriptions
@@ -89,6 +103,13 @@ module.exports = async ({ ctx, omega, user, data }) => {
     if (subProductId !== 'basic' && subStatus !== 'cancelled') {
       ctx.log(`User ${uid} has existing subscription: product=${subProductId}, status=${subStatus}, resourceId=${user.subscription.payment?.resourceId}`);
       return ctx.respond('You already have a subscription. Please cancel your existing subscription before purchasing a new one.', { code: 400 });
+    }
+
+    // A provider with no trials sells the plan without one, downgraded the
+    // same silent way an ineligible buyer is below
+    if (trial && !capability.trials) {
+      ctx.log(`Provider ${provider} offers no trials, continuing without trial`);
+      trial = false;
     }
 
     // Resolve trial eligibility: if requested but user has subscription history, silently downgrade
@@ -137,13 +158,9 @@ module.exports = async ({ ctx, omega, user, data }) => {
   const confirmationUrl = buildConfirmationUrl(omega.project.websiteUrl, { product, productId, productType, frequency, provider, trial, orderId, discount: resolvedDiscount });
   const cancelUrl = buildCancelUrl(omega.project.websiteUrl, { productId, frequency });
 
-  // Load the provider module
-  let providerModule;
-  try {
-    providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
-  } catch (e) {
-    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
-  }
+  // Every registry row has an intent module (provider-registry.test.js), so a
+  // load that throws here is a framework bug, never the caller's
+  const providerModule = loadProvider(path.join(__dirname, 'providers'), provider);
 
   // Create the intent via the provider
   let result;

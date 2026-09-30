@@ -185,7 +185,7 @@ Firebase is **bundled from @omega.js/desktop's module context** (@omega.js/clien
 
 If you're building a no-auth Electron app, just leave `cloud.config` empty — the bridge is a clean no-op.
 
-In a TESTING run (`OMEGA_ENVIRONMENT=testing`) the bridge connects its auth instance to the local auth emulator, on the port it reads in three steps: `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, then the `dev.ports.auth` value the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then the classic `9099`. Same chain `getApiUrl()` walks ([environment-detection.md](environment-detection.md)) and the same move it makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
+In a TESTING run (`OMEGA_ENVIRONMENT=testing`) the bridge connects its auth instance to the local auth emulator at `getAuthEmulatorUrl(omega)` from `src/utils/url-helpers.js`: `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, then the `dev.ports.auth` value the bundle baked into `OMEGA_BUILD_JSON` (a packaged main process has no parent env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then a throw naming the port, answered as `http://127.0.0.1:<port>`. It is the same client chain `getApiUrl()` delegates to ([environment-detection.md](environment-detection.md)), and the same one @omega.js/extension's background worker connects through for its emulator runs; development and production are untouched.
 
 ## Common patterns
 

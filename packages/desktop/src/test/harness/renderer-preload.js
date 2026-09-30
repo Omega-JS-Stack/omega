@@ -157,11 +157,11 @@ contextBridge.exposeInMainWorld('desktop', desktopSurface);
 let testOmega;
 let buildError = null;
 
-// The ESM modules renderer.js requires. Electron's preload loader has no
-// require(esm) (a production renderer is esbuild-bundled, so it never needs one):
-// each is loaded through import() first and seated in require's cache, and
-// renderer.js's own require() then finds it there.
-const RENDERER_ESM = ['@omega.js/client', '@omega.js/client/modules/request.js', './assets/js/core/app-shell.js'];
+// The ESM modules renderer.js requires, directly or through utils/url-helpers.js.
+// Electron's preload loader has no require(esm) (a production renderer is
+// esbuild-bundled, so it never needs one): each is loaded through import() first
+// and seated in require's cache, and the require() that wants it finds it there.
+const RENDERER_ESM = ['@omega.js/client', '@omega.js/client/modules/request.js', '@omega.js/client/modules/dev-ports.js', './assets/js/core/app-shell.js'];
 
 async function buildInstance() {
   const Module = require('module');

@@ -6,6 +6,7 @@ const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS } = require('@omega.js/config');
 
 // Helper: stage a consumer dir with config/omega.json5 containing the given
 // platforms.windows.signing.strategy (under targets.desktop in the raw file). Returns the
@@ -219,7 +220,36 @@ module.exports = defineCases({
             threw = e;
           }
           ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toMatch(/imaginary-provider-xyz|not yet implemented/);
+          ctx.expect(threw.message).toContain('imaginary-provider-xyz');
+          ctx.expect(threw.message).toContain(`Supported: ${WINDOWS_CLOUD_PROVIDERS.join(', ')}.`);
+        } finally {
+          process.chdir(origCwd);
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    // No cloud provider signer ships, so a declared provider is refused by name
+    // rather than looked up in a module directory that does not exist.
+    {
+      name: 'sign-windows: cloud strategy with a declared provider refuses, naming it',
+      run: async (ctx) => {
+        const signWindows = require(path.join(__dirname, '..', '..', '..', 'commands', 'sign-windows.js'));
+        const tmp = stageStrategyConfig({ strategy: 'cloud', cloudProvider: 'azure' });
+        fs.writeFileSync(path.join(tmp, 'fake.exe'), 'fake');
+
+        const origCwd = process.cwd();
+        process.chdir(tmp);
+
+        try {
+          let threw;
+          try {
+            await signWindows({ in: tmp, out: path.join(tmp, 'signed') });
+          } catch (e) {
+            threw = e;
+          }
+          ctx.expect(threw).toBeDefined();
+          ctx.expect(threw.message).toContain('azure');
+          ctx.expect(threw.message).not.toContain('sign-providers');
         } finally {
           process.chdir(origCwd);
           fs.rmSync(tmp, { recursive: true, force: true });
@@ -270,6 +300,7 @@ module.exports = defineCases({
           }
           ctx.expect(threw).toBeDefined();
           ctx.expect(threw.message).toMatch(/Unknown Windows signing strategy/);
+          ctx.expect(threw.message).toContain(`Supported: ${WINDOWS_SIGNING_STRATEGIES.join(', ')}.`);
         } finally {
           process.chdir(origCwd);
           fs.rmSync(tmp, { recursive: true, force: true });

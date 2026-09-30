@@ -68,6 +68,7 @@ const { isBuiltin } = require('node:module');
 const jetpack = require('fs-jetpack');
 const vendorDocs = require('./vendor-docs');
 const Logger = require('../src/logger');
+const { resolvePackageDir } = require('../src/local');
 
 const logger = new Logger('devkit-vendor');
 
@@ -80,15 +81,26 @@ const SPECIFIER = '@omega\\.js\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
 // packages (web, client, backend, ...) are never folded into a host's dist.
 const VENDORABLE_PACKAGES = ['devkit', 'config', 'account', 'template-kit', 'analytics', 'monitoring'];
 
-// The ways dist code can reference an @omega.js package. Each pattern captures:
-// 1 = prefix (kept verbatim on rewrite), 2 = quote, 3 = package name, 4 = subpath.
-// The match ends at the closing quote, so trailing syntax (`)`, `;`) is untouched.
-const REFERENCE_PATTERNS = [
-  new RegExp(`(require(?:\\.resolve)?\\(\\s*)(['"])${SPECIFIER}\\2`, 'g'), // require / require.resolve
-  new RegExp(`(from\\s+)(['"])${SPECIFIER}\\2`, 'g'),                      // import|export ... from
-  new RegExp(`(import\\s*\\(\\s*)(['"])${SPECIFIER}\\2`, 'g'),             // dynamic import()
-  new RegExp(`(import\\s+)(['"])${SPECIFIER}\\2`, 'g'),                    // side-effect import
+// The ways dist code can reference an @omega.js package: the one home of the
+// reference shape, which the rewrite and every self-containment reader derive.
+const REFERENCE_PREFIXES = [
+  'require(?:\\.resolve)?\\(\\s*', // require / require.resolve
+  'from\\s+',                     // import|export ... from
+  'import\\s*\\(\\s*',             // dynamic import()
+  'import\\s+',                   // side-effect import
 ];
+
+// Each pattern captures: 1 = prefix (kept verbatim on rewrite), 2 = quote,
+// 3 = package name, 4 = subpath. The match ends at the closing quote, so
+// trailing syntax (`)`, `;`) is untouched.
+const REFERENCE_PATTERNS = REFERENCE_PREFIXES.map((prefix) => new RegExp(`(${prefix})(['"])${SPECIFIER}\\2`, 'g'));
+
+// A raw reference to a vendorable, the self-containment gates' one shape: it
+// surviving into a shipped tree is a broken install, those packages never being
+// published. Match whole file contents, never lines (`from` may end a line).
+const PRIVATE_REFERENCE = new RegExp(
+  `(?:${REFERENCE_PREFIXES.join('|')})['"]@omega\\.js\\/(${VENDORABLE_PACKAGES.join('|')})(?:['"/])`,
+);
 
 // Matches relative requires/imports — used to walk package-internal dependencies.
 // Group 2 = the relative path in every pattern.
@@ -246,22 +258,15 @@ function resolvePackageRoot(name, cwd) {
   }
 }
 
-// Locate a package's ROOT directory (where its package.json lives) for asset
-// vendoring. A plain node_modules walk-up from the host, never require.resolve:
-// that resolves the package's `main`, which for a dist-building package is a
-// file its own prepare has not written yet on a fresh tree (a CI checkout
-// preparing desktop before web), and assets live in the package's SOURCES.
+// A package's ROOT dir for asset vendoring: the plain `resolvePackageDir` walk,
+// never require.resolve, which resolves `main`: on a fresh tree a dist-building
+// package's `main` is not written yet (a CI checkout preparing desktop before
+// web), and assets live in the package's SOURCES.
 function resolveAssetPackageRoot(name, cwd) {
   for (const base of [cwd, __dirname]) {
-    let dir = path.resolve(base);
-    while (true) {
-      const candidate = path.join(dir, 'node_modules', name);
-      if ((jetpack.read(path.join(candidate, 'package.json'), 'json') || {}).name === name) {
-        return candidate;
-      }
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
+    const dir = resolvePackageDir(name, base);
+    if (dir && jetpack.read(path.join(dir, 'package.json'), 'json')?.name === name) {
+      return dir;
     }
   }
   throw new Error(`[devkit vendor] Cannot resolve '${name}' from ${cwd} — is it a devDependency of the host?`);
@@ -606,3 +611,4 @@ module.exports = vendorPackages;
 // The canonical vendorable list — watch-all's vendor propagation watches
 // exactly the packages this tool folds into dists.
 module.exports.VENDORABLE_PACKAGES = VENDORABLE_PACKAGES;
+module.exports.PRIVATE_REFERENCE = PRIVATE_REFERENCE;

@@ -55,7 +55,7 @@ module.exports = defineCases({
 
         assert.ok(refusal, 'A crypto purchase is not refundable');
         assert.equal(refusal.reason, 'provider-cannot-refund', 'The refusal names WHY, machine-readably');
-        assert.match(refusal.message, /crypto/i, 'And says so in words a buyer can read');
+        assert.match(refusal.message, /Coinbase Commerce purchases cannot be refunded/, 'And says so, naming the provider off its descriptor');
       },
     },
 

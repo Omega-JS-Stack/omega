@@ -271,6 +271,12 @@ const RETIRED_PATHS = {
     why: 'pacing is per FEATURE now (#647): day pacing is the default on every counted feature, and `usage: { pace: false }` on the catalog entry is the opt-out the product-wide `rateLimit: "monthly"` used to be',
   },
 
+  'payment.products.prices.amount': {
+    replacement: 'payment.products[].prices.once',
+    why: 'one one-time price key (#849): every reader of a one-time price takes `once`, and the config validator refuses `amount` (and `monthly` on a one-time product), so the number moves to `once` inside its own product',
+    convert: (value) => value,
+  },
+
   'targets.desktop.downloads.enabled': {
     replacement: 'targets.desktop.releases',
     why: 'one public releases repo per brand (#620/#799): the fixed-name mirror is gone, and the versionless assets on the releases repo ARE the permanent download links',

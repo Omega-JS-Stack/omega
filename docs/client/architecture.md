@@ -46,7 +46,8 @@ export default async ({ omega, options }) => {
 │       ├── verts.js           # The fallback-ladder ad engine
 │       ├── motion.js          # createMotion(), the factory behind omega.motion
 │       └── …                  # Plain helpers: live-page, vert-document, path-prefix,
-│                              #   logger, icon-core, icon-renderer, features
+│                              #   logger, icon-core, icon-renderer, features,
+│                              #   reveal-stagger
 ├── dist/                      # Transpiled ES5 output (generated)
 └── test/                      # Tests
 ```

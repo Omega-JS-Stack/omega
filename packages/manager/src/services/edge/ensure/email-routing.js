@@ -1,8 +1,9 @@
 /**
  * Ensure Cloudflare Email Routing is enabled and forwarding rules are synced.
  *
- * Only runs when domain.email.providers names cloudflare; rules come from
- * domain.email.forwarding [{ from: 'support' | '*', to: 'inbox@…' }].
+ * Only runs when the mailbox provider's registry entry says `routing`
+ * (cloudflare); rules come from domain.email.forwarding
+ * [{ from: 'support' | '*', to: 'inbox@…' }].
  *
  * Unverified destination addresses: a verification email is sent; interactive
  * runs open the dashboard and retry the rule write until the address verifies,
@@ -13,7 +14,7 @@ const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
-const { resolveEmailProvider } = require('../../domain/lib/registrars.js');
+const { DOMAIN_PROVIDERS, resolveEmailProvider } = require('../../domain/lib/providers.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function isUnverifiedError(error) {
@@ -91,7 +92,7 @@ module.exports = async function ensureEmailRouting(context) {
   if (gated) return gated;
   const emailConfig = brandConfig.domain?.email;
 
-  if (resolveEmailProvider(brandConfig) !== 'cloudflare') {
+  if (!DOMAIN_PROVIDERS.mailbox[resolveEmailProvider(brandConfig)]?.routing) {
     console.log(`      ${chalk.dim('⊘ Email provider is not cloudflare — nothing to route')}`);
     return;
   }

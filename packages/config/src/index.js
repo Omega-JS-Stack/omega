@@ -38,8 +38,11 @@ const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js')
 const { resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
-const { PLATFORMS, FORMATS, enabledFormats, formatKeys, desktopProductName, sanitizeProductName, desktopArtifactName, desktopArtifactNames } = require('./platforms.js');
+const { PLATFORMS, FORMATS, enabledFormats, formatKeys, windowsCloudProviderKeys, desktopProductName, sanitizeProductName, desktopArtifactName, desktopArtifactNames } = require('./platforms.js');
+const { WINDOWS_SIGNING_STRATEGIES, DEFAULT_WINDOWS_SIGNING_STRATEGY, WINDOWS_CLOUD_PROVIDERS, windowsSigningStrategy } = require('./windows-signing.js');
 const { resolveWinbackOffer, WINBACK_OFFER_DEFAULTS, WINBACK_DURATIONS } = require('./winback.js');
+const { PAYMENT_PROVIDERS, paymentProvider } = require('./payment-providers.js');
+const { SUBSCRIPTION_CADENCES } = require('./payment-cadences.js');
 const { REPO_PROVIDERS, HOSTING_PROVIDERS, repoBlock, sourceRepo, repoDrift, releasesRepo, websiteRepo, hostingProvider, pagesHost, brandVisibility } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { deriveBundleIdPrefix, composeBundleId } = require('./bundle-id.js');
@@ -192,6 +195,11 @@ module.exports = {
   FORMATS,
   enabledFormats,
   formatKeys,
+  WINDOWS_SIGNING_STRATEGIES,
+  DEFAULT_WINDOWS_SIGNING_STRATEGY,
+  WINDOWS_CLOUD_PROVIDERS,
+  windowsSigningStrategy,
+  windowsCloudProviderKeys,
   desktopProductName,
   sanitizeProductName,
   desktopArtifactName,
@@ -202,6 +210,12 @@ module.exports = {
   resolveWinbackOffer,
   WINBACK_OFFER_DEFAULTS,
   WINBACK_DURATIONS,
+
+  // One capability descriptor per payment provider: the backend's registry
+  // reads it and the browser bake carries it as payment.capabilities
+  PAYMENT_PROVIDERS,
+  paymentProvider,
+  SUBSCRIPTION_CADENCES,
 
   // demo-* project ids are emulator-only (Firebase's convention) — cloud
   // surfaces short-circuit on this instead of 403ing at Google

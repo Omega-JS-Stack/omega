@@ -24,6 +24,19 @@ export function getProviders() {
   return getPaymentConfig().providers || {};
 }
 
+// The provider capability table the build bakes beside the providers: which
+// product types each provider sells and whether it takes a $0 charge. A payment
+// config without it was not baked by the build, so there is nothing to fall back to.
+export function getCapabilities() {
+  const capabilities = getPaymentConfig().capabilities;
+
+  if (!capabilities) {
+    throw new Error('payment.capabilities is missing from the build config: the checkout cannot tell which provider sells what');
+  }
+
+  return capabilities;
+}
+
 // Get all products
 export function getProducts() {
   return getPaymentConfig().products || [];

@@ -145,9 +145,7 @@ function failedInit(initPath) {
 }
 
 /**
- * Seed the emulator with test personas — wipe, create accounts, fetch keys,
- * run setup hooks. Returns the accounts map (same shape as runner.accounts).
- *
+ * Seed the emulator with test personas: wipe, create accounts, fetch keys, run setup hooks.
  * @param {object} options
  * @param {object} options.admin       - Firebase Admin SDK instance (connected to emulator)
  * @param {string} options.domain      - Brand domain (for email templates)
@@ -156,7 +154,7 @@ function failedInit(initPath) {
  * @param {object} [options.omega]   - @omega.js/backend instance (passed to _init hooks)
  * @param {object} [options.ctx] - Backend ctx instance (passed to _init hooks)
  * @param {boolean} [options.quiet]    - Suppress progress output
- * @returns {Promise<{ accounts: object, created: number }>}
+ * @returns {Promise<{ accounts: object, extraAccounts: object, created: number }>} runner.accounts' shape, plus the test/_init.js table
  */
 async function seed({ admin, domain, config, projectDir, omega, ctx, quiet }) {
   const log = quiet ? () => {} : (msg) => process.stdout.write(msg);
@@ -236,7 +234,7 @@ async function seed({ admin, domain, config, projectDir, omega, ctx, quiet }) {
     }
   }
 
-  return { accounts, created: result.created };
+  return { accounts, extraAccounts: initHooks.accounts, created: result.created };
 }
 
 module.exports = { seed, loadInitHooks, loadSeedAccounts };

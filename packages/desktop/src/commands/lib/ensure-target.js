@@ -195,6 +195,9 @@ async function copyDefaults(projectDir, engineLogger) {
       // material really lives, so a target keeps the explanation that matches
       // the ignore rules the scaffold just wrote, never an older one.
       'config/certs/README.md': { overwrite: true },
+      // Scaffolded docs are generated output: the framework rewrites the Default
+      // section from this source on every verb, the project's notes live under Custom.
+      'test/README.md': { mergeLines: true },
       // In a brand the BRAND ROOT is the one doc home: per-target CHANGELOG.md
       // and docs/ never scaffold, and framework-owned copies are swept (consumer
       // content is kept). Last-match-wins over the rules above.

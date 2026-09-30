@@ -325,7 +325,7 @@ class TestRunner {
         projectId: this.options.cloud?.config?.projectId,
         rulesPath: this.options.rulesPath,
         port: this.options.emulatorPorts?.firestore,
-        accounts: this.accounts,
+        accounts: this.accounts, extraAccounts: result.extraAccounts,
       });
       console.log(chalk.green('✓'));
     } catch (error) {

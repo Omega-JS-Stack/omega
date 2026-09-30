@@ -284,13 +284,13 @@ module.exports = defineCases({
           ctx.expect(run(true, { ports: { auth: 9099 } })).toBe(authInstance);
           ctx.expect(connects.length).toBe(1);
           ctx.expect(connects[0].auth).toBe(authInstance);
-          ctx.expect(connects[0].url).toBe('http://localhost:9099');
+          ctx.expect(connects[0].url).toBe('http://127.0.0.1:9099');
 
           // a bumped port arrives on OMEGA_AUTH_PORT (N7)
           process.env.OMEGA_AUTH_PORT = '9199';
           run(true, { ports: { auth: 9099 } });
           ctx.expect(connects.length).toBe(2);
-          ctx.expect(connects[1].url).toBe('http://localhost:9199');
+          ctx.expect(connects[1].url).toBe('http://127.0.0.1:9199');
 
           // Neither channel is a broken artifact, and it says so by name
           // rather than dialling a port nothing identity-checks (#834).

@@ -8,6 +8,7 @@
  */
 const assert = require('node:assert');
 const { test } = require('node:test');
+const { validateConfig } = require('@omega.js/config');
 const { calculatePrices } = require('../core/js/pages/payment/checkout/modules/pricing.js');
 
 test('one-time product: prices.once drives subtotal and total', () => {
@@ -23,15 +24,19 @@ test('one-time product: prices.once drives subtotal and total', () => {
   assert.strictEqual(prices.trialDiscountAmount, 0, 'one-time products never trial');
 });
 
-test('one-time product: legacy amount key still resolves', () => {
-  const prices = calculatePrices({
-    product: { id: 'credits', type: 'one-time', prices: { amount: 9.99 } },
-    frequency: 'monthly',
-    discountPercent: 0,
-    trialEligible: false,
-  });
+test('#849: a one-time price is `once` alone, on the page and in the validator', () => {
+  // The page reads `once` only, the key every backend reader takes, and a config
+  // spelling the price any other way fails validation instead of pricing a page
+  // the purchase then refuses.
+  const legacy = { id: 'credits', type: 'one-time', prices: { amount: 9.99 } };
 
-  assert.strictEqual(prices.subtotal, 9.99, 'legacy { amount } shape keeps working');
+  for (const prices of [{ amount: 9.99 }, { monthly: 9.99 }]) {
+    const priced = calculatePrices({ product: { ...legacy, prices }, frequency: 'monthly', discountPercent: 0, trialEligible: false });
+    assert.strictEqual(priced.subtotal, 0, `the page prices no ${Object.keys(prices)[0]} key, the same as the backend`);
+
+    const { errors } = validateConfig({ brand: { id: 'acme', name: 'Acme' }, targets: { web: { type: 'web' } }, payment: { products: [{ ...legacy, prices }] } });
+    assert.ok(errors.some((error) => error.includes('once: 9.99')), `the validator refuses it, naming once: ${errors.join(' | ')}`);
+  }
 });
 
 test('subscription: frequency price + free trial zeroes today, recurring stays', () => {

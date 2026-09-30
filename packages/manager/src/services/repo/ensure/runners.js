@@ -27,7 +27,7 @@
 const path = require('path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { hasTargetOfType, targetsOfType } = require('@omega.js/config');
+const { hasTargetOfType, targetsOfType, windowsSigningStrategy } = require('@omega.js/config');
 
 /**
  * The triggers that must never reach a self-hosted runner
@@ -163,9 +163,9 @@ module.exports = async function ensureRunners(context) {
 
   // The desktop target's OWN entry, whatever it is named (#886): its
   // settings never live under a key spelled for the type.
-  // Absent = self-hosted: the framework default every desktop brand signs with
+  // Absent = the framework default every desktop brand signs with
   const desktop = targetsOfType(brandConfig, 'desktop')[0];
-  const strategy = desktop?.platforms?.windows?.signing?.strategy || 'self-hosted';
+  const strategy = windowsSigningStrategy(desktop);
   if (strategy !== 'self-hosted') {
     console.log(`      ${chalk.dim(`⊘ Windows signing strategy is ${strategy}, no self-hosted runner`)}`);
     return { status: 'success', output: { runners: { skipped: `Windows signing strategy is ${strategy}` } } };

@@ -1,23 +1,12 @@
-// Build-layer test for utils/url-helpers.js. Verifies every LOCAL helper
-// (getApiUrl, getFunctionsUrl, getWebsiteUrl) resolves its port from every
-// channel the MAIN process has, in precedence order: the OMEGA_*_PORT env vars
-// (the CLI that booted the stack publishes them, N7), then the `dev.ports` map
-// the bundle baked into OMEGA_BUILD_JSON (a PACKAGED main process has no parent
-// env, [#745](https://github.com/Omega-JS-Stack/omega/issues/745)), then the
-// classic defaults. Mirrors @omega.js/extension's suite of the same name.
-//
-// getWebsiteUrl is the one helper whose local answer is a whole ORIGIN rather
-// than a port on an assumed scheme: it reads the baked `dev.origin` the website
-// published, then composes OMEGA_WEBSITE_PORT / the baked port over https, then
-// the classic dev origin ([#747](https://github.com/Omega-JS-Stack/omega/issues/747)).
-//
-// The last case pins the auth emulator port lib/auth.js connects a testing
-// run to: the same three-step chain, off the same baked map.
+// Build-layer test for utils/url-helpers.js: every LOCAL helper resolves its
+// port from the OMEGA_*_PORT env var, then the `dev.ports` map the bundle baked
+// (a packaged main process has no parent env), then throws. getWebsiteUrl
+// answers a whole ORIGIN: the baked `dev.origin` first, else a port over https.
+// The last case pins the auth emulator URL lib/auth.js connects a testing run to.
 
 const path = require('path');
 
 const helpers = require(path.join(__dirname, '..', '..', '..', 'utils', 'url-helpers.js'));
-const auth = require(path.join(__dirname, '..', '..', '..', 'lib', 'auth.js'));
 const defineCases = require('@omega.js/devkit/test/define-cases');
 
 function withEnv(overrides, fn) {
@@ -51,13 +40,6 @@ function fakeOmega(environment, ports, origin) {
   };
 }
 
-// Run `fn` with auth pointed at a stand-in instance, then put the real one back.
-function withAuthOmega(omega, fn) {
-  const original = auth._omega;
-  auth._omega = omega;
-  try { return fn(); } finally { auth._omega = original; }
-}
-
 // No env channel published: the state a packaged main process is in.
 const NO_ENV = {
   OMEGA_HOSTING_PORT: null,
@@ -87,7 +69,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('testing', { hosting: 5012, auth: 9109 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5012');
         });
       },
     },
@@ -96,7 +78,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('development', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5012');
         });
       },
     },
@@ -105,7 +87,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
           const omega = fakeOmega('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5022');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5022');
         });
       },
     },
@@ -159,7 +141,7 @@ module.exports = defineCases({
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('development', { functions: 5011 });
           ctx.expect(helpers.getFunctionsUrl(omega))
-            .toBe('http://localhost:5011/demo-app/us-central1');
+            .toBe('http://127.0.0.1:5011/demo-app/us-central1');
         });
       },
     },
@@ -169,7 +151,7 @@ module.exports = defineCases({
         withEnv({ ...NO_ENV, OMEGA_FUNCTIONS_PORT: '5021' }, () => {
           const omega = fakeOmega('testing', { functions: 5011 });
           ctx.expect(helpers.getFunctionsUrl(omega))
-            .toBe('http://localhost:5021/demo-app/us-central1');
+            .toBe('http://127.0.0.1:5021/demo-app/us-central1');
         });
       },
     },
@@ -281,26 +263,17 @@ module.exports = defineCases({
       },
     },
     {
-      // lib/auth.js connects a TESTING run's auth to the emulator. Same chain:
-      // env, then the baked map, then classic 9099.
-      name: 'the auth emulator port rides the same chain (lib/auth.js)',
+      // lib/auth.js connects a TESTING run's auth to this URL: env, then the
+      // baked map, then a throw, on 127.0.0.1 like every plain-http emulator.
+      name: 'getAuthEmulatorUrl: the auth emulator rides the same chain (lib/auth.js)',
       run: (ctx) => {
         withEnv({ OMEGA_AUTH_PORT: null }, () => {
-          withAuthOmega(fakeOmega('testing', { auth: 9109 }), () => {
-            ctx.expect(auth._authEmulatorPort()).toBe(9109);
-          });
-          // The classic 9099 used to answer here (#834): nothing identity-checks
-          // what holds that port, so a neighbouring project's emulator read as
-          // an auth mystery instead of a port problem.
-          withAuthOmega(fakeOmega('testing'), () => {
-            ctx.expect(() => auth._authEmulatorPort()).toThrow(/dev port for `auth`/);
-            ctx.expect(() => auth._authEmulatorPort()).toThrow(/bundle task/);
-          });
+          ctx.expect(helpers.getAuthEmulatorUrl(fakeOmega('testing', { auth: 9109 }))).toBe('http://127.0.0.1:9109');
+          ctx.expect(() => helpers.getAuthEmulatorUrl(fakeOmega('testing'))).toThrow(/dev port for `auth`/);
+          ctx.expect(() => helpers.getAuthEmulatorUrl(fakeOmega('testing'))).toThrow(/bundle task/);
         });
         withEnv({ OMEGA_AUTH_PORT: '9119' }, () => {
-          withAuthOmega(fakeOmega('testing', { auth: 9109 }), () => {
-            ctx.expect(auth._authEmulatorPort()).toBe('9119');
-          });
+          ctx.expect(helpers.getAuthEmulatorUrl(fakeOmega('testing', { auth: 9109 }))).toBe('http://127.0.0.1:9119');
         });
       },
     },

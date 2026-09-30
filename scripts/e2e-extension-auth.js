@@ -360,8 +360,9 @@ async function main() {
           '--no-sandbox',
           '--disable-dev-shm-usage',
           // Offline by construction: the brand host is the local hosting
-          // emulator, localhost is itself, everything else does not resolve.
-          `--host-resolver-rules=MAP ${brandHost} 127.0.0.1,MAP localhost 127.0.0.1,MAP * ~NOTFOUND`,
+          // emulator, loopback is itself, everything else does not resolve. The
+          // wildcard also catches the 127.0.0.1 literal, so it is excluded by name.
+          `--host-resolver-rules=MAP ${brandHost} 127.0.0.1,MAP localhost 127.0.0.1,EXCLUDE 127.0.0.1,MAP * ~NOTFOUND`,
         ],
       });
 

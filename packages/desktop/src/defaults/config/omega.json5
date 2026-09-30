@@ -192,8 +192,8 @@
           // job gating. See @omega.js/manager/docs/desktop/signing.md.
           //   self-hosted (default):  sign with signtool against an EV USB token (typically
           //                           on an framework-managed self-hosted GH Actions runner)
-          //   cloud:                  shell to a cloud signing provider's CLI (Azure /
-          //                           SSL.com / DigiCert), provider configured in cloud.provider
+          //   cloud:                  a cloud signing provider named in cloud.provider (azure,
+          //                           sslcom, digicert); no signer ships yet, the job refuses by name
           //   local:                  skip CI signing; developer signs manually on their box
           signing: {
             strategy: 'self-hosted',

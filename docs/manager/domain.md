@@ -9,8 +9,8 @@ nameservers that zone was assigned.
 One operation, `nameservers`:
 
 1. Read the Cloudflare zone to learn its assigned nameservers.
-2. **namecheap** (the one API registrar today) — read the current nameservers and set them
-   when they mismatch.
+2. **API registrars** (a registry entry with an `api` client; `namecheap`): read the current
+   nameservers and set them when they mismatch.
 3. **Manual registrars** — an ACTIVE zone proves the nameservers are already set (success); a
    pending zone prints the exact values to set and returns warned.
 
@@ -24,12 +24,22 @@ with no TTY — reports warned with the rerun message.
 `domain` carries TWO roles, each with its own providers block
 ([#425](https://github.com/Omega-JS-Stack/omega/issues/425)):
 
-- `domain.providers.<registrar>` — the registrar. Presence picks one; no entry means nothing
-  chosen and this service skips. `namecheap` is reconciled via API, everything else
-  (`squarespace`, …) is manual guidance.
-- `domain.email.providers.<provider>` and `domain.email.forwarding` — the MAILBOX provider.
-  This service does not read them: the `edge` service's `dns-records` and `email-routing`
-  operations do.
+- `domain.providers.<registrar>`: the registrar, `namecheap` (reconciled via API) or
+  `squarespace` (manual guidance). Presence picks one; no entry means nothing chosen and this
+  service skips.
+- `domain.email.providers.<provider>` and `domain.email.forwarding`: the MAILBOX provider,
+  `cloudflare`, `squarespace` or `privateemail`. This service does not read them: the `edge`
+  service's `dns-records` and `email-routing` operations do.
+
+Both sets are exactly the rows of ONE registry, `packages/manager/src/services/domain/lib/providers.js`,
+the one place a registrar or mailbox provider is added. A registrar entry carries its API
+client (`api`, null for manual), its dashboard nameserver page (`nameserverUrl`) and its
+credentials (`envKeys`); a mailbox entry carries its MX records and match domain (`mx`,
+`mxDomain`), its SPF include (`spf`), its MX comment (`label`) and whether Email Routing
+forwards its mail (`routing`). The config schema declares one row per entry
+(`packages/config/src/schema-domain.js`) and `test/domain-providers.test.js` holds the two
+equal, so a new provider is a registry entry plus its schema row; any other key fails the
+load naming `npx omega migrate`.
 
 `domain.enabled: false` skips the service.
 

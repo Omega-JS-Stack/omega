@@ -33,6 +33,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { User } = require('@omega.js/account');
+const { clientConfig } = require('@omega.js/config');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const MODULES_DIR = path.join(CORE_DIR, 'js', 'pages', 'payment', 'checkout', 'modules');
@@ -48,6 +49,9 @@ const ALL_PROVIDERS = {
   paypal: { clientId: 'paypal-client-id' },
   coinbase: { enabled: true },
 };
+
+// The capability table exactly as the build bakes it beside the providers
+const CAPABILITIES = clientConfig({ payment: {} }).payment.capabilities;
 
 // The two products the shipped $10 code can swallow whole
 const CHEAP_ONE_TIME = { id: 'pocket-guide', name: 'Pocket Guide', type: 'one-time', prices: { once: 9.99 } };
@@ -110,10 +114,11 @@ function bundleOnce() {
  * answer and read the bindings the buttons would have been drawn from.
  *
  * @param {object} product - the catalog product on the page
- * @param {object} [options] - `providers` (the brand's `payment.providers`) and
- *   `trialEligible`, the server's answer the DISPLAY reads (#637)
+ * @param {object} [options] - `providers` (the brand's `payment.providers`),
+ *   `capabilities` (the baked table) and `trialEligible`, the server's answer
+ *   the DISPLAY reads
  */
-async function openCheckout(product, { providers = ALL_PROVIDERS, trialEligible = false } = {}) {
+async function openCheckout(product, { providers = ALL_PROVIDERS, capabilities = CAPABILITIES, trialEligible = false } = {}) {
   await bundleOnce();
 
   let answer = { valid: false };
@@ -136,6 +141,7 @@ async function openCheckout(product, { providers = ALL_PROVIDERS, trialEligible 
   bundle.state.product = product;
   bundle.state.frequency = product.type === 'subscription' ? 'monthly' : 'once';
   bundle.state.providers = providers;
+  bundle.state.capabilities = capabilities;
   bundle.state.trialEligible = trialEligible;
 
   return {
@@ -275,6 +281,25 @@ test('#786: a card brand with a full code keeps a way to pay, and no refusal', a
   assert.strictEqual(bound.checkout.paymentMethods.card, true, 'card checkout is still offered');
   assert.strictEqual(bound.checkout.discount.error, false, 'so nothing is refused');
   assert.strictEqual(bound.checkout.discount.success, true, 'and the applied code still reads as applied');
+});
+
+test('#849: the $0 hide-set is the capability table, never a provider name', async () => {
+  // Flip the table and the same $0 checkout keeps both buttons: nothing in the
+  // page knows PayPal or Coinbase by name, only what their rows say
+  const acceptsZero = Object.fromEntries(Object.entries(CAPABILITIES).map(([id, row]) => [id, { ...row, acceptsZeroCharge: true }]));
+  const page = await openCheckout(CHEAP_ONE_TIME, { capabilities: acceptsZero });
+
+  const bound = await page.apply('welcome10off', FULL_PRICE_CODE);
+
+  assert.strictEqual(bound.order.total, '$0.00', 'the code still covers the price');
+  assert.strictEqual(bound.checkout.paymentMethods.paypal, true, 'a row that takes $0 keeps PayPal');
+  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'and crypto');
+
+  // And a card provider whose row refuses $0 loses the card button the same way
+  const cardRefuses = { ...CAPABILITIES, stripe: { ...CAPABILITIES.stripe, acceptsZeroCharge: false } };
+  const strict = await openCheckout(CHEAP_ONE_TIME, { capabilities: cardRefuses });
+
+  assert.strictEqual((await strict.apply('welcome10off', FULL_PRICE_CODE)).checkout.paymentMethods.card, false, 'the card button follows its row');
 });
 
 test('#786: the buttons this flag governs are the ones the layout binds to it', async () => {

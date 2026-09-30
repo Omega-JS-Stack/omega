@@ -102,7 +102,7 @@ describe('Omega methods', () => {
       // build always bakes one, so a test that wants a number states one.
       dev: { ports: { functions: 5001 } },
     });
-    assert.strictEqual(omega.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
+    assert.strictEqual(omega.getFunctionsUrl(), 'http://127.0.0.1:5001/my-project/us-central1');
   });
 
   it('should allow overriding environment in getFunctionsUrl', async () => {
@@ -112,7 +112,7 @@ describe('Omega methods', () => {
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
       dev: { ports: { functions: 5001 } },
     });
-    assert.strictEqual(omega.getFunctionsUrl('development'), 'http://localhost:5001/my-project/us-central1');
+    assert.strictEqual(omega.getFunctionsUrl('development'), 'http://127.0.0.1:5001/my-project/us-central1');
   });
 
   it('#925: a testing run talks to the local stack only when it was handed a dev port map', async () => {
@@ -127,7 +127,7 @@ describe('Omega methods', () => {
     // The desktop boot lane and the extension's emulator run bake one: local.
     await omega.initialize({ ...TEST_CONFIG, firebase, dev: { ports: { functions: 5001 } } });
     assert.strictEqual(omega._localStack(), true);
-    assert.strictEqual(omega.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
+    assert.strictEqual(omega.getFunctionsUrl(), 'http://127.0.0.1:5001/my-project/us-central1');
 
     // Development is local with or without the question; production never is.
     await omega.initialize({ ...TEST_CONFIG, firebase, environment: 'development' });
@@ -253,7 +253,7 @@ describe('Dev ports (N7)', () => {
       firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
       dev: { ports: { functions: 5003, hosting: 5004 } },
     });
-    assert.strictEqual(omega.getFunctionsUrl(), 'http://localhost:5003/my-project/us-central1');
+    assert.strictEqual(omega.getFunctionsUrl(), 'http://127.0.0.1:5003/my-project/us-central1');
     assert.strictEqual(omega.getApiUrl(), 'http://127.0.0.1:5004');
   });
 
@@ -269,7 +269,7 @@ describe('Dev ports (N7)', () => {
     // — a driver's injected map is a fallback for pages that carry none, and
     // must never be able to mask a wrong (or right) baked map
     global.window.__OMEGA_DEV_PORTS__ = { functions: 5103, hosting: 5104, auth: 9199 };
-    assert.strictEqual(omega.getFunctionsUrl(), 'http://localhost:5003/my-project/us-central1');
+    assert.strictEqual(omega.getFunctionsUrl(), 'http://127.0.0.1:5003/my-project/us-central1');
     assert.strictEqual(omega.getApiUrl(), 'http://127.0.0.1:5004');
     assert.strictEqual(omega._devPort('auth'), 9199, 'a key the chrome omits still comes from the runtime channel');
   });
@@ -372,7 +372,7 @@ describe('Dev ports (N7)', () => {
       environment: 'development',
       dev: { ports: { auth: 9199 } },
     });
-    assert.strictEqual(omega._authEmulatorUrl(), 'http://localhost:9199');
+    assert.strictEqual(omega._authEmulatorUrl(), 'http://127.0.0.1:9199');
   });
 
   it('should throw, naming the build step, when no dev map was baked at all (#834)', async () => {
@@ -384,7 +384,7 @@ describe('Dev ports (N7)', () => {
     });
 
     // The two URL getters that used to answer with a classic number.
-    assert.throws(() => omega.getApiUrl(), /dev `https` or `hosting` port/);
+    assert.throws(() => omega.getApiUrl(), /dev port for `hosting`/);
     assert.throws(() => omega.getApiUrl(), /OMEGA_BUILD_JSON\.config\.dev/);
     assert.throws(() => omega.getFunctionsUrl(), /dev port for `functions`/);
 

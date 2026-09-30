@@ -1,9 +1,10 @@
 /**
  * Schema rules for the keys the manager's services (and the backend's content
  * generators) read or write back: the brand switch, service switches, and the
- * Stripe, GA4, devlog, blog and SEO engine data. The four zero-data switches
- * default ON here and are materialized into brand files; the engine data's
- * defaults stay in the manager's config.js.
+ * Stripe, GA4, devlog, blog, SEO and account engine data. The zero-data
+ * switches default ON here and are materialized into brand files. What stays
+ * in the manager's MANAGER_DEFAULTS is data no schema default can carry; its
+ * table says why.
  */
 
 const MANAGER_RULES = [
@@ -34,6 +35,28 @@ const MANAGER_RULES = [
     required:    false,
     default:     true,
     description: "false skips the manager's payment service: no provider account, product, webhook or Radar reconciliation for this brand.",
+  },
+  {
+    path:        'certificates.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: "false (or `certificates: false`) skips the manager's certificates service: no bundle ids, no signing certificates, no provisioning profiles for this brand. A brand with no desktop or mobile target is skipped either way.",
+  },
+  {
+    path:        'account.enabled',
+    type:        'boolean',
+    required:    false,
+    default:     true,
+    description: "false (or `account: false`) skips the manager's account service: no managed accounts are created or converged in the brand's Firebase Auth.",
+  },
+  {
+    path:        'account.admins',
+    type:        'array',
+    required:    false,
+    default:     [{ email: 'support@{domain}', account: true, marketing: true }],
+    materialize: false,
+    description: "The accounts the account service keeps in the brand's Firebase Auth ([{ email, account, marketing }], '{domain}' templating to the brand domain): `account: true` ensures the user with its derived password, roles.admin and the top plan, `marketing: true` pushes the contact to the marketing providers, and any other user holding roles.admin fails the service. Resolved, never written into a brand file, so a list the company config sets once still wins.",
   },
   {
     path:        'payment.providers.stripe.updateAccountInfo',
@@ -105,6 +128,7 @@ const MANAGER_RULES = [
     path:        'seo.enabled',
     type:        'boolean',
     required:    false,
+    default:     true,
     description: "false (or `seo: false`) skips the manager's seo service.",
   },
   {

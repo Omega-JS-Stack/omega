@@ -4,7 +4,7 @@
 import { calculatePrices } from './pricing.js';
 import omega from '@omega.js/web/runtime';
 
-// All supported billing frequencies
+// All supported billing frequencies: a copy of @omega.js/config's SUBSCRIPTION_CADENCES, which a browser bundle cannot import
 export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];
 
 // What a one-time buy bills on, which is nothing: `once` is not a cadence and
@@ -29,6 +29,7 @@ export const state = {
   // From config (stored once, never transformed)
   product: null,
   providers: null,
+  capabilities: null,
 
   // User selections
   frequency: 'annually',
@@ -66,8 +67,15 @@ export function resolveProvider(paymentMethod) {
       }
     }
     /* @dev-only:end */
+  }
 
-    // Prefer Stripe, fall back to Chargebee
+  return methodProvider(paymentMethod);
+}
+
+// The provider a payment method pays through: a card prefers Stripe and falls
+// back to Chargebee
+function methodProvider(paymentMethod) {
+  if (paymentMethod === 'card') {
     if (state.providers?.stripe?.publishableKey) return 'stripe';
     if (state.providers?.chargebee?.site) return 'chargebee';
     return 'stripe';
@@ -75,6 +83,51 @@ export function resolveProvider(paymentMethod) {
 
   const map = { paypal: 'paypal', crypto: 'coinbase' };
   return map[paymentMethod] || paymentMethod;
+}
+
+// Whether the brand switched a provider on: each one's public datum, and
+// Coinbase's explicit `enabled` (its only credential is a secret)
+const CONFIGURED = {
+  stripe: (providers) => !!providers.stripe?.publishableKey,
+  chargebee: (providers) => !!providers.chargebee?.site,
+  paypal: (providers) => !!providers.paypal?.clientId,
+  coinbase: (providers) => providers.coinbase?.enabled === true,
+};
+
+/**
+ * Which payment methods this checkout can be paid with. What a provider SELLS
+ * and whether it takes a $0 charge are its row in the baked capability table,
+ * the same rows the backend refuses by, so a button offered is a checkout the
+ * intent route accepts. A product with no `type` is a subscription, as there.
+ *
+ * @param {object|null} product - the catalog product being bought
+ * @param {boolean} fullyDiscounted - a code leaves nothing to charge today
+ * @returns {object} method → offered
+ */
+export function offeredPaymentMethods(product, fullyDiscounted) {
+  const offered = (paymentMethod) => {
+    const provider = methodProvider(paymentMethod);
+
+    if (!CONFIGURED[provider]?.(state.providers || {})) return false;
+
+    const capability = state.capabilities[provider];
+
+    if (!capability) {
+      throw new Error(`No capability row for payment provider "${provider}" in payment.capabilities`);
+    }
+
+    const sells = product?.type === 'one-time' ? capability.oneTime : capability.subscriptions;
+
+    return sells && (!fullyDiscounted || capability.acceptsZeroCharge);
+  };
+
+  return {
+    card: offered('card'),
+    paypal: offered('paypal'),
+    applePay: false,
+    googlePay: false,
+    crypto: offered('crypto'),
+  };
 }
 
 // Resolve price for a frequency. A catalog price is a bare number and nothing
@@ -158,36 +211,15 @@ export function buildBindingsState() {
   // backend went on to charge the discounted one.
   const hasDiscount = state.discountPercent > 0 || state.discountAmount > 0;
 
-  // A code that covers the WHOLE price leaves nothing to charge, and the two
-  // providers this framework computes the amount for cannot take a $0.00
-  // payment — the backend refuses that checkout before it reaches them
-  // ([#786](https://github.com/Omega-JS-Stack/omega/issues/786)), so the buttons
-  // that could only end there are not offered.
-  //
-  // A free TRIAL is never this case, and the backend agrees: nothing is charged
-  // today (the provider's own trial cycle does that, and PayPal's setup-fee
-  // discount is skipped outright on a trial), and the code comes off the first
-  // PAID period later — so both buttons stay. It is read off the trial and the
-  // DISCOUNT, never off `prices.total`, which a trial zeroes on its own.
+  // A code that covers the WHOLE price leaves nothing to charge, and a provider
+  // whose row refuses a $0 charge is not offered for it. A free TRIAL is never
+  // this case: nothing is charged today and the code comes off the first PAID
+  // period, so it is read off the trial and the discount, never `prices.total`.
   const fullyDiscounted = hasDiscount && !hasFreeTrial && prices.subtotal > 0 && prices.subtotal - prices.discountAmount <= 0;
 
-  // What this checkout can still be paid with — built before the bindings
-  // because the page has to know when the set is EMPTY.
-  const paymentMethods = {
-    card: !!(state.providers?.stripe?.publishableKey || state.providers?.chargebee?.site),
-    paypal: !!state.providers?.paypal?.clientId && !fullyDiscounted,
-    applePay: false,
-    googlePay: false,
-    // Crypto is the one method with a PRODUCT condition as well as a
-    // provider one: Coinbase Commerce sells a single hosted charge and has
-    // no recurring anything, so the backend's intent provider refuses a
-    // subscription outright. A button offered there could only ever end in
-    // the checkout's generic failure sentence
-    // ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
-    // One-time ONLY, spelled positively: a product with no `type` is a
-    // subscription to the backend intent route, so the button must not show.
-    crypto: product?.type === 'one-time' && state.providers?.coinbase?.enabled === true && !fullyDiscounted,
-  };
+  // What this checkout can still be paid with, built before the bindings
+  // because the page has to know when the set is EMPTY
+  const paymentMethods = offeredPaymentMethods(product, fullyDiscounted);
 
   // A brand selling through PayPal (and crypto) alone has NO method left once a
   // code covers the price, and the page's only "no payment methods" sentence is

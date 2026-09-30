@@ -96,7 +96,7 @@ module.exports = defineCases({
         omega.config.cloud.config.projectId = 'demo-app';
         try {
           withClassicBakedPorts(omega, () => {
-            ctx.expect(omega.getFunctionsUrl('development')).toBe('http://localhost:5001/demo-app/us-central1');
+            ctx.expect(omega.getFunctionsUrl('development')).toBe('http://127.0.0.1:5001/demo-app/us-central1');
           });
         } finally { omega.config.cloud.config.projectId = orig; }
       },
@@ -131,7 +131,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getApiUrl: dev returns http://localhost:5002 from the baked classic map',
+      name: 'getApiUrl: dev returns http://127.0.0.1:5002 from the baked classic map',
       run: (ctx) => {
         const origHttps = process.env.OMEGA_HTTPS_PORT;
         const origHosting = process.env.OMEGA_HOSTING_PORT;
@@ -139,7 +139,7 @@ module.exports = defineCases({
         delete process.env.OMEGA_HOSTING_PORT;
         try {
           withClassicBakedPorts(ctx.omega, () => {
-            ctx.expect(ctx.omega.getApiUrl('development')).toBe('http://localhost:5002');
+            ctx.expect(ctx.omega.getApiUrl('development')).toBe('http://127.0.0.1:5002');
           });
         } finally {
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
@@ -148,7 +148,7 @@ module.exports = defineCases({
       },
     },
     {
-      name: 'getApiUrl: testing also returns http://localhost:5002 (local, not prod)',
+      name: 'getApiUrl: testing also returns http://127.0.0.1:5002 (local, not prod)',
       run: (ctx) => {
         // Testing resolves to the local URL just like development — tests must hit the
         // local emulator, never the production API.
@@ -158,7 +158,7 @@ module.exports = defineCases({
         delete process.env.OMEGA_HOSTING_PORT;
         try {
           withClassicBakedPorts(ctx.omega, () => {
-            ctx.expect(ctx.omega.getApiUrl('testing')).toBe('http://localhost:5002');
+            ctx.expect(ctx.omega.getApiUrl('testing')).toBe('http://127.0.0.1:5002');
           });
         } finally {
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
@@ -178,7 +178,7 @@ module.exports = defineCases({
         try {
           process.env.OMEGA_HOSTING_PORT = '5099';
           delete process.env.OMEGA_HTTPS_PORT;
-          ctx.expect(omega.getApiUrl('development')).toBe('http://localhost:5099');
+          ctx.expect(omega.getApiUrl('development')).toBe('http://127.0.0.1:5099');
           process.env.OMEGA_HTTPS_PORT = '5443';
           ctx.expect(omega.getApiUrl('development')).toBe('https://localhost:5443');
         } finally {
@@ -201,12 +201,12 @@ module.exports = defineCases({
           delete process.env.OMEGA_HTTPS_PORT;
           delete process.env.OMEGA_HOSTING_PORT;
           omega.config.dev = { ports: { hosting: 5012 } };
-          ctx.expect(omega.getApiUrl('development')).toBe('http://localhost:5012');
+          ctx.expect(omega.getApiUrl('development')).toBe('http://127.0.0.1:5012');
           omega.config.dev = { ports: { hosting: 5012, https: 5003 } };
           ctx.expect(omega.getApiUrl('development')).toBe('https://localhost:5003');
           process.env.OMEGA_HOSTING_PORT = '5099';
           delete omega.config.dev.ports.https;
-          ctx.expect(omega.getApiUrl('development')).toBe('http://localhost:5099');
+          ctx.expect(omega.getApiUrl('development')).toBe('http://127.0.0.1:5099');
         } finally {
           if (origDev !== undefined) omega.config.dev = origDev; else delete omega.config.dev;
           if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps; else delete process.env.OMEGA_HTTPS_PORT;

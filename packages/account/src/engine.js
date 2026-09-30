@@ -179,4 +179,4 @@ function resolve(schema, data, ctx) {
   return result;
 }
 
-module.exports = { resolve };
+module.exports = { resolve, expandTimestamp };

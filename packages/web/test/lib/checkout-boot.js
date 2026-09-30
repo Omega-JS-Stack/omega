@@ -18,6 +18,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { User } = require('@omega.js/account');
+const { clientConfig } = require('@omega.js/config');
 
 const CORE_DIR = path.join(__dirname, '..', '..', 'core');
 const PAGE_ENTRY = path.join(CORE_DIR, 'js', 'pages', 'payment', 'checkout', 'index.js');
@@ -74,6 +75,15 @@ const SUBSCRIPTION = {
   trial: { days: 14 },
 };
 
+/** The browser config the build bakes for this payment section, its capability table optionally swapped. */
+function bakedConfig(payment, capabilities) {
+  const config = clientConfig({ payment });
+
+  if (capabilities) config.payment.capabilities = capabilities;
+
+  return config;
+}
+
 /** The FormManager surface the page drives, with its gate + listener traffic recorded. */
 function makeFormManager(record) {
   return class StubFormManager {
@@ -101,20 +111,17 @@ function makeFormManager(record) {
 
 /**
  * Boot the REAL checkout page with the trial-eligibility request held open.
+ * Every caller answers it before its test ends: an unanswered race leaves the
+ * page's own 8s deadline standing, and node keeps the process alive for it.
  *
- * Every caller answers it before its test ends, even one asserting nothing
- * about the answer: an unanswered race leaves the page's own 8s deadline
- * standing, and node keeps the process alive for it.
- *
- * @param {object} [options]
- * @param {string} [options.search] - the page URL's query string
- * @param {object} [options.product] - the product the catalog sells
+ * @param {object} [options] - `search` (the query string), `product` (what the
+ *   catalog sells), `providers` (the brand's `payment.providers`) and
+ *   `capabilities` (a capability table in place of the baked one)
  * @returns {Promise<object>} the recorded bindings updates, form traffic,
- *   requests, analytics events, `emit(event, payload)` for a form listener,
- *   `pay(paymentMethod)` for the checkout being submitted, and
- *   `answerEligibility(eligible)` for the server finally replying.
+ *   requests and analytics events, `emit(event, payload)`, `pay(paymentMethod)`
+ *   and `answerEligibility(eligible)`
  */
-async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTION } = {}) {
+async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTION, providers = { stripe: { publishableKey: 'pk_test_123' } }, capabilities } = {}) {
   await bundleOnce();
 
   const updates = [];
@@ -151,7 +158,8 @@ async function bootCheckout({ search = '?product=premium', product = SUBSCRIPTIO
   const buyer = new User({}, { uid: 'u1', email: 'buyer@brand.test' });
 
   globalThis.__omegaClient = {
-    config: { payment: { providers: { stripe: { publishableKey: 'pk_test_123' } }, products: [product] } },
+    // Baked the way the build bakes it, so the capability table rides along
+    config: bakedConfig({ providers, products: [product] }, capabilities),
     isDevelopment: () => false,
     getApiUrl: () => 'https://api.test',
     dom: { ready: async () => {} },

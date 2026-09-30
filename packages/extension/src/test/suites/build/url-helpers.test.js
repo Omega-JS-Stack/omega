@@ -59,7 +59,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('testing', { hosting: 5012, auth: 9109 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5012');
         });
       },
     },
@@ -68,7 +68,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('development', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5012');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5012');
         });
       },
     },
@@ -77,7 +77,7 @@ module.exports = defineCases({
       run: (ctx) => {
         withEnv({ ...NO_ENV, OMEGA_HOSTING_PORT: '5022' }, () => {
           const omega = fakeOmega('testing', { hosting: 5012 });
-          ctx.expect(helpers.getApiUrl(omega)).toBe('http://localhost:5022');
+          ctx.expect(helpers.getApiUrl(omega)).toBe('http://127.0.0.1:5022');
         });
       },
     },
@@ -125,6 +125,19 @@ module.exports = defineCases({
         withEnv(NO_ENV, () => {
           const omega = fakeOmega('testing', { https: 5003, hosting: 5443 });
           ctx.expect(helpers.getApiUrl(omega)).toBe('https://localhost:5003');
+        });
+      },
+    },
+    {
+      // background-auth.js connects a testing run's auth to this URL.
+      name: 'getAuthEmulatorUrl: env, then the baked dev.ports.auth, on 127.0.0.1, else a throw',
+      run: (ctx) => {
+        withEnv({ ...NO_ENV, OMEGA_AUTH_PORT: null }, () => {
+          ctx.expect(helpers.getAuthEmulatorUrl(fakeOmega('testing', { auth: 9109 }))).toBe('http://127.0.0.1:9109');
+          ctx.expect(() => helpers.getAuthEmulatorUrl(fakeOmega('testing'))).toThrow(/dev port for `auth`/);
+        });
+        withEnv({ ...NO_ENV, OMEGA_AUTH_PORT: '9119' }, () => {
+          ctx.expect(helpers.getAuthEmulatorUrl(fakeOmega('testing', { auth: 9109 }))).toBe('http://127.0.0.1:9119');
         });
       },
     },

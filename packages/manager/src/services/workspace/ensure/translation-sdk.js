@@ -22,6 +22,7 @@ const jetpack = require('fs-jetpack');
 
 const { loadConfig } = require('@omega.js/config');
 const { resolveTranslationSettings } = require('@omega.js/devkit/translate');
+const { resolvePackageRealDir } = require('@omega.js/devkit/local');
 const { runCommand } = require('../../../lib/run-command.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
@@ -35,24 +36,17 @@ const FALLBACK_RANGE = '>=0.2';
 
 /**
  * The SDK range `@omega.js/web` declares as its optional peer, read from the
- * target's installed copy via the node_modules climb (a manual walk, not
- * require.resolve, because web's exports map doesn't expose its package.json).
+ * target's installed copy via devkit's one node_modules walk
+ * (`resolvePackageRealDir`).
  *
  * @param {string} targetPath - Absolute target root
  * @returns {string} The declared peer range, or FALLBACK_RANGE when web isn't installed
  */
 function sdkRange(targetPath) {
-  let dir = path.resolve(targetPath);
+  const web = resolvePackageRealDir('@omega.js/web', targetPath);
+  if (!web) return FALLBACK_RANGE;
 
-  while (true) {
-    const pkg = jetpack.read(path.join(dir, 'node_modules', '@omega.js', 'web', 'package.json'), 'json');
-    const range = pkg?.peerDependencies?.[SDK];
-    if (range) return range;
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return FALLBACK_RANGE;
-    dir = parent;
-  }
+  return jetpack.read(path.join(web, 'package.json'), 'json').peerDependencies?.[SDK] || FALLBACK_RANGE;
 }
 
 /**

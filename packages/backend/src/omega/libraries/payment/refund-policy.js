@@ -15,6 +15,8 @@
  * ([#672](https://github.com/Omega-JS-Stack/omega/issues/672)).
  */
 
+const registry = require('./providers/index.js');
+
 // Payments this many days old or younger refund in FULL. Older ones prorate by
 // the days remaining in the billing period the payment bought.
 const FULL_REFUND_DAYS = 7;
@@ -22,17 +24,6 @@ const FULL_REFUND_DAYS = 7;
 // Payments older than this are not eligible for a refund, whatever was bought.
 const REFUND_WINDOW_SECONDS = 6 * 30 * 24 * 60 * 60;
 const OUTSIDE_WINDOW_MESSAGE = 'Payments older than 6 months are not eligible for refunds';
-
-// Providers with no refund API at all. Coinbase Commerce settles in crypto and
-// exposes no refund endpoint — returning coins is a manual transfer the merchant
-// makes from its dashboard, at whatever the coin is worth that day, and nothing
-// about it is ever attached to the charge. So the refusal belongs HERE, with
-// every other one, rather than as a provider call that could only ever fail: the
-// route would answer the customer "try again shortly" for something no retry can
-// fix, and the account page would offer a Refund button on it
-// ([#642](https://github.com/Omega-JS-Stack/omega/issues/642)).
-const NO_REFUND_PROVIDERS = ['coinbase'];
-const NO_REFUND_MESSAGE = 'Crypto purchases cannot be refunded automatically. Contact support and we will arrange it by hand.';
 
 /**
  * Is a payment recent enough to refund? An absent date cannot disqualify one.
@@ -94,10 +85,12 @@ function oneTimeRefundRefusal(order) {
     return { reason: 'missing-payment-details', message: 'Order payment details not found' };
   }
 
-  // Last, because it is the least specific thing wrong with an order: a crypto
-  // purchase that is also already refunded should still say so.
-  if (NO_REFUND_PROVIDERS.includes(provider)) {
-    return { reason: 'provider-cannot-refund', message: NO_REFUND_MESSAGE };
+  // Last, because it is the least specific thing wrong with an order. An id
+  // with no registry row is left to the route's own "Unknown provider"
+  const capability = registry.paymentProvider(provider);
+
+  if (capability && !capability.refundable) {
+    return { reason: 'provider-cannot-refund', message: `${capability.name} purchases cannot be refunded automatically. Contact support and we will arrange it by hand.` };
   }
 
   return null;
@@ -107,7 +100,6 @@ module.exports = {
   FULL_REFUND_DAYS,
   REFUND_WINDOW_SECONDS,
   OUTSIDE_WINDOW_MESSAGE,
-  NO_REFUND_PROVIDERS,
   isWithinRefundWindow,
   oneTimeRefundRefusal,
 };

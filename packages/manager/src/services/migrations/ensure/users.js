@@ -1,34 +1,11 @@
 /**
- * Users collection migration — converges user documents to the canonical
- * @omega.js/backend user schema.
- *
- * Fixes:
- * - Deletes orphaned user docs (no matching Firebase Auth user)
- * - Renames `plan` → `subscription`
- * - Transforms flat `subscription.id` (string) → `subscription.product` (object)
- * - Renames `subscription.trial.activated` → `subscription.trial.claimed`
- * - Moves `oauth2.<provider>` → `connections.<provider>`, stamping each
- *   record with `type: 'oauth2'`, and deletes the original (#788)
- * - Removes deprecated payment/limits/trial/affiliate fields
- * - Migrates legacy timestamps → metadata.* and reconciles metadata.created
- *   against Firebase Auth's canonical creation time
- * - Backfills auth.uid/auth.email from Firebase Auth when missing
- * - Backfills consent (implicit grant at signup) for existing users
- * - Folds the legacy `attribution.utm` blob into `attribution.first`/`last`
- * - Backfills all missing fields with defaults from the @omega.js/backend user schema
- * - Generates dynamic values for affiliate.code, api.clientId, api.privateKey
- * - Normalizes '' and old sentinels ('127.0.0.1', 'ZZ', 'Unknown') to null
- * - Migrates usage.*.period → usage.*.monthly (+ daily backfill) and deletes
- *   zero-total usage placeholders
- *
- * De-ITW'd from omega-manager: the company instance's one-off damage-repair
- * fixes (per-brand usage-key renames, stray-key rescue from prior bad runs,
- * HTML-entity decoding from an old sanitize middleware, UID/base64 affiliate
- * code repair, the somiibo keep-plan carve-out) stay in omega-manager —
- * they repair one company's historical data, not the schema.
- *
- * Validates:
- * - All fields match the expected schema
+ * Users collection migration: converges every user document to the
+ * @omega.js/account user schema, whose record, validation shape and null
+ * defaults lib/user-schema.js derives. Fix order is load-bearing: the moves and
+ * the consent/attribution backfills run ahead of the defaults backfill, which
+ * would otherwise write the empty values they read; dynamic values
+ * (affiliate.code, api.*) are minted per document after it. One company's
+ * historical damage repairs stay in omega-manager: this converges the schema.
  */
 const { randomUUID, randomBytes } = require('node:crypto');
 
@@ -37,6 +14,10 @@ const { createMetadataFix } = require('../lib/ensure-metadata.js');
 const { validateDocument } = require('../lib/schema-validator.js');
 const { createSanitizeFix } = require('../lib/sanitize-strings.js');
 const { createAttributionFoldFix } = require('../lib/attribution-touch.js');
+const { DEFAULT_USER, USER_VALIDATION, RESET_DEFAULTS, nullableStringFields } = require('../lib/user-schema.js');
+
+// The branches whose legacy defaults wrote '' and the old sentinels
+const SENTINEL_FIELDS = [...nullableStringFields('activity'), ...nullableStringFields('personal')];
 
 /**
  * Generate a random alphanumeric ID (matches nanoid with URL-safe alphabet minus _ and -)
@@ -50,471 +31,6 @@ function generateId(size = 7) {
   }
   return result;
 }
-
-/**
- * Default user structure from @omega.js/backend's user schema.
- * Values here are used to backfill missing fields during migration.
- *
- * Dynamic fields (affiliate.code, api.clientId, api.privateKey) use empty strings here
- * and are generated per-doc in the dynamic-values fix.
- */
-const DEFAULT_USER = {
-  auth: {
-    uid: null,
-    email: null,
-    temporary: false,
-  },
-  subscription: {
-    product: {
-      id: 'basic',
-      name: 'Basic',
-    },
-    status: 'active',
-    expires: {
-      timestamp: '1970-01-01T00:00:00.000Z',
-      timestampUNIX: 0,
-    },
-    trial: {
-      claimed: false,
-      expires: {
-        timestamp: '1970-01-01T00:00:00.000Z',
-        timestampUNIX: 0,
-      },
-    },
-    cancellation: {
-      pending: false,
-      date: {
-        timestamp: '1970-01-01T00:00:00.000Z',
-        timestampUNIX: 0,
-      },
-    },
-    payment: {
-      provider: null,
-      orderId: null,
-      resourceId: null,
-      frequency: null,
-      price: 0,
-      startDate: {
-        timestamp: '1970-01-01T00:00:00.000Z',
-        timestampUNIX: 0,
-      },
-      updatedBy: {
-        event: {
-          name: null,
-          id: null,
-        },
-        date: {
-          timestamp: '1970-01-01T00:00:00.000Z',
-          timestampUNIX: 0,
-        },
-      },
-    },
-  },
-  roles: {
-    admin: false,
-    betaTester: false,
-    developer: false,
-  },
-  flags: {
-    signupProcessed: false,
-  },
-  affiliate: {
-    code: '',
-    referrals: [],
-  },
-  metadata: {
-    created: {
-      timestamp: '1970-01-01T00:00:00.000Z',
-      timestampUNIX: 0,
-    },
-    updated: {
-      timestamp: '1970-01-01T00:00:00.000Z',
-      timestampUNIX: 0,
-    },
-  },
-  activity: {
-    geolocation: {
-      ip: null,
-      continent: null,
-      country: null,
-      region: null,
-      city: null,
-      latitude: 0,
-      longitude: 0,
-    },
-    client: {
-      language: null,
-      mobile: false,
-      device: null,
-      platform: null,
-      browser: null,
-      vendor: null,
-      runtime: null,
-      userAgent: null,
-      url: null,
-    },
-  },
-  api: {
-    clientId: '',
-    privateKey: '',
-  },
-  usage: {},
-  personal: {
-    birthday: {
-      timestamp: '1970-01-01T00:00:00.000Z',
-      timestampUNIX: 0,
-    },
-    gender: null,
-    location: {
-      country: null,
-      region: null,
-      city: null,
-    },
-    name: {
-      first: null,
-      last: null,
-    },
-    company: {
-      name: null,
-      position: null,
-    },
-    telephone: {
-      countryCode: 0,
-      national: 0,
-    },
-  },
-  connections: {},
-  attribution: {
-    affiliate: {
-      code: null,
-      timestamp: null,
-      url: null,
-      page: null,
-    },
-    // The #384 touch model. `tags`/`clickIds` are deliberately absent from the
-    // default: a visit that carried none writes no key at all, so backfilling
-    // them here would re-inject the empty husks the fold refuses to write.
-    first: {
-      referrer: null,
-      url: null,
-      page: null,
-      timestamp: null,
-    },
-    last: {
-      referrer: null,
-      url: null,
-      page: null,
-      timestamp: null,
-    },
-  },
-  consent: {
-    legal: {
-      status: 'revoked',
-      grantedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-    },
-    marketing: {
-      status: 'revoked',
-      grantedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-      revokedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-    },
-  },
-};
-
-/**
- * Users collection schema
- * Based on @omega.js/backend's user schema
- */
-const timestampSchema = {
-  type: 'object',
-  required: true,
-  properties: {
-    timestamp: { type: 'string', required: true },
-    timestampUNIX: { type: 'number', required: true },
-  },
-};
-
-/**
- * One attribution touch — @omega.js/account's ATTRIBUTION_TOUCH, shared by
- * `attribution.first` and `attribution.last`.
- *
- * `tags` and `clickIds` are optional because capture writes a key only when the
- * visit carried one: an organic landing has neither, and demanding them here
- * would flag every untagged user for a husk nothing should be writing.
- */
-const attributionTouchSchema = {
-  type: 'object',
-  required: true,
-  properties: {
-    tags: { type: 'object', required: false },
-    clickIds: { type: 'object', required: false },
-    referrer: { type: 'string', required: true, nullable: true },
-    url: { type: 'string', required: true, nullable: true },
-    page: { type: 'string', required: true, nullable: true },
-    timestamp: { type: 'string', required: true, nullable: true },
-  },
-};
-
-const schema = {
-  auth: {
-    type: 'object',
-    required: true,
-    properties: {
-      uid: { type: 'string', required: true, nullable: true },
-      email: { type: 'string', required: true, nullable: true },
-      temporary: { type: 'boolean', required: true },
-    },
-  },
-  subscription: {
-    type: 'object',
-    required: true,
-    properties: {
-      product: {
-        type: 'object',
-        required: true,
-        properties: {
-          id: { type: 'string', required: true },
-          name: { type: 'string', required: true },
-        },
-      },
-      status: { type: 'string', required: true },
-      expires: timestampSchema,
-      trial: {
-        type: 'object',
-        required: true,
-        properties: {
-          claimed: { type: 'boolean', required: true },
-          expires: timestampSchema,
-        },
-      },
-      cancellation: {
-        type: 'object',
-        required: true,
-        properties: {
-          pending: { type: 'boolean', required: true },
-          date: timestampSchema,
-        },
-      },
-      payment: {
-        type: 'object',
-        required: true,
-        properties: {
-          provider: { type: 'string', required: true, nullable: true },
-          orderId: { type: 'string', required: true, nullable: true },
-          resourceId: { type: 'string', required: true, nullable: true },
-          frequency: { type: 'string', required: true, nullable: true },
-          price: { type: 'number', required: true },
-          startDate: timestampSchema,
-          updatedBy: {
-            type: 'object',
-            required: true,
-            properties: {
-              event: {
-                type: 'object',
-                required: true,
-                properties: {
-                  name: { type: 'string', required: true, nullable: true },
-                  id: { type: 'string', required: true, nullable: true },
-                },
-              },
-              date: timestampSchema,
-            },
-          },
-        },
-      },
-    },
-  },
-  roles: {
-    type: 'object',
-    required: true,
-    properties: {
-      admin: { type: 'boolean', required: true },
-      betaTester: { type: 'boolean', required: true },
-      developer: { type: 'boolean', required: true },
-    },
-  },
-  flags: {
-    type: 'object',
-    required: true,
-    properties: {
-      signupProcessed: { type: 'boolean', required: true },
-    },
-  },
-  affiliate: {
-    type: 'object',
-    required: true,
-    properties: {
-      code: { type: 'string', required: true },
-      referrals: { type: 'array', required: true },
-    },
-  },
-  metadata: {
-    type: 'object',
-    required: true,
-    properties: {
-      created: timestampSchema,
-      updated: timestampSchema,
-    },
-  },
-  activity: {
-    type: 'object',
-    required: true,
-    properties: {
-      geolocation: {
-        type: 'object',
-        required: true,
-        properties: {
-          ip: { type: 'string', required: true, nullable: true },
-          continent: { type: 'string', required: true, nullable: true },
-          country: { type: 'string', required: true, nullable: true },
-          region: { type: 'string', required: true, nullable: true },
-          city: { type: 'string', required: true, nullable: true },
-          latitude: { type: 'number', required: true },
-          longitude: { type: 'number', required: true },
-        },
-      },
-      client: {
-        type: 'object',
-        required: true,
-        properties: {
-          language: { type: 'string', required: true, nullable: true },
-          mobile: { type: 'boolean', required: true },
-          device: { type: 'string', required: true, nullable: true },
-          platform: { type: 'string', required: true, nullable: true },
-          browser: { type: 'string', required: true, nullable: true },
-          vendor: { type: 'string', required: true, nullable: true },
-          runtime: { type: 'string', required: true, nullable: true },
-          userAgent: { type: 'string', required: true, nullable: true },
-          url: { type: 'string', required: true, nullable: true },
-        },
-      },
-    },
-  },
-  api: {
-    type: 'object',
-    required: true,
-    properties: {
-      clientId: { type: 'string', required: true },
-      privateKey: { type: 'string', required: true },
-    },
-  },
-  usage: {
-    type: 'object',
-    required: true,
-  },
-  personal: {
-    type: 'object',
-    required: true,
-    properties: {
-      birthday: timestampSchema,
-      gender: { type: 'string', required: true, nullable: true },
-      location: {
-        type: 'object',
-        required: true,
-        properties: {
-          country: { type: 'string', required: true, nullable: true },
-          region: { type: 'string', required: true, nullable: true },
-          city: { type: 'string', required: true, nullable: true },
-        },
-      },
-      name: {
-        type: 'object',
-        required: true,
-        properties: {
-          first: { type: 'string', required: true, nullable: true },
-          last: { type: 'string', required: true, nullable: true },
-        },
-      },
-      company: {
-        type: 'object',
-        required: true,
-        properties: {
-          name: { type: 'string', required: true, nullable: true },
-          position: { type: 'string', required: true, nullable: true },
-        },
-      },
-      telephone: {
-        type: 'object',
-        required: true,
-        properties: {
-          countryCode: { type: 'number', required: true },
-          national: { type: 'number', required: true },
-        },
-      },
-    },
-  },
-  connections: { type: 'object', required: true },
-  attribution: {
-    type: 'object',
-    required: true,
-    properties: {
-      affiliate: {
-        type: 'object',
-        required: true,
-        properties: {
-          code: { type: 'string', required: true, nullable: true },
-          timestamp: { type: 'string', required: true, nullable: true },
-          url: { type: 'string', required: true, nullable: true },
-          page: { type: 'string', required: true, nullable: true },
-        },
-      },
-      first: attributionTouchSchema,
-      last: attributionTouchSchema,
-    },
-  },
-  consent: {
-    type: 'object',
-    required: true,
-    properties: {
-      legal: {
-        type: 'object',
-        required: true,
-        properties: {
-          status: { type: 'string', required: true },
-          grantedAt: {
-            type: 'object',
-            required: true,
-            properties: {
-              timestamp: { type: 'string', required: true, nullable: true },
-              timestampUNIX: { type: 'number', required: true, nullable: true },
-              source: { type: 'string', required: true, nullable: true },
-              ip: { type: 'string', required: true, nullable: true },
-              text: { type: 'string', required: true, nullable: true },
-            },
-          },
-        },
-      },
-      marketing: {
-        type: 'object',
-        required: true,
-        properties: {
-          status: { type: 'string', required: true },
-          grantedAt: {
-            type: 'object',
-            required: true,
-            properties: {
-              timestamp: { type: 'string', required: true, nullable: true },
-              timestampUNIX: { type: 'number', required: true, nullable: true },
-              source: { type: 'string', required: true, nullable: true },
-              ip: { type: 'string', required: true, nullable: true },
-              text: { type: 'string', required: true, nullable: true },
-            },
-          },
-          revokedAt: {
-            type: 'object',
-            required: true,
-            properties: {
-              timestamp: { type: 'string', required: true, nullable: true },
-              timestampUNIX: { type: 'number', required: true, nullable: true },
-              source: { type: 'string', required: true, nullable: true },
-              ip: { type: 'string', required: true, nullable: true },
-              text: { type: 'string', required: true, nullable: true },
-            },
-          },
-        },
-      },
-    },
-  },
-};
 
 /**
  * Deep merge defaults under existing data (existing values take precedence)
@@ -1003,36 +519,13 @@ module.exports = async function ensureUsers(context) {
       // Fix 16: Normalize empty strings and old sentinel values to null
       // Old defaults used '' for unknown strings and '127.0.0.1'/'ZZ'/'Unknown' for geolocation
       (data) => {
-        const NULLABLE_FIELDS = [
-          'activity.geolocation.ip',
-          'activity.geolocation.continent',
-          'activity.geolocation.country',
-          'activity.geolocation.region',
-          'activity.geolocation.city',
-          'activity.client.language',
-          'activity.client.device',
-          'activity.client.platform',
-          'activity.client.browser',
-          'activity.client.vendor',
-          'activity.client.runtime',
-          'activity.client.userAgent',
-          'activity.client.url',
-          'personal.gender',
-          'personal.location.country',
-          'personal.location.region',
-          'personal.location.city',
-          'personal.name.first',
-          'personal.name.last',
-          'personal.company.name',
-          'personal.company.position',
-        ];
 
         const SENTINEL_VALUES = new Set(['', '127.0.0.1', 'ZZ', 'Unknown']);
 
         const updates = {};
         let hasUpdates = false;
 
-        for (const path of NULLABLE_FIELDS) {
+        for (const path of SENTINEL_FIELDS) {
           const parts = path.split('.');
           let value = data;
           for (const part of parts) {
@@ -1053,38 +546,10 @@ module.exports = async function ensureUsers(context) {
 
       // Fix 18: Reset null values to their correct defaults for non-nullable fields
       (data) => {
-        const RESET_MAP = {
-          // Timestamps should never be null — reset to epoch
-          'personal.birthday.timestamp': '1970-01-01T00:00:00.000Z',
-          'personal.birthday.timestampUNIX': 0,
-          'metadata.created.timestamp': '1970-01-01T00:00:00.000Z',
-          'metadata.created.timestampUNIX': 0,
-          'metadata.updated.timestamp': '1970-01-01T00:00:00.000Z',
-          'metadata.updated.timestampUNIX': 0,
-          'subscription.expires.timestamp': '1970-01-01T00:00:00.000Z',
-          'subscription.expires.timestampUNIX': 0,
-          'subscription.trial.expires.timestamp': '1970-01-01T00:00:00.000Z',
-          'subscription.trial.expires.timestampUNIX': 0,
-          'subscription.cancellation.date.timestamp': '1970-01-01T00:00:00.000Z',
-          'subscription.cancellation.date.timestampUNIX': 0,
-          'subscription.payment.startDate.timestamp': '1970-01-01T00:00:00.000Z',
-          'subscription.payment.startDate.timestampUNIX': 0,
-          'subscription.payment.updatedBy.date.timestamp': '1970-01-01T00:00:00.000Z',
-          'subscription.payment.updatedBy.date.timestampUNIX': 0,
-          // Coordinates should never be null — reset to 0
-          'activity.geolocation.latitude': 0,
-          'activity.geolocation.longitude': 0,
-          // Boolean fields should never be null — reset to false
-          'activity.client.mobile': false,
-          // Telephone fields should never be null — reset to 0
-          'personal.telephone.countryCode': 0,
-          'personal.telephone.national': 0,
-        };
-
         const updates = {};
         let hasUpdates = false;
 
-        for (const [path, defaultValue] of Object.entries(RESET_MAP)) {
+        for (const [path, defaultValue] of Object.entries(RESET_DEFAULTS)) {
           const parts = path.split('.');
           let value = data;
           for (const part of parts) {
@@ -1167,10 +632,7 @@ module.exports = async function ensureUsers(context) {
     ],
 
     validate: (data) => {
-      return validateDocument(data, schema);
+      return validateDocument(data, USER_VALIDATION);
     },
   });
 };
-
-// Exported for tests — the canonical @omega.js/backend default user shape the backfill converges to
-module.exports.DEFAULT_USER = DEFAULT_USER;

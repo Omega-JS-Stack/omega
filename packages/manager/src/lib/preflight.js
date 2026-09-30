@@ -31,6 +31,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk').default;
+const { resolvePackageDir } = require('@omega.js/devkit/local');
 
 const { REQUIRES, TARGET_FRAMEWORKS, describeServiceInputs } = require('../config.js');
 const { canPrompt } = require('./run-gates.js');
@@ -310,10 +311,10 @@ function runPreflight({ services, brandConfig, brandRoot, company = null, option
 // ─── The lockstep boot check (#794) ─────────────────────────────────────────
 
 /**
- * The nearest installed copy of a package, climbing from a target dir toward
- * the brand root — npm hoists a workspace tree's deps to the root, so the
- * target's own node_modules is the first place to look and never the only
- * one (the same "nearest, climbing" resolution `omega update` reports from).
+ * The nearest installed copy of a package from a target dir (devkit's one
+ * walk, `resolvePackageDir`). The LINK path, because `isLinkedInstall` asks
+ * whether the entry is a symlink; a copy above the brand root is not the
+ * brand's install (an in-repo brand sits under the monorepo's own links).
  *
  * @param {string} fromDir - Where to start looking (a target dir).
  * @param {string} brandRoot - Where to stop climbing.
@@ -321,17 +322,8 @@ function runPreflight({ services, brandConfig, brandRoot, company = null, option
  * @returns {string|null} The installed package dir, or null when nothing is installed.
  */
 function findInstalled(fromDir, brandRoot, packageName) {
-  let current = path.resolve(fromDir);
-  const stop = path.resolve(brandRoot);
-
-  for (;;) {
-    const candidate = path.join(current, 'node_modules', packageName);
-    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
-
-    const parent = path.dirname(current);
-    if (current === stop || parent === current) return null;
-    current = parent;
-  }
+  const installed = resolvePackageDir(packageName, fromDir);
+  return installed && installed.startsWith(`${path.resolve(brandRoot)}${path.sep}`) ? installed : null;
 }
 
 /**

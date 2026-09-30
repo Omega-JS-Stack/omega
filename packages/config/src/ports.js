@@ -34,6 +34,9 @@ const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const { findBrandRoot } = require('./load.js');
+// The env-var name and the port check are browser-safe, so they live beside
+// the missing-fact error the browser chain also reads.
+const { envName, parsePort } = require('./dev-facts.js');
 
 // The classic defaults every framework has always used — allocation starts
 // here, and single-brand dev never leaves them.
@@ -301,15 +304,6 @@ function siblingTargetDirs(targetDir) {
 }
 
 /**
- * Env-var name for a port ('auth' → 'OMEGA_AUTH_PORT').
- * @param {string} name - Port name.
- * @returns {string} Env var name.
- */
-function envName(name) {
-  return `OMEGA_${name.toUpperCase()}_PORT`;
-}
-
-/**
  * Resolved map → the OMEGA_*_PORT env block to inject into spawned children.
  * @param {object} ports - Resolved name → port map.
  * @returns {object} Env var name → string port.
@@ -329,9 +323,7 @@ function portsToEnv(ports) {
  * @returns {number|null} The port, or null when unset/invalid.
  */
 function envPort(name, env = process.env) {
-  const raw = env[envName(name)];
-  const port = Number.parseInt(raw, 10);
-  return Number.isInteger(port) && port > 0 ? port : null;
+  return parsePort(env[envName(name)]);
 }
 
 /**

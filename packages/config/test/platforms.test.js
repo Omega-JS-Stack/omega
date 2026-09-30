@@ -9,6 +9,7 @@ const { test } = require('node:test');
 
 const {
   PLATFORMS, FORMATS, enabledFormats, formatKeys,
+  WINDOWS_SIGNING_STRATEGIES, DEFAULT_WINDOWS_SIGNING_STRATEGY, WINDOWS_CLOUD_PROVIDERS, windowsSigningStrategy, windowsCloudProviderKeys, validateConfig,
   desktopProductName, sanitizeProductName, desktopArtifactName, desktopArtifactNames,
 } = require('../src/index.js');
 const { ENV_SCHEMA } = require('../src/env-schema.js');
@@ -161,6 +162,52 @@ test('formatKeys with a config keeps only the keys that config actually owes', (
   // An unconditional key is never filtered away: the store keys carry no gate
   assert.deepStrictEqual(formatKeys('extension', 'firefox', 'store', {}).requires, ['FIREFOX_API_KEY', 'FIREFOX_API_SECRET']);
   assert.deepStrictEqual(formatKeys('desktop', 'linux', 'nope'), { requires: [], listing: [] });
+});
+
+test('the Windows signing strategies and cloud providers are the ones the env schema gates on', () => {
+  // Every value a signing key is gated on is a declared one, so no credential hangs off a name nothing offers
+  const gated = (prefix) => [...new Set(ENV_SCHEMA
+    .filter((entry) => typeof entry.requiredWhen === 'string' && entry.requiredWhen.startsWith(prefix))
+    .map((entry) => entry.requiredWhen.slice(prefix.length)))];
+  for (const strategy of gated('platforms.windows.signing.strategy=')) assert.ok(WINDOWS_SIGNING_STRATEGIES.includes(strategy), strategy);
+  assert.deepStrictEqual(gated('platforms.windows.signing.cloud.provider='), WINDOWS_CLOUD_PROVIDERS);
+  assert.ok(WINDOWS_SIGNING_STRATEGIES.includes('cloud'));
+});
+
+test('a cloud provider\'s keys are exactly the env schema entries gated on it', () => {
+  for (const provider of WINDOWS_CLOUD_PROVIDERS) {
+    const expected = ENV_SCHEMA
+      .filter((entry) => entry.requiredWhen === `platforms.windows.signing.cloud.provider=${provider}`)
+      .map((entry) => entry.name);
+    assert.ok(expected.length > 0, provider);
+    assert.deepStrictEqual(windowsCloudProviderKeys(provider), expected, provider);
+  }
+  assert.deepStrictEqual(windowsCloudProviderKeys('imaginary'), []);
+});
+
+test('the Windows signing strategy defaults to self-hosted, and a configured one wins', () => {
+  assert.equal(DEFAULT_WINDOWS_SIGNING_STRATEGY, 'self-hosted');
+  assert.ok(WINDOWS_SIGNING_STRATEGIES.includes(DEFAULT_WINDOWS_SIGNING_STRATEGY));
+  assert.equal(windowsSigningStrategy({}), 'self-hosted');
+  assert.equal(windowsSigningStrategy(undefined), 'self-hosted');
+  assert.equal(windowsSigningStrategy({ platforms: { windows: { signing: { strategy: 'cloud' } } } }), 'cloud');
+});
+
+test('the config schema accepts the declared strategy and cloud provider sets, and refuses anything else', () => {
+  const brand = { brand: { id: 'acme', name: 'Acme' } };
+  const signing = (value) => ({ ...brand, platforms: { windows: { signing: value } } });
+  const errors = (value) => validateConfig(signing(value), { target: 'desktop' }).errors;
+
+  for (const strategy of WINDOWS_SIGNING_STRATEGIES) assert.deepStrictEqual(errors({ strategy }), [], strategy);
+  for (const provider of WINDOWS_CLOUD_PROVIDERS) assert.deepStrictEqual(errors({ strategy: 'cloud', cloud: { provider } }), [], provider);
+
+  const unknownStrategy = errors({ strategy: 'banana' });
+  assert.equal(unknownStrategy.length, 1);
+  assert.match(unknownStrategy[0], /platforms\.windows\.signing\.strategy "banana"/);
+  const unknownProvider = errors({ strategy: 'cloud', cloud: { provider: 'imaginary' } });
+  assert.equal(unknownProvider.length, 1);
+  assert.match(unknownProvider[0], /platforms\.windows\.signing\.cloud\.provider "imaginary"/);
+  assert.ok(unknownProvider[0].includes(WINDOWS_CLOUD_PROVIDERS.join(', ')));
 });
 
 // ─── the declaration ─────────────────────────────────────────────────────────

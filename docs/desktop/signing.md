@@ -176,7 +176,7 @@ Once the framework's cloud strategy is finalized, set the provider in `config/om
 # Provider-specific creds (secrets) live in .env Custom Values section.
 ```
 
-Provider modules will live in `src/lib/sign-providers/{azure,sslcom,digicert}.js` (Pass 3 work).
+No provider signer ships yet: `npx omega sign-windows` refuses the `cloud` strategy, naming the provider, while `validate-certs` already checks the provider's keys. The strategy and provider sets are declared once, in @omega.js/config's `windows-signing.js`, and each provider's keys are the env schema's `requiredWhen` set for it.
 
 ### Local (developer-machine) fallback
 

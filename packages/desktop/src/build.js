@@ -190,10 +190,11 @@ function getLiveReloadPort() {
 }
 
 // Windows signing strategy. Config-only: `platforms.windows.signing.strategy`
-// (targets.desktop.platforms.windows in the raw omega.json5). Default 'self-hosted'.
+// (targets.desktop.platforms.windows in the raw omega.json5), defaulted by
+// @omega.js/config's one declaration of the strategy set.
 function getWindowsSignStrategy() {
-  const config = getConfig();
-  return config?.platforms?.windows?.signing?.strategy || 'self-hosted';
+  const { windowsSigningStrategy } = require('@omega.js/config');
+  return windowsSigningStrategy(getConfig());
 }
 
 // Touch files to trigger a rebuild watcher

@@ -16,7 +16,7 @@
  * [#646](https://github.com/Omega-JS-Stack/omega/issues/646)).
  */
 const chalk = require('chalk').default;
-const { resolveEmailProvider } = require('../../domain/lib/registrars.js');
+const { DOMAIN_PROVIDERS, resolveEmailProvider } = require('../../domain/lib/providers.js');
 
 // =============================================================================
 // BUILD REQUIRED STATIC RECORDS
@@ -67,23 +67,14 @@ function buildRequiredRecords(domain, dnsConfig, isSubdomainProject = false, ema
   addDefault({ type: 'CNAME', name: `www.${domain}`, content: domain, proxied: true, comment: 'Redirect www to root domain' });
 
   // MX (email provider)
-  if (emailProvider === 'squarespace') {
-    addDefault({ type: 'MX', name: domain, content: 'mxa.mailgun.org', priority: 10, comment: 'Squarespace email forwarding' });
-    addDefault({ type: 'MX', name: domain, content: 'mxb.mailgun.org', priority: 10, comment: 'Squarespace email forwarding' });
-  } else if (emailProvider === 'privateemail') {
-    addDefault({ type: 'MX', name: domain, content: 'mx1.privateemail.com', priority: 10, comment: 'Private email forwarding (Namecheap)' });
-    addDefault({ type: 'MX', name: domain, content: 'mx2.privateemail.com', priority: 10, comment: 'Private email forwarding (Namecheap)' });
-  } else if (emailProvider === 'cloudflare') {
-    addDefault({ type: 'MX', name: domain, content: 'route1.mx.cloudflare.net', priority: 36, comment: 'Cloudflare Email Routing' });
-    addDefault({ type: 'MX', name: domain, content: 'route2.mx.cloudflare.net', priority: 4, comment: 'Cloudflare Email Routing' });
-    addDefault({ type: 'MX', name: domain, content: 'route3.mx.cloudflare.net', priority: 24, comment: 'Cloudflare Email Routing' });
+  const mailbox = DOMAIN_PROVIDERS.mailbox[emailProvider];
+  for (const { host, priority } of mailbox?.mx || []) {
+    addDefault({ type: 'MX', name: domain, content: host, priority, comment: mailbox.label });
   }
 
   // SPF
   const spfIncludes = [...(dnsConfig?.spfIncludes || [])];
-  if (emailProvider === 'squarespace') spfIncludes.push('mailgun.org');
-  else if (emailProvider === 'privateemail') spfIncludes.push('spf.privateemail.com');
-  else if (emailProvider === 'cloudflare') spfIncludes.push('_spf.mx.cloudflare.net');
+  if (mailbox) spfIncludes.push(mailbox.spf);
 
   if (spfIncludes.length > 0) {
     const spfEnforcement = dnsConfig?.spf === 'strict' ? '-all' : '~all';
@@ -156,16 +147,9 @@ function buildRequiredRecords(domain, dnsConfig, isSubdomainProject = false, ema
 function findObsoleteMxRecords(existingRecords, domain, emailProvider = null) {
   const toDelete = [];
 
-  const providerMxServers = {
-    squarespace: ['mailgun.org'],
-    privateemail: ['privateemail.com'],
-    cloudflare: ['cloudflare.net'],
-  };
-
-  const obsoleteServers = [];
-  for (const [provider, servers] of Object.entries(providerMxServers)) {
-    if (provider !== emailProvider) obsoleteServers.push(...servers);
-  }
+  const obsoleteServers = Object.entries(DOMAIN_PROVIDERS.mailbox)
+    .filter(([provider]) => provider !== emailProvider)
+    .map(([, mailbox]) => mailbox.mxDomain);
 
   for (const record of existingRecords) {
     if (record.type !== 'MX') continue;
@@ -240,8 +224,9 @@ function determineComment(record, domain) {
   }
 
   if (type === 'mx') {
-    if (content.includes('mailgun.org')) return 'Squarespace email forwarding';
-    if (content.includes('privateemail.com')) return 'Private email forwarding (Namecheap)';
+    const mailbox = Object.values(DOMAIN_PROVIDERS.mailbox).find(({ mxDomain }) => content.includes(mxDomain));
+    // Email Routing owns its MX records: an existing comment there is left as is
+    if (mailbox) return mailbox.routing && record.comment ? record.comment : mailbox.label;
   }
 
   if (type === 'txt') {

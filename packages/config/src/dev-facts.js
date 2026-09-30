@@ -42,7 +42,28 @@ function devFactMissing(what, writer) {
   return new Error(`No resolved ${what} in ${DEV_FACT_CHANNEL}. It is written by ${writer}. A build made without it is not a build, so nothing here assumes a classic port.`);
 }
 
+/**
+ * Env-var name for a port ('auth' -> 'OMEGA_AUTH_PORT').
+ * @param {string} name - Port name.
+ * @returns {string} Env var name.
+ */
+function envName(name) {
+  return `OMEGA_${name.toUpperCase()}_PORT`;
+}
+
+/**
+ * A raw port value (an env string, a baked number) as a port, or null.
+ * @param {string|number} [raw] - The value to read.
+ * @returns {number|null} The positive integer port, or null when unset/invalid.
+ */
+function parsePort(raw) {
+  const port = Number.parseInt(raw, 10);
+  return Number.isInteger(port) && port > 0 ? port : null;
+}
+
 module.exports = {
   DEV_FACT_CHANNEL,
   devFactMissing,
+  envName,
+  parsePort,
 };

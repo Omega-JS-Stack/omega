@@ -27,9 +27,10 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { envLayerFiles, ENV_ENVIRONMENTS, resolveCompany } = require('@omega.js/config');
+const { resolvePackageDir } = require('@omega.js/devkit/local');
 
 const { runCommand } = require('../../../lib/run-command.js');
-const { fingerprintTarget, resolvePackageDir } = require('../lib/fingerprint.js');
+const { fingerprintTarget } = require('../lib/fingerprint.js');
 const { readCache, writeCache, CACHE_VERSION } = require('../lib/cache.js');
 
 /**
@@ -95,7 +96,7 @@ function missingDeps(targetPath) {
   if (!pkg) return [];
 
   const declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-  return declared.filter((name) => !resolvePackageDir(targetPath, name));
+  return declared.filter((name) => !resolvePackageDir(name, targetPath));
 }
 
 module.exports = async ({ brandRoot, targets, options }) => {

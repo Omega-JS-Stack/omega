@@ -146,7 +146,7 @@ The fixture is then **built into a real `main.bundle.js`** (under its own `.omeg
 
 | Env | Purpose |
 |---|---|
-| `OMEGA_TEST_BOOT_PROJECT` | Root of a project to boot instead of the cwd. Auto-set to `src/test/fixtures/consumer-app` when @omega.js/desktop tests itself; set it explicitly to boot a **real consumer** (e.g. `deployment-playground-desktop`) without `cd`-ing into it. |
+| `OMEGA_TEST_BOOT_PROJECT` | Root of a project to boot instead of the cwd. Auto-set to `src/test/fixtures/consumer-app` when @omega.js/desktop tests itself; set it explicitly to boot a **real consumer** (e.g. `brands/playground-omega/targets/desktop`) without `cd`-ing into it. |
 
 ### Why this exists
 

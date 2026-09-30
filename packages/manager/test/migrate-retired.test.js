@@ -263,6 +263,17 @@ test('#647: product limits and rateLimit name the features catalog, at their rea
   assert.ok(fired(config, 'payment.products.0.rateLimit', 'features.<id>.usage.pace'), lines(config).join(' | '));
 });
 
+test('#849: a price spelled `amount` names `once`, at its real array path, and CONVERTS', () => {
+  const config = { ...VALID, payment: { products: [{ id: 'kit', type: 'one-time', prices: { amount: 9.99 } }] } };
+  const [finding] = findRetiredKeys(config);
+
+  assert.ok(fired(config, 'payment.products.0.prices.amount', 'payment.products[].prices.once'), lines(config).join(' | '));
+  assert.equal(finding.convert(9.99), 9.99, 'the number moves as it is');
+
+  // The live spelling is clean
+  assert.deepStrictEqual(findRetiredKeys({ ...VALID, payment: { products: [{ id: 'kit', type: 'one-time', prices: { once: 9.99 } }] } }), []);
+});
+
 test('#677: the typed company name and parent wordmark name the resolved company', () => {
   const config = { ...VALID, brand: { ...VALID.brand, company: 'Acme Holdings Inc', images: { companyWordmark: '/wordmark.png' } } };
 

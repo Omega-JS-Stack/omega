@@ -15,6 +15,7 @@ const FILE_MAP = {
   'src/**/*':            { overwrite: false },      // never overwrite user code
   'hooks/**/*':          { overwrite: false },      // never overwrite hooks
   '_.gitignore':         { mergeLines: true },      // marker-section merge (rename is an engine built-in)
+  'test/README.md':      { mergeLines: true },      // generated doc: Default from the source, the project's notes under Custom
   'config/omega.json5':  { overwrite: true, merge: true },  // JSON5 defaults merge
   '.nvmrc':              { template: cleanVersions },       // `{{ versions.node }}` render
 };

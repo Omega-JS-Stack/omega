@@ -156,8 +156,9 @@ async function expectFailure(operation) {
  * This is needed because security rules like isAdmin() read from Firestore documents
  *
  * @param {object} accounts - Test accounts object with uid, email, etc.
+ * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
  */
-async function seedTestAccounts(accounts) {
+async function seedTestAccounts(accounts, extraAccounts) {
   if (!testEnv) {
     throw new Error('Test environment not initialized. Call initRulesTestEnv() first.');
   }
@@ -166,14 +167,14 @@ async function seedTestAccounts(accounts) {
   // Do NOT write subscription — that's already set by createAccount with config-resolved product IDs
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
-    const { TEST_ACCOUNTS } = require('../test-accounts.js');
+    const table = require('../test-accounts.js').getAccountTable(extraAccounts);
 
     for (const [accountType, account] of Object.entries(accounts)) {
       if (!account.uid) {
         continue;
       }
 
-      const staticDef = TEST_ACCOUNTS[accountType];
+      const staticDef = table[accountType];
 
       // Only write auth + roles for rules testing — subscription is already correct in the doc
       const userData = {
@@ -195,6 +196,7 @@ async function seedTestAccounts(accounts) {
  * @param {object} options
  * @param {string} options.projectId - Firebase project ID
  * @param {object} options.accounts - Test accounts object
+ * @param {object} [options.extraAccounts] - Project-defined accounts from test/_init.js
  * @returns {object} Rules testing context
  */
 async function createRulesContext(options) {
@@ -204,7 +206,7 @@ async function createRulesContext(options) {
 
   // Seed test account documents so rules like isAdmin() work
   if (options.accounts) {
-    await seedTestAccounts(options.accounts);
+    await seedTestAccounts(options.accounts, options.extraAccounts);
   }
 
   return {
@@ -229,8 +231,9 @@ async function createRulesContext(options) {
         email: account.email,
       };
 
-      // Add admin claim if this is the admin account
-      if (accountType === 'admin' || account.roles?.admin) {
+      // Add admin claim if this is the admin account; roles live on the seed table, not the resolved account
+      const roles = require('../test-accounts.js').getAccountTable(options.extraAccounts)[accountType]?.properties?.roles;
+      if (accountType === 'admin' || roles?.admin) {
         claims.admin = true;
       }
 

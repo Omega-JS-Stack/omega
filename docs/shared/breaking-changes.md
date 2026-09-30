@@ -28,6 +28,25 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-09-30: the registrar and mailbox provider sets are closed ([#1015](https://github.com/Omega-JS-Stack/omega/issues/1015))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| The mailbox provider key, `domain.email.providers.<id>` | Any key loaded; one the manager did not know built no MX or SPF records and left Email Routing off, silently | Exactly the rows of the manager's registry, `services/domain/lib/providers.js`: `cloudflare`, `squarespace`, `privateemail`. Any other key fails the load naming `npx omega migrate` | Rename the key to the provider that actually serves the domain's mail, or delete the entry to choose none (the MX/SPF records and Email Routing stay off, as the unknown key left them) |
+| The registrar key, `domain.providers.<id>` | Only `namecheap` loaded; `squarespace` failed the load | `namecheap` and `squarespace` both load, the registry's two registrars; any other key still fails | None: a brand whose Squarespace registrar failed the load now loads and gets manual nameserver guidance |
+
+## 2026-09-30: a one-time price is `prices.once`, and only that ([#849](https://github.com/Omega-JS-Stack/omega/issues/849))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A product's one-time price in `payment.products[].prices` | `prices.amount` on any product, or a cadence key such as `prices.monthly` on a `type: 'one-time'` product: the checkout page read both as fallbacks, and every backend reader took `once` alone, so the page priced a purchase the backend then refused | `prices: { once: 49.99 }` on a one-time product; a subscription prices its cadences (`daily`, `weekly`, `monthly`, `annually`) and carries no `once`. The config validator refuses `amount` or any cadence key on a one-time product (naming `once`), and `once` or `amount` on a subscription (naming the cadence keys) | Rename the key to `once` on each one-time product. `npx omega migrate --execute` at the brand root moves an `amount` to `once` for you; a cadence key on a one-time product is renamed by hand, and an `amount` on a subscription is deleted by hand (migrate moves it to `once`, which the load then refuses) |
+
+## 2026-09-30: a target's test/README.md is marker-merged ([#843](https://github.com/Omega-JS-Stack/omega/issues/843))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A backend, desktop or extension target's `test/README.md` | Copied once on the first verb and never touched again, so a framework fix to it never reached an existing project | The marked file: the framework's text under `<!-- ========== Default Values ========== -->`, rewritten from the framework's `src/defaults/test/README.md` on every verb; your own notes under `<!-- ========== Custom Values ========== -->`, verbatim. The next verb converges an unmarked copy: a line the framework text carries goes, every other line lands under Custom in order | Before the next verb, move a note you wrote INSIDE a framework paragraph or table (an extra row in the layout table, say) into a paragraph of its own: the converge keeps it, but lifted out of its table |
+
 ## 2026-09-30: the backend and the router have exports maps ([#1009](https://github.com/Omega-JS-Stack/omega/issues/1009))
 
 `@omega.js/backend` and `@omega.js/mcp-router` declare an `exports` map in the siblings' shape, so a path the map does not name throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. The backend's doors are `.`, `./test`, `./config`, `./lib/email-constants`, `./lib/mcp-utils`, `./cli`, `./ensure-target`, `./migrate` and `./package.json`; any other deep require moves to its door (`dist/mcp/utils.js` is `./lib/mcp-utils`).

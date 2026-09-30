@@ -237,13 +237,22 @@ test('missingDefaults: a fully materialized config has nothing left to heal', ()
 
 // ─── connections: the packaged card table (#793) ───
 
+// The provider files @omega.js/backend ships: config is vendored into surfaces
+// that never install the backend, so the card table cannot be read from them
+// at load time, and this read is what keeps the two sides in step.
+const PACKAGED_PROVIDERS_DIR = path.join(__dirname, '..', '..', 'backend', 'src', 'omega', 'routes', 'user', 'connections', 'providers');
+
 test('#793: the connections defaults carry a card for each packaged provider', () => {
   const connections = schemaDefaults().connections;
+  const packaged = fs.readdirSync(PACKAGED_PROVIDERS_DIR)
+    .filter((file) => file.endsWith('.js'))
+    .map((file) => path.basename(file, '.js'));
 
+  assert.ok(packaged.length > 0, `the provider files are where this test reads them: ${PACKAGED_PROVIDERS_DIR}`);
   assert.deepEqual(
     Object.keys(connections).sort(),
-    ['discord', 'google', 'kick', 'spotify', 'twitch'],
-    'the five providers @omega.js/backend ships a module for',
+    packaged.sort(),
+    'one card per provider file @omega.js/backend ships, no more and no fewer',
   );
 
   for (const [provider, entry] of Object.entries(connections)) {

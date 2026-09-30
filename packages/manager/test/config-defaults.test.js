@@ -190,11 +190,41 @@ test('manager DEFAULTS derive from the schema — one home per default', () => {
   assert.equal(DEFAULTS.search.providers.searchConsole.enabled, schemaDefaults().search.providers.searchConsole.enabled);
   assert.equal(DEFAULTS.marketing.prune.enabled, true);
   assert.equal(DEFAULTS.inbound.chat.providers.chatsy.enabled, true);
-  for (const [value, name] of [[DEFAULTS.enabled, 'enabled'], [DEFAULTS.server.enabled, 'server.enabled'], [DEFAULTS.assets.enabled, 'assets.enabled'], [DEFAULTS.payment.enabled, 'payment.enabled']]) {
-    assert.equal(value, true, `${name} reaches the manager from its schema default`);
+  const schema = schemaDefaults();
+  for (const name of ['enabled', 'server.enabled', 'assets.enabled', 'payment.enabled', 'seo.enabled', 'certificates.enabled', 'account.enabled']) {
+    const read = (config) => name.split('.').reduce((node, key) => node?.[key], config);
+    assert.equal(read(schema), true, `${name} is a schema default`);
+    assert.equal(read(DEFAULTS), true, `${name} reaches the manager from its schema default`);
   }
 
+  assert.equal(DEFAULTS.edge.providers.cloudflare.settings.ssl, schema.edge.providers.cloudflare.settings.ssl);
+
   // …and the service-owned data the schema does not declare still lives here
-  assert.equal(DEFAULTS.edge.providers.cloudflare.settings.ssl, 'full');
   assert.equal(DEFAULTS.analytics.providers.google.currency, 'USD');
+});
+
+test('no key in MANAGER_DEFAULTS has a schema default', () => {
+  const { MANAGER_DEFAULTS } = require('../src/config.js');
+  const { schemaDefaults, TARGETS } = require('@omega.js/config');
+  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const leaves = (node, prefix) => Object.entries(node).flatMap(([key, value]) => {
+    const dotted = prefix ? `${prefix}.${key}` : key;
+    return isObject(value) && Object.keys(value).length > 0 ? leaves(value, dotted) : [dotted];
+  });
+
+  // A schema default at the leaf, above it, or below an empty manager leaf is a second home
+  const defaulted = (defaults, dotted) => {
+    let node = defaults;
+    for (const name of dotted.split('.')) {
+      if (!isObject(node) || !(name in node)) return false;
+      node = node[name];
+      if (!isObject(node)) return true;
+    }
+    return true;
+  };
+
+  const views = [schemaDefaults(), ...TARGETS.map((target) => schemaDefaults(target))];
+  const twins = leaves(MANAGER_DEFAULTS, '').filter((dotted) => views.some((defaults) => defaulted(defaults, dotted)));
+
+  assert.deepEqual(twins, [], 'each of these defaults has two homes: the schema and MANAGER_DEFAULTS');
 });

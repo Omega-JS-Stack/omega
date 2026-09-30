@@ -48,17 +48,9 @@ function snapshot(dir) {
 
 const HOST_DEPS = { chalk: '*', 'node-powertools': '*' };
 
-// The self-containment gate's pattern (#713): a raw REFERENCE to any vendorable
-// surviving into a shipped tree is a broken install, those packages never being
-// published. Hardcoding the alternation is what let it drift two names behind
-// the tool's own list — it is derived here, and ci.yml's pack-smoke grep derives
-// the same alternation from the same export. The prefixes mirror the tool's
-// REFERENCE_PATTERNS, so a package NAME in prose or in a log tag (every vendored
-// logger.js carries its own) is not a reference.
-const RAW_PRIVATE_REF = new RegExp(
-  `(?:require(?:\\.resolve)?\\(\\s*|from\\s+|import\\s*\\(\\s*|import\\s+)`
-  + `['"]@omega\\.js\\/(${vendorDevkit.VENDORABLE_PACKAGES.join('|')})(?:['"/])`,
-);
+// The self-containment gate's shape, read from the tool: a package NAME in prose
+// or in a log tag (every vendored logger.js carries its own) is not a reference.
+const RAW_PRIVATE_REF = vendorDevkit.PRIVATE_REFERENCE;
 
 test('copies devkit into dist/vendor, rewrites requires, and the result loads + runs', (t) => {
   const root = makeFixture('vendor-ok', {

@@ -199,6 +199,29 @@ module.exports = defineCases({
     },
 
     {
+      name: 'refuses-a-purchase-on-a-provider-that-cannot-refund',
+      auth: 'none',
+      async run({ assert, omega, firestore }) {
+        // The registry's `refundable: false` row is the refusal, before any
+        // provider module is loaded
+        const orderId = '_test-order-one-time-no-refund-api';
+        await firestore.set(`payments-orders/${orderId}`, oneTimeOrder(orderId, {
+          provider: 'coinbase',
+          unified: {
+            product: { id: 'credits-100', name: '100 Credits' },
+            status: 'completed',
+            payment: { provider: 'coinbase', orderId: orderId, resourceId: `_test-cs-${orderId}`, price: 9.99 },
+          },
+        }));
+
+        const sent = await refund(omega, purchaser(omega, OWNER), orderId);
+
+        assert.equal(sent.code, 400, `A provider with no refund API should be refused, got ${sent.code}: ${sent.body}`);
+        assert.match(`${sent.body}`, /Coinbase Commerce purchases cannot be refunded/, 'The refusal names the provider');
+      },
+    },
+
+    {
       name: 'reaches-the-provider-for-a-valid-one-time-order',
       auth: 'none',
       async run({ assert, omega, firestore }) {

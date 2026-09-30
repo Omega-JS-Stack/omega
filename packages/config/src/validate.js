@@ -19,6 +19,7 @@ const { TARGET_NAME_PATTERN, TARGET_TYPES } = require('./targets.js');
 const { REPO_PROVIDERS, HOSTING_PROVIDERS } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { isCountedFeature } = require('@omega.js/account/features');
+const { SUBSCRIPTION_CADENCES } = require('./payment-cadences.js');
 
 // Firebase's own default authDomain shape: a third-party host by definition
 const FIREBASE_AUTH_DOMAIN = /\.firebaseapp\.com$/;
@@ -597,6 +598,17 @@ function validateConfig(config, options) {
             `config.payment.products[${index}] (${product.id || 'unnamed'}) price "${key}" must be a number `
             + `— write \`${key}: 9.99\`, never \`${key}: { amount: 9.99 }\` (the two sides do not read the object shape the same)`,
           );
+          return;
+        }
+
+        // `once` is the only one-time price key, and a plan prices only cadences
+        const name = `config.payment.products[${index}] (${product.id || 'unnamed'}) price "${key}"`;
+        if (product.type === 'one-time') {
+          if (key === 'amount' || SUBSCRIPTION_CADENCES.includes(key)) {
+            errors.push(`${name} is not a one-time price key: a one-time price is written \`once: ${value}\``);
+          }
+        } else if (key === 'amount' || key === 'once') {
+          errors.push(`${name} is not a subscription price key: a subscription prices its cadence (${SUBSCRIPTION_CADENCES.join(', ')}), and \`once\` belongs to a one-time product`);
         }
       });
     });

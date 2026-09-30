@@ -1,25 +1,17 @@
-// Strategy-aware Windows code signer.
-//
-// Reads strategy from config platforms.windows.signing.strategy:
-//   self-hosted — sign with signtool against an EV USB token (typically on a self-hosted runner)
-//   cloud       — shell out to a cloud signing provider's CLI (Azure / SSL.com / DigiCert)
-//   local       — no-op (developer signs manually on their own Windows box)
-//
-// Usage:
-//   npx omega sign-windows                                 # sign every .exe/.msi under ./release
-//   npx omega sign-windows --in release/ --out release/signed/
-//   npx omega sign-windows --verify-only                   # don't sign, just verify existing signatures
-//   npx omega sign-windows --smoke                         # sign a 1-byte dummy .exe to validate the setup
-//   npx omega sign-windows --target some-binary.exe        # sign a single specific file
-//
-// Cloud provider modules will live in src/lib/sign-providers/{azure,sslcom,digicert}.js
-// (Pass 3 work). For now the cloud branch logs the intended provider command and exits cleanly.
+// Strategy-aware Windows code signer (`npx omega sign-windows`). The strategy is
+// config platforms.windows.signing.strategy; the strategy and cloud provider sets
+// are @omega.js/config's (WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS).
+//   self-hosted, local: signtool against the EV token (local = a developer's own box)
+//   cloud: refused naming the provider, since no cloud provider signer ships yet
+// Flags: --in <dir> --out <dir> (default release/ to release/signed/), --target <file>,
+// --verify-only, --smoke (sign a throwaway exe to prove the box's setup).
 
 const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
 const jetpack = require('fs-jetpack');
 const { execute } = require('node-powertools');
+const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS } = require('@omega.js/config');
 
 const build = require('../build.js');
 const logger = build.logger('sign-windows');
@@ -146,11 +138,13 @@ async function runSignCommand(options) {
     if (!provider) {
       throw new Error('strategy=cloud but no provider set (config platforms.windows.signing.cloud.provider).');
     }
-    await signWithCloudProvider(provider, targets, inDir, outDir);
-    return;
+    if (!WINDOWS_CLOUD_PROVIDERS.includes(provider)) {
+      throw new Error(`Unknown cloud signing provider "${provider}" (config platforms.windows.signing.cloud.provider). Supported: ${WINDOWS_CLOUD_PROVIDERS.join(', ')}.`);
+    }
+    throw new Error(`Cloud signing through "${provider}" is not built: no cloud provider signer ships yet. Sign with strategy self-hosted or local (config platforms.windows.signing.strategy).`);
   }
 
-  throw new Error(`Unknown Windows signing strategy: ${strategy}`);
+  throw new Error(`Unknown Windows signing strategy: ${strategy}. Supported: ${WINDOWS_SIGNING_STRATEGIES.join(', ')}.`);
 }
 
 // The runner log this run may tee to, or null.
@@ -547,30 +541,6 @@ async function smokeTest() {
   } finally {
     try { jetpack.remove(tmp); } catch (e) { /* ignore */ }
   }
-}
-
-async function signWithCloudProvider(provider, targets, inDir, outDir) {
-  // Provider modules live in src/lib/sign-providers/<name>.js. Each exports
-  //   async function sign({ targets, inDir, outDir, projectRoot, env }) { ... }
-  let providerModule;
-  try {
-    providerModule = require(path.join(__dirname, '..', 'lib', 'sign-providers', `${provider}.js`));
-  } catch (e) {
-    throw new Error(`Cloud provider "${provider}" is not yet implemented (no src/lib/sign-providers/${provider}.js). Supported: azure, sslcom, digicert.`);
-  }
-
-  if (typeof providerModule.sign !== 'function') {
-    throw new Error(`sign-providers/${provider}.js does not export a sign() function.`);
-  }
-
-  await providerModule.sign({
-    targets,
-    inDir,
-    outDir,
-    projectRoot: process.cwd(),
-    env:         process.env,
-    logger,
-  });
 }
 
 // Exports for testing — the pure halves of the signer: what the command line

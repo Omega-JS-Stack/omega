@@ -27,6 +27,7 @@
 const { CLIENT_SECTIONS } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
 const { resolveWinbackOffer } = require('./winback.js');
+const { PAYMENT_PROVIDERS } = require('./payment-providers.js');
 
 // The per-build facts a surface composes ON TOP of the resolved config before
 // baking it. They are not config sections (nothing authors them in
@@ -121,12 +122,11 @@ function clientConfig(resolved) {
     );
   }
 
-  // The one home of the cancel-flow save offer's default (#268) is
-  // @omega.js/config, so the browser is handed the RESOLVED offer: the dialog a
-  // customer reads and the coupon the backend creates can never name different
-  // numbers.
+  // The browser is handed the RESOLVED winback offer and the provider
+  // capability table, so the dialog and the coupon, and the checkout's buttons
+  // and the backend's refusals, can never disagree.
   if (client.payment) {
-    client.payment = { ...client.payment, winback: resolveWinbackOffer(client.payment) };
+    client.payment = { ...client.payment, winback: resolveWinbackOffer(client.payment), capabilities: PAYMENT_PROVIDERS };
   }
 
   // Never an alias of the resolved config: what a bake stamps into an artifact

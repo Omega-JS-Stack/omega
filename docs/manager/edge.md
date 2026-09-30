@@ -38,7 +38,8 @@ Everything sits under `edge.providers.cloudflare`:
 - `cacheRules[]`, `rules.{managedTransforms,redirect,configuration,responseHeaders,security}`,
   `speedTest.{frequency,region}`, `workers[]`.
 
-The manager's defaults hold PLATFORM answers only; company-specific values (DMARC report
+The schema's defaults hold PLATFORM answers only, resolved but never written into a brand file
+(`materialize: false`, docs/shared/config.md); company-specific values (DMARC report
 addresses, the BIMI logo, extra CSP hosts) belong in the company or brand layer.
 
 **Credential**: `CLOUDFLARE_TOKEN` in the brand `.env`, asked for through the shared setup
@@ -46,7 +47,7 @@ contract. No `brand.url` → the service skips.
 
 ## Cache lifetimes: /assets for a year, HTML for a minute
 
-The manager's defaults carry the whole `cacheRules` set, so a brand that declares no rules
+The schema's defaults carry the whole `cacheRules` set, so a brand that declares no rules
 still reconciles both of them ([#751](https://github.com/Omega-JS-Stack/omega/issues/751)):
 
 | Rule | Matches | Edge TTL | Browser TTL |
@@ -133,7 +134,7 @@ it:
 `targetUrl` takes `{ value }` for a fixed destination and `{ expression }` for a computed
 one. The ruleset is reconciled whole — a configured rule is created or updated by `name`,
 and a rule in Cloudflare that config does not name is REMOVED — so the block is the complete
-desired set, the manager's platform defaults (the trailing-slash rule) included.
+desired set, the schema's platform defaults (the trailing-slash rule) included.
 
 A redirect whose URLs CAN be enumerated is not this: it is a redirect PAGE in the web target
 (`redirect.url` in frontmatter on the `modules/utilities/redirect` layout,

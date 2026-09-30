@@ -113,7 +113,7 @@ module.exports = defineCases({
         const calls = BACKGROUND_AUTH.match(/connectAuthEmulator\(/g) || [];
         ctx.expect(calls.length).toBe(1);
         ctx.expect(BACKGROUND.includes('connectAuthEmulator')).toBe(false);
-        ctx.expect(/if \(this\.omega\.isTesting\(\)\) \{[\s\S]*?const port = requiredPort\(this\.omega, 'OMEGA_AUTH_PORT', 'auth'\);\s*this\.logger\.log\([^\n]*\);\s*connectAuthEmulator\(this\._firebaseAuth, `http:\/\/localhost:\$\{port\}`/.test(BACKGROUND_AUTH)).toBe(true);
+        ctx.expect(/if \(this\.omega\.isTesting\(\)\) \{[\s\S]*?const url = getAuthEmulatorUrl\(this\.omega\);\s*this\.logger\.log\([^\n]*\);\s*connectAuthEmulator\(this\._firebaseAuth, url, /.test(BACKGROUND_AUTH)).toBe(true);
         // The baked map is the ONLY source (#300: a SW can't read a bumped
         // OMEGA_AUTH_PORT, so the bake carries it). The classic 9099 that used
         // to sit under it as a fallback is gone (#834), numbers and all.

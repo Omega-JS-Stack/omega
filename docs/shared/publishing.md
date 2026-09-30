@@ -72,7 +72,9 @@ failure ABORTS the prepare: every publishable sets `preparePackage.hooks.afterBl
 so a tarball can never build missing its vendored internals. Contract:
 [agent-docs.md](agent-docs.md).
 
-The MODULE payload is closed over itself ([#739](https://github.com/Omega-JS-Stack/omega/issues/739)): a vendored file's own cross-package requires are rewritten to the sibling vendored copy, and any vendorable only a vendored file needs is vendored too, so the raw-private-reference grep below reads `dist/vendor/` as strictly as the rest of the tree.
+The MODULE payload is closed over itself ([#739](https://github.com/Omega-JS-Stack/omega/issues/739)): a vendored file's own cross-package requires are rewritten to the sibling vendored copy, and any vendorable only a vendored file needs is vendored too, so the raw-private-reference scan below reads `dist/vendor/` as strictly as the rest of the tree.
+
+**Self-containment has one shape** ([#848](https://github.com/Omega-JS-Stack/omega/issues/848)): a raw reference to a private package is `PRIVATE_REFERENCE` in [packages/devkit/tools/vendor.js](../../packages/devkit/tools/vendor.js), composed from the same reference prefixes the rewrite uses and from `VENDORABLE_PACKAGES`. Every reader derives it: devkit's vendor tests assert against the export, and [scripts/private-refs.js](../../scripts/private-refs.js) is the one tree scan, which `release-check` calls and CI's pack-smoke runs as `node scripts/private-refs.js <installed-dir>`. The scan matches whole file contents, so `require( '@omega.js/config')`, a `from` that ends its line, and `import (  '@omega.js/analytics')` are all hits; `node --test scripts/private-refs.test.js` proves each reader catches them.
 
 ## The license check ([#320](https://github.com/Omega-JS-Stack/omega/issues/320))
 
@@ -137,7 +139,7 @@ circumventing license-key functionality and removing notices.
 
 1. `npm run release:check` — packs all seven through their real prepare (vendoring
    included), scratch-installs each tarball with local-tarball overrides, resolves,
-   and greps the shipped trees for raw private references. **Must be 7/7 green.**
+   and scans the shipped trees for raw private references. **Must be 7/7 green.**
    This is the laptop mirror of CI's pack-smoke.
 2. Full battery green: root `npm test` (packages → corpus → sandbox e2e → journey).
 3. npm auth sanity: `npm whoami` (expected `itwcw2000`). Known parked mystery: `npm org ls omega.js`

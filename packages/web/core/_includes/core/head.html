@@ -200,13 +200,15 @@
      mutation batch collects the reveals it just saw (data-omega-inview IS the
      guard) and coalesces TWO frames, so the browser paints the opacity-0 state
      and the CSS transition really runs. The stagger is re-applied to the whole
-     container each time (motion.js applyStagger, same 60ms default): parse
+     container each time, by the engine's own applyStagger, printed in at build
+     time from its one home (@omega.js/client modules/reveal-stagger.js): parse
      order is document order, so an index never changes and re-setting the same
      value restarts nothing. The engine's observeReveal skips a stamped element,
      so its later boot does nothing in here, and reduced motion needs no guard:
      the reveal lane only hides under no-preference. -->
 <script>
 (() => {
+  {{ revealStagger }}
   const HOOK = '[data-omega-first-paint] [data-omega-reveal]:not([data-omega-inview])'
     + ', [data-omega-first-paint][data-omega-reveal]:not([data-omega-inview])';
   const queue = new Set();
@@ -229,12 +231,7 @@
         frame = 0;
         new Set(batch.map((el) => el.closest('[data-omega-first-paint]'))).forEach((band) => {
           if (!band) { return; }
-          band.querySelectorAll('[data-omega-reveal-stagger]').forEach((parent) => {
-            const step = Number(parent.getAttribute('data-omega-reveal-stagger')) || 60;
-            parent.querySelectorAll('[data-omega-reveal]').forEach((el, index) => {
-              el.style.setProperty('--omega-reveal-delay', `${index * step}ms`);
-            });
-          });
+          band.querySelectorAll('[data-omega-reveal-stagger]').forEach(applyStagger);
         });
         batch.forEach((el) => el.setAttribute('data-omega-inview', 'true'));
         schedule();

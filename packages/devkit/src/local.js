@@ -207,33 +207,16 @@ function frameworkPackagesOf(targetDir) {
 }
 
 /**
- * Check whether a dependency is already the monorepo copy: the FIRST
- * node_modules entry walking up from dir (mirroring Node resolution — npm
- * workspaces hoist installs to the brand root) resolves to the target package
- * directory.
+ * Check whether a dependency is already the monorepo copy: the copy
+ * `resolvePackageRealDir` finds from dir (npm workspaces hoist installs to the
+ * brand root) is the target package directory.
  * @param {string} dir - Directory the dependency is declared in.
  * @param {string} name - Package name.
  * @param {string} targetDir - Monorepo package directory.
  * @returns {boolean}
  */
 function isLinkedTo(dir, name, targetDir) {
-  let current = path.resolve(dir);
-
-  while (true) {
-    const candidate = path.join(current, 'node_modules', name);
-    if (fs.existsSync(candidate)) {
-      try {
-        return fs.realpathSync(candidate) === fs.realpathSync(targetDir);
-      } catch (e) {
-        return false;
-      }
-    }
-    const parent = path.dirname(current);
-    if (parent === current) {
-      return false;
-    }
-    current = parent;
-  }
+  return resolvePackageRealDir(name, dir) === fs.realpathSync(targetDir);
 }
 
 /**
@@ -1534,10 +1517,31 @@ function acquireHealLock(realDir) {
 }
 
 /**
+ * The ONE node_modules walk: the first `node_modules/<name>` holding a
+ * package.json, climbing from fromDir (Node's own order, so a hoisted copy is
+ * found from a nested target). The entry as installed: a link stays a link,
+ * for the callers that ask whether the install IS one.
+ * @param {string} packageName - Package name (e.g. '@omega.js/web').
+ * @param {string} fromDir - Directory to resolve from.
+ * @returns {string|null} The installed package directory, or null when nothing is installed.
+ */
+function resolvePackageDir(packageName, fromDir) {
+  for (let dir = path.resolve(fromDir); ; dir = path.dirname(dir)) {
+    const candidate = path.join(dir, 'node_modules', packageName);
+    if (fs.existsSync(path.join(candidate, 'package.json'))) {
+      return candidate;
+    }
+    if (path.dirname(dir) === dir) {
+      return null;
+    }
+  }
+}
+
+/**
  * Resolve a package's REAL on-disk directory as seen from fromDir, mirroring
  * Node resolution. require.resolve of '<name>/package.json' first (works when
- * the exports map exposes './package.json', as the backend's does), then a
- * manual node_modules walk-up (most framework maps expose no './package.json',
+ * the exports map exposes './package.json', as the backend's does), then the
+ * resolvePackageDir walk (most framework maps expose no './package.json',
  * and a missing dist makes the '.' entry unresolvable: the stale case this exists for).
  * @param {string} packageName - Package name (e.g. '@omega.js/web').
  * @param {string} fromDir - Directory to resolve from.
@@ -1551,22 +1555,8 @@ function resolvePackageRealDir(packageName, fromDir) {
     // Fall through to the manual walk
   }
 
-  let dir = path.resolve(fromDir);
-  while (true) {
-    const candidate = path.join(dir, 'node_modules', packageName);
-    if (fs.existsSync(path.join(candidate, 'package.json'))) {
-      try {
-        return fs.realpathSync(candidate);
-      } catch (e) {
-        return null;
-      }
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      return null;
-    }
-    dir = parent;
-  }
+  const installed = resolvePackageDir(packageName, fromDir);
+  return installed && fs.realpathSync(installed);
 }
 
 /**
@@ -2033,6 +2023,7 @@ module.exports = {
   findBrandRoot,
   discoverTargets,
   frameworkPackagesOf,
+  resolvePackageDir,
   resolvePackageRealDir,
   isLocalCheckout,
   linkLocalPackages,

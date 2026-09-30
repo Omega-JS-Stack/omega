@@ -23,6 +23,8 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { User } = require('@omega.js/account');
+const { clientConfig } = require('@omega.js/config');
+const { bootCheckout } = require('./lib/checkout-boot.js');
 
 const CORE_DIR = path.join(__dirname, '..', 'core');
 const MODULES_DIR = path.join(CORE_DIR, 'js', 'pages', 'payment', 'checkout', 'modules');
@@ -80,13 +82,17 @@ async function loadState() {
   return require(BUNDLE);
 }
 
+// The capability table exactly as the build bakes it beside the providers
+const CAPABILITIES = clientConfig({ payment: {} }).payment.capabilities;
+
 /** The checkout bindings for one product against one `payment.providers` block. */
-async function bindingsFor(product, providers, { frequency = 'annually' } = {}) {
+async function bindingsFor(product, providers, { frequency = 'annually', capabilities = CAPABILITIES } = {}) {
   const modules = await loadState();
 
   modules.state.product = product;
   modules.state.frequency = product.type === 'subscription' ? frequency : 'once';
   modules.state.providers = providers;
+  modules.state.capabilities = capabilities;
 
   return modules.buildBindingsState();
 }
@@ -137,4 +143,32 @@ test('#642: switching the provider on adds nothing to the other methods', async 
     others, { card: false, paypal: false, applePay: false, googlePay: false },
     'a crypto-only brand offers crypto and nothing else',
   );
+});
+
+test('#849: which product types crypto sells is its capability row, never its name', async () => {
+  const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
+  const bound = await bindingsFor(SUBSCRIPTION, { coinbase: { enabled: true } }, { capabilities: sellsPlans });
+
+  assert.strictEqual(bound.checkout.paymentMethods.crypto, true, 'a row that sells subscriptions offers the button on a plan');
+
+  const noOneTime = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, oneTime: false } };
+  const hidden = await bindingsFor(ONE_TIME, { coinbase: { enabled: true } }, { capabilities: noOneTime });
+
+  assert.strictEqual(hidden.checkout.paymentMethods.crypto, false, 'and a row that sells no one-time purchase hides it');
+});
+
+test('#849: a crypto-only brand can sell a plan only where the table says crypto sells plans', async () => {
+  // The page's "no payment methods" check reads the same rows as the buttons
+  const refused = await bootCheckout({ providers: { coinbase: { enabled: true } } });
+  const error = refused.updates[refused.updates.length - 1].checkout.error;
+
+  assert.strictEqual(error.show, true, 'no method can pay for a plan');
+  assert.match(error.message, /No payment methods/);
+
+  const sellsPlans = { ...CAPABILITIES, coinbase: { ...CAPABILITIES.coinbase, subscriptions: true } };
+  const offered = await bootCheckout({ providers: { coinbase: { enabled: true } }, capabilities: sellsPlans });
+
+  assert.strictEqual(offered.updates[0].checkout.error.show, false, 'a row that sells plans paints the checkout');
+  assert.strictEqual(offered.updates[0].checkout.paymentMethods.crypto, true, 'with the crypto button on it');
+  await offered.answerEligibility(false);
 });

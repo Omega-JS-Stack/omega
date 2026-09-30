@@ -85,7 +85,7 @@ module.exports = defineCases({
       name: 'getFunctionsUrl: dev → localhost:5001/<projectId>/us-central1',
       run: (ctx) => {
         ctx.expect(window.__omegaTestInstance.getFunctionsUrl('development'))
-          .toBe('http://localhost:5001/demo-app/us-central1');
+          .toBe('http://127.0.0.1:5001/demo-app/us-central1');
       },
     },
     {

@@ -13,10 +13,13 @@ const build = require('../../../build.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { copyDefaults } = require('../../../commands/lib/ensure-target.js');
 const defineCases = require('@omega.js/devkit/test/define-cases');
+const { sectionMarkers } = require('@omega.js/devkit/merge-line-files');
 const package = build.getPackage('main');
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 const CUSTOM_MARKER = '# ========== Custom Values ==========';
+
+const { defaultMarker: MD_DEFAULT, customMarker: MD_CUSTOM } = sectionMarkers('README.md');
 
 module.exports = defineCases({
   type: 'group',
@@ -179,6 +182,24 @@ module.exports = defineCases({
         jetpack.write(sibling, '*\n!.gitignore\n!my-own-note.txt\n');
         await copyDefaults(tmp);
         ctx.expect(jetpack.exists(sibling)).toBe('file');
+      },
+    },
+    {
+      // The framework owns the Default section of test/README.md, so a stale
+      // one is rewritten from the source; the project's own notes under the
+      // Custom marker are kept verbatim.
+      name: 'test/README.md: the framework section heals to the source, the Custom section stays',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
+        await copyDefaults(tmp);
+        const readme = path.join(tmp, 'test', 'README.md');
+        const fresh = jetpack.read(readme);
+        const custom = "## This project's suites\n\n- `build/notes.test.js`: our notes.\n";
+
+        jetpack.write(readme, `${MD_DEFAULT}\n# Project tests\n\nAn older framework text.\n\n${MD_CUSTOM}\n${custom}`);
+        await copyDefaults(tmp);
+
+        ctx.expect(jetpack.read(readme)).toBe(`${fresh}${custom}`);
       },
     },
     {

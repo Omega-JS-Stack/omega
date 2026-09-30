@@ -15,8 +15,10 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const { scaffoldDefaults } = require('../../dist/utils/scaffold-defaults.js');
-const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../../dist/utils/merge-line-files.js');
+const { DEFAULT_MARKER, CUSTOM_MARKER, sectionMarkers } = require('../../dist/utils/merge-line-files.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+
+const { defaultMarker: MD_DEFAULT, customMarker: MD_CUSTOM } = sectionMarkers('README.md');
 
 // The engine logs per-file by default; tests only want failures surfaced.
 const quiet = { log() {}, warn: console.warn, error: console.error };
@@ -243,6 +245,24 @@ module.exports = defineCases({
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
         assert.ok(jetpack.read(giPath).includes('my-secret-dir/'), 'custom .gitignore line should survive re-merge');
+      },
+    },
+    {
+      name: 'test-readme-framework-section-heals-to-the-source-and-the-custom-section-stays',
+      async run({ assert }) {
+        // The framework owns the Default section of test/README.md, so a
+        // stale one is rewritten from the source; the project's own notes
+        // under the Custom marker are kept verbatim.
+        const tmp = makeTmp();
+        scaffoldDefaults({ outputDir: tmp, logger: quiet });
+        const readme = path.join(tmp, 'test', 'README.md');
+        const fresh = jetpack.read(readme);
+
+        jetpack.write(readme, `${MD_DEFAULT}\n# Project tests\n\nAn older framework text.\n\n${MD_CUSTOM}\n## This project's suites\n\n- \`routes/notes.test.js\`: our notes route.\n`);
+        const result = scaffoldDefaults({ outputDir: tmp, logger: quiet });
+
+        assert.equal(jetpack.read(readme), `${fresh}## This project's suites\n\n- \`routes/notes.test.js\`: our notes route.\n`);
+        assert.ok(result.merged.includes('test/README.md'));
       },
     },
     {

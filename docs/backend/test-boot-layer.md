@@ -52,7 +52,7 @@ Two packaging details keep the fixture sound: the fixture's `.firebaserc` is **r
 
 | Env | Purpose |
 |---|---|
-| `OMEGA_TEST_BOOT_PROJECT` | Root of a Firebase project to boot instead of the bundled fixture. Auto-set to `src/test/fixtures/firebase-project` when @omega.js/backend tests itself; set it explicitly to self-test against a **real consumer** (e.g. `ultimate-jekyll-backend`) without `cd`-ing into it. |
+| `OMEGA_TEST_BOOT_PROJECT` | Root of a Firebase project to boot instead of the bundled fixture. Auto-set to `src/test/fixtures/firebase-project` when @omega.js/backend tests itself; set it explicitly to self-test against a **real consumer** (e.g. `brands/playground-omega/targets/backend`) without `cd`-ing into it. |
 
 ## What happens in a consumer run
 

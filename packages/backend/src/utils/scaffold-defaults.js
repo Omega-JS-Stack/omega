@@ -24,6 +24,9 @@ const WORKFLOW = '.github/workflows/deploy.yml';
 const FILE_MAP = {
   '**/*': { overwrite: false },
   '_.gitignore': { mergeLines: true },
+  // Scaffolded docs are generated output: the framework rewrites the Default
+  // section from this source on every verb, the project's notes live under Custom.
+  'test/README.md': { mergeLines: true },
   // The deploy workflow is FRAMEWORK-owned: re-rendered on every verb so the
   // generated env block tracks the schema and the pinned node tracks the
   // framework ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)).

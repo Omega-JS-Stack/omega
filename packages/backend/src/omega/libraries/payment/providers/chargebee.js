@@ -6,6 +6,7 @@ const env = require('../../env.js');
 // index.js is still evaluating (a circular require), when its export is not whole yet
 const instance = () => require('../../../index.js');
 const assertLicensedPayments = require('../license.js');
+const { SUBSCRIPTION_CADENCES } = require('@omega.js/config');
 
 // Epoch zero timestamps (used as default/empty dates)
 const EPOCH_ZERO = powertools.timestamp(new Date(0), { output: 'string' });
@@ -14,8 +15,6 @@ const EPOCH_ZERO_UNIX = powertools.timestamp(EPOCH_ZERO, { output: 'unix' });
 // Chargebee billing_period_unit → unified frequency map
 const UNIT_TO_FREQUENCY = { year: 'annually', month: 'monthly', week: 'weekly', day: 'daily' };
 
-// Valid frequency suffixes for deterministic item_price_id parsing
-const VALID_FREQUENCIES = ['monthly', 'annually', 'weekly', 'daily'];
 
 // Cached config
 let cachedConfig = null;
@@ -696,7 +695,7 @@ function resolveFrequency(raw) {
   if (itemPriceId) {
     const suffix = itemPriceId.split('-').pop();
 
-    if (VALID_FREQUENCIES.includes(suffix)) {
+    if (SUBSCRIPTION_CADENCES.includes(suffix)) {
       return suffix;
     }
   }

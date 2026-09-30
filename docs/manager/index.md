@@ -93,8 +93,8 @@ below is `config.js`'s `SERVICE_ORDER` — the dependency order every walk runs 
 |---|---|
 | [workspace](workspace.md) | The brand monorepo itself: structure, config health, the agent-docs chain, the `.env` files |
 | [repo](repo.md) | Every repo the brand owns: the SOURCE monorepo, one website repo plus its Pages per GitHub-hosted web target ([#883](https://github.com/Omega-JS-Stack/omega/issues/883)), and the org runner group a public desktop brand's self-hosted Windows signer needs ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)) |
-| [edge](edge.md) | The Cloudflare zone: DNS, email routing, settings, rulesets, speed tests, workers |
-| [domain](domain.md) | The registrar's nameservers, pointed at that zone |
+| [edge](edge.md) | The Cloudflare zone: DNS, email routing, settings, rulesets, speed tests, workers. Each mailbox provider's MX records, SPF include, MX label and Email Routing switch come from its entry in `services/domain/lib/providers.js` |
+| [domain](domain.md) | The registrar's nameservers, pointed at that zone. Each registrar's API client, credentials and nameserver page live in one registry, `services/domain/lib/providers.js`, which the domain, edge and preflight code all read and a test pins to the names the config schema accepts |
 | [cloud](cloud.md) | The Firebase/GCP project: billing, APIs, hosting, auth, the data stores, the SDK config |
 | [captcha](captcha.md) | The brand's own reCAPTCHA keys, proven valid |
 | [analytics](analytics.md) | GA4 streams per target, the Firebase link, the Meta/TikTok pixels |

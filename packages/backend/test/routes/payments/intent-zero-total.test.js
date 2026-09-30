@@ -28,6 +28,7 @@ const coinbaseIntent = require('../../../dist/omega/routes/payments/intent/provi
 const PayPal = require('../../../dist/omega/libraries/payment/providers/paypal.js');
 const Coinbase = require('../../../dist/omega/libraries/payment/providers/coinbase.js');
 const discountCodes = require('../../../dist/omega/libraries/payment/discount-codes.js');
+const registry = require('../../../dist/omega/libraries/payment/providers/index.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 const UID = '_test-zero-total-buyer';
@@ -194,6 +195,34 @@ module.exports = defineCases({
         assert.match(error.message, /\$9\.99/, 'And the price it covered');
         assert.match(error.message, /nothing for Coinbase Commerce to charge/, 'And names the method that cannot take it');
         assert.equal(calls.length, 0, 'Coinbase was never called');
+      },
+    },
+
+    {
+      name: 'a-zero-checkout-on-every-provider-follows-its-descriptor',
+      async run({ assert }) {
+        // The registry decides, never a provider name: a provider whose row
+        // takes a $0 charge is handed one, and every other is refused before
+        // its API is called, for each product type it sells
+        const code = discountCodes.validate(AMOUNT_CODE);
+
+        for (const descriptor of Object.values(registry.PAYMENT_PROVIDERS)) {
+          if (descriptor.acceptsZeroCharge) {
+            assert.equal(discountCodes.chargeableAmount(CHEAP_ONE_TIME.prices.once, code, { provider: descriptor.id }), 0, `${descriptor.name} takes the $0 checkout`);
+            continue;
+          }
+
+          const intent = require(`../../../dist/omega/routes/payments/intent/providers/${descriptor.id}.js`);
+          const products = [descriptor.oneTime && CHEAP_ONE_TIME, descriptor.subscriptions && CHEAP_PLAN].filter(Boolean);
+
+          for (const product of products) {
+            const { calls, error } = await checkout(intent, { product });
+
+            assert.equal(error?.code, 400, `${descriptor.name} refuses a $0 ${product.type} as a 400, got ${error?.message}`);
+            assert.match(error.message, new RegExp(`nothing for ${descriptor.name} to charge`), 'naming the provider');
+            assert.equal(calls.length, 0, `${descriptor.name} was never called`);
+          }
+        }
       },
     },
 

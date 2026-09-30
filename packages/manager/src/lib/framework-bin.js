@@ -1,28 +1,20 @@
 /**
- * Resolve a framework's `omega` bin FILE via the node_modules directory climb
- * from where the target declares it. A manual walk (not require.resolve) because
- * exports-restricted packages don't expose ./package.json.
+ * Resolve a framework's `omega` bin FILE through devkit's one node_modules
+ * walk (`resolvePackageDir`), the path as the brand installed it.
  *
- * Also the ONE place the brand root decides HOW to run a verb on a target, by
- * the verb's row. A fan-out verb (`fanout: 'each'`: test, deploy, build, clean,
- * the pass-through's translate and the like) has one lane: every target,
- * framework and custom alike, runs `npm run <verb>` in its dir, and steps aside
- * loudly when it declares no such script. Only the framework's own script
- * (exactly `omega <verb>`) hears the brand's flags, after `--`; a brand-owned
- * script runs bare, because it has no contract for them. A
- * single-target command (`fanout: 'none'`) is the framework's own: it passes
- * through to that framework's CLI in the target dir with the argv as typed.
- *
- * And the ONE place they decide WHERE a target's scaffold comes from
- * (`resolveTargetScaffold`, #901): the deploy fan-out runs each selected
- * target's `ensureTarget` in-process, through the `./ensure-target` subpath
- * every framework exposes, because there is no scaffold verb to spawn. A
- * custom target has no framework scaffold and steps aside the same way.
+ * The ONE place the brand root decides HOW to run a verb on a target, by its
+ * row: a fan-out verb runs `npm run <verb>` in every target and steps aside
+ * loudly when the script is missing; only the framework's own script
+ * (exactly `omega <verb>`) hears the brand's flags after `--`. A single-target
+ * verb passes through to the framework's CLI with the argv as typed. And the
+ * ONE place deciding WHERE a target's scaffold comes from: the framework's
+ * `./ensure-target` subpath, run in-process; a custom target steps aside.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 
 const { findTarget, MANAGER } = require('@omega.js/devkit/omega-bin');
+const { resolvePackageDir } = require('@omega.js/devkit/local');
 // A verb's dryRun fact is its row in the one verb table
 const { findVerb } = require('@omega.js/devkit/verbs');
 const { targetScripts } = require('./custom-target.js');
@@ -49,20 +41,10 @@ function resolveFrameworkBin(fromDir, name) {
  * @returns {{ dir: string, pkg: object }|null} - null when not installed
  */
 function resolveFrameworkPackage(fromDir, name) {
-  let dir = path.resolve(fromDir);
+  const dir = resolvePackageDir(name, fromDir);
+  if (!dir) return null;
 
-  while (true) {
-    const pkgDir = path.join(dir, 'node_modules', name);
-    const pkgPath = path.join(pkgDir, 'package.json');
-
-    if (fs.existsSync(pkgPath)) {
-      return { dir: pkgDir, pkg: JSON.parse(fs.readFileSync(pkgPath, 'utf8')) };
-    }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
+  return { dir, pkg: JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) };
 }
 
 /**

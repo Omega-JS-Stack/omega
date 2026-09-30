@@ -1,4 +1,4 @@
-// Merge line-based files (.env, .gitignore, .gitattributes, AGENTS.md) through
+// Merge line-based files (.env, .gitignore, .gitattributes, AGENTS.md, test/README.md) through
 // the OMEGA marker sections: the framework rewrites Default on every run, the
 // consumer's Custom stays verbatim, and a file with no markers yet converges
 // once, its consumer lines landing under Custom. The protocol (the grammar and its

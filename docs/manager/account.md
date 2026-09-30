@@ -23,7 +23,7 @@ is not a warning.
 | Key | Meaning |
 |---|---|
 | `account.enabled: false` (or `account: false`) | Skip. |
-| `account.admins[]` | The required accounts — `{ email, account, marketing }`, with `{domain}` templated from `brand.url`. The manager default is `support@{domain}` ONLY; a company's own list lives in its company omega.json5 and replaces the default whole. |
+| `account.admins[]` | The required accounts, `{ email, account, marketing }`, with `{domain}` templated from `brand.url`. The schema default is `support@{domain}` ONLY, resolved but never written into a brand file; a company's own list lives in its company omega.json5 and replaces the default whole. |
 | `cloud.config.apiKey` | Read for password verification and backend calls (the cloud service lands it). |
 | `cloud.shared: true` | Skip — the owning brand manages accounts. |
 

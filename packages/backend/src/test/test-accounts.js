@@ -2258,6 +2258,7 @@ function resolveWipeProjectId(admin, env) {
  */
 async function deleteTestUsers(admin, extraAccounts) {
   const results = { deleted: [], skipped: [], failed: [] };
+  const allAccounts = getAccountTable(extraAccounts);
 
   // Wipe the entire emulator Firestore up front (guarded to emulator-only).
   await flushEmulatorFirestore(admin);
@@ -2288,19 +2289,16 @@ async function deleteTestUsers(admin, extraAccounts) {
       }
 
       // Count all known accounts as deleted (the bulk API doesn't return per-user results)
-      const allAccounts = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
       results.deleted = Object.values(allAccounts).map(a => a.uid);
     } catch (e) {
       // Bulk clear failed — fall back to individual deletes. Say why out loud:
       // the individual path races auth:on-delete (the documented flake), so a
       // silent downgrade turns a loud HTTP refusal into an unexplained flaky run.
       console.warn(`Auth bulk-clear failed (${e.message}); falling back to individual deletes, which can race auth:on-delete`);
-      const allAccounts = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
       await _deleteAccountsIndividually(admin, allAccounts, results);
     }
   } else {
     // Not running against emulator — fall back to individual deletes
-    const allAccounts = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
     await _deleteAccountsIndividually(admin, allAccounts, results);
   }
 
@@ -2424,7 +2422,7 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
  * @returns {{ orderId: string, doc: object }|null} null when the persona bought nothing
  */
 function buildOrderFixture(key, config, extraAccounts) {
-  const account = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) }[key];
+  const account = getAccountTable(extraAccounts)[key];
 
   if (!account) {
     throw new Error(`No seeded persona named ${key} — there is no order fixture to seed`);
@@ -2530,7 +2528,7 @@ async function seedOrderFixture(admin, key, config, extraAccounts) {
  * @returns {Promise<string[]>} The order ids seeded
  */
 async function seedOrderFixtures(admin, config, extraAccounts) {
-  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const all = getAccountTable(extraAccounts);
   const seeded = await Promise.all(
     Object.keys(all).map((key) => seedOrderFixture(admin, key, config, extraAccounts)),
   );
@@ -2604,7 +2602,7 @@ function sessionsDatabase(admin) {
  * @returns {Promise<string[]|null>} The session ids seeded, or null when the persona has none
  */
 async function seedSessionFixture(admin, key, extraAccounts) {
-  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const all = getAccountTable(extraAccounts);
   const sessions = buildSessionFixtures(key, all);
 
   if (!sessions) {
@@ -2634,7 +2632,7 @@ async function seedSessionFixture(admin, key, extraAccounts) {
  * @returns {Promise<string[]>} The session ids seeded
  */
 async function seedSessionFixtures(admin, extraAccounts) {
-  const all = { ...TEST_ACCOUNTS, ...(extraAccounts || {}) };
+  const all = getAccountTable(extraAccounts);
   const seeded = await Promise.all(
     Object.keys(all).map((key) => seedSessionFixture(admin, key, extraAccounts)),
   );

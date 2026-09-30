@@ -150,7 +150,7 @@ Strategy-pluggable via `platforms.windows.signing.strategy` in `config/omega.jso
 | `cloud` | `windows-latest` runner shells out to a cloud signing CLI (Azure Trusted Signing / SSL.com / DigiCert KeyLocker) | Future migration target |
 | `local` | Developer's Windows machine after CI uploads unsigned artifact | Fallback when no runner is available |
 
-The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `platforms.windows.signing.strategy` so the same code path drives all three. Provider modules live in `src/lib/sign-providers/{ev,azure,sslcom,digicert}.js` (Pass 3).
+The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `platforms.windows.signing.strategy` so the same code path drives all three. The strategy and cloud provider sets are declared once, in @omega.js/config's `windows-signing.js`. No cloud provider signer ships yet: `sign-windows` refuses `cloud`, naming the configured provider.
 
 ## GitHub Actions
 

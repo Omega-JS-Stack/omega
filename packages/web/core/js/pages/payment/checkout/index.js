@@ -1,8 +1,8 @@
 // Payment Checkout Page
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import { getProviders, getProductById } from '__main_assets__/js/libs/payment-config.js';
+import { getProviders, getCapabilities, getProductById } from '__main_assets__/js/libs/payment-config.js';
 import { fetchTrialEligibility, createPaymentIntent } from './modules/api.js';
-import { state, buildBindingsState, resolveProvider, resolveFrequency, TRIAL_ELIGIBILITY_UNKNOWN } from './modules/state.js';
+import { state, buildBindingsState, resolveProvider, resolveFrequency, offeredPaymentMethods, TRIAL_ELIGIBILITY_UNKNOWN } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
@@ -134,22 +134,15 @@ async function initializeCheckout() {
       throw new Error(`Product "${productId}" not found.`);
     }
     state.product = product;
+    state.capabilities = getCapabilities();
 
     // Resolve frequency: `once` for a one-time buy, otherwise the URL param if
     // valid and the longest available term if not (#668)
     state.frequency = resolveFrequency(product, frequencyParam);
 
-    // Check payment methods are available
-    const hasPaymentMethods = !!(
-      state.providers?.stripe?.publishableKey
-      || state.providers?.chargebee?.site
-      || state.providers?.paypal?.clientId
-      // Crypto counts only where it can actually be paid: a subscription has no
-      // Coinbase Commerce flow at all (#642), so a crypto-only brand must still
-      // say "no payment methods" on a subscription rather than paint a checkout
-      // whose one button is hidden.
-      || (state.providers?.coinbase?.enabled === true && product.type !== 'subscription')
-    );
+    // Check payment methods are available: the same capability rows the
+    // buttons read, so a crypto-only brand on a plan says so
+    const hasPaymentMethods = Object.values(offeredPaymentMethods(product, false)).some(Boolean);
 
     if (!hasPaymentMethods) {
       showError('No payment methods are currently available. Please contact support for assistance.');

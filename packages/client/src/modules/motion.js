@@ -44,6 +44,8 @@
  *     scan(root) is exposed for callers that render into detached roots.
  */
 
+import { applyStagger } from './reveal-stagger.js';
+
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
 const COUNTUP_DURATION = 1200;
 const MARQUEE_SPEED = 80; // px/s — data-omega-marquee="120" overrides per marquee
@@ -220,7 +222,7 @@ function createMotion() {
   let mutationObserver = null;
   let scrollWatchers = [];
   let rotateTimers = new Map();
-  let dotfields = new WeakSet();
+  const dotfields = new WeakSet();
   let scrollHandler = null;
 
   // ── reveals ────────────────────────────────────────────────────────────────
@@ -236,13 +238,6 @@ function createMotion() {
       return;
     }
     revealObserver.observe(el);
-  };
-
-  const applyStagger = (parent) => {
-    const step = Number(parent.getAttribute('data-omega-reveal-stagger')) || 60;
-    parent.querySelectorAll('[data-omega-reveal]').forEach((el, index) => {
-      el.style.setProperty('--omega-reveal-delay', `${index * step}ms`);
-    });
   };
 
   // ── count-up ───────────────────────────────────────────────────────────────

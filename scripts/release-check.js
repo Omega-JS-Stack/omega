@@ -1,29 +1,12 @@
 /**
- * Local publish rehearsal — `npm run release:check`.
- *
- * The mechanical gate for the publish-proving checkpoint: proves every
- * publishable would survive `npm publish` TODAY, without publishing
- * anything. CI's pack-smoke (ci.yml) is the dispatch-lane mirror of this;
- * this script is the laptop lane, so the red shows up here before it can
- * burn a CI dispatch or a real publish.
- *
- * Per publishable package:
- *   1. `npm pack` it (runs the package's REAL prepare — src→dist copy +
- *      vendoring; npm packs private:true packages fine, it only refuses to
- *      publish them, which is the latch working as designed)
- *   2. install the tarball into a scratch project — `overrides` pin the
- *      published @omega.js runtime deps (client, backend, mcp-router) to their
- *      local tarballs so nothing resolves against the (empty) registry
- *   3. `require.resolve('<name>')` from the scratch project
- *   4. scan the installed tree for raw PRIVATE @omega.js references
- *      (devkit's VENDORABLE_PACKAGES) — vendoring must have rewritten
- *      or eliminated every one; published runtime deps (@omega.js/client,
- *      @omega.js/backend, @omega.js/mcp-router) are legitimate package
- *      requires and are skipped
+ * Local publish rehearsal, `npm run release:check`: the laptop mirror of CI's
+ * pack-smoke. Per publishable: `npm pack` (the real prepare, vendoring included),
+ * install the tarball into a scratch project with `overrides` pinning client,
+ * backend and mcp-router to their local tarballs, `require.resolve` it, and scan
+ * the installed tree with scripts/private-refs.js.
  *
  * Flags:
- *   --only=web,manager   check a subset (client/backend/mcp-router still pack —
- *                        their tarballs feed the overrides)
+ *   --only=web,manager   check a subset (the override packages still pack)
  *   --keep               keep the scratch dir for inspection
  */
 
@@ -32,20 +15,13 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { scanTree } = require('./private-refs');
 
 // Constants
 const ROOT = path.join(__dirname, '..');
 const PUBLISHABLES = ['backend', 'client', 'desktop', 'extension', 'manager', 'mcp-router', 'web'];
-const { VENDORABLE_PACKAGES: PRIVATE_PACKAGES } = require('../packages/devkit/tools/vendor');
 // Always packed even under --only: overrides point at these tarballs
 const OVERRIDE_PACKAGES = ['client', 'backend', 'mcp-router'];
-
-// The ways shipped code can reference an @omega.js package (mirrors
-// devkit/tools/vendor.js REFERENCE_PATTERNS + ci.yml's pack-smoke grep).
-const PRIVATE_REFERENCE = new RegExp(
-  `(?:require(?:\\.resolve)?\\(\\s*|from\\s+|import\\s*\\(\\s*|import\\s+)` +
-  `['"]@omega\\.js\\/(${PRIVATE_PACKAGES.join('|')})(?:['"/])`
-);
 
 /**
  * Run a command, capturing output; returns { ok, output }.
@@ -83,41 +59,6 @@ function packPackage(name, destRoot) {
   const result = run('npm', ['pack', `--workspace=packages/${name}`, '--pack-destination', dest], { cwd: ROOT });
   const tgz = fs.existsSync(dest) ? fs.readdirSync(dest).find((f) => f.endsWith('.tgz')) : null;
   return { tarball: tgz ? path.join(dest, tgz) : null, output: result.output };
-}
-
-/**
- * Scan an installed package tree for raw private @omega.js references.
- * Walks .js/.cjs/.mjs files, skipping nested node_modules.
- * @param {string} dir - Installed package root.
- * @returns {{ hits: string[], files: number, bytes: number }}
- */
-function scanInstalledTree(dir) {
-  const hits = [];
-  let files = 0;
-  let bytes = 0;
-
-  const walk = (current) => {
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-      if (entry.name === 'node_modules') continue;
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      files += 1;
-      bytes += fs.statSync(full).size;
-      if (!/\.(js|cjs|mjs)$/.test(entry.name)) continue;
-      const lines = fs.readFileSync(full, 'utf8').split('\n');
-      lines.forEach((line, i) => {
-        if (PRIVATE_REFERENCE.test(line)) {
-          hits.push(`${path.relative(dir, full)}:${i + 1}`);
-        }
-      });
-    }
-  };
-
-  walk(dir);
-  return { hits, files, bytes };
 }
 
 /**
@@ -218,7 +159,7 @@ function main() {
     result.resolve = resolve.ok;
 
     const installedDir = path.join(scratch, 'node_modules', '@omega.js', name);
-    const scan = scanInstalledTree(installedDir);
+    const scan = scanTree(installedDir);
     result.hits = scan.hits;
     result.files = scan.files;
     result.bytes = scan.bytes;

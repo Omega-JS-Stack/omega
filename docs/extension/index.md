@@ -47,7 +47,7 @@ To load the unpacked extension in Chrome: point chrome://extensions → "Load un
 
 1. `npm install`
 2. `npm start` — watch + compile `src/` → `dist/` via prepare-package
-3. Test in the **designated test consumer**: `../../ITW-Creative-Works/powertools-browser-extension` is @omega.js/extension's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From its brand root, run `npx omega i local` to link @omega.js/extension to this local repo, required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/extension`). Reverse with `npx omega i live`.
+3. Test in the **designated test consumer**: [`brands/playground-omega/targets/extension`](../../brands/playground-omega/targets/extension), the extension target of the standing in-repo test brand, is @omega.js/extension's consumer for validating framework changes end-to-end ([docs/shared/brands.md](../shared/brands.md)). Its `@omega.js/extension` spec is a `file:` path into this monorepo, so it runs this working tree's build with no linking step (the root `npm start` keeps that build current). Run its verbs at the brand root: `cd brands/playground-omega && npx omega test --target=extension`.
 4. `npm test` — runs the framework's own suites
 
 ## Architecture
@@ -81,6 +81,8 @@ Every context's `omega` carries the same core:
 - `omega.messenger`: the one lane between contexts, `send({ destination, command, payload })` and `onMessage(handler)` (returns the unsubscribe)
 - `omega.config` (the `OMEGA_BUILD_JSON.config` snapshot), `omega.version`, `omega.getApiUrl()`
 - `omega.getEnvironment()` / `isDevelopment()` / `isProduction()` / `isTesting()`: cross-context helpers ([docs/extension/environment-detection.md](environment-detection.md))
+
+**The local port chain** (env, then the baked `dev.ports`, then a loud miss, and the host each local URL carries) has one home, `@omega.js/client/modules/dev-ports.js`: [docs/shared/config.md § Port auto-allocation](../shared/config.md#port-auto-allocation-n7).
 
 The four page contexts (popup, options, sidepanel, page) are ONE subclass of `@omega.js/client`'s base class, told apart by the context name, so they also carry `omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore`, `omega.analytics`, `omega.utilities` and the rest of the client ([client guide](../client/index.md)). `omega.auth.user` is always a `User`, and `omega.auth.openPage()` opens the brand site's sign-in page in a new tab. Background carries its own `omega.auth`, desktop main's `omega.auth` shape (its Firebase app, `.user`, `.listen()`, `.signOut()`, and `.getIdToken()`, the session's fresh ID token or `null` signed out), and `omega.request()`, the page contexts' API fetch on background's own session; content and offscreen have no auth.
 

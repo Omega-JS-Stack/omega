@@ -359,7 +359,7 @@ exactly like icon-renderer.
 | Surface | Use |
 |---|---|
 | `data-omega-reveal="up\|fade\|left\|right\|scale"` | reveal once on scroll-in |
-| `data-omega-reveal-stagger="60"` (parent) | staggers child reveals (ms step) |
+| `data-omega-reveal-stagger="60"` (parent) | staggers child reveals (ms step, 60 when the value is empty): child N gets `--omega-reveal-delay: N × step`. The default and the formula live ONCE, in `applyStagger` (`@omega.js/client/modules/reveal-stagger.js`): the engine imports it, and head.html's inline starter runs the same function, printed in at build time (below) |
 | `data-omega-first-paint` (band) | the band IS the first viewport: its reveals are started at PARSE time by head.html's inline starter (no fetch), and a rotator inside it opens on its first word (css) |
 | `data-omega-countup` | counts to the number already in the markup |
 | `data-omega-rotate="2600"` | children cycle (hero word rotator, quotes) |
@@ -405,9 +405,17 @@ Resilience rules (load-bearing):
   wait this removes. Each batch coalesces TWO animation frames — the first
   paints what was collected at opacity 0, which is the transition's starting
   state, the second stamps it — then re-applies the stagger across the whole
-  container (`--omega-reveal-delay` per child, same 60ms default; parse order is
-  document order, so an index never changes and re-setting a value restarts
-  nothing) and sets `data-omega-inview`. `DOMContentLoaded` disconnects the
+  container (`--omega-reveal-delay` per child; parse order is document order, so
+  an index never changes and re-setting a value restarts nothing) and sets
+  `data-omega-inview`. **The stagger is the engine's own, never a copy**: the
+  starter cannot import a module, so the web build prints `applyStagger`'s
+  source into it from its one home, `@omega.js/client/modules/reveal-stagger.js`
+  (the `revealStagger` global, registered in `packages/web/src/head-globals.js`
+  the way web's build already requires `icon-core`). That function closes over
+  nothing, because the inlined copy has no module scope, and
+  `packages/web/test/reveal-stagger-pin.test.js` runs the rendered starter and
+  the module side by side and holds head.html and motion.js to carrying no
+  formula of their own. `DOMContentLoaded` disconnects the
   observer after one last pass, as a backstop. The engine's `observeReveal`
   returns early on a stamped element, so its later boot changes nothing inside
   the band, and the starter needs no reduced-motion guard of its own: the reveal

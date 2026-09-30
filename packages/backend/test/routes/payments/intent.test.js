@@ -209,6 +209,27 @@ module.exports = defineCases({
     },
 
     {
+      name: 'rejects-a-product-type-the-provider-does-not-sell',
+      async run({ http, assert, config, skip }) {
+        // The provider gate reads the registry: Coinbase Commerce's row sells
+        // no subscription, so the route refuses before any provider module runs
+        const plan = config.payment.products.find(p => p.id !== 'basic' && (p.type || 'subscription') === 'subscription' && p.prices);
+        if (!plan) {
+          skip('No paid subscription configured in this brand');
+        }
+
+        const response = await http.as('basic').post('omega/payments/intent', {
+          provider: 'coinbase',
+          productId: plan.id,
+          frequency: 'monthly',
+        });
+
+        assert.isError(response, 400, 'Should refuse a subscription on a provider that sells none');
+        assert.match(`${response.error}`, /Coinbase Commerce cannot sell a subscription/, 'The refusal names the provider and the product type');
+      },
+    },
+
+    {
       name: 'rejects-invalid-discount-code',
       async run({ http, assert, config, skip }) {
         const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);

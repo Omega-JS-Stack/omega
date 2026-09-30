@@ -211,9 +211,8 @@ jobs:
       # tree (dist + any shipped test/templates) must contain zero raw requires OR
       # imports of the PRIVATE @omega.js packages (the vendor after-hook rewrites
       # dist references to relative paths; see packages/devkit/tools/vendor.js).
-      # The grep names none of them: the alternation is DERIVED from that tool's
-      # own VENDORABLE_PACKAGES (#713 — the hand-written list sat two names
-      # behind it, so a raw analytics/monitoring require could ship undetected).
+      # scripts/private-refs.js does the scan: the reference shape and the
+      # package list are that tool's PRIVATE_REFERENCE, never spelled here.
       # Published @omega.js runtime deps (@omega.js/client, and @omega.js/backend
       # + @omega.js/mcp-router inside manager) legitimately stay as package
       # requires — the scratch install maps them to their local tarballs via
@@ -222,8 +221,6 @@ jobs:
       - name: Pack and scratch-install each package
         run: |
           set -euo pipefail
-          private_packages=$(node -p "require('./packages/devkit/tools/vendor').VENDORABLE_PACKAGES.join('|')")
-          echo "Private (never-published) packages the scan covers: $private_packages"
           client_tarball=$(npm pack --workspace=packages/client --pack-destination /tmp | tail -1)
           backend_tarball=$(npm pack --workspace=packages/backend --pack-destination /tmp | tail -1)
           router_tarball=$(npm pack --workspace=packages/mcp-router --pack-destination /tmp | tail -1)
@@ -251,9 +248,8 @@ jobs:
               " \
               && npm install --no-audit --no-fund "/tmp/$tarball")
             (cd "$scratch" && node -e "require.resolve('$name'); console.log('$name: resolves OK')")
-            if grep -rE --include='*.js' --include='*.cjs' --include='*.mjs' "(require(\.resolve)?\(|from |import\(|import )['\"]@omega\.js/($private_packages)" "$scratch/node_modules/$name"; then
+            if ! node scripts/private-refs.js "$scratch/node_modules/$name"; then
               echo "FAIL: $name ships raw private @omega.js references — vendoring did not run/rewrite"
               exit 1
             fi
-            echo "$name: shipped tree is self-contained (no raw private @omega.js references)"
           done

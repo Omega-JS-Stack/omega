@@ -121,7 +121,7 @@ function runService(config, { cloudflare, namecheap, options = {} } = {}) {
     options,
     serviceData: {},
     cloudflareApi: cloudflare,
-    namecheapApi: namecheap,
+    registrarApi: namecheap,
   });
 }
 

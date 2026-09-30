@@ -133,6 +133,39 @@ module.exports = defineCases({
         ctx.expect(bare[0].message).toContain('Missing cloud-signing env vars for azure');
       },
     },
+    // The per-provider keys are the env schema's `requiredWhen` sets, read off the
+    // schema itself here, so a key added to or dropped from a provider there is
+    // one validate-certs checks without a second list to edit.
+    {
+      name: 'each cloud provider requires exactly the env schema\'s keys for it, and an unknown provider is refused',
+      run: (ctx) => {
+        const { ENV_SCHEMA } = require('@omega.js/config/env-schema');
+        const gate = 'platforms.windows.signing.cloud.provider=';
+        const providers = [...new Set(ENV_SCHEMA
+          .filter((entry) => typeof entry.requiredWhen === 'string' && entry.requiredWhen.startsWith(gate))
+          .map((entry) => entry.requiredWhen.slice(gate.length)))];
+        ctx.expect(providers.length).toBeGreaterThan(0);
+
+        for (const provider of providers) {
+          const config = { platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider } } } } };
+          const keys = ENV_SCHEMA.filter((entry) => entry.requiredWhen === `${gate}${provider}`).map((entry) => entry.name);
+
+          const bare = [];
+          withEnv(Object.fromEntries(keys.map((key) => [key, undefined])), () => validateCerts.checkWindows(bare, 'cloud', config));
+          ctx.expect(bare.map((issue) => issue.message)).toEqual([`Missing cloud-signing env vars for ${provider}: ${keys.join(', ')}`]);
+
+          const configured = [];
+          withEnv(Object.fromEntries(keys.map((key) => [key, 'set'])), () => validateCerts.checkWindows(configured, 'cloud', config));
+          ctx.expect(configured).toEqual([]);
+        }
+
+        const unknown = [];
+        validateCerts.checkWindows(unknown, 'cloud', { platforms: { windows: { signing: { strategy: 'cloud', cloud: { provider: 'imaginary' } } } } });
+        ctx.expect(unknown.length).toBe(1);
+        ctx.expect(unknown[0].severity).toBe('error');
+        ctx.expect(unknown[0].message).toContain(`Supported: ${providers.join(', ')}`);
+      },
+    },
     {
       name: 'CSC_LINK carrying an inline base64 cert is reported, not statted',
       run: (ctx) => {

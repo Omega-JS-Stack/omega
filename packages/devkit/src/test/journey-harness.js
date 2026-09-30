@@ -35,6 +35,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { afterExit } = require('./boot-child.js');
 const { createStepsLog } = require('./steps-log.js');
 const { targetOfType } = require('./target-of-type.js');
+const { resolvePackageRealDir } = require('../local.js');
 
 // Ceilings, not expectations — cold-cache registry installs and the four
 // real target builds dominate; a warm rerun finishes far inside them.
@@ -414,22 +415,12 @@ async function runJourney(options) {
 
       // Every target's framework — and the brand root's manager — must resolve
       // to the monorepo copy (realpath through the hoisted symlinks).
-      const resolveFrom = (dir, name) => {
-        let current = dir;
-        while (true) {
-          const candidate = path.join(current, 'node_modules', name);
-          if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate);
-          const parent = path.dirname(current);
-          if (parent === current) return null;
-          current = parent;
-        }
-      };
       const misses = [];
       for (const dir of [run.brandRoot, ...targets]) {
         const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
         for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
           if (!name.startsWith('@omega.js/')) continue;
-          const real = resolveFrom(dir, name);
+          const real = resolvePackageRealDir(name, dir);
           if (!real || !real.startsWith(run.monorepoRoot)) {
             misses.push(`${path.basename(dir)}:${name} → ${real || 'unresolved'}`);
           }

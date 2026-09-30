@@ -43,10 +43,10 @@ async function runBootTests({ tests, suites, projectRoot, frameworkDistRoot }) {
     return { passed: 0, failed: 0, skipped: 0 };
   }
 
-  // OMEGA_TEST_BOOT_PROJECT — boot a different project root than the CWD. Auto-set to the
-  // bundled fixture when @omega.js/desktop self-tests (see commands/test.js); set it explicitly to boot a
-  // real consumer (e.g. deployment-playground-desktop) without cd-ing into it. The
-  // same switch every framework's boot runner reads.
+  // OMEGA_TEST_BOOT_PROJECT boots a different project root than the CWD. Auto-set to the
+  // bundled fixture when @omega.js/desktop self-tests (see commands/test.js); set it explicitly
+  // to boot a real consumer (brands/playground-omega/targets/desktop) without cd-ing into it.
+  // The same switch every framework's boot runner reads.
   const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
     ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
     : projectRoot;

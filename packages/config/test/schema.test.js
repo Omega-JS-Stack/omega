@@ -399,7 +399,6 @@ test('the paths services read and write back are declared (#636)', () => {
   const rules = new Map(SHARED_SCHEMA.map((entry) => [entry.path, entry]));
 
   const expected = {
-    'certificates.enabled': 'boolean',
     'certificates.providers.apple.bundleIdPrefix': 'string',
     'certificates.providers.apple.capabilities': 'array',
     'certificates.providers.apple.profiles': 'array',
@@ -420,12 +419,12 @@ test('the paths services read and write back are declared (#636)', () => {
     assert.ok(rule.description, `${path} documents what it drives`);
     // No materialized default: these are owner decisions (the Apple prefix, the
     // registrar) and machine-written confirmations. A default would write the
-    // block into every brand's omega.json5 — a certificates block in a
+    // block into every brand's omega.json5: Apple signing declared by a
     // website-only brand, a registrar in a brand that owns no domain.
     assert.ok(!('default' in rule), `${path} must not materialize a default`);
   }
 
-  assert.equal(schemaDefaults('desktop').certificates, undefined, 'nothing certificates lands in the defaults layer');
+  assert.deepEqual(schemaDefaults('desktop').certificates, { enabled: true }, 'only the service switch lands in the defaults layer, never an Apple key');
   assert.equal(schemaDefaults('web').domain, undefined, 'nothing domain lands in the defaults layer');
 });
 

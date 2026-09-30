@@ -1,58 +1,30 @@
-// Backend URL helpers: plain functions the process `Omega` classes (main / renderer /
-// preload) call, each passing itself as `context`. Mirror
-// @omega.js/client's contract so @omega.js/desktop apps can hit the same dev/prod backends as
-// @omega.js/web and @omega.js/extension consumers.
-//
-// `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
-// (alongside the is*() family, the same on every framework). It returns exactly ONE of
-// 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
-//
-// `getFunctionsUrl()` / `getApiUrl()` / `getWebsiteUrl()` route through the context's
-// `getEnvironment()` and resolve to LOCAL urls in BOTH development AND testing,
-// callers normally pass NO argument. An explicit `environment` arg is an override
-// (used mainly by tests to pin a specific environment's mapping).
+// Backend URL helpers: plain functions the process `Omega` classes (main /
+// renderer / preload) call, each passing itself as `context`, and that resolve
+// LOCAL urls in development AND testing through the context's getEnvironment()
+// (src/utils/mode-helpers.js). An explicit `environment` arg is an override,
+// used mainly by tests. Every local answer comes from the client chain below.
 
-// The missing-fact error is the ONE shared one (#834). Its module requires
-// nothing, so it rides the renderer bundle exactly as this file does.
-const { devFactMissing } = require('@omega.js/config/dev-facts');
-
-// Guarded the way @omega.js/extension's twin is: the renderer bundle is a
-// browser context, and only the Node-side contexts (main, preload, build, the
-// test harness) carry the resolved-port env channel.
-function envPort(name) {
-  return typeof process !== 'undefined' && process.env
-    ? process.env[name]
-    : undefined;
-}
+// The local port chain and the local URLs on it (env, then the baked
+// `dev.ports`, then a loud miss) are @omega.js/client's, the one home.
+const chain = require('@omega.js/client/modules/dev-ports.js');
 
 // The step that writes the resolved dev map into this surface's artifact, named
 // in every missing-fact error below (#834).
 const DEV_FACT_WRITER = "@omega.js/desktop's bundle task, from the live stack's ports file plus the OMEGA_*_PORT env channel";
 
-// One local port, from whichever channel this context has: the env var first
-// (the CLI that booted the stack publishes it, N7), then the `dev.ports` map
-// the bundle baked into OMEGA_BUILD_JSON: a PACKAGED main process has no
-// parent env, so a bumped emulator port reaches it only that way
-// ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)). Same helper,
-// same order as @omega.js/extension's src/utils/url-helpers.js.
-//
-// There is no third step any more (#834): the classic numbers used to be
-// hand-typed here as a last resort for "a build made with no stack up", which
-// is a guess about a port nothing identity-checks. A miss is loud instead.
-function localPort(context, envName, name) {
-  return envPort(envName) || context?.config?.dev?.ports?.[name];
+// The map this context's build baked; a production build bakes none.
+function bakedPorts(context) {
+  return context?.config?.dev?.ports;
 }
 
-// The same read, REQUIRED: the one every URL getter below uses, because every
-// one of them is answering with a real local address or not at all.
-function requiredPort(context, envName, name) {
-  const port = localPort(context, envName, name);
+// One local port by name (`hosting`, `auth`, ...), or null.
+function localPort(context, name) {
+  return chain.localPort(bakedPorts(context), name);
+}
 
-  if (!port) {
-    throw devFactMissing(`dev port for \`${name}\``, DEV_FACT_WRITER);
-  }
-
-  return port;
+// The same read, REQUIRED, naming this surface's writer on a miss.
+function requiredPort(context, name) {
+  return chain.requiredPort(bakedPorts(context), name, DEV_FACT_WRITER);
 }
 
 /**
@@ -71,11 +43,10 @@ function getFunctionsUrl(context, environment) {
   }
 
   // Local for development OR testing; production otherwise. The port rides the
-  // same three-step chain getApiUrl() walks: the OMEGA_*_PORT env channel (N7),
-  // then the baked map, then the classic default.
+  // same chain getApiUrl() walks: the OMEGA_*_PORT env channel (N7), then the
+  // baked map, then a loud miss.
   if (env === 'development' || env === 'testing') {
-    const port = requiredPort(context, 'OMEGA_FUNCTIONS_PORT', 'functions');
-    return `http://localhost:${port}/${projectId}/us-central1`;
+    return chain.localFunctionsUrl(bakedPorts(context), projectId, DEV_FACT_WRITER);
   }
 
   return `https://us-central1-${projectId}.cloudfunctions.net`;
@@ -91,16 +62,10 @@ function getFunctionsUrl(context, environment) {
 function getApiUrl(context, environment) {
   const env = environment || context.getEnvironment();
 
-  // Local for development OR testing; production otherwise. Mirrors
-  // @omega.js/backend's getApiUrl (N7): a resolved OMEGA_HTTPS_PORT means
-  // `mgr serve`'s mkcert proxy is up (https); otherwise plain http to the
-  // hosting emulator (env port, then baked port). Neither resolved is a broken
-  // build, not a case to assume the classic 5002 through (#834).
+  // Local for development OR testing; production otherwise. The client chain
+  // answers the mkcert proxy on localhost, else the hosting emulator on 127.0.0.1.
   if (env === 'development' || env === 'testing') {
-    const httpsPort = localPort(context, 'OMEGA_HTTPS_PORT', 'https');
-    return httpsPort
-      ? `https://localhost:${httpsPort}`
-      : `http://localhost:${requiredPort(context, 'OMEGA_HOSTING_PORT', 'hosting')}`;
+    return chain.localApiUrl(bakedPorts(context), DEV_FACT_WRITER);
   }
 
   // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
@@ -112,6 +77,15 @@ function getApiUrl(context, environment) {
   }
 
   return `https://api.${new URL(brandUrl).hostname}`;
+}
+
+/**
+ * The auth emulator's origin, for a testing run's `connectAuthEmulator`.
+ * @param {object} context - the instance asking (its baked `config`).
+ * @returns {string} the auth emulator URL.
+ */
+function getAuthEmulatorUrl(context) {
+  return chain.localAuthEmulatorUrl(bakedPorts(context), DEV_FACT_WRITER);
 }
 
 // Marketing-site / brand website URL. Dev → the local website's whole ORIGIN, the
@@ -143,7 +117,7 @@ function getWebsiteUrl(context, environment) {
       return origin;
     }
 
-    return `https://localhost:${requiredPort(context, 'OMEGA_WEBSITE_PORT', 'website')}`;
+    return `https://localhost:${requiredPort(context, 'website')}`;
   }
 
   const url = context.config?.brand?.url;
@@ -190,6 +164,7 @@ module.exports = {
   requiredPort,
   getFunctionsUrl,
   getApiUrl,
+  getAuthEmulatorUrl,
   getWebsiteUrl,
   getAuthUrl,
 };

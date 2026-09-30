@@ -22,6 +22,7 @@ const jetpack = require('fs-jetpack');
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
 const { sourceRepo, targetUrl } = require('@omega.js/config');
 const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
+const { resolvePackageRealDir } = require('@omega.js/devkit/local');
 
 const MAX_RETRIES = 3;
 const MAX_FILES_SHOWN = 10;
@@ -150,23 +151,15 @@ function compareVersions(a, b) {
 }
 
 /**
- * Resolve the INSTALLED version of a package via the node_modules climb from
- * a directory — handles file:/workspace refs where the declared range says
- * nothing. null when not installed.
+ * Resolve the INSTALLED version of a package via devkit's one node_modules
+ * walk from a directory: handles file:/workspace refs where the declared
+ * range says nothing. null when not installed.
  */
 function installedVersion(fromDir, packageName) {
-  let dir = path.resolve(fromDir);
+  const dir = resolvePackageRealDir(packageName, fromDir);
+  if (!dir) return null;
 
-  while (true) {
-    const pkg = jetpack.read(path.join(dir, 'node_modules', packageName, 'package.json'), 'json');
-    if (pkg?.version) {
-      return pkg.version;
-    }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
+  return jetpack.read(path.join(dir, 'package.json'), 'json').version || null;
 }
 
 // ── Local checks ────────────────────────────────────────────────────────────

@@ -26,11 +26,8 @@ export function calculatePrices({ product, frequency, discountPercent, discountA
   if (isSubscription) {
     basePrice = resolvePrice(product.prices, frequency);
   } else {
-    // One-time: `once` is the catalog key; `amount`/`monthly` are legacy shapes
-    basePrice = resolvePrice(product.prices, 'once')
-      || resolvePrice(product.prices, 'amount')
-      || resolvePrice(product.prices, 'monthly')
-      || 0;
+    // `once` is the only one-time key, the one every backend reader takes
+    basePrice = resolvePrice(product.prices, 'once');
   }
 
   const subtotal = basePrice;

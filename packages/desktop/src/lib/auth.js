@@ -24,7 +24,7 @@
 const { User } = require('@omega.js/account');
 const LoggerLite = require('./logger-lite.js');
 const authPersistence = require('./auth-persistence.js');
-const { requiredPort } = require('../utils/url-helpers.js');
+const { getAuthEmulatorUrl } = require('../utils/url-helpers.js');
 const sanitizeURL = require('../utils/sanitize-url.js');
 
 const logger = new LoggerLite('auth');
@@ -130,28 +130,17 @@ const auth = {
     }
 
     // A TESTING run talks to the LOCAL stack, never real auth: the same move
-    // getApiUrl() makes when it maps testing to localhost, and the same one
+    // getApiUrl() makes when it maps testing to the local stack, and the same one
     // @omega.js/extension's background SW makes for its emulator runs. Only an
     // OMEGA_ENVIRONMENT=testing run reaches here; dev and production are untouched.
     if (auth._omega.isTesting()) {
       const { connectAuthEmulator } = auth._firebaseModule;
-      const port = auth._authEmulatorPort();
-      logger.log(`testing run: connecting auth to the emulator on :${port}`);
-      connectAuthEmulator(auth._firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
+      const url = getAuthEmulatorUrl(auth._omega);
+      logger.log(`testing run: connecting auth to the emulator at ${url}`);
+      connectAuthEmulator(auth._firebaseAuth, url, { disableWarnings: true });
     }
 
     return auth._firebaseAuth;
-  },
-
-  // The auth emulator's port, on the same chain getApiUrl() walks: the
-  // resolved-port env channel (N7), then the `dev.ports` map the bundle baked
-  // into OMEGA_BUILD_JSON
-  // ([#745](https://github.com/Omega-JS-Stack/omega/issues/745)). The classic
-  // 9099 used to sit under those two as a last resort; it is gone (#834),
-  // because nothing identity-checks what answers on it and a neighbouring
-  // project's emulator reads as an auth mystery rather than a port problem.
-  _authEmulatorPort() {
-    return requiredPort(auth._omega, 'OMEGA_AUTH_PORT', 'auth');
   },
 
   _registerIpc() {

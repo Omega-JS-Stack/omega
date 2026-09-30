@@ -37,6 +37,7 @@ const { execute } = require('node-powertools');
 const { certificateExpiry, EXPIRY_WARN_DAYS } = require('@omega.js/devkit/certs');
 const { signingPathCandidates } = require('@omega.js/devkit/signing-env');
 const { requiredWhenHolds } = require('@omega.js/config/env-rules');
+const { WINDOWS_SIGNING_STRATEGIES, WINDOWS_CLOUD_PROVIDERS, windowsCloudProviderKeys } = require('@omega.js/config');
 
 const build = require('../build.js');
 const logger = build.logger('validate-certs');
@@ -347,13 +348,12 @@ function checkWindows(issues, strategy, config) {
       issues.push({ severity: 'error', message: 'Cloud signing strategy selected but no provider set (platforms.windows.signing.cloud.provider in omega.json5).' });
       return;
     }
-    const required = {
-      azure:    ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TRUSTED_SIGNING_ENDPOINT'],
-      sslcom:   ['SSLCOM_USERNAME', 'SSLCOM_PASSWORD', 'SSLCOM_CREDENTIAL_ID'],
-      digicert: ['DIGICERT_API_KEY', 'DIGICERT_KEYPAIR_ALIAS'],
-    }[provider] || [];
+    if (!WINDOWS_CLOUD_PROVIDERS.includes(provider)) {
+      issues.push({ severity: 'error', message: `Unknown cloud signing provider "${provider}" (platforms.windows.signing.cloud.provider). Supported: ${WINDOWS_CLOUD_PROVIDERS.join(', ')}.` });
+      return;
+    }
 
-    const missing = required.filter((k) => !process.env[k]);
+    const missing = windowsCloudProviderKeys(provider).filter((k) => !process.env[k]);
     if (missing.length > 0) {
       issues.push({ severity: 'error', message: `Missing cloud-signing env vars for ${provider}: ${missing.join(', ')}` });
       return;
@@ -362,7 +362,7 @@ function checkWindows(issues, strategy, config) {
     return;
   }
 
-  issues.push({ severity: 'error', message: `Unknown Windows signing strategy: ${strategy}` });
+  issues.push({ severity: 'error', message: `Unknown Windows signing strategy: ${strategy}. Supported: ${WINDOWS_SIGNING_STRATEGIES.join(', ')}.` });
 }
 
 /**

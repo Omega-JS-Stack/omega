@@ -43,6 +43,11 @@ const FILE_MAP = {
   'test/**/*': {
     overwrite: false,
   },
+  // Scaffolded docs are generated output: the framework rewrites the Default
+  // section from this source on every verb, the project's notes live under Custom.
+  'test/README.md': {
+    mergeLines: true,
+  },
   'src/**/*.{html,md}': {
     skip: (file) => {
       // Get the name

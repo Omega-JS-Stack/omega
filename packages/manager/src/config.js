@@ -34,7 +34,7 @@
  */
 
 const { isDemoProject, chosenProvider, schemaDefaults, deepMerge, hasTargetOfType, envSchemaEntry } = require('@omega.js/config');
-const { resolveRegistrar } = require('./services/domain/lib/registrars.js');
+const { DOMAIN_PROVIDERS, resolveRegistrar } = require('./services/domain/lib/providers.js');
 const { shipCredentials, brandShipKeys } = require('./services/publishing/lib/ship-list.js');
 
 // Framework package per target — used by the testing service to compare each
@@ -51,18 +51,11 @@ const TARGET_FRAMEWORKS = {
 // =============================================================================
 // DEFAULT SETTINGS - The manager defaults layer under every brand config
 // =============================================================================
-// Deliberately minimal: omega-manager's giant DEFAULTS block is service-owned
-// data — each section moves here WITH its service port (cloudflare settings
-// arrive with the cloudflare service, etc.). Never park defaults for services
-// that don't exist here yet.
-//
-// SERVICE-OWNED data ONLY (#478): a default for a key @omega.js/config's schema
-// declares lives THERE, as that entry's `default:` — the schema is the one home,
-// and the manage walk materializes those blocks into the brand's own
-// omega.json5. What stays here is the engine data the schema does not declare
-// (Cloudflare zone settings, Apple cert types, Stripe Radar rules, the GA4
-// property fields) plus the placeholder keys a service writes back into. The
-// exported DEFAULTS is the two composed, schema first.
+
+// Only what a schema `default:` cannot carry (docs/shared/config.md): null or
+// empty placeholders a service writes back or an owner fills, settings under a
+// `providers.<vendor>` key whose presence picks that vendor, and the case-3
+// `devlog.enabled`. The exported DEFAULTS is the schema's defaults plus this.
 const MANAGER_DEFAULTS = {
   // Domain registrar + email — two roles, one providers block each (#425).
   // The domain service reconciles registrar nameservers from the KEY under
@@ -354,7 +347,6 @@ const MANAGER_DEFAULTS = {
   // company prefix and kept one shared cert set in its company-instance
   // .output/_shared/; the port keeps everything brand-local.
   certificates: {
-    enabled: true,
     providers: {
       apple: {
         // Full bundle ID = composeBundleId(prefix, brand.id) — the brand id's
@@ -380,30 +372,13 @@ const MANAGER_DEFAULTS = {
     },
   },
 
-  // Parasite SEO content — programmatically created GitHub repos with
-  // templated READMEs. Content definitions live in seo.github.content
-  // (config/omega.json5) or the config/seo.json5 sidecar (omega-manager
-  // kept them in .brands/{id}/seo.json and auto-created a default entry
-  // for every brand; the port never writes config — no content = skip).
-  seo: {
-    enabled: true,
-  },
+  // Parasite SEO content: GitHub repos with templated READMEs, defined in
+  // seo.github.content or the config/seo.json5 sidecar (no content = skip).
+  // Its switch (`seo.enabled`, on by default) is a schema default.
 
-  // Required accounts in the brand's Firebase Auth — created/converged with
-  // deterministic passwords derived from ACCOUNT_PASSWORD_SEED (brand .env,
-  // auto-generated on the first real run). `{domain}` in emails resolves to
-  // the brand's domain. Per entry: account: true = ensure the auth user
-  // exists with the derived password + roles.admin + the highest plan;
-  // marketing: true = push the contact to the marketing providers via the
-  // brand backend. Any OTHER user holding roles.admin fails the service.
-  // (omega-manager hardcoded the company's personal emails as ADMIN_EMAILS
-  // and derived passwords from a company-specific formula in code.)
-  account: {
-    enabled: true,
-    admins: [
-      { email: 'support@{domain}', account: true, marketing: true },
-    ],
-  },
+  // Required accounts in the brand's Firebase Auth, passwords derived from
+  // ACCOUNT_PASSWORD_SEED in the brand .env. The switch (`account.enabled`)
+  // and the admin list (`account.admins`) are schema defaults.
 
   // Classic reCAPTCHA — the brand's OWN keys (de-ITW: never a company-shared
   // key): the public SITE key is `siteKey` right here (#893) and the secret is
@@ -415,196 +390,6 @@ const MANAGER_DEFAULTS = {
     providers: {
       recaptcha: {
         project: null,
-      },
-    },
-  },
-
-  // Cloudflare settings — the engine defaults are PLATFORM defaults only.
-  // Company-specific records (DMARC report addresses, BIMI logo, verification
-  // TXTs, extra CSP hosts) belong in company/brand config, NOT here —
-  // omega-manager hardcoded them; the port moved them to config:
-  // dns.dmarcReports { rua, ruf }, dns.bimiLogo, dns.records [...], and the
-  // responseHeaders rules. The SendGrid domain-auth CNAMEs are NOT config in
-  // any layer: they are SendGrid's own observed facts, read live per run
-  // ([#692](https://github.com/Omega-JS-Stack/omega/issues/692)).
-  edge: {
-    providers: {
-      cloudflare: {
-        dns: {
-          spf: 'strict', // 'strict' (-all) | 'soft' (~all)
-          dmarcPolicy: 'quarantine', // 'none' | 'quarantine' | 'reject'
-          spfIncludes: ['_spf.google.com', 'sendgrid.net'], // provider include appended automatically
-        },
-        // Zone settings — flat map matching the Cloudflare API setting IDs exactly.
-        // Managed by the generic `zone-settings` operation which diffs all keys in
-        // one pass. Includes both bulk settings (from /zones/{id}/settings) and
-        // addon settings (speed_brain, fonts) fetched individually.
-        // Any brand can override with `edge.providers.cloudflare.settings.{setting_id}`.
-        settings: {
-          // SSL / TLS
-          ssl: 'full',
-          min_tls_version: '1.2',
-          always_use_https: 'on',
-          automatic_https_rewrites: 'on',
-          opportunistic_encryption: 'on',
-          opportunistic_onion: 'on',
-          tls_1_3: 'zrt',
-          tls_1_2_only: 'off',
-          tls_client_auth: 'off',
-          ech: 'on',                  // Encrypted Client Hello
-          pq_keyex: 'on',             // Post-quantum key exchange
-          replace_insecure_js: 'on',  // Block mixed content by rewriting http:// → https://
-
-          // Scrape Shield
-          email_obfuscation: 'off',   // Injects cloudflare-static/email-decode.min.js — breaks clean HTML
-          server_side_exclude: 'on',
-          hotlink_protection: 'off',  // Breaks legit embeds (Slack unfurls, etc.)
-
-          // Speed
-          brotli: 'on',
-          early_hints: 'on',
-          rocket_loader: 'off',       // Rewrites <script> tags — causes issues with modern frameworks
-          speed_brain: 'on',          // Speculation Rules API — addon setting (not in bulk endpoint)
-          fonts: 'on',                // Cloudflare Fonts — addon setting (not in bulk endpoint)
-
-          // Network
-          http3: 'on',
-          '0rtt': 'on',
-          ipv6: 'on',
-          websockets: 'on',
-          ip_geolocation: 'on',
-          pseudo_ipv4: 'off',
-          orange_to_orange: 'off',
-          visitor_ip: 'on',
-
-          // Caching
-          cache_level: 'aggressive',
-          browser_cache_ttl: 432000,  // 5 days
-          always_online: 'on',
-          development_mode: 'off',
-          edge_cache_ttl: 7200,       // 2 hours — only applies without cache rules
-
-          // Security
-          security_level: 'low',
-          browser_check: 'on',
-          challenge_ttl: 1800,
-          privacy_pass: 'on',
-          waf: 'off',                 // Legacy WAF — Cloudflare replaced with rulesets
-          max_upload: 100,
-          security_header: {
-            strict_transport_security: {
-              enabled: true,
-              max_age: 0,
-              include_subdomains: true,
-              preload: true,
-              nosniff: true,
-            },
-          },
-
-          // Logging
-          log_to_cloudflare: 'on',
-          filter_logs_to_cloudflare: 'off',
-        },
-        // Speed scheduled tests — custom API endpoint, kept as separate operation
-        speedTest: {
-          frequency: 'WEEKLY',
-          region: 'us-central1',
-        },
-        // Cache rules — complex ruleset, kept as separate operation.
-        // The web build content-hashes the bundles it emits under /assets
-        // (`main-<hash>.js`, `theme-<hash>.css`), so those bytes are immutable
-        // and cacheable forever. HTML is the opposite: its URL never changes,
-        // so whatever a browser holds is what a returning visitor sees until it
-        // expires — a minute here, and the edge copy a deploy purges (#751).
-        // One path, one lifetime: the HTML rule excludes /assets so the two
-        // never both match a request.
-        cacheRules: [
-          {
-            name: 'Assets: Cache for 1 Year',
-            expression: '(http.request.uri.path wildcard r"/assets/*") or (http.request.uri.path eq "/__/auth/iframe.js")',
-            edgeTtl: 31536000,
-            browserTtl: 31536000,
-            enabled: true,
-            priority: 100,
-          },
-          {
-            name: 'HTML: Short Browser Cache',
-            // A cache rule is ZONE-scoped, and the zone also serves the api
-            // host — whose Firebase rewrites answer EXTENSIONLESS user-scoped
-            // GETs (/authorize, /token, /omega/**, /mcp/**). Caching one of
-            // those at the edge would hand one user's answer to the next, so
-            // the rule is guarded by host: every SITE host on the zone (apex,
-            // www, a subdomain project under the parent zone) matches, and the
-            // two non-site hosts the stack creates never do: api.<domain>,
-            // `api.` + the target's own domain at every shape
-            // (cloud/ensure/hosting.js), and emailurl.<domain>, the proxied
-            // SendGrid link-tracking CNAME (edge/lib/dns-records-helpers.js)
-            // whose extensionless click and open URLs must reach SendGrid
-            // every time or campaign counts undercount.
-            // Pages are extensionless (the trailing-slash redirect below) or
-            // end in .html; `not … contains "."` is the free-plan way to say
-            // "no file extension" (`matches` needs Business).
-            expression: '(not starts_with(http.host, "api.") and not starts_with(http.host, "emailurl.") and not starts_with(http.request.uri.path, "/assets/") and (not (http.request.uri.path contains ".") or ends_with(http.request.uri.path, ".html")))',
-            // The edge copy is what a deploy purges; only the browser copy,
-            // which no purge can reach, has to expire on its own.
-            edgeTtl: 7200,
-            browserTtl: 60,
-            enabled: true,
-            priority: 200,
-          },
-        ],
-        rules: {
-          managedTransforms: {
-            request: {
-              addClientCertificateHeaders: false,
-              addVisitorLocationHeaders: true,
-              removeVisitorIpHeaders: false,
-              addWafCredentialCheckStatusHeader: false,
-            },
-            response: {
-              removeXPoweredByHeader: true,
-              addSecurityHeaders: false,
-            },
-          },
-          responseHeaders: [
-            {
-              name: 'CSP: Allow iframe from self',
-              expression: 'true',
-              headers: {
-                // Brand/company config overrides this rule to append extra hosts
-                'Content-Security-Policy': "frame-ancestors 'self' https://localhost:* https://{ domain } https://*.{ domain }",
-              },
-              enabled: true,
-              priority: 100,
-            },
-          ],
-          redirect: [
-            {
-              name: 'Redirect: Remove Trailing Slash',
-              expression: '(ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")',
-              statusCode: 301,
-              preserveQueryString: true,
-              targetUrl: {
-                expression: 'concat("https://", http.host, substring(http.request.uri.path, 0, -1))',
-              },
-              enabled: true,
-              priority: 100,
-            },
-          ],
-          security: [
-            {
-              name: 'API: Minimal Security',
-              action: 'skip',
-              expression: '(http.host eq "api.{ domain }")',
-              skipProducts: ['uaBlock', 'bic', 'hot', 'securityLevel', 'rateLimit', 'zoneLockdown', 'waf'],
-              skipPhases: ['http_ratelimit', 'http_request_firewall_managed', 'http_request_sbfm'],
-              skipRuleset: 'current',
-              logging: true,
-              enabled: true,
-              priority: 100,
-            },
-          ],
-        },
       },
     },
   },
@@ -957,8 +742,10 @@ const REQUIRES = {
     when: (config) => config.domain?.enabled !== false && Boolean(resolveRegistrar(config)),
     env: [
       { name: 'CLOUDFLARE_TOKEN', prompted: true },
-      { name: 'NAMECHEAP_USERNAME', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
-      { name: 'NAMECHEAP_API_KEY', prompted: true, when: (config) => resolveRegistrar(config) === 'namecheap' },
+      // Each registrar's own credentials, asked only when it is the brand's
+      ...Object.entries(DOMAIN_PROVIDERS.registrar).flatMap(([id, { envKeys }]) => envKeys.map((name) => (
+        { name, prompted: true, when: (config) => resolveRegistrar(config) === id }
+      ))),
     ],
     scopes: [],
   },
@@ -1381,6 +1168,7 @@ function templateObject(obj, data) {
 
 module.exports = {
   TARGET_FRAMEWORKS,
+  MANAGER_DEFAULTS,
   DEFAULTS,
   SERVICE_ORDER,
   BOOT_SERVICES,
