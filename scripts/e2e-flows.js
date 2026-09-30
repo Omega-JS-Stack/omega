@@ -70,6 +70,7 @@ const { startChild, stopChild } = require('@omega.js/devkit/test/boot-child');
 const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('@omega.js/devkit/test/port-hold');
 const { launchBrowser, resolvePuppeteer } = require('@omega.js/devkit/test/browser');
 const { createStepsLog } = require('./steps-log');
+const { waitForSignOutAtDoubt } = require('./flows-session-doubt');
 
 // The billing journeys hand-build the provider webhooks no UI can produce (a
 // declined renewal, a trial converting), and the webhook route authenticates
@@ -1001,22 +1002,11 @@ async function main() {
       // `auth/user-disabled`, the same "session is gone" class.
       await admin.auth().updateUser(personaSeed('premium-active').uid, { disabled: true });
 
-      // The tab comes back into view. @omega.js/client forces a token refresh,
+      // The tab comes back into view: @omega.js/client forces a token refresh,
       // the Auth server refuses it, the client signs out, and the page's auth
-      // policy takes an `authenticated` page's signed-out visitor to the auth
-      // surface: /signin or /signup, whichever the policy picks (the kick-out
-      // step above accepts the same pair).
-      await accountPage.evaluate(() => {
-        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-
-      await accountPage.waitForFunction(
-        () => /^\/(signin|signup)/.test(window.location.pathname),
-        { timeout: 60000 },
-      );
-
-      return accountPage.url();
+      // policy routes the signed-out visitor to /signin or /signup, whichever
+      // it picks (the kick-out step above accepts the same pair).
+      return waitForSignOutAtDoubt(accountPage);
     });
 
     await accountPage.close();

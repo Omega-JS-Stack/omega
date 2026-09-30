@@ -723,8 +723,10 @@ describe('Verts Module', () => {
       let reloads = 0;
       unit.reload = () => { reloads += 1; };
 
-      await new Promise((resolve) => setTimeout(resolve, 90));
-      assert(reloads >= 2, `rotation ticked (${reloads})`);
+      // Poll for two ticks under a generous ceiling: a loaded machine delays
+      // the timer, and the promise is that it fires, not how fast
+      for (const deadline = Date.now() + 2000; reloads < 2 && Date.now() < deadline;) await new Promise((resolve) => setTimeout(resolve, 5));
+      assert(reloads >= 2, `rotation never reached two ticks (${reloads})`);
 
       unit.destroy();
       const after = reloads;
