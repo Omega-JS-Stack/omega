@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - [#1002](../../issues/1002) - Every `.env` line the framework writes is `KEY="value"`, unescaped: empty is `KEY=""`, a placeholder `# KEY=""`. A value that would read back changed is refused naming the key, including in the staged `dist/.env` Firebase also reads. GitHub's runner `.env` stays bare.
+- [#982](../../issues/982) - The devkit's child boot and the journey harness's server boot reject an early exit only after the child's pipes are read (bounded when a grandchild holds them) and the log tee has finished, so the reason it died is on disk before the lane reads the log.
 - [#987](../../issues/987) - The dist audit reads a whole `<meta>` or `<img>` tag even when a quoted attribute holds a raw `>` (the minifier decodes `&gt;` there), so a description or title with angle brackets no longer hides the tag from the meta and alt checks.
 - [#815](../../issues/815) - The dependency tree moved off 93 of the 121 open Dependabot findings: same-major bumps through the update verb (mjml, fast-xml-parser, sanitize-html, liquidjs, cheerio, js-yaml) and a lock refresh under the 7-day quarantine; the 28 that stay are pinned by upstream ranges or have no patched version.
 - [#976](../../issues/976) - `omega i local` flips a registry pin whose tree already resolves to the monorepo copy, so a playground manifest left on a published version cannot let the next install shadow the local code.

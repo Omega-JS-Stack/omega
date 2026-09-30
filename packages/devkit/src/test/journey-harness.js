@@ -32,6 +32,7 @@ const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 const { spawn, spawnSync } = require('node:child_process');
+const { afterExit } = require('./boot-child.js');
 const { createStepsLog } = require('./steps-log.js');
 const { targetOfType } = require('./target-of-type.js');
 
@@ -274,8 +275,8 @@ class JourneyRun {
 
       child.stdout.on('data', scan);
       child.stderr.on('data', scan);
-      child.on('exit', (code) => {
-        clearTimeout(timer);
+      child.on('exit', () => clearTimeout(timer));
+      afterExit(child, logStream).then((code) => {
         if (pending.size > 0) {
           reject(new Error(`${stage} exited early (code ${code}, log: ${logFile})`));
         }

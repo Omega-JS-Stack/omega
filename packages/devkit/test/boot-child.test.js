@@ -129,6 +129,32 @@ test('a child that dies before its marker rejects with the code and the log path
   assert.match(fs.readFileSync(logFile, 'utf8'), /port 8080 is taken/, 'the reason is on disk, not only in the rejection');
 });
 
+test('a grandchild holding the pipes open does not stall the early-exit rejection', async () => {
+  const dir = scratch();
+  const logFile = path.join(dir, 'emulator.log');
+  // The emulator shape: the child spawns a longer-lived process that
+  // inherits its stdout, then dies. Its pipes reach no EOF until the
+  // grandchild ends, so the rejection is bounded by the drain grace instead.
+  const script = `process.stdout.write("port 8080 is taken\\n");`
+    + `require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 4000)'], { stdio: 'inherit' }).unref();`
+    + `process.exit(3);`;
+
+  const started = Date.now();
+  const { ready } = startChild({
+    bin: process.execPath,
+    args: ['-e', script],
+    cwd: dir,
+    logFile,
+    marker: /never printed/,
+    timeout: 20000,
+    relativeTo: dir,
+  });
+
+  await assert.rejects(() => ready, /exited early \(code 3, log: emulator\.log\)/);
+  assert.ok(Date.now() - started < 3000, 'the rejection came within the drain grace, not after the grandchild');
+  assert.match(fs.readFileSync(logFile, 'utf8'), /port 8080 is taken/);
+});
+
 test('a child that never prints its marker rejects on the timeout', async () => {
   const dir = scratch();
   const { child, ready } = startChild({

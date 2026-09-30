@@ -25,6 +25,37 @@ const { spawn } = require('child_process');
 // How long a clean SIGINT gets before the group is killed outright.
 const STOP_GRACE = 20000;
 
+// How long a dead child's pipes get to reach EOF before the tee ends: a
+// grandchild that inherited them can hold them open past the child's death.
+const DRAIN_GRACE = 1000;
+
+/**
+ * Resolve with the exit code once the child has exited, its pipes are read
+ * to EOF (or DRAIN_GRACE passed and they were dropped), and the log stream
+ * has finished, so a caller reading the log sees every byte the child wrote.
+ *
+ * @param {object} child - A spawned child with piped stdout and stderr
+ * @param {object} logStream - The write stream its output is teed to
+ * @returns {Promise<number|null>}
+ */
+function afterExit(child, logStream) {
+  return new Promise((resolve) => {
+    child.once('exit', (code) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(cap);
+        child.stdout.destroy();
+        child.stderr.destroy();
+        logStream.end(() => resolve(code));
+      };
+      const cap = setTimeout(finish, DRAIN_GRACE);
+      child.once('close', finish);
+    });
+  });
+}
+
 /**
  * Spawn a long-running child, teeing its output to a log file, and resolve
  * when its ready marker appears.
@@ -80,8 +111,8 @@ function startChild({ bin, args, cwd, env, logFile, marker, timeout, relativeTo 
 
     child.stdout.on('data', watch);
     child.stderr.on('data', watch);
-    child.on('exit', (code) => {
-      clearTimeout(timer);
+    child.on('exit', () => clearTimeout(timer));
+    afterExit(child, logStream).then((code) => {
       reject(new Error(`${path.basename(bin)} ${args[0]} exited early (code ${code}, log: ${reportedLog})`));
     });
   });
@@ -117,4 +148,4 @@ async function stopChild(child, { grace = STOP_GRACE } = {}) {
   }
 }
 
-module.exports = { startChild, stopChild, STOP_GRACE };
+module.exports = { startChild, stopChild, afterExit, STOP_GRACE };
