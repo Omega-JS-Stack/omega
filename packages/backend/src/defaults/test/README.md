@@ -46,9 +46,13 @@ Every feature ships with tests at every surface it exposes: logic (handler suite
 
 ## Quick example
 
+A case file exports its spec through `defineCases`, from the framework's public test API (`@omega.js/backend/test`, one of the package's `exports`; a deep `dist/` path is refused):
+
 ```js
 // test/routes/hello.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'GET /hello',
   type: 'group',
   tests: [
@@ -61,7 +65,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 ## See also

@@ -9,7 +9,7 @@
  *
  * Run (from this target): npx omega test mcp/count-notes
  */
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 // The streamable HTTP transport answers as SSE: the last `data:` line is the reply
 function parseSSE(text) {

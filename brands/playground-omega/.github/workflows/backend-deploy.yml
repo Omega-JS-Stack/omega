@@ -125,7 +125,7 @@ jobs:
         working-directory: targets/backend
         run: |
           node -e '
-            const { serializeEnv } = require("@omega.js/backend/dist/vendor/config/env.js");
+            const { serializeEnv } = require("@omega.js/backend/config");
             const values = {};
             for (const key of ["ANTHROPIC_API_KEY","BEEHIIV_API_KEY","CHARGEBEE_API_KEY","CLOUDFLARE_TOKEN","COINBASE_COMMERCE_API_KEY","CONNECTIONS_GOOGLE_CLIENT_ID","CONNECTIONS_GOOGLE_CLIENT_SECRET","GH_TOKEN","GOOGLE_ANALYTICS_SECRET","HCAPTCHA_SECRET","META_ACCESS_TOKEN","NEVERBOUNCE_API_KEY","OMEGA_ADMIN_KEY","OMEGA_NAMESPACE","OMEGA_WEBHOOK_KEY","OPENAI_API_KEY","PAYPAL_CLIENT_SECRET","RECAPTCHA_SECRET_KEY","SENDGRID_API_KEY","STRIPE_SECRET_KEY","TIKTOK_ACCESS_TOKEN","UNSUBSCRIBE_HMAC_KEY","ZEROBOUNCE_API_KEY"]) {
               if (process.env[key]) values[key] = process.env[key];

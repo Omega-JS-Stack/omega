@@ -326,5 +326,26 @@ module.exports = defineCases({
         ctx.expect(source.includes('authLogger')).toBe(false);
       },
     },
+    {
+      // `.` is the build-time entry; each context imports its instance by subpath
+      name: 'the package root exports { version, build } and nothing else',
+      run: (ctx) => {
+        const root = require('@omega.js/extension');
+        ctx.expect(Object.keys(root).sort()).toEqual(['build', 'version']);
+        ctx.expect(root.version).toBe(require(path.join(SRC, '..', 'package.json')).version);
+        // Compared by shape: an earlier suite may have reloaded the build module
+        ctx.expect(Object.keys(root.build).sort()).toEqual(Object.keys(require(path.join(SRC, 'build.js'))).sort());
+      },
+    },
+    {
+      // A consumer case file wraps its spec in defineCases from this one door
+      name: 'the ./test door hands out { defineCases, expect }',
+      run: (ctx) => {
+        const door = require('@omega.js/extension/test');
+        ctx.expect(Object.keys(door).sort()).toEqual(['defineCases', 'expect']);
+        ctx.expect(door.defineCases).toBe(defineCases);
+        ctx.expect(door.expect).toBe(require(path.join(SRC, 'test', 'assert.js')));
+      },
+    },
   ],
 });

@@ -8,7 +8,7 @@
  *
  * Run (from this target): npx omega test events/notes-on-create
  */
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 const DIRECT_OWNER = '_test-notes-event-direct';
 const TRIGGER_OWNER = '_test-notes-event-trigger';

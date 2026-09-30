@@ -81,6 +81,26 @@ test("somebody else's live listener is reported busy and left completely alone",
   }
 });
 
+test('a client holding a connection open never keeps a released port from closing', async () => {
+  const port = 46045;
+  const hold = await holdClassicPorts([port]);
+  const accepted = Promise.race(hold.servers.map((server) => new Promise((resolve) => server.once('connection', resolve))));
+  const client = net.connect({ port, host: '127.0.0.1' });
+  client.on('error', () => {});
+
+  try {
+    await accepted;
+    const closed = hold.servers.map((server) => new Promise((resolve) => server.once('close', () => resolve(true))));
+    releasePorts(hold.servers);
+    const ceiling = new Promise((resolve) => setTimeout(() => resolve(false), 2000).unref());
+    for (const close of closed) {
+      assert.equal(await Promise.race([close, ceiling]), true, `a held listener on :${port} must close within 2 s of release`);
+    }
+  } finally {
+    client.destroy();
+  }
+});
+
 test('releasePorts is safe on an empty list and on already-closed listeners', async () => {
   const hold = await holdClassicPorts([46044]);
   releasePorts(hold.servers);

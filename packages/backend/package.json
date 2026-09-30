@@ -7,14 +7,22 @@
     "access": "public"
   },
   "main": "dist/omega/index.js",
+  "exports": {
+    ".": "./dist/omega/index.js",
+    "./config": "./dist/vendor/config/index.js",
+    "./test": "./dist/test/index.js",
+    "./lib/email-constants": "./dist/omega/libraries/email/constants.js",
+    "./lib/mcp-utils": "./dist/mcp/utils.js",
+    "./cli": "./dist/cli/run.js",
+    "./ensure-target": "./dist/cli/utils/ensure-target.js",
+    "./migrate": "./dist/cli/utils/migrate.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "bin/",
     "dist/",
     "templates/",
-    "test/",
-    "cli.js",
-    "ensure-target.js",
-    "migrate.js"
+    "test/"
   ],
   "bin": {
     "omega": "bin/omega",
@@ -23,7 +31,7 @@
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "test": "node src/test/parse-audit.js && node cli.js test",
+    "test": "node src/test/parse-audit.js && node dist/cli/run.js test",
     "prepare": "node -e \"require('../devkit/tools/prepare-guard').run()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },

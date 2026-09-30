@@ -191,6 +191,16 @@ module.exports = defineCases({
       },
     },
     {
+      // A consumer case file wraps its spec in defineCases from this one door
+      name: 'the ./test door hands out { defineCases, expect }',
+      run: (ctx) => {
+        const door = require('@omega.js/desktop/test');
+        ctx.expect(Object.keys(door).sort()).toEqual(['defineCases', 'expect']);
+        ctx.expect(door.defineCases).toBe(defineCases);
+        ctx.expect(door.expect).toBe(require(path.join(ROOT, 'test', 'assert.js')));
+      },
+    },
+    {
       name: 'the build module is one plain object: no class, no new',
       run: (ctx) => {
         ctx.expect(typeof build).toBe('object');

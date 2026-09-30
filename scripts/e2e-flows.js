@@ -88,7 +88,7 @@ const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
 // Seeded personas (@omega.js/backend's test-accounts.js — every persona shares
 // the deterministic password, and the domain comes from the brand's contact
 // email). One persona per area, so no area's writes can perturb another's.
-const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS, seedOrderFixture } = require('@omega.js/backend/src/test/test-accounts.js');
+const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS, seedOrderFixture } = require('../packages/backend/src/test/test-accounts.js');
 const PERSONA_IDS = {
   password: '_test.basic',
   checkout: '_test.premium-expired',

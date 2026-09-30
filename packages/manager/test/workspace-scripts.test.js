@@ -216,10 +216,10 @@ const BACKEND_PROJECT_SCRIPTS = {
 };
 
 // The real @omega.js/backend manifest and scaffold entry, for the op cases that hold its policy
-// (ensure-target.js loads packages/backend/dist: it needs the backend's prepare to have run)
+// (the ensure-target door loads packages/backend/dist: it needs the backend's prepare to have run)
 const REAL_BACKEND_DIR = path.join(__dirname, '..', '..', 'backend');
 const REAL_BACKEND = require(path.join(REAL_BACKEND_DIR, 'package.json'));
-const { CUSTOM_OWNED_SCRIPTS } = require(path.join(REAL_BACKEND_DIR, 'ensure-target.js'));
+const { CUSTOM_OWNED_SCRIPTS } = require('@omega.js/backend/ensure-target');
 
 test('syncTargetScripts: rewrites every standard key to its default, keeps every consumer-added key (#689)', () => {
   const synced = syncTargetScripts(
@@ -333,8 +333,9 @@ test('scripts op: a custom-server backend is PER-KEY: the framework-owned subset
     '@omega.js/backend',
     REAL_BACKEND);
   // The installed backend's scaffold entry names its brand-owned scripts
-  fs.writeFileSync(path.join(backendPath, 'node_modules', '@omega.js', 'backend', 'ensure-target.js'),
-    `module.exports = require(${JSON.stringify(path.join(REAL_BACKEND_DIR, 'ensure-target.js'))});\n`);
+  const door = path.join(backendPath, 'node_modules', '@omega.js', 'backend', REAL_BACKEND.exports['./ensure-target']);
+  fs.mkdirSync(path.dirname(door), { recursive: true });
+  fs.writeFileSync(door, `module.exports = require(${JSON.stringify(require.resolve('@omega.js/backend/ensure-target'))});\n`);
 
   // A custom-server backend carries projectType 'custom' (#584)
   const entries = [{ name: 'backend', dir: 'targets/backend', path: backendPath, target: 'backend', projectType: 'custom' }];

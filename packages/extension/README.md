@@ -70,8 +70,9 @@ Test files use Jest-compatible matchers:
 ```js
 // test/build/manifest.test.js
 const build = require('@omega.js/extension/build');
+const { defineCases } = require('@omega.js/extension/test');
 
-module.exports = {
+module.exports = defineCases({
   layer: 'build',
   description: 'manifest is valid MV3',
   run: (ctx) => {
@@ -79,7 +80,7 @@ module.exports = {
     ctx.expect(m.manifest_version).toBe(3);
     ctx.expect(m.permissions).toContain('storage');
   },
-};
+});
 ```
 
 Full guide: [docs/extension/test-framework.md](../../docs/extension/test-framework.md). End-to-end "did my packaged extension actually boot in Chrome?" tests: [docs/extension/test-boot-layer.md](../../docs/extension/test-boot-layer.md).

@@ -178,8 +178,8 @@ web|src/_sections/|themes/*/_sections/
 web|src/_components/|themes/*/_components/
 web|src/assets/css/|core/css/
 web|src/assets/css/|themes/*/css/
-backend|src/routes/|src/omega/routes/
-backend|src/schemas/|src/omega/schemas/
+backend|src/routes/|dist/omega/routes/
+backend|src/schemas/|dist/omega/schemas/
 backend||templates/
 "
 

@@ -24,7 +24,9 @@ Use `boot` for tests that need to verify **integration** rather than unit behavi
 
 ```js
 // test/boot.test.js (consumer-side)
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type:        'group',
   layer:       'boot',
   description: 'consumer boot smoke',
@@ -45,7 +47,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 The `inspect` function receives:

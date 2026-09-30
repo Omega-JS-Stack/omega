@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const net = require('node:net');
 const dns = require('node:dns');
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 // `--extended` and `--lane=` runs exist to reach real services, so the runner arms no trap there
 const STANDS_DOWN = process.env.TEST_EXTENDED_MODE || process.env.OMEGA_TEST_LANE

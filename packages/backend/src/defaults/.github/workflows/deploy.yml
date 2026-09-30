@@ -83,7 +83,7 @@ jobs:
       - name: Write the target .env
         run: |
           node -e '
-            const { serializeEnv } = require("@omega.js/backend/dist/vendor/config/env.js");
+            const { serializeEnv } = require("@omega.js/backend/config");
             const values = {};
             for (const key of {{ envFileKeys }}) {
               if (process.env[key]) values[key] = process.env[key];

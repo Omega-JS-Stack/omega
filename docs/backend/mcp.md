@@ -204,7 +204,7 @@ Add to `.claude/settings.json`:
   "mcpServers": {
     "@omega.js/backend": {
       "command": "npx",
-      "args": ["bm", "mcp"],
+      "args": ["omega", "mcp"],
       "cwd": "/path/to/consumer-project"
     }
   }

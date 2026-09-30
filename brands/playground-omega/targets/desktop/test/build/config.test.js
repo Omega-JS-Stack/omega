@@ -16,8 +16,9 @@
 
 const build = require('@omega.js/desktop/build');
 const { sourceRepo, releasesRepo } = require('@omega.js/desktop/config');
+const { defineCases } = require('@omega.js/desktop/test');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'omega.json5: the playground desktop identity',
@@ -63,4 +64,4 @@ module.exports = {
       },
     },
   ],
-};
+});

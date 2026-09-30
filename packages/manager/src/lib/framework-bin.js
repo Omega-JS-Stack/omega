@@ -230,10 +230,10 @@ function resolveTargetEntry(entry, subpath, exported, customDetail) {
     return { kind: 'error', detail: 'no framework dependency detected (target-root package.json)' };
   }
 
-  // Resolved from where the target declares the dependency: an exports map and
-  // the backend's package-root file alike. A missing subpath (a framework out of
-  // date with its manager) and a module that throws on load are both the
-  // caller's failure line, never a raw stack out of the middle of a brand run.
+  // Resolved from where the target declares the dependency, through its
+  // exports map. A missing subpath (a framework out of date with its manager)
+  // and a module that throws on load are both the caller's failure line, never
+  // a raw stack out of the middle of a brand run.
   let resolved;
   let loaded;
   try {

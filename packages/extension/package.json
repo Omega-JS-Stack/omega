@@ -8,9 +8,11 @@
   },
   "main": "dist/index.js",
   "exports": {
+    ".": "./dist/index.js",
     "./config": "./dist/vendor/config/index.js",
     "./gulp": "./dist/gulp/main.js",
     "./build": "./dist/build.js",
+    "./test": "./dist/test/index.js",
     "./background": "./dist/background.js",
     "./content": "./dist/content.js",
     "./popup": "./dist/popup.js",

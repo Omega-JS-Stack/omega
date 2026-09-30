@@ -1,7 +1,7 @@
 /**
  * The throwaway projects and hook runners the agent-plugins suites share:
- * agent-plugins.test.js (the plugin and every hook) and
- * agent-plugins-subagent.test.js (the inject hook's SubagentStart mode).
+ * agent-plugins.test.js (the plugin itself) and one agent-plugins-<hook>.test.js
+ * per hook, the subagent suite being the inject hook's SubagentStart mode.
  */
 const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
@@ -12,6 +12,8 @@ const ROOT = path.join(__dirname, '..');
 const PLUGIN_ROOT = path.join(ROOT, 'agent-plugins', 'claude');
 const INJECT_HOOK = path.join(PLUGIN_ROOT, 'hooks', 'inject', 'run.sh');
 const GATE_HOOK = path.join(PLUGIN_ROOT, 'hooks', 'gate', 'run.sh');
+
+const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
 // A project fixture: a directory with its own .git, so the hook's walk up to
 // the git root stops here instead of wandering out of the temp dir.
@@ -62,6 +64,21 @@ const doneWhenBrand = () => brand({
   },
 });
 
+// The monorepo fixture: packages/<pkg> whose manifest IS @omega.js/<pkg>.
+const monorepo = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-mono-'));
+  fs.mkdirSync(path.join(dir, '.git'));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'omega' }));
+  for (const pkg of ['web', 'backend', 'client', 'devkit', 'config']) {
+    fs.mkdirSync(path.join(dir, 'packages', pkg), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'packages', pkg, 'package.json'),
+      JSON.stringify({ name: `@omega.js/${pkg}` }),
+    );
+  }
+  return dir;
+};
+
 const gate = (filePath, session) => spawnSync(GATE_HOOK, {
   input: JSON.stringify({
     hook_event_name: 'PreToolUse',
@@ -73,12 +90,15 @@ const gate = (filePath, session) => spawnSync(GATE_HOOK, {
 });
 
 module.exports = {
+  ROOT,
   PLUGIN_ROOT,
   INJECT_HOOK,
   GATE_HOOK,
+  readJson,
   project,
   inject,
   brand,
   doneWhenBrand,
+  monorepo,
   gate,
 };

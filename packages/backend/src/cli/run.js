@@ -35,3 +35,6 @@ async function run() {
 }
 
 module.exports = { run };
+
+// Runnable as a file: the package's own `npm test` calls it directly, never through the dispatcher
+if (require.main === module) run();

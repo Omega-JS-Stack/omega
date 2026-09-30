@@ -5,7 +5,7 @@
  * Run (from this target): npx omega test hooks/prune-notes
  */
 const path = require('path');
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 const OWNER = '_test-notes-prune';
 const DAY = 24 * 60 * 60;

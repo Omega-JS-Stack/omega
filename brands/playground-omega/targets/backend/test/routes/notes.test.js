@@ -9,7 +9,7 @@
  *
  * Run (from this target): npx omega test routes/notes
  */
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 const ROUTE = 'notes';
 const WELCOME_TEXT = 'Welcome to the playground';

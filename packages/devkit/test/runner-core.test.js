@@ -343,7 +343,19 @@ const CASE_ROOTS = [
   { label: 'backend',   dir: 'packages/backend/test',                extension: '.test.js' },
   { label: 'desktop',   dir: 'packages/desktop/src/test/suites',     extension: '.js' },
   { label: 'extension', dir: 'packages/extension/src/test/suites',   extension: '.js' },
+  ...consumerCaseRoots(['backend', 'desktop', 'extension']),
 ];
+
+// A consumer's own test/ under the same runner: the scaffold each framework
+// copies into a new project, and every brand's copy in this monorepo.
+function consumerCaseRoots(frameworks) {
+  const brandsDir = path.join(__dirname, '..', '..', '..', 'brands');
+  const brands = fs.existsSync(brandsDir) ? fs.readdirSync(brandsDir) : [];
+  return frameworks.flatMap((framework) => [
+    { label: `${framework} scaffold`, dir: `packages/${framework}/src/defaults/test`, extension: '.test.js' },
+    ...brands.map((brand) => ({ label: `${brand} ${framework}`, dir: `brands/${brand}/targets/${framework}/test`, extension: '.test.js' })),
+  ]);
+}
 
 function collectCaseFiles(dir, extension, found = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -195,12 +195,14 @@ module.exports = ({ projectRoot }) => ({
 
 ## Test file shapes
 
-Three forms — pick whichever fits.
+Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/extension/test');`. It hands the spec to the OMEGA runner unchanged, and fails loudly when `node --test` loads the file, which would otherwise report a hollow pass ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
 
 ### Suite (sequential, share state, stop on first failure)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'background',
   description: 'storage round-trip',
@@ -221,7 +223,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 Tests share `ctx.state` across the suite. If one fails, remaining tests are skipped (`stopOnFailure: false` to disable).
@@ -229,34 +231,40 @@ Tests share `ctx.state` across the suite. If one fails, remaining tests are skip
 ### Group (sequential, share state, run all regardless of failures)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'config defaults',
   tests: [ /* same shape as suite */ ],
-};
+});
 ```
 
 ### Standalone (single test per file)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   layer: 'build',
   description: 'manifest_version is 3',
   run: (ctx) => {
     const m = require('@omega.js/extension/build').getManifest();
     ctx.expect(m.manifest_version).toBe(3);
   },
-};
+});
 ```
 
 ### Array form (treated as a group)
 
 ```js
-module.exports = [
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases([
   { name: 'test 1', run: (ctx) => { /* ... */ } },
   { name: 'test 2', run: (ctx) => { /* ... */ } },
-];
+]);
 ```
 
 ## The `ctx` object
@@ -309,8 +317,9 @@ This is the same pattern @omega.js/desktop and @omega.js/backend consumers use: 
 ```js
 // test/build/config.test.js
 const build = require('@omega.js/extension/build');
+const { defineCases } = require('@omega.js/extension/test');
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'config has required brand fields',
@@ -329,14 +338,16 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 ## Background-layer example
 
 ```js
 // test/background/messaging.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'background',
   description: 'chrome.runtime.* surface in real SW',
@@ -357,14 +368,16 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 ## View-layer example
 
 ```js
 // test/view/popup.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'view',
   context: 'popup',     // popup | options | sidepanel — which HTML to open
@@ -384,7 +397,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 For boot-layer (`inspect: async ({ extension, page, expect }) => { ... }`) tests, see [test-boot-layer.md](test-boot-layer.md).

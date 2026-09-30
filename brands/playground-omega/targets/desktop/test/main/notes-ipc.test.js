@@ -9,6 +9,7 @@
 const path = require('path');
 
 const notes = require(path.join(__dirname, '..', '..', 'src', 'lib', 'notes.js'));
+const { defineCases } = require('@omega.js/desktop/test');
 
 const COUNT_KEY = 'notes.count';
 
@@ -28,7 +29,7 @@ function reportFromRenderer(payload) {
   require('electron').ipcMain.emit('notes:report', {}, payload);
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'notes: main-process IPC, app store and auth',
@@ -102,4 +103,4 @@ module.exports = {
       },
     },
   ],
-};
+});

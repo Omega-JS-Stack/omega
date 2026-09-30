@@ -14,7 +14,9 @@
  * is the one argument.
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'the playground desktop app boots (real bundle)',
@@ -114,4 +116,4 @@ module.exports = {
       },
     },
   ],
-};
+});

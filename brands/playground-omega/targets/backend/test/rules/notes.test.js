@@ -8,7 +8,7 @@
  *
  * Run (from this target): npx omega test rules/notes
  */
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 const NOTE = 'notes/rules-note';
 

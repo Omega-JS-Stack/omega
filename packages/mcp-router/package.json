@@ -7,6 +7,11 @@
     "access": "public"
   },
   "main": "./src/router.js",
+  "exports": {
+    ".": "./src/router.js",
+    "./cli": "./bin/mcp-router.js",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "mcp-router": "bin/mcp-router.js",
     "omega-mcp": "bin/omega-mcp.js"

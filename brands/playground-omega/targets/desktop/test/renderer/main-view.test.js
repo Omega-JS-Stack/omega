@@ -16,7 +16,9 @@
  * they get.
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'renderer',
   view: 'main',
@@ -53,4 +55,4 @@ module.exports = {
       },
     },
   ],
-};
+});

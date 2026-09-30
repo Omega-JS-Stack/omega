@@ -20,8 +20,8 @@ package not on that list, so read the count from there rather than from this pag
 `@omega.js/mcp-router` joined the set (Ian 2026-07-30, [#144](https://github.com/Omega-JS-Stack/omega/issues/144)):
 the manager's vendored Claude plugin declares the router, so the router has to be
 installable beside it — a real dependency, never vendored. It ships no docs (only
-the manager does) and no `exports` map, so the
-plugin's launcher can deep-resolve `@omega.js/mcp-router/bin/mcp-router.js`.
+the manager does), and its `exports` map has the siblings' shape, so the plugin's
+launcher resolves the router's bin as `@omega.js/mcp-router/cli`.
 
 Registry-real internal ranges (everything else is workspace `*`): `@omega.js/client`
 in backend/web/desktop/extension; `@omega.js/backend` and `@omega.js/mcp-router` in

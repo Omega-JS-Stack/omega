@@ -7,7 +7,9 @@
  * call is made.
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   layer: 'boot',
   description: 'the packaged background answers notes:count over the messenger',
   inspect: async ({ extension, page, expect }) => {
@@ -22,4 +24,4 @@ module.exports = {
 
     expect(answer).toEqual({ ok: true, count: 0 });
   },
-};
+});

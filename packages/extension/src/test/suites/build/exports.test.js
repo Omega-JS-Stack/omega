@@ -31,21 +31,11 @@ const BROWSER_CONTEXT_KEYS = new Set([
   './offscreen',
 ]);
 
-// The dead root entry is retired: every consumer imports a context by its
-// subpath, and there is no `.` for a bare `@omega.js/extension` to land on.
-const ROOT_ENTRY_RETIRED = {
-  name: 'no `.` export and no root index.js: a context is imported by its subpath',
-  run: (ctx) => {
-    ctx.expect(pkg.exports['.']).toBeUndefined();
-    ctx.expect(require('fs').existsSync(path.join(DIST_ROOT, 'index.js'))).toBe(false);
-  },
-};
-
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'package.json#exports: node-safe entries resolve',
-  tests: [ROOT_ENTRY_RETIRED, ...Object.entries(pkg.exports || {})
+  tests: Object.entries(pkg.exports || {})
     .filter(([key]) => !BROWSER_CONTEXT_KEYS.has(key))
     .map(([key, relDistPath]) => ({
       name: `${key} → ${relDistPath}`,
@@ -58,5 +48,5 @@ module.exports = defineCases({
         const mod = require(abs);
         ctx.expect(mod).toBeDefined();
       },
-    }))],
+    })),
 });

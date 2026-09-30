@@ -17,7 +17,9 @@ If the boot smoke passes, the framework at minimum *boots a consumer backend end
 Same `{ description, type, tests }` contract as every other @omega.js/backend suite — the boot suite is just scoped to the `test/boot/` directory and gated to self-test runs:
 
 ```js
-module.exports = {
+const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+
+module.exports = defineCases({
   description: 'Boot smoke — fixture emulator + omega_api reachable',
   type: 'group',
   timeout: 30000,
@@ -30,7 +32,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 ## The bundled fixture project

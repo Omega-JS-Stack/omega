@@ -17,7 +17,9 @@ If a boot test passes, the extension at minimum *loads* in a real Chrome — tha
 ## Test file shape
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   layer: 'boot',
   description: 'extension loads + popup renders',
   timeout: 20000,
@@ -27,13 +29,15 @@ module.exports = {
     const html = await page.content();
     expect(html).toContain('<html');
   },
-};
+});
 ```
 
 Or as a group:
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'extension boots end-to-end',
@@ -51,7 +55,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 ## The `inspect` callback args

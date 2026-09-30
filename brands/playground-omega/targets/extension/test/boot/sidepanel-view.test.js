@@ -7,9 +7,11 @@
  * shown as the form's error, and nothing reaches the API.
  */
 
+const { defineCases } = require('@omega.js/extension/test');
+
 const SETTLE = { timeout: 30000 };
 
-module.exports = {
+module.exports = defineCases({
   layer: 'boot',
   description: 'the side panel: a signed-out submit shows background\'s refusal',
   inspect: async ({ extension, page, expect }) => {
@@ -28,4 +30,4 @@ module.exports = {
 
     expect(listHidden).toBe(true);
   },
-};
+});

@@ -1,9 +1,11 @@
 // Public test API — what consumers see.
 //
-// Test files export a test definition. Three forms:
+// Test files export a test definition through defineCases, taken from this door:
+//   const { defineCases } = require('@omega.js/extension/test');
+// Three forms:
 //
 // Standalone:
-//   module.exports = {
+//   module.exports = defineCases({
 //     layer: 'build',                  // 'build' | 'background' | 'view' | 'boot'
 //     description: 'config has brand.id',
 //     timeout: 5000,
@@ -12,14 +14,14 @@
 //       ctx.expect(cfg.brand.id).toBeTruthy();
 //     },
 //     cleanup: async (ctx) => { ... },
-//   };
+//   });
 //
 // Boot layer — spawns Chromium with the consumer's actual built `dist/` loaded as an
 // unpacked extension and runs `inspect` against the live extension surface. Replaces
 // shell-level smoke tests with deterministic, signal-driven pass/fail. Use this to
 // verify the WHOLE integration: consumer scaffolds, brand config, real manifest, real boot.
 //
-//   module.exports = {
+//   module.exports = defineCases({
 //     layer: 'boot',
 //     description: 'extension loads and SW boots',
 //     timeout: 20000,
@@ -27,10 +29,10 @@
 //       expect(extension.id).toBeTruthy();
 //       expect(extension.manifest.manifest_version).toBe(3);
 //     },
-//   };
+//   });
 //
 // Suite (sequential, shared state, stop on first failure):
-//   module.exports = {
+//   module.exports = defineCases({
 //     type: 'suite',
 //     layer: 'background',
 //     description: 'messaging round-trip',
@@ -38,17 +40,17 @@
 //       { name: 'send',  run: async (ctx) => { ctx.state.echo = await chrome.runtime.sendMessage({ ping: 1 }); } },
 //       { name: 'reply', run: async (ctx) => { ctx.expect(ctx.state.echo.pong).toBe(1); } },
 //     ],
-//   };
+//   });
 //
 // Group (sequential, shared state, runs ALL tests even if some fail):
-//   module.exports = {
+//   module.exports = defineCases({
 //     type: 'group',
 //     layer: 'build',
 //     tests: [ ... ],
-//   };
+//   });
 //
 // Array form (treated as group):
-//   module.exports = [ { name, run }, ... ];
+//   module.exports = defineCases([ { name, run }, ... ]);
 //
 // The ctx (context) provided to every run/cleanup includes:
 //   - ctx.expect       — Jest-compatible assertion library
@@ -59,5 +61,6 @@
 //   - ctx.page         — Puppeteer Page (view layer only)
 
 module.exports = {
+  defineCases: require('@omega.js/devkit/test/define-cases'),
   expect: require('./assert.js'),
 };

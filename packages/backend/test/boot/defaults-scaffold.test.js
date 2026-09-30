@@ -155,6 +155,7 @@ module.exports = defineCases({
         // config serializer, so a secret carrying a newline cannot split its
         // line or inject a key (the heredoc this replaced did, #872).
         assert.ok(workflow.includes('serializeEnv'), 'the .env is written through the config serializer');
+        assert.ok(workflow.includes('require("@omega.js/backend/config")'), 'the serializer is read through the exports map, never a deep dist path');
         assert.equal(/cat > \.env/.test(workflow), false, 'no heredoc pastes a secret into the shell');
 
         // The license key is delivered to backend as well now, so the runner's

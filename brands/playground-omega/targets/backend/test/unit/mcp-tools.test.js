@@ -7,11 +7,11 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 
 const APP_DIR = path.join(__dirname, '..', '..');
 const SRC = path.join(APP_DIR, 'src');
-const { loadConsumerTools } = require(require.resolve('@omega.js/backend/dist/mcp/utils.js', { paths: [APP_DIR] }));
+const { loadConsumerTools } = require(require.resolve('@omega.js/backend/lib/mcp-utils', { paths: [APP_DIR] }));
 
 module.exports = defineCases({
   description: 'Consumer MCP tools: they load, and every route tool names a shipped route',

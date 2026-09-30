@@ -10,7 +10,9 @@
  * from this module (the poll helper is inlined per test).
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'renderer',
   view: 'main',
@@ -82,4 +84,4 @@ module.exports = {
       },
     },
   ],
-};
+});

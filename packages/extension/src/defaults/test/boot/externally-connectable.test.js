@@ -12,7 +12,9 @@
  * match the origins you declared.
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/extension/test');
+
+module.exports = defineCases({
   layer: 'boot',
   description: 'the packaged manifest lets the brand site message the extension',
   inspect: async ({ extension, expect }) => {
@@ -25,4 +27,4 @@ module.exports = {
     const matches = extension.manifest.externally_connectable?.matches || [];
     expect(matches).toContain(`${new URL(brandUrl).origin}/*`);
   },
-};
+});

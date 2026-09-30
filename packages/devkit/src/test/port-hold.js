@@ -40,7 +40,9 @@ const FAMILY_UNAVAILABLE = ['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL'];
  */
 function holdAddress(port, host) {
   return new Promise((resolve) => {
-    const server = net.createServer();
+    // A held port answers nothing: no accepted socket outlives the hold, so a
+    // release closes at once even with a browser tab still connected.
+    const server = net.createServer((socket) => socket.destroy());
     server.once('error', (error) => resolve({
       status: FAMILY_UNAVAILABLE.includes(error.code) ? 'unavailable' : 'busy',
     }));

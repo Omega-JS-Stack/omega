@@ -12,7 +12,7 @@
  * only writer is the legacy-contact import script, which hasn't ported —
  * the field rides that port.
  */
-const { FIELDS, SEGMENTS, GROUP_KEYS, fieldsForProvider } = require('@omega.js/backend/dist/omega/libraries/email/constants.js');
+const { FIELDS, SEGMENTS, GROUP_KEYS, fieldsForProvider } = require('@omega.js/backend/lib/email-constants');
 
 // Array shapes for handlers that iterate
 const BACKEND_FIELDS = Object.entries(FIELDS).map(([name, field]) => ({

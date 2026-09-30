@@ -14,6 +14,7 @@
  * (test/boot/notes-count.test.js).
  */
 const path = require('path');
+const { defineCases } = require('@omega.js/extension/test');
 
 const NOTES_MODULE = path.join(__dirname, '..', '..', 'src', 'assets', 'js', 'components', 'background', 'notes.js');
 
@@ -89,7 +90,7 @@ function setup({ authenticated, notes = [] }) {
   return { omega, send, calls, badges, authListeners, cleanup };
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'background notes commands over the real messenger',
@@ -196,4 +197,4 @@ module.exports = {
       },
     },
   ],
-};
+});

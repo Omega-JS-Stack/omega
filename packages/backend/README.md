@@ -790,11 +790,15 @@ Bare runs and bare paths are PROJECT-scoped (C5); reach the framework corpus exp
 
 ### Writing Tests
 
+A case file exports its spec through `defineCases`, from the public test API (`@omega.js/backend/test`).
+
 **Suite** - Sequential tests with shared state (stops on first failure):
 
 ```javascript
 // test/user/sign-up.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'User signup flow with affiliate tracking',
   type: 'suite',
   tests: [
@@ -816,14 +820,16 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 **Group** - Independent tests (continues even if one fails):
 
 ```javascript
 // test/admin/firestore-write.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'Admin Firestore write operation',
   type: 'group',
   tests: [
@@ -850,7 +856,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 **Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`

@@ -22,6 +22,7 @@ const os = require('os');
 const path = require('path');
 
 const prepareRelease = require('../../../../scripts/release-lane.js');
+const { defineCases } = require('@omega.js/desktop/test');
 
 // What `gh release list --json tagName,publishedAt` answers on the playground's
 // releases repo: both target families, out of published order on purpose.
@@ -71,7 +72,7 @@ function deletedTags(calls) {
   return calls.filter((args) => args[1] === 'delete').map((args) => args[2]);
 }
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'build',
   description: 'release-lane: the playground prunes to one release per family',
@@ -129,4 +130,4 @@ module.exports = {
       },
     },
   ],
-};
+});

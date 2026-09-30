@@ -329,42 +329,50 @@ Use `backend:` or `project:` prefix to filter by source. **Mirror the source pat
 | Suite (`type: 'suite'`) | Sequential dependent tests | Shared state, stops on failure |
 | Group (`type: 'group'`) | Multiple independent tests | Continues on failure |
 
+Every shape exports through `defineCases`. A consumer's case file takes it from the public test API, `@omega.js/backend/test`; the framework's own suites require the vendored copy by relative path (`dist/vendor/devkit/test/define-cases.js`), since they run from a consumer install too ([index.md](index.md#test-framework)).
+
 ### Standalone Test
 
 ```javascript
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'Test name',
   auth: 'none',  // none, user, admin, premium-active, premium-expired
   timeout: 10000,
   async run({ http, assert, accounts, firestore, state, waitFor }) { },
   async cleanup({ ... }) { },  // Optional
-};
+});
 ```
 
 ### Suite (Sequential with Shared State)
 
 ```javascript
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'Suite name',
   type: 'suite',
   tests: [
     { name: 'step-1', async run({ state }) { state.value = 'shared'; } },
     { name: 'step-2', async run({ state }) { /* state.value available */ } },
   ],
-};
+});
 ```
 
 ### Group (Independent Tests)
 
 ```javascript
-module.exports = {
+const { defineCases } = require('@omega.js/backend/test');
+
+module.exports = defineCases({
   description: 'Group name',
   type: 'group',
   tests: [
     { name: 'test-1', auth: 'admin', async run({ http, assert }) { } },
     { name: 'test-2', auth: 'none', async run({ http, assert }) { } },
   ],
-};
+});
 ```
 
 ## Context Object

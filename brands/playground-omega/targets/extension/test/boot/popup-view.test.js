@@ -6,9 +6,11 @@
  * profile is signed out, which is the state asserted.
  */
 
+const { defineCases } = require('@omega.js/extension/test');
+
 const SETTLE = { timeout: 30000 };
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'the popup (packaged, real DOM)',
@@ -48,4 +50,4 @@ module.exports = {
       },
     },
   ],
-};
+});

@@ -24,17 +24,18 @@ Tests that hit REAL external services (Firebase, push, network) are skipped by d
 ```js
 // test/build/my-feature.test.js
 const build = require('@omega.js/extension/build');
+const { defineCases } = require('@omega.js/extension/test');
 
-module.exports = {
+module.exports = defineCases({
   layer: 'build',
   description: 'the project config carries a brand id',
   run: (ctx) => {
     ctx.expect(build.getConfig().brand.id).toBeTruthy();
   },
-};
+});
 ```
 
-That is the standalone form: one test per file. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library (there is nothing to require). The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
+That is the standalone form: one test per file. Every case file wraps its spec in `defineCases` from `@omega.js/extension/test`, so `node --test` on it fails loudly instead of reporting a hollow pass. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library. The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
 
 ## See also
 

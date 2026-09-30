@@ -9,9 +9,11 @@
  * shown on the button.
  */
 
+const { defineCases } = require('@omega.js/extension/test');
+
 const SETTLE = { timeout: 30000 };
 
-module.exports = {
+module.exports = defineCases({
   type: 'suite',
   layer: 'boot',
   description: 'options + content: "save selection as note" (packaged)',
@@ -68,4 +70,4 @@ module.exports = {
       },
     },
   ],
-};
+});

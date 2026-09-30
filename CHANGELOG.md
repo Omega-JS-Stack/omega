@@ -13,9 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#212](../../issues/212) - `POST /payments/intent` takes `simulate: 'abandon'` - the session is created and no webhook is fired, which is what an abandoned checkout IS. Test-provider only, never persisted.
 
 ### Changed
+- [#1009](../../issues/1009) - `@omega.js/backend` and `@omega.js/mcp-router` declare an `exports` map, so a deep path into either is refused. A backend case file takes `defineCases` from `@omega.js/backend/test`; the plugin launches the router through `@omega.js/mcp-router/cli`. The by-hand steps are in `docs/shared/breaking-changes.md`.
+- [#1009](../../issues/1009) - The plugin guard refuses a brand backend route or schema that shadows the framework's in a registry install too: it reads the published `dist/` tree instead of `src/`, which the package never ships.
+- [#1009](../../issues/1009) - `@omega.js/desktop/test` and `@omega.js/extension/test` hand out `{ defineCases, expect }`, and every desktop and extension case file in the scaffold and the playground brand wraps in `defineCases`, as backend case files do.
 - [#609](../../issues/609) - The playground carries four `_alternatives` fixtures so /alternatives and its comparison pages are checkable, and drops both its hand-written `download` map (derived) and its `translation.exclude` list (framework-owned).
 
 ### Fixed
+- [#1007](../../issues/1007) - A held e2e port answers nothing: the hold closes every connection it accepts, so a passed run exits at once instead of waiting on a browser tab still connected to a classic port like `localhost:5002`.
+- [#1008](../../issues/1008) - `require('@omega.js/extension')` resolves again: the package root is the build-time entry `{ version, build }`, as it is on desktop, so the release check no longer marks the extension "resolve failed". The extension also exports `./test`, its public test API, as desktop does.
 - [#769](../../issues/769) - Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#212](../../issues/212) - The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) - The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.

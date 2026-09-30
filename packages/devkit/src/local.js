@@ -1536,9 +1536,9 @@ function acquireHealLock(realDir) {
 /**
  * Resolve a package's REAL on-disk directory as seen from fromDir, mirroring
  * Node resolution. require.resolve of '<name>/package.json' first (works when
- * there is no exports map — @omega.js/backend), then a manual node_modules
- * walk-up (exports maps rarely expose './package.json', and a missing dist
- * makes the '.' entry unresolvable — exactly the stale case this exists for).
+ * the exports map exposes './package.json', as the backend's does), then a
+ * manual node_modules walk-up (most framework maps expose no './package.json',
+ * and a missing dist makes the '.' entry unresolvable: the stale case this exists for).
  * @param {string} packageName - Package name (e.g. '@omega.js/web').
  * @param {string} fromDir - Directory to resolve from.
  * @returns {string|null} Real package directory, or null when unresolvable.

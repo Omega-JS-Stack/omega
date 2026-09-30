@@ -11,7 +11,9 @@
  * `require` and `process` are injected.
  */
 
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'boot',
   description: 'notes: main, the integrations, and the main window (real bundle)',
@@ -250,4 +252,4 @@ module.exports = {
       },
     },
   ],
-};
+});

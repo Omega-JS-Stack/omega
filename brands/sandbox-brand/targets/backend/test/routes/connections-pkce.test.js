@@ -25,7 +25,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
-const defineCases = require('@omega.js/backend/dist/vendor/devkit/test/define-cases.js');
+const { defineCases } = require('@omega.js/backend/test');
 const provider = require('../../src/connections/sandbox-pkce.js');
 
 const PROVIDER_ID = 'sandbox-pkce';

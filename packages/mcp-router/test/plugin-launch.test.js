@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PLUGIN_DIR = path.join(__dirname, '..', '..', '..', 'agent-plugins', 'claude');
-const ROUTER_BIN = '@omega.js/mcp-router/bin/mcp-router.js';
+const ROUTER_BIN = '@omega.js/mcp-router/cli';
 
 test('the plugin declares one server, launched from inside the plugin', () => {
   const declaration = JSON.parse(fs.readFileSync(path.join(PLUGIN_DIR, '.mcp.json'), 'utf8'));

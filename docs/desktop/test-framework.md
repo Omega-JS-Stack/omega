@@ -160,12 +160,14 @@ module.exports = ({ projectRoot }) => ({
 
 ## Test file shapes
 
-Three forms — pick whichever fits.
+Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/desktop/test');`. It hands the spec to the OMEGA runner unchanged, and fails loudly when `node --test` loads the file, which would otherwise report a hollow pass ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
 
 ### Suite (sequential, share state, stop on first failure)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',                    // 'build' | 'main' | 'renderer'
   description: 'storage (main)',
@@ -187,7 +189,7 @@ module.exports = {
       skip: 'reason',                       // skip this test
     },
   ],
-};
+});
 ```
 
 Tests share `ctx.state` across the suite. If one fails, remaining tests are skipped (`stopOnFailure: false` to disable).
@@ -195,12 +197,14 @@ Tests share `ctx.state` across the suite. If one fails, remaining tests are skip
 ### Group (parallel-ish, share state, run all regardless of failures)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'main',
   description: 'boot sequence (main)',
   tests: [ /* same shape as suite */ ],
-};
+});
 ```
 
 Same shape as suite, but all tests run even if some fail.
@@ -208,23 +212,27 @@ Same shape as suite, but all tests run even if some fail.
 ### Standalone (single test per file)
 
 ```js
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   layer: 'build',
   description: 'CLI alias resolves to a command file',
   run: (ctx) => { /* ... */ },
   cleanup: (ctx) => { /* ... */ },
   timeout: 10000,
   skip: false,
-};
+});
 ```
 
 ### Array shorthand (group of tests, no metadata)
 
 ```js
-module.exports = [
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases([
   { name: 'A', run: (ctx) => { /* ... */ } },
   { name: 'B', run: (ctx) => { /* ... */ } },
-];
+]);
 ```
 
 ## Layers
@@ -306,7 +314,9 @@ In a consumer project, drop files in `test/` (or `test/**`):
 
 ```js
 // test/login-flow.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'suite',
   layer: 'main',
   description: 'login flow',
@@ -318,7 +328,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 `npx omega test` runs your project suites; scope `framework:` or `full:` to reach the framework's own.
@@ -329,7 +339,9 @@ A `renderer` suite that declares **`view: '<name>'`** runs against `src/views/<n
 
 ```js
 // test/renderer/main-view.test.js
-module.exports = {
+const { defineCases } = require('@omega.js/desktop/test');
+
+module.exports = defineCases({
   type: 'group',
   layer: 'renderer',
   view: 'main',                       // <- src/views/main/, as built
@@ -348,7 +360,7 @@ module.exports = {
       },
     },
   ],
-};
+});
 ```
 
 Such a suite rides the **boot lane**, because only that lane stages and builds the real app (`<project>/.omega/test-app/`) before running: the page gets the project's real `dist/preload.bundle.js`, the real IPC handlers of the booted main process, and the real config. The window is created through the app's own window manager (hidden, no bounds persistence) and destroyed when the suite ends. Cost is the boot lane's: one build (~10-30s) shared with your boot tests.

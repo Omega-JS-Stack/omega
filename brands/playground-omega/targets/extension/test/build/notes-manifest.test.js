@@ -7,8 +7,9 @@
  * moves without the manifest fails here instead of silently injecting nowhere.
  */
 const build = require('@omega.js/extension/build');
+const { defineCases } = require('@omega.js/extension/test');
 
-module.exports = {
+module.exports = defineCases({
   type: 'group',
   layer: 'build',
   description: 'manifest: the notes permissions and the brand-only content script',
@@ -35,4 +36,4 @@ module.exports = {
       },
     },
   ],
-};
+});

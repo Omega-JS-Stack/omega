@@ -70,6 +70,8 @@ await omega.initialize();
 
 `initialize()` returns the instance, and `omega.ready` is the same promise, so a module that did not call it can still await it.
 
+The package root, `require('@omega.js/extension')`, is the build-time entry and never a context: `{ version, build }`, the package version and the build module (`@omega.js/extension/build`). `@omega.js/extension/test` is the public test API, `{ defineCases, expect }`: `defineCases` wraps every consumer case file's spec, and `expect` is the same assertion library every suite gets as `ctx.expect` ([docs/extension/test-framework.md](test-framework.md)).
+
 ### The instance (`omega`)
 
 Every context's `omega` carries the same core:
@@ -195,7 +197,7 @@ The boot layer SKIPS when the consumer has not built: a candidate directory qual
 
 A boot test's per-test timeout defaults to **45000ms** — sized for the FIRST run after a fresh build, where the extension's Firebase service worker initializes cold (observed 20-30s; the old 20000 default sat right under it and consumers had to declare a timeout of their own to get a green run, [#262](https://github.com/Omega-JS-Stack/omega/issues/262)). Later runs are far quicker. Declare `timeout` on a test only when THAT test is genuinely slower — never to work around the first-run cost.
 
-Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/extension/test-framework.md](test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
+Test files export `defineCases({ type, layer, description, tests, cleanup })` (`defineCases` from `@omega.js/extension/test`) with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/extension/test-framework.md](test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
 
 **NEVER mock: test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a mock `omega`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --target=<name> --extended` or `TEST_EXTENDED_MODE=true`): normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/extension/test-framework.md](test-framework.md).
 

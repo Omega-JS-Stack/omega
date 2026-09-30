@@ -10,13 +10,13 @@
  * installed `@omega.js/mcp-router` — wherever npm hoisted it — when the plugin
  * is vendored into `@omega.js/manager` inside a consumer brand.
  *
- * The router package declares no `exports` map, so its bin is resolvable by
- * subpath; requiring it starts the stdio server (which self-bootstraps its own
- * dependencies on a bare checkout). Stdout is the MCP wire — the failure path
- * speaks on stderr only, in the router's own voice.
+ * The router's `./cli` export is its bin; requiring it starts the stdio server
+ * (which self-bootstraps its own dependencies on a bare checkout). Stdout is
+ * the MCP wire: the failure path speaks on stderr only, in the router's own
+ * voice.
  */
 
-const ROUTER_BIN = '@omega.js/mcp-router/bin/mcp-router.js';
+const ROUTER_BIN = '@omega.js/mcp-router/cli';
 
 let entry;
 try {
