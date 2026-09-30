@@ -19,8 +19,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#769](../../issues/769) - Windows hosts get answers, not crashes: one cross-platform PATH probe (`where`/`which`) behind every mkcert, nodemon and Stripe-CLI check, mkcert and openjdk install hints that branch per platform instead of always saying `brew`, every shelled-out child through the host's own shell, and no `sleep` or `lsof` assumed.
 - [#212](../../issues/212) - The trial-lapse sweep re-reads and writes in ONE transaction, and counts a same-second webhook write as newer. A provider's own trial-end event landing in the sweep's window, or inside its read's own second, was silently written over.
 - [#212](../../issues/212) - The four test processors write `metadata.created`/`completed` like the webhook route, not `received`/`processed`. Their synthetic events handed the pipeline's staleness clock nothing and rode a now-fallback as if freshly arrived.
-- [#1004](../../issues/1004) - The client's verts rotation test waits for two ticks under a 2 s ceiling instead of counting them after a fixed 90 ms sleep, so a loaded machine's late timer no longer fails it.
-- [#1005](../../issues/1005) - The flows lane's session-kill step brings the tab back into view every 5 s inside its 60 s wait, as a person would, and a failure names the client's last probe log line instead of a bare timeout.
+
+## [0.54.1] - 2026-09-30
+
+### Fixed
+- [#1004](../../issues/1004) [`d24aaf9e`](../../commit/d24aaf9e) Thanks [@ianwieds]! - The client's verts rotation test waits for two ticks under a 2 s ceiling instead of counting them after a fixed 90 ms sleep, so a loaded machine's late timer no longer fails it.
+- [#1005](../../issues/1005) [`d24aaf9e`](../../commit/d24aaf9e) Thanks [@ianwieds]! - The flows lane's session-kill step brings the tab back into view every 5 s inside its 60 s wait, as a person would, and a failure names the client's last probe log line instead of a bare timeout.
 
 ## [0.54.0] - 2026-09-29
 
