@@ -49,7 +49,7 @@ spot waits.
 The bindings root key is the unit of deferral. `bindings.update()` filters by
 the top-level keys it was handed, so a spot that must wait belongs to a root
 the early paint does not publish
-([packages/client/docs/bindings.md](../../packages/client/docs/bindings.md)).
+([docs/client/bindings.md](../client/bindings.md)).
 Checkout is the worked example: its build-config half publishes `checkout`, and
 the money line and trial spot live under `order`, written once when eligibility
 answers.
@@ -111,4 +111,4 @@ Four questions, in order:
 
 - [docs/web/index.md](index.md) — the web framework guide
 - [docs/client/index.md](../client/index.md) — the runtime that fills the bindings
-- [packages/client/docs/bindings.md](../../packages/client/docs/bindings.md) — `data-omega-bind`, skeletons, root-key update filtering
+- [docs/client/bindings.md](../client/bindings.md) — `data-omega-bind`, skeletons, root-key update filtering

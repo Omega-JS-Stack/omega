@@ -1,7 +1,7 @@
 /**
  * Surface: background message handlers (omega.messenger.onMessage), the one
  * owner of the notes feature inside the extension
- * Doc: node_modules/@omega.js/extension/docs/contexts.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/contexts.md
  *
  * Every other context asks background over the messenger; background alone
  * calls the API, through omega.request() on its own session (the auth source

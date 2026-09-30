@@ -1,35 +1,11 @@
-// Vendors the monorepo's DOCS into a publishable package at prepare time, so a
-// published install carries knowledge that matches the installed version
-// ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)) instead of
-// pointing at a monorepo tree the consumer doesn't have.
-//
-// Runs from tools/vendor.js (the prepare `after` hook every framework already
-// wires), so there is ONE docs+modules lane, not two.
-//
-// For each publishable (@omega.js/backend, client, desktop, extension, manager,
-// web), from the package's cwd it:
-//   1. Copies the monorepo's guide tree `docs/<package>/` FLAT into the
-//      package's own `docs/` — the guide lands at `docs/index.md`, beside the
-//      package's committed deep docs it points at
-//   2. Copies `docs/shared/` (the cross-framework contracts) to `docs/shared/`
-//   3. Rewrites the guide's monorepo-relative links to the shipped layout:
-//      `../../packages/<self>/` → `../` (so `docs/architecture.md` and
-//      `README.md` both land) and `../shared/` → `shared/`
-//   4. For @omega.js/manager ONLY: copies the repo-root map (`AGENTS.md`) to
-//      `docs/AGENTS.md` with its links retargeted at the shipped layout, so a
-//      published install has a map for the brand chain to link at, copies the
-//      Claude plugin to `claude-plugin/` — `.mcp.json` INCLUDED, since it now
-//      addresses a launcher inside the plugin that node-resolves the installed
-//      `@omega.js/mcp-router` ([#144](https://github.com/Omega-JS-Stack/omega/issues/144))
-//      — and writes a package-root `.claude-plugin/marketplace.json` listing it
-//      by the package-relative `./claude-plugin` source, so a consumer brand
-//      can enable the plugin straight from its node_modules
-//      ([#62](https://github.com/Omega-JS-Stack/omega/issues/62))
-//
-// Everything it writes is GENERATED (gitignored per package) and idempotent:
-// each destination is cleared before it is rewritten, so a deleted source doc
-// never survives as a stale shipped copy.
+// Vendors the monorepo's top-level docs/ into @omega.js/manager at prepare
+// time, the one package every brand installs, so brand agents read docs that
+// match the installed version. The tree ships whole, links that leave it are
+// retargeted, and the Claude plugin plus its marketplace ride along.
+// Runs from tools/vendor.js's prepare hook; the manager's workspace step calls
+// syncDocs too, to keep a locally linked manager's copy current.
 
+const fs = require('fs');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const { resolveMonorepoRoot } = require('../src/local.js');
@@ -37,84 +13,138 @@ const Logger = require('../src/logger');
 
 const logger = new Logger('devkit-vendor-docs');
 
-// The packages that ship docs — the six DOCUMENTED publishables (mcp-router
-// publishes but carries no guide tree). The private packages (devkit, config,
-// account, template-kit) are vendored INTO these and never ship a tree of
-// their own.
-const DOCUMENTED_PACKAGES = ['backend', 'client', 'desktop', 'extension', 'manager', 'web'];
+// The one package that ships docs and the plugin.
+const HOST_PACKAGE = 'manager';
+const DOCS_DIR = 'docs';
+// The map every agent entry imports, inside the docs tree.
+const MAP_FILE = path.join(DOCS_DIR, 'omega.md');
 
 // The Claude plugin: source in the monorepo, destination inside the manager
 // package, and the marketplace that points at it there.
-const PLUGIN_PACKAGE = 'manager';
 const PLUGIN_SOURCE = 'agent-plugins/claude';
 const PLUGIN_DIR = 'claude-plugin';
 const MARKETPLACE_FILE = path.join('.claude-plugin', 'marketplace.json');
-// The repo-root map — the ONE agent entry — and where it ships inside the
-// manager package for the brand chain's scope symlink to point at (#144).
-const MAP_SOURCE = 'AGENTS.md';
-const MAP_FILE = path.join('docs', 'AGENTS.md');
+
+const LINK = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+// A web URL, an anchor, a site path (`/pricing`) or a build alias (`@post/a.jpg`).
+const NOT_A_PATH = /^([a-z][a-z0-9+.-]*:|#|\/|@)/i;
 
 /**
- * Rewrite a guide file's monorepo-relative links to the shipped layout.
- * Applies to the guide tree's TOP level only, where the mapping is exact.
+ * Rewrite one doc's links for the copy inside the manager package. A link
+ * inside `docs/` keeps its shape, since the tree ships whole. A link out of it:
  *
- * @param {string} contents - The guide markdown as written in the monorepo
- * @param {string} short - The package's short name ('web', 'backend', …)
- * @returns {string} - The markdown as it ships inside the package
+ * | In the monorepo | Shipped as |
+ * |---|---|
+ * | `packages/<pkg>/<rest>` | the sibling package in the installed `@omega.js` scope |
+ * | `agent-plugins/claude/<rest>` | the plugin copy inside the manager |
+ * | anything else (`brands/`, root files) | the link text alone |
+ *
+ * A sibling that isn't installed or never publishes leaves a dead relative
+ * link, which beats a monorepo path that resolves nowhere. A locally linked
+ * manager sits in `packages/`, so the same links land on the live sources.
+ *
+ * @param {string} contents - The doc as written in the monorepo
+ * @param {string} relativeFile - Its path inside `docs/` (posix separators)
+ * @returns {string} - The doc as it ships inside the manager package
  */
-function rewriteGuideLinks(contents, short) {
-  return contents
-    .split(`../../packages/${short}/`).join('../')
-    .split('../shared/').join('shared/');
-}
+function rewriteDocLinks(contents, relativeFile) {
+  const fromDir = path.posix.dirname(path.posix.join(DOCS_DIR, relativeFile));
+  const shippedDir = path.posix.join(HOST_PACKAGE, fromDir);
 
-/**
- * Rewrite the repo-root map's links for the copy that ships at
- * `@omega.js/manager/docs/AGENTS.md`. Every target is repo-root-relative
- * there, and each kind has exactly one shipped home:
- *
- * | In the monorepo | Shipped as | Why |
- * |---|---|---|
- * | `docs/shared/<x>.md` | `shared/<x>.md` | the manager's own vendored shared contracts sit beside it |
- * | `docs/manager/<x>.md` | `<x>.md` | the manager's guide tree lands FLAT in the same dir |
- * | `docs/<other>/<x>.md` | `../../<other>/docs/<x>.md` | a sibling package under the same @omega.js scope |
- * | `packages/…`, `brands/…` | the link text alone | no published target exists — the words survive, the link doesn't |
- *
- * A sibling that isn't installed, never publishes (`devkit`), or publishes
- * without a guide tree (`mcp-router` is not in DOCUMENTED_PACKAGES) leaves a
- * dead relative link — the same trade the guide trees already make for their
- * cross-framework links, and better than a `docs/` path that resolves nowhere.
- *
- * @param {string} contents - The map markdown as written in the monorepo
- * @returns {string} - The map as it ships inside the manager package
- */
-function rewriteMapLinks(contents) {
-  return contents.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (link, text, target) => {
-    if (target.startsWith('docs/shared/')) {
-      return `[${text}](${target.slice('docs/'.length)})`;
+  return contents.replace(LINK, (link, text, target) => {
+    if (NOT_A_PATH.test(target)) {
+      return link;
     }
-    if (target.startsWith(`docs/${PLUGIN_PACKAGE}/`)) {
-      return `[${text}](${target.slice(`docs/${PLUGIN_PACKAGE}/`.length)})`;
+    const hash = target.indexOf('#');
+    const bare = hash === -1 ? target : target.slice(0, hash);
+    const anchor = hash === -1 ? '' : target.slice(hash);
+    const resolved = path.posix.normalize(path.posix.join(fromDir, bare));
+
+    if (resolved === DOCS_DIR || resolved.startsWith(`${DOCS_DIR}/`)) {
+      return link;
     }
-    const sibling = target.match(/^docs\/([^/]+)\/(.+)$/);
-    if (sibling) {
-      return `[${text}](../../${sibling[1]}/docs/${sibling[2]})`;
+    let shipped = null;
+    if (resolved.startsWith('packages/')) {
+      shipped = resolved.slice('packages/'.length);
+    } else if (resolved === PLUGIN_SOURCE || resolved.startsWith(`${PLUGIN_SOURCE}/`)) {
+      shipped = path.posix.join(HOST_PACKAGE, PLUGIN_DIR, resolved.slice(PLUGIN_SOURCE.length));
     }
-    if (/^(packages|brands)\//.test(target)) {
+    if (shipped === null) {
       return text;
     }
-    return link;
+    return `[${text}](${path.posix.relative(shippedDir, shipped)}${anchor})`;
   });
 }
 
+// Every file under `dir`, as posix paths relative to it. Dotfiles (a stray
+// .DS_Store) are not docs.
+function listFiles(dir) {
+  if (jetpack.exists(dir) !== 'dir') {
+    return [];
+  }
+  return fs.readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+    .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'));
+}
+
 /**
- * Copy the monorepo docs (and, for the manager, the map and the Claude plugin)
- * into a publishable package.
+ * Make `<packageDir>/docs` match the monorepo's `docs/`: write only the files
+ * whose shipped content differs, remove the files the source no longer has,
+ * and prune the folders that removal empties.
+ *
+ * @param {object} options
+ * @param {string} options.monorepoRoot - The monorepo root holding `docs/`
+ * @param {string} options.packageDir - The manager package root to write into
+ * @param {boolean} [options.dryRun] - Report the same changes, write nothing
+ * @returns {{ written: string[], removed: string[] }} - Paths inside `docs/`
+ */
+function syncDocs({ monorepoRoot, packageDir, dryRun = false }) {
+  const sourceDir = path.join(monorepoRoot, DOCS_DIR);
+  if (jetpack.exists(sourceDir) !== 'dir') {
+    throw new Error(`[devkit vendor-docs] Missing docs source: ${sourceDir}`);
+  }
+  const destDir = path.join(packageDir, DOCS_DIR);
+  const sources = listFiles(sourceDir);
+  const written = [];
+
+  for (const relative of sources) {
+    const raw = fs.readFileSync(path.join(sourceDir, relative));
+    const content = relative.endsWith('.md') ? Buffer.from(rewriteDocLinks(raw.toString('utf8'), relative)) : raw;
+    const destination = path.join(destDir, relative);
+    if (jetpack.exists(destination) === 'file' && fs.readFileSync(destination).equals(content)) {
+      continue;
+    }
+    if (!dryRun) {
+      jetpack.write(destination, content);
+    }
+    written.push(relative);
+  }
+
+  const wanted = new Set(sources);
+  const removed = listFiles(destDir).filter((relative) => !wanted.has(relative));
+  if (!dryRun) {
+    for (const relative of removed) {
+      jetpack.remove(path.join(destDir, relative));
+      // A folder another prepare already pruned lists as undefined and ends the walk.
+      let dir = path.dirname(path.join(destDir, relative));
+      while (dir !== destDir && jetpack.list(dir)?.length === 0) {
+        jetpack.remove(dir);
+        dir = path.dirname(dir);
+      }
+    }
+  }
+
+  return { written, removed };
+}
+
+/**
+ * Vendor the docs and the Claude plugin into @omega.js/manager. Any other
+ * package is a no-op.
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - The package root (defaults to process.cwd())
  * @param {string} [options.monorepoRoot] - Monorepo root (test seam; resolved otherwise)
- * @returns {{ docs: string[], plugin: boolean }}
+ * @returns {{ docs: string[], removed: string[], plugin: boolean }}
  */
 function vendorDocs(options) {
   options = options || {};
@@ -124,78 +154,35 @@ function vendorDocs(options) {
   if (!hostPackage) {
     throw new Error(`[devkit vendor-docs] No package.json found in ${cwd}`);
   }
-
-  const short = (hostPackage.name || '').startsWith('@omega.js/')
-    ? hostPackage.name.slice('@omega.js/'.length)
-    : null;
-  if (!short || !DOCUMENTED_PACKAGES.includes(short)) {
-    return { docs: [], plugin: false };
+  if (hostPackage.name !== `@omega.js/${HOST_PACKAGE}`) {
+    return { docs: [], removed: [], plugin: false };
   }
 
   const monorepoRoot = options.monorepoRoot ? path.resolve(options.monorepoRoot) : resolveMonorepoRoot();
-  const guideDir = path.join(monorepoRoot, 'docs', short);
-  const sharedDir = path.join(monorepoRoot, 'docs', 'shared');
-  for (const source of [guideDir, sharedDir]) {
-    if (jetpack.exists(source) !== 'dir') {
-      throw new Error(`[devkit vendor-docs] Missing docs source for ${hostPackage.name}: ${source}`);
-    }
-  }
+  const { written, removed } = syncDocs({ monorepoRoot, packageDir: cwd });
 
-  const docsDir = path.join(cwd, 'docs');
-  const written = [];
+  // The plugin, whole: its hooks, skills and `.mcp.json` address themselves
+  // through CLAUDE_PLUGIN_ROOT, so nothing in the shipped copy reaches outside it.
+  jetpack.remove(path.join(cwd, PLUGIN_DIR));
+  jetpack.copy(path.join(monorepoRoot, PLUGIN_SOURCE), path.join(cwd, PLUGIN_DIR));
 
-  // The guide tree, flat into docs/ — every entry is generated, so each one is
-  // cleared first (a renamed source doc leaves no stale shipped copy).
-  for (const entry of jetpack.list(guideDir)) {
-    const source = path.join(guideDir, entry);
-    const destination = path.join(docsDir, entry);
-    jetpack.remove(destination);
-    if (jetpack.exists(source) === 'dir') {
-      jetpack.copy(source, destination);
-    } else {
-      jetpack.write(destination, rewriteGuideLinks(jetpack.read(source), short));
-    }
-    written.push(`docs/${entry}`);
-  }
+  // The root marketplace stays the SSOT for name/owner/description; only the
+  // source moves, from the monorepo path to the in-package one.
+  const marketplace = jetpack.read(path.join(monorepoRoot, MARKETPLACE_FILE), 'json');
+  marketplace.plugins = marketplace.plugins.map((entry) => (entry.source === `./${PLUGIN_SOURCE}`
+    ? { ...entry, source: `./${PLUGIN_DIR}` }
+    : entry));
+  jetpack.write(path.join(cwd, MARKETPLACE_FILE), `${JSON.stringify(marketplace, null, 2)}\n`);
 
-  // The shared contracts, verbatim — they are read as a set, not rewritten.
-  jetpack.remove(path.join(docsDir, 'shared'));
-  jetpack.copy(sharedDir, path.join(docsDir, 'shared'));
-  written.push('docs/shared/');
+  logger.log(`Vendored docs/ (${written.length} written, ${removed.length} removed) + the Claude plugin into ${hostPackage.name}`);
 
-  // The map and the Claude plugin ride along in the manager package: it is the
-  // one package every brand installs.
-  let plugin = false;
-  if (short === PLUGIN_PACKAGE) {
-    // The map — a published brand has no monorepo to link at, so the workspace
-    // service's scope symlink lands on THIS copy instead (#144).
-    jetpack.write(path.join(cwd, MAP_FILE), rewriteMapLinks(jetpack.read(path.join(monorepoRoot, MAP_SOURCE))));
-    written.push('docs/AGENTS.md');
-
-    // The plugin, whole — its hooks and skills address themselves through
-    // CLAUDE_PLUGIN_ROOT, and since #144 so does `.mcp.json`: it launches the
-    // in-plugin launcher, which node-resolves @omega.js/mcp-router from the
-    // install around it. Nothing in the shipped copy reaches outside itself.
-    jetpack.remove(path.join(cwd, PLUGIN_DIR));
-    jetpack.copy(path.join(monorepoRoot, PLUGIN_SOURCE), path.join(cwd, PLUGIN_DIR));
-
-    // The root marketplace stays the SSOT for name/owner/description — only the
-    // source moves, from the monorepo path to the in-package one.
-    const marketplace = jetpack.read(path.join(monorepoRoot, MARKETPLACE_FILE), 'json');
-    marketplace.plugins = marketplace.plugins.map((entry) => (entry.source === `./${PLUGIN_SOURCE}`
-      ? { ...entry, source: `./${PLUGIN_DIR}` }
-      : entry));
-    jetpack.write(path.join(cwd, MARKETPLACE_FILE), `${JSON.stringify(marketplace, null, 2)}\n`);
-    plugin = true;
-  }
-
-  logger.log(`Vendored ${written.length} docs path(s)${plugin ? ' + the Claude plugin' : ''} into ${hostPackage.name}`);
-
-  return { docs: written, plugin };
+  return { docs: written, removed, plugin: true };
 }
 
 module.exports = vendorDocs;
-module.exports.DOCUMENTED_PACKAGES = DOCUMENTED_PACKAGES;
+module.exports.syncDocs = syncDocs;
+module.exports.rewriteDocLinks = rewriteDocLinks;
+module.exports.HOST_PACKAGE = HOST_PACKAGE;
+module.exports.MAP_FILE = MAP_FILE;
 module.exports.PLUGIN_DIR = PLUGIN_DIR;
 module.exports.MARKETPLACE_FILE = MARKETPLACE_FILE;
-module.exports.MAP_FILE = MAP_FILE;

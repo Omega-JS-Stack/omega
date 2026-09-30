@@ -16,7 +16,7 @@
 // MANGLES quoted eval expressions (cross-env strips inner quotes), so a
 // pinned-port script must pass the port as a flag instead. Targets are
 // matched by URL substring (the main window is always `/views/main/`).
-// Full reference: docs/cdp-debugging.md.
+// Full reference: docs/desktop/cdp-debugging.md.
 
 const path = require('path');
 

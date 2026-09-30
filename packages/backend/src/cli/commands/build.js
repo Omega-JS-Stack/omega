@@ -13,6 +13,7 @@ class BuildCommand extends BaseCommand {
     const self = this.main;
 
     this.attachVerbLog('build');
+    this.runEnsureTarget();
 
     const { staged } = stageFunctions({ projectDir: self.firebaseProjectPath });
 

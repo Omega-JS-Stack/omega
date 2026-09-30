@@ -1,6 +1,6 @@
 # OMEGA Client (@omega.js/client)
 
-> **Note for contributors and Claude:** This file is the guide for `@omega.js/client` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (module APIs, patterns, behavior tables) lives in the package's own [`docs/<topic>.md`](../../packages/client/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
+> **Note for contributors and Claude:** This file is the guide for `@omega.js/client` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the map, `docs/omega.md`, is what every AGENTS.md imports, and only the manager ships the docs). The **meat** (module APIs, patterns, behavior tables) lives in the `docs/client/<topic>.md` files beside this guide. When extending or adding content, write it in the matching `docs/client/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
 ## Identity
 
@@ -64,7 +64,7 @@ The rest of `src/modules/` follows one rule:
 - **`FormManager` is a class constructed per form**, and receives the instance first: `new FormManager(omega, '#my-form', options)` (lightweight form state: initializing, ready, submitting).
 - **A pure helper stays a plain import by subpath**: `live-page` (the self-refreshing-page kit: `swap` writes a section only when its markup changed, `loading` is the first-paint spinner, `createFeedPoller` owns the declared feed table with its in-flight count and keep-last-good-on-failure rule, taking an `omega.request`-shaped fetcher as an argument), `vert-document` (the ONE vert unit document renderer, consumed by the verts module's promo lane and by `@omega.js/backend`'s serve route, [docs/web/ads-system.md](../web/ads-system.md)), `path-prefix`, `logger`, `icon-core`, `icon-renderer`.
 
-See [docs/architecture.md](../../packages/client/docs/architecture.md) for the directory structure and module dependency graph, and [docs/modules.md](../../packages/client/docs/modules.md) for the API reference of each module.
+See [docs/client/architecture.md](architecture.md) for the directory structure and module dependency graph, and [docs/client/modules.md](modules.md) for the API reference of each module.
 
 Pages built on this runtime follow the **page paint contract** ([docs/web/page-contract.md](../web/page-contract.md)): the client fills the `auth`, `usage`, `config` and `device` binding roots at auth settle so page code never hides its DOM waiting for a user, `bindings.update()` filters by root key so a spot that must wait for a server answer lives under a root the early paint does not publish, and `FormManager`'s `addGate()` / `resolveGate()` hold a form's submit controls disabled until every async answer it depends on has landed.
 
@@ -75,7 +75,7 @@ Each auth state change builds ONE state, `{ user, denied }`, before anything rea
 - `omega.auth.listen({ once: true }, (state) => { })` waits for the first landed state (`omega.auth.settled`), then fires once with the newest one.
 - `omega.auth.listen((state) => { })` fires on every landed state and returns the unsubscribe; registered after a state landed, it catches up with that state once.
 - `omega.auth.reload()` re-reads the account for the current Firebase user, lands it as a new state, and resolves with it.
-- Bindings read the live `User`, so `auth.user.plan`, `auth.user.active` and `auth.user.authenticated` resolve through its getters, and `auth.user.profile.displayName` reads the sign-in's profile. The full path list: [docs/bindings.md](../../packages/client/docs/bindings.md).
+- Bindings read the live `User`, so `auth.user.plan`, `auth.user.active` and `auth.user.authenticated` resolve through its getters, and `auth.user.profile.displayName` reads the sign-in's profile. The full path list: [docs/client/bindings.md](bindings.md).
 
 ### The init contract: one call, one blob, one mapping
 
@@ -201,7 +201,7 @@ Web's `data-shell-toggle` / `data-shell-dismiss` are NOT triggers — they are @
 - **Template strings** — use backticks for string interpolation.
 - **DO NOT modify `_legacy/`** — reference only, frozen for historical context.
 - **No backwards compatibility** unless explicitly requested — just change to the new way.
-- **Early-return / short-circuit** style throughout — see [docs/code-patterns.md](../../packages/client/docs/code-patterns.md) for the full code-pattern checklist (`$`-prefixed DOM vars, operators at start of continuation lines, Firestore path syntax, dynamic imports, config deep-merge, event delegation).
+- **Early-return / short-circuit** style throughout — see [docs/client/code-patterns.md](code-patterns.md) for the full code-pattern checklist (`$`-prefixed DOM vars, operators at start of continuation lines, Firestore path syntax, dynamic imports, config deep-merge, event delegation).
 
 ## Doc-update parity
 
@@ -209,23 +209,23 @@ Whenever you make a behavioral change (new module, new method, new pattern, remo
 
 1. **`README.md`** — user-facing summary
 2. **`docs/client/index.md`** (this file) — architecture overview, one paragraph or cross-link
-3. **`docs/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
+3. **`docs/client/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
 4. **`CHANGELOG.md`** — if the project keeps one
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED** — this guide follows the library subset of that skeleton (the scaffolding frameworks [web](../web/index.md), [backend](../backend/index.md), [desktop](../desktop/index.md), and [extension](../extension/index.md) carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sibling guides.
+**The four framework guides are structurally MIRRORED** — this guide follows the library subset of that skeleton (the scaffolding frameworks [web](../web/index.md), [backend](../backend/index.md), [desktop](../desktop/index.md), and [extension](../extension/index.md) carry the full skeleton). Never add, rename, or reorder a section here without checking the sibling guides.
 
 ## Documentation
 
-Deep references live in `docs/`. Treat docs as a first-class deliverable. **Whenever you make a behavioral change, update both this overview AND the relevant `docs/*.md` deep reference.**
+Deep references live in `docs/client/`, beside this guide. Treat docs as a first-class deliverable. **Whenever you make a behavioral change, update both this overview AND the relevant `docs/client/*.md` deep reference.**
 
-- [docs/architecture.md](../../packages/client/docs/architecture.md): the base class and its hosts, directory structure, module dependency graph
-- [docs/code-patterns.md](../../packages/client/docs/code-patterns.md) — early returns, `$`-prefixed DOM vars, logical operator placement, Firestore path syntax, dynamic imports, config deep-merge, event delegation
-- [docs/modules.md](../../packages/client/docs/modules.md): full module quick reference (Storage, Auth + `auth.user` + one state per auth change, Bindings, Firestore, Notifications, ServiceWorker, Sentry, DOM, Utilities)
-- [docs/bindings.md](../../packages/client/docs/bindings.md) — `data-omega-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
-- [docs/build-system.md](../../packages/client/docs/build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
-- [docs/testing.md](../../packages/client/docs/testing.md) — Mocha test setup
-- [docs/cdp-debugging.md](../../packages/client/docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omega.js/client inside a consuming site
-- [docs/common-tasks.md](../../packages/client/docs/common-tasks.md) — adding a utility, adding a module, modifying config defaults, payment config (OMEGA SSOT shape), adding a binding action
-- [docs/dependencies.md](../../packages/client/docs/dependencies.md) — dependencies table + important notes (no TypeScript, prefer fs-jetpack, no backwards-compat requirement, etc.)
+- [docs/client/architecture.md](architecture.md): the base class and its hosts, directory structure, module dependency graph
+- [docs/client/code-patterns.md](code-patterns.md) — early returns, `$`-prefixed DOM vars, logical operator placement, Firestore path syntax, dynamic imports, config deep-merge, event delegation
+- [docs/client/modules.md](modules.md): full module quick reference (Storage, Auth + `auth.user` + one state per auth change, Bindings, Firestore, Notifications, ServiceWorker, Sentry, DOM, Utilities)
+- [docs/client/bindings.md](bindings.md) — `data-omega-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
+- [docs/client/build-system.md](build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
+- [docs/client/testing.md](testing.md) — Mocha test setup
+- [docs/client/cdp-debugging.md](cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omega.js/client inside a consuming site
+- [docs/client/common-tasks.md](common-tasks.md) — adding a utility, adding a module, modifying config defaults, payment config (OMEGA SSOT shape), adding a binding action
+- [docs/client/dependencies.md](dependencies.md) — dependencies table + important notes (no TypeScript, prefer fs-jetpack, no backwards-compat requirement, etc.)

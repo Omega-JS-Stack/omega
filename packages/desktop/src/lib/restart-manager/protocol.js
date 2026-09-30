@@ -29,7 +29,7 @@
 // storage-persisted, so they survive the update relaunch). @omega.js/desktop's lib only ever
 // installs RM when it's missing.
 //
-// Full reference: docs/restart-manager.md.
+// Full reference: docs/desktop/restart-manager.md.
 
 const path = require('path');
 

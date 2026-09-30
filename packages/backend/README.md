@@ -247,7 +247,7 @@ module.exports = ({ user, body, query, path, method, headers, geolocation }) => 
 | `value` | `any` | A forced value the caller cannot set |
 | `sanitize` | `false` | Keep the field's HTML when the route opts in to the HTML strip |
 
-The full example and the split kinds: [docs/schemas.md](docs/schemas.md).
+The full example and the split kinds: [docs/backend/schemas.md](../../docs/backend/schemas.md).
 
 ### Pipeline Options
 
@@ -362,7 +362,7 @@ Built-in marketing system with multi-provider support (SendGrid + Beehiiv + FCM 
 - **Contact pruning** — monthly 2-stage re-engagement + deletion of inactive contacts
 - **Template variables** — `{brand.name}`, `{holiday.name}`, `{season.name}`, `{date.*}` resolved at send time
 
-Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See [docs/marketing-campaigns.md](docs/marketing-campaigns.md) and [docs/marketing-fields.md](docs/marketing-fields.md) for full documentation.
+Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See [docs/backend/marketing-campaigns.md](../../docs/backend/marketing-campaigns.md) and [docs/backend/marketing-fields.md](../../docs/backend/marketing-fields.md) for full documentation.
 
 ## Marketing Consent
 
@@ -377,7 +377,7 @@ GDPR/CASL-compliant consent capture and cross-provider unsubscribe sync.
 - **Parent forwarder** — single public webhook endpoint (`/marketing/webhook/forward`) on the parent @omega.js/backend fans out to every brand's child @omega.js/backend so each one updates its own Firestore
 - **Library-level consent gate** — `email.add()` and `email.sync()` skip users whose `consent.marketing.status === 'revoked'` (covers every call site: payment syncs, admin re-syncs, newsletter form); admin contact DELETE mirrors `revoked` back to the user doc so removals stick
 
-See [docs/consent.md](docs/consent.md) for the full architecture, source enum reference, migration script template, and provider configuration steps.
+See [docs/backend/consent.md](../../docs/backend/consent.md) for the full architecture, source enum reference, migration script template, and provider configuration steps.
 
 ## Context and Services
 
@@ -510,7 +510,7 @@ usage.addWhitelistKeys(['another-key']);
 await usage.forKey(ctx.request.geolocation.ip).consume('signups', 1, { limit: 5 });
 ```
 
-A feature is defined ONCE in the top-level `features` catalog (name, icon, definition, and the `usage` block that meters it); each product names only its VALUE. Mirrors are declared there too — no call-site mirror API. Full reference: [docs/usage-rate-limiting.md](docs/usage-rate-limiting.md).
+A feature is defined ONCE in the top-level `features` catalog (name, icon, definition, and the `usage` block that meters it); each product names only its VALUE. Mirrors are declared there too — no call-site mirror API. Full reference: [docs/backend/usage-rate-limiting.md](../../docs/backend/usage-rate-limiting.md).
 
 ### The Request Pipeline
 
@@ -528,7 +528,7 @@ Every request (the built-in `omega_api`, your own function through `omega.routes
 
 ### Settings
 
-The pipeline's validation step: it loads `schemas/{name}/{method}.js` (else `index.js`), calls it with `{ user, body, query, path, method, headers, geolocation }`, and validates the input into `ctx.data`. Full contract: [docs/schemas.md](docs/schemas.md).
+The pipeline's validation step: it loads `schemas/{name}/{method}.js` (else `index.js`), calls it with `{ user, body, query, path, method, headers, geolocation }`, and validates the input into `ctx.data`. Full contract: [docs/backend/schemas.md](../../docs/backend/schemas.md).
 
 ### Utilities
 
@@ -734,7 +734,7 @@ npx omega test      # Terminal 2 - runs tests
 npx omega test
 ```
 
-`npx omega emulator` **seeds the test personas on boot** (same wipe-and-create pass the test runner uses), so an emulator-connected dev site is signin-able immediately — any persona email + the deterministic `TEST_ACCOUNT_PASSWORD` (`omega-test-password`). Pass `--no-seed` to boot without seeding. Seeding is non-fatal: if it fails (e.g. missing config), the emulator keeps running. See [docs/test-framework.md](docs/test-framework.md#personas-n6).
+`npx omega emulator` **seeds the test personas on boot** (same wipe-and-create pass the test runner uses), so an emulator-connected dev site is signin-able immediately — any persona email + the deterministic `TEST_ACCOUNT_PASSWORD` (`omega-test-password`). Pass `--no-seed` to boot without seeding. Seeding is non-fatal: if it fails (e.g. missing config), the emulator keeps running. See [docs/backend/test-framework.md](../../docs/backend/test-framework.md#personas-n6).
 
 **Ports auto-allocate (N7)**: boot resolves each emulator port from firebase.json, bumping +1 when taken — so a second brand's emulator runs ALONGSIDE the first instead of killing it (bumped runs boot via a generated, gitignored `firebase.resolved.json`; the committed firebase.json never changes). The resolved map publishes to `.temp/ports.json` (sibling processes — `omega test` reads it automatically) and `OMEGA_<NAME>_PORT` env (URL getters). Pin a port explicitly with the config `ports` section — pins never bump (busy pin = hard error). Single-brand dev on free defaults behaves exactly as before. `mgr serve` and `mgr emulator` allocate the same way (`--port` pins) and publish `https` (the mkcert proxy on the public port) + `hosting` (the internal plain-http port) so siblings — including `omega dev`'s page chrome — follow even a bumped run; Stripe forwarding targets the resolved plain-http port. Plain-http requests to the public port get a 307 redirect to https (typing `http://localhost:5002` lands in the right place). Pass `--no-https` (or run without mkcert installed) for plain http on the public port; the emulator an `omega test` run auto-starts is always plain.
 
@@ -752,7 +752,7 @@ TEST_EXTENDED_MODE=true npx omega test ...    # identical — the env-var form
 npx omega test ...                            # normal mode (next run flips back)
 ```
 
-See [docs/test-framework.md](docs/test-framework.md#extended-mode-test_extended_mode) for the full mechanism.
+See [docs/backend/test-framework.md](../../docs/backend/test-framework.md#extended-mode-test_extended_mode) for the full mechanism.
 
 ### Filtering Tests
 
@@ -855,7 +855,7 @@ module.exports = {
 
 **Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`
 
-See [docs/test-framework.md](docs/test-framework.md) for complete test API documentation.
+See [docs/backend/test-framework.md](../../docs/backend/test-framework.md) for complete test API documentation.
 
 ## Subscription System
 

@@ -116,7 +116,7 @@ class Usage {
    * anonymous store by a caller that only meant to rate-limit by address.
    *
    * Keyed counters are day-only in practice: the reset cron wipes the whole
-   * anonymous store every day (docs/usage-rate-limiting.md).
+   * anonymous store every day (docs/backend/usage-rate-limiting.md).
    *
    * @param {string} key - The key to count against
    * @returns {Usage} A new counter bound to that key

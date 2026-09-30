@@ -6,7 +6,7 @@
  *
  * Run: npx omega test backend:helpers/environment
  *
- * Contract (see docs/environment-detection.md):
+ * Contract (see docs/backend/environment-detection.md):
  *   - getEnvironment() is @omega.js/config's, the ONE environment module every
  *     OMEGA target answers from ([#817](https://github.com/Omega-JS-Stack/omega/issues/817)).
  *     It reads ONE input, `OMEGA_ENVIRONMENT`, which this backend's boot sets

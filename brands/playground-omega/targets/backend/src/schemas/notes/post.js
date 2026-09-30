@@ -1,6 +1,6 @@
 /**
  * Surface: schema, POST /notes (a required field, and an id the caller cannot set)
- * Doc: node_modules/@omega.js/backend/docs/schemas.md
+ * Doc: node_modules/@omega.js/manager/docs/backend/schemas.md
  */
 const omega = require('@omega.js/backend');
 

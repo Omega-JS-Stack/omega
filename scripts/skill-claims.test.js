@@ -162,11 +162,12 @@ function checkSkill(skill, source, surface) {
 
   for (const raw of matchAll(source, PATTERNS.consumerPath)) {
     if (isPlaceholder(raw)) continue;
-    // The scope path `node_modules/@omega.js/AGENTS.md` is the maintained
-    // symlink at the repo-root map — no package segment to translate.
-    const claimed = stripTrailing(raw) === 'node_modules/@omega.js/AGENTS.md'
-      ? 'AGENTS.md'
-      : stripTrailing(raw).replace('node_modules/@omega.js/', 'packages/');
+    // The manager ships the monorepo's docs/ tree whole, so a path into its
+    // docs/ checks against docs/ itself.
+    const consumer = stripTrailing(raw);
+    const claimed = consumer.startsWith('node_modules/@omega.js/manager/docs/')
+      ? consumer.slice('node_modules/@omega.js/manager/'.length)
+      : consumer.replace('node_modules/@omega.js/', 'packages/');
     if (!pathExists(claimed)) report('consumer path', stripTrailing(raw), `does not resolve to ${claimed}`);
   }
 

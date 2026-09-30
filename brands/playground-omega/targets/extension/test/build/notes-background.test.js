@@ -7,7 +7,7 @@
  * message is handed to it exactly as the browser would hand it.
  *
  * Two narrow stubs, each a dependency a build-layer run cannot provide
- * (docs/test-framework.md, exception 2): background's `omega.request` (a real
+ * (@omega.js/manager/docs/extension/test-framework.md, exception 2): background's `omega.request` (a real
  * call is an extended-mode concern and needs a signed-in session), and
  * background's auth and action badge (they exist only inside a service worker). The boot layer
  * covers the wired path in the real packaged extension

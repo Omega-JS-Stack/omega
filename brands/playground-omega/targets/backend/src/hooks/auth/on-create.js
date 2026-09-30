@@ -1,6 +1,6 @@
 /**
  * Surface: auth hook, on-create (non-blocking: seeds the new user's first note)
- * Doc: node_modules/@omega.js/backend/docs/auth-hooks.md
+ * Doc: node_modules/@omega.js/manager/docs/backend/auth-hooks.md
  */
 const WELCOME_TEXT = 'Welcome to the playground';
 

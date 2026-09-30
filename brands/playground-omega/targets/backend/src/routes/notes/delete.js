@@ -1,6 +1,6 @@
 /**
  * Surface: route, DELETE /notes (delete one note by data.id, owner only)
- * Doc: node_modules/@omega.js/backend/docs/routes.md
+ * Doc: node_modules/@omega.js/manager/docs/backend/routes.md
  */
 module.exports = async ({ ctx, omega, user, data }) => {
   if (!user.authenticated) {

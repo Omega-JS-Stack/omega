@@ -1,51 +1,51 @@
 /**
- * Ensure the brand agent-docs chain (Ian 2026-07-20): root AGENTS.md opens
- * with the framework-guide import, and the scope link resolves it. Consumer
- * content is preserved.
+ * Ensure the brand agent-docs chain: root AGENTS.md imports the manager in its
+ * Default section and the retired scope link is gone. The Custom section is
+ * preserved.
  */
 const chalk = require('chalk').default;
 
-const { ensureAgentsMd, ensureGuideLink, IMPORT_LINE } = require('../../../lib/agents-md.js');
+const { ensureAgentsMd, removeRetiredLink, IMPORT_LINE, RETIRED_SUBPATH } = require('@omega.js/devkit/agents-md');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 /**
  * Print one item's line and return the verdict the output records: under a
- * dry run, a change the real run would make prints as its plan instead.
+ * dry run, a change the real run would make prints as its plan instead. A
+ * verdict with no label prints nothing.
  */
 function settle(verdict, labels, plans, dryRun) {
   if (dryRun && plans[verdict]) {
     dryRunPlan(plans[verdict]);
     return 'planned';
   }
-  console.log(`      ${chalk.green('✓')} ${labels[verdict]}`);
+  if (labels[verdict]) {
+    console.log(`      ${chalk.green('✓')} ${labels[verdict]}`);
+  }
   return verdict;
 }
 
-module.exports = async ({ brandRoot, brand, options = {} }) => {
-  const brandName = brand.config?.brand?.name || brand.id;
+module.exports = async ({ brandRoot, options = {} }) => {
   const dryRun = options.dryRun || false;
 
-  const guide = settle(ensureGuideLink(brandRoot, { dryRun }), {
-    present: 'node_modules/@omega.js/AGENTS.md links the framework map',
-    created: 'Linked node_modules/@omega.js/AGENTS.md at the framework map',
-    healed: 'Relinked node_modules/@omega.js/AGENTS.md at the framework map',
-    skipped: 'No resolvable framework map yet (pre-install) — link skipped',
+  const link = settle(removeRetiredLink(brandRoot, { dryRun }), {
+    removed: `Removed the retired ${RETIRED_SUBPATH} link`,
   }, {
-    created: 'link node_modules/@omega.js/AGENTS.md at the framework map',
-    healed: 'relink node_modules/@omega.js/AGENTS.md at the framework map',
+    removed: `remove the retired ${RETIRED_SUBPATH} link`,
   }, dryRun);
 
-  const agents = settle(ensureAgentsMd(brandRoot, brandName, { dryRun }), {
-    present: `AGENTS.md imports the framework guide (${IMPORT_LINE})`,
-    created: 'Created AGENTS.md with the framework-guide import',
-    healed: 'Healed AGENTS.md — framework-guide import moved to line 1 (your content preserved)',
+  const agents = settle(ensureAgentsMd(brandRoot, { dryRun }), {
+    present: `AGENTS.md imports the omega map (${IMPORT_LINE})`,
+    created: 'Created AGENTS.md with the omega map import',
+    healed: 'Healed AGENTS.md: the Default section imports the omega map (your Custom section preserved)',
+    converged: 'Converged AGENTS.md to the marker sections: the omega map import under Default, your notes under Custom',
   }, {
-    created: 'create AGENTS.md with the framework-guide import',
-    healed: 'move the framework-guide import to line 1 of AGENTS.md',
+    created: 'create AGENTS.md with the omega map import',
+    healed: 'heal the omega map import in the Default section of AGENTS.md',
+    converged: 'converge AGENTS.md to the marker sections: the omega map import under Default, your notes under Custom',
   }, dryRun);
 
-  if (agents === 'present' && (guide === 'present' || guide === 'skipped')) {
+  if (agents === 'present' && link === 'absent') {
     return null;
   }
-  return { output: { guide, agents } };
+  return { output: { link, agents } };
 };

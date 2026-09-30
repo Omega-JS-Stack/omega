@@ -1,6 +1,6 @@
 /**
  * Surface: a page module, bound to /notes by its asset key (js/pages/notes.js)
- * Doc: node_modules/@omega.js/web/docs/index.md (The consumer entry)
+ * Doc: node_modules/@omega.js/manager/docs/web/index.md (The consumer entry)
  *
  * What it consumes, one of each: FormManager for the composer, omega.request()
  * against the backend's /notes routes (GET, POST, DELETE, its own function),

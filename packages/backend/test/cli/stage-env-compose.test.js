@@ -14,6 +14,7 @@
  *
  * Run: npx omega test backend:cli/stage-env-compose
  */
+const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -112,6 +113,30 @@ module.exports = defineCases({
           assert.equal(env.ANTHROPIC_API_KEY, 'company-anthropic', 'the company layer fills the gaps');
           assert.equal(env.GOOGLE_ANALYTICS_SECRET, 'brand-stream', "the backend's own GA4 stream secret arrives renamed");
           assert.equal(env.CHROME_CLIENT_ID, undefined, 'a key the schema names for the extension only never joins the functions upload');
+        } finally {
+          jetpack.remove(root);
+        }
+      },
+    },
+
+    {
+      name: 'a-value-firebase-would-decode-differently-is-refused-before-dist-env-is-written',
+      auth: 'none',
+
+      // Firebase's own .env reader turns the `\t` in C:\temp into a tab, so
+      // the stage refuses the value by key, and the wipe before it means no
+      // dist/.env is left on disk at all.
+      async run() {
+        const { root, targetDir } = seedBrand({ targetEnv: 'X="C:\\temp"\nSAFE_KEY="plain"\n' });
+
+        try {
+          assert.throws(
+            () => stageFunctions({ projectDir: targetDir }),
+            (error) => /\bX\b/.test(error.message)
+              && !error.message.includes('C:\\temp')
+              && !error.message.includes('SAFE_KEY'),
+          );
+          assert.equal(jetpack.exists(path.join(targetDir, 'dist', '.env')), false, 'the refused stage must not write dist/.env');
         } finally {
           jetpack.remove(root);
         }

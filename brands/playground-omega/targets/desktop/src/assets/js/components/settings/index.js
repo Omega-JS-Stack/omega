@@ -1,6 +1,6 @@
 /**
  * Surface: the settings window's renderer (opened from the Preferences menu item)
- * Doc: node_modules/@omega.js/desktop/docs/storage.md
+ * Doc: node_modules/@omega.js/manager/docs/desktop/storage.md
  *
  * One setting, notes.confirmDelete, in omega.storage: the PAGE store, which
  * every window of this app shares and the main window reads at delete time.

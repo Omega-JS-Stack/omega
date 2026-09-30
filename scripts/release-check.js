@@ -121,24 +121,25 @@ function scanInstalledTree(dir) {
 }
 
 /**
- * Lockstep check (#794) — every publishable's package.json version is the
- * SAME number. Reads the manifests, never the packed tarballs: the whole
- * family releases together, so a differing version is a broken release
- * before anything is packed.
+ * Lockstep check: the root package.json and every publishable carry the SAME
+ * version, the one the `chore(release)` commit sets by hand. Reads the
+ * manifests, never the packed tarballs, so an off version fails before
+ * anything is packed.
+ * @param {string} [root] - the monorepo root to read
  * @returns {{ ok: boolean, detail: string }}
  */
-function checkLockstepVersions() {
-  const versions = PUBLISHABLES.map((name) => ({
-    name,
-    version: JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', name, 'package.json'), 'utf8')).version,
-  }));
-  const distinct = [...new Set(versions.map((entry) => entry.version))];
+function checkLockstepVersions(root = ROOT) {
+  const read = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version;
+  const family = read(root);
+  const off = PUBLISHABLES
+    .map((name) => ({ name, version: read(path.join(root, 'packages', name)) }))
+    .filter((entry) => entry.version !== family);
 
-  if (distinct.length === 1) {
-    return { ok: true, detail: distinct[0] };
+  if (off.length === 0) {
+    return { ok: true, detail: family };
   }
 
-  return { ok: false, detail: versions.map((entry) => `${entry.name} ${entry.version}`).join(', ') };
+  return { ok: false, detail: `root ${family}; ${off.map((entry) => `${entry.name} ${entry.version}`).join(', ')}` };
 }
 
 function main() {
@@ -268,6 +269,5 @@ if (require.main === module) {
   main();
 }
 
-// PUBLISHABLES is the one home of what publishes — the changeset lockstep
-// group is asserted against it (#794), never a second copy of the list.
+// PUBLISHABLES is the one home of what publishes; the lockstep test reads it.
 module.exports = { PUBLISHABLES, checkLockstepVersions };

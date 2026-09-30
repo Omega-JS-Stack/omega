@@ -208,8 +208,8 @@ test('account: custom tokens carry the Firebase audience and uid, signed by the 
 test('env-secret: writeEnvValue appends to a fresh .env and replaces in place on rerun', () => {
   const root = stageBrand();
 
-  // Writes are canonically ordered since cp137 (env-order.test.js owns the
-  // layout contract) — this test pins the value semantics only
+  // Writes converge onto the marker sections (env-order.test.js owns the
+  // layout contract): this test pins the value semantics only
   writeEnvValue(root, 'FIXTURE_SECRET', 'first');
   assert.match(jetpack.read(join(root, '.env')), /^FIXTURE_SECRET="first"$/m);
 

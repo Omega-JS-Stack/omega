@@ -8,6 +8,7 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const { template } = require('node-powertools');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 
@@ -63,15 +64,6 @@ const FILE_MAP = {
   // .env is an optional per-key override a HUMAN writes, and no machine writes a
   // target .env — so the template is gone.
   '_.gitignore': {
-    mergeLines: true,
-  },
-
-  // AGENTS.md carries the agent docs and uses the same marker-based merge as
-  // .gitignore.
-  // Must come AFTER `**/*.md` (which sets overwrite: false) — last-match-wins,
-  // so this rule's `mergeLines: true` activates the merge path even though the
-  // catch-all would otherwise skip.
-  'AGENTS.md': {
     mergeLines: true,
   },
 
@@ -199,12 +191,9 @@ function scaffoldDefaults(options) {
   const { values: composed } = composeTargetEnv({ targetDir: outputDir, target: 'extension', environment: 'production' });
   if (!seed.standalone) {
     fileMap['config/omega.json5'] = { skip: true };
-    // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home: per-target AGENTS.md/CHANGELOG.md/docs/
-    // never scaffold, and existing framework-owned-only copies are swept
-    // (retire rules; consumer content is never destroyed). Standalone projects
-    // keep them. Last-match-wins over the `**/*.md` preserve rule.
-    fileMap['AGENTS.md'] = { retire: true };
+    // In a brand the BRAND ROOT is the one doc home: per-target CHANGELOG.md
+    // and docs/ never scaffold, and framework-owned copies are swept (consumer
+    // content is kept). Last-match-wins over the `**/*.md` preserve rule.
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
     // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
@@ -229,6 +218,11 @@ function scaffoldDefaults(options) {
     transform: (contents, item) => renderInstallWorkspace(siteTokenTransform(contents, item, composed)),
     logger,
   });
+
+  // The project-root AGENTS.md, through devkit's one builder (never on a watcher pass).
+  if (!options.files) {
+    scaffoldAgentsMd({ outputDir, standalone: seed.standalone, result, logger });
+  }
 
   if (!seed.standalone) {
     composeTargetWorkflows({

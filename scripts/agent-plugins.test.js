@@ -221,7 +221,7 @@ test('inject: a brand root asks for main, manager, and one skill per target', ()
 test('inject: a brand injection names the framework map as required reading', () => {
   const dir = doneWhenBrand();
   const ctx = JSON.parse(inject(dir)).hookSpecificOutput.additionalContext;
-  assert.match(ctx, /node_modules\/@omega\.js\/AGENTS\.md/);
+  assert.match(ctx, /node_modules\/@omega\.js\/manager\/AGENTS\.md/);
   assert.match(ctx, /before/i, 'the pointer is required reading BEFORE the first edit');
   fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -3,7 +3,7 @@
  * whose `path` is the HTTP path as served (`/notes`, the consumer's own
  * function, never `/omega/notes`), and a handler tool (HTTP transport only)
  * that runs its code directly as the caller the MCP request resolved
- * Doc: node_modules/@omega.js/backend/docs/mcp.md (Consumer MCP Tools)
+ * Doc: node_modules/@omega.js/manager/docs/backend/mcp.md (Consumer MCP Tools)
  */
 module.exports = [
   {

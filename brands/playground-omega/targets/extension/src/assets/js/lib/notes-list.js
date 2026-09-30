@@ -2,7 +2,7 @@
  * Surface: a page context's notes UI (the sidepanel and the pages dashboard
  * both mount it): FormManager, omega.utilities.escapeHTML, and the messenger
  * round trip to background
- * Doc: node_modules/@omega.js/extension/docs/components.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/components.md
  */
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { askBackground } from './notes.js';

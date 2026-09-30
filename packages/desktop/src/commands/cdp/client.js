@@ -7,7 +7,7 @@
 // matcher instead of a "selected page"; the main window's document is always
 // at `dist/views/main/` (the MAIN_VIEW default matcher).
 //
-// See docs/cdp-debugging.md for the full toolkit reference.
+// See docs/desktop/cdp-debugging.md for the full toolkit reference.
 
 // The main window's view path — @omega.js/desktop's templating convention, so it holds for
 // every consumer. Subcommands that need "the app's main renderer" (status,

@@ -278,7 +278,7 @@ async function getInventory(omega, options) {
   const verts = [];
 
   try {
-    // Batch-read the collection (~500 cursor pagination per docs/firestore.md)
+    // Batch-read the collection (~500 cursor pagination per docs/backend/firestore.md)
     let lastDoc = null;
 
     while (true) {

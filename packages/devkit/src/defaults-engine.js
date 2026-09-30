@@ -1,40 +1,8 @@
-// applyDefaults(config) — the shared OMEGA defaults-scaffolding engine.
-//
-// Every framework ships a defaults tree (src/defaults/ → dist/defaults/) that
-// setup copies into the consumer project. This is the single plain-fs engine
-// every framework's scaffold runs.
-//
-// File-map rules: minimatch patterns (dot:true) matched against the RAW path
-// relative to defaultsDir, last-match-wins option merging. Per-rule options:
-//   overwrite  bool|fn(item)  default true — write even if the destination exists
-//   skip       bool|fn(item)  default false — never process this file
-//   name       fn(item)       rename the output file
-//   path       fn(item)       re-destination the output (relative dir)
-//   template   object         render `{{ key.path }}` tokens with this data
-//                             (tolerant: unknown keys survive verbatim, so GitHub
-//                             Actions' `${{ secrets.X }}` passes through)
-//   merge      bool           JSON5 defaults-merge with the existing file, written
-//                             through @omega.js/config's comment-preserving editor
-//                             (only the differing keys change; comments stay)
-//   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/AGENTS.md)
-//   retire     bool           brand-context per-target doc retirement: NEVER scaffold
-//                             the file; an existing framework-owned-only copy is
-//                             DELETED (one-time heal — the brand root is the doc
-//                             home), a copy carrying consumer content stays with a
-//                             loud move-it warning (never destroyed)
-//
-// Engine built-ins (not expressed in the file map):
-//   - `_.name` segments lose the leading `_` (dotfiles ship past npm's filter)
-//   - non-final segments starting `_` (but not `_.`) are ARCHIVE dirs — skipped
-//     (reference material that ships in the framework package, e.g. desktop's `_mas/`)
-//   - `.gitkeep` creates the destination directory, the file itself never copies
-//   - `.DS_Store` never copies
-//   - text writes are skipped when the destination is byte-identical (idempotent
-//     re-runs report zero writes)
-//   - a destination carrying the OMEGA section markers when the current template
-//     no longer does is a PRIOR-GENERATION generated file: framework-owned, so
-//     `retire` sweeps it and `overwrite: false` still heals it
-//   - binary files (by extension) copy verbatim — never templated/merged/transformed
+// applyDefaults(config): the ONE plain-fs defaults-scaffolding engine every
+// framework's scaffold runs, copying its defaults tree into the consumer
+// project. The file-map options (overwrite, skip, name, path, template, merge,
+// mergeLines, retire), the built-ins and the minimatch matching rules live in
+// docs/devkit/index.md.
 
 const path = require('path');
 const fs = require('fs');

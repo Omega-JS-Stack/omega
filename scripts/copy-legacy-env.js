@@ -18,15 +18,18 @@
  * and store publishes are still gated. Payment keys are NEVER copied —
  * live-mode payment stays gated by standing policy.
  *
- * Idempotent: keys already present in the destination are left alone
- * (--force replaces them in place). Entries are copied VERBATIM (raw
- * lines, quoted multi-line values included), appended under a dated
- * marker comment.
+ * Idempotent: a key the destination already sets to a non-empty value is
+ * left alone (--force replaces it in place). Every copied value is rewritten
+ * in the one KEY="value" form, on the key's own line or its `# KEY=""`
+ * placeholder, appended when the destination has neither.
  */
 
 // Libraries
 const fs = require('node:fs');
 const path = require('node:path');
+const dotenv = require('dotenv');
+const { envLine, assertEnvReadsBack } = require('@omega.js/config');
+const { setEnvLines } = require('@omega.js/devkit/env-lines');
 
 // Defaults
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -69,38 +72,6 @@ const KEY_GROUPS = {
   ],
 };
 
-const ENTRY_START = /^([A-Za-z_][A-Za-z0-9_]*)\s*=/;
-
-/**
- * Parse a .env file into entries: KEY → its verbatim raw block (the KEY=
- * line plus any continuation lines of a quoted multi-line value).
- *
- * @param {string} content - Raw .env file content.
- * @returns {Map<string, string>} Key → raw block (no trailing newline).
- */
-function parseEnvEntries(content) {
-  const entries = new Map();
-  let currentKey = null;
-
-  for (const line of String(content).split('\n')) {
-    const match = line.match(ENTRY_START);
-    if (match) {
-      currentKey = match[1];
-      entries.set(currentKey, line);
-      continue;
-    }
-    if (/^\s*(#|$)/.test(line)) {
-      currentKey = null;
-      continue;
-    }
-    if (currentKey) {
-      entries.set(currentKey, `${entries.get(currentKey)}\n${line}`);
-    }
-  }
-
-  return entries;
-}
-
 /**
  * Resolve the key list for this run: --only wins, otherwise core plus any
  * --include groups.
@@ -133,34 +104,32 @@ function selectKeys(args) {
  * @returns {{ content: string, actions: Array<{ key: string, action: 'copied'|'replaced'|'kept'|'missing' }>, changed: boolean }}
  */
 function planCopy(sourceContent, destContent, keys, options = {}) {
-  const source = parseEnvEntries(sourceContent);
-  const dest = parseEnvEntries(destContent);
+  const source = dotenv.parse(sourceContent);
+  const dest = dotenv.parse(destContent);
   const actions = [];
-  const additions = [];
-  let content = destContent;
+  const copied = {};
 
+  // An empty value never claims a key, the rule composeTargetEnv applies
   for (const key of keys) {
-    if (!source.has(key)) {
+    if (!source[key]) {
       actions.push({ key, action: 'missing' });
       continue;
     }
-    if (dest.has(key)) {
-      if (!options.force) {
-        actions.push({ key, action: 'kept' });
-        continue;
-      }
-      content = content.replace(dest.get(key), source.get(key));
-      actions.push({ key, action: 'replaced' });
+    if (dest[key] && !options.force) {
+      actions.push({ key, action: 'kept' });
       continue;
     }
-    additions.push(source.get(key));
-    actions.push({ key, action: 'copied' });
+    copied[key] = source[key];
+    actions.push({ key, action: dest[key] ? 'replaced' : 'copied' });
   }
 
-  if (additions.length > 0) {
-    const separator = content && !content.endsWith('\n') ? '\n' : '';
-    content = `${content}${separator}\n# ── copied from legacy omega-manager/.env (scripts/copy-legacy-env.js) ──\n${additions.join('\n')}\n`;
+  if (Object.keys(copied).length === 0) {
+    return { content: destContent, actions, changed: false };
   }
+
+  const lineFor = Object.fromEntries(Object.entries(copied).map(([key, value]) => [key, envLine(key, value)]));
+  const content = setEnvLines(destContent, lineFor);
+  assertEnvReadsBack(content, copied);
 
   return { content, actions, changed: content !== destContent };
 }
@@ -223,7 +192,7 @@ function main() {
   console.log(`Written. Values were never displayed — verify in your editor if needed.`);
 }
 
-module.exports = { KEY_GROUPS, parseEnvEntries, selectKeys, planCopy, parseArgs };
+module.exports = { KEY_GROUPS, selectKeys, planCopy, parseArgs };
 
 if (require.main === module) {
   main();

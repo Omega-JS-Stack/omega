@@ -12,14 +12,19 @@ logs/
 # OS
 .DS_Store
 
+# Package build output, rebuilt by prepare-package (a nested fixture dist stays tracked)
+packages/*/dist/
+
 # Build/runtime scratch
-# (packages/*/dist is NOT tracked: each package's own .gitignore ignores it, matching
-# framework-repo convention; prepare-package regenerates dist on install/pack/publish)
 .temp/
 .cache/
 .omega/
 # Per-run port-bumped emulator config (N7 auto-allocation)
 firebase.resolved.json
+
+# npm pack tarballs and the Firebase CLI's deploy cache
+*.tgz
+.firebase/
 
 _attic/
 

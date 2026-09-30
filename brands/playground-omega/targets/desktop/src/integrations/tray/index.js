@@ -1,5 +1,5 @@
 // Surface: the tray (a file-based definition), with one live item, "Notes: N"
-// Doc: node_modules/@omega.js/desktop/docs/tray.md
+// Doc: node_modules/@omega.js/manager/docs/desktop/tray.md
 //
 // Tray definition. Called by @omega.js/desktop during boot.
 //

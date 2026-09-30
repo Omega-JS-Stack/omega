@@ -61,7 +61,7 @@ const BACKEND = [
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: "Overrides the consumer auth URL the backend's MCP OAuth flow sends a client to; unset derives `<website url>/token` (packages/backend/docs/mcp.md).",
+    description: "Overrides the consumer auth URL the backend's MCP OAuth flow sends a client to; unset derives `<website url>/token` (docs/backend/mcp.md).",
   },
 ];
 

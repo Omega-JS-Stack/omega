@@ -31,6 +31,7 @@
 // The list. Order is the boot order.
 const PRELUDES = [
   require('./origin-heal.js'),
+  require('./docs-sync.js'),
 ];
 
 /**

@@ -2,7 +2,7 @@
  * Test: the documented cron job actually RUNS
  * ([#495](https://github.com/Omega-JS-Stack/omega/issues/495)).
  *
- * `docs/routes.md` § "New Cron Job (Consumer Project)" documented a
+ * `docs/backend/routes.md` § "New Cron Job (Consumer Project)" documented a
  * `Job.prototype.main` constructor shape, but the runner does
  * `await handler({ ctx, omega, context })` — a job written to the
  * doc was called as a plain function, its body never ran, and nothing errored.
@@ -21,8 +21,9 @@ const jetpack = require('fs-jetpack');
 
 const { loadAndExecuteJobs } = require('../../dist/omega/cron.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
+const { frameworkDoc } = require('../helpers/_framework-doc.js');
 
-const ROUTES_DOC = path.join(__dirname, '..', '..', 'docs', 'routes.md');
+const ROUTES_DOC = frameworkDoc('backend', 'routes.md');
 const HEADING = '## New Cron Job (Consumer Project)';
 
 // The line the documented job logs when its body runs.
@@ -34,7 +35,7 @@ function documentedCronJob() {
   const heading = doc.indexOf(HEADING);
 
   if (heading === -1) {
-    throw new Error(`docs/routes.md no longer carries "${HEADING}" — the consumer cron recipe must stay documented`);
+    throw new Error(`docs/backend/routes.md no longer carries "${HEADING}" — the consumer cron recipe must stay documented`);
   }
 
   const fence = doc.indexOf('```javascript', heading);

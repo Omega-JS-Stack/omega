@@ -434,34 +434,53 @@ function composeTargetEnv({ targetDir, target, environment = envEnvironment() })
 }
 
 /**
- * Serialize one value as a double-quoted .env line — the serializer SSOT every
- * writeback rides (this composer, the manager's brand .env writeback and
- * scaffold stub). Backslashes, quotes and newlines escape so a multi-line blob
- * stays line-safe (dotenv expands `\n` back on read).
+ * Throw unless dotenv reads every given value back from `content` exactly as
+ * given. The error names the keys, never a value.
+ *
+ * @param {string} content - .env content holding the written lines.
+ * @param {Object<string, string>} values - The values those lines must carry.
+ */
+function assertEnvReadsBack(content, values) {
+  const parsed = require('dotenv').parse(content);
+  const changed = Object.keys(values).filter((key) => parsed[key] !== String(values[key]));
+  if (changed.length === 0) return;
+
+  throw new Error(`.env: the value of ${changed.join(', ')} would not read back unchanged from KEY="value" (dotenv expands a literal \\n or \\r, a quote followed by # ends the value, and a trailing backslash can run into the next line)`);
+}
+
+/**
+ * Serialize one value as a double-quoted .env line, the serializer SSOT every
+ * writeback rides. The value goes in raw (dotenv reads `"`, `\`, `'`, `#` back
+ * unchanged); a real newline or carriage return becomes `\n` / `\r`, which
+ * dotenv expands back. A value dotenv would read back changed, such as a
+ * literal backslash-n or backslash-r, throws naming the key only.
  *
  * @param {string} key - Env var name.
  * @param {string} value - Value to serialize.
  * @returns {string} `KEY="value"`.
  */
 function envLine(key, value) {
-  const escaped = String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n');
+  const raw = String(value).replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  const line = `${key}="${raw}"`;
+  assertEnvReadsBack(line, { [key]: value });
 
-  return `${key}="${escaped}"`;
+  return line;
 }
 
 /**
- * Serialize composed values as .env content — one envLine per key.
+ * Serialize composed values as .env content, one envLine per key. The whole
+ * file is judged too: a value ending in a backslash can carry dotenv's read
+ * into the next line, which no single line shows.
  *
  * @param {Object<string, string>} values
  * @returns {string} The file content, newline-terminated.
  */
 function serializeEnv(values) {
   const lines = Object.entries(values).map(([key, value]) => envLine(key, value));
+  const content = `${lines.join('\n')}\n`;
+  assertEnvReadsBack(content, values);
 
-  return `${lines.join('\n')}\n`;
+  return content;
 }
 
-module.exports = { loadEnv, reloadEnv, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv };
+module.exports = { loadEnv, reloadEnv, ENV_ENVIRONMENTS, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv };

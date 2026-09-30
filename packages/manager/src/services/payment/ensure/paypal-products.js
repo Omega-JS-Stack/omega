@@ -31,7 +31,7 @@ const FREQUENCY_TO_INTERVAL = {
 // PayPal Developer Dashboard → Sandbox → Accounts (the only surface that mints
 // a sandbox buyer) and the drive runbook that documents the hoops
 const SANDBOX_ACCOUNTS_URL = 'https://developer.paypal.com/dashboard/accounts';
-const SANDBOX_QA_RUNBOOK = '@omega.js/backend/docs/paypal-sandbox-qa.md';
+const SANDBOX_QA_RUNBOOK = '@omega.js/manager/docs/backend/paypal-sandbox-qa.md';
 
 /**
  * Build desired catalog-product details from brand/product config

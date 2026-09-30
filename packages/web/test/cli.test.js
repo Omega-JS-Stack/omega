@@ -103,9 +103,11 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   // .env is an optional per-key override a HUMAN writes, and no machine writes one.
   assert.ok(!fs.existsSync(path.join(root, '.env')), 'no target .env is scaffolded');
 
-  // AGENTS.md carries the content; Claude Code reads it natively, so no
-  // CLAUDE.md scaffolds beside it.
-  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /node_modules\/@omega\.js\/AGENTS\.md/, 'AGENTS.md points at the OMEGA map');
+  // A standalone project root gets the same AGENTS.md a brand root does: the
+  // manager import under Default, its own notes under Custom. Claude Code reads AGENTS.md
+  // natively, so no CLAUDE.md scaffolds beside it.
+  assert.strictEqual(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), '<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\n', 'no generated heading');
+  assert.deepStrictEqual(result.written.filter((file) => file === 'AGENTS.md'), ['AGENTS.md'], 'the write is recorded');
   assert.ok(!fs.existsSync(path.join(root, 'CLAUDE.md')), 'a fresh scaffold writes no CLAUDE.md');
   assert.strictEqual(fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim(), `v${NODE_VERSION}`, '.nvmrc templated');
 
@@ -149,10 +151,12 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   // optional per-key override that is the only way a target .env exists (#678).
   fs.writeFileSync(path.join(root, '.env'), 'MY_CUSTOM_KEY="hello"\n');
   fs.appendFileSync(path.join(root, '.gitignore'), '/my-custom-dir\n');
+  fs.appendFileSync(path.join(root, '.gitattributes'), '*.psd binary\n');
 
   const second = scaffoldDefaults({ outputDir: root, logger: quiet });
   assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), 'the hand-written .env is never touched');
   assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('/my-custom-dir'), '.gitignore custom preserved');
+  assert.ok(fs.readFileSync(path.join(root, '.gitattributes'), 'utf8').endsWith('# ========== Custom Values ==========\n*.psd binary\n'), '.gitattributes custom preserved');
   // The CI secrets block is the schema's set PLUS what only the composed .env
   // can name (#835): a key the schema never declared is the consumer's own,
   // their workflow step is the only thing that reads it, and it used to fail
@@ -171,6 +175,32 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   scaffoldDefaults({ outputDir: root, logger: quiet });
   const third = scaffoldDefaults({ outputDir: root, logger: quiet });
   assert.strictEqual(third.written.length + third.merged.length, 0, 'fully idempotent');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('scaffold: a pre-marker .gitattributes and the old .gitignore boilerplate converge, consumer lines kept', () => {
+  const root = tmpConsumer();
+  const scaffoldDir = path.join(__dirname, '..', 'scaffold');
+  const template = fs.readFileSync(path.join(scaffoldDir, '_.gitignore'), 'utf8');
+  const withCustom = (custom) => template.replace(/# ========== Custom Values ==========\n$/, `# ========== Custom Values ==========\n${custom}`);
+  const oldAttributes = fs.readFileSync(path.join(scaffoldDir, '_.gitattributes'), 'utf8')
+    .split('\n').filter((line) => !line.includes('==========')).join('\n').trim();
+  fs.writeFileSync(path.join(root, '.gitattributes'), `${oldAttributes}\n*.psd binary\n`);
+  fs.writeFileSync(path.join(root, '.gitignore'), withCustom('# Add your custom ignore patterns below this line\n# ...\n'));
+
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  const attributes = fs.readFileSync(path.join(root, '.gitattributes'), 'utf8');
+  assert.strictEqual(attributes, `${fs.readFileSync(path.join(scaffoldDir, '_.gitattributes'), 'utf8')}*.psd binary\n`, 'the framework line under Default, the consumer line under Custom');
+  assert.strictEqual(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), template, 'a Custom section of only the shipped boilerplate strips to its marker');
+
+  const mixed = withCustom('# Add your custom ignore patterns below this line\n# ...\n/my-custom-dir\n');
+  fs.writeFileSync(path.join(root, '.gitignore'), mixed);
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+  assert.strictEqual(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), mixed, 'a Custom section carrying a consumer line stays verbatim');
+
+  const again = scaffoldDefaults({ outputDir: root, logger: quiet });
+  assert.deepStrictEqual(again.merged.filter((file) => file.startsWith('.git')), [], 'a second run writes neither file');
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -255,6 +285,19 @@ test('scaffold: setup names the seed mode it detected (#95)', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('scaffold: an old-template AGENTS.md converges, keeping the consumer notes under the Custom marker', () => {
+  const root = tmpConsumer();
+  fs.writeFileSync(path.join(root, 'AGENTS.md'),
+    '# ========== Default Values ==========\n# OMEGA Web consumer project\nframework guidance\n\n# ========== Custom Values ==========\n<!-- Add your project-specific notes below this line -->\nOur deploy needs the VPN up.\n');
+  const warnings = [];
+  const result = scaffoldDefaults({ outputDir: root, logger: { ...quiet, warn: (m) => warnings.push(m) } });
+
+  assert.strictEqual(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), '<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\nOur deploy needs the VPN up.\n');
+  assert.ok(result.merged.includes('AGENTS.md'), 'the convergence is recorded');
+  assert.ok(warnings.some((m) => m.includes('Converged AGENTS.md')), 'the convergence is loud');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('scaffold: inside a brand monorepo the per-target agent docs never scaffold and framework-owned copies sweep (brand doc unification)', () => {
   const root = tmpConsumer();
   const targetDir = path.join(root, 'brand', 'targets', 'web');
@@ -262,7 +305,7 @@ test('scaffold: inside a brand monorepo the per-target agent docs never scaffold
 
   // Standalone scaffold first (no brand config yet) — the per-target agent docs land.
   scaffoldDefaults({ outputDir: targetDir, logger: quiet });
-  assert.ok(fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'standalone projects keep the per-project AGENTS.md');
+  assert.ok(fs.existsSync(path.join(targetDir, 'AGENTS.md')), 'a standalone project root gets its AGENTS.md');
   assert.ok(!fs.existsSync(path.join(targetDir, 'CLAUDE.md')), 'no scaffold writes a CLAUDE.md');
 
   // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.

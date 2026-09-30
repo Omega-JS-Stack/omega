@@ -37,10 +37,9 @@
 // package's --omega-* token sheet). Same freshness contract as module
 // vendoring: re-copied from the resolved source on every prepare.
 //
-// Docs (#64): the same hook also vendors KNOWLEDGE — tools/vendor-docs.js
-// copies the monorepo's guide tree + docs/shared/ into every publishable (and
-// the Claude plugin into @omega.js/manager), so a published install carries
-// docs that match its version. One lane, two payloads: code and knowledge.
+// Docs: the same hook also vendors KNOWLEDGE. tools/vendor-docs.js copies the
+// monorepo's docs/ tree and the Claude plugin into @omega.js/manager, so a
+// brand carries docs that match its version. One lane, two payloads.
 //
 // Notes:
 //   - prepare-package `after` hooks are non-blocking AT THE RUNNER (a failure
@@ -353,9 +352,8 @@ function vendorPackages(options) {
 
   const vendorRoot = path.join(distPath, 'vendor');
 
-  // The monorepo's guide + shared contracts (and, for the manager, the Claude
-  // plugin) ship inside the package — see tools/vendor-docs.js. Independent of
-  // dist: knowledge is vendored for every publishable on every prepare.
+  // The docs tree and the Claude plugin ship inside the manager (a no-op for
+  // any other package), on every prepare, independent of dist.
   const docs = vendorDocs({ cwd });
 
   // Declared cross-package assets copy on every run, independent of whether

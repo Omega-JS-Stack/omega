@@ -1,6 +1,6 @@
 /**
  * Surface: the site-wide module, EXTENDING the framework's instead of replacing it
- * Doc: node_modules/@omega.js/web/docs/index.md (Key contracts: the extend lane)
+ * Doc: node_modules/@omega.js/manager/docs/web/index.md (Key contracts: the extend lane)
  */
 import coreMain from 'omega:main';
 

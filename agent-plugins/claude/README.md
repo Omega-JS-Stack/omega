@@ -53,7 +53,7 @@ Every row also matches the manifest's own `name`, which is what covers working i
 
 **At a brand root, the nearest manifest is not the answer.** It carries `@omega.js/manager` alone, so a session at a brand root used to hear about the manager and nothing about the targets it was there to build. The hook now recognizes a brand — a directory carrying `config/omega.json5`, or one whose manifest depends on `@omega.js/manager`, found by walking up to the git root — and reads the level below it: `config/omega.json5`'s `targets` keys AND every `targets/*/package.json` (plus the `functions/package.json` a Firebase backend keeps its framework in). The whole set comes back at once: `omega:main` and `omega:manager` always, plus one `omega:<framework>` per target. A target no framework owns (`type: 'custom'`) and `mobile` (parked) map to nothing.
 
-A brand injection also names the framework map — the brand `AGENTS.md` import line, `node_modules/@omega.js/AGENTS.md` — as required reading BEFORE the first edit, which is what the gate hook below enforces.
+A brand injection also names the framework map (the brand `AGENTS.md` import chain, through `node_modules/@omega.js/manager/AGENTS.md`) as required reading BEFORE the first edit, which is what the gate hook below enforces.
 
 Each skill is asked for once per session per SKILL (a marker file under `TMPDIR`, keyed on the session id), so a target that appears mid-session still gets its own line while the skills already asked for stay quiet. The hook fails open — no `package.json`, unparseable JSON, an unreadable config, no `jq`, and it exits silently without touching the prompt. Behavior is covered by the inject cases in `scripts/agent-plugins.test.js`, which run the script directly against fixture projects.
 

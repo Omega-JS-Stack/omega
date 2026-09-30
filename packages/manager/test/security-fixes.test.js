@@ -1,4 +1,4 @@
-// Tests for the wave-2 security fix-batch (cp259): env-secret escaping
+// Tests for the wave-2 security fix-batch (cp259): env-secret writeback
 // (MGR-5), webhook-URL redaction (MGR-1), and token-store file modes (MGR-8).
 
 const { test } = require('node:test');
@@ -8,7 +8,8 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { writeEnvValue } = require('../src/lib/env-secret.js');
-const { envLine } = require('../src/lib/env-order.js');
+const { envLine } = require('@omega.js/config');
+const dotenv = require('dotenv');
 const { redactWebhookUrl, buildWebhookUrl } = require('../src/services/payment/lib/payment-utils.js');
 const { GoogleOAuth2Client } = require('../src/lib/google-auth.js');
 
@@ -16,19 +17,34 @@ function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-secfix-'));
 }
 
-test('envLine escapes backslashes, quotes, and newlines', () => {
+test('envLine writes quotes and backslashes raw, a newline as the two characters \\n', () => {
   assert.equal(envLine('K', 'plain'), 'K="plain"');
-  assert.equal(envLine('K', 'a"b'), 'K="a\\"b"');
-  assert.equal(envLine('K', 'a\\b'), 'K="a\\\\b"');
+  assert.equal(envLine('K', 'a"b'), 'K="a"b"');
+  assert.equal(envLine('K', 'a\\b'), 'K="a\\b"');
   assert.equal(envLine('K', 'a\nb'), 'K="a\\nb"');
 });
 
-test('writeEnvValue appends with envLine escaping', () => {
+test('writeEnvValue appends through envLine, and dotenv reads the value back as given', () => {
   const root = tmpDir();
-  writeEnvValue(root, 'OMEGA_TEST_SECRET', 'pa"ss\nword');
+  writeEnvValue(root, 'OMEGA_TEST_SECRET', 'pa"ss\\\nword');
 
   const content = fs.readFileSync(path.join(root, '.env'), 'utf8');
-  assert.ok(content.includes('OMEGA_TEST_SECRET="pa\\"ss\\nword"'), `unexpected: ${content}`);
+  assert.ok(content.includes('OMEGA_TEST_SECRET="pa"ss\\\\nword"'), `unexpected: ${content}`);
+  assert.equal(dotenv.parse(content).OMEGA_TEST_SECRET, 'pa"ss\\\nword');
+});
+
+test('writeEnvValue refuses a value that would run into the next line, naming the key only', () => {
+  const root = tmpDir();
+  // A trailing backslash escapes the closing quote, so dotenv reads on to the
+  // next quote in the file when only a comment follows it.
+  fs.writeFileSync(path.join(root, '.env'), 'OMEGA_TEST_SECRET="old"\n# a note ending in a quote"\n');
+
+  assert.throws(() => writeEnvValue(root, 'OMEGA_TEST_SECRET', 'ends-secret\\'), (error) => {
+    assert.match(error.message, /OMEGA_TEST_SECRET/);
+    assert.ok(!error.message.includes('ends-secret'), 'the value never reaches the message');
+    return true;
+  });
+  assert.equal(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('ends-secret'), false, 'nothing is written');
 });
 
 test('writeEnvValue replace path does not expand $-patterns in the secret', () => {
@@ -41,6 +57,31 @@ test('writeEnvValue replace path does not expand $-patterns in the secret', () =
   const content = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.ok(content.includes('OMEGA_TEST_SECRET="weird$&pass$1word"'), `unexpected: ${content}`);
   assert.ok(!content.includes('first-value'), 'old value should be replaced');
+});
+
+test('writeEnvValue replaces every assignment of the key, the export and indented forms included', () => {
+  for (const later of ['export MY_SECRET="b"', '  MY_SECRET="b"']) {
+    const root = tmpDir();
+    fs.writeFileSync(path.join(root, '.env'), `MY_SECRET="a"\n${later}\n`);
+    writeEnvValue(root, 'MY_SECRET', 'new');
+
+    const content = fs.readFileSync(path.join(root, '.env'), 'utf8');
+    assert.equal(content.match(/^\s*(?:export\s+)?MY_SECRET\s*=/gm).length, 1, later);
+    assert.equal(dotenv.parse(content).MY_SECRET, 'new');
+  }
+});
+
+test('writeEnvValue replaces a multi-line quoted value whole', () => {
+  const root = tmpDir();
+  // A marked file: its Custom section is kept verbatim, so nothing but the
+  // writer can drop a continuation line
+  writeEnvValue(root, 'OTHER', 'x');
+  fs.appendFileSync(path.join(root, '.env'), 'MY_SECRET="first\nsecond"\n');
+  writeEnvValue(root, 'MY_SECRET', 'new');
+
+  const content = fs.readFileSync(path.join(root, '.env'), 'utf8');
+  assert.equal(content.includes('second'), false, `a continuation line survived: ${content}`);
+  assert.deepEqual(dotenv.parse(content), { MY_SECRET: 'new', OTHER: 'x' });
 });
 
 test('redactWebhookUrl masks the key param and keeps the rest', () => {

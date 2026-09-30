@@ -1,7 +1,7 @@
 /**
  * Surface: the background service worker (the auth source of truth and the
  * notes feature's one API caller)
- * Doc: node_modules/@omega.js/extension/docs/contexts.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/contexts.md
  *
  * What it consumes, one of each: omega.messenger.onMessage (the notes commands,
  * ./notes.js), omega.request() over background's own session,

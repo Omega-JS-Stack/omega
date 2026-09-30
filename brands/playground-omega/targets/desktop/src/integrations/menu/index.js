@@ -1,6 +1,6 @@
 // Surface: the application menu (a file-based definition): a "Notes" menu, and
 // the Preferences item opening the settings window
-// Doc: node_modules/@omega.js/desktop/docs/menu.md
+// Doc: node_modules/@omega.js/manager/docs/desktop/menu.md
 //
 // Application menu definition. Called by @omega.js/desktop during boot.
 //

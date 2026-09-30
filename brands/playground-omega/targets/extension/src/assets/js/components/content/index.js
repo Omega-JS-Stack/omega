@@ -1,6 +1,6 @@
 /**
  * Surface: the content script (a light context, injected into the host page)
- * Doc: node_modules/@omega.js/extension/docs/components.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/components.md
  *
  * "Save selection as note": when the options page turned it on, selecting text
  * shows a small floating button that sends notes:create to background. The

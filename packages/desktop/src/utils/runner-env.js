@@ -35,6 +35,8 @@
 const fs   = require('fs');
 const os   = require('os');
 const path = require('path');
+const { envLine, assertEnvReadsBack } = require('@omega.js/config');
+const { setEnvLines } = require('@omega.js/devkit/env-lines');
 
 // Runner files live under %LOCALAPPDATA%\omega-runner — a per-user path that
 // doesn't need admin to read/write. Set OMEGA_RUNNER_HOME to override.
@@ -308,37 +310,20 @@ function ensureRunnerEnvFile(home) {
   return true;
 }
 
-// Write values into the file IN PLACE: an existing `KEY=` line (commented or
-// not) is replaced, a key the file never had is appended. Comments and order
-// survive, so the file stays the one a person reads.
+// Write values into the file IN PLACE through devkit's setEnvLines: a key's
+// first line or `# KEY=""` placeholder takes the new line and later ones drop,
+// so dotenv reads the new value; a key the file never had is appended. Comments
+// and order survive, so the file stays the one a person reads.
 function writeRunnerEnvValues(home, values) {
-  // Every value double-quoted, the one .env quoting rule this repo writes
-  // everywhere. dotenv reads a double-quoted value back verbatim and has no
-  // escape for a `"` inside one, so a value carrying one cannot be written at
-  // all: refuse it — naming the key and the character — before the file is
-  // touched, rather than save a value that reads back wrong.
-  const serialize = (key, value) => `${key}="${value}"`;
-  for (const [key, value] of Object.entries(values)) {
-    if (String(value).includes('"')) {
-      throw new Error(`${key} contains a double quote (") — a .env value cannot carry one. Remove it, then set ${key} again.`);
-    }
-  }
+  // envLine is the one .env serializer; it refuses, naming the key, a value
+  // dotenv would read back changed, before the file is touched.
+  const lineFor = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, envLine(key, value)]));
 
   ensureRunnerEnvFile(home);
-  const file  = runnerEnvFile(home);
-  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-  const seen  = new Set();
-
-  const out = lines.map((line) => {
-    const m = /^\s*#?\s*([A-Z][A-Z0-9_]*)\s*=/.exec(line);
-    if (!m || !(m[1] in values) || seen.has(m[1])) return line;
-    seen.add(m[1]);
-    return serialize(m[1], String(values[m[1]]));
-  });
-  for (const [key, value] of Object.entries(values)) {
-    if (!seen.has(key)) out.push(serialize(key, String(value)));
-  }
-  fs.writeFileSync(file, out.join('\n').replace(/\n*$/, '\n'));
+  const file    = runnerEnvFile(home);
+  const content = setEnvLines(fs.readFileSync(file, 'utf8'), lineFor);
+  assertEnvReadsBack(content, values);
+  fs.writeFileSync(file, content);
   return file;
 }
 

@@ -38,7 +38,7 @@
  * superseding #422's opt-in): the schema default supplies
  * marketing.prune.enabled = true through the resolved config, so the gate
  * below only stops a brand that set it false — see
- * docs/marketing-campaigns.md § Contact Pruning for the contract.
+ * docs/backend/marketing-campaigns.md § Contact Pruning for the contract.
  *
  * Runs on omega_cronDaily.
  */

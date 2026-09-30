@@ -9,7 +9,7 @@
  *
  * The file still EXISTS, because a missing one makes the route answer "Unknown
  * provider" — a different and wrong statement about a provider this backend
- * plainly knows ([Capability gating](../../../../../../docs/payment-system.md)).
+ * plainly knows ([Capability gating](../../../../../../../../docs/backend/payment-system.md)).
  *
  * Nothing reaches these functions in practice: the refund route refuses a crypto
  * order before it loads a provider, through the ONE predicate the account page's

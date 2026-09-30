@@ -1,6 +1,6 @@
 /**
  * Surface: the offscreen document (a light context background opens on demand)
- * Doc: node_modules/@omega.js/extension/docs/offscreen.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/offscreen.md
  *
  * One handler, notes:parse: the plain text of an HTML string, through the
  * DOMParser a service worker does not have. Background calls it before every

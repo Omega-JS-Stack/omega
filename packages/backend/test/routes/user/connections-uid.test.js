@@ -32,12 +32,13 @@ const deleteRoute = require('../../../dist/omega/routes/user/connections/delete.
 const { encryptState } = require('../../../dist/omega/routes/user/connections/_state.js');
 const { validate } = require('../../../dist/omega/helpers/schema.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
+const { frameworkDoc } = require('../../helpers/_framework-doc.js');
 
 const PROVIDER_ID = 'uid-fixture-782';
 const PROVIDER_ENV_KEY = 'UID_FIXTURE_782';
 const CALLER_UID = 'caller-782';
 const OTHER_UID = 'other-782';
-const DOC_PATH = path.join(__dirname, '../../../docs/connections.md');
+const DOC_PATH = frameworkDoc('backend', 'connections.md');
 
 // The credentials the lane resolves for the fixture provider. Restored in
 // cleanup() — a run that leaves them behind changes what the next file reads.

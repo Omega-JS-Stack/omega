@@ -27,7 +27,7 @@ const { chosenProvider } = require('./providers.js');
 const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
-const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, envLine, serializeEnv } = require('./env.js');
+const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, requiredEnvKeys, envKeysByGroup } = require('./env-schema.js');
 const { WORKFLOW_OWNED_KEYS, deliveredKeys, workflowSecretKeys, envFileKeys, artifactEnvValues, bakeKeys, bakeSourceKeys, publishSecretKeys, renderSecretsBlock, renderEnvFileKeys } = require('./env-delivery.js');
 const { checkEnvRules } = require('./env-rules.js');
@@ -100,6 +100,7 @@ module.exports = {
   composeTargetEnv,
 
   // The .env serializer SSOT — every writeback renders through these
+  assertEnvReadsBack,
   envLine,
   serializeEnv,
 

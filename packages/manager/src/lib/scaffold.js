@@ -33,16 +33,15 @@ const { TARGET_FRAMEWORKS } = require('../config.js');
 // The environment vocabulary is @omega.js/config's — the same three names the
 // overlay files are suffixed with and every runtime's environment() answers
 const { ENV_ENVIRONMENTS } = require('@omega.js/config');
-// The canonical group list + renderer live in env-order.js (the ordering
-// SSOT, cp137) — the stub is just a canonical render with generated Omega
-// keys, so a scaffolded .env and a reordered one have the same shape.
-const { renderCanonicalEnv, envLine } = require('./env-order.js');
-// What gets generated (the env schema's `generated` entries) — with
-// env-order.js's serializer above, the same two SSOTs writeEnvValue rides.
+// The stub is the marker template every .env writer converges onto, with
+// the generated keys minted: a scaffolded .env is already converged.
+const { renderEnvTemplate } = require('./env-order.js');
 const { generatedEnvKeys } = require('@omega.js/config');
 // The heal's value is the SSOT for the manage script — a scaffolded brand
 // must never be born needing the migration the heal just learned (#229)
 const { MANAGE_SCRIPT } = require('./package-scripts.js');
+// The marked .gitignore the workspace service heals every manage
+const { renderBrandGitignore } = require('./gitignore.js');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the target manifest's `dependencies`
@@ -275,42 +274,8 @@ function renderRootPackageJson(answers) {
   }, null, 2)}\n`;
 }
 
-function renderGitignore() {
-  return [
-    '# Dependencies',
-    'node_modules/',
-    '',
-    '# Build output',
-    'dist/',
-    '',
-    '# OMEGA manager state (derived data, never committed)',
-    '.omega/',
-    '',
-    '# Run logs (truncated on every launch, never committed)',
-    'logs/',
-    '',
-    '# Secrets',
-    '.env',
-    '.env.*',
-    '',
-    '# OS',
-    '.DS_Store',
-    '',
-  ].join('\n');
-}
-
-function renderEnvStub(answers) {
-  return renderCanonicalEnv({
-    header: [
-      `# ${answers.name} — brand secrets (gitignored; loaded before every omega run).`,
-      '# Uncomment and fill what this brand uses. Services without their credentials',
-      '# skip cleanly, so add these as the brand adopts each service.',
-    ],
-    // The generated keys and their line form come from the SSOTs the
-    // manage-time mint uses too (#569), so a brand born here and a brand
-    // healed by the env-keys op carry byte-identical shapes.
-    entries: new Map(Object.entries(generatedEnvKeys()).map(([key, generate]) => [key, { raw: envLine(key, generate()) }])),
-  });
+function renderEnvStub() {
+  return renderEnvTemplate(Object.fromEntries(Object.entries(generatedEnvKeys()).map(([key, generate]) => [key, generate()])));
 }
 
 /**
@@ -398,8 +363,8 @@ function buildScaffoldPlan(answers) {
   const plan = [
     { path: 'config/omega.json5', contents: renderOmegaConfig(answers) },
     { path: 'package.json', contents: renderRootPackageJson(answers) },
-    { path: '.gitignore', contents: renderGitignore() },
-    { path: '.env', contents: renderEnvStub(answers) },
+    { path: '.gitignore', contents: renderBrandGitignore() },
+    { path: '.env', contents: renderEnvStub() },
     ...ENV_ENVIRONMENTS.map((environment) => ({ path: `.env.${environment}`, contents: renderEnvOverlayStub(environment) })),
     { path: 'README.md', contents: renderReadme(answers) },
   ];

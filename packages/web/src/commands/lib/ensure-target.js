@@ -1,23 +1,14 @@
 /**
- * ensure-target — the LOCAL, idempotent scaffold every verb runs
- * ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)).
- *
- * `omega setup` used to own this half and nothing ran it for you, so a target
- * drifted until someone remembered the command per target. It is retired: the
- * "write it if missing" steps live here and dev/build/test/deploy each call it
- * first, so every verb heals the tree on the way past.
- *
- * What it guarantees:
+ * ensure-target: the LOCAL, idempotent scaffold every verb runs first, so every
+ * verb heals the tree on the way past. It guarantees:
  *
  *   node version         a WARNING when the shell is older than the standard
- *   scaffold defaults    the framework tree (marker merges for
- *                        .gitignore/.env/AGENTS.md, omega.json5 seed, CI workflow)
+ *   scaffold defaults    the framework tree (marker merges, the AGENTS.md
+ *                        builder, the omega.json5 seed, the CI workflow)
  *   package.json         the omega verb scripts + the engines.node floor
  *
- * Everything here is copy-if-missing, marker-merge or write-if-changed: a
- * consumer file is never clobbered, and a run that changes nothing writes
- * nothing. Anything that needs the network is NOT here — the secret
- * publication `omega setup` also carried is a deploy precheck (deploy-precheck.js).
+ * Copy-if-missing, marker-merge or write-if-changed: nothing is clobbered, and
+ * nothing needing the network runs here (secrets publish in deploy-precheck.js).
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -102,7 +93,7 @@ function ensureTarget(options) {
   // ---- Scaffold defaults (copy-if-missing + marker merges)
   const scaffolded = scaffoldDefaults({
     outputDir: projectDir,
-    logger: { log: () => {}, warn: () => {}, error: () => {} },
+    logger: { log: () => {}, warn, error: warn },
   });
   result.written.push(...scaffolded.written);
   result.merged.push(...scaffolded.merged);

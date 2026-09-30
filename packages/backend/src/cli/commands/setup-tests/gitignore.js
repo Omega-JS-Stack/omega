@@ -98,24 +98,10 @@ class GitignoreTest extends BaseTest {
       jetpack.remove(oldGitignorePath);
     }
 
-    let existingContent = jetpack.read(gitignorePath) || '';
-
-    // Normalize runs of blank lines
-    existingContent = existingContent.replace(/\n{3,}/g, '\n\n');
-
-    // If file doesn't have section markers, treat existing content as custom values
-    if (!hasSectionMarkers(existingContent)) {
-      const customValues = existingContent.trim();
-      existingContent = templateContent.replace(
-        '# ...',
-        customValues ? customValues + '\n# ...' : '# ...'
-      );
-    } else {
-      // Smart merge
-      existingContent = mergeLineBasedFiles(existingContent, templateContent, '.gitignore');
-    }
-
-    jetpack.write(gitignorePath, existingContent);
+    // The engine heals the Default section and keeps the Custom one; a file
+    // from before the markers converges, its own lines landing under Custom
+    const existingContent = jetpack.read(gitignorePath) || '';
+    jetpack.write(gitignorePath, mergeLineBasedFiles(existingContent, templateContent, '.gitignore'));
   }
 }
 

@@ -18,10 +18,11 @@
 
 const path = require('node:path');
 
-// The .env template is a canonical render with NO values — one SSOT
-// (lib/env-order.js) shared with the brand scaffold stub and every
-// writeEnvValue writeback, so a company .env and a brand .env look alike.
-const { renderCanonicalEnv } = require('./env-order.js');
+// The .env stub is the marker template with NO values: the one template the
+// brand stub and every .env writer share, so the two files look alike.
+const { renderEnvTemplate } = require('./env-order.js');
+// The marked .gitignore the workspace service heals every manage
+const { renderCompanyGitignore } = require('./gitignore.js');
 
 // Directories init guarantees inside the tree, company-dir-relative. The
 // signing tree is the certificates service's layout under
@@ -86,46 +87,6 @@ function renderCompanyConfig(name) {
 }
 
 /**
- * The company `.env` template — every canonical group, every key commented
- * out, the same shape a brand `.env` has. Nothing is generated: the company
- * file holds only what EVERY brand shares (the Apple signing account, a
- * company-wide token), and a brand's own `.env` wins over it.
- *
- * @param {string} name - The company brand's display name.
- * @returns {string} The file contents.
- */
-function renderCompanyEnvStub(name) {
-  return renderCanonicalEnv({
-    header: [
-      `# ${name}: COMPANY secrets (gitignored; loaded UNDER every brand of this company).`,
-      '# Precedence: shell env > brand .env > this file. Put here only what every brand',
-      '# shares. Anything brand-specific belongs in that brand\'s .env, never here.',
-    ],
-  });
-}
-
-/**
- * The tree's own .gitignore. The parent repo's root .gitignore already
- * carries these rules; this one mirrors them so the unshareable half can
- * never be committed by a root-file edit or a copy of the tree.
- *
- * @returns {string} The file contents.
- */
-function renderCompanyGitignore() {
-  return [
-    '# Secrets: the shared .env and its per-environment overlays',
-    '.env',
-    '.env.*',
-    '',
-    '# The SHARED SIGNING TREE: .omega/certificates/apple/ holds Apple private key',
-    '# material (.p8, .p12, CSR keys). It never goes in git; move it between',
-    '# machines out of band.',
-    '.omega/',
-    '',
-  ].join('\n');
-}
-
-/**
  * @param {string} name - The company brand's display name.
  * @returns {string} The README contents.
  */
@@ -161,7 +122,7 @@ function buildCompanyScaffoldPlan(name) {
   return [
     { path: path.join('config', 'omega.json5'), contents: renderCompanyConfig(name) },
     { path: '.gitignore', contents: renderCompanyGitignore() },
-    { path: '.env', contents: renderCompanyEnvStub(name) },
+    { path: '.env', contents: renderEnvTemplate() },
     { path: 'README.md', contents: renderCompanyReadme(name) },
   ];
 }

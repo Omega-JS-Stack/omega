@@ -1,7 +1,7 @@
 // Build-layer tests for the boot layer's extension-directory discovery (#575).
 //
 // The boot layer promises a SKIP when the consumer has not built yet
-// (docs/test-boot-layer.md). It discovered by existence alone, so it fell
+// (docs/extension/test-boot-layer.md). It discovered by existence alone, so it fell
 // through to `<consumer>/dist/` — which exists after any dev run or `omega
 // clean` — loaded the JSON5 source manifest Chrome cannot parse, and hard-failed
 // every boot test instead. A directory only qualifies when its manifest is

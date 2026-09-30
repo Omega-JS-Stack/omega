@@ -39,8 +39,7 @@
   },
   "files": [
     "bin/",
-    "dist/",
-    "docs/"
+    "dist/"
   ],
   "preparePackage": {
     "input": "./src",

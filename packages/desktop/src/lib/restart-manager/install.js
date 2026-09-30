@@ -19,7 +19,7 @@
 // the same machine from running installers concurrently; RM itself ignores it.
 //
 // Pure helpers (parseFeed, pickArtifact, URL builders) are exported individually
-// for build-layer tests. See docs/restart-manager.md.
+// for build-layer tests. See docs/desktop/restart-manager.md.
 
 const path       = require('path');
 const fs         = require('fs');

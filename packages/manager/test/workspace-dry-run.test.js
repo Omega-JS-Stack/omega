@@ -19,8 +19,8 @@ const SANDBOX = path.join(__dirname, '..', '..', '..', 'brands', 'sandbox-brand'
 
 /**
  * The sandbox's tracked shape the workspace service reads (never its .env or
- * key files), plus a PUBLISHED manager install so the guide link and the
- * Claude settings have work, and the drift the other writing ops heal.
+ * key files), plus a PUBLISHED manager install and the retired scope link so the agents op
+ * and the Claude settings have work, and the drift the other writing ops heal.
  */
 function stageBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-workspace-dry-run-'));
@@ -35,7 +35,8 @@ function stageBrand() {
 
   const manager = path.join(root, 'node_modules', '@omega.js', 'manager');
   jetpack.write(path.join(manager, '.claude-plugin', 'marketplace.json'), { name: 'omega', plugins: [] });
-  jetpack.write(path.join(manager, 'docs', 'AGENTS.md'), '# the map\n');
+  // The retired scope link, so the agents op has a removal to plan.
+  fs.symlinkSync(path.join(root, 'nowhere.md'), path.join(root, 'node_modules', '@omega.js', 'AGENTS.md'));
 
   jetpack.write(path.join(root, '.gitignore'), 'node_modules/\n');
   jetpack.write(path.join(root, '.env'), 'ZZZ_BRAND_OWN="z"\nANTHROPIC_API_KEY=""\n');
@@ -78,8 +79,8 @@ test('#971: a dry-run workspace walk plans every write and leaves the brand tree
   // Each op had real work, so an identical tree means it was skipped
   const { output } = result;
   assert.ok(output.defaults.planned.length > 0);
-  assert.equal(output.gitignore, 'planned');
-  assert.deepEqual([output.guide, output.agents], ['planned', 'planned']);
+  assert.equal(output.gitignore.brand, 'planned');
+  assert.deepEqual([output.link, output.agents], ['planned', 'planned']);
   assert.equal(output.claudeSettings, 'planned');
   assert.equal(output.scripts, 'planned');
   assert.equal(output.envOrder.brand, 'planned');

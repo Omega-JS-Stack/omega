@@ -1,6 +1,6 @@
 /**
  * Surface: the popup (a page context)
- * Doc: node_modules/@omega.js/extension/docs/contexts.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/contexts.md
  *
  * What it consumes, one of each: data-omega-bind for the signed-in state and
  * the count (omega.bindings), the .omega-signin / .omega-signout classes (no

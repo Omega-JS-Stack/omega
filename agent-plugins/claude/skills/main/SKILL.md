@@ -6,7 +6,7 @@ user-invocable: true
 
 # OMEGA — the hub
 
-The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `brands/`, changesets for independent versioning. Start at the repo root `AGENTS.md` — it is the map, and it carries the hard rules (the legacy manager repos are read-only; nothing publishes until the proving checkpoint). This skill orients; every fact belongs to a guide below.
+The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under `packages/`, test brands under `brands/`, one family version bumped by hand. Start at the map, `docs/omega.md` (the repo-root `AGENTS.md` imports it and adds the hard rules: the legacy manager repos are read-only, and nothing publishes until the proving checkpoint). This skill orients; every fact belongs to a guide below.
 
 ## The roster
 
@@ -30,7 +30,7 @@ Every framework ships the same context-aware `omega` / `omg` / `mgr` dispatcher:
 
 `docs/` is the SSOT. Cross-framework contracts are `docs/shared/*.md` — config, local-dev, testing, deploys, updates, publishing, icons, theming, translation, analytics, agent-docs, brands, rulings. Each framework's guide is `docs/<framework>/index.md` with its deep docs beside it, and the package's own `README.md` carries long-form detail. The four framework guides (web, backend, extension, desktop) mirror each other section for section — each guide's header states the rule.
 
-The repo-root `AGENTS.md` is the ONE agent entry — packages carry no agent docs (the parent walk hands every monorepo session the map). Consumer brands import `node_modules/@omega.js/AGENTS.md`, a symlink the workspace service maintains at the map. The brand-root guide is `docs/manager/brand.md`; the contract is `docs/shared/agent-docs.md`.
+The map is `docs/omega.md`, and every agent entry imports it: the repo-root `AGENTS.md` here, and in a brand the manager's one-line `AGENTS.md`, reached through `node_modules/@omega.js/manager/AGENTS.md`. The manager ships the whole `docs/` tree; no other package carries docs. The brand-root guide is `docs/manager/brand.md`; the contract is `docs/shared/agent-docs.md`.
 
 ## The brands
 

@@ -1,5 +1,5 @@
 // Surface: a consumer section's contract (args, defaults, showcase demo)
-// Doc: node_modules/@omega.js/web/docs/sections.md
+// Doc: node_modules/@omega.js/manager/docs/web/sections.md
 {
   description: 'The notes band: a composer form, the signed-in user\'s notes, and two bindings (the display name and the notes written so far). Its behavior lives in the page module, js/pages/notes.js.',
 

@@ -1,9 +1,5 @@
-# GENERATED output — prepare-package rebuilds dist from src on install/pack/publish
-/dist/
-
-# GENERATED — the prepare-time docs lane (@omega.js/devkit tools/vendor-docs.js)
-# vendors the monorepo guide + docs/shared/ into the shipped package (#64)
+# Vendored at prepare time by the devkit docs lane (tools/vendor-docs.js)
 /docs/
-# …plus the Claude plugin + its marketplace, vendored for consumer brands (#62)
+# The Claude plugin and its marketplace, vendored for brands
 /claude-plugin/
 /.claude-plugin/

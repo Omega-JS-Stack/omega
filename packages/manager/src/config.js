@@ -674,13 +674,13 @@ const OPERATIONS = {
     { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-target)
     { name: 'defaults', ensure: true },   // Schema-defaulted blocks the brand file lacks are materialized (#478)
     { name: 'company', ensure: true },    // The ONE key joining this brand to its company, asked when the file carries none (#677)
-    { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
+    { name: 'gitignore', ensure: true },  // brand + company .gitignore marker sections (state and secrets never committed)
     { name: 'scripts', ensure: true },    // Root scripts say `omega` + deploy exists; target scripts fill from framework projectScripts (#675)
-    { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + its scope link
+    { name: 'agents', ensure: true },     // AGENTS.md manager import; the retired scope link removed
     { name: 'claude-settings', ensure: true }, // .claude/settings.json enables the omega plugin from the installed manager (published installs)
     { name: 'workflows', ensure: true },  // Composed .github/workflows/<target>-*.yml for targets the config no longer enables are removed (#636)
     { name: 'env-keys', ensure: true },   // Brand-generated keys (the OMEGA_* trio + UNSUBSCRIBE_HMAC_KEY) minted into the brand .env when the cascade has none (#569)
-    { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
+    { name: 'env-order', ensure: true },  // Brand/company .env converged onto its Default/Custom marker sections
     { name: 'env-rules', ensure: true },  // Keys the brand's own config makes mandatory (the schema's requiredWhen) — WARNS, never fails (#626)
     { name: 'translation-sdk', ensure: true }, // Translating web targets declare + install @anthropic-ai/claude-agent-sdk (#168)
   ],

@@ -135,7 +135,7 @@ fi
 # skill that owns it was invoked.
 if [ -n "$brand_root" ]; then
   ctx="$ctx
-This is an OMEGA brand monorepo: every skill above, plus the framework map it points at (the brand AGENTS.md import line — node_modules/@omega.js/AGENTS.md), is required reading BEFORE the first edit. Writes under targets/ and to config/omega.json5 are refused until the skill owning that surface has been invoked."
+This is an OMEGA brand monorepo: every skill above, plus the framework map it points at (the brand AGENTS.md import, node_modules/@omega.js/manager/AGENTS.md), is required reading BEFORE the first edit. Writes under targets/ and to config/omega.json5 are refused until the skill owning that surface has been invoked."
 fi
 
 # The gate's sanctioned lane for an agent with no Skill tool: mark.sh writes

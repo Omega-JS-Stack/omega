@@ -23,5 +23,3 @@ node_modules/
 *.tgz
 
 # ========== Custom Values ==========
-# Add your custom ignore patterns below this line
-# ...

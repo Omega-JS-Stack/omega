@@ -2,7 +2,6 @@ const BaseCommand = require('./base-command');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
-const util = require('util');
 const { spawnShell } = require('../utils/spawn-shell');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
@@ -587,23 +586,24 @@ class TestCommand extends BaseCommand {
    * Emulator-only values, gitignored like the service account, never committed.
    */
   ensureFixtureEnv(fixture) {
-    const { requiredEnvKeys } = require('@omega.js/config');
+    const { requiredEnvKeys, serializeEnv, assertEnvReadsBack } = require('@omega.js/config');
     const envPath = path.join(fixture, '.env');
     const existing = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
-    const present = util.parseEnv(existing);
+    const present = require('dotenv').parse(existing);
 
-    const lines = requiredEnvKeys('backend')
+    const values = Object.fromEntries(requiredEnvKeys('backend')
       .filter((name) => !present[name])
-      .map((name) => `${name}="${process.env[name] || `fixture-${name.toLowerCase().replace(/_/g, '-')}`}"`);
+      .map((name) => [name, process.env[name] || `fixture-${name.toLowerCase().replace(/_/g, '-')}`]));
 
-    if (lines.length === 0) {
+    if (Object.keys(values).length === 0) {
       return;
     }
 
-    const header = existing ? '' : '# @omega.js/backend self-test fixture — emulator-only values, seeded per run.\n';
-
+    // An empty file gets the header; the whole file is judged by dotenv before the write
+    const content = `${existing || '# @omega.js/backend self-test fixture: emulator-only values, seeded per run.\n'}${existing && !existing.endsWith('\n') ? '\n' : ''}${serializeEnv(values)}`;
+    assertEnvReadsBack(content, values);
     try {
-      jetpack.write(envPath, `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines.join('\n')}\n`);
+      jetpack.write(envPath, content);
     } catch (e) {
       this.logWarning(`Could not write fixture .env: ${e.message}`);
     }

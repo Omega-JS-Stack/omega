@@ -35,7 +35,7 @@
 //   - config.restartManager.enabled === false
 //   - non-production without OMEGA_RESTART_MANAGER_DEV=1 (dev noise guard)
 //
-// Full reference: docs/restart-manager.md.
+// Full reference: docs/desktop/restart-manager.md.
 
 const path       = require('path');
 const fs         = require('fs');

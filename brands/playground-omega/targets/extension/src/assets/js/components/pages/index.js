@@ -1,6 +1,6 @@
 /**
  * Surface: a custom extension page (a page context), the notes dashboard
- * Doc: node_modules/@omega.js/extension/docs/components.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/components.md
  *
  * The sidepanel's list (../../lib/notes-list.js), plus omega.auth.reload()
  * after each create: the one re-read of the account, beside the listen() the

@@ -66,9 +66,10 @@ module.exports = defineCases({
         // .env and every verb delivers them.
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
-        // AGENTS.md carries the content; Claude Code reads it natively, so no
-        // CLAUDE.md scaffolds beside it.
-        ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toContain('node_modules/@omega.js/AGENTS.md');
+        // A standalone project root gets the same AGENTS.md a brand root does:
+        // the manager import under Default, its notes under Custom. Claude Code reads
+        // AGENTS.md natively, so no CLAUDE.md scaffolds beside it.
+        ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toBe('<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\n');
         ctx.expect(jetpack.exists(path.join(tmp, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(tmp, 'config', 'omega.json5'))).toBeTruthy();
 
@@ -177,6 +178,18 @@ module.exports = defineCases({
 
         scaffoldDefaults({ outputDir: targetDir });
         ctx.expect(jetpack.exists(path.join(targetDir, 'config', 'omega.json5'))).toBe(false);
+      },
+    },
+    {
+      name: 'an old-template AGENTS.md converges, keeping the consumer notes under the Custom marker',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
+        jetpack.write(path.join(tmp, 'AGENTS.md'),
+          '# ========== Default Values ==========\n# OMEGA Extension consumer project\nframework guidance\n\n# ========== Custom Values ==========\n\n## Project-specific notes\n\nAdd anything specific to THIS project here. Edits below this line are preserved across framework re-syncs.\n\nOur deploy needs the VPN up.\n');
+        const result = scaffoldDefaults({ outputDir: tmp });
+
+        ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toBe('<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\nOur deploy needs the VPN up.\n');
+        ctx.expect(result.merged.includes('AGENTS.md')).toBe(true);
       },
     },
     {

@@ -243,8 +243,8 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // The .env stub documents the credential entry points: external keys
   // commented out, omega-owned keys provisioned with generated secrets
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
-  assert.ok(env.includes('# CLOUDFLARE_TOKEN='));
-  assert.ok(env.includes('# STRIPE_SECRET_KEY='));
+  assert.ok(env.includes('# CLOUDFLARE_TOKEN=""'));
+  assert.ok(env.includes('# STRIPE_SECRET_KEY=""'));
   assert.match(env, /^OMEGA_ADMIN_KEY="[A-Za-z0-9_-]{43}"$/m);
   assert.match(env, /^OMEGA_WEBHOOK_KEY="[A-Za-z0-9_-]{43}"$/m);
   assert.match(env, /^OMEGA_NAMESPACE="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"$/m);
@@ -261,6 +261,8 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   for (const entry of ['node_modules/', '.omega/', '.env', 'dist/', 'logs/']) {
     assert.ok(gitignore.includes(entry), `gitignore missing ${entry}`);
   }
+  assert.ok(gitignore.startsWith('# ========== Default Values ==========\n'), 'the scaffold writes the marked file the workspace service heals');
+  assert.ok(gitignore.endsWith('\n# ========== Custom Values ==========\n'), 'its Custom section is only its marker line');
 });
 
 test('non-interactive: everything derives from the directory name', async () => {
@@ -438,8 +440,6 @@ test('resume from inside an existing brand: answers come from its config, only g
   // Scaffolded files carry the EXISTING brand's identity, not derived guesses
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   assert.ok(readme.startsWith('# Existing Brand'));
-  const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
-  assert.ok(env.startsWith('# Existing Brand'));
 });
 
 test('resume: a target NAMED admin scaffolds targets/admin around its declared type (#886)', async () => {

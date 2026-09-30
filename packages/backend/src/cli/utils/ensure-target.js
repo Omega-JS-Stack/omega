@@ -20,8 +20,9 @@
  *   package.json engines    the FRAMEWORK's pinned Cloud Functions runtime
  *   package.json scripts    the standard verb scripts, rewritten to their
  *                           defaults (#689 — the framework owns those keys)
- *   src/defaults/**         the defaults tree (copy-if-missing; AGENTS.md and
- *                           .gitignore live-sync their Default section)
+ *   src/defaults/**         the defaults tree (copy-if-missing; .gitignore
+ *                           live-syncs its Default section)
+ *   AGENTS.md               standalone only, through devkit's one builder
  *
  * Everything here is copy-if-missing or merge-in-place — the one exception is
  * the standard scripts above, which the framework owns outright in every
@@ -249,7 +250,8 @@ function scaffoldPackageJson(projectDir, result) {
  * Apply the framework's defaults tree (src/defaults/**) to the target root via
  * the shared devkit engine. The file map lives in src/utils/scaffold-defaults.js:
  * copy-if-missing for everything, marker-section merge (Default =
- * framework-owned, Custom = consumer-owned) for AGENTS.md and .gitignore.
+ * framework-owned, Custom = consumer-owned) for .gitignore, and devkit's
+ * AGENTS.md builder for a standalone project root.
  *
  * @param {string} projectDir - The target root.
  * @param {{ written: string[], merged: string[] }} result - Collector.

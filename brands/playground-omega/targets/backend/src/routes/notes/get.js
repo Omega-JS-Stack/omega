@@ -1,6 +1,6 @@
 /**
  * Surface: route, GET /notes (list the caller's notes, newest first)
- * Doc: node_modules/@omega.js/backend/docs/routes.md
+ * Doc: node_modules/@omega.js/manager/docs/backend/routes.md
  */
 module.exports = async ({ ctx, omega, user, data }) => {
   if (!user.authenticated) {

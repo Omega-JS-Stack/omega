@@ -33,7 +33,7 @@
  * preserve list for runtime artifacts that live inside dist/ between stages:
  * node_modules/ (self-test symlinks, legacy installs) and *.log
  * (dev/emulator/test/deploy logs — co-located with firebase-tools' logs by
- * design, see docs/logging.md). Everything else is wiped first, so a file
+ * design, see docs/backend/logging.md). Everything else is wiped first, so a file
  * deleted from src/ disappears from the stage and a stale composed config
  * can never shadow a brand edit.
  *
@@ -60,6 +60,25 @@ const CONFIG_BANNER = '// Staged by `omega build` (brand+local config layers fla
   + '// and the deploy upload boundary). GENERATED — edit the brand/local omega.json5.\n';
 
 const PUBLIC_TEMPLATE_DIR = path.resolve(__dirname, '../../../templates/public');
+
+// Firebase's own .env reader decodes \n \r \t \v \\ \' \" inside double quotes where
+// dotenv decodes only \n and \r, so a value with a backslash before one of those (or
+// before a real line break, which serializeEnv writes as \n) reads back changed there.
+const FIREBASE_ENV_UNSAFE = /\\[nrtv\\'"\n\r]/;
+
+/**
+ * Throw when a dist/.env value would read back changed through Firebase's .env
+ * reader (the deploy runtime and the emulator). The error names the keys, never
+ * a value.
+ *
+ * @param {Object<string, string>} values - The values dist/.env will carry.
+ */
+function assertFirebaseEnvSafe(values) {
+  const unsafe = Object.keys(values).filter((key) => FIREBASE_ENV_UNSAFE.test(String(values[key])));
+  if (unsafe.length === 0) return;
+
+  throw new Error(`dist/.env: the value of ${unsafe.join(', ')} holds a backslash before n, r, t, v, a backslash, a quote or a line break, which Firebase's .env reader would decode differently from how it is written. Change the value in its .env layer so it holds no such backslash (a path can use forward slashes).`);
+}
 
 /**
  * Stage the authored target tree into dist/.
@@ -189,6 +208,7 @@ function stageFunctions(options) {
   //     which no cascade layer can supply and no human writes. Deploy-only, so
   //     a local stage composes byte-identically to before.
   if (options.licenseStatus) composed.values.OMEGA_LICENSE_STATUS = options.licenseStatus;
+  assertFirebaseEnvSafe(composed.values);
   jetpack.write(path.join(distDir, '.env'), serializeEnv(composed.values));
 
   // Key NAMES and the layer each came from — never a value (the .env is all
@@ -337,4 +357,4 @@ function watchAndStage(options) {
   };
 }
 
-module.exports = { stageFunctions, watchAndStage, envWatchInputs, resolveServiceAccountPath, PRESERVE };
+module.exports = { stageFunctions, watchAndStage, envWatchInputs, assertFirebaseEnvSafe, resolveServiceAccountPath, PRESERVE };

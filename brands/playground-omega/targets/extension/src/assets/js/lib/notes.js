@@ -1,7 +1,7 @@
 /**
  * Surface: the sending side of the messenger (omega.messenger.send to
  * background), shared by every context that asks for notes
- * Doc: node_modules/@omega.js/extension/docs/contexts.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/contexts.md
  */
 
 // The one setting the options page writes and the content script reads. It

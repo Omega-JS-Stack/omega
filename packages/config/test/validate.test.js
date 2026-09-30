@@ -44,7 +44,7 @@ test('match, enum, and type violations are reported', () => {
 
 test('email identity keys are optional but typed when present', () => {
   // The email path reads these instead of carrying a built-in identity
-  // (packages/backend docs/email-system.md → "Identity is config, or it is an error").
+  // (docs/backend/email-system.md → "Identity is config, or it is an error").
   const configured = validateConfig({
     ...VALID,
     brand: {

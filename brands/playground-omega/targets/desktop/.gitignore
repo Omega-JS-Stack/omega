@@ -22,5 +22,3 @@ config/certs/*
 *.pem
 
 # ========== Custom Values ==========
-
-# Add your own ignores below. This section is preserved across `npx omega setup` runs.

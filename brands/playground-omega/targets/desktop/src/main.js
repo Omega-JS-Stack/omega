@@ -1,6 +1,6 @@
 /**
  * Surface: the main-process entry (one require, one initialize)
- * Doc: node_modules/@omega.js/desktop/docs/boot-sequence.md
+ * Doc: node_modules/@omega.js/manager/docs/desktop/boot-sequence.md
  *
  * Config is auto-loaded from config/omega.json5 (resolved for the desktop
  * target). The notes feature's main-process half lives in ./lib/notes.js.

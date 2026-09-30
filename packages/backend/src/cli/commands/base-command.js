@@ -109,6 +109,20 @@ class BaseCommand {
   }
 
   /**
+   * The local scaffold every verb runs first (ensure-target.js): its lines
+   * print gray, its warnings yellow, so a kept or converged file is never silent.
+   */
+  runEnsureTarget() {
+    const { ensureTarget } = require('../utils/ensure-target');
+
+    ensureTarget({
+      projectDir: this.main.firebaseProjectPath,
+      log: (message) => this.log(chalk.gray(`  ${message}`)),
+      warn: (message) => this.logWarning(`  ${message}`),
+    });
+  }
+
+  /**
    * Stage the authored target tree into dist/ (the src/dist pillar's build step).
    * Every runtime surface calls this before touching dist/ — emulator, serve,
    * test, deploy — so the staged tree is always fresh.
@@ -132,13 +146,9 @@ class BaseCommand {
    *   deploy lane resolves one; every local lane stages without it.
    */
   ensureStaged({ environment, licenseStatus } = {}) {
-    const { ensureTarget } = require('../utils/ensure-target');
     const { stageFunctions } = require('../utils/stage-functions');
 
-    ensureTarget({
-      projectDir: this.main.firebaseProjectPath,
-      log: (message) => this.log(chalk.gray(`  ${message}`)),
-    });
+    this.runEnsureTarget();
 
     stageFunctions({
       projectDir: this.main.firebaseProjectPath,

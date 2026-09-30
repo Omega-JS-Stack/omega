@@ -89,7 +89,7 @@
   // Appearance: the app's DEFAULT theme. 'system' follows the OS preference live;
   // 'light'/'dark' are explicit overrides. A user's runtime choice (omega.theme.set
   // or the [data-omega-theme-set] controls) persists in storage and wins over this on
-  // every boot. See docs/themes.md.
+  // every boot. See @omega.js/manager/docs/desktop/themes.md.
   theme: {
     appearance: 'system',
   },
@@ -115,7 +115,7 @@
       // (mac uses Apple's UTI strings, linux uses freedesktop categories). Allowed values:
       //   productivity (default) | developer-tools | utilities | media | social | network
       // Override the per-platform mapping in `platforms.<plat>.category` if you need
-      // something specific. See docs/installer-options.md for the full table.
+      // something specific. See @omega.js/manager/docs/desktop/installer-options.md for the full table.
       //
       // `copyright` accepts a `{YEAR}` token expanded at build time to the current year.
       // Default is `© {YEAR}, <brand.name>`. Set explicitly only to change the holder.
@@ -145,7 +145,7 @@
       // beside `formats` are install knobs that map onto the same
       // electron-builder concepts (`mac.target`, `win.target`, `linux.target`),
       // but @omega.js/desktop owns the actual target list so auto-update keeps
-      // working (see docs/installer-options.md for why). Each block exposes only
+      // working (see @omega.js/manager/docs/desktop/installer-options.md for why). Each block exposes only
       // the knobs that exist for that platform: there is no cross-platform
       // analog for any of these.
       platforms: {
@@ -189,7 +189,7 @@
           runAfterFinish:     true,
           perMachine:         false,       // per-user install (required for oneClick:true)
           // Code-signing strategy. Picked at workflow time to drive runner selection +
-          // job gating. See docs/signing.md.
+          // job gating. See @omega.js/manager/docs/desktop/signing.md.
           //   self-hosted (default):  sign with signtool against an EV USB token (typically
           //                           on an framework-managed self-hosted GH Actions runner)
           //   cloud:                  shell to a cloud signing provider's CLI (Azure /
@@ -276,7 +276,7 @@
       // `npx omega deploy`'s precheck auto-creates it if it doesn't exist (uses GH_TOKEN).
       // Artifact names carry NO version (MyApp-mac-dmg.dmg), so this repo also serves the marketing
       // site: https://github.com/<org>/<brand.id>-releases/releases/latest/download/<asset> never changes
-      // across versions, and the website derives its download buttons from it. See docs/releasing.md.
+      // across versions, and the website derives its download buttons from it. See @omega.js/manager/docs/desktop/releasing.md.
       releases: {
         enabled: true,
       },
@@ -297,7 +297,7 @@
         // url: 'https://brand.example/data/resources/main.json',   // default uses brand.url
       },
       // Restart Manager: external guardian app that relaunches this app if it
-      // crashes. @omega.js/desktop talks to it over a localhost HTTP protocol (docs/restart-manager.md):
+      // crashes. @omega.js/desktop talks to it over a localhost HTTP protocol (@omega.js/manager/docs/desktop/restart-manager.md):
       // auto-registers ~15s after launch, heartbeats every 60s, deregisters on clean
       // quit, and silently installs RM when missing (mac zip / win silent NSIS /
       // linux AppImage: no installer UI, no admin; RM then keeps itself updated via

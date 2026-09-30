@@ -1,6 +1,6 @@
 // Surface: the context menu (a file-based definition, built per right-click):
 // "Save selection as note" whenever text is selected
-// Doc: node_modules/@omega.js/desktop/docs/context-menu.md
+// Doc: node_modules/@omega.js/manager/docs/desktop/context-menu.md
 //
 // Context-menu definition. Called by @omega.js/desktop EVERY time the user right-clicks.
 //

@@ -5,7 +5,7 @@
 > monorepo's own number (0.1.0 went out first that night and is deprecated: the family
 > carries ONE version, the root package.json's, by ruling 2026-09-10),
 > each with `publishConfig.access: public`, and published is the new normal. The unlatch
-> step below is history; versions move by changesets from here.
+> step below is history; versions move by the hand bump (Lockstep, below).
 
 ## What publishes, what never does
 
@@ -19,8 +19,8 @@ package not on that list, so read the count from there rather than from this pag
 
 `@omega.js/mcp-router` joined the set (Ian 2026-07-30, [#144](https://github.com/Omega-JS-Stack/omega/issues/144)):
 the manager's vendored Claude plugin declares the router, so the router has to be
-installable beside it — a real dependency, never vendored. It ships no docs tree
-(it is not in the vendor lane's `DOCUMENTED_PACKAGES`) and no `exports` map, so the
+installable beside it — a real dependency, never vendored. It ships no docs (only
+the manager does) and no `exports` map, so the
 plugin's launcher can deep-resolve `@omega.js/mcp-router/bin/mcp-router.js`.
 
 Registry-real internal ranges (everything else is workspace `*`): `@omega.js/client`
@@ -30,11 +30,17 @@ lockstep (below).
 
 ## Lockstep — the family ships ONE version ([#794](https://github.com/Omega-JS-Stack/omega/issues/794))
 
-Changesets carries the seven publishables as a single `fixed` group
-(`.changeset/config.json`; `scripts/changeset-config.test.js` holds that group
-and `release-check.js`'s `PUBLISHABLES` in parity, and release-check itself
-prints a `one version across the family` check). A bump on any one bumps all
-seven to the same number, and packages with no code change republish anyway.
+A release is bumped by hand, in its own `chore(release): <x.y.z>` commit. That commit:
+
+- moves the root `CHANGELOG.md` `[Unreleased]` entries under the new version;
+- sets the root `package.json` and the seven publishables to that version;
+- sets the exact internal ranges (above) to the same number.
+
+Packages with no code change republish anyway. `release-check.js`'s
+`checkLockstepVersions` fails when any publishable's version differs from the
+root's; `scripts/release-lockstep.test.js` proves it, and release-check prints
+it as `one version across the family`. `PUBLISHABLES` in that script is the one
+list of what publishes.
 
 Why, in two sentences: ONE number for the family means a brand can never
 install a backend from one release beside a client from another — "everything
@@ -44,8 +50,7 @@ each framework, so a config-schema change already forces every framework to
 republish; independent numbers only hid that, and let one omega.json5 be
 validated by two validators.
 
-`updateInternalDependencies` stays `patch`, so the exact ranges above move
-with the group on every release. In a brand, the same number lands as an exact
+In a brand, the same number lands as an exact
 PIN per target ([updates.md](updates.md)) and the manager's boot check refuses
 a brand that ever drifts ([../manager/brand.md](../manager/brand.md)).
 
@@ -53,15 +58,15 @@ a brand that ever drifts ([../manager/brand.md](../manager/brand.md)).
 
 Every publishable's prepare `after` hook runs the devkit vendor lane, which
 ships two payloads: the private packages' MODULES into `dist/vendor/`
-(`tools/vendor.js`), and the DOCS into the package root (`tools/vendor-docs.js`
-— the package's guide as `docs/index.md` plus `docs/shared/`, and for
-`@omega.js/manager` also the repo-root map as `docs/AGENTS.md` (links
-retargeted) and `claude-plugin/` + `.claude-plugin/marketplace.json`, the
-plugin a consumer brand enables from its node_modules, `.mcp.json` included —
-its launcher resolves `@omega.js/mcp-router` from the install
-([#144](https://github.com/Omega-JS-Stack/omega/issues/144))). All of it is
-generated and gitignored; `node --test scripts/vendor-docs.test.js` packs the
-six documented packages for real and asserts the tarball listings. A vendor
+(`tools/vendor.js`), and, for `@omega.js/manager` only, the DOCS
+(`tools/vendor-docs.js`): the whole top-level `docs/` tree as `docs/`, links
+that leave it retargeted, plus `claude-plugin/` and
+`.claude-plugin/marketplace.json`, the plugin a consumer brand enables from its
+node_modules, `.mcp.json` included (its launcher resolves `@omega.js/mcp-router`
+from the install). The manager's one-line `AGENTS.md` is tracked and ships
+beside them. All of the vendored output is generated and gitignored;
+`node --test scripts/vendor-docs.test.js` packs every publishable for real and
+asserts the tarball listings, docs in the manager and nowhere else. A vendor
 failure ABORTS the prepare: every publishable sets `preparePackage.hooks.afterBlocking: true`
 (prepare-package 2.2.0, [#38](https://github.com/Omega-JS-Stack/omega/issues/38)),
 so a tarball can never build missing its vendored internals. Contract:
@@ -153,8 +158,8 @@ circumventing license-key functionality and removing notices.
    and ONLY those seven (the six vendorable privates keep theirs forever:
    `VENDORABLE_PACKAGES` in [packages/devkit/tools/vendor.js](../../packages/devkit/tools/vendor.js)
    names them, so the list is never re-typed here).
-2. **Publish** each (changesets is configured lockstep + `access: public`, so the
-   seven go out at ONE number; the direct form per package is equally fine):
+2. **Publish** each at the one family number (every publishable sets
+   `publishConfig.access: public`):
    `npm publish --workspace=packages/<name>` — order matters only where a dependent
    waits on a dependency: **client and backend before their dependents**
    (web/desktop/extension need client on the registry; manager needs backend and
@@ -172,7 +177,7 @@ circumventing license-key functionality and removing notices.
    now runs on registry packages; CI-dispatch web deploys become buildable (the
    deploy guard stops refusing once no `file:` specs remain).
 6. Record: CHANGELOG entry + close the tracking issue; re-latch nothing — published is the
-   new normal, versions move by changesets from here.
+   new normal, versions move by the hand bump from here.
 
 ## After the first publish
 

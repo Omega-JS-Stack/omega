@@ -249,11 +249,11 @@ domain — pass nothing. It is normalized defensively (leading slash added,
 trailing slash stripped); `/` and unset both mean the domain root, and then no
 pass runs at all, so the output is byte-for-byte what it has always been.
 
-**`omega deploy` fills it for you** ([#358](../../issues/358)), so an ordinary
+**`omega deploy` fills it for you** ([#358](https://github.com/Omega-JS-Stack/omega/issues/358)), so an ordinary
 gh-pages brand never types the variable: a `brand.url` naming a domain of your
 own means the site serves at that domain's root (the CNAME both lanes publish
 cannot carry a path) → `/`; a `brand.url` naming a `*.github.io` address means
-the path IT carries is the mount → `/<name>/` ([#366](../../issues/366));
+the path IT carries is the mount → `/<name>/` ([#366](https://github.com/Omega-JS-Stack/omega/issues/366));
 `brand.url` unset means the default project address
 `https://<owner>.github.io/<name>/` → `/<name>/`, from the same repo slug the
 deploy plan resolves. `--direct` sets it around the build it runs itself; the
@@ -262,7 +262,7 @@ scaffolded CI workflow derives it remotely through the same function
 the repo when the config carries no slug). An explicitly exported value always
 wins, and `omega dev` / a bare `omega build` stay at the root.
 
-The direct lane deploys **both** Pages shapes ([#361](../../issues/361)): with a
+The direct lane deploys **both** Pages shapes ([#361](https://github.com/Omega-JS-Stack/omega/issues/361)): with a
 `brand.url` naming your own domain it writes the CNAME and reports that domain;
 without one it publishes a project site at the derived
 `https://<owner>.github.io/<name>/`, mounted under the matching base path, with
@@ -271,7 +271,7 @@ and the repo slug resolves from the config, then `GITHUB_REPOSITORY`, then the
 tree's own `origin` remote. A project site still sets `brand.url` to its Pages
 URL, without a trailing slash (`https://<owner>.github.io/<name>`) — absolute
 URLs build from it and nothing derives them at build time, so the direct lane
-warns and prints the exact value when it is unset ([#366](../../issues/366)).
+warns and prints the exact value when it is unset ([#366](https://github.com/Omega-JS-Stack/omega/issues/366)).
 A `*.github.io` host is **never** a custom domain: neither the deploy plan nor
 the production build's `dist/CNAME` step reads one as such, so setting that
 value keeps the project shape instead of flipping the site to the domain root.
@@ -289,7 +289,7 @@ project site already carries the path — nothing prefixes them twice. Pinned by
 `test/path-prefix.test.js`.
 
 The translation pass reads the same stamp and composes **prefix, then
-language** ([#359](../../issues/359)): a mounted link's route is read from
+language** ([#359](https://github.com/Omega-JS-Stack/omega/issues/359)): a mounted link's route is read from
 underneath the base path — which is also the route the exclusion list is
 matched on — and the language segment mounts after it, `/workkit/es/pricing`.
 Pinned by `test/translate.test.js`.
@@ -298,7 +298,7 @@ Pinned by `test/translate.test.js`.
 
 Every build emits `/service-worker.js` + `/build.js` + `/build.json`;
 @omega.js/client registers the worker at scope `/` on every page load
-(`updateViaCache: 'none'`). Under a base path ([#360](../../issues/360)) it
+(`updateViaCache: 'none'`). Under a base path ([#360](https://github.com/Omega-JS-Stack/omega/issues/360)) it
 registers `<prefix>/service-worker.js` at scope `<prefix>/` — the only scope a
 script served from there can claim — and hands the prefix to the worker as the
 `omega-path-prefix` query param on that URL, since a worker has no document to
@@ -410,8 +410,8 @@ example, and the four questions to read a page against them:
   is optional: the redirect layout hops at import time and exports nothing, so
   no stub may name a `default` esbuild can prove undefined, #742).
 - **Scaffolding (`ensureTarget()`, every verb)** — devkit's defaults engine over
-  `scaffold/`: marker-section merges live-sync .gitignore/AGENTS.md
-  (Custom sections preserved verbatim), config/omega.json5 seeds then
+  `scaffold/`: marker-section merges live-sync .gitignore and .gitattributes
+  (Custom sections preserved verbatim, a pre-marker file converging once), config/omega.json5 seeds then
   JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +
   .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
   Inside a brand monorepo that CI workflow is composed into the BRAND ROOT

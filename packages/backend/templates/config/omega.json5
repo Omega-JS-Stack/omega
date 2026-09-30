@@ -245,7 +245,7 @@
         },
         // Monthly contact prune (deletes cold contacts from your mail providers).
         // OPT-IN: nothing runs unless enabled is true. See @omega.js/backend's
-        // docs/marketing-campaigns.md (Contact Pruning).
+        // @omega.js/manager/docs/backend/marketing-campaigns.md (Contact Pruning).
         prune: {
           enabled: false,
         },

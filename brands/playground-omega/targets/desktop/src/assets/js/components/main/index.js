@@ -1,6 +1,6 @@
 /**
  * Surface: the main window's renderer (the `import` entry)
- * Doc: node_modules/@omega.js/desktop/docs/ipc.md
+ * Doc: node_modules/@omega.js/manager/docs/desktop/ipc.md
  *
  * What it consumes, one of each: omega.request() against the backend's
  * /notes routes (its own function), FormManager for the composer, data-omega-bind for the

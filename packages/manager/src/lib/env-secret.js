@@ -1,29 +1,24 @@
 /**
- * Brand .env writeback — persist a secret so every future run (and CI)
- * sees the same value. Used for machine-generated secrets that only have
- * to stay stable (CSC_KEY_PASSWORD, ACCOUNT_PASSWORD_SEED) and for
- * interactively-entered ones (the payment provider-setup flows). Replaces
- * the variable's line in place when it already exists, appends otherwise —
- * then applies the canonical ordering (env-order.js, cp137), the same way
- * writeConfigValues applies the omega.json5 canonical order on every
- * writeback. The order pass is a polish step: if it declines (exotic file
- * structure), the plain replace/append result is written unchanged.
+ * Brand .env writeback: persist a secret so every future run (and CI) sees the
+ * same value. The key's first line or placeholder takes the new line and every
+ * later assignment drops (appended when the file has none), then
+ * converges through the marker engine (env-order.js); when the converge
+ * declines, the plain replace/append result is written.
  *
- * mintGeneratedKey is the ONE mint for the keys OMEGA generates for itself
- * (the env schema's `generated:` set): the workspace service's env-keys op
- * does it for the whole set up front, the setup contract (lib/service-input.js)
- * does it for a single key a service reached first — same write, same export,
- * same success line, so a brand cannot tell which one got there first.
+ * mintGeneratedKey is the ONE mint for the env schema's `generated:` keys: the
+ * workspace env-keys op and the setup contract (lib/service-input.js) both call
+ * it, so a brand cannot tell which one got there first.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { generatedEnvKeys } = require('@omega.js/config');
-const { applyEnvOrder, envLine } = require('./env-order.js');
+const { generatedEnvKeys, assertEnvReadsBack, envLine } = require('@omega.js/config');
+const { setEnvLines } = require('@omega.js/devkit/env-lines');
+const { convergeEnv } = require('./env-order.js');
 
 /**
- * Write NAME="value" into the brand .env (replace-or-append).
+ * Write NAME="value" into the brand .env (replace-or-append, then converge).
  *
  * @param {string} brandRoot - Brand-monorepo root (its .env is the target)
  * @param {string} name - Env var name, e.g. 'CSC_KEY_PASSWORD'
@@ -31,20 +26,12 @@ const { applyEnvOrder, envLine } = require('./env-order.js');
  */
 function writeEnvValue(brandRoot, name, value) {
   const envPath = join(brandRoot, '.env');
-  // envLine escapes \ " and newlines (env-order.js's serializer — the SSOT);
-  // the replacer FUNCTION keeps $& / $1 in a secret from being expanded by String.replace
-  const line = envLine(name, value);
-  const pattern = new RegExp(`^${name}\\s*=.*$`, 'm');
-
-  let envContent = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
-  if (pattern.test(envContent)) {
-    envContent = envContent.replace(pattern, () => line);
-  } else {
-    // Terminate any existing content with exactly one newline, then append
-    envContent = envContent === '' ? '' : envContent.replace(/\n*$/, '\n');
-    envContent += `${line}\n`;
-  }
-  jetpack.write(envPath, applyEnvOrder(envContent).content);
+  // envLine is the serializer SSOT (@omega.js/config); setEnvLines is the key-line grammar
+  const envContent = setEnvLines(jetpack.exists(envPath) ? jetpack.read(envPath) : '', { [name]: envLine(name, value) });
+  const converged = convergeEnv(envContent).content;
+  // One line cannot show it all: a trailing backslash can run into the next
+  assertEnvReadsBack(converged, { [name]: value });
+  jetpack.write(envPath, converged);
 }
 
 /**

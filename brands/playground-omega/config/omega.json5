@@ -11,6 +11,9 @@
 // playground, subdomain playground.omegajs.dev, Firebase project
 // omegajs-playground — only the NAME and the VOICE moved.
 {
+  // Whether the brand is active. `false` makes the manager skip it: a company
+  // run stamps it but never spawns its walk.
+  enabled: true,
   brand: {
     id: "playground",
     name: "OMEGA Playground",
@@ -324,7 +327,7 @@
         // carries a 14-day trial that defers the first sale two weeks. A
         // proof press is the machine printers pull test prints on — the name
         // is placeholder copy like the rest of the catalog. Recipe:
-        // packages/backend/docs/paypal-sandbox-qa.md. Deliberately VISIBLE on
+        // docs/backend/paypal-sandbox-qa.md. Deliberately VISIBLE on
         // the pricing page (Ian 2026-08-19, #348): real checkouts run against
         // it by hand. The hidden: true mechanism still exists for products
         // that should stay off /pricing.
@@ -373,6 +376,9 @@
     // before the fact had a home. The successor to the retired
     // targets.web.currency.
     currency: "USD",
+    // false skips the manager's payment service: no provider account, product,
+    // webhook or Radar reconciliation for this brand.
+    enabled: true,
   },
 
   connections: {
@@ -494,6 +500,16 @@
       },
     },
   },
+  server: {
+    // false (or `server: false`) skips the manager's server service, which
+    // registers this brand in the company server's brands collection.
+    enabled: true,
+  },
+  assets: {
+    // false (or `assets: false`) skips the manager's assets service, which
+    // derives the brand's visual collateral from its logo sources.
+    enabled: true,
+  },
   // Directory participation (@omega.js/manager directory service): { enabled }
   // opts this brand's entry into the parent project's `brands` collection.
   // Absent or false never pushes. Needs `company: { id }` to name the
@@ -582,6 +598,18 @@
           },
         },
       },
+      // Site-wide defaults for page-meta values: the SAME names a page's
+      // `meta:` frontmatter carries, and the page (or its layout) wins
+      // (docs/web/frontmatter.md). `index` is the only key defined today,
+      // because everything else already falls back to the brand block.
+      meta: {
+        // false takes the WHOLE site out of search: every page emits noindex
+        // and sitemap.xml, llms.txt and pages.json list nothing. It is the
+        // site-wide DEFAULT of the one flag every signal reads, so a page's own
+        // `meta.index: true` still exempts it. Case 2 (docs/shared/config.md):
+        // default ON, and the literal false is the only OFF.
+        index: true,
+      },
     },
     backend: {
       type: "backend",
@@ -643,6 +671,13 @@
           id: "extension@playground.omegajs.dev",
         },
       },
+      // The AMO categories a FIRST Firefox publish lists the add-on under:
+      // addons.mozilla.org requires them on a new listing, and the Firefox lane
+      // writes them into the `--amo-metadata` file it hands `web-ext sign`.
+      // Slugs come from AMO's own set; the default is `alerts-updates`, the
+      // most generic one that is not `other`. Chrome and Edge pick their
+      // category in their own dashboards.
+      categories: ["alerts-updates"],
     },
   },
 }

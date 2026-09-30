@@ -216,7 +216,7 @@ This is a small addition to the existing `/token` page layout. Files:
 - `ultimate-jekyll-manager/src/defaults/dist/_layouts/blueprint/auth/token.html`
 - `ultimate-jekyll-manager/src/defaults/dist/_layouts/themes/classy/frontend/pages/auth/token.html`
 
-### 8. `docs/mcp.md` — Documentation
+### 8. `docs/backend/mcp.md` — Documentation
 
 - Add "Roles" section explaining admin/user/public scoping
 - Add "User Authentication" section with the OAuth flow diagram
@@ -233,7 +233,7 @@ This is a small addition to the existing `/token` page layout. Files:
 5. `src/cli/commands/mcp.js` — new CLI flags
 6. `src/mcp/handler.js` — HTTP role filtering + OAuth user flow + consumer tool handlers
 7. UJM `/token` page update (separate repo)
-8. `docs/mcp.md` — documentation
+8. `docs/backend/mcp.md` — documentation
 
 ## Verification
 

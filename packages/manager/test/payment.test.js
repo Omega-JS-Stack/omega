@@ -1038,7 +1038,7 @@ test('paypal-products: sandbox mode closes with the sandbox-buyer reminder (#348
   assert.ok(reminder.includes('proof-press'), 'the reminder names the QA fixture product');
   const pointer = log.lines.find((line) => line.includes('https://developer.paypal.com/dashboard/accounts'));
   assert.ok(pointer, 'the reminder points at the Developer Dashboard sandbox accounts page');
-  assert.ok(pointer.includes('@omega.js/backend/docs/paypal-sandbox-qa.md'), 'the reminder points at the runbook');
+  assert.ok(pointer.includes('@omega.js/manager/docs/backend/paypal-sandbox-qa.md'), 'the reminder points at the runbook');
   assert.deepEqual(paypal.mutations(), []); // a reminder, never a mutation
 });
 

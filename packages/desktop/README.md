@@ -21,11 +21,11 @@
 - **Lazy windows + Discord-style hide-on-close.** @omega.js/desktop doesn't auto-create any windows — your `main.js` calls `windows.create('main', { show: !startup.isLaunchHidden() })`. The `main` window's X button hides instead of quitting on every platform; real quit only via Cmd+Q / menu Quit / tray Quit / auto-update install. Inset titlebar by default (mac `hiddenInset` traffic lights / win native overlay buttons / linux native frame) with a draggable topbar in the page template.
 - **Zero-bounce hidden-launch on macOS.** `startup.mode = 'hidden'` bakes `LSUIElement: true` into Info.plist at build time → app launches completely invisible (no dock icon, no Cmd+Tab, no taskbar). Tray + notifications + networking still work. When the user double-clicks the running app's icon, @omega.js/desktop's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler surfaces the `main` window and the dock icon appears alongside it. CleanMyMac-style "tray-only at login, full window when manually opened" is the default.
 - **Auto-update background install.** When a download finishes from a background poll (not user-initiated), @omega.js/desktop auto-relaunches into the new version after 5s — apps update overnight without bothering the user. User-initiated checks skip this so your UI can prompt instead.
-- **Vert (ad) units with zero JS.** Drop `<div data-omega-vert></div>` into any view — the renderer auto-binds it (live, MutationObserver) to the shared OMEGA verts module: house/company inventory only (no AdSense in desktop surfaces), lazy near-viewport loading, sandboxed iframe, no-fill collapse. See [verts](docs/verts.md).
+- **Vert (ad) units with zero JS.** Drop `<div data-omega-vert></div>` into any view — the renderer auto-binds it (live, MutationObserver) to the shared OMEGA verts module: house/company inventory only (no AdSense in desktop surfaces), lazy near-viewport loading, sandboxed iframe, no-fill collapse. See [verts](../../docs/desktop/verts.md).
 - **esbuild-bundled** main / preload / renderer for source protection.
 - **Built-in test framework**: Jest-like syntax, four layers: `build` (plain Node), `main` (spawned Electron), `renderer` (hidden BrowserWindow), and `boot` (spawns the consumer's actual built `dist/main.bundle.js` for end-to-end smoke tests against the live `omega`, no `npm start && sleep && kill` shell hacks). Boot layer always rebuilds the bundle first so tests never see stale code.
-- **Schema-validated config.** One `config/omega.json5` (the OMEGA-wide format: shared brand/analytics/payment/firebase sections + desktop settings under `targets.desktop`), validated against the canonical schema in the bundled `@omega.js/config`. Validation runs at app boot AND during `gulp audit` — a misconfigured app never reaches the "white window of confusion" stage; it tells you exactly which field is broken with a numbered list. Simple flag model — `required: true | false | (config) => bool` — and `match` / `enum` / `type` only fire on field presence so consumers never see a flood of redundant errors for the same field. Pure-JS validator, no Ajv/Joi/Zod dep. See [config-schema](docs/config-schema.md).
-- **Multi-platform build/release** via GitHub Actions — macOS sign + notarize, Linux (deb + AppImage + optional Snap), Windows EV-token signing (self-hosted runner now, cloud-signing pluggable). Sensible installer defaults out of the box: NSIS one-click install on Windows (desktop + start menu shortcut, launch on finish), universal mac binary (one .dmg for Intel + Apple Silicon), `app.category` automatically mapped to per-platform values, copyright `{YEAR}` token always current. Snap Store publishing is on by default in the scaffold and auto-skipped at build time when `SNAPCRAFT_STORE_CREDENTIALS` isn't set — drop the credential blob into `.env`, run `mgr push-secrets`, and the next release ships to the Snap Store. See [installer-options](docs/installer-options.md).
+- **Schema-validated config.** One `config/omega.json5` (the OMEGA-wide format: shared brand/analytics/payment/firebase sections + desktop settings under `targets.desktop`), validated against the canonical schema in the bundled `@omega.js/config`. Validation runs at app boot AND during `gulp audit` — a misconfigured app never reaches the "white window of confusion" stage; it tells you exactly which field is broken with a numbered list. Simple flag model — `required: true | false | (config) => bool` — and `match` / `enum` / `type` only fire on field presence so consumers never see a flood of redundant errors for the same field. Pure-JS validator, no Ajv/Joi/Zod dep. See [config-schema](../../docs/desktop/config-schema.md).
+- **Multi-platform build/release** via GitHub Actions — macOS sign + notarize, Linux (deb + AppImage + optional Snap), Windows EV-token signing (self-hosted runner now, cloud-signing pluggable). Sensible installer defaults out of the box: NSIS one-click install on Windows (desktop + start menu shortcut, launch on finish), universal mac binary (one .dmg for Intel + Apple Silicon), `app.category` automatically mapped to per-platform values, copyright `{YEAR}` token always current. Snap Store publishing is on by default in the scaffold and auto-skipped at build time when `SNAPCRAFT_STORE_CREDENTIALS` isn't set — drop the credential blob into `.env`, run `mgr push-secrets`, and the next release ships to the Snap Store. See [installer-options](../../docs/desktop/installer-options.md).
 
 ## Quick start (consumer)
 
@@ -36,7 +36,7 @@ npm install @omega.js/desktop --save-dev
 nvm use                  # switch to the Node version Electron uses (one-time per shell)
 npm start                # dev: gulp → esbuild → electron .
 OMEGA_CDP_PORT=9222 npm start  # dev + expose Chrome DevTools Protocol for Claude/MCP debugging
-npx omega cdp status       # drive the running dev app over CDP: status|eval|shot|capture|theme|relaunch|quit (docs/cdp-debugging.md)
+npx omega cdp status       # drive the running dev app over CDP: status|eval|shot|capture|theme|relaunch|quit (docs/desktop/cdp-debugging.md)
 npm run build            # local production build (bundles only, no installer)
 npm run package:quick    # fast packaged build for host platform/arch (.app/.exe-folder/linux-unpacked, ~20-30s) — for smoke-testing packaged behavior
 npm run package          # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
@@ -96,7 +96,7 @@ In production, `runtime.log` lives at `app.getPath('logs')`:
 - Windows: `%APPDATA%\<AppName>\logs\runtime.log`
 - Linux: `~/.config/<AppName>/logs/runtime.log`
 
-See [docs/logging.md](docs/logging.md) for the full picture (renderer forwarding, log levels, programmatic path access).
+See [docs/desktop/logging.md](../../docs/desktop/logging.md) for the full picture (renderer forwarding, log levels, programmatic path access).
 
 Override gulp's `dev.log` path via `OMEGA_LOG_FILE=<path>`; disable entirely via `OMEGA_LOG_FILE=false`. The default `.gitignore` includes `logs/`.
 
@@ -131,40 +131,40 @@ omega.initialize().then(() => { const { logger, desktop } = omega; });
 
 ## Documentation
 
-Each subsystem has its own API reference under [`docs/`](docs/):
+Each subsystem has its own API reference under [`docs/desktop/`](../../docs/desktop):
 
-- [storage](docs/storage.md) — KV store, sync in main, async (via IPC) in renderer, dot-notation paths, change broadcasts
-- [ipc](docs/ipc.md) — typed channel bus, `handle` / `invoke` / `broadcast`
-- [windows](docs/windows.md) — lazy named-window registry (no auto-create), bounds persistence, inset titlebar, hide-on-close
-- [tray](docs/tray.md) — file-based tray definition, dynamic items, runtime mutators
-- [menu](docs/menu.md) — file-based application menu, platform-aware default template
-- [context-menu](docs/context-menu.md) — file-based right-click menus, called per-event with `params`
-- [startup](docs/startup.md) — launch modes (`normal` / `hidden`), LSUIElement on macOS, login-item handling
-- [app-state](docs/app-state.md) — first-launch / launch-count / crash-sentinel flags
-- [deep-link](docs/deep-link.md) — cross-platform deep links, single-instance, pattern routing, built-in routes
-- [auth](docs/auth.md): `omega.auth`, Firebase auth state synchronized across main + every renderer
-- [auto-updater](docs/auto-updater.md) — startup + periodic checks, 30-day max-age gate, dev simulation
-- [analytics](docs/analytics.md) — GA4 Measurement Protocol with cross-platform `uuidv5` identity (same human → same `user_id` across desktop/web/backend)
-- [context](docs/context.md) — runtime info block (geolocation, client, session, app) — @omega.js/backend-shaped
-- [usage](docs/usage.md) — opens / hoursTotal / hoursThisSession; clean-exit accumulation
-- [remote-config](docs/remote-config.md) — "hot config" fetched from brand site for runtime flag flips without re-releases
-- [restart-manager](docs/restart-manager.md) — auxiliary helper app for relaunches; auto-installs via signed mac.zip / NSIS exe / browser-opened .deb
-- [config-schema](docs/config-schema.md) — canonical schema + validator for `config/omega.json5`. Hard-fails boot AND `gulp audit` on missing required fields, regex mismatches, enum violations, type mismatches. Single source of truth in the bundled `@omega.js/config`
-- [templating](docs/templating.md) — `{{ var }}` token replacement, page template, body-only views
-- [themes](docs/themes.md): classy + bootstrap themes, `@use 'omega-desktop' as * with (...)` overrides, per-page CSS bundles, system-aware appearance (`omega.theme`)
-- [sentry](docs/sentry.md) — error/crash reporting, dev-mode gating, auto auth attribution, release tagging
-- [hooks](docs/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize)
-- [installer-options](docs/installer-options.md) — installer/distribution config: NSIS one-click defaults, ia32 inclusion, app.category mapping, `{YEAR}` copyright token, snap publishing (default-on with cred-gated auto-skip), MAS roadmap
-- [signing](docs/signing.md) — macOS + Windows code signing reference, cert files, env vars
-- [releasing](docs/releasing.md) — end-to-end release walkthrough (`.env` → GitHub Release)
-- [runner](docs/runner.md) — Windows EV-token signing runner — `npx omega runner start`, which onboards new GH orgs, `npx omega runner monitor` for a live signing event tail
-- [test-framework](docs/test-framework.md) — writing tests, running them, layers
-- [test-boot-layer](docs/test-boot-layer.md) — boot test layer (spawns the consumer's actual built bundle for end-to-end smoke tests)
-- [build-system](docs/build-system.md) — gulp, esbuild, electron-builder pipeline
+- [storage](../../docs/desktop/storage.md) — KV store, sync in main, async (via IPC) in renderer, dot-notation paths, change broadcasts
+- [ipc](../../docs/desktop/ipc.md) — typed channel bus, `handle` / `invoke` / `broadcast`
+- [windows](../../docs/desktop/windows.md) — lazy named-window registry (no auto-create), bounds persistence, inset titlebar, hide-on-close
+- [tray](../../docs/desktop/tray.md) — file-based tray definition, dynamic items, runtime mutators
+- [menu](../../docs/desktop/menu.md) — file-based application menu, platform-aware default template
+- [context-menu](../../docs/desktop/context-menu.md) — file-based right-click menus, called per-event with `params`
+- [startup](../../docs/desktop/startup.md) — launch modes (`normal` / `hidden`), LSUIElement on macOS, login-item handling
+- [app-state](../../docs/desktop/app-state.md) — first-launch / launch-count / crash-sentinel flags
+- [deep-link](../../docs/desktop/deep-link.md) — cross-platform deep links, single-instance, pattern routing, built-in routes
+- [auth](../../docs/desktop/auth.md): `omega.auth`, Firebase auth state synchronized across main + every renderer
+- [auto-updater](../../docs/desktop/auto-updater.md) — startup + periodic checks, 30-day max-age gate, dev simulation
+- [analytics](../../docs/desktop/analytics.md) — GA4 Measurement Protocol with cross-platform `uuidv5` identity (same human → same `user_id` across desktop/web/backend)
+- [context](../../docs/desktop/context.md) — runtime info block (geolocation, client, session, app) — @omega.js/backend-shaped
+- [usage](../../docs/desktop/usage.md) — opens / hoursTotal / hoursThisSession; clean-exit accumulation
+- [remote-config](../../docs/desktop/remote-config.md) — "hot config" fetched from brand site for runtime flag flips without re-releases
+- [restart-manager](../../docs/desktop/restart-manager.md) — auxiliary helper app for relaunches; auto-installs via signed mac.zip / NSIS exe / browser-opened .deb
+- [config-schema](../../docs/desktop/config-schema.md) — canonical schema + validator for `config/omega.json5`. Hard-fails boot AND `gulp audit` on missing required fields, regex mismatches, enum violations, type mismatches. Single source of truth in the bundled `@omega.js/config`
+- [templating](../../docs/desktop/templating.md) — `{{ var }}` token replacement, page template, body-only views
+- [themes](../../docs/desktop/themes.md): classy + bootstrap themes, `@use 'omega-desktop' as * with (...)` overrides, per-page CSS bundles, system-aware appearance (`omega.theme`)
+- [sentry](../../docs/desktop/sentry.md) — error/crash reporting, dev-mode gating, auto auth attribution, release tagging
+- [hooks](../../docs/desktop/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize)
+- [installer-options](../../docs/desktop/installer-options.md) — installer/distribution config: NSIS one-click defaults, ia32 inclusion, app.category mapping, `{YEAR}` copyright token, snap publishing (default-on with cred-gated auto-skip), MAS roadmap
+- [signing](../../docs/desktop/signing.md) — macOS + Windows code signing reference, cert files, env vars
+- [releasing](../../docs/desktop/releasing.md) — end-to-end release walkthrough (`.env` → GitHub Release)
+- [runner](../../docs/desktop/runner.md) — Windows EV-token signing runner — `npx omega runner start`, which onboards new GH orgs, `npx omega runner monitor` for a live signing event tail
+- [test-framework](../../docs/desktop/test-framework.md) — writing tests, running them, layers
+- [test-boot-layer](../../docs/desktop/test-boot-layer.md) — boot test layer (spawns the consumer's actual built bundle for end-to-end smoke tests)
+- [build-system](../../docs/desktop/build-system.md) — gulp, esbuild, electron-builder pipeline
 
 ## Status
 
-Active development on `v1`. See [`PROGRESS.md`](PROGRESS.md) for pass-by-pass progress.
+Active development on `v1`.
 
 ## License
 

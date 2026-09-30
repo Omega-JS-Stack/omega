@@ -26,7 +26,6 @@
     "release:check": "node scripts/release-check.js"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
     "@omega.js/devkit": "*"
   }
 }

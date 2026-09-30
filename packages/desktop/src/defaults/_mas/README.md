@@ -24,7 +24,7 @@ Team ID + appId at build time.
 ## Roadmap
 
 When MAS support is implemented (currently stubbed in
-`config.targets.mac.mas`, see `docs/installer-options.md`), this folder will be
+`config.targets.mac.mas`, see `node_modules/@omega.js/manager/docs/desktop/installer-options.md`), this folder will be
 the starting point for the entitlements @omega.js/desktop auto-generates into `dist/config/`
 when `mac.mas.enabled === true`. The structure should be similar to the existing
 `writeMacEntitlements` flow but with separate output files for `mas`, `mas.inherit`,

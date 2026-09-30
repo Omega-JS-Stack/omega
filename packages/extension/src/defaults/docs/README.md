@@ -14,4 +14,4 @@ Examples of good `docs/*.md` topics:
 
 ## See also
 
-The framework's own docs follow this same pattern: browse `node_modules/@omega.js/extension/docs/` for the canonical examples.
+The framework's own docs follow this same pattern: browse `node_modules/@omega.js/manager/docs/extension/` for the canonical examples.

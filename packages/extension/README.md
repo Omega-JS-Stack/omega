@@ -23,8 +23,8 @@
 - **Component architecture**: seven contexts (background / popup / options / sidepanel / content / pages / offscreen) each with view + styles + script
 - **One ready-made `omega` per context**: `import omega from '@omega.js/extension/popup'; await omega.initialize();`, with the cross-browser API wrapper, the logger and the messenger on every context, and `@omega.js/client` on the four page contexts
 - **Cross-context auth sync**: sign-in in one tab is reflected in all open contexts (no `chrome.storage` needed)
-- **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/verts.md](docs/verts.md)
-- **Affiliate redirects**: a visit to a partner site (Amazon, Rakuten, NordVPN, …) redirects once per 24h to an affiliate URL — default-on, `?affiliatizerStatus=block` to stop it. The partner map is a fixed framework constant carrying the framework author's referral codes, not per-brand config. See [docs/affiliatizer.md](docs/affiliatizer.md)
+- **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/extension/verts.md](../../docs/extension/verts.md)
+- **Affiliate redirects**: a visit to a partner site (Amazon, Rakuten, NordVPN, …) redirects once per 24h to an affiliate URL — default-on, `?affiliatizerStatus=block` to stop it. The partner map is a fixed framework constant carrying the framework author's referral codes, not per-brand config. See [docs/extension/affiliatizer.md](../../docs/extension/affiliatizer.md)
 - **Auto-translation** to the languages in `translation.languages` (omega.json5) on every build — only missing keys hit the provider
 - **Four-layer test framework**: build / background / view / boot — real Chromium, real MV3 service worker, real consumer extensions
 - **Multi-browser packaging + auto-publish** to Chrome / Firefox / Edge stores from one command
@@ -63,7 +63,7 @@ npx omega test --extended        # also run extended suites against REAL externa
 
 Tests run against the **real** harness: a real MV3 service worker, a real Chromium tab, the real packaged extension. **Never mock** (`chrome`, `omega`, contexts are all real); only pure, I/O-free functions are called directly. Real external APIs are gated behind **extended mode**: `--extended` or the shared, unprefixed `TEST_EXTENDED_MODE=true` env var (skipped in-source otherwise, never mocked).
 
-All CLI output also lands in `logs/` (ANSI-stripped, truncated each run) — `test.log` from `npx omega test`, `dev.log` from `npm start`, `build.log` from `npm run build`. Details: [docs/logging.md](docs/logging.md).
+All CLI output also lands in `logs/` (ANSI-stripped, truncated each run) — `test.log` from `npx omega test`, `dev.log` from `npm start`, `build.log` from `npm run build`. Details: [docs/extension/logging.md](../../docs/extension/logging.md).
 
 Test files use Jest-compatible matchers:
 
@@ -82,13 +82,13 @@ module.exports = {
 };
 ```
 
-Full guide: [docs/test-framework.md](docs/test-framework.md). End-to-end "did my packaged extension actually boot in Chrome?" tests: [docs/test-boot-layer.md](docs/test-boot-layer.md).
+Full guide: [docs/extension/test-framework.md](../../docs/extension/test-framework.md). End-to-end "did my packaged extension actually boot in Chrome?" tests: [docs/extension/test-boot-layer.md](../../docs/extension/test-boot-layer.md).
 
 ## 🌐 Auto-translation
 
 When you run `npm run build`, @omega.js/extension auto-translates `config/messages.json` to the languages set in `translation.languages` (omega.json5), via the shared devkit translation engine (Claude CLI by default). Translation is off until `translation.languages` is set.
 
-Only missing translations are generated — existing translations live in the committed `translations/` cache and are preserved. Full guide: [docs/translations.md](docs/translations.md).
+Only missing translations are generated — existing translations live in the committed `translations/` cache and are preserved. Full guide: [docs/extension/translations.md](../../docs/extension/translations.md).
 
 ## 🎨 Design tokens (C4)
 
@@ -152,7 +152,7 @@ EDGE_CLIENT_ID="..."
 EDGE_API_KEY="..."
 ```
 
-Only stores with configured credentials get published to. Full guide: [docs/publishing.md](docs/publishing.md).
+Only stores with configured credentials get published to. Full guide: [docs/extension/publishing.md](../../docs/extension/publishing.md).
 
 ## 🔐 Authentication
 
@@ -186,7 +186,7 @@ Add these CSS classes to HTML elements for declarative auth UI:
 </div>
 ```
 
-Full guide: [docs/auth.md](docs/auth.md).
+Full guide: [docs/extension/auth.md](../../docs/extension/auth.md).
 
 ## 🔒 Supply-chain security
 
@@ -194,7 +194,7 @@ All `npm install` calls in @omega.js/extension CLI commands (the peer-dependency
 
 ## 📚 Documentation
 
-In-depth docs for every subsystem live in [docs/](docs/); the architecture overview is the framework guide, `docs/extension/index.md` in the omega monorepo.
+In-depth docs for every subsystem live in [docs/extension/](../../docs/extension); the architecture overview is the framework guide, `docs/extension/index.md` in the omega monorepo.
 
 ## 🧰 Sister projects
 

@@ -53,7 +53,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   domain:         { providers: { namecheap: {} }, email: { providers: { cloudflare: {} }, forwarding: [] } },   // TWO roles (#425): the REGISTRAR is the one key under `providers` (namecheap is the one the service drives by API; every other registrar gets manual instructions), the mailbox provider the one key under `email.providers`. Presence picks; no entry = nothing chosen, and the service skips
   certificates:   { enabled, providers: { apple: { bundleIdPrefix, capabilities: [], profiles: [], certificates: [] } } },   // Apple signing for desktop/mobile targets. bundleIdPrefix is the brand's own answer ('com.mycompany' + brand.id composes the bundle id); the credentials live in .env (APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID)
   reviews:        { enabled, sites: [] },
-  marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: packages/backend/docs/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
+  marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: docs/backend/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
   blog:           { /* AI blog-content settings (Ghostii pipeline) */ },
   devlog:         { enabled, providers: { ghostii: { orgs, lookbackDays, … } } },   // commit-digest devlog (#553): `enabled: true` PUBLISHES AI-written posts to the live site, so it is case 3 — the literal true is the only ON, absence is off, and no default is materialized
   seo:            { github: { content: [] } },   // the manager's parasite-SEO content repos; big blocks may live in the `config/seo.json5` sidecar. The site-wide SEARCH POSTURE is NOT here: it is `targets.web.meta.index`, the same name a page writes (#564)
@@ -527,9 +527,25 @@ over it.
 - **Empty file values never claim a key (cp95a, friction #20)**: `KEY=` / `KEY=""` in any
   `.env` FILE means "documented here, value supplied by another layer" — a scaffolded local
   file full of placeholders can't shadow the brand root's real values. Only the shell can
-  deliberately set a key to empty. The brand root's `.env` stub ships `# KEY=` commented
-  placeholders, rendered from the env schema (the merge protocol keeps set values on their
-  line, converges empties to the placeholder); no framework scaffolds a target `.env` at all.
+  deliberately set a key to empty. The brand root's `.env` stub ships `# KEY=""` commented
+  placeholders in its `Default Values` section, rendered from the env schema (the merge
+  protocol keeps set values on their line, converges empties to the placeholder, and keeps
+  the `Custom Values` section verbatim); no framework scaffolds a target `.env` at all.
+- **Every `.env` line the framework writes is double-quoted, and reads back as written.**
+  `KEY="value"`, an empty value `KEY=""`, a placeholder `# KEY=""`: no other form, with
+  one exception. GitHub's runner-dir `.env`, written by `ensureRunnerDirEnv`
+  ([runner.md](../desktop/runner.md)), holds bare `KEY=value` lines, because the runner reads
+  each line verbatim and quotes would land in the value.
+  `envLine` / `serializeEnv` (`src/env.js`) are the one serializer. A value goes in raw
+  (dotenv reads `"`, `\`, `'` and `#` back unchanged); a real newline or carriage return is
+  written as the two characters `\n` / `\r`, which dotenv expands back, so every line stays
+  one line. dotenv judges every write by reading it back: a value it would read back changed
+  (one already holding a literal backslash-n or backslash-r, a quote followed by `#`, or a
+  trailing backslash that runs into the next line) throws, naming the key and never the value.
+  That judge is `assertEnvReadsBack(content, values)`: `envLine` and `serializeEnv` run it, and
+  a writer that rewrites lines inside an existing file runs it on the whole file before writing.
+  Such a writer finds a key's lines through devkit's `setEnvLines` ([devkit](../devkit/index.md)),
+  never a regex of its own.
 - **Defined at the source, resolved at runtime/build**: a brand-wide `GH_TOKEN` lives once
   in the brand `.env`; every framework CLI/build resolves the chain at boot
   (`loadEnv(process.cwd())` in the web/desktop/extension CLIs + gulp pipelines,
@@ -543,7 +559,11 @@ over it.
   `dist/.env`: it rides the Firebase deploy artifact (the cloud can't walk up), so every verb
   that produces one (`omega build`, `dev`, `test`, `deploy`) composes it from the file layers,
   filtered by the env schema. In the cloud the walk finds no brand/company and behavior
-  is identical to plain dotenv.
+  is identical to plain dotenv. Firebase reads the staged `dist/.env` too, with its own
+  reader, which decodes backslash codes that dotenv leaves alone. So a value holding a
+  backslash before `n`, `r`, `t`, `v`, a backslash or a quote, or before a line break, is
+  refused at staging (`assertFirebaseEnvSafe` in the backend's `stage-functions.js`),
+  naming the key and never the value.
 - **The brand-generated keys are the manager's to mint** — `OMEGA_ADMIN_KEY`,
   `OMEGA_WEBHOOK_KEY`, `OMEGA_NAMESPACE` and `UNSUBSCRIBE_HMAC_KEY` have no dashboard
   behind them, so the onboard stub writes them for a fresh brand and the workspace
@@ -746,11 +766,11 @@ Who derives from it:
 | Lane | What it takes |
 |---|---|
 | `@omega.js/manager` workspace `env-keys` + the onboard `.env` stub | `generatedEnvKeys()` — name → the function that mints a value |
-| `@omega.js/manager` `lib/env-order.js` (canonical .env order) | `envFileGroups()` + `envKeysByGroup()` — the sections, their comments, their keys |
+| `@omega.js/manager` `lib/env-order.js` (the brand and company `.env` marker template) | `envFileGroups()` + `envKeysByGroup()`: the groups of the `Default Values` section, their comments, their keys |
 | `@omega.js/config` `composeTargetEnv()` (the delivery composition every verb runs) | `ENV_SCHEMA` + `envFileGroups()`: a DECLARED brand key rides down when its entry claims it (by `name` or by `match`), its `targets` include the target, and its group renders into a file; a key no entry knows at all is the consumer's own and rides down to every target ([#835](https://github.com/Omega-JS-Stack/omega/issues/835)); `deliverAs` is applied on arrival, and each layer's `.env.<environment>` overlay composes above its own base (#586) |
 | `@omega.js/config` `envKeysForTarget(target)` (the rendering lane's list) | `ENV_SCHEMA` + `envFileGroups()` — the NAMED keys a target reads, which placeholders a brand `.env` carries |
 | `@omega.js/backend` `libraries/env.js` (the one reader) | `envSchemaEntry()` for every read, `requiredEnvKeys('backend')` for the boot guard, and `getEnvironment()` re-exported under its own name ([docs/backend/index.md](../backend/index.md)) |
-| `@omega.js/manager` `lib/scaffold.js` (the onboard stub) + `lib/gitignore.js` (the heal) | `ENV_ENVIRONMENTS` — one empty `.env.<environment>` per name, and the `.env.*` ignore |
+| `@omega.js/manager` `lib/scaffold.js` (the onboard stub) + `lib/gitignore.js` (the brand `.gitignore` template and its heal) | `ENV_ENVIRONMENTS`: one empty `.env.<environment>` per name, and the `.env.*` ignore |
 | `@omega.js/config` `env-delivery.js` (the one delivery renderer) | `delivery` + `deliverAs` + `machineLocal` + `publicAtRest`, plus the target's COMPOSED production values for the keys the schema cannot name (`match` families and custom keys, #835/#876): each target's workflow secrets block, bake list, and publish-step secret set; web and extension render their workflow token from it, desktop's ensure-target template pass does the same, backend's composed `deploy.yml` renders both its secrets block and the KEY LIST its node `.env` writer reads out of the runner env ([#872](https://github.com/Omega-JS-Stack/omega/issues/872)), and all secret publishers send exactly its set |
 | `@omega.js/config` `env-rules.js` (the one presence checker) | `required` + `requiredWhen` — the violations the backend boot, the desktop/extension bakes, and the manager's manage walk act on, each at its own severity |
 
@@ -1089,7 +1109,7 @@ unifying. The mapping is in [breaking-changes.md](breaking-changes.md).
 `usage` at the top level is reserved for **counting settings** (an anonymous-store mode, a
 reset hour) and carries **no key today**. It is not a second home for the catalog. The
 backend's gate reads `features`; how a user's counters behave is
-[packages/backend/docs/usage-rate-limiting.md](../../packages/backend/docs/usage-rate-limiting.md).
+[docs/backend/usage-rate-limiting.md](../backend/usage-rate-limiting.md).
 
 ## User connections (`connections`) — #771, #788, #792, #793
 
@@ -1126,7 +1146,7 @@ Secrets never live here: the credentials are the `CONNECTIONS_<PROVIDER>_CLIENT_
 `CONNECTIONS_<PROVIDER>_CLIENT_SECRET` pair in the `.env` (the provider name uppercased,
 dashes as underscores). The full provider contract — the module shape, the ONE context
 every step takes, `pkce: 'S256'`, the route-owned identity uniqueness, and the `type` every
-stored record carries — is `packages/backend/docs/connections.md`.
+stored record carries — is `docs/backend/connections.md`.
 
 ## The cancel-flow save offer (`payment.winback`) — #268
 
@@ -1556,7 +1576,7 @@ rarely does — presentation the framework owns — belongs at the layer that ow
 every brand config is a copy that drifts from the thing it came from. The `connections` section is
 the first: the framework ships the five packaged providers' `name`, `logo` and `description`, a
 brand overrides any key through the ordinary merge chain, and nothing is copied into a brand file to
-go stale ([packages/backend/docs/connections.md](../../packages/backend/docs/connections.md)).
+go stale ([docs/backend/connections.md](../backend/connections.md)).
 
 ## Writeback (comment-preserving edits)
 

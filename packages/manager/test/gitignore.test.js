@@ -1,8 +1,7 @@
-// Tests for src/lib/gitignore.js — the idempotent .gitignore healer the
-// workspace service applies at every brand root. Real files in a temp dir, no
-// mocks. #197 added `logs/`: a brand scaffolded before
-// the run-log lane exists on disk without it, so the healer is what gets every
-// EXISTING root there.
+// Tests for src/lib/gitignore.js and the workspace `gitignore` op: the brand
+// root and company root .gitignore speak the one marker engine, a Default
+// section the framework rewrites on every manage and a Custom section kept
+// verbatim. Real files in a temp dir, no mocks.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +9,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { ensureOmegaIgnored } = require('../src/lib/gitignore.js');
+const { ensureGitignore, renderBrandGitignore, renderCompanyGitignore } = require('../src/lib/gitignore.js');
+const gitignoreOp = require('../src/services/workspace/ensure/gitignore.js');
+
+const DEFAULT = '# ========== Default Values ==========';
+const CUSTOM = '# ========== Custom Values ==========';
+const EM_DASH = String.fromCharCode(0x2014);
 
 function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-gitignore-'));
@@ -20,110 +24,137 @@ function readGitignore(root) {
   return fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
 }
 
-function entryCount(contents, entry) {
-  return contents.split('\n').filter((line) => line.trim() === entry).length;
+// The Default half's entries (comments and blanks dropped) and the Custom half.
+function halves(contents) {
+  const [head, custom] = contents.split(`${CUSTOM}\n`);
+  const entries = head.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
+  return { entries, custom };
 }
 
-test('gitignore: a missing .gitignore is created with every entry', () => {
+// A brand born before the markers: the scaffold's old file plus the appender's
+// blocks, em-dash headers and all.
+const UNMARKED_BRAND = [
+  '# Dependencies',
+  'node_modules/',
+  '',
+  `# OMEGA manager state (derived data ${EM_DASH} never committed)`,
+  '.omega/',
+  '',
+  '# Secrets',
+  '.env',
+  '',
+  `# Run logs (truncated on every launch ${EM_DASH} never committed)`,
+  'logs/',
+  '',
+  `# Secrets ${EM_DASH} the environment overlays beside .env`,
+  '.env.*',
+  '',
+].join('\n');
+
+// ─── The templates ───────────────────────────────────────────────────────────
+
+test('gitignore: the brand template is the marked file: every framework entry under Default, Custom empty', () => {
+  const contents = renderBrandGitignore();
+  assert.equal(contents.split('\n')[0], DEFAULT);
+  assert.ok(contents.endsWith(`\n\n${CUSTOM}\n`), 'the Custom section is only its marker line');
+  assert.deepEqual(halves(contents), { entries: ['node_modules/', 'dist/', '.omega/', 'logs/', '.env', '.env.*', '.DS_Store'], custom: '' });
+  assert.equal(contents.includes(EM_DASH), false, 'no em dash');
+});
+
+test('gitignore: the company template is the marked file with the unshareable half', () => {
+  const contents = renderCompanyGitignore();
+  assert.equal(contents.split('\n')[0], DEFAULT);
+  assert.deepEqual(halves(contents), { entries: ['.env', '.env.*', '.omega/'], custom: '' });
+});
+
+// ─── ensureGitignore ─────────────────────────────────────────────────────────
+
+test('gitignore: a missing file is created from the template, then present', () => {
   const root = tmpdir();
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'created');
+  assert.equal(readGitignore(root), renderBrandGitignore());
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'present');
+});
 
-  assert.equal(ensureOmegaIgnored(root), 'added');
+test('gitignore: an unmarked brand file of framework lines only converges to the template', () => {
+  const root = tmpdir();
+  fs.writeFileSync(path.join(root, '.gitignore'), UNMARKED_BRAND);
 
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'converged');
+  assert.equal(readGitignore(root), renderBrandGitignore(), 'every old header and entry was the framework\'s');
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'present', 'a second run writes nothing');
+});
+
+test('gitignore: an unmarked file keeps every consumer line under Custom, nothing duplicated', () => {
+  const root = tmpdir();
+  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\ntest/e2e/.logs/\n\n# Omega manager state (durable IDs + per-run output)\n.omega/\n\n# my own\n*.log\n');
+
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'converged');
   const contents = readGitignore(root);
-  assert.equal(entryCount(contents, '.omega/'), 1);
-  assert.equal(entryCount(contents, 'logs/'), 1);
-  assert.equal(entryCount(contents, '.env.*'), 1);
-  assert.equal(contents.includes('\u2014'), false, 'the written comments carry no em dash');
+  assert.equal(contents, `${renderBrandGitignore()}test/e2e/.logs/\n\n# my own\n*.log\n`);
+  assert.equal(contents.split('\n').filter((line) => line === 'node_modules/').length, 1);
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'present');
 });
 
-// #586 — the environment overlays are new secret files at the brand root. Every
-// brand born before them lists `.env` and nothing else, so the heal is the only
-// thing standing between a `.env.production` and a public commit.
-test('gitignore: a brand that predates the environment overlays gains .env.*', () => {
+test('gitignore: a marked file heals its Default section and keeps the Custom section verbatim', () => {
   const root = tmpdir();
-  fs.writeFileSync(path.join(root, '.gitignore'), [
-    '# Secrets',
-    '.env',
-    '',
-    '# OMEGA manager state (derived data — never committed)',
-    '.omega/',
-    '',
-    '# Run logs (truncated on every launch — never committed)',
-    'logs/',
-    '',
-  ].join('\n'));
+  fs.writeFileSync(path.join(root, '.gitignore'), `${DEFAULT}\nnode_modules/\nretired-by-the-framework/\n\n${CUSTOM}\nmy-secret-dir/\n`);
 
-  assert.equal(ensureOmegaIgnored(root), 'added');
-
-  const contents = readGitignore(root);
-  assert.equal(entryCount(contents, '.env.*'), 1, 'the overlays are ignored');
-  assert.equal(entryCount(contents, '.env'), 1, "the base's own line is untouched");
-  assert.equal(entryCount(contents, '.omega/'), 1, 'nothing already present is duplicated');
-
-  assert.equal(ensureOmegaIgnored(root), 'present', 'a second heal is a no-op');
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'healed');
+  assert.equal(readGitignore(root), `${renderBrandGitignore()}my-secret-dir/\n`);
+  assert.equal(ensureGitignore(root, renderBrandGitignore()), 'present');
 });
 
-test('gitignore: an existing brand missing logs/ gains it, keeping what it had', () => {
+test('gitignore: a dry run returns the verdict and writes nothing', () => {
   const root = tmpdir();
-  fs.writeFileSync(path.join(root, '.gitignore'), [
-    '# Dependencies',
-    'node_modules/',
-    '',
-    '# OMEGA manager state (derived data — never committed)',
-    '.omega/',
-    '',
-  ].join('\n'));
+  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
+  assert.equal(ensureGitignore(root, renderBrandGitignore(), { dryRun: true }), 'converged');
+  assert.equal(readGitignore(root), 'node_modules/\n');
 
-  assert.equal(ensureOmegaIgnored(root), 'added');
-
-  const contents = readGitignore(root);
-  assert.equal(entryCount(contents, 'logs/'), 1, 'the run-log lane is now ignored');
-  assert.equal(entryCount(contents, '.omega/'), 1, 'the entry it already had is not duplicated');
-  assert.match(contents, /node_modules\//, 'the brand’s own entries survive');
+  const empty = tmpdir();
+  assert.equal(ensureGitignore(empty, renderBrandGitignore(), { dryRun: true }), 'created');
+  assert.equal(fs.existsSync(path.join(empty, '.gitignore')), false);
 });
 
-test('gitignore: a root that already has every entry is untouched', () => {
-  const root = tmpdir();
-  const before = [
-    'node_modules/',
-    '.omega/',
-    'logs/',
-    '.env.*',
-    '',
-  ].join('\n');
-  fs.writeFileSync(path.join(root, '.gitignore'), before);
+// ─── The workspace op: the brand root and the company root ───────────────────
 
-  assert.equal(ensureOmegaIgnored(root), 'present');
-  assert.equal(readGitignore(root), before, 'not one byte rewritten');
+test('gitignore op: converges the brand root and the company root, each from its own template, then is a no-op', async () => {
+  const brandRoot = tmpdir();
+  const companyRoot = path.join(tmpdir(), 'company');
+  fs.mkdirSync(companyRoot);
+  fs.writeFileSync(path.join(brandRoot, '.gitignore'), UNMARKED_BRAND);
+  fs.writeFileSync(path.join(companyRoot, '.gitignore'), '# Secrets: the shared .env and its per-environment overlays\n.env\n.env.*\n\n.omega/\nshared-scratch/\n');
+
+  const logged = [];
+  const log = console.log;
+  console.log = (line) => logged.push(line);
+  let result;
+  try {
+    result = await gitignoreOp({ brandRoot, companyRoot });
+  } finally {
+    console.log = log;
+  }
+  assert.deepEqual(result.output, { gitignore: { brand: 'converged', company: 'converged' } });
+  assert.ok(logged.every((line) => !/undefined|Custom section kept/.test(line)), logged.join('\n'));
+  assert.equal(readGitignore(brandRoot), renderBrandGitignore());
+  assert.equal(readGitignore(companyRoot), `${renderCompanyGitignore()}shared-scratch/\n`);
+
+  assert.equal(await gitignoreOp({ brandRoot, companyRoot }), null, 'a second run writes nothing');
 });
 
-test('gitignore: slashless aliases satisfy every entry', () => {
-  const root = tmpdir();
-  const before = '.omega\nlogs\n.env*\n';
-  fs.writeFileSync(path.join(root, '.gitignore'), before);
-
-  assert.equal(ensureOmegaIgnored(root), 'present');
-  assert.equal(readGitignore(root), before);
+test('gitignore op: a brand with no company heals the brand root alone', async () => {
+  const brandRoot = tmpdir();
+  const result = await gitignoreOp({ brandRoot, companyRoot: null });
+  assert.deepEqual(result.output, { gitignore: { brand: 'created' } });
+  assert.equal(readGitignore(brandRoot), renderBrandGitignore());
 });
 
-test('gitignore: a second run adds nothing (idempotent)', () => {
-  const root = tmpdir();
-  fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/');
-
-  ensureOmegaIgnored(root);
-  const afterFirst = readGitignore(root);
-
-  assert.equal(ensureOmegaIgnored(root), 'present');
-  assert.equal(readGitignore(root), afterFirst);
-});
-
-test('#971: the workspace op under --dry-run plans the missing entries and writes nothing', async () => {
-  const gitignoreOp = require('../src/services/workspace/ensure/gitignore.js');
+test('#971: the workspace op under --dry-run plans the heal and writes nothing', async () => {
   const root = tmpdir();
   fs.writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n');
 
   const result = await gitignoreOp({ brandRoot: root, options: { dryRun: true } });
 
   assert.equal(readGitignore(root), 'node_modules/\n');
-  assert.deepEqual(result.output, { gitignore: 'planned' });
+  assert.deepEqual(result.output, { gitignore: { brand: 'planned' } });
 });

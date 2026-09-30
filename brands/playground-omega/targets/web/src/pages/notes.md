@@ -1,6 +1,6 @@
 ---
 # Surface: a page, composed of section calls
-# Doc: node_modules/@omega.js/web/docs/frontmatter.md
+# Doc: node_modules/@omega.js/manager/docs/web/frontmatter.md
 #
 # The auth policy sends a signed-out visitor to sign in before the page runs,
 # so the page itself never waits on auth to decide what to draw. A page nobody

@@ -52,7 +52,7 @@ test('subagent: a brand root hands every skill as a SKILL.md path, then the map 
     assert.ok(fs.existsSync(skillPath), `${skillPath} does not exist`);
   }
   assert.doesNotMatch(ctx, /via the Skill tool/);
-  assert.match(lines.at(-2), /node_modules\/@omega\.js\/AGENTS\.md/, 'the brand line names the framework map');
+  assert.match(lines.at(-2), /node_modules\/@omega\.js\/manager\/AGENTS\.md/, 'the brand line names the framework map');
   assert.match(lines.at(-1), /hooks\/gate\/mark\.sh" <skill> --session /, 'the last line names the gate mark command');
   fs.rmSync(dir, { recursive: true, force: true });
 });

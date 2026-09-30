@@ -1,12 +1,14 @@
 /**
- * copy-legacy-env tests — parsing (incl. quoted multi-line values), key
- * selection, the idempotent copy plan, and the no-value-leak guarantee.
+ * copy-legacy-env tests: key selection, the idempotent copy plan written in
+ * the one KEY="value" form (quoted multi-line values included), and the
+ * no-value-leak guarantee.
  * Run: node --test scripts/copy-legacy-env.test.js
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const dotenv = require('dotenv');
 
-const { KEY_GROUPS, parseEnvEntries, selectKeys, planCopy, parseArgs } = require('./copy-legacy-env.js');
+const { KEY_GROUPS, selectKeys, planCopy, parseArgs } = require('./copy-legacy-env.js');
 
 const SOURCE = [
   '# legacy secrets',
@@ -18,14 +20,6 @@ const SOURCE = [
   'NAMECHEAP_API_KEY=nc-secret',
   'NAMECHEAP_USERNAME=ian',
 ].join('\n');
-
-test('parseEnvEntries: keys, quoted values, multi-line blocks verbatim', () => {
-  const entries = parseEnvEntries(SOURCE);
-  assert.equal(entries.get('CLOUDFLARE_TOKEN'), 'CLOUDFLARE_TOKEN=cf-secret-123');
-  assert.equal(entries.get('SENDGRID_API_KEY'), 'SENDGRID_API_KEY="sg-secret"');
-  assert.equal(entries.get('MULTILINE_KEY'), 'MULTILINE_KEY="line one\nline two"');
-  assert.equal(entries.has('#'), false);
-});
 
 test('selectKeys: core by default, groups add, --only wins', () => {
   assert.deepEqual(selectKeys({}), KEY_GROUPS.core);
@@ -47,7 +41,6 @@ test('planCopy: copies missing, keeps existing, reports absent-in-source', () =>
   assert.ok(plan.changed);
   assert.ok(plan.content.includes('CLOUDFLARE_TOKEN=old-token')); // untouched
   assert.ok(plan.content.includes('SENDGRID_API_KEY="sg-secret"'));
-  assert.ok(plan.content.includes('copied from legacy omega-manager/.env'));
 });
 
 test('planCopy: --force replaces in place, no duplicate key lines', () => {
@@ -55,8 +48,7 @@ test('planCopy: --force replaces in place, no duplicate key lines', () => {
   const plan = planCopy(SOURCE, dest, ['CLOUDFLARE_TOKEN'], { force: true });
 
   assert.equal(plan.actions[0].action, 'replaced');
-  assert.ok(plan.content.includes('CLOUDFLARE_TOKEN=cf-secret-123'));
-  assert.ok(!plan.content.includes('old-token'));
+  assert.equal(plan.content, 'CLOUDFLARE_TOKEN="cf-secret-123"\nOTHER=x\n');
   assert.equal(plan.content.match(/CLOUDFLARE_TOKEN=/g).length, 1);
 });
 
@@ -67,9 +59,46 @@ test('planCopy: fully-satisfied destination is a no-op (idempotent)', () => {
   assert.equal(plan.content, dest);
 });
 
-test('multi-line values copy as one intact block', () => {
+test('multi-line values copy as one line that reads back whole', () => {
   const plan = planCopy(SOURCE, '', ['MULTILINE_KEY']);
-  assert.ok(plan.content.includes('MULTILINE_KEY="line one\nline two"'));
+  assert.equal(plan.content, 'MULTILINE_KEY="line one\\nline two"\n');
+  assert.equal(dotenv.parse(plan.content).MULTILINE_KEY, 'line one\nline two');
+});
+
+test('planCopy: an empty source value is not there to copy', () => {
+  const plan = planCopy('CLOUDFLARE_TOKEN=""\n', 'CLOUDFLARE_TOKEN="real"\n', ['CLOUDFLARE_TOKEN'], { force: true });
+  assert.equal(plan.actions[0].action, 'missing');
+  assert.equal(plan.changed, false);
+});
+
+test('planCopy: --force copies $ patterns in a secret literally', () => {
+  const source = 'CLOUDFLARE_TOKEN="a$$b"\nSENDGRID_API_KEY="c$&d"\n';
+  const dest = 'CLOUDFLARE_TOKEN="old-token"\nSENDGRID_API_KEY="old-key"\n';
+  const plan = planCopy(source, dest, ['CLOUDFLARE_TOKEN', 'SENDGRID_API_KEY'], { force: true });
+
+  const read = dotenv.parse(plan.content);
+  assert.equal(read.CLOUDFLARE_TOKEN, 'a$$b');
+  assert.equal(read.SENDGRID_API_KEY, 'c$&d');
+});
+
+test('planCopy: a # KEY="" placeholder takes the value on its own line', () => {
+  const dest = '# CLOUDFLARE_TOKEN=""\nOTHER="x"\n';
+  const plan = planCopy(SOURCE, dest, ['CLOUDFLARE_TOKEN']);
+
+  assert.equal(plan.actions[0].action, 'copied');
+  assert.equal(plan.content, 'CLOUDFLARE_TOKEN="cf-secret-123"\nOTHER="x"\n');
+});
+
+test('planCopy: an empty destination value never claims the key', () => {
+  const plan = planCopy(SOURCE, 'CLOUDFLARE_TOKEN=""\n', ['CLOUDFLARE_TOKEN']);
+
+  assert.equal(plan.actions[0].action, 'copied');
+  assert.equal(plan.content, 'CLOUDFLARE_TOKEN="cf-secret-123"\n');
+});
+
+test('planCopy: a source value envLine refuses throws naming the key', () => {
+  const source = "CLOUDFLARE_TOKEN='a\\nb'\n";
+  assert.throws(() => planCopy(source, '', ['CLOUDFLARE_TOKEN']), /CLOUDFLARE_TOKEN/);
 });
 
 test('parseArgs: defaults + every flag form', () => {

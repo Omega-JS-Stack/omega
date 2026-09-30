@@ -89,7 +89,7 @@ skill="${skill:2}"
 cat >&2 <<EOF
 omega:gate — $skill has not been loaded, and owns this surface: $file_path
 Invoke $skill via the Skill tool, read the framework map it routes to
-(the brand's AGENTS.md import line, node_modules/@omega.js/AGENTS.md), and
+(the brand's AGENTS.md import, node_modules/@omega.js/manager/AGENTS.md), and
 then make this edit. The framework has conventions for this surface — pages,
 sections, config keys, routes — and hand-rolling it is the failure this gate
 exists to stop. Reading tools are free; this refusal only covers writes.

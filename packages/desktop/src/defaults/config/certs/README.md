@@ -37,4 +37,4 @@ These are values, not files, and live in the brand `.env` (never here):
 
 Windows keeps no file here at all: the self-hosted EV USB token is addressed by `WIN_EV_TOKEN_PATH` / `WIN_CSC_KEY_PASSWORD`, and each cloud provider by its own env set.
 
-For the whole picture see [`docs/signing.md`](../../docs/signing.md).
+For the whole picture see `node_modules/@omega.js/manager/docs/desktop/signing.md`.

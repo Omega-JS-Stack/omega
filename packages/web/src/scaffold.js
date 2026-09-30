@@ -1,18 +1,15 @@
 /**
- * @omega.js/web's defaults scaffolding — applies the framework's scaffold tree
- * (scaffold/ in the package) to the consumer project root via the shared
- * devkit engine. Exported standalone (the @omega.js/backend and @omega.js/extension pattern) so the framework
- * test suite can exercise the REAL file map against a temp dir.
+ * @omega.js/web's defaults scaffolding: applies the package's scaffold/ tree to
+ * the consumer root through devkit's shared engine. Exported standalone so the
+ * framework suite exercises the REAL file map against a temp dir.
  *
- * Scaffold semantics:
- *   - NO page copying — default pages are virtual templates served from the
- *     package (the whole ~60-page default set works with zero files in src/)
- *   - NO Gemfile / _config.yml / Ruby anywhere
- *   - marker-section merges keep .gitignore/.env/AGENTS.md live-synced while
- *     the consumer's Custom section survives verbatim
+ * No page copying (default pages are virtual templates served from the
+ * package) and no Ruby; .gitignore and .gitattributes are marker-merged, and
+ * AGENTS.md comes from devkit's one builder.
  */
 const path = require('node:path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
@@ -21,19 +18,13 @@ const { PATHS } = require('./paths.js');
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
 const NODE_VERSION = '24';
 
-// minimatch FILE_MAP (last-match-wins). Patterns match the RAW scaffold-tree
-// path (before the `_.` strip), so the mergeLines rules name `_.gitignore`,
-// not its output.
-//
-// The target-root .env is NOT scaffolded ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
-// the brand root's .env is the one file humans and the manager edit, a target
-// .env is an optional per-key override a HUMAN writes, and no machine writes a
-// target .env — so the template is gone.
+// Last-match-wins, matched on the RAW scaffold-tree path (`_.gitignore`, before
+// the `_.` strip). No target .env is scaffolded: the brand root's is the one
+// edited file (docs/web/index.md).
 const FILE_MAP = {
   '**/*': { overwrite: false },
-  // AGENTS.md carries the agent docs, marker-merged like .gitignore.
-  'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
+  '_.gitattributes': { mergeLines: true },
   // JSON5 defaults-merge: consumer values win, new framework keys are added
   'config/omega.json5': { merge: true },
   // Ruby-free CI: regenerated every setup so workflow fixes roll out
@@ -88,11 +79,6 @@ function scaffoldDefaults(options) {
     // a missing config template and a missing AGENTS.md read as a bug.
     logger.log('brand monorepo detected: no target-level config seed; the brand root config and the agent docs cover this target');
     fileMap['config/omega.json5'] = { skip: true };
-    // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home: the per-target AGENTS.md never
-    // scaffolds, and an existing framework-owned-only copy is swept (retire
-    // rule; consumer content is never destroyed). Standalone projects keep it.
-    fileMap['AGENTS.md'] = { retire: true };
     // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
     // .github/workflows/ in a brand monorepo can never fire. It is composed
     // into the brand root below instead — scoped to this target's path.
@@ -116,6 +102,9 @@ function scaffoldDefaults(options) {
     transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: options.logger,
   });
+
+  // The project-root AGENTS.md, through devkit's one builder.
+  scaffoldAgentsMd({ outputDir: options.outputDir, standalone: seed.standalone, result, logger });
 
   if (!seed.standalone) {
     composeTargetWorkflows({

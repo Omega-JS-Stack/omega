@@ -38,4 +38,4 @@ That is the standalone form: one test per file. Every `run` receives `ctx`, whos
 
 ## See also
 
-`node_modules/@omega.js/extension/docs/test-framework.md`: full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/manager/docs/extension/test-framework.md`: full reference for the test framework (layers, assert API, fixtures, runner internals).

@@ -120,7 +120,7 @@ test('company init: one command scaffolds the tree inside the company brand', (t
   // The .env carries placeholders only: the same canonical shape a brand .env
   // has, and not one key set
   const env = fs.readFileSync(path.join(root, 'company', '.env'), 'utf8');
-  assert.match(env, /^# APPLE_API_ISSUER=$/m, 'the canonical groups render as commented placeholders');
+  assert.match(env, /^# APPLE_API_ISSUER=""$/m, 'the canonical groups render as commented placeholders');
   assert.equal(env.split('\n\n')[0].includes('\u2014'), false, 'the .env header carries no em dash');
   assert.equal(env.split('\n').filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line)).length, 0, 'not one key is set');
 
@@ -128,6 +128,7 @@ test('company init: one command scaffolds the tree inside the company brand', (t
   const entries = fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8')
     .split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
   assert.deepEqual(entries, ['.env', '.env.*', '.omega/']);
+  assert.equal(fs.readFileSync(path.join(root, 'company', '.gitignore'), 'utf8'), require('../src/lib/gitignore.js').renderCompanyGitignore(), 'the marked file the workspace service heals');
 
   // The signing tree and the shared templates have an obvious home from minute one
   for (const relative of ['.omega/certificates/apple/certificates', '.omega/certificates/apple/csr', 'assets/templates']) {

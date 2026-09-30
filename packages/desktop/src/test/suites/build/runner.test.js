@@ -1279,16 +1279,17 @@ module.exports = defineCases({
           ctx.expect(back.WIN_CSC_KEY_PASSWORD).toBe('p in spaces #1');
           ctx.expect(back.NEW_KEY).toBe('appended');
 
-          // A value carrying a double quote cannot be written at all — dotenv
-          // has no escape for it — so it is refused naming the key and the char.
+          // A `"` is written raw and reads back whole. A quote followed by # would
+          // not, so it is refused naming the key, never the value, file untouched.
+          runnerEnv.writeRunnerEnvValues(home, { WIN_CSC_KEY_PASSWORD: 'p in "quotes"' });
+          delete back.WIN_CSC_KEY_PASSWORD;
+          runnerEnv.loadRunnerEnv({ home, env: back });
+          ctx.expect(back.WIN_CSC_KEY_PASSWORD).toBe('p in "quotes"');
           let refused;
-          try {
-            runnerEnv.writeRunnerEnvValues(home, { WIN_CSC_KEY_PASSWORD: 'p in "quotes"' });
-          } catch (e) { refused = e; }
-          ctx.expect(refused).toBeDefined();
+          try { runnerEnv.writeRunnerEnvValues(home, { WIN_CSC_KEY_PASSWORD: 'p "x" #tail' }); } catch (e) { refused = e; }
           ctx.expect(refused.message).toContain('WIN_CSC_KEY_PASSWORD');
-          ctx.expect(refused.message).toContain('"');
-          ctx.expect(jetpack.read(path.join(home, '.env'))).toContain('WIN_CSC_KEY_PASSWORD="p in spaces #1"');
+          ctx.expect(refused.message).not.toContain('#tail');
+          ctx.expect(jetpack.read(path.join(home, '.env'))).toContain('WIN_CSC_KEY_PASSWORD="p in "quotes""');
         } finally {
           jetpack.remove(home);
         }

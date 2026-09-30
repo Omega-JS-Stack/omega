@@ -13,6 +13,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { ENV_SCHEMA, generatedEnvKeys } = require('@omega.js/config');
+const { CUSTOM_MARKER } = require('@omega.js/devkit/merge-line-files');
 const { buildScaffoldPlan } = require('../src/lib/scaffold.js');
 
 const GENERATED_ENV_KEYS = generatedEnvKeys();
@@ -57,10 +58,13 @@ test('env-keys op: a brand .env missing UNSUBSCRIBE_HMAC_KEY gains a minted one'
     assert.deepEqual(result.output.envKeys.present, ['OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE']);
 
     const env = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
-    // 32 random bytes as hex, double-quoted like every other value
-    assert.match(env, /^UNSUBSCRIBE_HMAC_KEY="[0-9a-f]{64}"$/m);
-    // The keys already there are untouched
-    assert.match(env, /^OMEGA_ADMIN_KEY="admin"$/m);
+    // 32 random bytes as hex, double-quoted like every other value, on its
+    // Default-section line above the Custom marker
+    const [defaults, custom] = env.split(CUSTOM_MARKER);
+    assert.match(defaults, /^UNSUBSCRIBE_HMAC_KEY="[0-9a-f]{64}"$/m);
+    assert.equal(custom, '\n');
+    // The keys already there keep their values
+    assert.match(defaults, /^OMEGA_ADMIN_KEY="admin"$/m);
   } finally {
     fs.rmSync(brandRoot, { recursive: true, force: true });
   }

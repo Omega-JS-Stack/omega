@@ -68,6 +68,17 @@ test('ensureTarget: writes on a fresh target, no-op on the rerun', () => {
   assert.deepStrictEqual(third, { written: [], merged: [], changed: [] }, 'a converged target is a total no-op');
 });
 
+test('ensureTarget: the AGENTS.md builder\'s warnings reach the verb, as a converged old template shows', () => {
+  const root = tmpConsumer();
+  fs.writeFileSync(path.join(root, 'AGENTS.md'),
+    '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
+  const warnings = [];
+
+  ensureTarget({ projectDir: root, warn: (line) => warnings.push(line) });
+  assert.ok(warnings.some((line) => line.includes('Converged AGENTS.md')), 'a web verb prints the convergence');
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /VPN/, 'the notes stay');
+});
+
 test('ensureTarget: refuses a workspace root, loudly, without writing a single file (#699)', () => {
   // The accident: `omega deploy` at a workspace root scaffolded a whole website
   // target into it — src/, workflows, rewritten root scripts — before failing

@@ -11,7 +11,7 @@
 
   // Permissions
   permissions: [
-    // The sign-in round trip watches the brand site's /token tab (docs/auth.md)
+    // The sign-in round trip watches the brand site's /token tab (@omega.js/manager/docs/extension/auth.md)
     'tabs',
     // omega.extension.storage: the notes.autoSaveSelection setting
     'storage',

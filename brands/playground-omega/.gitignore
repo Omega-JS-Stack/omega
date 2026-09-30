@@ -1,20 +1,21 @@
+# ========== Default Values ==========
 # Dependencies
 node_modules/
 
 # Build output
 dist/
 
-# OMEGA manager state (derived data — never committed)
+# OMEGA manager state (derived data, never committed)
 .omega/
+
+# Run logs (truncated on every launch, never committed)
+logs/
 
 # Secrets
 .env
+.env.*
 
 # OS
 .DS_Store
 
-# Run logs (truncated on every launch — never committed)
-logs/
-
-# Secrets — the environment overlays beside .env
-.env.*
+# ========== Custom Values ==========

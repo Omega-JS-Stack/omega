@@ -20,7 +20,8 @@
  *   peer dependencies installed when missing or behind (a satisfied target
  *                     installs nothing)
  *   defaults tree     src/defaults/** — copy-if-missing, marker merges for
- *                     .env/.gitignore/AGENTS.md, workflows re-rendered
+ *                     .env/.gitignore, workflows re-rendered
+ *   AGENTS.md         standalone only, through devkit's one builder
  *   locality          a WARNING when the framework is a `file:` link
  *
  * Everything here is copy-if-missing, marker-merge or write-if-changed. What
@@ -36,6 +37,7 @@ const { ensurePeerDependencies, readProject } = require('./dependencies.js');
 const { renderSecretsBlock } = require('@omega.js/config/env-delivery');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { assertScaffoldable } = require('@omega.js/devkit/scaffold-guard');
+const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { projectScripts } = require('@omega.js/devkit/verb-scripts');
 
 const logger = build.logger('ensure-target');
@@ -193,15 +195,10 @@ async function copyDefaults(projectDir, engineLogger) {
       // material really lives, so a target keeps the explanation that matches
       // the ignore rules the scaffold just wrote, never an older one.
       'config/certs/README.md': { overwrite: true },
-      // AGENTS.md carries the agent docs, marker-merged like .gitignore.
-      'AGENTS.md': { mergeLines: true, template: templateContext },
-      // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-      // BRAND ROOT is the one doc home: per-target AGENTS.md/CHANGELOG.md/docs/
-      // never scaffold, and existing framework-owned-only copies are swept
-      // (retire rules; consumer content is never destroyed). Standalone projects
-      // keep them. Last-match-wins: these override the rules above.
+      // In a brand the BRAND ROOT is the one doc home: per-target CHANGELOG.md
+      // and docs/ never scaffold, and framework-owned copies are swept (consumer
+      // content is kept). Last-match-wins over the rules above.
       ...(isBrandTarget ? {
-        'AGENTS.md': { retire: true, template: templateContext },
         'CHANGELOG.md': { retire: true },
         'docs/**/*': { retire: true },
       } : {}),
@@ -229,6 +226,9 @@ async function copyDefaults(projectDir, engineLogger) {
     transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: engineLogger,
   });
+
+  // The project-root AGENTS.md, through devkit's one builder.
+  scaffoldAgentsMd({ outputDir: projectDir, standalone: seed.standalone, result: applied, logger: engineLogger });
 
   if (isBrandTarget) {
     // The same templateContext the yml rule uses, so the composed copy carries

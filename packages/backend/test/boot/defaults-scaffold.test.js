@@ -59,9 +59,10 @@ module.exports = defineCases({
           assert.equal(jetpack.exists(path.join(tmp, file)), 'file', `${file} should exist`);
         }
 
-        // AGENTS.md carries the content; Claude Code reads it natively, so no
-        // CLAUDE.md scaffolds beside it.
-        assert.ok(jetpack.read(path.join(tmp, 'AGENTS.md')).includes('node_modules/@omega.js/AGENTS.md'), 'AGENTS.md points at the OMEGA map');
+        // A standalone project root gets the same AGENTS.md a brand root does:
+        // the manager import under Default, its own notes under Custom. Claude
+        // Code reads AGENTS.md natively, so no CLAUDE.md scaffolds beside it.
+        assert.equal(jetpack.read(path.join(tmp, 'AGENTS.md')), '<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\n');
         assert.equal(jetpack.exists(path.join(tmp, 'CLAUDE.md')), false, 'a fresh scaffold writes no CLAUDE.md');
 
         // Marker files ship with the protocol sections intact.
@@ -236,11 +237,27 @@ module.exports = defineCases({
 
         // Consumer adds their own gitignore line.
         const giPath = path.join(tmp, '.gitignore');
-        jetpack.write(giPath, jetpack.read(giPath).replace('# ...', 'my-secret-dir/\n# ...'));
+        jetpack.append(giPath, 'my-secret-dir/\n');
 
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
         assert.ok(jetpack.read(giPath).includes('my-secret-dir/'), 'custom .gitignore line should survive re-merge');
+      },
+    },
+    {
+      name: 'an-old-template-agents-md-converges-keeping-the-consumer-notes',
+      async run({ assert }) {
+        // The retired per-framework template: its framework section goes, the
+        // notes below its Custom marker stay under the import, loudly.
+        const tmp = makeTmp();
+        jetpack.write(path.join(tmp, 'AGENTS.md'),
+          `${DEFAULT_MARKER}\n# OMEGA Backend consumer project\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here. Edits below this line are preserved across runs.\n\nOur deploy needs the VPN up.\n`);
+        const warnings = [];
+        const result = scaffoldDefaults({ outputDir: tmp, logger: { log() {}, warn: (m) => warnings.push(m), error: console.error } });
+
+        assert.equal(jetpack.read(path.join(tmp, 'AGENTS.md')), '<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\nOur deploy needs the VPN up.\n');
+        assert.ok(result.merged.includes('AGENTS.md'));
+        assert.ok(warnings.some((m) => m.includes('Converged AGENTS.md')), 'the convergence is loud');
       },
     },
     {
@@ -331,7 +348,7 @@ module.exports = defineCases({
         scaffoldDefaults({ outputDir: standalone, logger: quiet });
 
         assert.equal(jetpack.read(path.join(standalone, 'CLAUDE.md')), content);
-        assert.ok(jetpack.read(path.join(standalone, 'AGENTS.md')).includes('node_modules/@omega.js/AGENTS.md'), 'AGENTS.md carries the content');
+        assert.ok(jetpack.read(path.join(standalone, 'AGENTS.md')).includes('node_modules/@omega.js/manager/AGENTS.md'), 'AGENTS.md carries the content');
       },
     },
     {

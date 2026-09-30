@@ -60,7 +60,7 @@ class Omega {
       environment: process.env[ENVIRONMENT_VAR] || null,
       ipc: {
         invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
-        // Returns an unsubscribe fn (docs/ipc.md contract, same shape as the
+        // Returns an unsubscribe fn (docs/desktop/ipc.md contract, same shape as the
         // sibling onChange subscriptions below).
         on: (channel, handler) => {
           const wrapped = (_, payload) => handler(payload);

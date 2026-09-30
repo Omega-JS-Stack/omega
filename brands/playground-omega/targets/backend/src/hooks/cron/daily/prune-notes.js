@@ -1,6 +1,6 @@
 /**
  * Surface: cron job, daily (deletes notes older than 30 days)
- * Doc: node_modules/@omega.js/backend/docs/routes.md (New Cron Job)
+ * Doc: node_modules/@omega.js/manager/docs/backend/routes.md (New Cron Job)
  */
 const MAX_AGE_DAYS = 30;
 const BATCH_SIZE = 500;

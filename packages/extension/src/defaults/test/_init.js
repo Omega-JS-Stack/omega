@@ -1,6 +1,6 @@
 /**
  * Test lifecycle hook for this project. Runs once before any suite (not a test itself).
- * See @omega.js/extension/docs/test-framework.md → "test/_init.js".
+ * See @omega.js/manager/docs/extension/test-framework.md → "test/_init.js".
  */
 
 module.exports = ({ projectRoot }) => ({

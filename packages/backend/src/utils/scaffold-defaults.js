@@ -6,6 +6,7 @@
 
 const path = require('path');
 const { applyDefaults, renderTemplate } = require('@omega.js/devkit/defaults-engine');
+const { scaffoldAgentsMd } = require('@omega.js/devkit/agents-md');
 const { composeTargetWorkflows, renderInstallFirewall, renderInstallWorkspace } = require('@omega.js/devkit/ci-workflows');
 const { renderSecretsBlock, renderEnvFileKeys } = require('@omega.js/config/env-delivery');
 
@@ -16,22 +17,12 @@ const frameworkPackage = require('../../package.json');
 
 const WORKFLOW = '.github/workflows/deploy.yml';
 
-// minimatch FILE_MAP (last-match-wins). @omega.js/backend's contract:
-//   - everything copies on first scaffold only (consumer files are never clobbered)
-//   - AGENTS.md / .gitignore live-sync their Default section on every run via
-//     the marker-section merge (the Custom section is the consumer's,
-//     preserved verbatim). Both live at the TARGET ROOT.
-//   - the target-root .env is NOT scaffolded ([#678](https://github.com/Omega-JS-Stack/omega/issues/678)):
-//     the brand root's .env is the one file humans and the manager edit, a
-//     target .env is an optional per-key override a HUMAN writes, and the
-//     machine's env file is the composed dist/.env. No machine writes a
-//     target .env, so the template is skipped.
-// Patterns match the RAW defaults-tree path (before the `_.` strip), so the
-// mergeLines rules name `_.gitignore`, not its output.
+// Last-match-wins, matched on the RAW defaults-tree path (`_.gitignore`, before
+// the `_.` strip). Everything copies on first scaffold only, .gitignore
+// marker-merges, and no target .env is scaffolded: the brand root's is the one
+// edited file (docs/backend/index.md, The env cascade).
 const FILE_MAP = {
   '**/*': { overwrite: false },
-  // AGENTS.md carries the agent docs, marker-merged like .gitignore.
-  'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
   // The deploy workflow is FRAMEWORK-owned: re-rendered on every verb so the
   // generated env block tracks the schema and the pinned node tracks the
@@ -51,10 +42,9 @@ const FILE_MAP = {
 function scaffoldDefaults(options) {
   options = options || {};
 
-  // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the BRAND
-  // ROOT is the one doc home: per-target AGENTS.md/CHANGELOG.md/docs/
-  // never scaffold, and existing framework-owned-only copies are swept (retire
-  // rules; consumer content is never destroyed). Standalone projects keep them.
+  // In a brand the BRAND ROOT is the one doc home: per-target CHANGELOG.md and
+  // docs/ never scaffold, and framework-owned copies are swept (consumer
+  // content is kept). Standalone projects keep them.
   const fileMap = { ...FILE_MAP };
   const { composeTargetEnv, resolveSeedMode } = require('@omega.js/config');
   const seed = resolveSeedMode(options.outputDir);
@@ -83,7 +73,6 @@ function scaffoldDefaults(options) {
   };
 
   if (!seed.standalone) {
-    fileMap['AGENTS.md'] = { retire: true };
     fileMap['CHANGELOG.md'] = { retire: true };
     fileMap['docs/**/*'] = { retire: true };
     // CI (#265): GitHub runs workflows from the REPO ROOT only, so a per-target
@@ -104,6 +93,9 @@ function scaffoldDefaults(options) {
     transform: (contents) => renderInstallWorkspace(renderInstallFirewall(contents)),
     logger: options.logger,
   });
+
+  // The project-root AGENTS.md, through devkit's one builder.
+  scaffoldAgentsMd({ outputDir: options.outputDir, standalone: seed.standalone, result, logger: options.logger });
 
   if (!seed.standalone) {
     composeTargetWorkflows({

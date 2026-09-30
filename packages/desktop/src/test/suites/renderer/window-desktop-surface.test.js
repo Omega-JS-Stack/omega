@@ -49,7 +49,7 @@ module.exports = defineCases({
     },
     {
       // wave-5 F4: ipc.on used to return ipcRenderer (stripped to a useless
-      // object across the contextBridge) — docs/ipc.md promises an unsubscribe fn.
+      // object across the contextBridge) — docs/desktop/ipc.md promises an unsubscribe fn.
       name: 'ipc.on returns an unsubscribe function (docs contract)',
       run: (ctx) => {
         const off = window.desktop.ipc.on('omega-test:noop-channel', () => {});

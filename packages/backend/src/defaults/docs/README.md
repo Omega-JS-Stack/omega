@@ -14,4 +14,4 @@ Examples of good `docs/*.md` topics:
 
 ## See also
 
-`node_modules/@omega.js/AGENTS.md` is the OMEGA map: follow it to `docs/backend/index.md`, the framework's own overview.
+`node_modules/@omega.js/manager/AGENTS.md` is the OMEGA map: follow it to `docs/backend/index.md`, the framework's own overview.

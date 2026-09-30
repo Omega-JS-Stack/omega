@@ -113,7 +113,7 @@ class Omega {
   }
 
   /**
-   * Boot the main process in the fixed order (docs/boot-sequence.md), and
+   * Boot the main process in the fixed order (docs/desktop/boot-sequence.md), and
    * settle `ready`.
    * @param {object|string} [consumerConfig] - a RESOLVED config, a project dir to resolve one from, or nothing.
    * @param {object} [options] - boot options (the test harness passes `skipWindowCreation`).
@@ -413,7 +413,7 @@ class Omega {
     // when missing (mac zip / win silent NSIS / linux AppImage; RM then self-updates
     // via its own @omega.js/desktop autoUpdater). Skips itself when this app IS restart-manager, in
     // dev (unless OMEGA_RESTART_MANAGER_DEV=1), or when restartManager.enabled=false.
-    // See docs/restart-manager.md.
+    // See docs/desktop/restart-manager.md.
     this.restartManager.initialize(this);
 
     // 13. Initialize the windows lib: registers app-level handlers (window-all-closed, etc.)

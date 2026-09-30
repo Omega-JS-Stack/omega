@@ -1,8 +1,8 @@
 # OMEGA Extension (@omega.js/extension)
 
-> **Note for contributors and Claude:** This file is the guide for `@omega.js/extension` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the package's own [`docs/<topic>.md`](../../packages/extension/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
+> **Note for contributors and Claude:** This file is the guide for `@omega.js/extension` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the map, `docs/omega.md`, is what every AGENTS.md imports, and only the manager ships the docs). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the `docs/extension/<topic>.md` files beside this guide. When extending or adding content, write it in the matching `docs/extension/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
-> **Mirrored structure:** the four framework guides (`docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md`) mirror each other: shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them. Each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`) mirrors its guide the same way.
+> **Mirrored structure:** the four framework guides (`docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md`) mirror each other: shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
@@ -19,7 +19,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 
 **Required reading:**
 - **`docs/client/index.md`** (in the framework monorepo) — the client guide: identity, module list, conventions
-- **`node_modules/@omega.js/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omega.js/manager/docs/client/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 2. There is no setup step ([#675](https://github.com/Omega-JS-Stack/omega/issues/675)). The project scaffolds itself on the first verb below — `ensureTarget()` copies `src/defaults/` into the project (`src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.), syncs the project scripts, and checks Node + peer deps, idempotently and silently once the target is converged.
 3. `npx omega dev --target=<name>`: the dev loop, what the target's `start` script (`omega dev`) runs: clean, then the gulp default task (serve with live reload, then the watched build). The `--` flags it is given ride to the gulp lane (`npm start -- --debug`)
 4. `npx omega build --target=<name>`: production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`); the target's `build` script is a thin alias of the verb, which owns the pipeline
-5. `OMEGA_IS_PUBLISH=true npx omega build --target=<name>`: also uploads to Chrome / Firefox / Edge stores (see [docs/shared/publishing.md](../../packages/extension/docs/publishing.md))
+5. `OMEGA_IS_PUBLISH=true npx omega build --target=<name>`: also uploads to Chrome / Firefox / Edge stores (see [docs/shared/publishing.md](publishing.md))
 6. `npx omega test --target=<name>`: runs the project's test suites (bare consumer runs never include the framework corpus)
    - `npx omega test --target=<name> build/config`: bare path: run project tests matching a path
    - `npx omega test --target=<name> framework:` / `npx omega test --target=<name> full:`: reach the framework suite (alone, or both sources)
@@ -54,7 +54,7 @@ To load the unpacked extension in Chrome: point chrome://extensions → "Load un
 
 ### The consumer entry
 
-Each extension context's module exports ONE ready-made instance, `omega`; the class is exported by name (`Omega`) for tests only, and a consumer never writes `new`. Seven contexts, one shape; see [docs/contexts.md](../../packages/extension/docs/contexts.md):
+Each extension context's module exports ONE ready-made instance, `omega`; the class is exported by name (`Omega`) for tests only, and a consumer never writes `new`. Seven contexts, one shape; see [docs/extension/contexts.md](contexts.md):
 
 ```js
 // src/assets/js/components/popup/index.js
@@ -74,11 +74,11 @@ await omega.initialize();
 
 Every context's `omega` carries the same core:
 - `omega.context`: the context name (`background`, `popup`, `options`, `sidepanel`, `page`, `content`, `offscreen`)
-- `omega.extension`: cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension.md](../../packages/extension/docs/extension.md))
+- `omega.extension`: cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension/extension.md](extension.md))
 - `omega.logger`: per-context logger stamping the ONE identity tag, `[@omega.js/extension:<context>]`, with NO timestamp (devtools stamps runtime lines; only the build-time devkit logger prefixes `[HH:MM:SS]`)
 - `omega.messenger`: the one lane between contexts, `send({ destination, command, payload })` and `onMessage(handler)` (returns the unsubscribe)
 - `omega.config` (the `OMEGA_BUILD_JSON.config` snapshot), `omega.version`, `omega.getApiUrl()`
-- `omega.getEnvironment()` / `isDevelopment()` / `isProduction()` / `isTesting()`: cross-context helpers ([docs/environment-detection.md](../../packages/extension/docs/environment-detection.md))
+- `omega.getEnvironment()` / `isDevelopment()` / `isProduction()` / `isTesting()`: cross-context helpers ([docs/extension/environment-detection.md](environment-detection.md))
 
 The four page contexts (popup, options, sidepanel, page) are ONE subclass of `@omega.js/client`'s base class, told apart by the context name, so they also carry `omega.auth`, `omega.storage`, `omega.bindings`, `omega.firestore`, `omega.analytics`, `omega.utilities` and the rest of the client ([client guide](../client/index.md)). `omega.auth.user` is always a `User`, and `omega.auth.openPage()` opens the brand site's sign-in page in a new tab. Background carries its own `omega.auth`, desktop main's `omega.auth` shape (its Firebase app, `.user`, `.listen()`, `.signOut()`, and `.getIdToken()`, the session's fresh ID token or `null` signed out), and `omega.request()`, the page contexts' API fetch on background's own session; content and offscreen have no auth.
 
@@ -101,7 +101,7 @@ Each component has three parts at conventional paths:
 - Styles: `src/assets/css/components/<component>/index.scss`
 - Script: `src/assets/js/components/<component>/index.js`
 
-Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/components/<component>.bundle.css`, `dist/assets/js/components/<component>.bundle.js`. See [docs/components.md](../../packages/extension/docs/components.md).
+Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/components/<component>.bundle.css`, `dist/assets/js/components/<component>.bundle.js`. See [docs/extension/components.md](components.md).
 
 ### Cross-context auth sync
 
@@ -109,7 +109,7 @@ Background's `omega.auth` is the source of truth for authentication. The page co
 
 Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.omega-signin`, `.omega-signout`, `.omega-account`) wire UI without writing JS: they are click triggers on @omega.js/client's shared registry ([client guide](../client/index.md#click-triggers-modulestriggersjs)), with the extension registering `omega-signin` and `omega-account` itself. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user.authenticated"`) handle DOM state.
 
-Required setup: `brand.url` in config (background.js watches that host for the /token redirect), `tabs` permission in manifest. See [docs/auth.md](../../packages/extension/docs/auth.md).
+Required setup: `brand.url` in config (background.js watches that host for the /token redirect), `tabs` permission in manifest. See [docs/extension/auth.md](auth.md).
 
 ### Build system
 
@@ -119,11 +119,11 @@ Required setup: `brand.url` in config (background.js watches that host for the /
 - **esbuild** — bundles each `src/assets/js/components/<name>/index.js` to `dist/assets/js/components/<name>.bundle.js`. The bundler is @omega.js/devkit's ONE `bundle()` wrapper since [#738](https://github.com/Omega-JS-Stack/omega/issues/738) — webpack, babel-loader and `@babel/preset-env` are gone, and the task went with the name: `src/gulp/tasks/bundle.js`, gulp task `bundle`, log tag `[@omega.js/extension:bundle]`. ONE call covers every lane (`iife`, no code splitting anywhere, which is what MV3's CSP requires of a service worker and a content script alike), and esbuild's `target` IS the syntax floor, READ from the manifest (`minimum_chrome_version`, `browser_specific_settings.gecko.strict_min_version`) with the MV3 minimums — chrome88, firefox91 — as the fallback. Custom `__theme__` / `__main_assets__` / `__project_assets__` aliases resolve to the active theme and the vendored assets. A post-emit pass substitutes `%%% version %%%` / `%%% brand.name %%%` / etc.
 - **The build snapshot is ONE file.** `bundle.js` composes `OMEGA_BUILD_JSON` once per build and writes it to `dist/build.js` through `@omega.js/devkit/build-json` ([#743](https://github.com/Omega-JS-Stack/omega/issues/743)); `package.js` copies it into every `packaged/<browser>/raw/` with the rest of `dist`. The page template loads it with `<script src="/build.js">` as its first script, and `background.js` with `importScripts('/build.js')` on its first line (the manifest declares a CLASSIC service worker, so importScripts is legal; an extension's own pages need no `web_accessible_resources` entry to fetch their own origin). No bundle carries a copy: the `define` + `banner` bake that put one config into 21 files is retired, and so is the `build.json` sidecar nothing read. The same file and the same load order web and @omega.js/desktop use.
 - **The wrapper and the subset are @omega.js/config's, not this framework's** ([#894](https://github.com/Omega-JS-Stack/omega/issues/894)). The wrapper is the ONE shape every OMEGA browser surface bakes, `{ config, package, mode, license, builtAt }`, and `config` is `clientConfig(resolved)`: the sections the schema's `client` flag marks browser-visible plus this build's facts (`runtime`, `environment`, `version`, `buildTime`, `target`, `dev`). The legacy `omega` block is gone ([#896](https://github.com/Omega-JS-Stack/omega/issues/896)): the service worker reads `config.environment`, `config.buildTime` (its cache breaker) and `config.dev.liveReloadPort`, the names every OMEGA surface spells. The hand-written allow list this task used to keep is gone, so a store artifact can no longer carry a brand's provisioning sections and a new public value is one schema row instead of three lists. The Measurement Protocol secret is the one `.env` value sanctioned into the artifact (`publicAtRest`) and is added AFTER that gate, which refuses secret-shaped keys outright. Every context hands the blob to `@omega.js/client` the same way: `const configuration = window.OMEGA_BUILD_JSON?.config;`.
-- **Sass** — load-path resolution lets consumer SCSS `@use 'omega-extension'` / `@use 'theme'` / `@use 'components/popup'` without long relative paths. See [docs/css.md](../../packages/extension/docs/css.md).
-- **HTML templating** — two-pass `{{ }}` replacement: view first, then outer page-template. Vars: `brand.name`, `brand.url`, `page.title`, `theme.appearance`, `version`, `cacheBust`. See [docs/templating.md](../../packages/extension/docs/templating.md).
+- **Sass** — load-path resolution lets consumer SCSS `@use 'omega-extension'` / `@use 'theme'` / `@use 'components/popup'` without long relative paths. See [docs/extension/css.md](css.md).
+- **HTML templating** — two-pass `{{ }}` replacement: view first, then outer page-template. Vars: `brand.name`, `brand.url`, `page.title`, `theme.appearance`, `version`, `cacheBust`. See [docs/extension/templating.md](templating.md).
 - **Packaging** ([gulp/package.js](../../packages/extension/src/gulp/tasks/package.js)): per-browser manifest normalization (JSON5 → strict JSON), zip, optional auto-publish. The bundles arrive with the snapshot already baked in, so the package lane writes no config file of its own. A DECLARED consumer value beats the framework default, arrays included: an empty array ships nothing, the only way to drop a default like `externally_connectable`'s dev origin ([#260](https://github.com/Omega-JS-Stack/omega/issues/260)). That default is now the BRAND's own origin (from `brand.url`), with the dev-website origin added in dev builds only: a packaged build shipped the localhost origin alone, so the live site could not message the published extension ([#583](https://github.com/Omega-JS-Stack/omega/issues/583)); the scaffolded `test/boot/externally-connectable.test.js` asserts it against the real packaged manifest. `homepage_url` bakes from `brand.url` on every target: the store listing's developer-site link ([#576](https://github.com/Omega-JS-Stack/omega/issues/576)). The firefox target translates the chrome-only panel keys (`side_panel` → `sidebar_action`) and writes `browser_specific_settings.gecko.id` from the ONE home of that id, `targets.<name>.listings.firefox.id` in config ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)): a manifest declaring a DIFFERENT id fails the package naming both, and a brand that declares neither still DERIVES one, `extension@<brand.url host>` falling back to `extension@<brand.id>.extension`, failing loudly only with no brand facts at all ([#264](https://github.com/Omega-JS-Stack/omega/issues/264)). The derived id is not left implicit: the LOCAL scaffold pins it into `config/omega.json5` as `listings.firefox.id` the first time a verb runs in the target, before any push ([#893](https://github.com/Omega-JS-Stack/omega/issues/893)), because it must stay stable across releases and `brand.url` can change ([#574](https://github.com/Omega-JS-Stack/omega/issues/574)).
 
-See [docs/build-system.md](../../packages/extension/docs/build-system.md).
+See [docs/extension/build-system.md](build-system.md).
 
 ### Build modes
 
@@ -142,17 +142,17 @@ See [docs/build-system.md](../../packages/extension/docs/build-system.md).
 
 ### Themes
 
-Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`, and `$primary` itself arrives from `brand.color`: the sass task renders `dist/assets/css/_brand.scss` before every compile (`$primary` plus a `ramp` mixin of the runtime `--omega-accent` family), and the scaffold's `main.scss` reads both, `@use 'brand';` above the framework import and `@include brand.ramp;` below it. A deliberate divergence puts a literal back in place of `brand.$primary`. Same mechanism, same renderer, on @omega.js/desktop ([#912](https://github.com/Omega-JS-Stack/omega/issues/912), [shared/theming.md](../shared/theming.md)). `theme.id` is a SHARED config key while the theme SET is per-framework, so both resolve sites (sass load path, the bundler's `__theme__` alias) go through [src/lib/theme.js](../../packages/extension/src/lib/theme.js): an id this framework doesn't ship falls back to `classy` with one warning naming the key, the value, and the valid set; override per target with `targets.extension.theme.id` ([#261](https://github.com/Omega-JS-Stack/omega/issues/261)). See [docs/themes.md](../../packages/extension/docs/themes.md).
+Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`, and `$primary` itself arrives from `brand.color`: the sass task renders `dist/assets/css/_brand.scss` before every compile (`$primary` plus a `ramp` mixin of the runtime `--omega-accent` family), and the scaffold's `main.scss` reads both, `@use 'brand';` above the framework import and `@include brand.ramp;` below it. A deliberate divergence puts a literal back in place of `brand.$primary`. Same mechanism, same renderer, on @omega.js/desktop ([#912](https://github.com/Omega-JS-Stack/omega/issues/912), [shared/theming.md](../shared/theming.md)). `theme.id` is a SHARED config key while the theme SET is per-framework, so both resolve sites (sass load path, the bundler's `__theme__` alias) go through [src/lib/theme.js](../../packages/extension/src/lib/theme.js): an id this framework doesn't ship falls back to `classy` with one warning naming the key, the value, and the valid set; override per target with `targets.extension.theme.id` ([#261](https://github.com/Omega-JS-Stack/omega/issues/261)). See [docs/extension/themes.md](themes.md).
 
 ### Defaults system
 
-`src/defaults/` is the starter template — copied to consumer projects by every verb's `ensureTarget()`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so the scaffold composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every verb, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/defaults.md](../../packages/extension/docs/defaults.md).
+`src/defaults/` is the starter template — copied to consumer projects by every verb's `ensureTarget()`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](../../packages/extension/src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. Inside a brand monorepo the map also skips `.github/**`: GitHub runs workflows from the REPO ROOT only, so the scaffold composes the target's CI into the brand root as `.github/workflows/<target>-publish.yml` — target-scoped, per-target concurrency, regenerated (never duplicated) on every verb, and `omega deploy` dispatches that composed name ([#265](https://github.com/Omega-JS-Stack/omega/issues/265)). See [docs/extension/defaults.md](defaults.md).
 
 The workflow's `env:` carries `GOOGLE_ANALYTICS_SECRET` beside the seven store credentials (the three listing IDS left that block with #893: a public id rides the config snapshot, never a repo secret): a dispatched run has no `.env`, so the Measurement Protocol secret the build bakes into `OMEGA_BUILD_JSON` only reaches it from the repo secrets, and without it every CI-published extension shipped an empty secret and sent no events. A build-mode build of a brand with `analytics.providers.google.id` set now FAILS when the secret is empty ([#582](https://github.com/Omega-JS-Stack/omega/issues/582)).
 
 ### Auto-translation
 
-`npm run build` invokes the `translate` gulp task: reads `config/messages.json`, sends only the strings missing from the committed `translations/<lang>/` cache to the provider, and composes `dist/_locales/<lang>/messages.json` per language in `translation.languages` (omega.json5; unset = off). Existing translations are preserved. See [docs/translations.md](../../packages/extension/docs/translations.md).
+`npm run build` invokes the `translate` gulp task: reads `config/messages.json`, sends only the strings missing from the committed `translations/<lang>/` cache to the provider, and composes `dist/_locales/<lang>/messages.json` per language in `translation.languages` (omega.json5; unset = off). Existing translations are preserved. See [docs/extension/translations.md](translations.md).
 
 The English source is seeded from the brand: the scaffold renders `appName` / `appNameShort` / `btnTooltip` from `brand.name`, and `appDescription` from `brand.description` when it fits the 200-character store cap — otherwise "The official &lt;brand&gt; browser extension." ([#573](https://github.com/Omega-JS-Stack/omega/issues/573)). All four render through ONE escape — each lands inside a single-quoted JSON5 value, and the brand-name paths used to render raw, so a name carrying an apostrophe seeded an unparseable file ([#592](https://github.com/Omega-JS-Stack/omega/issues/592)). `config/messages.json` is copy-once, so the seed is a starting point, never a rewrite.
 
@@ -165,7 +165,7 @@ Three lifecycle hooks let consumers run custom logic while the extension is pack
 
 The NESTED path is the one the defaults scaffold writes and the extension leg of the brand root's `npx omega migrate --execute` moves flat files to (`@omega.js/extension/migrate`, [#885](https://github.com/Omega-JS-Stack/omega/issues/885); a bare run lists the moves); the package task resolves it first and falls back to the flat pre-migration `hooks/build:pre.js` during the transition. It used to resolve ONLY the flat path, so every migrated consumer's hooks were dead and the miss printed an untagged `console.warn` ([#571](https://github.com/Omega-JS-Stack/omega/issues/571)).
 
-All three receive the ONE hook-argument shape every OMEGA framework passes: `{ build, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)), and everything else comes off `build`, the plain build module (`getManifest()`, `getConfig()`, `getPackage('project')`). Async. See [docs/hooks.md](../../packages/extension/docs/hooks.md).
+All three receive the ONE hook-argument shape every OMEGA framework passes: `{ build, projectRoot, mode }`, the same `ctx` @omega.js/desktop hands its lifecycle hooks ([docs/desktop/index.md](../desktop/index.md)), and everything else comes off `build`, the plain build module (`getManifest()`, `getConfig()`, `getPackage('project')`). Async. See [docs/extension/hooks.md](hooks.md).
 
 ### Cross-context helpers
 
@@ -177,7 +177,7 @@ The build module and all seven runtime contexts answer the same helpers from `sr
 
 **The environment four are `@omega.js/config`'s ONE module** ([#817](https://github.com/Omega-JS-Stack/omega/issues/817), the contract in full: [docs/shared/config.md](../shared/config.md)): this file re-exports them beside the extension's own `getVersion()`, so `@omega.js/extension`, `@omega.js/desktop`, `@omega.js/web` and `@omega.js/backend` all hang the identical functions. They read ONE input and never guess: `OMEGA_ENVIRONMENT` in build-time Node, and the baked `OMEGA_BUILD_JSON.config.environment` in an extension context (which has no `process.env`). Nothing sniffs `manifest.update_url` or `NODE_ENV` any more, so what an artifact WAS BUILT AS is what it answers, wherever it is loaded from, and a context with neither input throws by name rather than defaulting. `src/build.js` names the input at load, from the lane: `OMEGA_BUILD_MODE` (the `omega build` flag) is production and wins over an inherited value, the `test` verb names `testing`, and a bare dev boot is `development`.
 
-Gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test); never `!isDevelopment()`. Use these instead of grepping `process.env` ad-hoc. See [docs/environment-detection.md](../../packages/extension/docs/environment-detection.md).
+Gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test); never `!isDevelopment()`. Use these instead of grepping `process.env` ad-hoc. See [docs/extension/environment-detection.md](environment-detection.md).
 
 ### Test framework
 
@@ -195,15 +195,15 @@ The boot layer SKIPS when the consumer has not built: a candidate directory qual
 
 A boot test's per-test timeout defaults to **45000ms** — sized for the FIRST run after a fresh build, where the extension's Firebase service worker initializes cold (observed 20-30s; the old 20000 default sat right under it and consumers had to declare a timeout of their own to get a green run, [#262](https://github.com/Omega-JS-Stack/omega/issues/262)). Later runs are far quicker. Declare `timeout` on a test only when THAT test is genuinely slower — never to work around the first-run cost.
 
-Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/test-framework.md](../../packages/extension/docs/test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
+Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/extension/test-framework.md](test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
 
-**NEVER mock: test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a mock `omega`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --target=<name> --extended` or `TEST_EXTENDED_MODE=true`): normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/test-framework.md](../../packages/extension/docs/test-framework.md).
+**NEVER mock: test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a mock `omega`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --target=<name> --extended` or `TEST_EXTENDED_MODE=true`): normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/extension/test-framework.md](test-framework.md).
 
-See [docs/test-framework.md](../../packages/extension/docs/test-framework.md) and [docs/test-boot-layer.md](../../packages/extension/docs/test-boot-layer.md).
+See [docs/extension/test-framework.md](test-framework.md) and [docs/extension/test-boot-layer.md](test-boot-layer.md).
 
 ### Test coverage
 
-Every feature ships with tests at EVERY layer it has a surface in — logic (`build`/`background`), UI (`view` — real events on the real DOM), and end-to-end (`boot`). Skip a layer ONLY when the feature genuinely has no surface there (a pure build utility has no UI; a CSS-only tweak has no logic). "The logic test already covers it" is NOT a reason to skip the UI test — logic tests prove the logic, UI tests prove the wiring, boot tests prove the built artifact. See [docs/test-framework.md](../../packages/extension/docs/test-framework.md).
+Every feature ships with tests at EVERY layer it has a surface in — logic (`build`/`background`), UI (`view` — real events on the real DOM), and end-to-end (`boot`). Skip a layer ONLY when the feature genuinely has no surface there (a pure build utility has no UI; a CSS-only tweak has no logic). "The logic test already covers it" is NOT a reason to skip the UI test — logic tests prove the logic, UI tests prove the wiring, boot tests prove the built artifact. See [docs/extension/test-framework.md](test-framework.md).
 
 ## CLI
 
@@ -219,7 +219,7 @@ At a brand root, `npx omega <command> --target=<name>` (bins `omega`, `omg`, `mg
 | `test` | run the project's test suites (`framework:` / `full:` reach the framework suite) |
 | `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); a bare run installs the safe set via npu, `--dry-run` only reports, `--major` explicit. Aliases: `-u`, `--update`. See docs/shared/updates.md in the Omega repo |
 
-See [docs/cli.md](../../packages/extension/docs/cli.md).
+See [docs/extension/cli.md](cli.md).
 
 ## Dependency Resolution
 
@@ -231,9 +231,9 @@ See [docs/cli.md](../../packages/extension/docs/cli.md).
 
 - **🚫 NEVER use `npx omega ...` from the framework repo**: `npx omega` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. The `scripts` in `package.json` call `node bin/omega` directly. This applies to ALL four OMEGA frameworks.
 - **🚫 NEVER run `npm start`** (consumer projects): it's the user's long-running dev watcher. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `build.log`, `test.log`), never tail/attach to the process. Running `npx omega test --target=<name>` is fine.
-- **Where the output logs live:** the gulp pipeline tees all stdout/stderr to `<projectRoot>/logs/dev.log` (on `npm start`) or `logs/build.log` (on `npm run build`), truncated fresh each run, ANSI-stripped. `cat logs/dev.log` (or `grep` it) instead of scrolling scrollback, never restart the watcher to see output it already wrote. `npx omega test --target=<name>` writes `logs/test.log`. See [docs/build-system.md](../../packages/extension/docs/build-system.md#log-files); the cross-framework tee contract and the full path table are [docs/shared/logging.md](../shared/logging.md).
+- **Where the output logs live:** the gulp pipeline tees all stdout/stderr to `<projectRoot>/logs/dev.log` (on `npm start`) or `logs/build.log` (on `npm run build`), truncated fresh each run, ANSI-stripped. `cat logs/dev.log` (or `grep` it) instead of scrolling scrollback, never restart the watcher to see output it already wrote. `npx omega test --target=<name>` writes `logs/test.log`. See [docs/extension/build-system.md](build-system.md#log-files); the cross-framework tee contract and the full path table are [docs/shared/logging.md](../shared/logging.md).
 - **After editing files**, verify the gulp watcher recompiled successfully. Check for esbuild/sass errors in the console output. A change that breaks the build is not a completed change.
-- **Live-test the extension via CDP.** Use the `chrome-devtools-extension` MCP upstream: it launches a per-session Chrome for Testing with the unpacked extension pre-loaded (`OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chrome/raw" claude`, then `router__enable_upstream`; stable Chrome ignores `--load-extension`). Plain web pages (no extension needed): the regular `chrome-devtools` MCP tools; your session auto-launches its own private Chrome on the first tool call. This is the primary way to confirm UI changes: type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](../../packages/extension/docs/cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools-extension/CLAUDE.md`.
+- **Live-test the extension via CDP.** Use the `chrome-devtools-extension` MCP upstream: it launches a per-session Chrome for Testing with the unpacked extension pre-loaded (`OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chrome/raw" claude`, then `router__enable_upstream`; stable Chrome ignores `--load-extension`). Plain web pages (no extension needed): the regular `chrome-devtools` MCP tools; your session auto-launches its own private Chrome on the first tool call. This is the primary way to confirm UI changes: type-checking and test suites verify code correctness, not feature correctness. See [docs/extension/cdp-debugging.md](cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools-extension/CLAUDE.md`.
 
 ## Supply-Chain Security
 
@@ -257,48 +257,48 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 1. **`README.md`** — user-facing summary
 2. **`docs/extension/index.md`** (this file) — architecture overview, one paragraph or cross-link
-3. **`docs/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
+3. **`docs/extension/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
 4. **`CHANGELOG.md`** — if the project keeps one
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 
-API references for each subsystem live in `docs/`:
+API references for each subsystem live in `docs/extension/`, beside this guide:
 
 ### Architecture
-- [docs/components.md](../../packages/extension/docs/components.md) — seven component contexts, three-part structure (view + styles + script), manifest wiring
-- [docs/contexts.md](../../packages/extension/docs/contexts.md): the one instance per context, import paths, `initialize()` flow
-- [docs/environment-detection.md](../../packages/extension/docs/environment-detection.md): `omega.isTesting / isDevelopment / isProduction`, the build module's `getVersion`
+- [docs/extension/components.md](components.md) — seven component contexts, three-part structure (view + styles + script), manifest wiring
+- [docs/extension/contexts.md](contexts.md): the one instance per context, import paths, `initialize()` flow
+- [docs/extension/environment-detection.md](environment-detection.md): `omega.isTesting / isDevelopment / isProduction`, the build module's `getVersion`
 
 ### Runtime
-- [docs/extension.md](../../packages/extension/docs/extension.md) — cross-browser `chrome.*` / `browser.*` API wrapper
-- [docs/auth.md](../../packages/extension/docs/auth.md) — cross-context auth sync, sign-in / load / sign-out flows, button CSS classes
-- [docs/verts.md](../../packages/extension/docs/verts.md) — `[data-omega-vert]` auto-bind to @omega.js/client's verts module on page surfaces (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense; content scripts never bind)
-- [docs/affiliatizer.md](../../packages/extension/docs/affiliatizer.md) — the content script's affiliate-link redirect on matched partner hostnames (a fixed framework-level map, not brand config): default-on, once per partner per 24h, `?affiliatizerStatus=block|allow|reset` control, store-listing disclosure
-- [docs/offscreen.md](../../packages/extension/docs/offscreen.md) — offscreen document lifecycle, creation from background, messaging
-- [docs/xss-prevention.md](../../packages/extension/docs/xss-prevention.md) — escapeHTML/sanitizeURL canonical forms, extension attack vectors
+- [docs/extension/extension.md](extension.md) — cross-browser `chrome.*` / `browser.*` API wrapper
+- [docs/extension/auth.md](auth.md) — cross-context auth sync, sign-in / load / sign-out flows, button CSS classes
+- [docs/extension/verts.md](verts.md) — `[data-omega-vert]` auto-bind to @omega.js/client's verts module on page surfaces (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense; content scripts never bind)
+- [docs/extension/affiliatizer.md](affiliatizer.md) — the content script's affiliate-link redirect on matched partner hostnames (a fixed framework-level map, not brand config): default-on, once per partner per 24h, `?affiliatizerStatus=block|allow|reset` control, store-listing disclosure
+- [docs/extension/offscreen.md](offscreen.md) — offscreen document lifecycle, creation from background, messaging
+- [docs/extension/xss-prevention.md](xss-prevention.md) — escapeHTML/sanitizeURL canonical forms, extension attack vectors
 
 ### Build
-- [docs/build-system.md](../../packages/extension/docs/build-system.md) — gulp pipeline, esbuild, sass, html, packaging
-- [docs/templating.md](../../packages/extension/docs/templating.md) — `{{ }}` token replacement, available vars, page template
-- [docs/css.md](../../packages/extension/docs/css.md) — SCSS load paths, framework + theme + project resolution
-- [docs/themes.md](../../packages/extension/docs/themes.md) — bootstrap / classy / `_template`, variable overrides, dark mode
-- [docs/shared/icons.md](../../packages/extension/docs/icons.md) — one source icon → all generated sizes, manifest wiring
-- [docs/defaults.md](../../packages/extension/docs/defaults.md) — `src/defaults/` system, `FILE_MAP` rules
-- [docs/hooks.md](../../packages/extension/docs/hooks.md) — `build:pre` / `build:post` lifecycle hooks
-- [docs/translations.md](../../packages/extension/docs/translations.md) — auto-translate to the configured `translation.languages`
+- [docs/extension/build-system.md](build-system.md) — gulp pipeline, esbuild, sass, html, packaging
+- [docs/extension/templating.md](templating.md) — `{{ }}` token replacement, available vars, page template
+- [docs/extension/css.md](css.md) — SCSS load paths, framework + theme + project resolution
+- [docs/extension/themes.md](themes.md) — bootstrap / classy / `_template`, variable overrides, dark mode
+- [docs/shared/icons.md](icons.md) — one source icon → all generated sizes, manifest wiring
+- [docs/extension/defaults.md](defaults.md) — `src/defaults/` system, `FILE_MAP` rules
+- [docs/extension/hooks.md](hooks.md) — `build:pre` / `build:post` lifecycle hooks
+- [docs/extension/translations.md](translations.md) — auto-translate to the configured `translation.languages`
 
 ### Operations
-- [docs/cli.md](../../packages/extension/docs/cli.md) — commands, aliases, env var conventions
-- [docs/cdp-debugging.md](../../packages/extension/docs/cdp-debugging.md) — launching a controllable Chrome (CDP), loading the unpacked extension (persistent agent profile — `--load-extension` is dead on stable Chrome), driving via MCP/CDP
-- [docs/logging.md](../../packages/extension/docs/logging.md) — `dev.log` / `build.log` / `test.log` tee, controls
-- [docs/common-mistakes.md](../../packages/extension/docs/common-mistakes.md) — the canonical "don't do this" list
-- [docs/audit.md](../../packages/extension/docs/audit.md) — full-audit check catalog (U-xx universal / EXT-xx / F-xx IDs with severity + scope), protocol + fix loop
-- [docs/shared/publishing.md](../../packages/extension/docs/publishing.md) — Chrome / Firefox / Edge store auto-publishing, credentials, CI, store listing description format (`config/description.md`)
+- [docs/extension/cli.md](cli.md) — commands, aliases, env var conventions
+- [docs/extension/cdp-debugging.md](cdp-debugging.md) — launching a controllable Chrome (CDP), loading the unpacked extension (persistent agent profile — `--load-extension` is dead on stable Chrome), driving via MCP/CDP
+- [docs/extension/logging.md](logging.md) — `dev.log` / `build.log` / `test.log` tee, controls
+- [docs/extension/common-mistakes.md](common-mistakes.md) — the canonical "don't do this" list
+- [docs/extension/audit.md](audit.md) — full-audit check catalog (U-xx universal / EXT-xx / F-xx IDs with severity + scope), protocol + fix loop
+- [docs/shared/publishing.md](publishing.md) — Chrome / Firefox / Edge store auto-publishing, credentials, CI, store listing description format (`config/description.md`)
 
 ### Testing
-- [docs/test-framework.md](../../packages/extension/docs/test-framework.md) — writing tests, four layers, `ctx` + `expect` API
-- [docs/test-boot-layer.md](../../packages/extension/docs/test-boot-layer.md) — boot layer (loads consumer's actual packaged extension)
+- [docs/extension/test-framework.md](test-framework.md) — writing tests, four layers, `ctx` + `expect` API
+- [docs/extension/test-boot-layer.md](test-boot-layer.md) — boot layer (loads consumer's actual packaged extension)

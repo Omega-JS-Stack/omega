@@ -47,7 +47,6 @@
   "files": [
     "bin/",
     "dist/",
-    "docs/",
     "scripts/"
   ],
   "preparePackage": {

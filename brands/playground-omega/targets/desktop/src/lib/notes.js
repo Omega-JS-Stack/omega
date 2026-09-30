@@ -2,7 +2,7 @@
  * Surface: the main process's side of the notes feature: ipc.handle and
  * ipc.on, the app store (omega.storage), omega.auth.listen, a deep link, and
  * the tray refresh
- * Doc: node_modules/@omega.js/desktop/docs/ipc.md
+ * Doc: node_modules/@omega.js/manager/docs/desktop/ipc.md
  *
  * The main window's renderer owns the notes themselves (it calls the API);
  * main keeps the one fact the rest of the app shows, the last count, in the
@@ -20,7 +20,7 @@ const COUNT_KEY = 'notes.count';
  */
 function initialize(omega) {
   // The renderer reports every count it draws. Its payload is untrusted input
-  // (docs/ipc.md, zero-trust payloads): a count is a non-negative integer.
+  // (@omega.js/manager/docs/desktop/ipc.md, zero-trust payloads): a count is a non-negative integer.
   const report = (payload) => {
     const count = payload?.count;
 

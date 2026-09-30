@@ -8,7 +8,7 @@ Once every brand's provider URLs (Stripe / PayPal / Chargebee / Chargeblast / Co
 
 - `src/manager/routes/payments/webhook/post.js` — line ~28: remove the `|| key === process.env.BACKEND_MANAGER_KEY` half of the validation check.
 - `src/manager/routes/payments/dispute-alert/post.js` — line ~20: same removal. Also update the docstring at line ~11 to drop the "BACKEND_MANAGER_KEY accepted as legacy fallback" note.
-- `docs/stripe-webhook-forwarding.md` — drop the "BACKEND_MANAGER_KEY also accepted as a legacy fallback" parenthetical.
+- `docs/backend/stripe-webhook-forwarding.md` — drop the "BACKEND_MANAGER_KEY also accepted as a legacy fallback" parenthetical.
 
 ## How to verify it's safe
 

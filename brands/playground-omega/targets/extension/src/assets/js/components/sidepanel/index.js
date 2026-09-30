@@ -1,6 +1,6 @@
 /**
  * Surface: the side panel (a page context)
- * Doc: node_modules/@omega.js/extension/docs/components.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/components.md
  *
  * The full notes list: list, create and delete, each a messenger round trip to
  * background, rendered with omega.utilities.escapeHTML (../../lib/notes-list.js).

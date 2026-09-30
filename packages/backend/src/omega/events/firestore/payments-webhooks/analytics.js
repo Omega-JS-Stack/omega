@@ -36,7 +36,7 @@ const { buildAttributionContext, buildIdentity } = require('../../../libraries/a
  * ONE LIMIT OF THE TRIAL EVENTS, deliberate. This resolver reads the subscription's
  * TERM, never an invoice amount (the same reason PayPal's transform refuses to read
  * the payment record — a day-zero setup fee exists during a trial and is not a
- * billing period, docs/payment-system.md), so a real charge taken INSIDE the trial
+ * billing period, docs/backend/payment-system.md), so a real charge taken INSIDE the trial
  * term books nothing at all.
  *
  * `trial_lapse` covers EVERY way a trial ends without paying, in whatever shape the

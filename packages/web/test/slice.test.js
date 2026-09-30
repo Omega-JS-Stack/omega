@@ -377,7 +377,7 @@ test('admin verts card serves at /admin/verts (docs/web/ads-system.md phase 3)',
   assert.ok(verts.includes('omega-shell'), 'verts card wears the app shell (admin/core/minimal gate)');
   assert.ok(verts.includes('id="verts-table"'), 'inventory table present');
   assert.ok(verts.includes('id="vert-editor-modal"'), 'create/edit modal present');
-  // The editor form covers the verts collection shape (backend docs/verts.md)
+  // The editor form covers the verts collection shape (docs/backend/verts.md)
   for (const field of ['vert.enabled', 'vert.title', 'vert.description', 'vert.button', 'vert.link', 'vert.image', 'vert.footer', 'vert.weight', 'vert.targeting.sites', 'vert.targeting.categories', 'vert.targeting.keywords', 'vert.whitelist', 'vert.blacklist']) {
     assert.ok(verts.includes(`name="${field}"`), `editor form field ${field}`);
   }

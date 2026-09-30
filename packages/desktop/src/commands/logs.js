@@ -3,7 +3,7 @@
 //
 // The optional positional names the surface (default `runtime`) and resolves to
 // <projectRoot>/logs/<surface>.log — the same four files documented in
-// docs/logging.md. Every flag below works on whichever surface was named.
+// docs/desktop/logging.md. Every flag below works on whichever surface was named.
 //
 // `runtime` resolves to the file the runtime logger writes to:
 //   - Dev (running from a project directory): <projectRoot>/logs/runtime.log

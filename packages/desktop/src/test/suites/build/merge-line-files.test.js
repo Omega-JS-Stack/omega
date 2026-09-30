@@ -222,17 +222,17 @@ ${CUSTOM_MARKER}
       },
     },
     {
-      name: 'normalizeEnvLine: empty value stays unquoted',
+      name: 'normalizeEnvLine: an empty value becomes KEY=""',
       run: (ctx) => {
-        ctx.expect(normalizeEnvLine('KEY=')).toBe('KEY=');
-        ctx.expect(normalizeEnvLine('KEY=   ')).toBe('KEY=');
+        ctx.expect(normalizeEnvLine('KEY=')).toBe('KEY=""');
+        ctx.expect(normalizeEnvLine('KEY=   ')).toBe('KEY=""');
       },
     },
     {
-      name: 'normalizeEnvLine: escapes embedded double quotes and backslashes',
+      name: 'normalizeEnvLine: keeps embedded quotes and backslashes as dotenv reads them',
       run: (ctx) => {
-        ctx.expect(normalizeEnvLine('KEY=he said "hi"')).toBe('KEY="he said \\"hi\\""');
-        ctx.expect(normalizeEnvLine('KEY=back\\slash')).toBe('KEY="back\\\\slash"');
+        ctx.expect(normalizeEnvLine('KEY=he said "hi"')).toBe('KEY="he said "hi""');
+        ctx.expect(normalizeEnvLine('KEY=back\\slash')).toBe('KEY="back\\slash"');
       },
     },
     {

@@ -6,11 +6,11 @@ const omega = require('@omega.js/backend');
 omega.initialize({
 });
 
-// Routes:  src/routes/<path>/<method>.js, served by the consumer's own function below at /<path> (node_modules/@omega.js/backend/docs/routes.md)
-// Schemas: src/schemas/<path>/<method>.js, the input each route accepts (node_modules/@omega.js/backend/docs/schemas.md)
-// Hooks:   src/hooks/auth/<event>.js and src/hooks/cron/<schedule>/<job>.js (node_modules/@omega.js/backend/docs/auth-hooks.md)
-// Events:  src/events/<name>.js, run by a trigger below through omega.events.run (node_modules/@omega.js/backend/docs/routes.md)
-// MCP:     src/mcp.js, consumer tools delegating to routes (node_modules/@omega.js/backend/docs/mcp.md)
+// Routes:  src/routes/<path>/<method>.js, served by the consumer's own function below at /<path> (node_modules/@omega.js/manager/docs/backend/routes.md)
+// Schemas: src/schemas/<path>/<method>.js, the input each route accepts (node_modules/@omega.js/manager/docs/backend/schemas.md)
+// Hooks:   src/hooks/auth/<event>.js and src/hooks/cron/<schedule>/<job>.js (node_modules/@omega.js/manager/docs/backend/auth-hooks.md)
+// Events:  src/events/<name>.js, run by a trigger below through omega.events.run (node_modules/@omega.js/manager/docs/backend/routes.md)
+// MCP:     src/mcp.js, consumer tools delegating to routes (node_modules/@omega.js/manager/docs/backend/mcp.md)
 
 /**
  * @route /notes

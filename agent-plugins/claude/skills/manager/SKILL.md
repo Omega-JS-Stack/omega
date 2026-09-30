@@ -13,11 +13,11 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `packages/manager/README.md` is the package's long-form reference (the wizard, the manage cycle, the three data buckets, every service, company mode, the CLI surface); `docs/manager/index.md` is the short map pointing at it. The brand-monorepo shape and the agent-docs chain are in `docs/shared/agent-docs.md`; cross-framework contracts are in `docs/shared/` (config, deploys, updates, brands, local-dev).
-- **Working in a consumer brand** — the brand root's `AGENTS.md` imports `node_modules/@omega.js/AGENTS.md`, a symlink the workspace service maintains at the monorepo's top-level `AGENTS.md` (the map). The brand-root guide itself is `docs/manager/brand.md`: the app-to-target map, the verbs, and the brand hard rules — read it first, then the framework guide for whichever app the work is in. Published installs will carry the map and docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+- **Working in a consumer brand** — the brand root's `AGENTS.md` imports `node_modules/@omega.js/manager/AGENTS.md`, which imports the map (`docs/omega.md`) from the whole `docs/` tree the manager ships. The brand-root guide itself is `node_modules/@omega.js/manager/docs/manager/brand.md`: the app-to-target map, the verbs, and the brand hard rules. Read it first, then the framework guide for whichever app the work is in.
 
 ## Non-negotiables
 
-- **No package carries agent docs.** The repo-root `AGENTS.md` map is the one agent entry; the brand guide is `docs/manager/brand.md`. Never create a `packages/<pkg>/AGENTS.md`.
+- **One map, one AGENTS.md per entry.** The map is `docs/omega.md`; the repo-root `AGENTS.md` and the manager's one-line `AGENTS.md` import it. No other package carries docs or an AGENTS.md.
 - **Upstream-first, permission first**: a defect the next consumer would hit gets fixed in the framework, not patched in the brand — but a consumer session surfaces the proposed framework change and waits for Ian's go (or files an upstream issue) before editing the monorepo. The rule and its "within reason" line live in `docs/shared/local-dev.md`.
 - **Every service is idempotent.** Check before acting; a second run must change nothing.
 - **Grep the logs FIRST.** The manage cycle tees to `<brandRoot>/logs/manage.log` and the `omega dev` fan-out to `<brandRoot>/logs/dev.log`, and every app keeps its own `logs/` beside it — truncated per launch, gitignored. What a service walk did, and what a dev leg printed, is on disk: read it instead of re-running a manage or restarting the stack (`docs/shared/logging.md`).

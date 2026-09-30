@@ -16,6 +16,7 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const { ensureTarget } = require('../../dist/cli/utils/ensure-target.js');
+const BuildCommand = require('../../dist/cli/commands/build.js');
 const defineCases = require('../../dist/vendor/devkit/test/define-cases.js');
 
 /** A virgin backend target: a manifest and nothing else. */
@@ -315,6 +316,44 @@ module.exports = defineCases({
         const source = jetpack.read(path.join(__dirname, '..', '..', 'dist', 'cli', 'commands', 'base-command.js'));
 
         assert.match(source, /ensureTarget\(/, 'ensureStaged() runs the scaffold before it stages');
+      },
+    },
+
+    {
+      name: 'a-verb-prints-the-scaffolds-warnings-and-build-runs-it-first',
+      auth: 'none',
+
+      async run({ assert }) {
+        // A brand target whose AGENTS.md carries notes is kept with a
+        // move-it warning. The verb has to print that warning, not drop it,
+        // and a bare `omega build` has to reach the scaffold at all.
+        const brand = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'omega-ensure-target-brand-')));
+        const targetDir = path.join(brand, 'targets', 'backend');
+
+        try {
+          jetpack.write(path.join(brand, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+          jetpack.write(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'acme-backend', version: '0.0.0' }, null, 2));
+          jetpack.write(path.join(targetDir, 'AGENTS.md'),
+            '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
+
+          const command = new BuildCommand({ firebaseProjectPath: targetDir, argv: {}, options: {} });
+          const warnings = [];
+          command.log = () => {};
+          command.logWarning = (message) => warnings.push(message);
+          command.runEnsureTarget();
+
+          assert.ok(warnings.some((message) => message.includes('Kept AGENTS.md')), 'the scaffold warning reaches the verb output');
+          assert.match(jetpack.read(path.join(targetDir, 'AGENTS.md')), /VPN/, 'the notes stay');
+
+          // Build runs the scaffold before it stages: stop it at that seam.
+          const order = [];
+          command.attachVerbLog = () => {};
+          command.runEnsureTarget = () => { order.push('ensureTarget'); throw new Error('stop'); };
+          await command.execute().catch((error) => order.push(error.message));
+          assert.deepEqual(order, ['ensureTarget', 'stop'], 'build reaches ensureTarget first');
+        } finally {
+          jetpack.remove(brand);
+        }
       },
     },
 

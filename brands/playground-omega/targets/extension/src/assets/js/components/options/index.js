@@ -1,6 +1,6 @@
 /**
  * Surface: the options page (a page context)
- * Doc: node_modules/@omega.js/extension/docs/extension.md
+ * Doc: node_modules/@omega.js/manager/docs/extension/extension.md
  *
  * One setting, notes.autoSaveSelection, written to omega.extension.storage:
  * the store the content script reads on load (../../lib/notes.js says why it

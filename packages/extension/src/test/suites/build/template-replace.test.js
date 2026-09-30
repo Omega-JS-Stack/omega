@@ -95,7 +95,7 @@ module.exports = defineCases({
     },
 
     {
-      // The keys the build promises consumer code (packages/extension/docs/build-system.md):
+      // The keys the build promises consumer code (docs/extension/build-system.md):
       // the substitution being wired proves nothing if the set it fills from lost
       // a key. `webManagerConfiguration` was in this set and is gone (#743): it
       // composed a SECOND, diverging copy of the @omega.js/client runtime blob

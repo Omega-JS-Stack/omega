@@ -1,9 +1,10 @@
-// Tests for src/lib/agents-md.js + the workspace `agents` ensure op — the
-// brand agent-docs chain (Ian 2026-07-20, amended 2026-07-27): AGENTS.md
-// line 1 imports the TOP-LEVEL omega AGENTS.md through the scope path
-// `node_modules/@omega.js/AGENTS.md` (a symlink this service maintains).
-// Create / present / heal are idempotent, consumer content survives every
-// path, a CLAUDE.md is never written or read, and no package ships agent docs.
+// Tests for the workspace `agents` ensure op, the brand agent-docs chain: the
+// op writes the brand root through devkit's one AGENTS.md builder (its own
+// cases: packages/devkit/test/agents-md.test.js), so its Default section imports
+// the installed manager's AGENTS.md, which imports the omega map from the docs the
+// manager ships. The retired scope link is removed and a CLAUDE.md is never
+// written or read. A linked brand's full chain is proved with devkit's
+// docs-sync prelude, which keeps a linked manager's docs current.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,10 +12,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const agentsMd = require('../src/lib/agents-md.js');
-
-const { IMPORT_LINE, ensureAgentsMd, ensureGuideLink } = agentsMd;
+// The brand root shape, written out: the import under Default, an empty Custom section.
+const BRAND_AGENTS_MD = '<!-- ========== Default Values ========== -->\n@node_modules/@omega.js/manager/AGENTS.md\n\n<!-- ========== Custom Values ========== -->\n';
 const agentsOp = require('../src/services/workspace/ensure/agents.js');
+const { MAP_FILE } = require('../../devkit/tools/vendor-docs.js');
+const docsSync = require('../../devkit/src/preludes/docs-sync.js');
+
+const PKG_ROOT = path.join(__dirname, '..');
+const MONOREPO = path.join(PKG_ROOT, '..', '..');
+const MAP_IMPORT = `@${MAP_FILE.split(path.sep).join('/')}`;
 
 function tmpdir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-agents-md-'));
@@ -24,101 +30,42 @@ function read(dir, file) {
   return fs.readFileSync(path.join(dir, file), 'utf8');
 }
 
-// ─── The map is the target — no package ships agent docs ─────────────────────
+// Follow each file's first `@` import line, relative to that file, the way
+// Claude Code does; returns the files read, in order.
+function followChain(file) {
+  const chain = [file];
+  for (let hops = 0; hops < 5; hops += 1) {
+    const found = fs.readFileSync(chain.at(-1), 'utf8').split('\n').find((line) => line.trim().startsWith('@'));
+    if (!found) break;
+    chain.push(path.join(path.dirname(chain.at(-1)), found.trim().slice(1)));
+  }
+  return chain;
+}
 
-test('agents-md: no package agent docs — the top-level map is the one entry', () => {
-  const pkgRoot = path.join(__dirname, '..');
-  assert.ok(!fs.existsSync(path.join(pkgRoot, 'AGENTS.md')), 'packages/manager must carry NO AGENTS.md (Ian 2026-07-27)');
-
-  const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
-  assert.ok(!pkg.files.includes('AGENTS.md'), 'files whitelist must not ship AGENTS.md');
-
-  assert.ok(fs.existsSync(path.join(pkgRoot, '..', '..', 'AGENTS.md')), 'the top-level AGENTS.md map must exist — it is the import target');
-});
-
-test('agents-md: the import line is the scope path to the top-level map', () => {
-  assert.equal(IMPORT_LINE, '@node_modules/@omega.js/AGENTS.md');
-  assert.ok(!IMPORT_LINE.includes('/Users/'), 'never an absolute machine path');
-});
-
-test('agents-md: resolveImportLine walks up to a hoisted install and falls back to canonical', () => {
-  const { resolveImportLine, GUIDE_SUBPATH } = require('../src/lib/agents-md.js');
-  const root = tmpdir();
-
-  // Nothing installed anywhere → canonical brand-local path
-  const brand = path.join(root, 'targets', 'my-brand');
-  fs.mkdirSync(brand, { recursive: true });
-  assert.equal(resolveImportLine(brand), IMPORT_LINE);
-
-  // Hoisted two levels up (in-repo brand shape) → upward relative path.
-  // A scope only counts with a real install inside (#153), so the fixture
-  // carries a manager entry.
-  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  assert.equal(resolveImportLine(brand), `@../../${GUIDE_SUBPATH}`);
-
-  // Brand-local install wins over the hoisted one
-  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  assert.equal(resolveImportLine(brand), IMPORT_LINE);
-});
-
-test('agents-md: an empty local @omega.js dir never wins the scope walk (#153)', () => {
-  const { resolveImportLine, GUIDE_SUBPATH } = require('../src/lib/agents-md.js');
-  const { monorepo, brand } = linkFixture();
-
-  // The dangling shape: the target two levels down carries an EMPTY local
-  // @omega.js dir while the hoisted brand-root scope holds the real install.
-  const targetDir = path.join(brand, 'targets', 'website');
-  fs.mkdirSync(path.join(targetDir, 'node_modules', '@omega.js'), { recursive: true });
-
-  assert.equal(resolveImportLine(targetDir), `@../../${GUIDE_SUBPATH}`, 'the empty local dir is skipped for the hoisted scope');
-
-  assert.equal(ensureGuideLink(targetDir), 'created', 'the link lands in the scope the import points at');
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(monorepo, 'AGENTS.md')));
-});
-
-test('agents-md: a pre-2026-07-27 manager-package import is consumer content, not an import', () => {
-  const dir = tmpdir();
-  const legacyImport = '@node_modules/@omega.js/manager/AGENTS.md';
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${legacyImport}\n\n# Notes survive\n`);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const content = read(dir, 'AGENTS.md');
-  assert.equal(content.split('\n')[0], IMPORT_LINE, 'the current import goes to line 1');
-  assert.ok(content.includes(legacyImport), 'the retired target is left alone — edit it by hand');
-  assert.match(content, /# Notes survive/);
-});
-
-// ─── ensureGuideLink ─────────────────────────────────────────────────────────
-
-// A fixture consumer: a fake monorepo (top-level AGENTS.md + packages/manager)
-// and a brand whose node_modules/@omega.js/manager symlinks into it — the
-// local-era file: shape.
+// A locally linked brand: a fake monorepo (docs/ with the map, the manager's
+// tracked AGENTS.md, the REAL devkit linked in so its docs lane runs) and a
+// brand whose node_modules/@omega.js/manager symlinks into it.
 function linkFixture() {
   const root = tmpdir();
   const monorepo = path.join(root, 'omega');
-  fs.mkdirSync(path.join(monorepo, 'packages', 'manager'), { recursive: true });
-  fs.writeFileSync(path.join(monorepo, 'AGENTS.md'), '# the map\n');
+  const manager = path.join(monorepo, 'packages', 'manager');
+  fs.mkdirSync(path.join(monorepo, 'docs', 'shared'), { recursive: true });
+  fs.mkdirSync(manager, { recursive: true });
+  fs.writeFileSync(path.join(monorepo, 'package.json'), JSON.stringify({ name: 'omega' }));
+  fs.writeFileSync(path.join(manager, 'package.json'), JSON.stringify({ name: '@omega.js/manager' }));
+  fs.symlinkSync(path.join(MONOREPO, 'packages', 'devkit'), path.join(monorepo, 'packages', 'devkit'));
+  fs.writeFileSync(path.join(monorepo, MAP_FILE), '# the map\n');
+  fs.writeFileSync(path.join(monorepo, 'docs', 'shared', 'config.md'), '# config\n');
+  fs.copyFileSync(path.join(PKG_ROOT, 'AGENTS.md'), path.join(manager, 'AGENTS.md'));
 
   const brand = path.join(root, 'brand');
   fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js'), { recursive: true });
-  fs.symlinkSync(path.join(monorepo, 'packages', 'manager'), path.join(brand, 'node_modules', '@omega.js', 'manager'));
-  return { monorepo, brand };
+  fs.symlinkSync(manager, path.join(brand, 'node_modules', '@omega.js', 'manager'));
+  return { monorepo, manager, brand };
 }
 
-test('agents-md: ensureGuideLink links the scope AGENTS.md at the top-level map, idempotently', () => {
-  const { monorepo, brand } = linkFixture();
-
-  assert.equal(ensureGuideLink(brand), 'created');
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  assert.equal(fs.readFileSync(link, 'utf8'), '# the map\n', 'the link resolves to the live map');
-  assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(monorepo, 'AGENTS.md')));
-
-  assert.equal(ensureGuideLink(brand), 'present');
-});
-
-// A published consumer: a REAL manager package directory (no symlink, no
-// monorepo above it) carrying the map the prepare lane vendored into it.
+// A published brand: a REAL manager package directory (no monorepo above it)
+// carrying the docs its prepare lane vendored.
 function publishedFixture() {
   const brand = tmpdir();
   const manager = path.join(brand, 'node_modules', '@omega.js', 'manager');
@@ -126,119 +73,30 @@ function publishedFixture() {
   return { brand, manager };
 }
 
-test('agents-md: ensureGuideLink links a published install at the vendored map (#144)', () => {
-  const { brand, manager } = publishedFixture();
-  const vendored = path.join(manager, 'docs', 'AGENTS.md');
-  fs.writeFileSync(vendored, '# the vendored map\n');
+// ─── The manager's AGENTS.md: one tracked import of the map ─────────────────
 
-  assert.equal(ensureGuideLink(brand), 'created');
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  assert.equal(fs.realpathSync(link), fs.realpathSync(vendored), 'no monorepo above it — the package copy is the target');
-  assert.equal(fs.readFileSync(link, 'utf8'), '# the vendored map\n');
-
-  assert.equal(ensureGuideLink(brand), 'present');
+test('agents-md: the manager ships a one-line AGENTS.md importing the map inside its docs', () => {
+  assert.equal(read(PKG_ROOT, 'AGENTS.md'), `${MAP_IMPORT}\n`);
+  const pkg = JSON.parse(read(PKG_ROOT, 'package.json'));
+  assert.ok(pkg.files.includes('AGENTS.md'), 'the files list ships it');
+  assert.ok(fs.existsSync(path.join(MONOREPO, MAP_FILE)), 'the map it imports exists in the monorepo docs');
+  assert.equal(read(MONOREPO, 'AGENTS.md').split('\n')[0], MAP_IMPORT, 'the root AGENTS.md opens with the same map');
 });
 
-test('agents-md: a published install with no vendored map still skips', () => {
-  const { brand } = publishedFixture();
+// ─── The whole chain on a linked brand ──────────────────────────────────────
 
-  assert.equal(ensureGuideLink(brand), 'skipped');
-  assert.ok(!fs.existsSync(path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md')), 'nothing is linked');
-});
+test('agents-md: a linked brand resolves the two-import chain (three files) to the live map', async () => {
+  const { brand, monorepo } = linkFixture();
+  fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md'));
 
-test('agents-md: a locally linked brand takes the LIVE map, never the generated copy in that monorepo', () => {
-  const { monorepo, brand } = linkFixture();
-  // The monorepo's own packages/manager grows the vendored map on every
-  // prepare — the live map two dirs up must still win.
-  fs.mkdirSync(path.join(monorepo, 'packages', 'manager', 'docs'), { recursive: true });
-  fs.writeFileSync(path.join(monorepo, 'packages', 'manager', 'docs', 'AGENTS.md'), '# the generated copy\n');
+  assert.equal(docsSync.run({ brandRoot: brand, log: () => {} }).synced, true);
+  const result = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } });
+  assert.deepEqual(result.output, { link: 'removed', agents: 'created' });
 
-  assert.equal(ensureGuideLink(brand), 'created');
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  assert.equal(fs.readFileSync(link, 'utf8'), '# the map\n');
-});
-
-test('agents-md: ensureGuideLink replaces a stale regular file and skips when nothing resolves', () => {
-  const { brand } = linkFixture();
-  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
-  fs.writeFileSync(link, 'stale copy\n');
-
-  assert.equal(ensureGuideLink(brand), 'healed');
-  assert.ok(fs.lstatSync(link).isSymbolicLink(), 'the stale copy became the live link');
-
-  const bare = tmpdir();
-  assert.equal(ensureGuideLink(bare), 'skipped', 'no scope directory → skipped');
-});
-
-test('agents-md: a stale-depth import line is healed to the resolved path', () => {
-  const { GUIDE_SUBPATH } = require('../src/lib/agents-md.js');
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@../../${GUIDE_SUBPATH}\n\n# Notes survive\n`);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const lines = read(dir, 'AGENTS.md').split('\n');
-  assert.equal(lines[0], IMPORT_LINE, 'stale ../../ depth rewritten to the resolved (canonical) path');
-  assert.equal(lines.filter((line) => line.trim().endsWith(GUIDE_SUBPATH)).length, 1);
-  assert.match(read(dir, 'AGENTS.md'), /# Notes survive/);
-});
-
-// ─── ensureAgentsMd ──────────────────────────────────────────────────────────
-
-test('agents-md: missing AGENTS.md is created — import first, then a short brand-notes heading (Ian: keep it short)', () => {
-  const dir = tmpdir();
-  assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'created');
-
-  const lines = read(dir, 'AGENTS.md').split('\n');
-  assert.equal(lines[0], IMPORT_LINE);
-  assert.equal(lines[1], '');
-  assert.equal(lines[2], '# Fixture Brand: brand notes');
-  assert.ok(!read(dir, 'AGENTS.md').includes('\u2014'), 'no em dash in the written AGENTS.md');
-  assert.ok(!read(dir, 'AGENTS.md').includes('<!--'), 'no marker comment (culled 2026-07-20)');
-
-  assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'present');
-});
-
-test('agents-md: a cp244 marker comment under a correct import is consumer content — present, untouched', () => {
-  const dir = tmpdir();
-  const legacyMarker = '<!-- ^ OMEGA framework agent guide — maintained by `npm start`; keep this import first. -->';
-  const content = `${IMPORT_LINE}\n${legacyMarker}\n\n# Notes\n`;
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), content);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'present');
-  assert.equal(read(dir, 'AGENTS.md'), content, 'the marker is never scrubbed — delete it by hand');
-});
-
-test('agents-md: existing file without the import is healed in place — content preserved, import at line 1', () => {
-  const dir = tmpdir();
-  const consumer = '# My brand\n\nHand-written notes that must survive.\n';
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), consumer);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const content = read(dir, 'AGENTS.md');
-  assert.equal(content.split('\n')[0], IMPORT_LINE);
-  assert.match(content, /Hand-written notes that must survive\./);
-
-  // Idempotent: a second run is a no-op
-  assert.equal(ensureAgentsMd(dir, 'X'), 'present');
-  assert.equal(read(dir, 'AGENTS.md'), content);
-});
-
-test('agents-md: healing removes a stray mid-file copy of the import — no duplicates ever', () => {
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Notes\n\n${IMPORT_LINE}\n\nMore notes.\n`);
-
-  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
-  const content = read(dir, 'AGENTS.md');
-  const importCount = content.split('\n').filter((line) => line.trim() === IMPORT_LINE).length;
-  assert.equal(importCount, 1);
-  assert.equal(content.split('\n')[0], IMPORT_LINE);
-  assert.match(content, /More notes\./);
-});
-
-// ─── No CLAUDE.md: Claude Code reads AGENTS.md itself ────────────────────────
-
-test('agents-md: the lib carries no CLAUDE.md pointer helper', () => {
-  assert.deepEqual(Object.keys(agentsMd).filter((key) => /claude/i.test(key)), []);
+  const chain = followChain(path.join(brand, 'AGENTS.md'));
+  assert.equal(chain.length, 3, 'brand AGENTS.md, then the manager\'s, then the map');
+  assert.equal(fs.readFileSync(chain[2], 'utf8'), '# the map\n');
+  assert.equal(await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} } }), null, 'a second run is a no-op');
 });
 
 // ─── The workspace ensure op ─────────────────────────────────────────────────
@@ -248,18 +106,17 @@ test('agents-md: op creates AGENTS.md and no CLAUDE.md on a fresh brand, then is
   const context = { brandRoot: dir, brand: { id: 'fixture', config: { brand: { name: 'Fixture' } } } };
 
   const first = await agentsOp(context);
-  assert.deepEqual(first.output, { guide: 'skipped', agents: 'created' });
-  assert.equal(read(dir, 'AGENTS.md').split('\n')[0], IMPORT_LINE);
+  assert.deepEqual(first.output, { link: 'absent', agents: 'created' });
+  assert.equal(read(dir, 'AGENTS.md'), BRAND_AGENTS_MD, 'the builder\'s file, no generated heading');
   assert.equal(fs.existsSync(path.join(dir, 'CLAUDE.md')), false, 'a manage run writes no CLAUDE.md');
 
   assert.equal(await agentsOp(context), null);
-  assert.equal(fs.existsSync(path.join(dir, 'CLAUDE.md')), false);
 });
 
 test('agents-md: op leaves an existing CLAUDE.md alone, content or pointer, with no warning', async () => {
   for (const content of ['# content\n', '@AGENTS.md\n']) {
     const dir = tmpdir();
-    fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n\n# Fixture: brand notes\n`);
+    fs.writeFileSync(path.join(dir, 'AGENTS.md'), BRAND_AGENTS_MD);
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), content);
 
     assert.equal(await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} } }), null);
@@ -267,21 +124,14 @@ test('agents-md: op leaves an existing CLAUDE.md alone, content or pointer, with
   }
 });
 
-test('#971: op under --dry-run plans the link, AGENTS.md and the heal, and writes nothing', async () => {
-  const { brand, manager } = publishedFixture();
-  fs.writeFileSync(path.join(manager, 'docs', 'AGENTS.md'), '# vendored map\n');
+test('agents-md: op under --dry-run plans the link removal and AGENTS.md, and writes nothing', async () => {
+  const { brand, monorepo } = linkFixture();
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  fs.symlinkSync(path.join(monorepo, 'AGENTS.md'), link);
 
-  const fresh = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
+  const planned = await agentsOp({ brandRoot: brand, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
 
-  assert.deepEqual(fresh.output, { guide: 'planned', agents: 'planned' });
+  assert.deepEqual(planned.output, { link: 'planned', agents: 'planned' });
   assert.deepEqual(fs.readdirSync(brand), ['node_modules']);
-  assert.deepEqual(fs.readdirSync(path.join(brand, 'node_modules', '@omega.js')), ['manager']);
-
-  const dir = tmpdir();
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# notes without the import\n');
-
-  const heal = await agentsOp({ brandRoot: dir, brand: { id: 'fixture', config: {} }, options: { dryRun: true } });
-
-  assert.equal(heal.output.agents, 'planned');
-  assert.equal(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8'), '# notes without the import\n');
+  assert.ok(fs.lstatSync(link).isSymbolicLink(), 'the retired link is still there');
 });

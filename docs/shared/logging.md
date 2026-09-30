@@ -144,7 +144,7 @@ surface attaches it at its entry point.
 | `omega logs` | `<targetRoot>/dist/production.log` | the Cloud Logging tail |
 | firebase-tools itself | `<targetRoot>/*-debug.log` | `firestore-debug.log`, `firebase-debug.log`, `ui-debug.log`, … — theirs, never swept by us |
 | **Desktop extras** | | |
-| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; kept across boots, rotating at 10 MB — `packages/desktop/docs/logging.md` |
+| the running app itself (main + preload + renderer converge) | `<targetRoot>/logs/runtime.log` (dev) · the OS log dir (packaged) | lifecycle, window and updater lines; kept across boots, rotating at 10 MB — `docs/desktop/logging.md` |
 | `npx omega logs [runtime\|dev\|build\|test]` (desktop's own verb — read, not write) | tails whichever of the four `<targetRoot>/logs/` files was named, `runtime` by default | the print/follow/open surface for all of the above; backend's `omega logs` is a different verb (the Cloud Logging tail, one row up) |
 | `omega release` (the same dispatch `omega deploy` delegates to) | `<targetRoot>/logs/deploy.log` | the GH Actions release run, streamed locally: one name for every target's deploy ([#873](https://github.com/Omega-JS-Stack/omega/issues/873)), where this was `logs/ci.log` |
 | Windows code-signing | `<targetRoot>/logs/signing.log` | JSONL signing events (local fallback; on CI it lands in the runner home) |

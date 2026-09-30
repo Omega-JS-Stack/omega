@@ -1,4 +1,4 @@
-@../../node_modules/@omega.js/AGENTS.md
+<!-- ========== Default Values ========== -->
+@../../node_modules/@omega.js/manager/AGENTS.md
 
-# OMEGA Playground: brand notes
-
+<!-- ========== Custom Values ========== -->

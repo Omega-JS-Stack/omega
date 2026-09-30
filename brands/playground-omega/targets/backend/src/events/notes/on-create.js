@@ -1,7 +1,7 @@
 /**
  * Surface: event, a consumer Firestore trigger (notesOnCreate in src/index.js)
  * run through omega.events.run('notes/on-create'): bumps the owner's counter
- * Doc: node_modules/@omega.js/backend/docs/routes.md (New Event Handler)
+ * Doc: node_modules/@omega.js/manager/docs/backend/routes.md (New Event Handler)
  */
 const { FieldValue } = require('firebase-admin/firestore');
 
