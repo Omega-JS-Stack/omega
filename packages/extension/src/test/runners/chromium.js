@@ -1,19 +1,10 @@
-// Chromium-runner: launches Puppeteer with the harness extension loaded,
-// runs background-layer suites in the SW context via CDP Runtime.evaluate, then
-// runs view-layer suites in tabs pointed at popup/options/sidepanel pages.
-//
-// Communication channel: each injected test wraps its events as
-//   console.log(TEST_EVENT_PREFIX + JSON.stringify(evt))
-// from inside the SW / tab. The runner subscribes to `Runtime.consoleAPICalled`
-// (for SW) and Puppeteer's `page.on('console')` (for tabs) and parses those
-// lines exactly like @omega.js/desktop's electron runner parses stdout. Same
-// JSON-line protocol, the same prefix, a different transport.
-//
-// Test source is shipped as a string. Each test's `run` function body is
-// extracted at load-time and wrapped as `(async (ctx) => { <body> })(ctx)`
-// inside an outer harness that constructs `ctx` + `expect` from inline
-// assert.js source. The body has no closure to its file — it must `require`
-// nothing and rely only on `ctx` + globals (`chrome`, `globalThis`).
+// Chromium-runner: launches Puppeteer with the harness extension loaded, runs
+// background-layer suites in the SW via CDP Runtime.evaluate, then view-layer
+// suites in tabs on the popup/options/sidepanel pages. Each injected test logs
+// TEST_EVENT_PREFIX + JSON, read like the desktop electron runner reads stdout.
+// Test source ships as a string: each `run` body is wrapped in an async arrow
+// inside a harness that builds `ctx` + `expect` from devkit's inlined expect.js,
+// so a body must `require` nothing and use only `ctx` + globals.
 
 const path = require('path');
 const fs   = require('fs');
@@ -25,7 +16,7 @@ const { attachLiveWorker } = require('./service-worker.js');
 // payload. The runner reads it from disk once at module-load time. Resolved through
 // devkit (NOT ../assert.js, which is now a CommonJS re-export shim — its source would
 // leave a bare `module.exports = require(...)` in the browser context).
-const ASSERT_SRC = fs.readFileSync(require.resolve('@omega.js/devkit/test/assert'), 'utf8');
+const ASSERT_SRC = fs.readFileSync(require.resolve('@omega.js/devkit/test/expect'), 'utf8');
 
 // The ONE prefix every harness event line carries, written inside the SW / tab
 // and read back here (the same word @omega.js/desktop's harness writes)
@@ -290,9 +281,9 @@ function buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: s
     })
     .join('\n');
 
-  // assert.js declares `function expect(...) { ... }` at the top level. We strip its
-  // `module.exports = expect` line (no `module` in the browser) and keep the function
-  // declaration available as the local `expect`.
+  // expect.js binds `const expect` at the top level and guards its export behind
+  // `typeof module`. We strip the `module.exports = expect` line anyway (no `module`
+  // in the browser) and keep the binding available as the local `expect`.
   return `
 (async function () {
   'use strict';

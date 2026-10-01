@@ -145,6 +145,8 @@ The module **must export a function** — `module.exports = (ctx) => ({ ... })` 
 
 There is **no `cleanup` hook** and **no `accounts` field** (unlike @omega.js/backend — these frameworks have no auth/user system): tests clean up after themselves, so there is nothing project-level to tear down.
 
+A hook that fails to load, exports a non-function, whose factory throws or returns a non-object, or whose `setup` throws, fails the run before any suite: the loader (`@omega.js/devkit/test/init-hooks`) throws an `InitHookError` naming the file and carrying the cause, runner-core passes it up uncaught, and `omega test` prints it and exits 1.
+
 ```javascript
 // <cwd>/test/_init.js
 const fs = require('fs');
@@ -160,7 +162,7 @@ module.exports = ({ projectRoot }) => ({
 
 ## Test file shapes
 
-Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/desktop/test');`. It hands the spec to the OMEGA runner unchanged, and fails loudly when `node --test` loads the file, which would otherwise report a hollow pass ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
+Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/desktop/test');`. It hands the spec to the OMEGA runner unchanged. Run on its own with `node --test`, a `build`-layer file runs its own cases, and a file on any other layer registers one failing case naming `npx omega test` ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
 
 ### Suite (sequential, share state, stop on first failure)
 
@@ -259,22 +261,32 @@ ctx.omega                 // (main layer only) the booted @omega.js/desktop main
 
 ## expect() matchers
 
-Jest-compatible subset:
+On the build, main and boot layers `ctx.expect` is devkit's one assertion library ([packages/devkit/src/test/expect.js](../../packages/devkit/src/test/expect.js), re-exported by [src/test/assert.js](../../packages/desktop/src/test/assert.js)). `expect(actual, message?)`: a failed check throws an `AssertionError`, its message prefixed `<message>: ` when you pass one.
 
 ```js
-.toBe(expected)              // ===
-.toEqual(expected)           // deep equal
+.toBe(expected)                         // Object.is: NaN is NaN, 0 is not -0
+.toEqual(expected)                      // strict deep equality: Date, RegExp, Map, Set, typed arrays, Error,
+                                        //   boxed primitives, prototypes, symbol keys and undefined-valued keys count
 .toBeTruthy() / .toBeFalsy()
 .toBeDefined() / .toBeUndefined() / .toBeNull()
-.toContain(item)             // array.includes / string.includes
-.toHaveProperty(key)
-.toMatch(regex)
-.toBeInstanceOf(class)
-.toBeGreaterThan(n) / .toBeLessThan(n)
-.toThrow(regex|string)       // also accepts async fns
+.toContain(item)                        // array member or substring
+.toHaveProperty(path, value?)           // 'a.b', or ['a.b'] for a key holding a dot; own or inherited; value by Object.is
+.toMatch(regexOrString)
+.toBeInstanceOf(Class)
+.toBeGreaterThan(n) / .toBeGreaterThanOrEqual(n)
+.toBeLessThan(n) / .toBeLessThanOrEqual(n)
+.toBeTypeOf(type)                       // typeof, plus 'array'
+.toBeSuccess() / .toBeError(status?)    // a response's .success is truthy / falsy (and .status equals status)
+.toThrow(matcher?)                      // below
 
-.not.<anything>              // negate any matcher
+.not.<matcher>                          // negates every matcher
+await expect(promise).rejects.<matcher> // applies to the rejection reason; a promise that fulfils fails
+expect.fail(message)                    // throws
 ```
+
+`toThrow` on a function that throws synchronously checks at once and returns nothing; on a function that returns a promise it returns a promise to `await`. Its matcher is a string (a substring of the message), a RegExp (tested on the message), an Error class (`instanceof`), a validator function (passes only when it returns `true`; its own throw propagates) or an object (each key checked on the thrown error: a RegExp value is tested, any other value compared by strict deep equality). A matcher of any other type throws a usage error naming `toThrow`.
+
+The renderer layer is the exception: its hidden window still inlines a small `expect` of its own ([src/test/harness/renderer-entry.js](../../packages/desktop/src/test/harness/renderer-entry.js)) with `toBe` (`===`), `toEqual` (compared as JSON text), `toBeTruthy`, `toBeFalsy`, `toBeDefined`, `toBeNull`, `toContain` and `toMatch` (a RegExp), and no `.not`, `.rejects` or message argument.
 
 ## Output
 

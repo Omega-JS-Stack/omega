@@ -180,6 +180,8 @@ The module **must export a function** — `module.exports = (ctx) => ({ ... })` 
 
 There is **no `cleanup` hook** and **no `accounts` field** (unlike @omega.js/backend — these frameworks have no auth/user system): tests clean up after themselves, so there is nothing project-level to tear down.
 
+A hook that fails to load, exports a non-function, whose factory throws or returns a non-object, or whose `setup` throws, fails the run before any suite: the loader (`@omega.js/devkit/test/init-hooks`) throws an `InitHookError` naming the file and carrying the cause, runner-core passes it up uncaught, and `omega test` prints it and exits 1.
+
 ```javascript
 // <cwd>/test/_init.js
 const fs = require('fs');
@@ -195,7 +197,7 @@ module.exports = ({ projectRoot }) => ({
 
 ## Test file shapes
 
-Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/extension/test');`. It hands the spec to the OMEGA runner unchanged, and fails loudly when `node --test` loads the file, which would otherwise report a hollow pass ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
+Three forms; pick whichever fits. Every one exports through `defineCases`, from the public test API: `const { defineCases } = require('@omega.js/extension/test');`. It hands the spec to the OMEGA runner unchanged. Run on its own with `node --test`, a `build`-layer file runs its own cases, and a file on any other layer registers one failing case naming `npx omega test` ([testing.md](../shared/testing.md#mirrored-suite-shape)). The framework's own suites take the same function from `@omega.js/devkit/test/define-cases`, which prepare vendors into `dist/`.
 
 ### Suite (sequential, share state, stop on first failure)
 
@@ -282,22 +284,30 @@ Boot-layer tests use `inspect: async ({ extension, page, expect, projectRoot }) 
 
 ## `expect()` matchers
 
-Same Jest-compatible surface across all layers:
+One surface on every layer: devkit's assertion library ([packages/devkit/src/test/expect.js](../../packages/devkit/src/test/expect.js)), required on the build and boot layers (the boot runner through [src/test/assert.js](../../packages/extension/src/test/assert.js), which re-exports it) and inlined as source into the service worker and the tab. `ctx.expect(actual, message?)`: a failed check throws an `AssertionError`, its message prefixed `<message>: ` when you pass one.
 
 ```js
-ctx.expect(actual).toBe(expected);                     // strict ===
-ctx.expect(actual).toEqual(expected);                  // deep equality
+ctx.expect(actual).toBe(expected);                     // Object.is: NaN is NaN, 0 is not -0
+ctx.expect(actual).toEqual(expected);                  // strict deep equality: Date, RegExp, Map, Set, typed arrays, Error,
+                                                       //   boxed primitives, prototypes, symbol keys and undefined-valued keys count
 ctx.expect(actual).toBeTruthy() / .toBeFalsy()
 ctx.expect(actual).toBeDefined() / .toBeUndefined()
 ctx.expect(actual).toBeNull()
-ctx.expect(actual).toContain(item);                    // string or array
-ctx.expect(actual).toHaveProperty('key')
-ctx.expect(actual).toMatch(/regex/)
+ctx.expect(actual).toContain(item);                    // array member or substring
+ctx.expect(actual).toHaveProperty('a.b', value?)       // or ['a.b'] for a key holding a dot; own or inherited; value by Object.is
+ctx.expect(actual).toMatch(/regex/)                    // or a string: a substring
 ctx.expect(actual).toBeInstanceOf(Class)
-ctx.expect(actual).toBeGreaterThan(n) / .toBeLessThan(n)
-await ctx.expect(fn).toThrow(/regex/)                  // async — fn may be async
+ctx.expect(actual).toBeGreaterThan(n) / .toBeGreaterThanOrEqual(n)
+ctx.expect(actual).toBeLessThan(n) / .toBeLessThanOrEqual(n)
+ctx.expect(actual).toBeTypeOf('string')                // typeof, plus 'array'
+ctx.expect(response).toBeSuccess() / .toBeError(401)   // .success truthy / falsy (and .status equals the status given)
+ctx.expect(fn).toThrow(matcher?)                       // below
 ctx.expect(actual).not.toBe(expected)                  // negation: every matcher
+await ctx.expect(promise).rejects.toThrow(/regex/)     // every matcher, on the rejection reason; a promise that fulfils fails
+ctx.expect.fail('why')                                 // throws
 ```
+
+`toThrow` on a function that throws synchronously checks at once and returns nothing; on a function that returns a promise it returns a promise to `await`. Its matcher is a string (a substring of the message), a RegExp (tested on the message), an Error class (`instanceof`), a validator function (passes only when it returns `true`; its own throw propagates) or an object (each key checked on the thrown error: a RegExp value is tested, any other value compared by strict deep equality). A matcher of any other type throws a usage error naming `toThrow`.
 
 ## Consumer pattern: use the build module
 

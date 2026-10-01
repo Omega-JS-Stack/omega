@@ -454,4 +454,4 @@ async function run({ hostName, hostRun, argv = process.argv.slice(2), spawn = sp
   return require(cliPath).run();
 }
 
-module.exports = { run, findTarget, isBrandRoot, isMonorepoRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, CONTEXTLESS_VERBS, BOX_VERBS, FRAMEWORKS, MANAGER };
+module.exports = { run, findTarget, frameworksOf, OMEGA_SCOPE, isBrandRoot, isMonorepoRoot, verbOf, isBoxVerbArgv, TARGET_SUBDIRS, CONTEXTLESS_VERBS, BOX_VERBS, FRAMEWORKS, MANAGER };

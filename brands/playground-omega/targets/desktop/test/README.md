@@ -36,7 +36,7 @@ module.exports = defineCases({
 });
 ```
 
-That is the standalone form: one test per file. Every case file wraps its spec in `defineCases` from `@omega.js/desktop/test`, so `node --test` on it fails loudly instead of reporting a hollow pass. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library. The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
+That is the standalone form: one test per file. Every case file wraps its spec in `defineCases` from `@omega.js/desktop/test`; run on its own with `node --test`, a `build`-layer file runs its cases, and any other layer registers one failing case naming `npx omega test`. Every `run` receives `ctx`, whose `ctx.expect` is the Jest-compatible assertion library. The `suite`, `group` and array forms, and the `inspect` form the `boot` layer takes, are all in the reference below.
 
 ## See also
 

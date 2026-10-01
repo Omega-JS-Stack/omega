@@ -168,7 +168,7 @@ test('the build emits a sitemap', () => {
 
 ## `test/_init.js`: pre-test lifecycle hook
 
-The project lane loads an optional `test/_init.js` and runs it **once, after the smoke checks and before the suites** (it is not itself a suite: without the `.test.js` suffix it is never discovered). It goes through the same loader desktop and extension use (`@omega.js/devkit/test/init-hooks`), so the shape is one shape: the module **must export a function**, `module.exports = (ctx) => ({ ... })`, called with `{ projectRoot }`, returning an object whose `async setup({ projectRoot })` seeds any fixture a suite needs. There is no `cleanup` hook and no `accounts` field: tests clean up after themselves. A hook that fails to load or throws prints its error in red and the suites still run, as on every runner-core framework.
+The project lane loads an optional `test/_init.js` and runs it **once, after the smoke checks and before the suites** (it is not itself a suite: without the `.test.js` suffix it is never discovered). It goes through the same loader desktop and extension use (`@omega.js/devkit/test/init-hooks`), so the shape is one shape: the module **must export a function**, `module.exports = (ctx) => ({ ... })`, called with `{ projectRoot }`, returning an object whose `async setup({ projectRoot })` seeds any fixture a suite needs. There is no `cleanup` hook and no `accounts` field: tests clean up after themselves. A hook that fails to load, exports a non-function, whose factory throws or returns a non-object, or whose `setup` throws, fails the run: the loader throws an `InitHookError` naming the file and carrying the cause, your suite never runs, and `omega test` prints the error and exits 1, as on desktop and extension.
 
 ```javascript
 // test/_init.js

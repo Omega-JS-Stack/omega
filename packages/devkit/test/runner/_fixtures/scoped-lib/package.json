@@ -1,0 +1,7 @@
+{
+  "name": "@omega.js/fixture-lib",
+  "private": true,
+  "dependencies": {
+    "@omega.js/backend": "*"
+  }
+}

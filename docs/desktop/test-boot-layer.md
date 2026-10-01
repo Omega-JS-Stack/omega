@@ -54,7 +54,7 @@ The `inspect` function receives:
 | Arg | Description |
 |---|---|
 | `omega` | The fully-initialized live main-process instance, the same one your consumer code uses. |
-| `expect` | @omega.js/desktop's [Jest-compatible assertion library](../../packages/desktop/src/test/assert.js). |
+| `expect` | devkit's assertion library ([expect.js](../../packages/devkit/src/test/expect.js)), reached through @omega.js/desktop's [src/test/assert.js](../../packages/desktop/src/test/assert.js), which re-exports it. Matchers: [test-framework.md](test-framework.md#expect-matchers). |
 | `projectRoot` | Absolute path to the consumer project root (its `src/`, `config/` — and the `dist/` a boot run must never write). |
 | `appRoot` | Absolute path to the staged app root Electron booted — `<projectRoot>/.omega/test-app`. Assert on built artifacts here (`<appRoot>/dist/main.bundle.js`), not under `projectRoot`. |
 | `frameworkDistRoot` | Absolute path to `<@omega.js/desktop>/dist` — where framework test utilities live. |

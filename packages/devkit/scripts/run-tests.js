@@ -1,25 +1,9 @@
 /**
- * Devkit test entry: the full suite in one runner pass, EXCEPT
- * e2e-harness.test.js, which runs afterward in its own isolated pass,
- * executed directly (no `node --test`), with one retry that preserves the
- * failure output as evidence.
- *
- * Why isolated: under a shared `node --test` run, e2e-harness.test.js
- * historically corrupted the runner's result stream ("Unable to deserialize
- * cloned data").
- *
- * Why executed directly: isolation alone kept flaking with that same
- * signature (~6 per 1000 runs at idle, far worse under load), and the fault
- * lives entirely in the test runner's own IPC. `node --test <file>` spawns a
- * child and streams results back over a serialized pipe; under load the
- * parent corrupts a message and marks the FILE failed while every subtest
- * passed. No runner child means no pipe, so the mechanism is gone (#36).
- * A node:test file executed directly still exits non-zero when a test fails,
- * so pass/fail semantics are unchanged.
- *
- * The retry stays as belt and suspenders for genuinely unknown flakes: a real
- * regression fails BOTH attempts and still fails the suite, while anything
- * left leaves a log instead of a mystery.
+ * Devkit test entry, three passes: the full suite in one `node --test` pass;
+ * then e2e-harness.test.js alone, executed directly (no runner child, so no
+ * result pipe to corrupt under load), with one retry that saves the output
+ * of a first failure; then the runner's own suites (`test/runner/`) through
+ * the runner itself, `src/test/cli.js`. A real regression fails twice.
  */
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -58,6 +42,11 @@ if (fs.existsSync(TEMP_DIR)) {
 // Forward any extra args (e.g. --test-name-pattern) to every pass
 const extraArgs = process.argv.slice(2);
 
+// A pass whose child ended on a signal has no exit status: that is a failure, never a 0.
+function exitCodeOf(result) {
+  return result.status === null ? 1 : result.status;
+}
+
 function runPass(files, { capture = false, inProcess = false } = {}) {
   return spawnSync(process.execPath, [...(inProcess ? [] : ['--require', STDOUT_GUARD, '--test']), ...extraArgs, ...files], {
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
@@ -77,12 +66,12 @@ const mainFiles = fs.readdirSync(TEST_DIR)
 const main = runPass(mainFiles, { capture: true });
 process.stdout.write(main.stdout || '');
 process.stderr.write(main.stderr || '');
-if (main.status !== 0) {
+if (exitCodeOf(main) !== 0) {
   const mainEvidence = path.join(PKG, '.temp', `main-pass-fail-${Date.now()}.log`);
   fs.mkdirSync(path.dirname(mainEvidence), { recursive: true });
   fs.writeFileSync(mainEvidence, `${main.stdout || ''}\n${main.stderr || ''}`);
   console.warn(`\n⚠ main pass failed — output saved to ${mainEvidence}`);
-  process.exit(main.status || 1);
+  process.exit(exitCodeOf(main));
 }
 
 // Isolated pass, run directly (see header) and captured so a flake leaves evidence
@@ -91,14 +80,20 @@ const first = runPass([isolatedFile], { capture: true, inProcess: true });
 process.stdout.write(first.stdout || '');
 process.stderr.write(first.stderr || '');
 
-if (first.status === 0) {
-  process.exit(0);
+let isolatedStatus = exitCodeOf(first);
+if (isolatedStatus !== 0) {
+  const evidence = path.join(PKG, '.temp', `e2e-harness-flake-${Date.now()}.log`);
+  fs.mkdirSync(path.dirname(evidence), { recursive: true });
+  fs.writeFileSync(evidence, `${first.stdout || ''}\n${first.stderr || ''}`);
+  console.warn(`\n⚠ ${ISOLATED} failed once, output saved to ${evidence}; retrying (a real regression fails twice)…\n`);
+  isolatedStatus = exitCodeOf(runPass([isolatedFile], { inProcess: true }));
 }
 
-const evidence = path.join(PKG, '.temp', `e2e-harness-flake-${Date.now()}.log`);
-fs.mkdirSync(path.dirname(evidence), { recursive: true });
-fs.writeFileSync(evidence, `${first.stdout || ''}\n${first.stderr || ''}`);
-console.warn(`\n⚠ ${ISOLATED} failed once — output saved to ${evidence}; retrying (a real regression fails twice)…\n`);
+// The runner's own suites, through the runner. `runner/` with the slash: the
+// scope's substring match would also pull in the plain runner-core.test.js.
+const runner = spawnSync(process.execPath, [path.join(PKG, 'src', 'test', 'cli.js'), 'runner/'], {
+  stdio: 'inherit',
+  cwd: PKG,
+});
 
-const second = runPass([isolatedFile], { inProcess: true });
-process.exit(second.status || 0);
+process.exit(isolatedStatus || exitCodeOf(runner));

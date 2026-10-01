@@ -1,0 +1,7 @@
+{
+  "name": "fixture-bare-target",
+  "private": true,
+  "dependencies": {
+    "@omega.js/backend": "*"
+  }
+}

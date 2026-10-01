@@ -1,27 +1,12 @@
-// defineCases — the wrapper every OMEGA case file exports its spec through
-// ([#630](https://github.com/Omega-JS-Stack/omega/issues/630)).
-//
-// A case file is a plain module: `module.exports = { tests: [...] }` with the
-// bodies as `run(ctx)` functions. Only the OMEGA runner (src/test/runner-core.js
-// here, @omega.js/backend's own runner there) ever CALLS those bodies. So
-// `node --test <case-file>` loads the module, executes nothing, and reports
-// `pass 1` — a hollow green that reads like a passing suite to a human and to a
-// verifier alike. That is the trap this closes.
-//
-// The signal is `NODE_TEST_CONTEXT`, which node:test sets in the child process
-// it spawns per file (`child-v8`); it is present for the whole module load, so a
-// require-time check sees it. It is NOT enough on its own: the env var is
-// inherited, so a legitimate `omega test` run nested inside a node:test process
-// would trip too. The runners therefore call markRunnerActive() before loading
-// any case file, and that opt-out is an ENV var rather than a module flag
-// because the desktop/extension lanes load their case files in spawned children
-// (Electron), which inherit the environment but not module state.
+// defineCases: the wrapper every OMEGA case file exports its spec through.
+// Under the runner (markRunnerActive(), an ENV var so spawned app children
+// inherit it) the spec passes through untouched. With no runner active, a file
+// loaded by `node --test <file>` or run as `node <file>` registers its own cases
+// with node:test, so they RUN: a host layer with no ctx extras runs as the runner
+// runs it, any other layer registers one failing case naming `npx omega test`.
 
 const path = require('path');
 
-// Set by every OMEGA case runner before it loads a case file; inherited by the
-// children those runners spawn. Its presence means "the cases are about to run
-// for real", which is exactly what NODE_TEST_CONTEXT alone cannot tell us.
 const RUNNER_ENV = 'OMEGA_CASE_RUNNER';
 
 /**
@@ -33,7 +18,7 @@ function markRunnerActive() {
 }
 
 /**
- * Resolve the file that called defineCases, so the failure can name it.
+ * Resolve the file that called defineCases.
  * @returns {string|null} Absolute path, or null when the stack is unreadable.
  */
 function callerFile() {
@@ -54,11 +39,10 @@ function callerFile() {
 /**
  * The runner-scoped path a human types to run just this file, derived from the
  * case file's position under its test root (`test/suites/` or `test/`).
- * @param {string|null} file - Absolute path of the case file.
+ * @param {string} file - Absolute path of the case file.
  * @returns {string} A path filter, or '' when the file sits outside a test root.
  */
 function scopedPath(file) {
-  if (!file) return '';
   const normalized = file.split(path.sep).join('/');
   const root = ['/test/suites/', '/test/'].find((marker) => normalized.includes(marker));
   if (!root) return '';
@@ -71,30 +55,84 @@ function scopedPath(file) {
 }
 
 /**
- * Return a case spec, failing loudly when the file was loaded by `node --test`.
+ * Was the case file loaded to run its cases: by `node --test`, or as the main module?
+ * @param {string} file - Absolute path of the case file.
+ * @returns {boolean} True when nothing else will run the cases.
+ */
+function loadedToRun(file) {
+  return Boolean(process.env.NODE_TEST_CONTEXT)
+    || process.execArgv.includes('--test')
+    || Boolean(require.main && require.main.filename === file);
+}
+
+/**
+ * The framework that owns a case file, by the dispatcher's rule: the nearest
+ * package.json's own name when it is a framework; any other `@omega.js/*` package
+ * is `node`; else the framework it depends on (a brand target), else `node`.
+ * @param {string} file - Absolute path of the case file.
+ * @returns {string} A LAYERS key.
+ */
+function frameworkOf(file) {
+  const fs = require('fs');
+  const { nearestManifest } = require('../scaffold-guard.js');
+  const { FRAMEWORKS, OMEGA_SCOPE, frameworksOf } = require('../omega-bin.js');
+  const { FRAMEWORK_IDS } = require('./scope.js');
+
+  const found = nearestManifest(path.dirname(file));
+  if (!found) return 'node';
+  const pkg = JSON.parse(fs.readFileSync(found.manifestPath, 'utf8'));
+  if (FRAMEWORKS.includes(pkg.name)) return FRAMEWORK_IDS[pkg.name][0];
+  if (typeof pkg.name === 'string' && pkg.name.startsWith(OMEGA_SCOPE)) return 'node';
+  const dependedOn = frameworksOf(pkg)[0];
+  return dependedOn ? FRAMEWORK_IDS[dependedOn][0] : 'node';
+}
+
+/**
+ * Register a case file's own cases with node:test.
+ * @param {object|Array} spec - The case spec.
+ * @param {string} file - Absolute path of the case file.
+ * @returns {void}
+ */
+function registerSelf(spec, file) {
+  const { normalizeSpec } = require('./run-case.js');
+  const { layersFor, defaultLayer, needsDriver } = require('./layers.js');
+  const { hostSession, registerSuite } = require('./register-suite.js');
+  const expect = require('./expect.js');
+
+  const framework = frameworkOf(file);
+  const normalized = normalizeSpec(spec, { file });
+  const layer = normalized.layer || defaultLayer(framework);
+  const row = layersFor(framework).find((candidate) => candidate.name === layer);
+  const suite = { ...normalized, layer };
+  const label = suite.description || path.basename(file);
+
+  if (row && !needsDriver(row)) {
+    registerSuite(suite, { label, session: hostSession(suite, { expect }) });
+    return;
+  }
+
+  const filter = scopedPath(file);
+  const { it } = require('node:test');
+  it(label, () => {
+    throw new Error([
+      `${file} runs on the ${framework} "${layer}" layer, which only the OMEGA runner can drive:`,
+      '',
+      `  npx omega test framework:${filter}   (a framework suite)`,
+      `  npx omega test ${filter}             (a project's own test/)`,
+    ].join('\n'));
+  });
+}
+
+/**
+ * Return a case spec; with no runner active, a file loaded to run registers its own cases.
  * @param {object|Array} spec - The case-runner spec (suite, group, standalone, or array form).
  * @returns {object|Array} The same spec, unchanged.
  */
 function defineCases(spec) {
-  // NODE_TEST_CONTEXT only exists in the default per-file child; with
-  // --experimental-test-isolation=none the file loads in the main process,
-  // where the --test flag itself is the surviving signal.
-  if ((process.env.NODE_TEST_CONTEXT || process.execArgv.includes('--test')) && process.env[RUNNER_ENV] !== 'true') {
-    const file = callerFile();
-    const filter = scopedPath(file);
-    throw new Error([
-      'OMEGA case file loaded under `node --test` — NOTHING RAN.',
-      '',
-      `  ${file || '(this file)'}`,
-      '',
-      '`node --test` only loads the module; the case bodies never execute, so the',
-      'run reports a hollow pass. These cases run under the OMEGA runner:',
-      '',
-      `  npx omega test framework:${filter}   (a framework suite)`,
-      `  npx omega test ${filter}             (a project's own test/)`,
-      '',
-    ].join('\n'));
-  }
+  if (process.env[RUNNER_ENV] === 'true') return spec;
+
+  const file = callerFile();
+  if (file && loadedToRun(file)) registerSelf(spec, file);
 
   return spec;
 }

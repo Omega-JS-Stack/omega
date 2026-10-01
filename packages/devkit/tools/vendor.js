@@ -189,7 +189,7 @@ function stripComments(source) {
   return result;
 }
 
-// Map a package subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its module-root-relative file.
+// Map a package subpath ('' | 'logger' | 'test/expect' | 'logger.js') to its module-root-relative file.
 function subpathToFile(subpath, packageRoot) {
   const name = subpath || 'index';
   if (name.endsWith('.js')) {

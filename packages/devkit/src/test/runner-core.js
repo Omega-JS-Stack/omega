@@ -45,7 +45,7 @@ const glob = require('glob').globSync;
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
-const expect = require('./assert.js');
+const expect = require('./expect.js');
 const { parseTestScope, isPathTargeted } = require('./scope.js');
 const { markRunnerActive } = require('./define-cases.js');
 const { runInitSetups } = require('./init-hooks.js');

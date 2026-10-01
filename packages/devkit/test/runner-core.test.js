@@ -422,7 +422,7 @@ test('exports SkipError, DISCOVERY_IGNORE, and the shared expect', () => {
   assert.equal(typeof SkipError, 'function');
   assert.ok(Array.isArray(DISCOVERY_IGNORE));
   assert.equal(typeof expect, 'function');
-  assert.equal(expect, require('../src/test/assert.js'));
+  assert.equal(expect, require('../src/test/expect.js'));
 });
 
 test('a scoped target matches nested suites in slash form on every platform (#337)', async () => {
