@@ -1,57 +1,19 @@
 /**
- * Root `npm run test:e2e-desktop` — the desktop ↔ backend AUTH boundary, proven
- * in a REAL Electron app across the real app boundary (#46).
- *
- * The fast wire lane (scripts/e2e-auth-token.js) requires the desktop
- * lib/auth.js in-process from node with a synthetic instance: it proves the
- * TOKEN contract, never the app. This lane proves the APP: a real consumer
- * bundle booting in a real Electron process, a real deep link arriving the way
- * the OS delivers one, and both sides of the process boundary landing on the
- * emulator user.
- *
- * Proof, in order:
- *   1. The playground backend emulator boots (auth + functions + hosting).
- *   2. A real user signs up against the AUTH emulator and the backend mints its
- *      sign-in custom token at POST /omega/user/token (the node-side setup —
- *      the same seed the sibling lanes use).
- *   3. A consumer app is staged from @omega.js/desktop's bundled fixture, given
- *      a cloud config pointed at the emulator project, and built by the
- *      REAL gulp pipeline into a real dist/main.bundle.js (the boot runner does
- *      the build + the spawn — the production boot path, not lib code in node).
- *   4. A SECOND Electron instance launches carrying
- *      `<brand.id>://auth/token?authToken=…` in its argv. The OS-level
- *      single-instance lock forwards that argv to the running app, whose real
- *      `second-instance` handler parses it, dispatches `auth/token` through the
- *      real deep-link pipeline, and hands the token to lib/auth.js. Nothing
- *      here calls a route handler directly.
- *   5. BOTH sides of the process boundary are asserted: main's auth is
- *      signed in as the emulator user, and the RENDERER — which learned about it
- *      only through the real `desktop:auth:sign-in-with-token` broadcast — has
- *      its own @omega.js/client Firebase on the same uid, with main's view of
- *      the user agreeing over IPC.
- *
- * Offline: emulator only. Main runs as a TESTING app, so lib/auth.js connects
- * its Firebase Auth to the local auth emulator; the staged consumer config marks
- * the renderer's @omega.js/client `development` with the resolved dev ports, so
- * its Firebase talks to the same emulator. No leg reaches a real cloud.
- *
- * Two test-time overrides, neither of them an edit to a committed file — the
- * staged copy under packages/desktop/.temp/ carries both:
- *   - a cloud config + `environment`/`dev.ports` block (the committed fixture
- *     ships an EMPTY cloud config on purpose, so its boot suite never inits
- *     Firebase), and
- *   - a renderer entry that parks the renderer instance on `window` so the lane
- *     can read the renderer's own auth state.
- *
- * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes). No electron
- * binary → SKIPPED with the reason printed, exit 0 (never a silent green).
+ * Root `npm run test:e2e-desktop`: the desktop sign-in in a REAL Electron app.
+ * The emulator seeds its personas; this lane's own (scripts/roster-persona.js)
+ * is minted a custom token; a consumer app staged from @omega.js/desktop's
+ * fixture builds and boots; a SECOND instance carries
+ * `<brand.id>://auth/token?authToken=` so the OS single-instance lock forwards
+ * it through the real deep-link pipeline. Main's session and the renderer's own
+ * Firebase must both land on the persona, and a sign-out in main must end both
+ * (the renderer through the real broadcast). Offline: emulator only. The staged
+ * copy (never committed) carries a cloud config and a renderer entry that parks
+ * the instance on `window`. OMEGA_SKIP_E2E=1 skips; no electron is a SKIP.
  */
 const path = require('path');
 const fs = require('fs');
 const net = require('net');
 const { spawn } = require('child_process');
-const { createRequire } = require('module');
-const assert = require('assert');
 
 if (process.env.OMEGA_SKIP_E2E === '1') {
   console.log('⏭ OMEGA_SKIP_E2E=1 — skipping desktop auth e2e');
@@ -74,6 +36,10 @@ const BRAND_ID = 'desktop-auth-e2e';
 
 const { readPortsFile } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
+const { mintPersonaToken } = require('./roster-persona');
+
+// This lane's own seeded persona, never shared with another suite
+const PERSONA_LOCALPART = '_test.desktop-auth-e2e';
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -125,7 +91,7 @@ function startEmulator() {
   // and speaks plain http to the hosting emulator; an mkcert-fronted stack would
   // move plain hosting off the port the child was told about.
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
-  const child = spawn(mgrBin, ['emulator', '--no-seed', '--no-https'], {
+  const child = spawn(mgrBin, ['emulator', '--no-https'], {
     cwd: PLAYGROUND_BACKEND,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
@@ -249,7 +215,7 @@ function stageApp({ projectId, apiKey, ports }) {
 
 const bootTests = [
   {
-    description: 'main-process auth is live on the emulator, not yet the e2e user',
+    description: 'main-process auth is live on the emulator, not yet the persona',
     timeout: 30000,
     inspect: async ({ omega, expect }) => {
       expect(omega._initialized).toBe(true);
@@ -263,7 +229,7 @@ const bootTests = [
   },
 
   {
-    description: 'a REAL second instance delivers the deep link; main signs in as the emulator user',
+    description: 'a REAL second instance delivers the deep link; main signs in as the persona',
     timeout: 150000,
     inspect: async ({ omega, expect, appRoot }) => {
       const { spawn } = require('child_process');
@@ -326,7 +292,7 @@ const bootTests = [
   },
 
   {
-    description: 'the renderer reflects the same emulator user (own Firebase + main over IPC)',
+    description: 'the renderer reflects the same persona (own Firebase + main over IPC)',
     timeout: 90000,
     inspect: async ({ omega, expect }) => {
       const { BrowserWindow } = require('electron');
@@ -352,6 +318,36 @@ const bootTests = [
 
       expect(state?.rendererUid).toBe(process.env.OMEGA_E2E_UID);
       expect(state?.mainUid).toBe(process.env.OMEGA_E2E_UID);
+    },
+  },
+
+  {
+    description: 'a sign-out ends main\'s session and the renderer follows the broadcast',
+    timeout: 60000,
+    inspect: async ({ omega, expect }) => {
+      const { BrowserWindow } = require('electron');
+
+      const win = omega.windows.get('main') || BrowserWindow.getAllWindows()[0];
+      const readRendererUid = () => win.webContents.executeJavaScript(
+        '(window.__omegaAuthE2E?.firebaseAuth?.currentUser?.uid || null)',
+      ).catch(() => 'unreadable');
+
+      // Both sides start on the persona, so the sign-out below cannot pass vacuously
+      expect(omega.auth._firebaseAuth.currentUser?.uid).toBe(process.env.OMEGA_E2E_UID);
+      expect(await readRendererUid()).toBe(process.env.OMEGA_E2E_UID);
+
+      const result = await omega.auth.signOut();
+      expect(result.success).toBe(true);
+      expect(omega.auth._firebaseAuth.currentUser).toBeNull();
+      expect(omega.auth.user.authenticated).toBe(false);
+
+      // The renderer signs out ONLY on the desktop:auth:sign-out broadcast
+      let rendererUid = await readRendererUid();
+      for (let i = 0; i < 60 && rendererUid !== null; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        rendererUid = await readRendererUid();
+      }
+      expect(rendererUid).toBeNull();
     },
   },
 ];
@@ -391,7 +387,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('playground emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting) and seeds its personas', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);
@@ -406,39 +402,11 @@ async function main() {
     const projectId = firebaserc.projects.default;
     const apiKey = 'fake-api-key';
 
-    // Real firebase client SDK, resolved from @omega.js/client's dependency tree
-    const clientRequire = createRequire(path.join(ROOT, 'packages', 'client', 'package.json'));
-    const { initializeApp } = clientRequire('firebase/app');
-    const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } = clientRequire('firebase/auth');
+    let signIn = null;
 
-    const EMAIL = `desktop-e2e-${Date.now()}@example.com`;
-    const PASSWORD = 'e2e-password-1';
-
-    let user = null;
-    let signInToken = null;
-
-    await step('a real user signs up against the auth emulator', async () => {
-      const app = initializeApp({ apiKey, projectId }, 'desktop-e2e');
-      const auth = getAuth(app);
-      connectAuthEmulator(auth, `http://127.0.0.1:${ports.auth}`, { disableWarnings: true });
-
-      const credential = await createUserWithEmailAndPassword(auth, EMAIL, PASSWORD);
-      user = credential.user;
-      return `uid ${user.uid}`;
-    });
-
-    await step('the backend mints the sign-in custom token for that user', async () => {
-      const idToken = await user.getIdToken(true);
-      const response = await fetch(`${apiBase}/omega/user/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({}),
-      });
-      if (response.status !== 200) {
-        throw new Error(`POST /omega/user/token should 200 (got ${response.status})`);
-      }
-      signInToken = (await response.json()).token;
-      assert.equal(typeof signInToken, 'string', 'custom token should be a string');
+    await step('the roster\'s persona signs in with the test password and the backend mints its custom token', async () => {
+      signIn = await mintPersonaToken({ apiBase, authPort: ports.auth, firebaseConfig: { apiKey, projectId }, localpart: PERSONA_LOCALPART });
+      return `${signIn.email}, uid ${signIn.uid}`;
     });
 
     await step('a consumer app is staged from the bundled fixture', async () => {
@@ -454,15 +422,15 @@ async function main() {
       OMEGA_AUTH_PORT:          String(ports.auth),
       OMEGA_FUNCTIONS_PORT:     String(ports.functions),
       OMEGA_E2E_SCHEME:         BRAND_ID,
-      OMEGA_E2E_TOKEN:          signInToken,
-      OMEGA_E2E_UID:            user.uid,
-      OMEGA_E2E_EMAIL:          EMAIL,
+      OMEGA_E2E_TOKEN:          signIn.token,
+      OMEGA_E2E_UID:            signIn.uid,
+      OMEGA_E2E_EMAIL:          signIn.email,
       OMEGA_E2E_ELECTRON_BIN:   electronBin,
       OMEGA_E2E_SECOND_INSTANCE_LOG: path.join(LOG_DIR, 'second-instance.log'),
     });
     delete process.env.OMEGA_HTTPS_PORT;
 
-    await step('the app builds + boots in a REAL Electron process, and the deep link signs it in', async () => {
+    await step('the app builds + boots in a REAL Electron process, the deep link signs it in, and a sign-out reaches the renderer', async () => {
       const counts = await runBootTests({
         tests: bootTests,
         projectRoot: APP_DIR,

@@ -1,29 +1,13 @@
-// Boot-runner — spawns Chromium with the consumer's actual built `dist/` loaded
-// as an unpacked extension, runs `inspect` functions against the live extension,
-// then closes cleanly.
-//
-// Differences from runners/chromium.js:
-//   - chromium.js spawns the harness extension and tests the framework surface.
-//   - boot.js spawns the CONSUMER'S `dist/` (their real production extension) and
-//     verifies it boots end-to-end: manifest is valid, SW starts, popup loads, etc.
-//
-// Why both? `background` + `view` layers cover framework / lib code fast. `boot`
-// layer covers integration — does the consumer's actual extension boot with their
-// real manifest + brand config + scaffolds? Replaces shell-level smoke tests.
-//
-// `inspect` functions receive { extension, page, expect, projectRoot } where:
-//   extension.id        — the loaded extension's chrome-extension://<id>
-//   extension.manifest  — parsed manifest.json
-//   extension.popupUrl  — chrome-extension://<id>/<action.default_popup>
-//   extension.optionsUrl— chrome-extension://<id>/<options_ui.page>
-//   extension.swTarget  — Puppeteer ServiceWorker target (may be null)
-//   page                — Puppeteer Page (fresh per test; popup not auto-loaded)
-//   projectRoot         — absolute path to the consumer project root
-//   expect              — same Jest-compatible expect() as build/background/view
+// Boot lane: Chromium with the project's packaged extension loaded unpacked. Each
+// `inspect({ extension, page, expect, projectRoot })` gets a fresh page against the live
+// extension; `extension` carries id, manifest, popupUrl, optionsUrl and swTarget.
+// After the inspect tests, each view suite naming `view: '<name>'` runs inside
+// `views/<name>/index.html` of this same loaded extension.
 
 const path  = require('path');
 const fs    = require('fs');
-const { waitForTarget } = require('./helpers.js');
+const { waitForTarget, suiteTestCount } = require('./helpers.js');
+const { runViewSuite } = require('./chromium.js');
 const chalk = require('chalk').default;
 
 /**
@@ -91,15 +75,16 @@ function resolveBootDir(projectRoot) {
   return { effectiveRoot, dir: null, manifestPath: null, candidates, rejected, error: null, errorPath: null };
 }
 
-async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTimeout }) {
-  if (tests.length === 0) return { passed: 0, failed: 0, skipped: 0 };
+async function runBootTests({ tests, suites = [], projectRoot, frameworkDistRoot, defaultTimeout }) {
+  const total = tests.length + suites.reduce((n, { mod }) => n + suiteTestCount(mod), 0);
+  if (total === 0) return { passed: 0, failed: 0, skipped: 0 };
 
   let puppeteer;
   try {
     puppeteer = require('puppeteer');
   } catch (e) {
     console.log(chalk.yellow(`    ○ boot tests skipped (puppeteer not installed)`));
-    return { passed: 0, failed: 0, skipped: tests.length };
+    return { passed: 0, failed: 0, skipped: total };
   }
 
   const discovery = resolveBootDir(projectRoot);
@@ -112,7 +97,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
     console.log(chalk.gray(`      Parser error: ${discovery.error.message}`));
     console.log(chalk.gray(`      OMEGA_TEST_BOOT_DIR names this directory explicitly — point it at a`));
     console.log(chalk.gray(`      packaged/<browser>/raw/ output, or unset it and run \`npm run build\`.`));
-    return { passed: 0, failed: tests.length, skipped: 0 };
+    return { passed: 0, failed: total, skipped: 0 };
   }
 
   if (!discovery.dir) {
@@ -120,7 +105,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
     for (const c of discovery.candidates) console.log(chalk.yellow(`        ${c}`));
     for (const r of discovery.rejected) console.log(chalk.yellow(`      ${r.manifestPath} exists but is not strict JSON (the intermediate JSON5 source Chrome refuses)`));
     console.log(chalk.yellow(`      - run \`npm run build\` first to produce packaged/chrome/raw/)`));
-    return { passed: 0, failed: 0, skipped: tests.length };
+    return { passed: 0, failed: 0, skipped: total };
   }
 
   const consumerDist = discovery.dir;
@@ -165,7 +150,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
         console.log(chalk.gray(`        - default_locale is set but _locales/<locale>/messages.json is missing`));
         console.log(chalk.gray(`        - __MSG_*__ placeholders used without default_locale + _locales/`));
         console.log(chalk.gray(`        - referenced files (background.service_worker, content_scripts) don't exist on disk`));
-        return { passed: 0, failed: tests.length, skipped: 0 };
+        return { passed: 0, failed: total, skipped: 0 };
       }
       extId = anyExtTarget.url().split('/')[2];
     }
@@ -173,7 +158,7 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
       manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     } catch (e) {
       console.log(chalk.red(`    ✗ Boot aborted — failed to parse manifest: ${e.message}`));
-      return { passed: 0, failed: tests.length, skipped: 0 };
+      return { passed: 0, failed: total, skipped: 0 };
     }
 
     const popupRel   = (manifest.action && manifest.action.default_popup) || null;
@@ -210,6 +195,16 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot, defaultTime
       } finally {
         try { await page.close(); } catch (_) { /* ignore */ }
       }
+    }
+
+    for (const { file, mod } of suites) {
+      const view = `views/${mod.view}/index.html`;
+      if (!fs.existsSync(path.join(consumerDist, view))) {
+        console.log(chalk.red(`    ✗ ${mod.description || path.basename(file)}: view "${mod.view}" is not built (no ${path.join(consumerDist, view)})`));
+        counts.failed += suiteTestCount(mod);
+        continue;
+      }
+      await runViewSuite({ browser, url: `chrome-extension://${extId}/${view}`, label: view, file, mod, filter: null, counts });
     }
   } finally {
     try { await browser.close(); } catch (_) { /* ignore */ }

@@ -141,7 +141,6 @@
     "@omega.js/web": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.16.1",
-    "firebase-admin": "^13.10.0",
     "prepare-package": "^2.2.1"
   },
   "dependencies": {

@@ -8,7 +8,7 @@ Built-in test framework for both @omega.js/extension itself and consumer project
 npx omega test                          # consumer: runs YOUR project suites (bare runs never include the framework corpus)
 npx omega test --layer build            # only build-layer suites (plain Node, fast)
 npx omega test --layer background       # only background-layer suites (real MV3 SW)
-npx omega test --layer view             # only view-layer suites (popup/options/sidepanel)
+npx omega test --layer view             # only view-layer suites on the harness pages (a suite naming its own view rides --layer boot)
 npx omega test --layer boot             # only boot-layer suites (real consumer extension)
 npx omega test --filter "messaging"     # only suites/tests whose name contains "messaging"
 npx omega test --extended               # run extended suites against REAL external services (Firebase, etc.) — normal mode skips them in-source, never mocks them
@@ -97,7 +97,7 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 |---|---|---|
 | `build` | Plain Node, fast (~ms) | `build.getConfig/getManifest/getPackage`, CLI alias resolution, schema/manifest validation, build helpers, `lib/*.js` regex maps + utilities |
 | `background` | Real MV3 service worker via Puppeteer + CDP | Background boot sequence, Firebase auth wiring, messaging listeners, `chrome.runtime.onMessage` handlers |
-| `view` | Chromium tab loading harness extension's popup.html / options.html / sidepanel.html | DOM bindings, the `omega` surface, @omega.js/client integration, popup ↔ background messaging |
+| `view` | Chromium tab: the harness extension's popup.html / options.html / sidepanel.html by default, one of the project's own built views when the suite declares `view: '<name>'` | DOM bindings, the `omega` surface, @omega.js/client integration, popup ↔ background messaging, your own views |
 | `boot` | Real headless Chromium with the **consumer's** `packaged/<browser>/raw/` loaded as unpacked | End-to-end smoke: does the consumer's actual extension boot? Manifest validates? SW comes up? Popup renders? |
 
 `all` (default) runs build → background → view → boot.
@@ -108,7 +108,7 @@ Each background suite attaches the harness's LIVE service worker afresh, releasi
 
 Every layer hands your test the **real** runtime, never a hand-rolled fake:
 
-- **No mock `omega`, no fake `chrome`/`browser` objects, no stubbed background/popup contexts.** `background`-layer tests run inside a real MV3 service worker with the real `chrome.*` API; `view`-layer tests run inside a real Chromium tab with the real DOM and real `chrome.runtime` messaging; `boot`-layer tests load the consumer's real packaged extension. Use what the harness gives you (`ctx`, `ctx.page`, the `inspect` callback's `{ extension, page }`, and the browser globals `chrome` / `document` / `window`): do not reconstruct any of it.
+- **No mock `omega`, no fake `chrome`/`browser` objects, no stubbed background/popup contexts.** `background`-layer tests run inside a real MV3 service worker with the real `chrome.*` API; `view`-layer tests run inside a real Chromium tab with the real DOM and real `chrome.runtime` messaging; `boot`-layer tests load the consumer's real packaged extension. Use what the harness gives you (`ctx`, the `inspect` callback's `{ extension, page }`, and the browser globals `chrome` / `document` / `window`): do not reconstruct any of it.
 - **Pure functions (zero I/O) are the only thing you call directly.** A regex map in `lib/*.js`, a string formatter, a config-shape validator — `require` it and assert on its output in a `build`-layer test. That is not mocking; it is calling a pure function. Anything that touches real I/O (storage, messaging, the SW lifecycle, the DOM, the network) runs against the real harness, not a substitute.
 
 ### Real external APIs are GATED, NOT mocked
@@ -274,8 +274,9 @@ Every `run` / `cleanup` callback receives `ctx`:
 - `ctx.expect` — Jest-compatible assertion library
 - `ctx.state` — shared object across tests in a suite/group
 - `ctx.skip(reason)` — throw to skip the current test at runtime
-- `ctx.layer` — current layer name (`'build' | 'background' | 'view' | 'boot'`)
-- `ctx.page` — present on view-layer tests (the loaded tab's window)
+- `ctx.layer`: `'build'` on the build layer; `'browser'` inside the service worker and the tab (the background and view layers share one in-page payload)
+
+A background or view test has no page handle on `ctx`: its body runs INSIDE the worker or the tab, so it reaches the page through the globals (`document`, `window`, `chrome`).
 
 Boot-layer tests use `inspect: async ({ extension, page, expect, projectRoot }) => { ... }` instead of `run`. See [test-boot-layer.md](test-boot-layer.md).
 
@@ -373,32 +374,45 @@ module.exports = defineCases({
 
 ## View-layer example
 
+A `view` suite runs on the harness extension's pages by default: `context: 'popup' | 'options' | 'sidepanel'` picks which one (`popup` when omitted). That tests the framework surface in a bare page, not your UI.
+
+### Testing your own views
+
+A `view` suite that declares **`view: '<name>'`** runs in YOUR built `views/<name>/index.html` instead ([#959](https://github.com/Omega-JS-Stack/omega/issues/959)), the same knob a desktop renderer suite takes:
+
 ```js
 // test/view/popup.test.js
 const { defineCases } = require('@omega.js/extension/test');
 
 module.exports = defineCases({
-  type: 'suite',
+  type: 'group',
   layer: 'view',
-  context: 'popup',     // popup | options | sidepanel — which HTML to open
-  description: 'popup DOM + chrome surface',
+  view: 'popup',                      // <- views/popup/index.html, as built
+  description: 'the popup',
   tests: [
     {
-      name: 'document body has data-omega-context="popup"',
+      name: 'the sign-in button renders',
       run: async (ctx) => {
-        ctx.expect(document.body.dataset.bxmContext).toBe('popup');
+        ctx.expect(document.querySelector('.omega-signin')).not.toBeNull();
       },
     },
     {
-      name: 'popup ↔ background messaging round-trip',
+      name: 'the page is the built popup',
       run: async (ctx) => {
-        const reply = await chrome.runtime.sendMessage({ type: 'extension:test:ping' });
-        ctx.expect(reply.pong).toBe(true);
+        ctx.expect(location.href).toBe(chrome.runtime.getURL('views/popup/index.html'));
       },
     },
   ],
 });
 ```
+
+Such a suite rides the **boot lane**, because only that lane loads your packaged extension (`packaged/chrome/raw/`, see [test-boot-layer.md](test-boot-layer.md)): the page is your real built view with its real bundle, talking to your real background. Build first (`npm run build`); without a build the lane skips it as it skips every boot test.
+
+- **`--layer view` does NOT run a view suite that names its view** (it needs the boot). `--layer boot` and the default `--layer all` do.
+- The standalone form (one `run`, no `tests`) works too: it runs as one test named for its `description`, and `--filter` matches that name.
+- The page opens at `domcontentloaded` and the suite starts at once, so a test waits for its own UI to settle (a short poll on the DOM) before asserting. Test bodies run inside the page and close over nothing, so each carries its own wait.
+- A view the project never built (no `views/<name>/index.html` in the loaded extension) fails every test of the suite, naming the missing file, rather than running on some other page.
+- The worked example is the playground extension target's [`test/view/`](../../brands/playground-omega/targets/extension/test/view): its popup's signed-out state and "Open notes" button, and a real submit in its side panel.
 
 For boot-layer (`inspect: async ({ extension, page, expect }) => { ... }`) tests, see [test-boot-layer.md](test-boot-layer.md).
 

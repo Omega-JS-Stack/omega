@@ -1,4 +1,5 @@
-const { TEST_ACCOUNTS, getPaletteRoster } = require('../../../dist/test/test-accounts.js');
+const { TEST_ACCOUNTS } = require('../../../dist/test/test-accounts.js');
+const { getRoster } = require('../../../dist/test/roster.js');
 const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
 
 /**
@@ -8,7 +9,8 @@ const defineCases = require('../../../dist/vendor/devkit/test/define-cases.js');
  * the palette's account switcher used to hardcode its own copy of this list, so
  * the two drifted. The seed is the one owner now, and this route is how the
  * palette reads it: the `palette`-labeled personas, in the order the seeder
- * declares them, and nothing else.
+ * declares them. A suite asking for machinery on a testing backend gets the
+ * unlabeled personas beside them; the palette never asks.
  */
 module.exports = defineCases({
   description: 'The palette-facing personas the seeder defines (development/testing only)',
@@ -44,10 +46,10 @@ module.exports = defineCases({
       },
     },
 
-    // Test 2: What it does NOT offer: the machinery an automated suite drives
-    // must never be handed to somebody mid-suite
+    // Test 2: What the palette is NOT offered: the machinery an automated suite
+    // drives must never be handed to a human mid-suite
     {
-      name: 'machinery-personas-stay-invisible',
+      name: 'machinery-stays-off-the-palette-roster',
       auth: 'none',
       async run({ http, assert }) {
         const response = await http.as('none').get('omega/test/roster');
@@ -55,7 +57,7 @@ module.exports = defineCases({
 
         assert.ok(localparts.includes('_test.referrer'), 'A human-facing persona is offered');
 
-        for (const localpart of ['_test.delete', '_test.signup-merge', '_test.allow_consent-granted']) {
+        for (const localpart of ['_test.delete', '_test.signup-merge', '_test.allow_consent-granted', '_test.desktop-auth-e2e']) {
           assert.ok(!localparts.includes(localpart), `${localpart} is machinery, so the roster must not offer it`);
         }
       },
@@ -76,7 +78,7 @@ module.exports = defineCases({
           'bulk-importer': { id: 'bulk-importer', uid: '_test-bulk-importer', email: '_test.bulk-importer@{domain}', properties: {} },
         };
 
-        const roster = getPaletteRoster(projectAccounts);
+        const roster = getRoster(projectAccounts, { testing: true });
         const localparts = roster.map((persona) => persona.localpart);
 
         assert.deepEqual(
@@ -86,15 +88,88 @@ module.exports = defineCases({
         );
         assert.ok(
           !localparts.includes('_test.bulk-importer'),
-          'A project persona with no label is machinery like any other, and stays invisible',
+          'A project persona with no label is machinery like any other, and stays off the palette roster',
         );
         assert.ok(localparts.includes('_test.referrer'), 'The framework\'s own personas are still every one of them');
 
         assert.deepEqual(
-          getPaletteRoster(),
-          getPaletteRoster({}),
+          getRoster(undefined, { testing: true }),
+          getRoster({}, { testing: true }),
           'A project that declares no personas of its own gets the framework roster, unchanged',
         );
+      },
+    },
+
+    // Test 4: a suite asks the SAME route for its own persona. The sign-in lanes
+    // (desktop, extension, the web form) each drive a machinery persona, which
+    // the roster offers only when asked for machinery on a testing backend.
+    {
+      name: 'a-testing-backend-offers-the-machinery-when-asked',
+      auth: 'none',
+      async run({ http, assert }) {
+        const response = await http.as('none').get('omega/test/roster', { machinery: true });
+
+        assert.isSuccess(response, 'The machinery roster is readable without signing in');
+
+        const personas = response.data.personas;
+        const localparts = personas.map((persona) => persona.localpart);
+
+        for (const localpart of ['_test.desktop-auth-e2e', '_test.extension-auth-e2e', '_test.auth-token-e2e', '_test.flows-signin']) {
+          assert.ok(localparts.includes(localpart), `${localpart} is a sign-in lane's own persona, so a testing roster offers it`);
+        }
+        assert.deepEqual(
+          personas.find((persona) => persona.localpart === '_test.desktop-auth-e2e'),
+          { localpart: '_test.desktop-auth-e2e', label: null },
+          'Machinery carries no palette label',
+        );
+        assert.ok(localparts.includes('_test.referrer'), 'The human-facing personas are still offered beside it');
+      },
+    },
+
+    // Test 5: the switch is honoured on a TESTING backend alone. PURE: the
+    // composition the route hands over for each environment, no emulator.
+    {
+      name: 'the-machinery-switch-is-testing-only',
+      auth: 'none',
+      async run({ assert }) {
+        const projectAccounts = {
+          'bulk-importer': { id: 'bulk-importer', uid: '_test-bulk-importer', email: '_test.bulk-importer@{domain}', properties: {} },
+        };
+        const palette = getRoster(projectAccounts, { testing: true });
+
+        const testing = getRoster(projectAccounts, { machinery: true, testing: true });
+        const localparts = testing.map((persona) => persona.localpart);
+
+        // Every sign-in lane's own persona: offered here, and never to the palette
+        for (const localpart of ['_test.desktop-auth-e2e', '_test.extension-auth-e2e', '_test.auth-token-e2e', '_test.flows-signin']) {
+          assert.ok(localparts.includes(localpart), `A testing backend offers ${localpart}`);
+          assert.ok(!palette.some((persona) => persona.localpart === localpart), `${localpart} is machinery, so the palette never offers it`);
+        }
+        assert.deepEqual(
+          testing[testing.length - 1],
+          { localpart: '_test.bulk-importer', label: null },
+          'A project machinery persona joins last, unlabeled',
+        );
+        assert.deepEqual(
+          testing.filter((persona) => persona.label),
+          palette,
+          'The labeled personas are the palette roster, in its order',
+        );
+
+        assert.deepEqual(
+          getRoster(projectAccounts, { machinery: true, testing: false }),
+          palette,
+          'A backend not running as testing ignores the switch and offers the palette alone',
+        );
+
+        // The caller always says whether the backend is testing, never a silent default
+        let thrown = null;
+        try {
+          getRoster(projectAccounts, { machinery: true });
+        } catch (error) {
+          thrown = error;
+        }
+        assert.match(String(thrown?.message), /options\.testing/, 'A roster asked without `testing` fails loudly');
       },
     },
   ],

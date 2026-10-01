@@ -34,12 +34,11 @@
 
   // Content scripts
   content_scripts: [
-    // "Save selection as note", on the brand's own site only. The match is the
-    // origin of brand.url in config/omega.json5 (test/build/notes-manifest.test.js
-    // holds the two together): a manifest carries no config tokens.
+    // "Save selection as note", on the brand's own site only: the match is
+    // brand.url in config/omega.json5, resolved when the manifest compiles.
     {
       matches: [
-        'https://playground.omegajs.dev/*',
+        '{{ brand.url }}/*',
       ],
       js: [
         'assets/js/components/content.bundle.js',

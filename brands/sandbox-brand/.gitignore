@@ -10,6 +10,7 @@ dist/
 
 # Run logs (truncated on every launch, never committed)
 logs/
+test/e2e/.logs/
 
 # Secrets
 .env
@@ -19,4 +20,3 @@ logs/
 .DS_Store
 
 # ========== Custom Values ==========
-test/e2e/.logs/

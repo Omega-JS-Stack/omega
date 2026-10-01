@@ -15,7 +15,6 @@
     "start": "omega dev",
     "deploy": "omega deploy",
     "test": "omega test",
-    "test:offline": "npx omega test",
     "build": "omega build",
     "clean": "omega clean",
     "update": "omega update",

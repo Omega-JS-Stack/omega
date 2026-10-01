@@ -12,11 +12,10 @@
     "firebase-functions": "^7.2.5"
   },
   "scripts": {
-    "start": "npx omega serve",
-    "deploy": "npx omega deploy",
-    "emulator": "npx omega emulator",
-    "test": "npx omega test",
-    "test:offline": "npx omega test",
-    "build": "npx omega build"
+    "start": "omega serve",
+    "deploy": "omega deploy",
+    "emulator": "omega emulator",
+    "test": "omega test",
+    "build": "omega build"
   }
 }

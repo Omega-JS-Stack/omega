@@ -16,10 +16,13 @@ import Messaging from './messaging.js';
 // The worker's Firebase app, by name: it never shares the [DEFAULT] app slot
 const APP_NAME = 'omega-auth';
 
+// The boot account read holds every message, so a hung API must not hold them for good
+const RESTORE_TIMEOUT = 10000;
+
 /**
- * Background's auth. `user` is always a `User`: signed out until a page
- * context pushes the account document of the uid this worker's Firebase
- * session holds, and signed out again the moment that session ends.
+ * Background's auth. `user` is always a `User`: on boot the account of the
+ * session this worker's Firebase persisted, then the account document a page
+ * context pushes for that uid, and signed out the moment that session ends.
  */
 class BackgroundAuth {
   /**
@@ -44,7 +47,8 @@ class BackgroundAuth {
 
   /**
    * Wire the auth lane: the page contexts' messages, the website sign-in
-   * redirect, and the persisted session.
+   * redirect, and the persisted session, restored before the worker answers
+   * any message.
    * @returns {void}
    */
   initialize() {
@@ -64,8 +68,9 @@ class BackgroundAuth {
     // Setup auth token listener (for cross-runtime auth)
     this.setupAuthTokenListener();
 
-    // Initialize Firebase auth on startup (restores persisted session if any)
-    this.initializeAuth();
+    // A woken worker's first message waits for the restore, so every handler
+    // (a content script's request included) reads the restored account
+    this.omega.messenger.holdUntil(this.restoreSession());
   }
 
   /**
@@ -294,26 +299,44 @@ class BackgroundAuth {
     });
   }
 
-  // Initialize Firebase auth on startup
-  // Firebase Auth persists sessions in IndexedDB - we just need to initialize it
-  initializeAuth() {
+  /**
+   * Restore the session Firebase persisted in this worker (IndexedDB), and
+   * land its account: the stored document the API serves for that session,
+   * resolved into a `User`. A document that cannot be fetched lands the
+   * signed-in identity alone, the way @omega.js/client degrades a failed read.
+   * @returns {Promise<void>} settles once `user` holds the restored account.
+   */
+  async restoreSession() {
     // Skip without a Firebase config: a Firebase-less brand has no session to restore
-    const firebaseConfig = this.omega.config.cloud?.config;
-    if (!firebaseConfig) {
-      this.logger.log('Firebase config not available, skipping auth initialization');
+    if (!this.omega.config.cloud?.config) {
+      this.logger.log('Firebase config not available, skipping session restore');
       return;
     }
 
-    // Initialize Firebase auth - it will auto-restore from IndexedDB if session exists
-    this.logger.log('Initializing Firebase Auth (will restore persisted session if any)...');
     const auth = this.getFirebaseAuth();
+    await auth.authStateReady();
 
-    // Check if already signed in (Firebase restored from IndexedDB)
-    if (auth.currentUser) {
-      this.logger.log('Firebase restored session from persistence:', auth.currentUser.email);
-    } else {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
       this.logger.log('No persisted Firebase session found');
+      return;
     }
+
+    this.logger.log('Firebase restored session from persistence:', firebaseUser.email);
+
+    let document = {};
+    try {
+      ({ user: document } = await this.omega.request('/omega/user', { timeout: RESTORE_TIMEOUT }));
+    } catch (error) {
+      this.logger.error('restoreSession: account fetch failed, landing the identity alone:', error.message);
+    }
+
+    // A sign-out or another sign-in during the fetch owns the truth now
+    if (auth.currentUser?.uid !== firebaseUser.uid) {
+      return;
+    }
+
+    this._land(new User(document, firebaseUser));
   }
 
   // Get or initialize Firebase auth (reuse existing instance)

@@ -1,33 +1,13 @@
 /**
- * Root `npm run test:auth` — desktop/extension SIGN-IN TOKEN round trip (cp260).
- *
- * The custom-token sync flow (extension background `omega:syncAuth`, desktop
- * lib/auth.js renderer sync) had ZERO e2e coverage, which is how a broken
- * response read (`data.response.token` against a `{ token }` body) shipped
- * unnoticed. This lane proves the whole loop against real infrastructure,
- * fully offline: the playground backend's emulator stack (auth + functions +
- * hosting) plus the real Firebase client SDK.
- *
- * Proof, in order:
- *   1. A real user signs up + signs in against the AUTH emulator (real
- *      firebase SDK from @omega.js/client's dependency tree — no stubs).
- *   2. The DESKTOP caller, the real `lib/auth.js` `_fetchCustomToken` with
- *      the real url-helpers, exchanges the user's ID token for a custom
- *      token at POST /omega/user/token.
- *   3. That custom token actually signs in a second app instance and lands
- *      on the SAME uid (the round trip, end to end).
- *
- * That is ALL this lane proves — the cross-boundary round trip (desktop ↔
- * backend). The route's own HTTP wire contract (`{ token }` at the top level,
- * no legacy `response` envelope, the retired `command` lane refusing to mint)
- * is a single-package assertion and lives in @omega.js/backend's route suite:
- * packages/backend/test/routes/user/token.test.js (#46 push-down).
- *
- * This is the fast WIRE lane — library code called from node. The REAL-SURFACE
- * proofs of the same chain are its siblings: scripts/e2e-extension-auth.js (the
- * background SW inside actual Chrome) and scripts/e2e-desktop-auth.js (the app
- * inside actual Electron, signed in by an OS-delivered deep link).
- *
+ * Root `npm run test:auth`: the fast WIRE lane for the sign-in custom token,
+ * library code called from node against the playground emulator.
+ * The emulator seeds its personas; this lane's own (from the roster, signed in
+ * with the test password, scripts/roster-persona.js) hands its ID token to the
+ * REAL desktop `lib/auth.js` `_fetchCustomToken`, which trades it for a custom
+ * token at POST /omega/user/token; that token must sign a second app instance
+ * in on the SAME uid. The route's own wire contract lives in the backend's
+ * route suite (test/routes/user/token.test.js); the real-surface proofs are
+ * scripts/e2e-desktop-auth.js and scripts/e2e-extension-auth.js.
  * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes).
  */
 const path = require('path');
@@ -49,6 +29,10 @@ const LOG_DIR = path.join(ROOT, '.temp', 'auth-token-e2e');
 
 const { readPortsFile } = require('@omega.js/config');
 const { createStepsLog } = require('./steps-log');
+const { signInPersona } = require('./roster-persona');
+
+// This lane's own seeded persona, never shared with another suite
+const PERSONA_LOCALPART = '_test.auth-token-e2e';
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
@@ -97,7 +81,7 @@ function startEmulator() {
   // PATH the npx shim routes through the Socket Firewall proxy, which breaks
   // firebase-tools' internal emulator REST calls.
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
-  const child = spawn(mgrBin, ['emulator', '--no-seed'], {
+  const child = spawn(mgrBin, ['emulator'], {
     cwd: PLAYGROUND_BACKEND,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
@@ -153,7 +137,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('playground emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting) and seeds its personas', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);
@@ -169,26 +153,18 @@ async function main() {
     // Real firebase client SDK, resolved from @omega.js/client's dependency tree
     const clientRequire = createRequire(path.join(ROOT, 'packages', 'client', 'package.json'));
     const { initializeApp } = clientRequire('firebase/app');
-    const {
-      getAuth,
-      connectAuthEmulator,
-      createUserWithEmailAndPassword,
-      signInWithCustomToken,
-    } = clientRequire('firebase/auth');
-
-    const EMAIL = `token-e2e-${Date.now()}@example.com`;
-    const PASSWORD = 'e2e-password-1';
+    const { getAuth, connectAuthEmulator, signInWithCustomToken } = clientRequire('firebase/auth');
 
     let user = null;
 
-    await step('a real user signs up against the auth emulator', async () => {
-      const app = initializeApp({ apiKey: 'fake-api-key', projectId }, 'auth-e2e-primary');
-      const auth = getAuth(app);
-      connectAuthEmulator(auth, `http://127.0.0.1:${ports.auth}`, { disableWarnings: true });
-
-      const credential = await createUserWithEmailAndPassword(auth, EMAIL, PASSWORD);
-      user = credential.user;
-      return `uid ${user.uid}`;
+    await step('the roster\'s persona signs in against the auth emulator with the test password', async () => {
+      user = await signInPersona({
+        apiBase: `http://127.0.0.1:${ports.hosting}`,
+        authPort: ports.auth,
+        firebaseConfig: { apiKey: 'fake-api-key', projectId },
+        localpart: PERSONA_LOCALPART,
+      });
+      return `${user.email}, uid ${user.uid}`;
     });
 
     let customToken = null;

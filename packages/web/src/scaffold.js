@@ -27,6 +27,9 @@ const FILE_MAP = {
   '_.gitattributes': { mergeLines: true },
   // JSON5 defaults-merge: consumer values win, new framework keys are added
   'config/omega.json5': { merge: true },
+  // Scaffolded docs are generated output: the framework rewrites the Default
+  // section from this source on every verb, the project's notes live under Custom.
+  'test/README.md': { mergeLines: true },
   // Ruby-free CI: regenerated every setup so workflow fixes roll out
   '.github/workflows/build.yml': { overwrite: true, template: { versions: { node: NODE_VERSION } } },
   '.nvmrc': { overwrite: true, template: { versions: { node: NODE_VERSION } } },

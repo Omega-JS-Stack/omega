@@ -2,6 +2,8 @@
 
 HTML views go through a two-step `{{ }}` token replacement during the `gulp/html` task. Same convention as EM and UJM.
 
+`src/manifest.json` speaks the same `{{ }}` syntax, resolved against the whole `config/omega.json5` when the package task compiles it (`matches: ['{{ brand.url }}/*']`), and an unresolved one fails the build: [build-system.md](build-system.md#manifest-compilation-rules).
+
 ## How it works
 
 1. Your view file (`src/views/<component>/index.html`) is templated first — `{{ brand.name }}` etc. resolve against the page-vars object.

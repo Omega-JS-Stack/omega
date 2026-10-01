@@ -1,45 +1,14 @@
 /**
- * Root `npm run test:flows` — the CRUCIAL USER FLOWS in a REAL browser
- * against the FULL local stack (#155).
- *
- * Ian's Google-signin click (2026-07-31) found a flow-breaking bug no suite
- * could see: every auth lane before this one signed in through the SDK or the
- * custom-token path, so the provider picker, the password FORMS, checkout, the
- * vert ladder and the signed-in policy pages had no committed end-to-end
- * coverage at all. This lane drives them the way a user does — real Chromium,
- * real forms, real emulator — and is the promotion of that session's scripted
- * Google-picker proof into the suite.
- *
- * The stack it owns (never a developer's live boot):
- *   1. Every CLASSIC port (4000/9099/8080/5001/5002/5443/4050/4443/…) is HELD
- *      by a placeholder listener for the whole run, so the N7 allocator in
- *      both children bumps past them onto fresh ports. A classic port that is
- *      already busy is somebody else's stack: the hold fails, the allocator
- *      bumps around it exactly the same, and nothing of theirs is touched.
- *   2. The playground backend's full emulator suite (auth, functions, firestore,
- *      database, hosting, pubsub) WITH persona seeding — the lane signs in as
- *      seeded personas only, never a hand-made account.
- *   3. The website's REAL `omega dev` — not a static server: the #156 auth
- *      proxy (the emulator's OAuth handler served under the SITE origin) only
- *      exists there, and the provider redirect leg is what it makes possible.
- *      The website port is allocated HERE and handed to BOTH children as
- *      OMEGA_WEBSITE_PORT, because the backend builds its checkout
- *      confirmation URLs from it and boots before the site does.
- *
- * On top of those single flows it runs the BILLING JOURNEYS (#209): the paid
- * lifecycle a brand's money actually moves through — upgrade, cancel, a
- * declined renewal, a trial converting — each on its OWN dedicated seeded
- * persona, so no journey can inherit another's subscription state. It also
- * talks to the emulator's Firestore directly (firebase-admin, host-side
- * only): reading the provider ids a journey's webhook needs, and writing the
- * purchase records persona seeding cannot.
- *
- * The browser is headless and refuses every host but the local stack and the
- * provider flow's irreducible externals (AUTH_FLOW_HOSTS), so ad and analytics
- * scripts never load and the vert ladder runs the same everywhere. Every
- * failing step drops a screenshot in .temp/flows-e2e/screenshots/.
- *
- * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes).
+ * Root `npm run test:flows`: the crucial user flows in a REAL browser against
+ * the FULL local stack: provider picker, the password forms, checkout, the vert
+ * ladder, the signed-in policy pages, and the billing journeys (upgrade, cancel,
+ * a declined renewal, a trial converting), each journey on its OWN seeded
+ * persona. The lane HOLDS every classic port so both children bump onto fresh
+ * ones, boots the playground backend's full emulator suite with persona
+ * seeding, then the website's real `omega dev` (the auth proxy lives only
+ * there); it hands the site port to both as OMEGA_WEBSITE_PORT. Only the
+ * /signin persona comes through the roster (scripts/roster-persona.js), proving
+ * that door once; every other persona is a seeded fixture named by personaEmail.
  */
 const path = require('path');
 const fs = require('fs');
@@ -71,6 +40,7 @@ const { holdClassicPorts, releasePorts, CLASSIC_HOLD_PORTS } = require('@omega.j
 const { launchBrowser, resolvePuppeteer } = require('@omega.js/devkit/test/browser');
 const { createStepsLog } = require('./steps-log');
 const { waitForSignOutAtDoubt } = require('./flows-session-doubt');
+const { personaEmail, fetchRosterPersona } = require('./roster-persona');
 
 // The billing journeys hand-build the provider webhooks no UI can produce (a
 // declined renewal, a trial converting), and the webhook route authenticates
@@ -85,12 +55,13 @@ const DEV_READY_TIMEOUT = 300000;
 const EMULATOR_READY_MARKER = /Emulator ready\. Press Ctrl\+C/i;
 const DEV_READY_MARKER = /Dev server: (https?:\/\/localhost:\d+)/;
 
-// Seeded personas (@omega.js/backend's test-accounts.js — every persona shares
-// the deterministic password, and the domain comes from the brand's contact
-// email). One persona per area, so no area's writes can perturb another's.
+// Seeded personas (@omega.js/backend's test-accounts.js): every persona shares
+// the deterministic password and lives on the brand's host (personaEmail). One
+// persona per area, so no area's writes can perturb another's.
 const { TEST_ACCOUNT_PASSWORD: PASSWORD, TEST_ACCOUNTS, seedOrderFixture } = require('../packages/backend/src/test/test-accounts.js');
+// The password FORMS' own persona, which the lane asks the roster for
+const FORMS_PERSONA_LOCALPART = '_test.flows-signin';
 const PERSONA_IDS = {
-  password: '_test.basic',
   checkout: '_test.premium-expired',
   account: '_test.premium-active',
   googleOne: '_test.google.one',
@@ -524,12 +495,7 @@ async function main() {
   }
 
   const backendConfig = composeTargetConfig(PLAYGROUND_BACKEND, 'backend').config;
-  const contactEmail = backendConfig.brand?.contact?.email || '';
-  const personaDomain = contactEmail.split('@')[1];
-  if (!personaDomain) {
-    throw new Error('brand.contact.email is missing — persona emails cannot be derived');
-  }
-  const persona = (id) => `${PERSONA_IDS[id]}@${personaDomain}`;
+  const persona = (id) => personaEmail(backendConfig, PERSONA_IDS[id]);
   const brandId = backendConfig.brand?.id;
   // The billing journeys' paid tier — the same product the checkout area buys
   const paidProduct = (backendConfig.payment?.products || []).find((product) => product.id === 'premium');
@@ -706,28 +672,32 @@ async function main() {
       return 'Sign-in did not complete. Please try again.';
     });
 
-    await step('the /signin FORM signs a persona in with email + password', async () => {
+    let formsPersona = null;
+
+    await step('the /signin FORM signs the roster\'s persona in with email + password', async () => {
+      formsPersona = await fetchRosterPersona({ apiBase: apiUrl, localpart: FORMS_PERSONA_LOCALPART });
+
       const passwordPage = await newPage(browser, 'password', consoleLog);
       activePage = passwordPage;
 
       await passwordPage.goto(`${siteUrl}/signin`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(passwordPage);
-      await passwordPage.type('#email', persona('password'));
-      await passwordPage.type('#password', PASSWORD);
+      await passwordPage.type('#email', formsPersona.email);
+      await passwordPage.type('#password', formsPersona.password);
       await clickElement(passwordPage, 'button[data-provider="email"]:not(.d-none)');
       await waitForLanding(passwordPage);
 
       const account = await readAccountPage(passwordPage, siteUrl);
-      assert.equal(account.email, persona('password'), `the form should sign in the persona (got ${account.email})`);
+      assert.equal(account.email, formsPersona.email, `the form should sign in the persona (got ${account.email})`);
       await passwordPage.close();
       activePage = authPage;
-      return persona('password');
+      return formsPersona.email;
     });
 
     await step('the /signup FORM creates an account and lands it signed in', async () => {
       const signupPage = await newPage(browser, 'signup', consoleLog);
       activePage = signupPage;
-      const email = `_test.flows-signup-${Date.now()}@${personaDomain}`;
+      const email = personaEmail(backendConfig, `_test.flows-signup-${Date.now()}`);
 
       await signupPage.goto(`${siteUrl}/signup`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(signupPage);
@@ -750,7 +720,7 @@ async function main() {
 
       await resetPage.goto(`${siteUrl}/reset`, { waitUntil: 'networkidle2' });
       await waitForAuthForm(resetPage);
-      await resetPage.type('#email', persona('password'));
+      await resetPage.type('#email', formsPersona.email);
       await clickElement(resetPage, '#auth-form button[data-provider="email"]:not(.d-none)');
 
       await resetPage.waitForFunction(
@@ -759,7 +729,7 @@ async function main() {
       );
       await resetPage.close();
       activePage = authPage;
-      return persona('password');
+      return formsPersona.email;
     });
 
     await authPage.close();

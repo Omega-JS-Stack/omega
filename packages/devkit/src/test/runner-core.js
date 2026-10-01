@@ -48,6 +48,7 @@ const chalk = require('chalk').default;
 const expect = require('./assert.js');
 const { parseTestScope, isPathTargeted } = require('./scope.js');
 const { markRunnerActive } = require('./define-cases.js');
+const { runInitSetups } = require('./init-hooks.js');
 
 class SkipError extends Error {
   constructor(reason) { super(reason); this.name = 'SkipError'; }
@@ -83,7 +84,10 @@ function createRunner(config) {
 
     // Run the optional test/_init.js setup() hooks (framework + consumer) ONCE,
     // before any suite. There is no cleanup hook — tests clean up after themselves.
-    await runInitSetups();
+    await runInitSetups([
+      { dir: config.frameworkTestDir, label: 'framework' },
+      { dir: path.join(process.cwd(), 'test'), label: 'project' },
+    ], process.cwd());
 
     // noMatch carries the target a run named that selected nothing; the CLI
     // turns it into a non-zero exit ([#814](https://github.com/Omega-JS-Stack/omega/issues/814)).
@@ -186,14 +190,19 @@ function createRunner(config) {
       if (Array.isArray(mod))                      mod = { type: 'group', tests: mod };
 
       if (bootBound(mod)) {
+        // The standalone form is one test named for its suite, so the filter and the
+        // framework glue read every bound file as a suite.
+        if (!Array.isArray(mod.tests)) {
+          mod = { ...mod, tests: [{ name: mod.description || path.basename(file), run: mod.run }] };
+        }
         // The filter reads the same way it does for the inspect list below: a test whose
         // own name misses it is dropped, and a suite with nothing left never runs.
-        const bound = (mod.tests || []).filter((t) => !options.filter
+        const bound = mod.tests.filter((t) => !options.filter
           || String(t.name || t.description || '').includes(options.filter));
         if (options.filter && bound.length === 0) continue;
         suites.push({
           file,
-          mod: bound.length === (mod.tests || []).length ? mod : { ...mod, tests: bound },
+          mod: bound.length === mod.tests.length ? mod : { ...mod, tests: bound },
         });
         continue;
       }
@@ -491,61 +500,6 @@ function createRunner(config) {
       return path.relative(config.suitesDir, file);
     }
     return path.relative(path.join(process.cwd(), 'test'), file);
-  }
-
-  // ---------------------------------------------------------------------------
-  // test/_init.js — pre-test lifecycle hook (setup only)
-  //
-  // Mirrors the backend framework's hook so all frameworks share one shape.
-  // A project may add `<cwd>/test/_init.js` exporting a FUNCTION —
-  // `module.exports = (ctx) => ({ setup })` — called with `{ projectRoot }` and
-  // returning an object with an async `setup({ projectRoot })` that runs ONCE
-  // before any suite (e.g. to scaffold a fixture file the boot layer needs).
-  // There is no `cleanup` hook: tests clean up after themselves.
-  // ---------------------------------------------------------------------------
-
-  function loadInit(testDir, label) {
-    const initPath = path.join(testDir, '_init.js');
-
-    if (!jetpack.exists(initPath)) {
-      return {};
-    }
-
-    try {
-      const fn = require(initPath);
-
-      if (typeof fn !== 'function') {
-        console.log(chalk.red(`  ✗ ${label} test/_init.js must export a function: module.exports = (ctx) => ({ ... })`));
-        return {};
-      }
-
-      const mod = fn({ projectRoot: process.cwd() });
-      return mod && typeof mod === 'object' ? mod : {};
-    } catch (e) {
-      console.log(chalk.red(`  ✗ Failed to load ${label} test/_init.js: ${e.message}`));
-      return {};
-    }
-  }
-
-  async function runInitSetups() {
-    const projectTestsDir = path.join(process.cwd(), 'test');
-
-    const hooks = [
-      loadInit(config.frameworkTestDir, 'framework'),
-      loadInit(projectTestsDir, 'project'),
-    ];
-
-    const setups = hooks.filter((h) => typeof h.setup === 'function').map((h) => h.setup);
-
-    for (const setup of setups) {
-      process.stdout.write(chalk.gray('  Running test/_init.js setup... '));
-      try {
-        await setup({ projectRoot: process.cwd() });
-        console.log(chalk.green('✓'));
-      } catch (e) {
-        console.log(chalk.red(`✗ (${e.message})`));
-      }
-    }
   }
 
   return { run, relativizePath };

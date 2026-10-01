@@ -5,14 +5,16 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers. OMEGA Extension's test runner discovers files by the directory they sit in:
+Match the framework's four layers. OMEGA Extension's test runner routes each file by the `layer:` it declares, not by its folder; keep each file in its layer's directory so the tree reads the same way:
 
 | Directory | Runtime | Use for |
 |---|---|---|
 | `test/build/` | Plain Node | Build-time logic, manifest validation, pure utilities |
 | `test/background/` | MV3 service worker context | Background messaging, auth source-of-truth, alarms |
-| `test/view/` | Popup / options / sidepanel page | DOM, view-side controllers, `data-omega-bind` directives |
+| `test/view/` | Your own built view, named by `view: '<name>'` (`views/<name>/index.html` in the packaged extension) | Your popup, options, side panel and pages UI: real events on the real DOM, `data-omega-bind` directives |
 | `test/boot/` | Consumer's actual built extension | End-to-end smoke tests (does the extension load, does the background register, do views render) |
+
+A view suite that declares `view: '<name>'` runs against that view of YOUR packaged extension instead of a harness page: it rides the boot lane, which loads your build, so run `npm run build` first. `--layer=boot` (or the default `all`) runs it and `--layer=view` does not.
 
 ## Coverage
 

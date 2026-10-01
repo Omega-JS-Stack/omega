@@ -1,55 +1,19 @@
 /**
- * Root `npm run test:e2e-extension` — the extension ↔ backend AUTH boundary,
- * proven in a REAL Chrome with a REAL built extension (#46).
- *
- * The sibling auth lane (scripts/e2e-auth-token.js) proves the DESKTOP caller's
- * round trip. This one proves the other consumer of the same wire: the MV3
- * background service worker's `omega:syncAuth` flow, running as actual
- * extension code inside actual Chrome — not library functions called in-process
- * from node.
- *
- * Proof, in order:
- *   1. The playground backend emulator boots (auth + functions + hosting) on
- *      its RESOLVED ports — bumped ones whenever the classics are busy.
- *   2. The playground extension app BUILDS (real gulp pipeline) as a TESTING
- *      build — `omega.environment: 'testing'`, which is what makes the SW's
- *      Firebase auth talk to the local auth emulator and getApiUrl() resolve
- *      to the local hosting emulator. Building AFTER the boot is what bakes
- *      the live ports into OMEGA_BUILD_JSON's `config.dev.ports`, the only
- *      channel a browser context has
- *      ([#744](https://github.com/Omega-JS-Stack/omega/issues/744)).
- *   3. A real user signs up against the AUTH emulator and a custom token is
- *      minted for it at POST /omega/user/token (the node-side setup).
- *   4. Chrome loads the built extension unpacked. A tab lands on the brand host
- *      carrying `?authToken=…` — the REAL sign-in path — and the background SW's
- *      tab watcher signs itself in with `signInWithCustomToken`.
- *   5. From the REAL popup context, the messenger's `{ destination: 'background',
- *      command: 'omega:syncAuth', payload }` makes the SW fetch a FRESH custom token from the
- *      backend emulator and hand it back. The uid equality is asserted INSIDE
- *      the extension context: the SW's user uid and the uid claim of the token
- *      the backend just minted must both be the uid node created.
- *
- * Offline: emulator only. Chrome runs with host-resolver rules that resolve the
- * brand host to 127.0.0.1 and NXDOMAIN everything else — the run cannot reach a
- * real cloud even if a bundle tried.
- *
- * Two test-time overrides, neither of them an edit to a committed file:
- *   - the build runs with OMEGA_TEST_MODE=true (a testing build, not the
- *     committed config), and
- *   - the packaged output is COPIED to .temp/ and granted the `tabs` permission
- *     the sign-in tab watcher needs (the playground consumer's manifest ships
- *     the default empty permission list; a consumer using the website sign-in
- *     flow declares it themselves).
- *
- * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes). No puppeteer
- * Chrome installed → SKIPPED with the reason printed, exit 0 (never a silent
- * green).
+ * Root `npm run test:e2e-extension`: the extension sign-in in a REAL Chrome.
+ * The emulator boots and seeds its personas, then the playground extension
+ * builds as a TESTING build (after the boot, so the live ports are baked in).
+ * This lane's own persona (scripts/roster-persona.js) is minted a custom token;
+ * a brand-host tab carrying `?authToken=` signs the background SW in; the
+ * popup's `omega:syncAuth` gets a FRESH token for the same uid; a popup opened
+ * afterwards renders signed in. Then the worker saves a note, Chrome stops it,
+ * and a `notes:count` from a document with no omega context wakes it: the
+ * restored session counts the note. Offline: host-resolver rules send the brand
+ * host to 127.0.0.1, nothing else. OMEGA_SKIP_E2E=1 skips; no Chrome is a SKIP.
  */
 const path = require('path');
 const fs = require('fs');
 const net = require('net');
 const { spawn } = require('child_process');
-const { createRequire } = require('module');
 const assert = require('assert');
 
 if (process.env.OMEGA_SKIP_E2E === '1') {
@@ -69,7 +33,12 @@ const { readPortsFile } = require('@omega.js/config');
 // [#743](https://github.com/Omega-JS-Stack/omega/issues/743), so this lane reads
 // it back the way a browser does: by running the file.
 const { readBakedBuildJson } = require(path.join(ROOT, 'packages', 'extension', 'src', 'gulp', 'tasks', 'utils', 'build-json.js'));
+const { attachLiveWorker } = require(path.join(ROOT, 'packages', 'extension', 'src', 'test', 'runners', 'service-worker.js'));
 const { createStepsLog } = require('./steps-log');
+const { mintPersonaToken } = require('./roster-persona');
+
+// This lane's own seeded persona, never shared with another suite
+const PERSONA_LOCALPART = '_test.extension-auth-e2e';
 
 const EMULATOR_READY_TIMEOUT = 240000;
 const BUILD_TIMEOUT = 300000;
@@ -173,7 +142,7 @@ function startEmulator() {
   // then have to trust the mkcert root for every SW fetch, which this lane
   // does not set up. Plain http keeps the wire itself the thing under test.
   const mgrBin = path.join(ROOT, 'node_modules', '.bin', 'mgr');
-  const child = spawn(mgrBin, ['emulator', '--no-seed', '--no-https'], {
+  const child = spawn(mgrBin, ['emulator', '--no-https'], {
     cwd: PLAYGROUND_BACKEND,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
@@ -245,7 +214,7 @@ async function main() {
       throw new Error(`a playground emulator stack is already running (hosting :${incumbent.hosting}) — stop it and re-run`);
     }
 
-    await step('playground emulator boots (auth, functions, hosting)', async () => {
+    await step('playground emulator boots (auth, functions, hosting) and seeds its personas', async () => {
       emulator = startEmulator();
       await emulator.ready;
       ports = readPortsFile(PLAYGROUND_BACKEND);
@@ -313,39 +282,12 @@ async function main() {
     const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
     const projectId = firebaserc.projects.default;
 
-    // Real firebase client SDK, resolved from @omega.js/client's dependency tree
-    const clientRequire = createRequire(path.join(ROOT, 'packages', 'client', 'package.json'));
-    const { initializeApp } = clientRequire('firebase/app');
-    const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } = clientRequire('firebase/auth');
+    let signIn = null;
 
-    const EMAIL = `extension-e2e-${Date.now()}@example.com`;
-    const PASSWORD = 'e2e-password-1';
-
-    let user = null;
-    let signInToken = null;
-
-    await step('a real user signs up against the auth emulator', async () => {
-      const app = initializeApp({ apiKey: buildConfig.cloud.config.apiKey, projectId }, 'extension-e2e');
-      const auth = getAuth(app);
-      connectAuthEmulator(auth, `http://127.0.0.1:${ports.auth}`, { disableWarnings: true });
-
-      const credential = await createUserWithEmailAndPassword(auth, EMAIL, PASSWORD);
-      user = credential.user;
-      return `uid ${user.uid}`;
-    });
-
-    await step('the backend mints the sign-in custom token for that user', async () => {
-      const idToken = await user.getIdToken(true);
-      const response = await fetch(`${apiBase}/omega/user/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({}),
-      });
-      if (response.status !== 200) {
-        throw new Error(`POST /omega/user/token should 200 (got ${response.status})`);
-      }
-      signInToken = (await response.json()).token;
-      assert.equal(typeof signInToken, 'string', 'custom token should be a string');
+    await step('the roster\'s persona signs in with the test password and the backend mints its custom token', async () => {
+      const firebaseConfig = { apiKey: buildConfig.cloud.config.apiKey, projectId };
+      signIn = await mintPersonaToken({ apiBase, authPort: ports.auth, firebaseConfig, localpart: PERSONA_LOCALPART });
+      return `${signIn.email}, uid ${signIn.uid}`;
     });
 
     const brandHost = new URL(buildConfig.brand.url).hostname;
@@ -414,7 +356,7 @@ async function main() {
       // against the auth emulator, and closes the tab.
       const page = await browser.newPage();
       page.on('console', (message) => pageConsole.push(`[auth-tab:${message.type()}] ${message.text()}`));
-      const authUrl = `http://${brandHost}:${ports.hosting}/?authToken=${signInToken}`;
+      const authUrl = `http://${brandHost}:${ports.hosting}/?authToken=${signIn.token}`;
       // The SW closes this tab on success, which rejects the in-flight goto.
       await page.goto(authUrl, { waitUntil: 'domcontentloaded' }).catch(() => {});
     });
@@ -445,15 +387,96 @@ async function main() {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         return { synced: false, last };
-      }, user.uid);
+      }, signIn.uid);
 
       if (!result.synced) {
         throw new Error(`background never handed a custom token back (last response: ${JSON.stringify(result.last)})`);
       }
-      assert.equal(result.backgroundUid, user.uid, 'the background SW should be signed in as the e2e user');
-      assert.equal(result.tokenUid, user.uid, 'the token the backend minted should carry the e2e uid');
+      assert.equal(result.backgroundUid, signIn.uid, 'the background SW should be signed in as the persona');
+      assert.equal(result.tokenUid, signIn.uid, 'the token the backend minted should carry the persona uid');
       assert.ok(result.uidMatches, 'the extension context asserted the uid round trip');
       return `uid ${result.tokenUid}`;
+    });
+
+    await step('a popup opened now signs its own page in, and its bindings show it', async () => {
+      // The page's OWN sync on load: its @omega.js/client asks background, takes
+      // the relayed custom token, and the playground popup's @show bindings flip.
+      const page = await browser.newPage();
+      page.on('console', (message) => pageConsole.push(`[popup-after:${message.type()}] ${message.text()}`));
+      await page.goto(`chrome-extension://${extensionId}/${popupPath}`, { waitUntil: 'domcontentloaded' });
+
+      await page.waitForFunction(() => {
+        const signedIn = document.getElementById('popup-signed-in');
+        const signedOut = document.getElementById('popup-signed-out');
+        return Boolean(signedIn && signedOut && !signedIn.hidden && signedOut.hidden);
+      }, { timeout: 60000 }).catch(() => {
+        throw new Error('the popup never rendered its signed-in state from the background relay');
+      });
+      await page.close();
+    });
+
+    // The restart proof runs from an extension-origin document that boots no
+    // omega context (the manifest opened as a page) and holds no port, so no
+    // omega:syncAuth can push an account into a restarted worker: it answers
+    // from its own session, even when Chrome restarts it before the wake.
+    let sender = null;
+    const askBackground = (command, payload) => sender.evaluate((name, input) => chrome.runtime.sendMessage({
+      destination: 'background', command: name, payload: input,
+    }), command, payload);
+    let signedInCount = null;
+
+    await step('the signed-in worker saves a note and counts it', async () => {
+      await popup.close();
+      sender = await browser.newPage();
+      await sender.goto(`chrome-extension://${extensionId}/manifest.json`);
+
+      // The popup's sync landed the account on background; retry until it has
+      const deadline = Date.now() + 30000;
+      let created = null;
+      while (Date.now() < deadline) {
+        created = await askBackground('notes:create', { text: 'restart proof' });
+        if (created?.ok) break;
+        await sleep(1000);
+      }
+      if (!created?.ok) {
+        throw new Error(`background never saved the note (last answer: ${JSON.stringify(created)})`);
+      }
+
+      const counted = await askBackground('notes:count');
+      assert.equal(counted?.ok, true, `notes:count should answer ok (got ${JSON.stringify(counted)})`);
+      assert.ok(counted.count >= 1, `the signed-in count should include the saved note (got ${counted.count})`);
+      signedInCount = counted.count;
+      return `count ${signedInCount}`;
+    });
+
+    await step('a restarted worker answers the signed-in notes:count with no page context open', async () => {
+      // Chrome's own word that the worker stopped: the target list may keep its entry
+      const control = await sender.createCDPSession();
+      const stopped = new Promise((resolve) => control.on('ServiceWorker.workerVersionUpdated', ({ versions }) => {
+        if (versions.some((version) => version.scriptURL.startsWith(`chrome-extension://${extensionId}/`) && version.runningStatus === 'stopped')) {
+          resolve();
+        }
+      }));
+      await control.send('ServiceWorker.enable');
+      await control.send('ServiceWorker.stopAllWorkers');
+      await Promise.race([
+        stopped,
+        sleep(15000).then(() => { throw new Error('the background service worker never reported stopped'); }),
+      ]);
+      await control.detach().catch(() => {});
+
+      // The message wakes a fresh worker, which restores its session before
+      // answering. The lane's console client from boot pauses the new worker on
+      // start, so attaching it live releases that pause.
+      const answer = askBackground('notes:count').catch((error) => ({ error: error.message }));
+      const live = await attachLiveWorker(browser, extensionId, 30000);
+      await live.detach().catch(() => {});
+      const counted = await Promise.race([
+        answer,
+        sleep(60000).then(() => { throw new Error('the restarted worker never answered notes:count'); }),
+      ]);
+      assert.deepEqual(counted, { ok: true, count: signedInCount }, 'the restarted worker should count the signed-in notes');
+      return `count ${counted.count} after the restart`;
     });
   } finally {
     if (browser) {

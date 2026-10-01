@@ -49,6 +49,27 @@ test('the old bare test/ positional fails on this Node — the defect stays pinn
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('the project lane runs test/_init.js setup once, before the suite that needs its fixture', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'web-commands-init-'));
+  fs.mkdirSync(path.join(dir, 'test', 'build'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'test', '_init.js'), `module.exports = ({ projectRoot }) => ({
+  async setup() { require('fs').appendFileSync(require('path').join(projectRoot, 'seeded.log'), 'seeded\\n'); },
+});\n`);
+  fs.writeFileSync(path.join(dir, 'test', 'build', 'seeded.test.js'), `const { test } = require('node:test');
+const assert = require('node:assert/strict');
+test('the fixture is there', () => {
+  assert.equal(require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'seeded.log'), 'utf8'), 'seeded\\n');
+});\n`);
+
+  // A clean child process: the lane spawns its own `node --test`, which this runner's context vars would hijack.
+  const lane = `require(${JSON.stringify(path.join(__dirname, '..', 'src', 'commands', 'test.js'))}).runProjectSuite({ root: ${JSON.stringify(dir)}, filters: [] }).catch((error) => { console.error(error.message); process.exit(1); })`;
+  const result = spawnSync(process.execPath, ['-e', lane], { cwd: dir, encoding: 'utf8', env: childEnv() });
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /pass 1/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('a project filter still maps to test/<path>* patterns', () => {
   assert.equal(projectTestArgs(['pages.js']), 'test/pages*');
   assert.equal(projectTestArgs(['a', 'b']), 'test/a* test/b*');

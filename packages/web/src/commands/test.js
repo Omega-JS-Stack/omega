@@ -1,17 +1,14 @@
 /**
- * `omega test` — C5-scoped test entry:
- *   bare / `project:` / `brand:`      → production build + smoke verification,
- *                                       then the consumer's own suite (node --test test/)
+ * `omega test`, the C5-scoped test entry:
+ *   bare / `project:` / `brand:`      → production build + smoke checks, then the
+ *                                       consumer's test/_init.js setup and its suite
  *   `framework:` / `omega:` / `web:`  → @omega.js/web's own suite
  *   `full:`                           → both
  *
- * Smoke checks: pages rendered, 404.html (the guaranteed default page —
- * consumers own their home page) carries the theme root, the manifest's main
- * bundle exists on disk, every internal link the built pages emit resolves to
- * something the same build wrote (#430), and the four built-output audit checks
- * pass — page meta, anchor fragments, image alt, sitemap orphans (#468). The
- * deeper 3-layer test framework (build/page/boot vs a real browser) is a later
- * devkit adoption step.
+ * Smoke checks: pages rendered, 404.html (the guaranteed default page) carries
+ * the theme root, the main bundle exists, every internal link resolves to
+ * something the same build wrote, and the four built-output audit checks pass
+ * (page meta, anchor fragments, image alt, sitemap orphans).
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,6 +16,7 @@ const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const attachLogFile = require('@omega.js/devkit/attach-log-file');
 const { parseTestScope, isPathTargeted, noMatchMessage, noMatchExitCode, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { runInitSetups } = require('@omega.js/devkit/test/init-hooks');
 const { setEnvironment } = require('@omega.js/config/environment');
 const { ensureTarget } = require('./lib/ensure-target.js');
 const { consumerPaths } = require('../consumer.js');
@@ -114,13 +112,26 @@ module.exports = async function (options) {
   logger.log(`Smoke checks passed (${result.htmlCount} pages, every internal link resolves, every page audits clean)`);
 
   // ---- Consumer test suite
-  const testDir = path.join(paths.root, 'test');
-  if (fs.existsSync(testDir)) {
-    const projectTests = projectTestArgs(scope.filters.project);
-    logger.log(`Running consumer tests (node --test ${projectTests})`);
-    execSync(`node --test ${projectTests}`, { stdio: 'inherit' });
+  if (fs.existsSync(path.join(paths.root, 'test'))) {
+    await runProjectSuite({ root: paths.root, filters: scope.filters.project });
   }
 };
+
+/**
+ * The consumer's own suite: its `test/_init.js` setup once, through devkit's
+ * one hook loader (the same the runner-core frameworks use), then `node --test`.
+ * @param {object} options
+ * @param {string} options.root - the consumer target root
+ * @param {string[]} options.filters - project scope filters (empty = the lot)
+ */
+async function runProjectSuite(options) {
+  await runInitSetups([{ dir: path.join(options.root, 'test'), label: 'project' }], options.root);
+
+  const projectTests = projectTestArgs(options.filters);
+  logger.log(`Running consumer tests (node --test ${projectTests})`);
+  execSync(`node --test ${projectTests}`, { stdio: 'inherit', cwd: options.root });
+}
+module.exports.runProjectSuite = runProjectSuite;
 
 /**
  * The built-output link check as smoke-check lines ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)).

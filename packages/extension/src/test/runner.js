@@ -1,24 +1,16 @@
-// Test runner — discovers + runs suites, reports OMEGA-Extension-style.
-//
-// The runner CORE (discovery, suite/group/standalone execution, filtering, skip
-// semantics, init hooks, reporting) is the shared @omega.js/devkit runner-core,
-// vendored into dist/vendor/devkit at prepare time. This file is the extension framework's config:
-// title, target alias, and the framework-specific layer glue.
-//
-// Layers:
-//   - 'build'      runs in plain Node (runner core).
-//   - 'background' spawns Chromium via runners/chromium.js, runs in the extension's service worker.
-//   - 'view'       runs in a Chromium tab loading the harness extension's popup/options/sidepanel HTML.
-//   - 'boot'       spawns Chromium with the consumer's actual built `dist/` loaded as unpacked.
-//
-// Chromium / boot runners are lazy-loaded so a missing puppeteer doesn't prevent build-layer
-// tests from running. The layer callbacks below require() them only when those layers exist.
+// The extension's config for the shared devkit runner-core: title, target alias, and the
+// layer glue. 'build' runs in Node; 'background' and 'view' share one Chromium with the
+// harness extension; 'boot' loads the project's packaged extension, and also carries the
+// view suites that name a project view (`view: '<name>'`).
+// The Chromium and boot runners are required lazily, so a missing puppeteer never stops
+// the build layer.
 
 const path = require('path');
 const chalk = require('chalk').default;
 
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
 const { FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
+const { suiteTestCount } = require('./runners/helpers.js');
 
 // Per-test default for the boot layer's inspect(). Sized for the FIRST run after
 // a fresh build, where the extension's Firebase service worker initializes from
@@ -36,6 +28,11 @@ const runner = createRunner({
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: BOOT_DEFAULT_TIMEOUT,
+
+  // A view suite that names a project view rides the BOOT lane instead of a harness page:
+  // only that lane loads the project's built extension, and the view lives there. The
+  // runner core hands such a file to boot.run whole, as `suites`.
+  bootBound: (mod) => mod.layer === 'view' && typeof mod.view === 'string',
 
   middleLayers: [
     {
@@ -71,13 +68,14 @@ const runner = createRunner({
   boot: {
     // Spawn Chromium with the consumer's actual built `dist/` and inspect the live
     // extension surface (the core aggregates boot tests into the flat `tests` list).
-    run: async ({ tests, results, projectRoot }) => {
+    // `suites` are the boot-bound view suites, run in the project's own built views.
+    run: async ({ tests, suites, results, projectRoot }) => {
       let runBootTests;
       try {
         ({ runBootTests } = require('./runners/boot.js'));
       } catch (e) {
         console.log(chalk.yellow(`    ○ boot tests skipped (boot runner not available: ${e.message})`));
-        results.skipped += tests.length;
+        results.skipped += tests.length + suites.reduce((n, s) => n + suiteTestCount(s.mod), 0);
         return;
       }
 
@@ -85,6 +83,7 @@ const runner = createRunner({
 
       const counts = await runBootTests({
         tests,
+        suites,
         projectRoot,
         frameworkDistRoot: path.resolve(__dirname, '..'),
         defaultTimeout: BOOT_DEFAULT_TIMEOUT,

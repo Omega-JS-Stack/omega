@@ -6,7 +6,7 @@ Browser extensions have multiple isolated JavaScript contexts (background SW, po
 
 **Background's `omega.auth` is the source of truth.** The page contexts compare their auth state with background's on load, and sync up if different. Sign-in/sign-out events are broadcast from background to everyone.
 
-Every context holds the account as one `User` (`@omega.js/account`), never null. A page context's `omega.auth.user` comes from @omega.js/client; background's `omega.auth.user` is built from the WHOLE account document the page contexts push on sync, so both sides read the same `user.plan`, `user.active` and `user.roles`.
+Every context holds the account as one `User` (`@omega.js/account`), never null. A page context's `omega.auth.user` comes from @omega.js/client. Background's `omega.auth.user` is restored by the worker itself on boot (see [Worker-boot flow](#worker-boot-flow)), then built from the WHOLE account document the page contexts push on sync, so both sides read the same `user.plan`, `user.active` and `user.roles`.
 
 This pattern avoids `chrome.storage` (no cross-context tokens on disk, no race conditions). Firebase persists session state in IndexedDB per-context.
 
@@ -17,7 +17,7 @@ Background's `omega.auth` has desktop main's `omega.auth` shape, and `omega.requ
 ```js
 import omega from '@omega.js/extension/background';
 
-omega.auth.user;                                  // a User, built from the account the pages push
+omega.auth.user;                                  // a User: the restored session's account, then the one the pages push
 const off = omega.auth.listen(({ user }) => { });
 await omega.auth.getIdToken();                    // the session's fresh ID token, null when signed out
 await omega.auth.signOut();
@@ -46,6 +46,28 @@ background.js closes the /token tab, reactivates original tab (using authSourceT
   ↓
 Open contexts receive the broadcast, signInWithCustomToken() locally
 ```
+
+## Worker-boot flow
+
+An MV3 service worker stops when idle and starts again on the next event, often a content script's message. Background does not wait for a page context to tell it who is signed in:
+
+```
+Worker starts (any event: a message, a tab update, an alarm)
+  ↓
+The messenger holds every message addressed to background
+  ↓
+Firebase restores the session it persisted in the worker's IndexedDB (authStateReady)
+  ↓
+Signed in → background fetches the stored account document (GET /omega/user, on its own session)
+            and lands it as omega.auth.user (new User(document, firebaseUser))
+Signed out → nothing to land
+  ↓
+The held messages reach their handlers, which read the restored omega.auth.user
+```
+
+Firebase persistence is the source, not `chrome.storage`: it is the session background already signs into, and no account document is kept on disk outside it. A document fetch that fails or takes longer than 10 seconds (offline, the API down) lands the signed-in identity alone, the way @omega.js/client degrades a failed account read; the next page-context sync pushes the full document. A brand without `cloud.config` has no session to restore, and its messages are released at once.
+
+The monorepo's root extension auth lane (`npm run test:e2e-extension`) proves the flow against the real emulator: a signed-in worker saves a note, Chrome stops it, and a `notes:count` from an extension page with no omega context wakes it and gets the signed-in count.
 
 ## Context-load flow
 
@@ -155,7 +177,7 @@ These bindings live in @omega.js/client, not @omega.js/extension, but they're ho
 
 ## Important implementation details
 
-1. **No storage.** Auth state is NOT in `chrome.storage`. Firebase persists sessions in IndexedDB per-context. @omega.js/client handles UI bindings off those persisted sessions.
+1. **No storage.** Auth state is NOT in `chrome.storage`. Firebase persists sessions in IndexedDB per-context. @omega.js/client handles UI bindings off those persisted sessions, and background restores its own on every worker start.
 
 2. **Firebase in service workers requires static imports.** A service worker cannot fetch code at runtime under MV3, so dynamic `import()` is not an option there. @omega.js/extension's background.js uses static `import { initializeApp } from 'firebase/app'`.
 

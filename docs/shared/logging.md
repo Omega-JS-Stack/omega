@@ -183,7 +183,7 @@ FAIL  preflight — a playground emulator stack is already running (hosting :500
 harness throw on the way up. One line, same shape, so one grep finds every failure:
 
 ```bash
-grep '^FAIL' .temp/*/steps.log brands/*/e2e/.logs/steps.log
+grep '^FAIL' .temp/*/steps.log brands/*/test/e2e/.logs/steps.log
 ```
 
 ### Retention (ruled 2026-08-05)

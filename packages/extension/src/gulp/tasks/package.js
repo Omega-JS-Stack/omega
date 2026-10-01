@@ -26,6 +26,10 @@ const input = [
 const output = 'dist';
 const delay = 250;
 
+// Permissions Firefox has no API for: it rejects an unknown permission at
+// install, so the firefox artifact drops every one of them.
+const CHROME_ONLY_PERMISSIONS = ['sidePanel', 'offscreen'];
+
 // Build targets with browser-specific configurations. The keys are OMEGA's
 // browser vocabulary ([#867](https://github.com/Omega-JS-Stack/omega/issues/867)),
 // which is the client's `getBrowser()`: `chrome`, never `chromium`. There are
@@ -103,7 +107,7 @@ const TARGETS = {
       }
 
       if (Array.isArray(manifest.permissions)) {
-        manifest.permissions = manifest.permissions.filter((permission) => permission !== 'sidePanel');
+        manifest.permissions = manifest.permissions.filter((permission) => !CHROME_ONLY_PERMISSIONS.includes(permission));
       }
 
       return manifest;
@@ -168,6 +172,35 @@ function externallyConnectableOrigins() {
   return origins;
 }
 
+// Render the `{{ path }}` tokens a view speaks against `data`. A token nothing
+// resolves passes through literally.
+function renderTokens(text, data) {
+  return template(text, data, { brackets: ['{{', '}}'] });
+}
+
+// The distinct `{{ }}` tokens left in rendered text: the ones nothing resolved.
+function unresolvedTokens(text) {
+  return [...new Set(text.match(/\{\{[^}]*\}\}/g) || [])];
+}
+
+// Resolve config tokens in every string of a parsed manifest, per value so a
+// resolved quote can never break the JSON around it. Returns the rendered tree.
+function resolveManifestTokens(value) {
+  if (typeof value === 'string') {
+    return renderTokens(value, config);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveManifestTokens(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolveManifestTokens(item)]));
+  }
+
+  return value;
+}
+
 // Special Compilation Task for manifest.json with default settings
 async function compileManifest(outputDir, target) {
   try {
@@ -175,10 +208,15 @@ async function compileManifest(outputDir, target) {
     const outputPath = path.join(outputDir, 'manifest.json');
     const configPath = path.join(rootPathPackage, 'dist', 'config', 'manifest.json');
 
-    // Read and parse using JSON5. The framework defaults carry build-time
-    // tokens (the same `%%%name%%%` idiom the bundle task's replacements speak) —
-    // the messaging origins are resolved facts now, never literals (#262, #583).
-    let manifest = JSON5.parse(jetpack.read(manifestPath));
+    // The consumer manifest renders the view `{{ }}` config tokens, and one
+    // nothing resolves fails here: Chrome refuses a match pattern carrying it.
+    // The framework defaults speak the bundle task's `%%%name%%%` idiom instead.
+    let manifest = resolveManifestTokens(JSON5.parse(jetpack.read(manifestPath)));
+    const leftover = unresolvedTokens(JSON.stringify(manifest));
+
+    if (leftover.length > 0) {
+      throw new Error(`Cannot build the manifest: src/manifest.json carries config token(s) nothing in config/omega.json5 resolves: ${leftover.join(', ')}`);
+    }
     const defaultConfig = JSON5.parse(template(jetpack.read(configPath), {
       externallyConnectableOrigins: externallyConnectableOrigins()
         .map((origin) => `'${origin}'`)
@@ -541,17 +579,13 @@ async function deployStoreAssets() {
   // Render brand tokens the same way the html task templates a view — a store
   // listing ships the resolved brand, never a literal `{{ brand.name }}` (#289)
   const renderDescription = (contents, label) => {
-    const rendered = template(contents, {
-      brand: config.brand || {},
-    }, {
-      brackets: ['{{', '}}'],
-    });
+    const rendered = renderTokens(contents, { brand: config.brand || {} });
+    const leftover = unresolvedTokens(rendered);
 
     // An unresolvable token (typo, missing config key) passes through literally
     // and would ship to the live store listing — say so instead of shipping quiet
-    const leftover = rendered.match(/\{\{[^}]*\}\}/g);
-    if (leftover) {
-      logger.warn(`Store description ${label}: unresolved token(s) ship literally: ${[...new Set(leftover)].join(', ')} — check config/omega.json5`);
+    if (leftover.length > 0) {
+      logger.warn(`Store description ${label}: unresolved token(s) ship literally: ${leftover.join(', ')}. Check config/omega.json5`);
     }
 
     return rendered;

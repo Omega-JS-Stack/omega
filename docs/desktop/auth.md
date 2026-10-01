@@ -263,7 +263,7 @@ omega.deepLink.on('user/profile/:id', (ctx) => {
 
 ### The real-surface e2e lane (monorepo root)
 
-`npm run test:e2e-desktop` ([scripts/e2e-desktop-auth.js](../../scripts/e2e-desktop-auth.js)) boots a real Electron app against the backend emulator and delivers `<brand.id>://auth/token` from a SECOND instance — the OS-forwarded argv path — then asserts main AND the renderer both land on the emulator user. Offline; it is the lane that proves this whole chain end to end.
+`npm run test:e2e-desktop` ([scripts/e2e-desktop-auth.js](../../scripts/e2e-desktop-auth.js)) boots a real Electron app against the backend emulator and delivers `<brand.id>://auth/token` from a SECOND instance — the OS-forwarded argv path — then asserts main AND the renderer both land on the emulator user, and that a sign-out in main ends both: main's session and `auth.user` drop, and the renderer signs out on the real `desktop:auth:sign-out` broadcast. Offline; it is the lane that proves this whole chain end to end.
 
 ### Extended tests (skip without the opt-in)
 

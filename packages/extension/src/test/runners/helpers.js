@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the extension test runners (boot.js + chromium.js).
+ * Shared helpers for the extension test runners (runner.js, boot.js, chromium.js).
  */
 
 /**
@@ -21,4 +21,9 @@ async function waitForTarget(browser, predicate, timeoutMs) {
   });
 }
 
-module.exports = { waitForTarget };
+// A suite file's test count: its `tests` list, or one for the standalone form.
+function suiteTestCount(mod) {
+  return Array.isArray(mod.tests) ? mod.tests.length : 1;
+}
+
+module.exports = { waitForTarget, suiteTestCount };

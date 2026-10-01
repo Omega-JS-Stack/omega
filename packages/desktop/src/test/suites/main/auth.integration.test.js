@@ -1,8 +1,7 @@
 // Integration tests for lib/auth.js (`omega.auth`): actually hits Firebase.
 //
-// The SIGN-IN proof lives in #904: web, desktop and extension each sign in as a
-// persona the backend emulator seeds, so this suite no longer mints a custom
-// token from a service account and asks a brand for no test credential at all.
+// The SIGN-IN proof is the root desktop auth lane (scripts/e2e-desktop-auth.js):
+// a persona the backend emulator seeds, signed in through the real deep link.
 //
 // To run: `npx omega test --extended` (the cases below need a cloud.config in
 // src/defaults/config/omega.json5 to have any Firebase to talk to).
@@ -27,11 +26,6 @@ module.exports = defineCases({
   layer: 'main',
   description: 'auth (main, integration)',
   skip: skipReason || false,
-  cleanup: async (ctx) => {
-    try {
-      await ctx.omega.auth.signOut();
-    } catch (e) { /* ignore */ }
-  },
   tests: [
     {
       name: 'firebase loaded (cloud.config present in test config)',
@@ -40,18 +34,6 @@ module.exports = defineCases({
           ctx.skip('cloud.config not set in default config — set one in src/defaults/config/omega.json5 to run');
         }
         ctx.expect(ctx.omega.auth._firebaseAuth).toBeTruthy();
-      },
-    },
-    {
-      name: 'sign-out ends the session, drops the account, and broadcasts',
-      run: async (ctx) => {
-        if (!ctx.omega.auth._firebaseAuth?.currentUser) {
-          ctx.skip('not signed in (previous test may have skipped)');
-        }
-        const r = await ctx.omega.auth.signOut();
-        ctx.expect(r.success).toBe(true);
-        ctx.expect(ctx.omega.auth._firebaseAuth.currentUser).toBeNull();
-        ctx.expect(ctx.omega.auth.user.authenticated).toBe(false);
       },
     },
   ],

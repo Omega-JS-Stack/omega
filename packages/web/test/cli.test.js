@@ -178,6 +178,31 @@ test('scaffold: marker merges preserve the Custom section; reruns are idempotent
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('scaffold: test/ gets the README and the _init.js hook; the README heals its framework section, the Custom section stays', () => {
+  const root = tmpConsumer();
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  const readme = path.join(root, 'test', 'README.md');
+  const init = path.join(root, 'test', '_init.js');
+  const fresh = fs.readFileSync(readme, 'utf8');
+  assert.ok(fresh.startsWith('<!-- ========== Default Values ========== -->\n# Project tests\n'), 'the README opens on the Default marker');
+  assert.ok(fresh.endsWith('<!-- ========== Custom Values ========== -->\n'), 'and closes on the Custom one');
+  assert.match(fresh, /\| `test\/build\/` \|/, 'it names the build layer');
+  assert.match(fresh, /\| `test\/pages\/` \|/, 'and the pages layer');
+  assert.equal(typeof require(init), 'function', 'the _init.js hook exports the (ctx) => ({ setup }) factory');
+
+  // The framework owns the README's Default section; the project owns Custom
+  // and the whole _init.js, so a rerun heals the one and keeps the others.
+  const custom = "## This project's suites\n\n- `build/home.test.js`: our home page.\n";
+  fs.writeFileSync(readme, `<!-- ========== Default Values ========== -->\n# Project tests\n\nAn older framework text.\n\n<!-- ========== Custom Values ========== -->\n${custom}`);
+  fs.writeFileSync(init, 'module.exports = () => ({ async setup() { /* ours */ } });\n');
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  assert.equal(fs.readFileSync(readme, 'utf8'), `${fresh}${custom}`);
+  assert.equal(fs.readFileSync(init, 'utf8'), 'module.exports = () => ({ async setup() { /* ours */ } });\n', 'the project\'s _init.js is never overwritten');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('scaffold: a pre-marker .gitattributes and the old .gitignore boilerplate converge, consumer lines kept', () => {
   const root = tmpConsumer();
   const scaffoldDir = path.join(__dirname, '..', 'scaffold');

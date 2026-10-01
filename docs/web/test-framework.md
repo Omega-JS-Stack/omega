@@ -43,7 +43,7 @@ npx omega test pages           # project scope, filtered to test/pages*
    - the asset manifest's `js.main` bundle exists on disk in `dist/`,
    - **every internal link resolves** ([#430](https://github.com/Omega-JS-Stack/omega/issues/430)) — see below,
    - **the four built-output audit checks pass** ([#468](https://github.com/Omega-JS-Stack/omega/issues/468)) — page meta, anchor fragments, image `alt`, sitemap orphans — see below.
-3. **Your suite** — `node --test` over `test/` at the target root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
+3. **Your suite**: `test/_init.js`'s `setup()` once (below), then `node --test` over `test/` at the target root, run only when that directory exists. No `test/` directory means the command ends after the smoke checks.
 
 ### The internal link check
 
@@ -135,6 +135,16 @@ One grammar across every framework (parser: [`@omega.js/devkit/test/scope`](../.
 
 ## Writing consumer tests
 
+Every verb scaffolds the target's `test/` ([#818](https://github.com/Omega-JS-Stack/omega/issues/818)), as backend, desktop and extension do: `test/README.md` names the layers, and `test/_init.js` is the lifecycle hook, copied once and yours from then on. The README is marker-merged: every verb rewrites its Default section from the framework's source (`scaffold/test/README.md`), and your notes, a list of your suites say, live under the Custom marker ([shared/agent-docs.md](../shared/agent-docs.md)).
+
+| Directory | Runtime | Use for |
+|---|---|---|
+| `test/build/` | Plain Node, after the production build | Config resolution and the built site in `dist/`: a page renders, carries the right content, links where it should |
+| `test/pages/` | Plain Node | Page modules (`src/assets/js/pages/`), imported directly, with the browser objects they touch passed in |
+| `<brandRoot>/test/e2e/run.js` | A real browser against the real local stack | End-to-end: the brand's own browser lane, run by `npx omega test` at the brand root after every target ([docs/manager/brand.md](../manager/brand.md)) |
+
+The directory is a convention, not a runner switch: the lane runs every `test/**/*.test.js` alike. OMEGA Playground's website carries one suite of each (`brands/playground-omega/targets/web/test/`) plus the brand lane at `brands/playground-omega/test/e2e/run.js`.
+
 Put plain `node --test` files at your target root under `test/`, one file per concern:
 
 ```js
@@ -153,8 +163,24 @@ test('the build emits a sitemap', () => {
 - `npx omega test` runs the production build **before** your suite, so `dist/` is fresh — assert against it directly.
 - **Name files `*.test.js`** — the suffix is the discovery signal across every OMEGA package ([docs/shared/testing.md](../shared/testing.md)).
 - **There is no `_`-prefix exclusion here** — the suffix does that job: the runner executes exactly `test/**/*.test.js`, so helpers and fixtures under `test/` are safe as long as they do not end in `.test.js` (`test/_helper.js`, `test/fixtures/data.js`).
-- There is no `test/_init.js` lifecycle hook, no `ctx`/`expect` object, and no boot harness — those belong to the desktop/extension/backend runners, not web.
+- There is no `ctx`/`expect` object and no boot harness: those belong to the desktop/extension/backend runners, not web. A browser proof goes in the brand's e2e lane.
 - **`OMEGA_TEST_MODE` is read, but never set here.** Web's build/CLI surface honors it FIRST — `OMEGA_TEST_MODE=true` resolves `getEnvironment()` to `testing` ahead of every other signal, the context's own `environment` included (#717). The web test lane itself sets nothing, so a bare `npx omega test` leaves the environment to the build's own signals; export the variable yourself when a case needs the testing environment.
+
+## `test/_init.js`: pre-test lifecycle hook
+
+The project lane loads an optional `test/_init.js` and runs it **once, after the smoke checks and before the suites** (it is not itself a suite: without the `.test.js` suffix it is never discovered). It goes through the same loader desktop and extension use (`@omega.js/devkit/test/init-hooks`), so the shape is one shape: the module **must export a function**, `module.exports = (ctx) => ({ ... })`, called with `{ projectRoot }`, returning an object whose `async setup({ projectRoot })` seeds any fixture a suite needs. There is no `cleanup` hook and no `accounts` field: tests clean up after themselves. A hook that fails to load or throws prints its error in red and the suites still run, as on every runner-core framework.
+
+```javascript
+// test/_init.js
+const fs = require('fs');
+const path = require('path');
+
+module.exports = ({ projectRoot }) => ({
+  async setup() {
+    fs.mkdirSync(path.join(projectRoot, '.temp'), { recursive: true });
+  },
+});
+```
 
 ## See also
 

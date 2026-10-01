@@ -18,7 +18,7 @@
 const path = require('path');
 const fs   = require('fs');
 const chalk = require('chalk').default;
-const { waitForTarget } = require('./helpers.js');
+const { waitForTarget, suiteTestCount } = require('./helpers.js');
 const { attachLiveWorker } = require('./service-worker.js');
 
 // Inline the source of assert.js so we can build it into the injected harness
@@ -142,9 +142,8 @@ async function runBackgroundSuites({ browser, extId, suiteFiles, filter }) {
     console.log(chalk.cyan(`    ⤷ ${suiteName}`));
 
     if (mod.skip) {
-      const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
       console.log(chalk.yellow(`      ○ ${suiteName}`) + chalk.gray(` (skipped)`));
-      counts.skipped += count;
+      counts.skipped += suiteTestCount(mod);
       continue;
     }
 
@@ -211,48 +210,52 @@ async function runViewSuites({ browser, extId, suiteFiles, filter }) {
     if (Array.isArray(mod)) mod = { type: 'group', tests: mod };
     if (mod.layer !== 'view') continue;
 
-    const suiteName = mod.description || path.basename(file);
-    const context   = mod.context || 'popup';   // popup | options | sidepanel
-    console.log(chalk.cyan(`    ⤷ ${suiteName} (${context})`));
-
-    if (mod.skip) {
-      const count = Array.isArray(mod.tests) ? mod.tests.length : 1;
-      console.log(chalk.yellow(`      ○ ${suiteName}`) + chalk.gray(` (skipped)`));
-      counts.skipped += count;
-      continue;
-    }
-
-    const isSuite = mod.type === 'suite' || mod.type === 'group' || Array.isArray(mod.tests);
-    const tests   = isSuite ? (mod.tests || []) : [{ name: suiteName, run: mod.run, timeout: mod.timeout }];
-    const isGroup = mod.type === 'group';
-    const stopOnFailure = !isGroup && isSuite && mod.stopOnFailure !== false;
-
-    const url  = `chrome-extension://${extId}/${context}.html`;
-    const page = await browser.newPage();
-    const consoleHandler = (msg) => {
-      const text = msg.text();
-      if (text.startsWith(TEST_EVENT_PREFIX)) {
-        handleConsoleLine(text, counts);
-      } else if (process.env.OMEGA_TEST_DEBUG) {
-        process.stdout.write(chalk.gray(`      [tab:${msg.type()}] ${text}\n`));
-      }
-    };
-    page.on('console', consoleHandler);
-
-    try {
-      await page.goto(url, { waitUntil: 'domcontentloaded' });
-      const payload = buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: mod.timeout });
-      await page.evaluate(payload);
-    } catch (e) {
-      console.log(chalk.red(`      ✗ ${suiteName}: harness threw: ${e.message}`));
-      counts.failed += tests.length;
-    } finally {
-      page.off('console', consoleHandler);
-      try { await page.close(); } catch (_) { /* ignore */ }
-    }
+    const context = mod.context || 'popup';   // popup | options | sidepanel
+    await runViewSuite({ browser, url: `chrome-extension://${extId}/${context}.html`, label: context, file, mod, filter, counts });
   }
 
   return counts;
+}
+
+// Run one view suite in a fresh tab on `url`, adding its results to `counts`. The
+// harness pages (above) and a project's own built views (the boot lane) both run here.
+async function runViewSuite({ browser, url, label, file, mod, filter, counts }) {
+  const suiteName = mod.description || path.basename(file);
+  console.log(chalk.cyan(`    ⤷ ${suiteName} (${label})`));
+
+  if (mod.skip) {
+    console.log(chalk.yellow(`      ○ ${suiteName}`) + chalk.gray(` (skipped)`));
+    counts.skipped += suiteTestCount(mod);
+    return;
+  }
+
+  const isSuite = mod.type === 'suite' || mod.type === 'group' || Array.isArray(mod.tests);
+  const tests   = isSuite ? (mod.tests || []) : [{ name: suiteName, run: mod.run, timeout: mod.timeout }];
+  const isGroup = mod.type === 'group';
+  const stopOnFailure = !isGroup && isSuite && mod.stopOnFailure !== false;
+
+  const page = await browser.newPage();
+  const consoleHandler = (msg) => {
+    const text = msg.text();
+    if (text.startsWith(TEST_EVENT_PREFIX)) {
+      handleConsoleLine(text, counts);
+    } else if (process.env.OMEGA_TEST_DEBUG) {
+      process.stdout.write(chalk.gray(`      [tab:${msg.type()}] ${text}\n`));
+    }
+  };
+  page.on('console', consoleHandler);
+
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    const payload = buildSuitePayload({ suiteName, tests, filter, stopOnFailure, timeout: mod.timeout });
+    await page.evaluate(payload);
+  } catch (e) {
+    console.log(chalk.red(`      ✗ ${suiteName}: harness threw: ${e.message}`));
+    counts.failed += tests.length;
+  } finally {
+    page.off('console', consoleHandler);
+    try { await page.close(); } catch (_) { /* ignore */ }
+  }
 }
 
 // ─── Suite payload builder ────────────────────────────────────────────────────
@@ -404,4 +407,4 @@ function extractFnBody(fn) {
   return `return (${src}).call(null, ctx);`;
 }
 
-module.exports = { runChromiumTests, runBackgroundSuites };
+module.exports = { runChromiumTests, runBackgroundSuites, runViewSuite };

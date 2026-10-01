@@ -269,6 +269,32 @@ test('the filter narrows a boot-bound suite by test name, and drops it when noth
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('a standalone boot-bound file reaches boot.run as one test named for its description, filter or not', async () => {
+  const root = makeTree('runner-bootbound-standalone', {
+    'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
+    'consumer/test/bound.js': `module.exports = { layer: 'page', view: 'main', description: 'standalone view', run: () => {} };`,
+  });
+
+  let boot = null;
+  const runner = createRunner(makeConfig(root, {
+    bootBound: (mod) => mod.layer === 'page' && typeof mod.view === 'string',
+    boot: { run: async ({ suites }) => { boot = suites.map(({ mod }) => mod.tests.map((t) => t.name)); } },
+  }));
+
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run()));
+  assert.deepEqual(boot, [['standalone view']]);
+
+  boot = null;
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ filter: 'standalone' })));
+  assert.deepEqual(boot, [['standalone view']]);
+
+  boot = null;
+  await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ filter: 'nothing-matches-this' })));
+  assert.equal(boot, null);
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('C5 scoping: bare = project only; framework:/alias:/full: select sources', async () => {
   const root = makeTree('runner-target', {
     'framework/suites/fw.js': `module.exports = { description: 'framework test', run: () => {} };`,

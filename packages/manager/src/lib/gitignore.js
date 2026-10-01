@@ -22,6 +22,7 @@ const BRAND_LINES = [
   '',
   '# Run logs (truncated on every launch, never committed)',
   'logs/',
+  'test/e2e/.logs/',
   '',
   '# Secrets',
   '.env',

@@ -1,8 +1,8 @@
 /**
  * scaffold-copies tests: a scaffolded doc has one source.
  *
- * A framework's `src/defaults/test/README.md` is the one source of the
- * `test/README.md` every target of that framework carries. The scaffold walk
+ * A framework's defaults tree (`src/defaults/`, web's `scaffold/`) holds the
+ * one source of the `test/README.md` every target of that framework carries. The scaffold walk
  * marker-merges it on every verb: the framework owns the Default section, the
  * target owns the Custom section. A tracked copy whose Default section drifts
  * from its source was edited by hand, and fails here.
@@ -20,10 +20,13 @@ const { mergeLineBasedFiles, hasSectionMarkers } = require(path.join(ROOT, 'pack
 
 const DOC = 'test/README.md';
 
+// Where a framework's defaults tree lives: web ships its as `scaffold/`.
+const TREES = [path.join('src', 'defaults'), 'scaffold'];
+
 // The frameworks that scaffold the doc, by the source their defaults tree ships.
 function sources() {
   return fs.readdirSync(path.join(ROOT, 'packages'))
-    .map((name) => ({ framework: `@omega.js/${name}`, file: path.join(ROOT, 'packages', name, 'src', 'defaults', DOC) }))
+    .flatMap((name) => TREES.map((tree) => ({ framework: `@omega.js/${name}`, file: path.join(ROOT, 'packages', name, tree, DOC) })))
     .filter(({ file }) => fs.existsSync(file));
 }
 
@@ -41,7 +44,7 @@ function copies() {
 
 test('every scaffold source speaks the markdown marker grammar', () => {
   const found = sources();
-  assert.deepEqual(found.map(({ framework }) => framework).sort(), ['@omega.js/backend', '@omega.js/desktop', '@omega.js/extension']);
+  assert.deepEqual(found.map(({ framework }) => framework).sort(), ['@omega.js/backend', '@omega.js/desktop', '@omega.js/extension', '@omega.js/web']);
   for (const { file } of found) {
     assert.ok(hasSectionMarkers(fs.readFileSync(file, 'utf8'), 'README.md'), `${path.relative(ROOT, file)} carries no Default/Custom markers, so the merge would wipe every copy`);
   }
@@ -56,6 +59,6 @@ test('every tracked copy is exactly what the scaffold walk writes from its sourc
     assert.equal(owners.length, 1, `${relative}: its target depends on no framework (or several) that scaffolds ${DOC}`);
     const copy = fs.readFileSync(path.join(ROOT, relative), 'utf8');
     const walked = mergeLineBasedFiles(copy, bySource.get(owners[0]), 'README.md');
-    assert.equal(copy, walked, `${relative} drifted from its source: edit the source under packages/*/src/defaults/, never the copy`);
+    assert.equal(copy, walked, `${relative} drifted from its source: edit the source in its framework's defaults tree, never the copy`);
   }
 });

@@ -61,6 +61,7 @@
     "./bundle": "./src/bundle.js",
     "./build-json": "./src/build-json.js",
     "./test/runner-core": "./src/test/runner-core.js",
+    "./test/init-hooks": "./src/test/init-hooks.js",
     "./test/define-cases": "./src/test/define-cases.js",
     "./test/scope": "./src/test/scope.js",
     "./test/assert": "./src/test/assert.js",

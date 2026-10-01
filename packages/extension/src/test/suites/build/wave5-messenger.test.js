@@ -41,6 +41,38 @@ function loadMessaging() {
   return { Messaging, listeners, sent, cleanup };
 }
 
+// A promise with its settle functions, for holdUntil() to wait on
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+// Run `fn` collecting every unhandled rejection it leaves behind
+async function collectUnhandled(fn) {
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await fn();
+    await flush();
+    await flush();
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+  return unhandled;
+}
+
+// A sendResponse that records each answer it is handed
+function responder() {
+  const answers = [];
+  const sendResponse = (...args) => answers.push(args);
+  return { answers, sendResponse };
+}
+
 module.exports = defineCases({
   type: 'group',
   layer: 'build',
@@ -105,6 +137,170 @@ module.exports = defineCases({
 
           off();
           ctx.expect(listener({ destination: 'background', command: 'omega:syncAuth' }, {}, () => {})).toBe(false);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil delays dispatch until the promise settles, keeping the channel open meanwhile',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          const heard = [];
+          messenger.onMessage((message) => { heard.push(message.command); });
+          const restore = deferred();
+          messenger.holdUntil(restore.promise);
+
+          const [listener] = listeners;
+          ctx.expect(listener({ destination: 'background', command: 'notes:count' }, {}, () => {})).toBe(true);
+          await flush();
+          ctx.expect(heard).toEqual([]);
+
+          restore.resolve();
+          await flush();
+          ctx.expect(heard).toEqual(['notes:count']);
+
+          // Released: the next message is dispatched at once
+          listener({ destination: 'background', command: 'after' }, {}, () => {});
+          ctx.expect(heard).toEqual(['notes:count', 'after']);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil: a message for another context is turned away before the hold, never queued',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          const heard = [];
+          messenger.onMessage((message) => { heard.push(message.command); });
+          const restore = deferred();
+          messenger.holdUntil(restore.promise);
+
+          const { answers, sendResponse } = responder();
+          ctx.expect(listeners[0]({ destination: 'popup', command: 'omega:signOut' }, {}, sendResponse)).toBe(false);
+
+          restore.resolve();
+          await flush();
+          ctx.expect(heard).toEqual([]);
+          ctx.expect(answers).toEqual([]);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil: a held message no handler claims is answered with nothing; a claimed one is left to its handler',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          messenger.onMessage((message, _sender, sendResponse) => {
+            if (message.command !== 'mine') {
+              return false;
+            }
+            setImmediate(() => sendResponse({ ok: true }));
+            return true;
+          });
+          const restore = deferred();
+          messenger.holdUntil(restore.promise);
+
+          const unclaimed = responder();
+          const claimed = responder();
+          listeners[0]({ destination: 'background', command: 'nobody' }, {}, unclaimed.sendResponse);
+          listeners[0]({ destination: 'background', command: 'mine' }, {}, claimed.sendResponse);
+
+          restore.resolve();
+          await flush();
+          await flush();
+          ctx.expect(unclaimed.answers).toEqual([[]]);
+          ctx.expect(claimed.answers).toEqual([[{ ok: true }]]);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil: a second hold replaces the first, and the first settling releases nothing',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          const heard = [];
+          messenger.onMessage((message) => { heard.push(message.command); });
+          const first = deferred();
+          const second = deferred();
+          messenger.holdUntil(first.promise);
+          messenger.holdUntil(second.promise);
+
+          listeners[0]({ destination: 'background', command: 'held' }, {}, () => {});
+          first.resolve();
+          await flush();
+          ctx.expect(heard).toEqual([]);
+
+          // Still held by the second: a new message waits too
+          listeners[0]({ destination: 'background', command: 'later' }, {}, () => {});
+          ctx.expect(heard).toEqual([]);
+
+          second.resolve();
+          await flush();
+          ctx.expect(heard).toEqual(['held', 'later']);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil: a rejected promise still releases the held messages, and leaves no unhandled rejection',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          const heard = [];
+          messenger.onMessage((message) => { heard.push(message.command); });
+          const restore = deferred();
+          const unclaimed = responder();
+
+          const unhandled = await collectUnhandled(async () => {
+            messenger.holdUntil(restore.promise);
+            listeners[0]({ destination: 'background', command: 'notes:count' }, {}, unclaimed.sendResponse);
+            restore.reject(new Error('restore failed'));
+          });
+
+          ctx.expect(heard).toEqual(['notes:count']);
+          ctx.expect(unclaimed.answers).toEqual([[]]);
+          ctx.expect(unhandled).toEqual([]);
+
+          // Released for good
+          listeners[0]({ destination: 'background', command: 'after' }, {}, () => {});
+          ctx.expect(heard).toEqual(['notes:count', 'after']);
+        } finally {
+          cleanup();
+        }
+      },
+    },
+    {
+      name: 'holdUntil: a handler that throws on a held message still answers it, with no unhandled rejection',
+      run: async (ctx) => {
+        const { Messaging, listeners, cleanup } = loadMessaging();
+        try {
+          const messenger = new Messaging({ sender: 'background' });
+          messenger.onMessage(() => { throw new Error('handler broke'); });
+          const restore = deferred();
+          const held = responder();
+
+          const unhandled = await collectUnhandled(async () => {
+            messenger.holdUntil(restore.promise);
+            listeners[0]({ destination: 'background', command: 'notes:count' }, {}, held.sendResponse);
+            restore.resolve();
+          });
+
+          ctx.expect(held.answers).toEqual([[]]);
+          ctx.expect(unhandled).toEqual([]);
         } finally {
           cleanup();
         }

@@ -29,7 +29,7 @@ await omega.initialize();
 //   omega.context     'popup'
 //   omega.extension   cross-browser chrome.*/browser.* API wrapper (see docs/extension/extension.md)
 //   omega.logger      LoggerLite('popup'); prints [@omega.js/extension:popup] (no timestamp: devtools stamps runtime lines)
-//   omega.messenger   the one lane between contexts: send({ destination, command, payload }), onMessage(handler)
+//   omega.messenger   the one lane between contexts: send({ destination, command, payload }), onMessage(handler), holdUntil(promise)
 //   omega.config      the OMEGA_BUILD_JSON.config snapshot
 //   omega.version     the manifest version
 //   omega.getApiUrl() / getEnvironment() / isDevelopment() / isProduction() / isTesting()
@@ -82,7 +82,7 @@ The environment helpers are the same plain functions the runtime contexts call (
 7. **Bind verts**: `[data-omega-vert]` elements, house/company lane only
 8. **Return the instance**
 
-Background's `initialize()` wires the worker's `message` event, then the auth lane (`omega:syncAuth` and `omega:signOut` from the page contexts, the website token flow, the persisted session), then livereload in development. See [auth.md](auth.md).
+Background's `initialize()` wires the worker's `message` event, then the auth lane (`omega:syncAuth` and `omega:signOut` from the page contexts, the website token flow, the persisted session), then livereload in development. The persisted session is restored before the worker answers anything: the messenger holds every message until the restore settles (`omega.messenger.holdUntil()`), so a handler registered on the worker's first turn reads the restored `omega.auth.user` even for the message that woke the worker. See [auth.md](auth.md).
 
 ## See also
 

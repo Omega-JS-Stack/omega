@@ -5,14 +5,16 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers. OMEGA Extension's test runner discovers files by the directory they sit in:
+Match the framework's four layers. OMEGA Extension's test runner routes each file by the `layer:` it declares, not by its folder; keep each file in its layer's directory so the tree reads the same way:
 
 | Directory | Runtime | Use for |
 |---|---|---|
 | `test/build/` | Plain Node | Build-time logic, manifest validation, pure utilities |
 | `test/background/` | MV3 service worker context | Background messaging, auth source-of-truth, alarms |
-| `test/view/` | Popup / options / sidepanel page | DOM, view-side controllers, `data-omega-bind` directives |
+| `test/view/` | Your own built view, named by `view: '<name>'` (`views/<name>/index.html` in the packaged extension) | Your popup, options, side panel and pages UI: real events on the real DOM, `data-omega-bind` directives |
 | `test/boot/` | Consumer's actual built extension | End-to-end smoke tests (does the extension load, does the background register, do views render) |
+
+A view suite that declares `view: '<name>'` runs against that view of YOUR packaged extension instead of a harness page: it rides the boot lane, which loads your build, so run `npm run build` first. `--layer=boot` (or the default `all`) runs it and `--layer=view` does not.
 
 ## Coverage
 
@@ -46,8 +48,10 @@ That is the standalone form: one test per file. Every case file wraps its spec i
 ## This project's suites
 
 - `build/notes-background.test.js`: background's notes commands, driven through the real messenger.
-- `build/notes-manifest.test.js`: the notes permissions, and the content script held to `brand.url`.
 - `boot/notes-count.test.js`: the packaged background answers `notes:count`.
+- `boot/notes-manifest.test.js`: the packaged manifest's notes permissions, and its content script match compiled to the `brand.url` origin.
 - `boot/options-content.test.js`: the options switch saves the setting, and the content script on the brand site (served by request interception) sends a selection to background.
-- `boot/popup-view.test.js`: the packaged popup's signed-out state and its "Open notes" button (the view layer runs the framework's harness pages, so this project's views are tested here).
-- `boot/sidepanel-view.test.js`: a real submit in the packaged side panel reaches background and shows its answer.
+- `view/popup.test.js`: the popup's signed-out state and its "Open notes" button.
+- `view/sidepanel.test.js`: a real submit in the side panel reaches background and shows its answer.
+
+A restarted worker answering a signed-in `notes:count` from its own restored session is proven against the real emulator by the monorepo's root extension auth lane (`npm run test:e2e-extension`), not by a suite here.

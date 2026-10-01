@@ -57,7 +57,7 @@ test('gitignore: the brand template is the marked file: every framework entry un
   const contents = renderBrandGitignore();
   assert.equal(contents.split('\n')[0], DEFAULT);
   assert.ok(contents.endsWith(`\n\n${CUSTOM}\n`), 'the Custom section is only its marker line');
-  assert.deepEqual(halves(contents), { entries: ['node_modules/', 'dist/', '.omega/', 'logs/', '.env', '.env.*', '.DS_Store'], custom: '' });
+  assert.deepEqual(halves(contents), { entries: ['node_modules/', 'dist/', '.omega/', 'logs/', 'test/e2e/.logs/', '.env', '.env.*', '.DS_Store'], custom: '' });
   assert.equal(contents.includes(EM_DASH), false, 'no em dash');
 });
 
@@ -91,8 +91,10 @@ test('gitignore: an unmarked file keeps every consumer line under Custom, nothin
 
   assert.equal(ensureGitignore(root, renderBrandGitignore()), 'converged');
   const contents = readGitignore(root);
-  assert.equal(contents, `${renderBrandGitignore()}test/e2e/.logs/\n\n# my own\n*.log\n`);
-  assert.equal(contents.split('\n').filter((line) => line === 'node_modules/').length, 1);
+  assert.equal(contents, `${renderBrandGitignore()}# my own\n*.log\n`);
+  for (const entry of ['node_modules/', 'test/e2e/.logs/']) {
+    assert.equal(contents.split('\n').filter((line) => line === entry).length, 1, entry);
+  }
   assert.equal(ensureGitignore(root, renderBrandGitignore()), 'present');
 });
 

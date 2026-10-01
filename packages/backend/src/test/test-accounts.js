@@ -1,6 +1,7 @@
 const uuid = require('uuid');
 const { envPort, CLASSIC_PORTS } = require('@omega.js/config');
 const { isCountedFeature, isPacedFeature, dayShare } = require('@omega.js/account/features');
+const { LANE_ACCOUNTS } = require('./lane-accounts.js');
 
 // Deterministic password for EVERY seeded persona (N6) — makes manual dev signin
 // possible: boot the emulators, open an emulator-connected dev site, and sign in
@@ -755,23 +756,16 @@ function resolveSeededUsage(subscription, config) {
 }
 
 /**
- * Static test accounts - always created with fixed properties
- * Used for testing access control levels
- * Both @omega.js/backend and consuming projects rely on these
- *
- * Structure: { id, uid, email, palette, properties }
- * - id: Account identifier
- * - uid: Firebase Auth UID
- * - email: Email with {domain} placeholder (resolved at runtime)
- * - palette: The label the dev palette's account switcher offers this persona
- *   under ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)). The
- *   seed is the ONE owner of that roster (routes/test/roster hands it over), so
- *   a HUMAN-facing persona carries a label, and machinery (the fixtures an
- *   automated suite drives) carries none and stays invisible.
- * - properties: Object to merge into user doc after auth:on-create
- *
- * IMPORTANT: Premium accounts MUST have subscription.expires set to a future date
- * and subscription.status set to 'active'
+ * Static test accounts, always created with fixed properties; the backend and
+ * consuming projects both rely on them. Shape: { id, uid, email, palette,
+ * properties }. `email` may carry the {domain} placeholder (resolved at runtime);
+ * `properties` merges into the user doc after auth:on-create.
+ * `palette` is the label the dev palette's account switcher offers the persona
+ * under: this seed is the ONE owner of that roster (routes/test/roster hands it
+ * over), so a human-facing persona carries a label and machinery (the fixtures
+ * an automated suite drives) carries none and stays off the palette roster.
+ * The sign-in lanes' own personas live in lane-accounts.js and join at the end.
+ * Premium accounts MUST set a future subscription.expires and status 'active'.
  */
 const STATIC_ACCOUNTS = {
   admin: {
@@ -964,6 +958,7 @@ const STATIC_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
+  ...LANE_ACCOUNTS,
 };
 
 /**
@@ -1852,24 +1847,6 @@ function getAccountTable(extraAccounts) {
 }
 
 /**
- * The personas a HUMAN switches between: every seeded account carrying a
- * `palette` label, in the order the seeder declares them. What
- * `GET /test/roster` hands the dev palette.
- *
- * Composed from the TABLE rather than the assembled definitions: a localpart is
- * the part of a declared email before the `@`, so it needs no domain and no
- * catalog to resolve, and the labels only exist on the table.
- *
- * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
- * @returns {{ localpart: string, label: string }[]} The roster, in declaration order
- */
-function getPaletteRoster(extraAccounts) {
-  return Object.values(getAccountTable(extraAccounts))
-    .filter((account) => account.palette)
-    .map((account) => ({ localpart: (account.email || '').split('@')[0], label: account.palette }));
-}
-
-/**
  * Get all test account definitions with resolved emails and dynamic product IDs
  * @param {string} domain - Domain for email addresses (e.g., 'itwcreativeworks.com')
  * @param {object} [config] - @omega.js/backend config (used to resolve first paid product)
@@ -2659,7 +2636,6 @@ module.exports = {
   getFirstPaidProduct,
   getPlanPricing,
   getAccountTable,
-  getPaletteRoster,
   getAccountDefinitions,
   fetchPrivateKeys,
   resolveWipeProjectId,

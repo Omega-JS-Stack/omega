@@ -368,6 +368,7 @@ Such a suite rides the **boot lane**, because only that lane stages and builds t
 Consequences worth knowing:
 
 - **`--layer=renderer` does NOT run a view suite** (it needs the boot). `--layer=boot` and the default `--layer=all` do.
+- The standalone form (one `run`, no `tests`) works too: it runs as one test named for its `description`, and `--filter` matches that name.
 - The test bodies still run as `new Function` inside the page: no closures over module scope, only `ctx` (`expect`, `state`, `layer`, `skip`) and the page globals (`window`, `document`, `window.desktop.*`).
 - Without `view`, nothing changes: the suite runs on the harness page in the main test Electron, as it always has.
 - A view that fails to load fails every test of the suite with `view "<name>" did not load`, rather than reporting an empty page.

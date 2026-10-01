@@ -1,25 +1,18 @@
 const path = require('path');
-const { getPaletteRoster } = require('../../../../test/test-accounts.js');
+const { getRoster } = require('../../../../test/roster.js');
 const { loadSeedAccounts } = require('../../../../test/seed.js');
 
 /**
- * GET /test/roster
- * The personas a HUMAN switches between: every seeded account that carries a
- * `palette` label, in the order the seeder declares them.
- * The seed is the ONE owner of that roster ([#400](https://github.com/Omega-JS-Stack/omega/issues/400)):
- * the dev palette used to keep a hand-curated copy of the list, and the two
- * drifted apart the moment a persona was seeded without one being added.
+ * GET /test/roster: the personas the dev palette offers, straight off the seed
+ * (the framework's table plus the project's `test/_init.js` accounts), so the
+ * palette keeps no list of its own. Development/testing only, and unauthenticated
+ * on purpose: the palette asks before anybody is signed in.
  *
- * The WHOLE seed, both halves ([#712](https://github.com/Omega-JS-Stack/omega/issues/712)):
- * the framework's own table plus the project's `test/_init.js` accounts — the
- * documented extension point the seeder itself merges in. Reading the table
- * alone made a consumer persona carrying a label invisible, which is the exact
- * drift #400 built this route to end.
- *
- * Development/testing only, and deliberately unauthenticated: the palette asks
- * for the roster before anybody is signed in, which is the whole point of it.
+ * `?machinery=true` is the sign-in lanes' door: a TESTING backend then offers
+ * every seeded account, so a suite finds its own persona here. Any other
+ * environment ignores it, and the palette never asks.
  */
-module.exports = async ({ ctx }) => {
+module.exports = async ({ ctx, data }) => {
   // Emulator-only: never a route outside development/testing (an explicit
   // positive check, per the context contract, not `!isProduction()`)
   if (!ctx.isDevelopment() && !ctx.isTesting()) {
@@ -32,9 +25,10 @@ module.exports = async ({ ctx }) => {
   const projectDir = path.dirname(ctx.omega.cwd);
   const projectAccounts = loadSeedAccounts({ projectDir, config: ctx.omega.config, omega: ctx.omega });
 
-  const personas = getPaletteRoster(projectAccounts);
+  const personas = getRoster(projectAccounts, { testing: ctx.isTesting(), machinery: data.machinery });
+  const machineryServed = personas.some((persona) => persona.label === null);
 
-  ctx.log(`test/roster: ${personas.length} palette persona(s)`);
+  ctx.log(`test/roster: ${personas.length} persona(s)${machineryServed ? ' (machinery included)' : ''}`);
 
   return ctx.respond({ personas });
 };

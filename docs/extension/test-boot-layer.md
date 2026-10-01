@@ -77,6 +77,8 @@ inspect: async ({ extension, page, expect, projectRoot }) => { /* ... */ }
 
 Each boot test gets a **fresh** `page` (closed at the end of the test). The browser + extension load are shared across all boot tests in a single `npx omega test` invocation (one Chromium boot per run, amortized across tests).
 
+The boot lane also carries the view suites that name a project view (`layer: 'view'` + `view: '<name>'`). After the `inspect` tests finish, each opens `chrome-extension://<id>/views/<name>/index.html` of this same loaded extension in a fresh tab and runs there, exactly as a harness view suite runs on a harness page. The knob and its rules are in [test-framework.md](test-framework.md#testing-your-own-views).
+
 ## Extension-directory discovery
 
 The runner looks for the consumer's Chrome-loadable build in this order:
