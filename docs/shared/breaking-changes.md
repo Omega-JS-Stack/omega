@@ -30,6 +30,12 @@ gap tables, not this file. Converter TOOLING is
 input, not its implementation. The legacy repos stay read-only reference
 (AGENTS.md HARD RULE 1): nothing here asks you to change them.
 
+## 2026-10-02: a seo item's token is named, never written ([#1059](https://github.com/Omega-JS-Stack/omega/issues/1059))
+
+| Contract | Old form | New form | Manual migration step |
+|---|---|---|---|
+| A seo content item's token override | `author: { token: 'env:GH_SOCK' }` (or a literal token) on an item of `seo.github.content` | `author: { tokenEnv: 'GH_SOCK' }`: the NAME of a `.env` variable, read from the environment by the seo walk, which fails the item when it is unset. The loader reads `config/seo.json5` as the `seo` section, so the strict schema refuses `seo.github.content[<i>].author.token` at load, and the secret check refuses it in either file | Run `npx omega migrate --execute` at the brand root: it moves each `env:` value to `author.tokenEnv` in `config/omega.json5` and `config/seo.json5`. A literal token is refused and left in place: put it in `.env` as a variable and write `author.tokenEnv: "<NAME>"` by hand |
+
 ## 2026-10-01: the repo block's owner key is `repo.owner` ([#1041](https://github.com/Omega-JS-Stack/omega/issues/1041))
 
 | Contract | Old form | New form | Manual migration step |
@@ -37,7 +43,7 @@ input, not its implementation. The legacy repos stay read-only reference
 | The repo block's owner | `repo: { provider: 'github', org: 'Acme-Org' }` | `repo: { provider: 'github', owner: 'Acme-Org' }`: a GitHub user or org, GitHub's own word for it. The strict schema refuses `repo.org`, naming `npx omega migrate` | Run `npx omega migrate --execute` at the brand root: it moves `repo.org` to `repo.owner` |
 | `omega onboard`'s owner flag | `--org=<owner>` | `--owner=<owner>`; `--org` is no flag at all, so it writes no `repo` block | Type `--owner` where a script passed `--org` |
 | The `/brand` payload's `repo` | `{ provider, org }` | `{ provider, owner }` | A client reading `repo.org` from the payload reads `repo.owner` |
-| A seo content item's owner override | `org` on an item of `seo.github.content` | `owner` on the item. The strict schema refuses `seo.github.content[<i>].org`, naming `npx omega migrate`, in `config/omega.json5` at load and in the `config/seo.json5` sidecar when the seo service runs | Run `npx omega migrate --execute` at the brand root: it moves each item's `org` to `owner`, in `config/omega.json5` and in `config/seo.json5` |
+| A seo content item's owner override | `org` on an item of `seo.github.content` | `owner` on the item. The strict schema refuses `seo.github.content[<i>].org`, naming `npx omega migrate`, at load, in `config/omega.json5` and in the `config/seo.json5` sidecar alike | Run `npx omega migrate --execute` at the brand root: it moves each item's `org` to `owner`, in `config/omega.json5` and in `config/seo.json5` |
 
 ## 2026-10-01: a default desktop format owes its keys ([#1035](https://github.com/Omega-JS-Stack/omega/issues/1035))
 

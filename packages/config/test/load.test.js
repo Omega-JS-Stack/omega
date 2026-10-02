@@ -9,6 +9,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 // The machine registry is per-machine state: this file's fixtures record into a temp home.
@@ -1181,4 +1182,94 @@ test('#856: composeTargetConfig freezes the overlay of the environment it is TOL
   // Told nothing, a compose is the authored layers alone: no overlay at all,
   // whatever this machine happens to answer.
   assert.strictEqual(composeTargetConfig(targetDir, 'backend').config.payment.providers.stripe.publishableKey, null);
+});
+
+// ─── The seo sidecar: config/seo.json5 is its layer's `seo` section ───
+
+const UNDECLARED = 'is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)';
+
+const SIDECAR_BASE = `{ brand: { id: 'acme', name: 'Acme' }, targets: { web: { type: 'web' } } }`;
+
+test('a sidecar item carrying org fails the strict check, from a target (the brand layer) and at the brand root', (t) => {
+  const root = makeFixture('sidecar-org', {
+    'config/omega.json5': SIDECAR_BASE,
+    'config/seo.json5': `{ github: { content: [{ name: 'fixture-tool', org: 'Acme-Org' }] } }`,
+    'targets/web/package.json': '{}',
+  });
+  cleanup(t, root);
+
+  const line = `config.seo.github.content[0].org ${UNDECLARED}`;
+  assert.deepStrictEqual(loadConfig(path.join(root, 'targets', 'web'), 'web').errors, [line]);
+  assert.deepStrictEqual(loadConfig(root).errors, [line]);
+});
+
+test('a sidecar token written as env:NAME fails the load with the secret line, naming the sidecar', (t) => {
+  const root = makeFixture('sidecar-secret', {
+    'config/omega.json5': SIDECAR_BASE,
+    'config/seo.json5': `{ github: { content: [{ name: 'fixture-tool', author: { token: 'env:X' } }] } }`,
+  });
+  cleanup(t, root);
+
+  assert.throws(
+    () => loadConfig(root),
+    /Secret-shaped keys in .*config[/\\]seo\.json5.*seo\.github\.content\[0\]\.author\.token/,
+  );
+});
+
+test('a sidecar content list and the base file\'s seo.enabled both land in the loaded seo section', (t) => {
+  const root = makeFixture('sidecar-merge', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, seo: { enabled: false }, targets: { web: { type: 'web' } } }`,
+    'config/seo.json5': `{ github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org' }] } }`,
+  });
+  cleanup(t, root);
+
+  const { config, errors } = loadConfig(root);
+  assert.deepStrictEqual(errors, []);
+  assert.strictEqual(config.seo.enabled, false);
+  assert.deepStrictEqual(config.seo.github.content, [{ name: 'fixture-tool', owner: 'Acme-Org' }]);
+});
+
+test('a target\'s own config/seo.json5 is not a layer: from the target only the brand root\'s sidecar lands', (t) => {
+  const root = makeFixture('sidecar-target', {
+    'config/omega.json5': SIDECAR_BASE,
+    'config/seo.json5': `{ github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org' }] } }`,
+    'targets/web/config/omega.json5': '{}',
+    'targets/web/config/seo.json5': `{ github: { content: [{ name: 'target-tool', org: 'Acme-Org' }] } }`,
+  });
+  cleanup(t, root);
+
+  const { config, errors } = loadConfig(path.join(root, 'targets', 'web'), 'web');
+  assert.deepStrictEqual(errors, []);
+  assert.deepStrictEqual(config.seo.github.content, [{ name: 'fixture-tool', owner: 'Acme-Org' }]);
+});
+
+test('composeTargetConfig freezes the brand root\'s sidecar into the upload', (t) => {
+  const root = makeFixture('sidecar-compose', {
+    'config/omega.json5': SIDECAR_BASE,
+    'config/seo.json5': `{ github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org' }] } }`,
+    'targets/web/package.json': '{}',
+  });
+  cleanup(t, root);
+
+  const composed = composeTargetConfig(path.join(root, 'targets', 'web'), 'web');
+  assert.deepStrictEqual(composed.config.seo.github.content, [{ name: 'fixture-tool', owner: 'Acme-Org' }]);
+});
+
+test('the playground and newsflash brands load clean at their roots, the sidecar read', (t) => {
+  // A temp home of its own: the playground's company resolves from no real registry line.
+  const previous = process.env.OMEGA_HOME;
+  process.env.OMEGA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-config-home-'));
+  t.after(() => {
+    fs.rmSync(process.env.OMEGA_HOME, { recursive: true, force: true });
+    if (previous === undefined) delete process.env.OMEGA_HOME;
+    else process.env.OMEGA_HOME = previous;
+  });
+
+  const brands = path.join(__dirname, '..', '..', '..', 'brands');
+
+  const playground = loadConfig(path.join(brands, 'playground-omega'));
+  assert.deepStrictEqual(playground.errors, []);
+  assert.strictEqual(playground.config.seo.github.content[0].name, 'omega-playground-seo-demo');
+
+  assert.deepStrictEqual(loadConfig(path.join(brands, 'newsflash-brand')).errors, []);
 });

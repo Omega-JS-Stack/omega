@@ -19,7 +19,7 @@ const { dryRunPlan } = require('./run-gates.js');
  *
  * @param {Object} context - Handler context ({ brandRoot, options }).
  * @param {Object<string, *>} edits - Dot-path → value (see @omega.js/config
- *   edit paths: dots, numeric indexes, and [key=value] array matchers).
+ *   edit paths: dots, `[0]` positions, and [key=value] array matchers).
  * @returns {string[]} The paths actually written (empty on dry-run or no-op).
  */
 function writeBrandConfig(context, edits) {

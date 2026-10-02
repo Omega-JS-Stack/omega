@@ -14,25 +14,32 @@ homepage / topics, and star the repo as the author.
 ## Config
 
 Content lives at `seo.github.content[]` in `config/omega.json5`, or in a `config/seo.json5`
-sidecar whose keys merge OVER the config's `seo` section (the `chatsy.md` / `replyify.md`
-convention: big content sections get their own file). `seo.enabled: false` skips the service,
-and no content at all is a clean skip — this service never WRITES config, so nothing is
-auto-created for a brand that declared nothing.
+sidecar (the `chatsy.md` / `replyify.md` convention: big content sections get their own file).
+The sidecar is the brand root's file only (a target's own `config/seo.json5` is never read):
+the config loader reads it as the brand root's `seo` section, with the same deep merge (right
+after the root's `omega.json5`, before its environment overlay), the same raw-file secret check
+and the same strict check. The service reads the
+loaded `seo` section and never opens a file. `seo.enabled: false` skips the service, and no
+content at all is a clean skip: this service never WRITES config, so nothing is auto-created
+for a brand that declared nothing.
 
 Per item, `owner` names the GitHub user or org its repo lives under (default: the brand's
-`repo.owner`), `author.token` (`env:VAR_NAME` or a literal) overrides the `gh` auth for that item's
-API calls, and `author.git` rides the Contents API commits as author and committer — parasite
-repos owned by separate accounts.
+`repo.owner`), `author.tokenEnv` NAMES the `.env` variable holding a GitHub token that overrides
+the `gh` auth for that item's API calls, and `author.git` rides the Contents API commits as
+author and committer: parasite repos owned by separate accounts. A token itself is never
+written in either file. A named variable that is unset fails that item before any API call
+(`seo item <name>: author.tokenEnv names <VAR>, which is not set in .env`); the walk still runs
+the other items.
 
 Every key an item takes is a schema rule (`seo.github.content.<key>`): `name`, `owner`,
 `template`, `title`, `description`, `features`, `custom`, `topics`, `cta` (`platform`, `url`)
-and `author` (`token`, `git`). The strict check refuses any other key on an item, one line per
-path with its position (`config.seo.github.content[0].org`, the standard line of
-[config.md](../shared/config.md) § Validation): the loader for `config/omega.json5`, and the
-service itself for the merged section, after it reads the sidecar and before any API call. The
-old `org` is one such key, and `npx omega migrate --execute` at the brand root moves it to
-`owner` in both files. `author.token` belongs in the sidecar: in `config/omega.json5` the
-secret-key check refuses a key named `token`.
+and `author` (`tokenEnv`, `git`). The strict check refuses any other key on an item, at load,
+one line per path with its position (`config.seo.github.content[0].org`, the standard line of
+[config.md](../shared/config.md) § Validation), in either file. Two old keys have a migrate
+row, and `npx omega migrate --execute` at the brand root runs both in both files: `org` moves
+to `owner`, and `author.token: "env:X"` moves to `author.tokenEnv: "X"`. A literal
+`author.token`, or a bare `env:` naming no variable, is reported as refused and left in place:
+put the token in `.env` and write `author.tokenEnv` by hand.
 
 **Credentials**: the default `gh` CLI auth, plus those per-item author overrides. A headless walk
 with a signed-out `gh` skips the service like a missing key, naming `GH_TOKEN`.

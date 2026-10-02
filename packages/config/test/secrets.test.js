@@ -29,7 +29,7 @@ test('flags on key NAME even with empty/placeholder values, walks arrays with in
     payment: { products: [{ stripe: { productId: 'x' } }, { signingSecret: null }] },
   });
 
-  assert.deepStrictEqual(found.sort(), ['payment.products.1.signingSecret', 'webhookSecret']);
+  assert.deepStrictEqual(found.sort(), ['payment.products[1].signingSecret', 'webhookSecret']);
 });
 
 test('public credentials pass by design', () => {

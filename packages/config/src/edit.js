@@ -20,8 +20,8 @@
  * at the requested path — any miss throws, so callers can never write a
  * corrupted config.
  *
- * Paths are dot-notation; numeric segments index arrays, and a matcher
- * segment selects an array element by one of its own keys —
+ * Paths are dot-notation; a `name[0]` segment indexes an array by position,
+ * and a matcher segment selects an array element by one of its own keys —
  * `payment.products[id=plus].stripe.productId` — so writes self-locate in
  * the file being edited instead of trusting an index computed from a merged
  * config. Array elements are user-authored and never created here. Inserted
@@ -34,18 +34,21 @@ const { isDeepStrictEqual } = require('node:util');
 const JSON5 = require('json5');
 
 const { resolveConfigPath, FILE_NAME } = require('./load.js');
+const { keyPath, itemPath, pathSteps } = require('./paths.js');
 
 const IDENTIFIER_KEY = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const MATCHER_SEGMENT = /^([^[]+)\[([A-Za-z0-9_$]+)=([^\]]*)\]$/;
+const POSITION_SEGMENT = /^[^[]+(\[\d+\])+$/;
 const DEFAULT_INDENT_UNIT = '  ';
 // Where a guiding comment wraps — the whole line, indent and `// ` included.
 const COMMENT_WIDTH = 80;
 
 /**
  * Parse a dot-path into walk steps. A `name[key=value]` segment expands to a
- * key step plus an array-matcher step.
+ * key step plus an array-matcher step, a `name[0]` segment to a key step plus
+ * a position step. A bare `0` segment is a plain key like any other.
  * @param {string} path - e.g. 'payment.products[id=plus].stripe.productId'
- * @returns {Array<{ type: 'plain', name: string } | { type: 'match', key: string, value: string }>}
+ * @returns {Array<{ type: 'plain', name: string } | { type: 'match', key: string, value: string } | { type: 'position', index: number }>}
  */
 function parsePath(path) {
   const steps = [];
@@ -54,11 +57,27 @@ function parsePath(path) {
     if (matcher) {
       steps.push({ type: 'plain', name: matcher[1] });
       steps.push({ type: 'match', key: matcher[2], value: matcher[3] });
+    } else if (POSITION_SEGMENT.test(raw)) {
+      const [name, ...positions] = pathSteps(raw);
+      steps.push({ type: 'plain', name });
+      positions.forEach((index) => steps.push({ type: 'position', index }));
     } else {
       steps.push({ type: 'plain', name: raw });
     }
   }
   return steps;
+}
+
+/**
+ * The path the walk has covered before step `count`, spelled the way paths
+ * are written, for an error line ('(root)' before the first step).
+ */
+function walkedPath(steps, count) {
+  return steps.slice(0, count).reduce((walked, step) => {
+    if (step.type === 'match') return `${walked}[${step.key}=${step.value}]`;
+    if (step.type === 'position') return itemPath(walked, step.index);
+    return keyPath(walked, step.name);
+  }, '') || '(root)';
 }
 
 // ─── Tokenizer ───────────────────────────────────────────────────────────────
@@ -359,7 +378,7 @@ function commentBlock(text, indent) {
  */
 function insertProperty(source, node, path, steps, value, unit, comments) {
   if (steps.some((step) => step.type !== 'plain')) {
-    throw new Error(`Cannot set '${path}': the branch is missing and a [key=value] matcher cannot create array elements`);
+    throw new Error(`Cannot set '${path}': the branch is missing and a [0] position or [key=value] matcher cannot create array elements`);
   }
 
   const names = steps.map((step) => step.name);
@@ -432,7 +451,7 @@ function matchesElement(source, item, step) {
  * Apply one dot-path edit to the source. Walks the span tree; replaces the
  * leaf's value span when the path exists, inserts the missing branch when it
  * doesn't (documented from `comments`, which an existing key never gets). Throws
- * when an intermediate value isn't a container, an array index is out of
+ * when an intermediate value isn't a container, a [0] position is out of
  * range, or a [key=value] matcher finds no element.
  */
 function applySingleEdit(source, path, value, comments) {
@@ -446,9 +465,7 @@ function applySingleEdit(source, path, value, comments) {
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const isLast = i === steps.length - 1;
-    const walked = steps.slice(0, i)
-      .map((prior) => (prior.type === 'match' ? `[${prior.key}=${prior.value}]` : prior.name))
-      .join('.') || '(root)';
+    const walked = walkedPath(steps, i);
 
     if (step.type === 'match') {
       if (node.kind !== 'array') {
@@ -465,19 +482,23 @@ function applySingleEdit(source, path, value, comments) {
       continue;
     }
 
-    if (node.kind === 'array') {
-      if (!/^\d+$/.test(step.name)) {
-        throw new Error(`Cannot set '${path}': '${walked}' is an array (expected a numeric index or [key=value] matcher, got '${step.name}')`);
+    if (step.type === 'position') {
+      if (node.kind !== 'array') {
+        throw new Error(`Cannot set '${path}': a [${step.index}] position needs an array, and '${walked}' is not one`);
       }
-      const item = node.items[Number(step.name)];
+      const item = node.items[step.index];
       if (!item) {
-        throw new Error(`Cannot set '${path}': index ${step.name} is out of range (array elements are never created by writeback)`);
+        throw new Error(`Cannot set '${path}': index ${step.index} is out of range (array elements are never created by writeback)`);
       }
       if (isLast) {
         return replaceSpan(item, lineIndentAt(source, item.start));
       }
       node = item;
       continue;
+    }
+
+    if (node.kind === 'array') {
+      throw new Error(`Cannot set '${path}': '${walked}' is an array (expected a [0] position or [key=value] matcher, got '${step.name}')`);
     }
 
     if (node.kind !== 'object') {
@@ -504,8 +525,9 @@ function applySingleEdit(source, path, value, comments) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Read a dot-path from a parsed config (numeric segments index arrays,
- * [key=value] matchers select array elements).
+ * Read a dot-path from a parsed config ([0] positions index arrays,
+ * [key=value] matchers select array elements; a plain key on an array reads
+ * nothing).
  */
 function getAtPath(parsed, path) {
   let current = parsed;
@@ -518,8 +540,10 @@ function getAtPath(parsed, path) {
         return undefined;
       }
       current = current.find((element) => element && typeof element === 'object' && String(element[step.key]) === step.value);
+    } else if (step.type === 'position') {
+      current = Array.isArray(current) ? current[step.index] : undefined;
     } else {
-      current = current[step.name];
+      current = Array.isArray(current) ? undefined : current[step.name];
     }
   }
   return current;
@@ -636,9 +660,9 @@ function locateEntry(source, path) {
       continue;
     }
 
-    if (node.kind === 'array') {
-      if (!/^\d+$/.test(step.name)) return null;
-      const item = node.items[Number(step.name)];
+    if (step.type === 'position') {
+      if (node.kind !== 'array') return null;
+      const item = node.items[step.index];
       if (!item) return null;
       if (isLast) throw elementError();
       node = item;

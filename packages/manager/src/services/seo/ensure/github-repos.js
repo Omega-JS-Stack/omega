@@ -1,20 +1,14 @@
 /**
  * Ensure the brand's parasite SEO repos exist and match their template:
- * create the repo if missing (public, auto-init README), push generated +
- * static template files (content-compared — unchanged files are never
- * rewritten), delete stale non-template files, reconcile description/
- * homepage/topics, and star the repo as the author.
+ * create when missing, push template files (content-compared), delete stale
+ * files, reconcile description/homepage/topics, and star as the author.
  *
- * Collision guardrail (critical safety, ported verbatim): a parasite repo
- * this handler created only ever contains the template's files, so before
- * ANY write the existing tree is inspected — more than MAX_STALE_FILES
- * non-template files means the configured name collides with a REAL repo,
- * and the item errors without touching anything. Never reuse a real
- * repo's name for a parasite entry.
+ * Collision guardrail: a parasite repo holds only template files, so more than
+ * MAX_STALE_FILES non-template files means the name collides with a REAL repo,
+ * and the item errors before ANY write. Never reuse a real repo's name.
  *
- * Per-item author identity: author.token (`env:VAR` or literal) overrides
- * the gh auth for that item's API calls; author.git rides the Contents
- * API commits as author/committer.
+ * Per-item author identity: author.tokenEnv names the .env variable whose token
+ * overrides the gh auth for the item; author.git is its commit identity.
  */
 const chalk = require('chalk').default;
 
@@ -30,26 +24,23 @@ const { loadTemplate } = require('../templates/index.js');
 const MAX_STALE_FILES = 10;
 
 /**
- * Resolve an author token config value (`env:VAR_NAME` reads process.env).
+ * The item's own GitHub token: the `.env` variable its `author.tokenEnv`
+ * names, or null for the default gh auth when the key is absent. Any other
+ * value, the empty string included, is a name: unset, it fails the item before
+ * any API call.
  */
-function resolveToken(tokenConfig) {
-  if (!tokenConfig) {
+function resolveToken(item) {
+  const variable = item.author?.tokenEnv;
+  if (variable === undefined) {
     return null;
   }
 
-  if (tokenConfig.startsWith('env:')) {
-    const envVar = tokenConfig.slice(4);
-    const value = process.env[envVar];
-
-    if (!value) {
-      console.log(`        ${chalk.yellow('⚠')} Token env var ${envVar} is not set — using default gh auth`);
-      return null;
-    }
-
-    return value;
+  const value = process.env[variable];
+  if (!value) {
+    throw new Error(`seo item ${item.name}: author.tokenEnv names ${variable}, which is not set in .env`);
   }
 
-  return tokenConfig;
+  return value;
 }
 
 function sleep(ms) {
@@ -243,7 +234,7 @@ module.exports = async (context) => {
     console.log(`      [${i + 1}/${content.length}] ${chalk.cyan(slug)}`);
 
     try {
-      const token = resolveToken(item.author?.token);
+      const token = resolveToken(item);
       const status = await reconcileItem(api, slug, owner, item, brandConfig, token, dryRun);
       console.log(`        ${chalk.green('✓')} ${status}`);
       results.push({ repo: slug, status });

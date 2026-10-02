@@ -1047,7 +1047,7 @@ const SHARED_SCHEMA = [
     path:        'seo',
     type:        'object',
     required:    false,
-    description: "Parasite-SEO content: seo.github.content is the @omega.js/manager seo service's repos, and big content blocks may live in the config/seo.json5 sidecar. The indexing switch is NOT here: it is `targets.web.meta.index`, the same name a page writes.",
+    description: "Parasite-SEO content: seo.github.content is the @omega.js/manager seo service's repos, and big content blocks may live in the config/seo.json5 sidecar, which the config loader reads as the `seo` section. The indexing switch is NOT here: it is `targets.web.meta.index`, the same name a page writes.",
   },
 
   // ── account ──────────────────────────────────────────────────────────────

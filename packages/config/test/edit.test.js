@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { applyConfigEdits, writeConfigValues, applyConfigRemovals, removeConfigValues } = require('../src/index.js');
+const { applyConfigEdits, writeConfigValues, writeConfigFileValues, applyConfigRemovals, removeConfigValues, removeConfigFileValues } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -91,14 +91,14 @@ test('already-equal edits are skipped: output is byte-identical (quote style unt
   const result = applyConfigEdits(NASTY, {
     'brand.id': 'fixture-brand',
     'marketing.campaigns.enabled': true,
-    'payment.products.1.stripe.productId': null,
+    'payment.products[1].stripe.productId': null,
   });
 
   assert.equal(result, NASTY);
 });
 
-test('array-element leaf replace via numeric segment', () => {
-  const result = applyConfigEdits(NASTY, { 'payment.products.1.stripe.productId': 'prod_ABC' });
+test('array-element leaf replace via a [N] position', () => {
+  const result = applyConfigEdits(NASTY, { 'payment.products[1].stripe.productId': 'prod_ABC' });
 
   assert.equal(result, NASTY.replace("stripe: { productId: null }", 'stripe: { productId: "prod_ABC" }'));
 });
@@ -106,7 +106,7 @@ test('array-element leaf replace via numeric segment', () => {
 test('[key=value] matcher self-locates the array element: replace and insert', () => {
   // Replace inside the matched element — identical result to the index path
   const replaced = applyConfigEdits(NASTY, { 'payment.products[id=plus].stripe.productId': 'prod_ABC' });
-  assert.equal(replaced, applyConfigEdits(NASTY, { 'payment.products.1.stripe.productId': 'prod_ABC' }));
+  assert.equal(replaced, applyConfigEdits(NASTY, { 'payment.products[1].stripe.productId': 'prod_ABC' }));
 
   // Insert a missing branch into the matched element (free has no `paypal` key)
   const inserted = applyConfigEdits(NASTY, { 'payment.products[id=plus].paypal.productId': 'PP-1' });
@@ -335,8 +335,10 @@ test('intermediate non-object, out-of-range array index, and non-numeric array s
 }
 `;
   assert.throws(() => applyConfigEdits(source, { 'marketing.campaigns.providers.sendgrid.listId': 'x' }), /'marketing' is not an object/);
-  assert.throws(() => applyConfigEdits(source, { 'payment.products.3.id': 'x' }), /index 3 is out of range/);
-  assert.throws(() => applyConfigEdits(source, { 'payment.products.first.id': 'x' }), /expected a numeric index/);
+  assert.throws(() => applyConfigEdits(source, { 'payment.products[3].id': 'x' }), /index 3 is out of range/);
+  assert.throws(() => applyConfigEdits(source, { 'payment.products.first.id': 'x' }), /expected a \[0\] position or \[key=value\] matcher/);
+  // The old dotted spelling of a position is a plain key now, never an index
+  assert.throws(() => applyConfigEdits(source, { 'payment.products.1.id': 'x' }), /expected a \[0\] position or \[key=value\] matcher, got '1'/);
 });
 
 test('unparseable input throws before any editing', () => {
@@ -525,7 +527,7 @@ test('remove: a name-matched retired key at any depth, including inside an insta
   },
 }
 `;
-  const parsed = JSON5.parse(applyConfigRemovals(source, ['targets.backend.0.web_manager']));
+  const parsed = JSON5.parse(applyConfigRemovals(source, ['targets.backend[0].web_manager']));
 
   assert.deepEqual(parsed.targets.backend, [{ id: 'main' }, { id: 'worker' }]);
 });
@@ -550,4 +552,38 @@ test('removeConfigValues: reports what it removed, dry-run writes nothing, rerun
   assert.deepEqual(rerun.removed, []);
   assert.equal(rerun.changed, false);
   assert.equal(fs.readFileSync(configPath, 'utf8'), written, 'the rerun rewrote the file');
+});
+
+// ─── A list position in a file path: the seo sidecar's shape ───
+
+test('writeConfigFileValues and removeConfigFileValues take a [N] position: the item key lands and goes, comments kept', (t) => {
+  const source = `// SEO sidecar: one content item
+{
+  github: {
+    content: [
+      {
+        // The repo name is infrastructure
+        name: 'fixture-tool',
+        org: 'Acme-Org',
+        title: 'Fixture Tool', // the brand's voice
+      },
+    ],
+  },
+}
+`;
+  const root = makeFixture('file-values-position', { 'config/seo.json5': source });
+  cleanup(t, root);
+  const file = path.join(root, 'config', 'seo.json5');
+
+  writeConfigFileValues(file, { 'github.content[0].owner': 'Acme' });
+  removeConfigFileValues(file, ['github.content[0].org']);
+
+  const written = fs.readFileSync(file, 'utf8');
+  assert.deepStrictEqual(JSON5.parse(written), {
+    github: { content: [{ name: 'fixture-tool', owner: 'Acme', title: 'Fixture Tool' }] },
+  });
+
+  // Every other byte stays: less the one line each edit touched, the files match
+  const without = (text, key) => text.split('\n').filter((line) => !line.includes(`${key}:`)).join('\n');
+  assert.equal(without(written, 'owner'), without(source, 'org'));
 });

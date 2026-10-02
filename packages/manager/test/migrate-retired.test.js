@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS } = require('../src/migrate/retired-keys.js');
+const { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS, ConvertRefused } = require('../src/migrate/retired-keys.js');
 const { RETIRED_ENV_KEYS, findRetiredEnvKeys } = require('../src/migrate/retired-env.js');
 const { stageBrand, runMigrate, block } = require('./lib/migrate-harness.js');
 
@@ -299,15 +299,15 @@ const SEO_ITEM_ORG = `{
 
 test('migrate: an seo content item\'s org names seo.github.content[].owner, and --execute moves the value', async () => {
   const config = { ...VALID, seo: { github: { content: [{ name: 'fixture-tool', org: 'Acme-Org' }] } } };
-  const finding = findRetiredKeys(config).find((entry) => entry.path === 'seo.github.content.0.org');
-  assert.ok(fired(config, 'seo.github.content.0.org', '→ seo.github.content[].owner:'), lines(config).join(' | '));
+  const finding = findRetiredKeys(config).find((entry) => entry.path === 'seo.github.content[0].org');
+  assert.ok(fired(config, 'seo.github.content[0].org', '→ seo.github.content[].owner:'), lines(config).join(' | '));
   assert.equal(finding.convert('Acme-Org'), 'Acme-Org', 'the owner moves as it is');
 
   const brand = stageBrand(SEO_ITEM_ORG);
   const report = await runMigrate(brand);
   assert.match(
     block(report.text, 'config/omega.json5'),
-    /due\s+move seo\.github\.content\.0\.org → seo\.github\.content\.0\.owner = "Acme-Org"/,
+    /due\s+move seo\.github\.content\[0\]\.org → seo\.github\.content\[0\]\.owner = "Acme-Org"/,
     report.text,
   );
 
@@ -322,23 +322,35 @@ test('migrate --execute: an seo item carrying both org and owner is refused, nev
   const { text, code } = await runMigrate(brand, { execute: true });
 
   assert.equal(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'), both, 'the file is untouched');
-  assert.match(block(text, 'config/omega.json5'), /refused seo\.github\.content\.0\.org → seo\.github\.content\.0\.owner/, text);
+  assert.match(block(text, 'config/omega.json5'), /refused seo\.github\.content\[0\]\.org → seo\.github\.content\[0\]\.owner/, text);
   assert.ok(text.includes('delete one of the two by hand'), text);
   assert.equal(code, 1);
+});
+
+test('an seo item\'s author.token names author.tokenEnv, and CONVERTS by dropping the env: prefix', () => {
+  const config = { ...VALID, seo: { github: { content: [{ name: 'fixture-tool', author: { token: 'env:GH_SOCK' } }] } } };
+  const finding = findRetiredKeys(config).find((entry) => entry.path === 'seo.github.content[0].author.token');
+
+  assert.ok(fired(config, 'seo.github.content[0].author.token', '→ seo.github.content[].author.tokenEnv:'), lines(config).join(' | '));
+  assert.equal(finding.convert('env:GH_SOCK'), 'GH_SOCK', 'the variable NAME moves, its prefix gone');
+  assert.throws(() => finding.convert('env:'), ConvertRefused, 'env: with no name names no variable, so nothing moves');
+
+  // The live spelling is clean
+  assert.deepStrictEqual(findRetiredKeys({ ...VALID, seo: { github: { content: [{ name: 'fixture-tool', author: { tokenEnv: 'GH_SOCK' } }] } } }), []);
 });
 
 test('#647: product limits and rateLimit name the features catalog, at their real array path', () => {
   const config = { ...VALID, payment: { products: [{ id: 'basic', name: 'Basic', limits: { saves: 100 }, rateLimit: 'monthly' }] } };
 
-  assert.ok(fired(config, 'payment.products.0.limits', 'payment.products[].features'), lines(config).join(' | '));
-  assert.ok(fired(config, 'payment.products.0.rateLimit', 'features.<id>.usage.pace'), lines(config).join(' | '));
+  assert.ok(fired(config, 'payment.products[0].limits', 'payment.products[].features'), lines(config).join(' | '));
+  assert.ok(fired(config, 'payment.products[0].rateLimit', 'features.<id>.usage.pace'), lines(config).join(' | '));
 });
 
 test('#849: a price spelled `amount` names `once`, at its real array path, and CONVERTS', () => {
   const config = { ...VALID, payment: { products: [{ id: 'kit', type: 'one-time', prices: { amount: 9.99 } }] } };
   const [finding] = findRetiredKeys(config);
 
-  assert.ok(fired(config, 'payment.products.0.prices.amount', 'payment.products[].prices.once'), lines(config).join(' | '));
+  assert.ok(fired(config, 'payment.products[0].prices.amount', 'payment.products[].prices.once'), lines(config).join(' | '));
   assert.equal(finding.convert(9.99), 9.99, 'the number moves as it is');
 
   // The live spelling is clean

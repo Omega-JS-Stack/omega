@@ -135,7 +135,7 @@ const MANAGER_RULES = [
     path:        'seo.github',
     type:        'object',
     required:    false,
-    description: "The parasite-SEO content repos (`seo.github.content[]`) the seo service reconciles; a `config/seo.json5` sidecar merges over it.",
+    description: "The parasite-SEO content repos (`seo.github.content[]`) the seo service reconciles; a `config/seo.json5` sidecar is read by the config loader as the `seo` section, merged and checked like the base file.",
   },
   {
     path:        'seo.github.content',
@@ -213,13 +213,13 @@ const MANAGER_RULES = [
     path:        'seo.github.content.author',
     type:        'object',
     required:    false,
-    description: "The item's own GitHub identity ({ token, git }), for a repo owned by a separate account.",
+    description: "The item's own GitHub identity ({ tokenEnv, git }), for a repo owned by a separate account.",
   },
   {
-    path:        'seo.github.content.author.token',
+    path:        'seo.github.content.author.tokenEnv',
     type:        'string',
     required:    false,
-    description: "The token the item's API calls use instead of the `gh` auth: `env:VAR_NAME` reads it from the environment, anything else is the token itself.",
+    description: "The NAME of a `.env` variable holding a GitHub token for this item's API calls (a parasite repo owned by another account); the walk reads it from the environment and fails the item when it is unset.",
   },
   {
     path:        'seo.github.content.author.git',

@@ -2,10 +2,10 @@
  * SEO service tests — the github-repos operation against a method-level
  * recording fake of the gh-backed API, with the template pipeline real
  * (auto-discovery, generators, static files). Proves skip semantics, the
- * config/seo.json5 sidecar merge, the converged zero-mutation no-op, repo
+ * loaded seo section as the only content source, the converged zero-mutation no-op, repo
  * creation with full template push, content-compared updates + stale-file
  * deletion, the MAX_STALE_FILES collision guardrail (nothing touched on a
- * suspected real repo), per-item author identity (env token + git
+ * suspected real repo), per-item author identity (a named .env token + git
  * author/committer), the loud per-item error surfacing omega-manager
  * swallowed, and the dry-run zero-mutation guarantee.
  */
@@ -15,6 +15,11 @@ const { mkdtempSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
+
+// The machine registry is per-machine state: the playground load records into a temp home.
+require('@omega.js/devkit/test/temp-home');
+
+const { loadConfig } = require('@omega.js/config');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { loadTemplate } = require('../src/services/seo/templates/index.js');
@@ -223,43 +228,28 @@ test('#1037 seo: a headless walk with a signed-out gh skips, naming GH_TOKEN and
   assert.match(result.reason, /gh auth login/);
 });
 
-test('seo: content from the config/seo.json5 sidecar merges over the config section', async () => {
+test('seo: the content of the loaded seo section runs, and the service never reads config/seo.json5', async () => {
   const root = stageBrand();
   const item = contentItem();
+  // A sidecar on disk the service must not read: the loader already merged it
   jetpack.write(
     join(root, 'config', 'seo.json5'),
-    `{\n  // sidecar content\n  github: { content: [${JSON.stringify(item)}] },\n}\n`,
+    `{\n  github: { content: [${JSON.stringify(contentItem({ name: 'from-disk' }))}] },\n}\n`,
   );
 
   const api = fakeSeo(convergedResponses(item));
-  const result = await runService(brandConfig({ seo: { enabled: true } }), { root, api });
+  const result = await runService(brandConfig({ seo: { enabled: true, github: { content: [item] } } }), { root, api });
 
-  assert.equal(result.status, 'success');
+  assert.equal(result.status, 'success', JSON.stringify(result));
+  assert.deepEqual(result.output.githubRepos.repos, [{ repo: 'fixture-org/fixture-tool', status: 'synced' }]);
   assert.deepEqual(api.mutations(), []);
-  assert.equal(result.output.githubRepos.synced, 1);
 });
 
-test('seo: a sidecar item carrying org is refused with the standard line, before any API call', async () => {
-  const root = stageBrand();
-  const item = contentItem({ owner: undefined, org: 'Acme-Org' });
-  jetpack.write(join(root, 'config', 'seo.json5'), `{\n  github: { content: [${JSON.stringify(item)}] },\n}\n`);
-
-  const api = fakeSeo(convergedResponses(item, 'Acme-Org'));
-  const result = await runService(brandConfig({ seo: { enabled: true } }), { root, api })
-    .then((r) => r, (error) => ({ status: 'error', error: error.message }));
-
-  assert.equal(result.status, 'error', JSON.stringify(result));
-  assert.ok(
-    result.error.includes('config.seo.github.content[0].org is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)'),
-    result.error,
-  );
-  assert.deepEqual(api.calls, []);
-});
-
-test('seo: the playground brand\'s config/seo.json5 as it stands passes the check', async () => {
+test('seo: the playground brand, loaded, plans its one repo from the sidecar the loader read', async () => {
   const root = join(__dirname, '..', '..', '..', 'brands', 'playground-omega');
+  const { config, errors } = loadConfig(root);
+  assert.deepEqual(errors, []);
   const api = fakeSeo({ getRepo: null });
-  const config = brandConfig({ seo: { enabled: true }, repo: { provider: 'github', owner: 'Omega-JS-Stack' } });
 
   const result = await runService(config, { root, api, options: { dryRun: true } });
 
@@ -414,7 +404,7 @@ test('seo: author token + git identity ride every call and commit', async () => 
   process.env.FIXTURE_GH_TOKEN = 'tok-123';
   try {
     const item = contentItem({
-      author: { token: 'env:FIXTURE_GH_TOKEN', git: { name: 'sockpuppet', email: 'sock@example.test' } },
+      author: { tokenEnv: 'FIXTURE_GH_TOKEN', git: { name: 'sockpuppet', email: 'sock@example.test' } },
     });
     const contents = templateContents(item);
     const api = fakeSeo({
@@ -444,15 +434,33 @@ test('seo: author token + git identity ride every call and commit', async () => 
   }
 });
 
-test('seo: an unset token env var falls back to default auth', async () => {
+test('seo: a tokenEnv naming an unset variable fails the item, and no API call is made for it', async () => {
   delete process.env.FIXTURE_MISSING_TOKEN;
-  const item = contentItem({ author: { token: 'env:FIXTURE_MISSING_TOKEN' } });
+  const item = contentItem({ author: { tokenEnv: 'FIXTURE_MISSING_TOKEN' } });
   const api = fakeSeo(convergedResponses(item));
 
   const result = await runService(brandConfig({ content: [item] }), { api });
 
-  assert.equal(result.status, 'success');
-  assert.equal(api.of('getRepo')[0].args[1], null);
+  assert.equal(result.status, 'error', JSON.stringify(result));
+  assert.ok(
+    result.output.githubRepos.repos[0].error.includes('seo item fixture-tool: author.tokenEnv names FIXTURE_MISSING_TOKEN, which is not set in .env'),
+    result.output.githubRepos.repos[0].error,
+  );
+  assert.deepEqual(api.calls, []);
+});
+
+test('seo: an empty tokenEnv names no variable, so it fails the item like an unset one, with no API call', async () => {
+  const item = contentItem({ author: { tokenEnv: '' } });
+  const api = fakeSeo(convergedResponses(item));
+
+  const result = await runService(brandConfig({ content: [item] }), { api });
+
+  assert.equal(result.status, 'error', JSON.stringify(result));
+  assert.ok(
+    result.output.githubRepos.repos[0].error.includes('seo item fixture-tool: author.tokenEnv names , which is not set in .env'),
+    result.output.githubRepos.repos[0].error,
+  );
+  assert.deepEqual(api.calls, []);
 });
 
 // ─── Defaults ────────────────────────────────────────────────────────────────

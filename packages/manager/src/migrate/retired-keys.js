@@ -3,8 +3,28 @@
  * knows an old config name. RETIRED_KEYS are NAMES walked at every depth;
  * RETIRED_PATHS are exact paths from the root, a target NAME read as its TYPE.
  */
-const { TARGET_TYPES } = require('@omega.js/config');
+const { TARGET_TYPES, keyPath, itemPath, pathSteps } = require('@omega.js/config');
 const { excludeToInclude } = require('@omega.js/devkit/translation-include');
+
+/**
+ * Thrown by a row's `convert` for a value it must not move: the pass reports a
+ * refusal line with its message and leaves the key where it is.
+ */
+class ConvertRefused extends Error {}
+
+/**
+ * An seo item's `author.token` as the variable NAME it pointed at: `env:X`
+ * becomes `X`; a bare `env:` names nothing, and anything else is a literal
+ * token, which never moves into config: both are refused.
+ * @param {*} value - The authored `author.token`.
+ * @returns {string}
+ */
+function tokenEnvName(value) {
+  if (value === 'env:') throw new ConvertRefused('the value names no variable; write author.tokenEnv: "<NAME>" by hand');
+  if (typeof value === 'string' && value.startsWith('env:')) return value.slice('env:'.length);
+
+  throw new ConvertRefused('a token never lives in config; put it in .env as a variable and write author.tokenEnv: "<NAME>"');
+}
 
 // A row: { replacement, why } and an optional `convert` (old value → new value).
 // key NAME, matched at every depth
@@ -304,6 +324,11 @@ const RETIRED_PATHS = {
     why: 'a repo is owned by a user or an org, and GitHub\'s word is owner (#1041): an seo content item names its own repo owner with `owner`, so the value moves unchanged inside its item',
     convert: (value) => value,
   },
+  'seo.github.content.author.token': {
+    replacement: 'seo.github.content[].author.tokenEnv',
+    why: 'a token never lives in config (#1059): the key names the `.env` variable that holds it, so `env:GH_SOCK` becomes `tokenEnv: "GH_SOCK"`, and the seo walk fails the item when that variable is unset',
+    convert: tokenEnvName,
+  },
   'repo.providers.github.org': {
     replacement: 'repo.owner',
     why: 'ONE repo block (#883): `repo: { provider: \'github\', owner }` is the whole declaration, and the owner owns every repo the brand derives',
@@ -398,14 +423,14 @@ for (const type of TARGET_TYPES) {
 }
 
 /**
- * The SHAPE a walked path matches rows by: array positions dropped, a target
+ * The SHAPE a walked path matches rows by: list positions dropped, a target
  * NAME read as its TYPE. The reported path stays the real one.
- * @param {string} keyPath
+ * @param {string} path
  * @param {object} types - target name → type
  * @returns {string}
  */
-function shapePath(keyPath, types) {
-  const parts = keyPath.split('.').filter((segment) => !/^\d+$/.test(segment));
+function shapePath(path, types) {
+  const parts = pathSteps(path).filter((step) => typeof step !== 'number');
 
   if (parts[0] === 'targets' && parts.length > 1 && types[parts[1]]) {
     parts[1] = types[parts[1]];
@@ -436,7 +461,7 @@ function targetTypes(object) {
 
 function walk(node, path, found, types) {
   if (Array.isArray(node)) {
-    node.forEach((item, index) => walk(item, path ? `${path}.${index}` : String(index), found, types));
+    node.forEach((item, index) => walk(item, itemPath(path, index), found, types));
     return;
   }
 
@@ -445,19 +470,19 @@ function walk(node, path, found, types) {
   }
 
   Object.keys(node).forEach((key) => {
-    const keyPath = path ? `${path}.${key}` : key;
+    const childPath = keyPath(path, key);
 
     if (RETIRED_KEYS[key]) {
-      found.push({ path: keyPath, key, ...RETIRED_KEYS[key] });
+      found.push({ path: childPath, key, ...RETIRED_KEYS[key] });
     }
 
-    const shape = shapePath(keyPath, types);
+    const shape = shapePath(childPath, types);
 
     if (RETIRED_PATHS[shape]) {
-      found.push({ path: keyPath, key, ...RETIRED_PATHS[shape] });
+      found.push({ path: childPath, key, ...RETIRED_PATHS[shape] });
     }
 
-    walk(node[key], keyPath, found, types);
+    walk(node[key], childPath, found, types);
   });
 }
 
@@ -472,4 +497,4 @@ function findRetiredKeys(object) {
   return found;
 }
 
-module.exports = { findRetiredKeys, RETIRED_KEYS, RETIRED_PATHS };
+module.exports = { findRetiredKeys, ConvertRefused, RETIRED_KEYS, RETIRED_PATHS };

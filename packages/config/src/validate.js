@@ -12,6 +12,7 @@
 
 const { TARGETS, SHARED_SCHEMA, TARGET_SCHEMAS, isCustomTargetEntry } = require('./schema.js');
 const { findSecretKeys } = require('./secrets.js');
+const { keyPath, itemPath } = require('./paths.js');
 const { CLIENT_FACT_KEYS } = require('./client-config.js');
 const { RESOLVED_COMPANY_KEYS } = require('./company.js');
 const { isPlainObject } = require('./merge.js');
@@ -432,12 +433,12 @@ function findUndeclaredPaths(config, schema, written = []) {
   // `shape` leaves positions out, the form the rules declare.
   const walk = (value, path, shape) => {
     if (isPlainObject(value) && Object.keys(value).length > 0) {
-      Object.keys(value).forEach((key) => walk(value[key], `${path}.${key}`, `${shape}.${key}`));
+      Object.keys(value).forEach((key) => walk(value[key], keyPath(path, key), `${shape}.${key}`));
       return;
     }
     if (Array.isArray(value) && paths.some((rule) => rule.startsWith(`${shape}.`))) {
       value.forEach((item, index) => {
-        if (isPlainObject(item)) walk(item, `${path}[${index}]`, shape);
+        if (isPlainObject(item)) walk(item, itemPath(path, index), shape);
       });
       return;
     }
@@ -462,18 +463,6 @@ function findUndeclaredPaths(config, schema, written = []) {
 function undeclaredLine(path) {
   return `config.${path} is not a key the schema declares. Remove it, or if it is a legacy key run `
     + '`npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)';
-}
-
-/**
- * The steps of a path as findUndeclaredPaths reports it, a list position a number.
- * @param {string} path - e.g. 'seo.github.content[0].org'.
- * @returns {Array<string|number>} e.g. ['seo', 'github', 'content', 0, 'org'].
- */
-function pathSteps(path) {
-  return path.split('.').flatMap((segment) => {
-    const [key, ...positions] = segment.split('[');
-    return [key, ...positions.map((position) => Number(position.slice(0, -1)))];
-  });
 }
 
 /**
@@ -670,4 +659,4 @@ function formatErrors(errors) {
   return errors.map((e, i) => `  ${i + 1}. ${e}`).join('\n');
 }
 
-module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, pathSteps, runSchema, formatErrors, getPath, resolvedBrandHost };
+module.exports = { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, runSchema, formatErrors, getPath, resolvedBrandHost };

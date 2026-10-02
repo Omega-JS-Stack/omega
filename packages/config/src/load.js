@@ -15,7 +15,7 @@
  * (`company: { id }`) inherits that company's own config/omega.json5 underneath
  * that (#677). Resolution for a target:
  *
- *   schema defaults ← framework defaults ← company ← company.<environment> ← brand shared ← brand targets[name] ← brand.<environment> ← local shared ← local targets[name] ← local.<environment>
+ *   schema defaults ← framework defaults ← company ← company.<environment> ← brand shared ← brand targets[name] ← brand root config/seo.json5 ← brand.<environment> ← local shared ← local targets[name] ← root config/seo.json5 (no brand layer) ← local.<environment>
  *
  * The bottom layer derives from the schema's own `default:` entries
  * ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)) — the one home
@@ -74,6 +74,7 @@ const { schemaDefaults } = require('./defaults.js');
 const { targetNameFromDir, targetUrl } = require('./targets.js');
 
 const FILE_NAME = 'omega.json5';
+const SEO_FILE_NAME = 'seo.json5';
 const CONFIG_LOCATIONS = [
   path.join('config', FILE_NAME),
 ];
@@ -181,6 +182,29 @@ function readConfigFile(absolutePath) {
   } catch (e) {
     throw new Error(`Failed to parse ${absolutePath}: ${e.message}`);
   }
+}
+
+/**
+ * The ONE spelling of the seo sidecar's path: `seo.json5` beside a base file.
+ * @param {string} basePath - A base omega.json5 path.
+ * @returns {string} The sidecar path beside it, whether or not it exists.
+ */
+function seoSidecarPath(basePath) {
+  return path.join(path.dirname(basePath), SEO_FILE_NAME);
+}
+
+/**
+ * The brand root's seo sidecar, whose root IS that layer's `seo` section, so it
+ * merges and is judged exactly like the base.
+ * @param {string|null} basePath - The brand root's omega.json5 path, or null to read none.
+ * @returns {{ path: string|null, layer: object|null }} The sidecar's path and its
+ *   `{ seo }` layer, both null when there is no sidecar.
+ */
+function readSeoSidecar(basePath) {
+  const sidecarPath = basePath ? seoSidecarPath(basePath) : null;
+  if (!sidecarPath || !fs.existsSync(sidecarPath)) return { path: null, layer: null };
+
+  return { path: sidecarPath, layer: { seo: readConfigFile(sidecarPath) } };
 }
 
 /**
@@ -350,30 +374,17 @@ function assertUsableRawFile(file, data) {
 }
 
 /**
- * Each layer's environment overlay (#856), read beside its own base file, plus
- * the raw-file gate every one of the six files passes. ONE copy for the two
- * readers of the chain (`loadConfig` and `composeTargetConfig`), which resolved
- * the same three paths, read the same three files and ran the same ten asserts
- * in the same order.
- *
- * An overlay is judged by the SAME hard fails as the base beside it: it is the
- * same authored file, so a secret (or a legacy targets array) in one is the
- * same defect, with the same message naming the overlay. That is why the bases
- * come in here too: the gate is one block, not two halves that can drift.
- *
- * @param {object} options - Options.
- * @param {string|null} options.companyPath - The company layer's base file.
- * @param {object|null} options.company - The parsed company layer.
- * @param {string|null} options.brandPath - The brand layer's base file.
- * @param {object|null} options.brand - The parsed brand layer.
- * @param {string|null} options.localPath - The local layer's base file.
- * @param {object|null} options.local - The parsed local layer.
- * @param {string|null} options.environment - The environment the overlays are
- *   FOR; null reads no overlay at all.
- * @returns {{ companyOverlay: object|null, brandOverlay: object|null, localOverlay: object|null }}
- *   Each layer's overlay, or null where that layer has none.
+ * Each layer's environment overlay and the brand root's seo sidecar (the brand
+ * slot from a target, the local slot with no brand above), then the raw-file
+ * gate every one of those files passes. ONE copy for both readers of the
+ * chain: an overlay or a sidecar meets the SAME hard fails as its base, so the
+ * gate is one block that cannot drift.
+ * @param {object} options - Each layer's base path (`companyPath`, `brandPath`,
+ *   `localPath`) and parsed file, and the `environment` the overlays are FOR (null reads none).
+ * @returns {{ companyOverlay: object|null, brandOverlay: object|null, localOverlay: object|null, brandSeo: object|null, localSeo: object|null }}
+ *   Each layer's overlay and `{ seo }` sidecar layer, or null where it has none.
  */
-function resolveLayerOverlays({ companyPath, company, brandPath, brand, localPath, local, environment }) {
+function resolveLayerFiles({ companyPath, company, brandPath, brand, localPath, local, environment }) {
   const companyOverlayPath = resolveOverlayPath(companyPath, environment);
   const brandOverlayPath = resolveOverlayPath(brandPath, environment);
   const localOverlayPath = resolveOverlayPath(localPath, environment);
@@ -381,10 +392,16 @@ function resolveLayerOverlays({ companyPath, company, brandPath, brand, localPat
   const companyOverlay = companyOverlayPath ? readConfigFile(companyOverlayPath) : null;
   const brandOverlay = brandOverlayPath ? readConfigFile(brandOverlayPath) : null;
   const localOverlay = localOverlayPath ? readConfigFile(localOverlayPath) : null;
+  // The sidecar is the brand root's file only: a target reads it as the brand
+  // layer, and the local layer reads it only where there is no brand above.
+  const brandSeo = readSeoSidecar(brandPath);
+  const localSeo = readSeoSidecar(brandPath ? null : localPath);
 
   assertUsableRawFile(companyPath, company);
   assertUsableRawFile(brandPath, brand);
   assertUsableRawFile(localPath, local);
+  assertUsableRawFile(brandSeo.path, brandSeo.layer);
+  assertUsableRawFile(localSeo.path, localSeo.layer);
   assertUsableRawFile(companyOverlayPath, companyOverlay);
   assertUsableRawFile(brandOverlayPath, brandOverlay);
   assertUsableRawFile(localOverlayPath, localOverlay);
@@ -393,7 +410,7 @@ function resolveLayerOverlays({ companyPath, company, brandPath, brand, localPat
   assertNoTypedCompany(companyOverlayPath, companyOverlay);
   assertNoTypedCompany(brandOverlayPath, brandOverlay);
 
-  return { companyOverlay, brandOverlay, localOverlay };
+  return { companyOverlay, brandOverlay, localOverlay, brandSeo: brandSeo.layer, localSeo: localSeo.layer };
 }
 
 /**
@@ -523,22 +540,24 @@ function loadConfig(projectDir, target, options) {
   // lazy require: env.js depends on this module (findBrandRoot)
   const { envEnvironment } = require('./env.js');
   const environment = resolveOverlayEnvironment(options.environment, envEnvironment());
-  const { companyOverlay, brandOverlay, localOverlay } = resolveLayerOverlays({
+  const { companyOverlay, brandOverlay, localOverlay, brandSeo, localSeo } = resolveLayerFiles({
     companyPath, company: company.config, brandPath, brand, localPath, local, environment,
   });
 
   const inherited = stripCompanyPlumbing(company.config);
 
   // ─── Resolve ─────────────────────────────────────────────────────────────
-  // The chain, weakest first: every layer's base file followed by its own
-  // environment overlay (#856), which beats that base and still loses to the
+  // The chain, weakest first: every layer's base file, the brand root's seo
+  // sidecar in its slot, then its overlay, which beats both and loses to the
   // layer above. Each entry contributes shared, then targets[name], below.
   const layers = [
     inherited,
     stripCompanyPlumbing(companyOverlay),
     brand,
+    brandSeo,
     brandOverlay,
     local,
+    localSeo,
     localOverlay,
   ];
 
@@ -709,18 +728,19 @@ function composeTargetConfig(projectDir, target, options) {
   const company = resolveCompany(companyHostRoot(targetRoot), brand || local);
   const companyPath = company.configFile;
 
-  // Each layer's overlay for THIS environment (#856), beside its own base file,
+  // Each layer's overlay for THIS environment and the brand root's seo sidecar,
   // read and gated by the same one helper loadConfig uses.
-  const { companyOverlay, brandOverlay, localOverlay } = resolveLayerOverlays({
+  const { companyOverlay, brandOverlay, localOverlay, brandSeo, localSeo } = resolveLayerFiles({
     companyPath, company: company.config, brandPath, brand, localPath, local, environment,
   });
 
   const inherited = stripCompanyPlumbing(company.config);
   const inheritedOverlay = stripCompanyPlumbing(companyOverlay);
 
-  // The chain, weakest first: every layer's base file followed by its own
-  // environment overlay (#856), exactly the order loadConfig folds them in.
-  const layers = [inherited, inheritedOverlay, brand, brandOverlay, local, localOverlay];
+  // The chain, weakest first: every layer's base file, the brand root's seo
+  // sidecar in its slot, then its environment overlay, exactly the order
+  // loadConfig folds them in.
+  const layers = [inherited, inheritedOverlay, brand, brandSeo, brandOverlay, local, localSeo, localOverlay];
 
   // Same collapse as loadConfig: the target dir NAMES the entry that is this
   // compose's target layer (outside a brand, the file's single target of this
@@ -749,4 +769,4 @@ function composeTargetConfig(projectDir, target, options) {
   return { config, files: { local: localPath, brand: brandPath, company: companyPath } };
 }
 
-module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, TARGET_SUBDIRS };
+module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, seoSidecarPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS, TARGET_SUBDIRS };

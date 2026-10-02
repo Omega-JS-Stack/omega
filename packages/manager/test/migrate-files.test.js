@@ -60,7 +60,7 @@ test('migrate: config/seo.json5 is read too, and an item\'s org moves to owner i
   const report = await runMigrate(brand);
   assert.match(
     block(report.text, 'config/seo.json5'),
-    /due\s+move (seo\.)?github\.content\.0\.org → (seo\.)?github\.content\.0\.owner = "Acme-Org"/,
+    /due\s+move (seo\.)?github\.content\[0\]\.org → (seo\.)?github\.content\[0\]\.owner = "Acme-Org"/,
     report.text,
   );
   assert.equal(report.code, 1);
@@ -70,6 +70,51 @@ test('migrate: config/seo.json5 is read too, and an item\'s org moves to owner i
   assert.deepEqual(JSON5.parse(written), { github: { content: [{ name: 'fixture-tool', owner: 'Acme-Org' }] } }, converted.text);
   assert.ok(written.includes('// parasite repos'), 'its comments survive');
   assert.equal(fs.readFileSync(path.join(brand, 'config', 'omega.json5'), 'utf8'), BASE, 'the brand config is untouched');
+});
+
+test('migrate: a retired path at a list position reports once, as its row, never again as a strict line', async () => {
+  const brand = stageBrand(BASE);
+  write(path.join(brand, 'config', 'seo.json5'), "{\n  github: { content: [{ name: 'fixture-tool', org: 'Acme-Org' }] },\n}\n");
+
+  const report = await runMigrate(brand);
+  const sidecar = block(report.text, 'config/seo.json5');
+  assert.match(sidecar, /due\s+move (seo\.)?github\.content\[0\]\.org → /, report.text);
+  assert.equal(sidecar.match(/content\[0\]\.org/g).length, 1, report.text);
+  assert.doesNotMatch(sidecar, /is not a key the schema declares/, report.text);
+});
+
+test('migrate: a sidecar author.token of env:NAME moves to author.tokenEnv, the name alone, comments kept', async () => {
+  const brand = stageBrand(BASE);
+  const sidecar = path.join(brand, 'config', 'seo.json5');
+  write(sidecar, "{\n  // parasite repos\n  github: {\n    content: [\n      { name: 'fixture-tool', author: { token: 'env:GH_SOCK' } },\n    ],\n  },\n}\n");
+
+  const report = await runMigrate(brand);
+  assert.ok(
+    block(report.text, 'config/seo.json5').includes('move seo.github.content[0].author.token → seo.github.content[0].author.tokenEnv = "GH_SOCK"'),
+    report.text,
+  );
+
+  const converted = await runMigrate(brand, { execute: true });
+  const written = fs.readFileSync(sidecar, 'utf8');
+  assert.deepEqual(JSON5.parse(written), { github: { content: [{ name: 'fixture-tool', author: { tokenEnv: 'GH_SOCK' } }] } }, converted.text);
+  assert.ok(written.includes('// parasite repos'), 'its comments survive');
+});
+
+test('migrate: a literal sidecar author.token is refused, never converted, and the key stays', async () => {
+  const brand = stageBrand(BASE);
+  const sidecar = path.join(brand, 'config', 'seo.json5');
+  const source = "{\n  github: {\n    content: [\n      { name: 'fixture-tool', author: { token: 'ghp_literal' } },\n    ],\n  },\n}\n";
+  write(sidecar, source);
+  const line = 'refused seo.github.content[0].author.token: a token never lives in config; put it in .env as a variable and write author.tokenEnv: "<NAME>"';
+
+  const report = await runMigrate(brand);
+  assert.ok(block(report.text, 'config/seo.json5').includes(line), report.text);
+  assert.equal(report.code, 1);
+
+  const executed = await runMigrate(brand, { execute: true });
+  assert.ok(block(executed.text, 'config/seo.json5').includes(line), executed.text);
+  assert.equal(fs.readFileSync(sidecar, 'utf8'), source, 'the key stays');
+  assert.equal(executed.code, 1);
 });
 
 test('migrate: each target\'s .env is its own block, and a .env outside the brand is never read or written', async () => {

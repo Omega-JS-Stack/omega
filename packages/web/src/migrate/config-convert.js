@@ -399,7 +399,7 @@ function convertConfig({ jekyll, ujm, name: targetName = 'web' }) {
   // ---- secrets never land in omega.json5
   const secretPaths = findSecretKeys(omega);
   for (const dotPath of secretPaths) {
-    const segments = dotPath.split('.');
+    const segments = pathSteps(dotPath);
     const key = segments.pop();
     let node = omega;
     for (const segment of segments) node = node && node[segment];

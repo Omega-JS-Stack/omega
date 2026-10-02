@@ -13,7 +13,7 @@ const path = require('node:path');
 const { folder, git, quietly, pluginInstalled } = require('./lib/onboard-seams.js');
 require('@omega.js/devkit/test/temp-home');
 
-const { ENV_SCHEMA } = require('@omega.js/config');
+const { ENV_SCHEMA, loadConfig } = require('@omega.js/config');
 const { runOnboard } = require('../src/onboard.js');
 const { brandState: readBrandState, STATES } = require('../src/lib/brand-state.js');
 const { toolProbe } = require('./lib/tool-probe.js');
@@ -225,6 +225,12 @@ test('#1031 case 6: a brand config with a retired key is legacy, and the next co
 test('#1056: a seo sidecar item carrying the retired org is legacy, its file read as the seo section', async () => {
   const root = await completeBrand();
   fs.writeFileSync(path.join(root, 'config', 'seo.json5'), "{ github: { content: [{ name: 'tool', org: 'Acme-Org' }] } }\n");
+
+  // The load itself refuses the item now, before any service runs
+  assert.ok(
+    loadConfig(root).errors.includes('config.seo.github.content[0].org is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)'),
+    'the brand load names the item by its position',
+  );
 
   const report = await brandState(root);
 

@@ -56,7 +56,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   marketing:      { campaigns: { enabled, providers: { sendgrid: { listId, groups: { orders, hello, account, marketing, security, newsletter, internal } } } }, newsletter: { enabled, providers: { beehiiv: { publicationId } }, content: […] }, prune: { enabled } },   // #425: each role names its vendor as a KEY under `providers`; `enabled` and the newsletter `content` PIPELINE blob stay role-level. `prune` is ON by default (Ian 2026-08-22, #478) and per-brand disableable: docs/backend/marketing-campaigns.md § Contact Pruning. `groups` holds the SendGrid unsubscribe (ASM) group ids — per ACCOUNT, so the campaigns service provisions them by name and writes the ids here (#649)
   blog:           { /* AI blog-content settings (Ghostii pipeline) */ },
   devlog:         { enabled, providers: { ghostii: { orgs, lookbackDays, … } } },   // commit-digest devlog (#553): `enabled: true` PUBLISHES AI-written posts to the live site, so it is case 3 — the literal true is the only ON, absence is off, and no default is materialized
-  seo:            { github: { content: [] } },   // the manager's parasite-SEO content repos; big blocks may live in the `config/seo.json5` sidecar. The site-wide SEARCH POSTURE is NOT here: it is `targets.web.meta.index`, the same name a page writes (#564)
+  seo:            { github: { content: [] } },   // the manager's parasite-SEO content repos; big blocks may live in the `config/seo.json5` sidecar, which the loader reads as this section (same merge, same checks). The site-wide SEARCH POSTURE is NOT here: it is `targets.web.meta.index`, the same name a page writes (#564)
   dataRequest:    { /* GDPR/CCPA data-request query definitions */ },
   directory:      { enabled },                   // opt in to the manager's directory PUSH: this brand's entry into the COMPANY's brands collection (#246/#677); default off, public facts only. docs/manager/directory.md
   sponsorships:   { acceptable: [], unacceptable: [], prices: { 'guest-post': 70, 'link-insertion': 50 } },   // sponsorship terms — the first directory BLOCK; `prices` is an open placement→USD map, not an enum
@@ -89,8 +89,10 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 `loadConfig(projectDir, target, { defaults })` produces ONE resolved object per target:
 
 ```
-schema defaults ← framework defaults ← company ← company.<environment> ← brand shared ← brand targets[name] ← brand.<environment> ← local shared ← local targets[name] ← local.<environment>
+schema defaults ← framework defaults ← company ← company.<environment> ← brand shared ← brand targets[name] ← brand root config/seo.json5 ← brand.<environment> ← local shared ← local targets[name] ← root config/seo.json5 (no brand layer) ← local.<environment>
 ```
+
+The brand root's `config/seo.json5` is the brand's `seo` section: the loader reads it with the same merge and the same two checks as the brand root's `omega.json5`, right after it. From a target it is the brand layer's; at the brand root, or in a standalone project, it is the local layer's. A target's own `config/seo.json5` is not a layer and is never read.
 
 - **The bottom layer is the SCHEMA's own defaults** ([#478](https://github.com/Omega-JS-Stack/omega/issues/478)) —
   see [Defaults & self-healing](#defaults--self-healing) below. `options.defaults` sits directly
@@ -1047,15 +1049,16 @@ per path, so a brand sees each key it has to move or delete:
 config.<path> is not a key the schema declares. Remove it, or if it is a legacy key run `npx omega migrate` at the brand root (report) and `--execute` to convert (docs/shared/config.md → Validation)
 ```
 
-The line has one home, the validator's exported `undeclaredLine(path)`: the loader prints it,
-and so does the manager's seo service, which runs the same strict check (`undeclaredPaths`) on
-the `seo` section merged with its `config/seo.json5` sidecar before any API call, since the
-sidecar never passes through the loader.
+The line has one home, the validator's exported `undeclaredLine(path)`, and the loader prints
+it for every file it reads, the `config/seo.json5` sidecar included: the loader reads that file
+as its layer's `seo` section, so the sidecar meets the strict check exactly like the base file.
 
 **A list with keys declared below it is walked item by item.** Rules spell an item's keys with
 the list position left out (`seo.github.content.owner`), and the check walks each plain-object
 item of such a list, so the reported path carries the position:
-`config.seo.github.content[0].org`. A list with nothing declared below it (`payment.products`,
+`config.seo.github.content[0].org`, the one spelling of a list position on every line (the
+secret line, the strict line, the migrate report) and in the editor's path argument, where a
+bare `.0` step is a key named `0`, never a position. A list with nothing declared below it (`payment.products`,
 `account.admins`) stays one value, as do its items, and an item that is not a plain object
 (a `purgecss.safelist` string) is never walked.
 
@@ -1711,7 +1714,7 @@ the Beehiiv publication, Stripe/PayPal product IDs, the Firebase SDK config.
 existing leaves get their value span replaced; missing branches insert as one property
 before the containing object's closing brace (matching indent; house style: unquoted
 keys, JSON.stringify strings, trailing commas). Every byte outside the edited spans
-survives. Paths take dots, numeric array indexes, and `[key=value]` matchers that select
+survives. Paths take dots, `[0]` positions, and `[key=value]` matchers that select
 an array element by its own key — `payment.products[id=plus].stripe.productId` — so
 writes self-locate in the file being edited instead of trusting an index computed from a
 merged config. Array elements are never created.
@@ -1808,7 +1811,7 @@ people toward. Same for `google`/`meta` under `analytics.providers`.
 
 **`omega migrate --execute` at the brand root deletes them** ([#612](https://github.com/Omega-JS-Stack/omega/issues/612)): both halves of the
 list, from every authored omega file (the brand's `config/omega.json5` and its environment
-overlays, the `config/seo.json5` sidecar read as the `seo` section, each target's own file
+overlays, the `config/seo.json5` sidecar the loader reads as the `seo` section, each target's own file
 and its overlays, one report block each), through the
 comment-preserving editor (`removeConfigFileValues`):
 the key, its subtree, and the comment documenting it, with every other byte untouched. One line
@@ -2114,6 +2117,7 @@ const {
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   overlayPath,         // (basePath, environment) → the abs omega.<environment>.json5 beside that base, existing or not: the ONE spelling of an overlay file (the loader and the migrate config pass both name it through here)
+  seoSidecarPath,      // (basePath) → the abs seo.json5 beside that base, existing or not: the ONE spelling of the sidecar (the loader and the migrate config pass both name it through here)
   getEnabledTargets,   // (config) → ['web', 'backend', …]
   findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one target dir (THE hierarchy rule)
   findBrandConfigPath, // (projectDir) → the BRAND layer's omega.json5 | null — the file a target with no local-layer file rides
@@ -2142,7 +2146,9 @@ const {
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
   resolvedBrandHost,   // (config) → the BRAND's own host (`brand.url`, top-level `url` only as fallback), lowercased | '' — authDomain validation AND every persona address (#708)
-  findSecretKeys,      // (object) → dot-paths of secret-shaped keys
+  findSecretKeys,      // (object) → paths of secret-shaped keys, a list position `[0]`
+  keyPath, itemPath,   // (parent, key) / (parent, index) → the one spelling of a config path (`seo.github.content[0].org`)
+  pathSteps, spellSteps, // path ↔ steps, a list position a number step: the one parser and its inverse
   chosenProvider,      // (role.providers) → the picked provider name | null — presence is the pick, `false` the off switch (#425)
   backendProjectType,  // (targets.backend | resolved backend config) → 'firebase' | 'custom' — how the backend runs (#584)
   BACKEND_PROJECT_TYPES,

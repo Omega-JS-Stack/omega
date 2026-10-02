@@ -9,6 +9,8 @@
  * API key is public) all fail to match.
  */
 
+const { keyPath, itemPath } = require('./paths.js');
+
 // Suffix-anchored shapes: *secret / *password / *token / *credential(s) /
 // secretKey / secret_key / privateKey / private_key (+ _id — the pasted
 // service-account JSON classic). Public credentials stay non-matching by
@@ -17,7 +19,7 @@ const SECRET_KEY_PATTERN = /(secret|password|passwd|token|credentials?|(secret|p
 
 function walk(node, path, found) {
   if (Array.isArray(node)) {
-    node.forEach((item, index) => walk(item, path ? `${path}.${index}` : String(index), found));
+    node.forEach((item, index) => walk(item, itemPath(path, index), found));
     return;
   }
 
@@ -26,20 +28,20 @@ function walk(node, path, found) {
   }
 
   Object.keys(node).forEach((key) => {
-    const keyPath = path ? `${path}.${key}` : key;
+    const childPath = keyPath(path, key);
 
     if (SECRET_KEY_PATTERN.test(key)) {
-      found.push(keyPath);
+      found.push(childPath);
     }
 
-    walk(node[key], keyPath, found);
+    walk(node[key], childPath, found);
   });
 }
 
 /**
  * Recursively find config keys whose names look like secrets.
  * @param {object} object - Parsed config (or any sub-tree of one).
- * @returns {string[]} Dot-paths of offending keys (array indices included).
+ * @returns {string[]} Paths of offending keys (array indices included, `list[0]`).
  */
 function findSecretKeys(object) {
   const found = [];

@@ -24,8 +24,9 @@ const { clientConfig, CLIENT_FACT_KEYS } = require('./client-config.js');
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { chosenProvider } = require('./providers.js');
-const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, pathSteps, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
-const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
+const { validateConfig, undeclaredPaths, undeclaredAuthoredPaths, undeclaredLine, runSchema, formatErrors, resolvedBrandHost } = require('./validate.js');
+const { keyPath, itemPath, pathSteps, spellSteps } = require('./paths.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, overlayPath, seoSidecarPath, getEnabledTargets, findBrandRoot, findBrandConfigPath, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { ENV_ENVIRONMENTS, ENVIRONMENT_VAR, getEnvironment, isDevelopment, isProduction, isTesting, setEnvironment, buildLaneEnvironment } = require('./environment.js');
 const { loadEnv, reloadEnv, envEnvironment, resolveEnvChain, envLayerFiles, loadEnvChain, loadEnvRoots, applyDeliverAs, composeTargetEnv, assertEnvReadsBack, envLine, serializeEnv } = require('./env.js');
 const { ENV_SCHEMA, ENV_GROUPS, DELIVERY_MODES, envFileGroups, envSchemaEntry, envKeysForTarget, generatedEnvKeys, envKeysByGroup } = require('./env-schema.js');
@@ -58,6 +59,7 @@ module.exports = {
   hasOmegaConfig,
   resolveConfigPath,
   overlayPath,
+  seoSidecarPath,
   getEnabledTargets,
   findBrandRoot,
   findBrandConfigPath,
@@ -278,9 +280,14 @@ module.exports = {
   undeclaredPaths,
   undeclaredAuthoredPaths,
   undeclaredLine,
-  pathSteps,
   runSchema,
   formatErrors,
+
+  // The one spelling of a config path, and its one parser
+  keyPath,
+  itemPath,
+  pathSteps,
+  spellSteps,
 
   // The brand's own HOST, resolved from a target `url` or `brand.url`, the
   // ONE derivation of it ([#708](https://github.com/Omega-JS-Stack/omega/issues/708)):

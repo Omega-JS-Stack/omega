@@ -10,8 +10,8 @@ const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const JSON5 = require('json5');
 
-const { ENV_ENVIRONMENTS, FILE_NAME, overlayPath, TARGETS, removeConfigFileValues, writeConfigFileValues, undeclaredAuthoredPaths, pathSteps } = require('@omega.js/config');
-const { findRetiredKeys } = require('./retired-keys.js');
+const { ENV_ENVIRONMENTS, FILE_NAME, overlayPath, seoSidecarPath, TARGETS, removeConfigFileValues, writeConfigFileValues, undeclaredAuthoredPaths, pathSteps, spellSteps } = require('@omega.js/config');
+const { findRetiredKeys, ConvertRefused } = require('./retired-keys.js');
 
 /**
  * One layer's omega files, present or not: its base, then one overlay per environment.
@@ -35,7 +35,7 @@ function authoredConfigFiles(baseFile, targets) {
   const layer = (dir, target) => layerFiles(dir)
     .filter((file) => fs.existsSync(file))
     .map((file) => ({ file, target }));
-  const seoFile = path.join(path.dirname(baseFile), 'seo.json5');
+  const seoFile = seoSidecarPath(baseFile);
 
   return [
     ...layer(path.dirname(baseFile)),
@@ -68,7 +68,7 @@ function readAuthoredConfig({ file, section }) {
 function migrateConfigFile({ file, target, section }, execute) {
   const result = { due: [], changed: [], errors: [], undeclared: 0 };
   const read = () => readAuthoredConfig({ file, section });
-  const inFile = (dotted) => (section ? dotted.slice(section.length + 1) : dotted);
+  const inFile = (spelled) => (section ? spellSteps(pathSteps(spelled).slice(1)) : spelled);
   let config;
 
   try {
@@ -97,7 +97,15 @@ function migrateConfigFile({ file, target, section }, execute) {
     // A brand that started the move by hand carries both keys: the row is
     // refused whole, so the converted old setting never replaces the new one.
     const to = convertedPath(finding);
-    const value = finding.convert(valueAt(config, finding.path));
+    let value;
+    try {
+      value = finding.convert(valueAt(config, finding.path));
+    } catch (e) {
+      if (!(e instanceof ConvertRefused)) throw e;
+      refused.add(finding);
+      result.errors.push(`refused ${finding.path}: ${e.message}`);
+      continue;
+    }
     const present = valueAt(config, to);
     if (present !== undefined && !isDeepStrictEqual(present, value)) {
       refused.add(finding);
@@ -117,15 +125,11 @@ function migrateConfigFile({ file, target, section }, execute) {
   }
 
   // Judged after converting, so the residue is what the brand still owes; a
-  // path a reported row covers is that row's line, never a second one (the
-  // strict check spells a list position `[0]`, a row's path `.0`)
+  // path a reported row covers is that row's line, never a second one
   const covered = findings.filter((finding) => !execute || refused.has(finding)).map((finding) => finding.path);
   const residue = undeclaredAuthoredPaths(config, { target })
-    .filter((spelled) => {
-      const dotted = pathSteps(spelled).join('.');
-      return !covered.some((row) => dotted === row || dotted.startsWith(`${row}.`));
-    });
-  result.due.push(...residue.map((dotted) => `config.${dotted} is not a key the schema declares; remove it by hand`));
+    .filter((spelled) => !covered.some((row) => spelled === row || spelled.startsWith(`${row}.`) || spelled.startsWith(`${row}[`)));
+  result.due.push(...residue.map((spelled) => `config.${spelled} is not a key the schema declares; remove it by hand`));
   result.undeclared = residue.length;
 
   return result;
@@ -139,21 +143,21 @@ function migrateConfigFile({ file, target, section }, execute) {
  * @returns {string}
  */
 function convertedPath(finding) {
-  const steps = finding.path.split('.');
+  const steps = pathSteps(finding.path);
   steps[steps.length - 1] = finding.replacement.split('.').pop();
 
-  return steps.join('.');
+  return spellSteps(steps);
 }
 
 /**
- * Read a dot-path off the parsed config. The path came from the walk that
- * found it, so every step exists.
+ * Read a path off the parsed config. The path came from the walk that found
+ * it, so every step exists.
  * @param {object} config
- * @param {string} dotted
+ * @param {string} spelled - e.g. 'seo.github.content[0].org'.
  * @returns {*}
  */
-function valueAt(config, dotted) {
-  return dotted.split('.').reduce((node, key) => (node == null ? undefined : node[key]), config);
+function valueAt(config, spelled) {
+  return pathSteps(spelled).reduce((node, step) => (node == null ? undefined : node[step]), config);
 }
 
 module.exports = { layerFiles, authoredConfigFiles, readAuthoredConfig, migrateConfigFile };
